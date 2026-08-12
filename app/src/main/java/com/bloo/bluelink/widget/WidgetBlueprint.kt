@@ -461,6 +461,30 @@ internal object WidgetBlueprint {
         val ringCandidate = minOf(heroH, innerW)
         val sideBySide = !controls && grid.rows in 2..3 && grid.cols >= 4 &&
             innerW >= 240.dp && heroH < MIN_RING
+        // A direct read of the GRID shape, not a derived band ratio -- "wide but not
+        // tall", in the words this was reported in. RING_ASPECT below answers a related
+        // but narrower question (is the HERO BAND's own reserved height a meaningful
+        // fraction of the tile's width), and it is derived from the allocator's slack
+        // split, which several sizes' worth of hand-verification already showed can
+        // clear that ratio while the tile is still visibly landscape overall -- the
+        // band ratio and "does this look wide" are not the same test. `wideNotTall`
+        // is: more columns than rows means more width to spend than height, full
+        // stop, independent of how the allocator happened to split that height up.
+        //
+        // Deliberately NOT applied to the `sideBySide` ring branch immediately below.
+        // `sideBySide` shapes (7x2/7x3) are wide-not-tall by this same definition, but
+        // that branch answers a different question than RING_ASPECT/the fallback below
+        // do: `blueprint.sideBySide` also picks the whole tile's ARRANGEMENT (see
+        // WidgetCanvas's SideBySide composable) -- hero in a narrow side column beside
+        // the text, not a hero band stacked above other rows -- and a wide horizontal
+        // BAR does not fit a narrow side column at all. Blocking ring there without
+        // giving the side-by-side arrangement anything else that fits would resurrect
+        // the exact blank-tile bug this branch exists to prevent, just via LINE/NONE
+        // this time instead of ring never being reachable. The reported "wide but not
+        // tall, should be a bar" shape is the ordinary STACKED layout (header, hero,
+        // map/info, buttons each their own band) -- RING_ASPECT and the fallback below,
+        // not this one.
+        val wideNotTall = grid.cols > grid.rows
         val hero = when {
             !wantsHero || heroH <= 0.dp -> Hero.NONE
             // Side-by-side gives the hero the ROW's height, not the band's, so
@@ -494,12 +518,25 @@ internal object WidgetBlueprint {
             // own axis instead of fighting it, the same reasoning RING_ASPECT already
             // uses for the width axis generally, just forced whenever a map is also on
             // the tile rather than left to the aspect ratio alone.
-            ringCandidate >= RING_WORTH_IT && heroH >= innerW * RING_ASPECT && !wantsMap -> Hero.RING
+            // `!wideNotTall` on top: this branch's own ratio check can still pass on a
+            // tile that is nonetheless landscape overall (see the val's own comment),
+            // and "wide but not tall, should be a bar not a circle" was reported
+            // against exactly that -- a size where the per-band math said ring but the
+            // tile plainly wasn't square-ish or taller-than-wide.
+            ringCandidate >= RING_WORTH_IT && heroH >= innerW * RING_ASPECT && !wantsMap && !wideNotTall -> Hero.RING
             heroH >= minBarHero(size, ts) -> Hero.BAR
             // Below the bar's floor a small ring still beats a bare text line: it is
             // the last thing that reads as a GAUGE, and MIN_RING is exactly the point
-            // where it stops being one.
-            ringCandidate >= MIN_RING -> Hero.RING
+            // where it stops being one -- UNLESS the tile has a map or is wide-not-tall,
+            // in which case the fallback below (LINE, or NONE) is preferred over a ring
+            // for the same reason as every other branch here: this shape doesn't get a
+            // circle. This was the branch that actually broke the FIRST fix: it had no
+            // `!wantsMap` guard at all when the RING_ASPECT branch above gained one, so
+            // a small map-bearing tile whose hero band fell short of the bar's floor
+            // still fell through to a ring here regardless of the map -- a size where
+            // the branch above genuinely didn't apply, not a slim margin on the ratio
+            // check, sailed straight past it into this one.
+            ringCandidate >= MIN_RING && !wantsMap && !wideNotTall -> Hero.RING
             heroH >= minLineHero(size, ts) -> Hero.LINE
             else -> Hero.NONE
         }

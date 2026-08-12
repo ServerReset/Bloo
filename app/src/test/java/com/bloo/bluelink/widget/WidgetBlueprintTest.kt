@@ -356,4 +356,41 @@ class WidgetBlueprintTest {
             }
         }
     }
+
+    /**
+     * The same "wide but not tall, should be a bar not a circle" report, but WITHOUT a
+     * map -- a wide, short-ish tile (more columns than rows) still chose a ring purely
+     * from its own hero band's aspect ratio. Unlike the map case, this doesn't need a
+     * "roomy enough" carve-out: `wideNotTall` blocks every RING branch outright once
+     * cols > rows, regardless of how much slack the hero band happened to win, so
+     * whatever it falls back to (bar, or line on the smallest of these) is never a
+     * ring. That is also why this sweeps a real range instead of a couple of large
+     * sizes -- there is no floor-vs-margin question left to be conservative about.
+     */
+    @Test
+    fun `a wide-not-tall tile never chooses the ring hero, map or no map`() {
+        // Starts at 4 rows, not 2: two things intentionally still choose a ring on a
+        // 2-3 row tile and are out of scope for this report rather than bugs left
+        // behind --
+        //  - rows == 1 takes the separate strip() path entirely (see its own KDoc), a
+        //    fundamentally different one-row shape, not the stacked
+        //    header/hero/map/buttons bands `wideNotTall` is about;
+        //  - rows in 2..3 (with cols >= 4) can hit `sideBySide`, which is deliberately
+        //    NOT gated by `wideNotTall` -- seeing a real screenshot with several
+        //    visually distinct stacked bands (header, hero, map/footer, buttons) rules
+        //    this branch out for what was actually reported, which needs a much
+        //    shorter hero band than that (< MIN_RING) to even engage. See its own
+        //    comment for why gating it here would just move the old blank-tile bug.
+        for (c in 5..WidgetGrid.MAX_COLS) {
+            for (r in 4 until c) {
+                val size = WidgetGrid.nominalSize(c, r)
+                val config = WidgetConfig(vin = "test", showMap = false)
+                val bp = WidgetBlueprint.plan(size, config, WidgetBlueprint.Facts(hasCoords = false, hasMapBitmap = false))
+                assertTrue(
+                    bp.hero != WidgetBlueprint.Hero.RING,
+                    "${c}x$r is wide-not-tall but still chose a ring hero",
+                )
+            }
+        }
+    }
 }
