@@ -151,20 +151,14 @@ internal fun ActionButtons(
         else ((availableWidth - gap * (actions.size - 1)) / actions.size).coerceAtLeast(0.dp)
     val labelStyle = buttonLabelStyle(render.theme)
     val labelRoom = perButton - (Scale.buttonIcon(size) + 14.dp)
-    // AUTO keeps the original all-or-nothing room check: label only when the row
-    // (or stack) is tall enough AND every configured button's own longest label
-    // actually fits. ALWAYS/OFF are a user override of that judgement -- ALWAYS is
-    // still safe to force even on a cramped tile because ActionButton renders the
-    // label through FitLine now, not a bare Text, so a forced label SHRINKS to the
-    // real per-button room rather than running past the button's edge (RemoteViews
-    // doesn't clip). OFF just skips the room math entirely.
-    val roomForLabels = (if (stack) stackHeight else rowHeight) >= 36.dp &&
+    // Always automatic now -- the ALWAYS/OFF override options were removed from
+    // WidgetConfigActivity's picker on request. Label only when the row (or stack)
+    // is tall enough AND every configured button's own longest label actually fits;
+    // an icon alone is a guess (a snowflake could be climate, defrost, or "cool the
+    // battery"), which is why this still tries to show one whenever there's real
+    // room for it, rather than defaulting to icon-only.
+    val showLabels = (if (stack) stackHeight else rowHeight) >= 36.dp &&
         actions.all { !wouldOverflow(it.label, labelStyle, labelRoom) }
-    val showLabels = when (render.config.buttonLabels) {
-        WidgetConfig.BUTTON_LABELS_ALWAYS -> true
-        WidgetConfig.BUTTON_LABELS_OFF -> false
-        else -> roomForLabels
-    }
     // Centred both ways. When a layout hands ActionButtons the whole tile
     // -- the controls-priority tiers, where the buttons ARE the widget --
     // the block belongs in the middle of it, not against the top-left.
@@ -322,18 +316,17 @@ internal fun ActionButton(
                     modifier = GlanceModifier.size(iconSize),
                 )
                 Spacer(GlanceModifier.width(6.dp))
-                // FitLine, not a bare Text: BUTTON_LABELS_ALWAYS forces showLabel
-                // true regardless of ActionButtons' own room check, so this has to
-                // be the one thing in the file that CAN'T overflow -- it shrinks
-                // the label to labelMaxWidth instead, the same fallback chain every
-                // other label in the widget already trusts (RemoteViews doesn't
-                // clip, so "forced on" and "silently unreadable" are the same bug
-                // if this were still a plain Text).
+                // FitLine, not a bare Text: even the automatic room check above is an
+                // ESTIMATE (wouldOverflow), not a guarantee, so this has to be the one
+                // thing in the file that CAN'T overflow -- it shrinks the label to
+                // labelMaxWidth instead, the same fallback chain every other label in
+                // the widget already trusts (RemoteViews doesn't clip, so "estimated
+                // to fit" and "silently unreadable" would otherwise be the same bug).
                 // allowStack = false: a button label is a word ("Climate"), and a word stacked
                     // one letter per row inside a pill is unreadable. If it will not fit
-                    // even relaxed, the label yields and the icon stands alone -- which is
-                    // exactly what BUTTON_LABELS_OFF looks like, and a button that still
-                    // works beats a button wearing a column of letters.
+                    // even relaxed, the label yields and the icon stands alone rather
+                    // than wearing a column of letters -- a button that still works
+                    // beats one that doesn't.
                     FitLine(
                         action.label, labelStyle, labelMaxWidth, GlanceModifier,
                         Alignment.Start, allowStack = false,

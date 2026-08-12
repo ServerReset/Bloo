@@ -312,7 +312,18 @@ internal object WidgetBlueprint {
         // a bar actually needs (minBarHero), and blocking ring left nothing to fall
         // back to. Reserving the bar's own floor from the start means the allocator
         // doesn't have to get lucky with slack for this shape to get its gauge.
-        val wideNotTall = grid.cols > grid.rows
+        //
+        // Reads the real measured `size.width`/`size.height` now, not `grid.cols` vs
+        // `grid.rows`. Grid-cell counts round the real measurement to the nearest whole
+        // cell on WidgetGrid's own NOMINAL 70n-30 scale, which is deliberately robust to
+        // launcher cell-pitch variance for classifying which layout shape applies -- but
+        // that same rounding means two grids can differ by one cell either way from a
+        // launcher's real px, and a tile that is genuinely wider than tall in actual
+        // measured dp can still round to cols == rows or even cols < rows. Reported a
+        // second time on a real device after the cols/rows version shipped: still a
+        // ring on a tile that visibly reads as wider than tall. The real dimensions
+        // don't have that rounding ambiguity.
+        val wideNotTall = size.width > size.height
 
         // Priority order. Controls-priority promotes the buttons above the
         // hero and the info stack, but never above a minimal hero: a

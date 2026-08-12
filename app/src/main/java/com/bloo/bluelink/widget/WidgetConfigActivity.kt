@@ -132,7 +132,6 @@ private fun ConfigScreen(
     var showMap by remember { mutableStateOf(initial.showMap) }
     var photoBackground by remember { mutableStateOf(initial.photoBackground) }
     var priority by remember { mutableStateOf(initial.priority) }
-    var buttonLabels by remember { mutableStateOf(initial.buttonLabels) }
     // effectiveCorner, not corner, so a widget set up before this picker
     // existed opens showing the pill it is actually rendering.
     var corner by remember { mutableStateOf(initial.effectiveCorner) }
@@ -205,26 +204,9 @@ private fun ConfigScreen(
                 }
             }
 
-            // --- Button labels (both modes) ---
-            Spacer(Modifier.height(16.dp))
-            SectionLabel("Button labels")
-            Text(
-                "An icon alone is a guess -- Auto names each button whenever every one of " +
-                    "them has room; Always keeps the name even on a tight tile by shrinking " +
-                    "it to fit; Off shows icons only.",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            Spacer(Modifier.height(6.dp))
-            MorphSegmented(
-                options = listOf(
-                    SegmentOption(WidgetConfig.BUTTON_LABELS_AUTO, "Auto", null),
-                    SegmentOption(WidgetConfig.BUTTON_LABELS_ALWAYS, "Always", null),
-                    SegmentOption(WidgetConfig.BUTTON_LABELS_OFF, "Off", null),
-                ),
-                selectedKey = buttonLabels,
-                onSelect = { buttonLabels = it },
-            )
+            // Button labels used to be a user-facing Auto/Always/Off picker here. Removed
+            // on request -- it's automatic now (WidgetButtons.ActionButtons' own room
+            // check), the same behavior AUTO always was, with no override to configure.
 
             // --- Small-size priority (both modes) ---
             Spacer(Modifier.height(16.dp))
@@ -369,7 +351,6 @@ private fun ConfigScreen(
                             showMap = showMap,
                             photoBackground = photoBackground,
                             priority = priority,
-                            buttonLabels = buttonLabels,
                             // The picker fully supersedes the old boolean, so
                             // it's written false here and `corner` is the only
                             // source of truth from this point on -- leaving it
