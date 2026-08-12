@@ -31,11 +31,13 @@ interface VehicleRepository {
 
 /**
  * Build the right repository for a brand. Kia US rides a different backend
- * ([KiaRepository]); Hyundai/Genesis share the Hyundai-shaped [BlueLinkApi].
+ * ([KiaRepository]); the three Canada brands share [CanadaApi]; Europe (CCS2)
+ * rides [EuApi]; Hyundai/Genesis US share the Hyundai-shaped [BlueLinkApi].
  */
 fun repositoryFor(brand: Brand, store: SessionStore, credentials: CredentialStore): VehicleRepository = when {
     brand == Brand.KIA -> KiaRepository(KiaUsaApi(), store, credentials)
     brand.isCanada -> CanadaRepository(CanadaApi(brand), store, brand, credentials)
+    brand.isEurope -> EuRepository(EuApi(brand), store, brand, credentials)
     else -> BlueLinkRepository(BlueLinkApi(brand), store, brand)
 }
 

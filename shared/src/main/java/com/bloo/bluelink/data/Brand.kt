@@ -90,6 +90,29 @@ enum class Brand(
         clientId = "HATAHSPACA0232141ED9722C67715A0B",
         clientSecret = "CLISCR01AHSPA",
         label = "Kia (Canada)",
+    ),
+
+    /**
+     * Hyundai Bluelink Europe on the CCAPI ("CCS2") platform, served by
+     * [EuApi]/[EuRepository]. Kia Connect EU and Genesis EU ride the SAME
+     * backend family (different host + client only) — exactly like the three
+     * Canada brands share [CanadaApi] — so they can later be added as sibling
+     * entries here with no new API code. Only Hyundai EU is shipped/verified now.
+     *
+     * clientSecret (and the stamp CFB seed in [EuStamp]) are community-derived
+     * and rotate with Hyundai's app; correct them here / in [EuStamp] in one
+     * place if EU sign-in starts failing. `baseUrl` keeps the non-standard :8080
+     * port the CCAPI is served on.
+     */
+    HYUNDAI_EU(
+        code = "HEU",
+        baseUrl = "https://prd.eu-ccapi.hyundai.com:8080",
+        host = "prd.eu-ccapi.hyundai.com",
+        clientId = "6d477c38-3ca4-4cf3-9557-2a1929a94654",
+        // From hyundai_kia_connect_api KiaUvoApiEU.py (Hyundai EU). base64("$clientId:$clientSecret")
+        // reproduces that project's hard-coded BASIC_AUTHORIZATION token (see EuApi.login).
+        clientSecret = "KUy49XxPzLpLuoK0xhBC77W6VXhmtQR9iQhmIFjjoY4IpxsV",
+        label = "Hyundai (Europe)",
     );
 
     /** False only for Kia US, whose commands aren't PIN-gated at all; every
@@ -117,6 +140,10 @@ enum class Brand(
      */
     val supportsChargeLimits: Boolean get() = !isCanada
 
+    /** True for the Europe (CCAPI/CCS2) brands, served by [EuApi]/[EuRepository].
+     *  Only Hyundai EU today; Kia/Genesis EU would join this check. */
+    val isEurope: Boolean get() = this == HYUNDAI_EU
+
     companion object {
         // Looks up an enum entry by its exact `name` (e.g. "KIA"); falls back to
         // HYUNDAI (the original, pre-multi-brand default) if `name` is null or
@@ -137,6 +164,7 @@ enum class Brand(
             indicator == HYUNDAI_CA.code -> HYUNDAI_CA
             indicator == GENESIS_CA.code -> GENESIS_CA
             indicator == KIA_CA.code -> KIA_CA
+            indicator == HYUNDAI_EU.code -> HYUNDAI_EU
             indicator.equals("G", ignoreCase = true) -> GENESIS
             indicator.equals("K", ignoreCase = true) -> KIA
             else -> HYUNDAI
@@ -255,6 +283,21 @@ val Brand.links: BrandLinks
             roadsidePhone = "8664445421",
             storeUrl = "https://owners.kia.com/us/en/kiaConnectStore/themes.html",
         )
+        // Europe: pan-European owner portal (country is chosen on the site). No
+        // single EU roadside number (it's per-country), so it's left blank —
+        // callers already guard empty phone strings. The Play Store package is
+        // the European Bluelink app, distinct from the US "com.stationdm.bluelink".
+        Brand.HYUNDAI_EU -> BrandLinks(
+            appPackage = "com.hyundai.bluelink.eu",
+            appName = "Bluelink",
+            ownersUrl = "https://www.hyundai.com/eu/en/owners.html",
+            dealerLabel = "Find a dealer",
+            dealerUrl = "https://www.hyundai.com/eu/en/find-a-dealer.html",
+            manualsUrl = "https://www.hyundai.com/eu/en/owners/e-manual.html",
+            serviceScheduleUrl = "https://www.hyundai.com/eu/en/owners/book-a-service.html",
+            roadsidePhone = "",
+            storeUrl = "https://www.hyundai.com/eu/en/owners.html",
+        )
     }
 
 /**
@@ -265,7 +308,7 @@ val Brand.links: BrandLinks
  * so Kia stays eligible and the store page itself gates by VIN.
  */
 val Vehicle.supportsConnectedStore: Boolean
-    get() = brand == Brand.KIA || (!brand.isCanada && (generation.trim().toIntOrNull() ?: 0) >= 3)
+    get() = brand == Brand.KIA || (!brand.isCanada && !brand.isEurope && (generation.trim().toIntOrNull() ?: 0) >= 3)
 
 /**
  * Whether this car is an older Gen5W (pre-ccNC) Hyundai/Genesis head unit —
@@ -274,7 +317,7 @@ val Vehicle.supportsConnectedStore: Boolean
  * ccNC, i.e. NOT Gen5W) when the value is missing/unparseable.
  */
 val Vehicle.isGen5W: Boolean
-    get() = brand != Brand.KIA && !brand.isCanada && (generation.trim().toIntOrNull() ?: 3) < 3
+    get() = brand != Brand.KIA && !brand.isCanada && !brand.isEurope && (generation.trim().toIntOrNull() ?: 3) < 3
 
 /** Horn & Lights / Flash Lights (rcs/rhl/light, rcs/rhl/hnl) exist on the
  *  Hyundai/Genesis US telematics API this app already uses for lock/unlock;
@@ -282,4 +325,4 @@ val Vehicle.isGen5W: Boolean
  *  was found in the Canada backend either ([CanadaApi] only exposes
  *  lock/unlock/climate/charge). */
 val Vehicle.supportsHornLights: Boolean
-    get() = brand != Brand.KIA && !brand.isCanada
+    get() = brand != Brand.KIA && !brand.isCanada && !brand.isEurope
