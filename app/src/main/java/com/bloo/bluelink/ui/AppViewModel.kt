@@ -43,6 +43,7 @@ import com.bloo.bluelink.data.EvTrip
 import com.bloo.bluelink.data.GeoLocation
 import com.bloo.bluelink.data.Powertrain
 import com.bloo.bluelink.data.isGen5W
+import com.bloo.bluelink.data.brand
 import com.bloo.bluelink.data.SeatConfig
 import com.bloo.bluelink.data.SessionStore
 import com.bloo.bluelink.data.SettingsStore
@@ -336,10 +337,17 @@ data class UiState(
         if (isPebbleHidden(v.vin, section)) return false
         return when (section) {
             "ai" -> aiEnabled
-            // The trip-details feed is EV-only, and Gen5W head units don't serve it at
-            // all, so TripsPebble would render nothing -- leaving a phantom slot with a
-            // spacedBy gap on either side of it.
-            "trips" -> hasBattery(v) && !v.isGen5W
+            // The trip-details feed is EV-only, Gen5W head units don't serve it at all,
+            // and only Hyundai/Genesis US actually has the endpoint (see
+            // Brand.supportsTrips) -- Kia US, every Canada brand and Europe all route
+            // to repositories with no trips() override, so they'd render nothing too.
+            // On the phone that leaves a phantom slot with a spacedBy gap on either
+            // side of it; on the cover screen's swipeable pager it is worse -- a
+            // completely blank page a user can swipe straight into, with the page-dots
+            // rail still showing a dot for it. TripsPebble's own `!v.brand.supportsTrips
+            // -> return` guard only stops it from drawing anything, not from being
+            // offered a slot in the first place.
+            "trips" -> hasBattery(v) && !v.isGen5W && v.brand.supportsTrips
             // `!updateTileDismissed` too: UpdateAvailableTile renders nothing once dismissed,
             // so the section stayed "available" and left a zero-height slot with a spacedBy gap
             // on either side of it -- the same phantom-slot shape the "trips" line above

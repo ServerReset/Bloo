@@ -59,6 +59,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.animation.core.snap
@@ -2875,39 +2876,17 @@ private fun coverScaled(base: Dp, refWidthDp: Float = 280f): Dp {
     return base * factor
 }
 
-/**
- * Per-edge camera-bump clearance for the cover screen, in dp, computed from the
- * display cutout's bounding rects. Returns how much each edge must be reserved so
- * content flows AROUND the punch-hole/bump instead of under it.
- *
- * Why this exists alongside the native WindowInsets.displayCutout padding: on
- * Samsung flip COVER displays the OS frequently reports the front camera via
- * displayCutout.boundingRects (which is why the decorative ring positions
- * correctly) but exposes ZERO safeInset/displayCutout WINDOW insets for it — so
- * windowInsetsPadding(displayCutout) alone reserves nothing and content sits under
- * the bump (observed on the user's device). This reads the rects directly (each
- * call, not a remember(view) snapshot, so it reflects insets once dispatched).
- *
- * CRITICAL for a CORNER bump: PaddingValues insets a WHOLE edge, so reserving both
- * edges a corner bump touches removes an L-shaped chunk from two full sides — for a
- * bottom-right bump that's a full-HEIGHT right strip ~45% of the width, which
- * crushed every tile's content into the left half (observed: values wrapping
- * "Locke/d"/"Runnin/g", range clipped to "26…"). A corner bump only occludes its
- * corner, so we reserve only the edge with the SMALLER intrusion — for a bottom-
- * right bump that's the bump's HEIGHT (small), pushing content up just enough to
- * clear it while reclaiming the full width. A true single-edge cutout still pads
- * that one edge. Only a bump within [edgeBandPx] of an edge counts.
- */
-@Composable
-private fun cameraBumpPadding(): PaddingValues {
-    // Delegates to cutoutClearanceDp() (the generalized, corner-safe implementation)
-    // and just rewraps its per-edge EdgeDp into PaddingValues — the two used to carry
-    // byte-identical cutout math, which meant any fix to the corner-bump rule had to be
-    // made in both. One source of truth now.
-    val e = cutoutClearanceDp()
-    return PaddingValues(start = e.start.dp, top = e.top.dp, end = e.end.dp, bottom = e.bottom.dp)
-}
-
+// (cameraBumpPadding removed: it was a thin PaddingValues-rewrap of
+// cutoutClearanceDp()'s own EdgeDp, and its one remaining caller,
+// CoverManageOnPhoneCard, has moved onto CoverScaffold -- which already calls
+// cutoutClearanceDp() directly and merges it with every other inset source via
+// max(), not additively. The "why does this exist at all" explanation that used
+// to live on this wrapper (Samsung flip COVER displays reporting the front
+// camera via displayCutout.boundingRects but exposing zero WINDOW insets for
+// it, so windowInsetsPadding(displayCutout) alone reserves nothing and content
+// sits under the bump) now lives on [cutoutClearanceDp] itself, the function
+// that actually does the work.
+//
 // (CameraEdge / cameraEdgeOf removed: cover-screen cutout avoidance is now driven
 // by native WindowInsets.displayCutout — corner-safe and recomposition-aware —
 // rather than hand-picking a single edge from a boundingRect margin comparison.)
@@ -3497,9 +3476,20 @@ private val LocalCoverMetrics = staticCompositionLocalOf<CoverMetrics?> { null }
 /** Below this (shorter usable side, dp) the cover is "tiny" — trim to essentials. */
 private const val COVER_TINY_DP = 300f
 
-/** Horizontal content inset for cover pebbles — one value shared by the scrolling body
- *  and the pinned action button in [PebbleShell]'s fillHeight branch, so they can't drift. */
-private val CoverContentInset = 16.dp
+/**
+ * Horizontal content inset for cover pebbles.
+ *
+ * The one real consumer of [CoverMetrics.isTiny] -- [LocalCoverMetrics] was provided by
+ * [CoverScaffold] and documented at length ("everything is derived from the REAL
+ * available space... rather than cramming against fixed assumptions"), but nothing
+ * actually read `isTiny` anywhere; every cover dimension was a flat constant
+ * regardless of how small the measured region came out. This trims the inset by 4dp
+ * on a tiny cover, which is a real fraction of a screen whose shorter usable side is
+ * already under 300dp -- a fixed 16dp on both sides was costing that tile
+ * proportionally more room than the same inset costs a larger cover.
+ */
+@Composable
+private fun coverContentInset(): Dp = if (LocalCoverMetrics.current?.isTiny == true) 12.dp else 16.dp
 
 /** True inside a [CoverTile]'s body, i.e. below a title band that already
  *  shows the page's icon and name. [CoverHero] reads it to avoid drawing that
@@ -3627,7 +3617,7 @@ private fun CoverTile(
             contentColor = contentColorFor(containerColor),
         ),
     ) {
-        Column(Modifier.fillMaxSize().padding(horizontal = CoverContentInset)) {
+        Column(Modifier.fillMaxSize().padding(horizontal = coverContentInset())) {
             Spacer(Modifier.height(14.dp))
             Row(
                 verticalAlignment = Alignment.CenterVertically,
@@ -3794,12 +3784,24 @@ private fun RowScope.CoverActionBar(v: Vehicle, state: UiState, vm: AppViewModel
         )
     }
     if (v.supportsHornLights) {
+        // One button doing double duty rather than a fifth icon squeezed into an
+        // already-tight row on a ~1-inch cover: tap for the combined "Horn &
+        // lights" the main phone UI leads with, long-press for lights-only --
+        // silent, useful for finding a car in a dark lot without honking. The
+        // main phone screen offers both as separate buttons in a group
+        // (PrimaryActions); flashLights had no cover-screen path at all before
+        // this, reported as a real feature gap. Long-press is already an
+        // established cover gesture (the tile-scrubber rail, the edge-trace
+        // refresh), so this isn't a new interaction language for the surface.
         CoverActionButton(
             icon = Icons.Filled.Campaign,
             label = "Horn",
+            // Both flashLights and hornAndLights run under the same "hornLights"
+            // pending key (AppViewModel), so one check covers either.
             pending = state.isPending(v.vin, "hornLights"),
             enabled = enabled,
             onClick = { vm.hornAndLights(v) },
+            onLongClick = { vm.flashLights(v) },
         )
     }
 }
@@ -3816,6 +3818,10 @@ private fun RowScope.CoverActionButton(
     attention: Boolean = false,
     pending: Boolean = false,
     enabled: Boolean = true,
+    // A second action on the same button, reached by holding rather than
+    // tapping -- null for every caller but the horn/flash one. Kept optional
+    // rather than every button growing a second gesture it has no use for.
+    onLongClick: (() -> Unit)? = null,
 ) {
     val scheme = MaterialTheme.colorScheme
     val haptics = LocalHaptics.current
@@ -3843,7 +3849,11 @@ private fun RowScope.CoverActionButton(
             .height(56.dp)
             .alpha(if (enabled) 1f else 0.45f)
             .clip(RoundedCornerShape(16.dp))
-            .clickable(enabled = enabled && !pending) { haptics?.click(); onClick() },
+            .combinedClickable(
+                enabled = enabled && !pending,
+                onLongClick = onLongClick?.let { fn -> { haptics?.tick(); fn() } },
+                onClick = { haptics?.click(); onClick() },
+            ),
         shape = RoundedCornerShape(16.dp),
         color = container,
         contentColor = content,
@@ -3882,12 +3892,27 @@ private const val MAX_CUTOUT_FRACTION = 0.22f
 
 /**
  * Per-edge camera-bump clearance in dp, computed from the display cutout rects for
- * ANY bump position. This is the generalized, corner-safe successor to the old
- * cameraBumpPadding: for a CORNER bump (rect hugging one horizontal AND one
- * vertical edge) it reserves ONLY the shallower-intruding axis — so a bottom-right
- * bump pushes content up by its (small) height instead of carving a full-height
- * strip off the width. A true single-edge notch pads just that edge. Returns
- * (start, top, end, bottom) in dp; zeros pre-API-28 or with no cutout.
+ * ANY bump position. Returns how much each edge must be reserved so content flows
+ * AROUND the punch-hole/bump instead of under it: (start, top, end, bottom) in dp,
+ * zeros pre-API-28 or with no cutout.
+ *
+ * Why this exists alongside the native WindowInsets.displayCutout padding: on
+ * Samsung flip COVER displays the OS frequently reports the front camera via
+ * displayCutout.boundingRects (which is why the decorative ring positions
+ * correctly) but exposes ZERO safeInset/displayCutout WINDOW insets for it — so
+ * windowInsetsPadding(displayCutout) alone reserves nothing and content sits under
+ * the bump (observed on the user's device). This reads the rects directly (each
+ * call, not a remember(view) snapshot, so it reflects insets once dispatched).
+ *
+ * CRITICAL for a CORNER bump: PaddingValues insets a WHOLE edge, so reserving both
+ * edges a corner bump touches removes an L-shaped chunk from two full sides — for a
+ * bottom-right bump that's a full-HEIGHT right strip ~45% of the width, which
+ * crushed every tile's content into the left half (observed: values wrapping
+ * "Locke/d"/"Runnin/g", range clipped to "26…"). A corner bump only occludes its
+ * corner, so this reserves only the edge with the SMALLER intrusion — for a
+ * bottom-right bump that's the bump's HEIGHT (small), pushing content up just
+ * enough to clear it while reclaiming the full width. A true single-edge cutout
+ * still pads that one edge. Only a bump within [edgeBandPx] of an edge counts.
  */
 private data class EdgeDp(val start: Float, val top: Float, val end: Float, val bottom: Float)
 
@@ -4074,16 +4099,25 @@ private fun CoverScaffold(
  * (search + keyboard, photo pickers/crop, drag-reorder lists, sign-out) is
  * unusable on a ~1-inch flip cover, so on the cover we route here instead (see
  * BlooApp) — a single centered card telling the user to unfold / open Bloo on the
- * phone, with one Back button. Corner-safe via [cameraBumpPadding] + nav insets.
+ * phone, with one Back button.
+ *
+ * Routed through [CoverScaffold] for its corner-safe padding, not a hand-rolled
+ * stack of its own -- this used to chain `.windowInsetsPadding(navigationBars +
+ * displayCutout)` and `.padding(cameraBumpPadding())` as two separate, ADDITIVE
+ * modifiers (plus a third gutter padding on top). That is exactly the
+ * double-reservation CoverScaffold's own doc explains at length: on a device
+ * where both the window-inset channel and the boundingRect-derived clearance
+ * report the same camera bump, this card reserved it twice -- "the 'crammed
+ * into the left half' bug", on the one screen every cover user reaches when
+ * they try to open Settings.
  */
 @Composable
 private fun CoverManageOnPhoneCard(vm: AppViewModel) {
+    CoverScaffold(reserveRailGutter = false) { metrics ->
     Box(
         Modifier
             .fillMaxSize()
-            .windowInsetsPadding(WindowInsets.navigationBars.union(WindowInsets.displayCutout))
-            .padding(cameraBumpPadding())
-            .padding(coverScaled(16.dp)),
+            .padding(metrics.contentPadding),
         contentAlignment = Alignment.Center,
     ) {
         Surface(
@@ -4111,6 +4145,7 @@ private fun CoverManageOnPhoneCard(vm: AppViewModel) {
                 MorphTextButton("Back", onClick = vm::closeSettings, modifier = Modifier.fillMaxWidth())
             }
         }
+    }
     }
 }
 
@@ -10812,7 +10847,6 @@ private fun ChargePebble(v: Vehicle, status: VehicleStatus?, enabled: Boolean, s
                 onApply = { vm.setChargeLimits(v, acLimit, dcLimit) },
             )
         }
-        // The charge-port toggle lives in the controls pebble, next to lock/unlock.
     }
 }
 
