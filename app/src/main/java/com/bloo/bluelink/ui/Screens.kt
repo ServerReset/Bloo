@@ -5187,25 +5187,61 @@ private fun HeroHeader(
                         .matchParentSize()
                         .onGloballyPositioned { cardCoords.value = it },
                 )
+                // Captured here (composable context) rather than inside the slide
+                // transitions' offset lambdas below, which run outside composition.
+                val heroPhotoDensity = LocalDensity.current
                 AnimatedVisibility(
                     visible = photoExpanded,
-                    // The shared collapse spec PLUS a settle: the photo eases up from 92%
-                    // as it unfolds, so it reads as arriving rather than as a window being
-                    // cranked open. scaleIn/Out is on the SPATIAL spec because scale is a
-                    // spatial property, which also means it shares physics with the height
-                    // change it rides on instead of being a second, differently-timed
-                    // animation laid over it.
+                    // The shared collapse spec (fade + the container's own height reveal)
+                    // PLUS a slide-and-settle for the photo itself. This used to be a
+                    // scaleIn/Out from 92%/94% on the same non-bouncy spec the container's
+                    // own height uses -- an 8% scale change finishing at the same rate as
+                    // the reveal it rides inside reads as the photo simply FILLING IN as
+                    // the card grows, not as an object arriving on its own. Reported as
+                    // "pops in" from a real device.
+                    //
+                    // The entrance spring is deliberately UNDER-damped
+                    // (Spring.DampingRatioLowBouncy < 1): it overshoots its target and
+                    // settles back, which is what makes this a bounce and not just a
+                    // faster ease. The exit stays on the non-bouncy default spec --
+                    // a bounce reads as arrival, not departure; overshooting on the
+                    // way OUT would look like the photo hesitating before it leaves.
+                    // slideInVertically travels a real distance (HeroPhotoSlideDistance)
+                    // rather than a subtle scale nudge, so the photo visibly arrives FROM
+                    // somewhere instead of blooming in place. Scale rides the same spring
+                    // as the slide on each side, so the two read as one physical motion
+                    // rather than two differently-timed effects layered on top of each
+                    // other.
                     //
                     // Only the hero does this. A pebble body sliding open is content
-                    // appearing; a photo is an object, and objects settle.
-                    enter = collapseEnter() + scaleIn(
-                        initialScale = 0.92f,
-                        animationSpec = MaterialTheme.motionScheme.defaultSpatialSpec(),
-                    ),
-                    exit = collapseExit() + scaleOut(
-                        targetScale = 0.94f,
-                        animationSpec = MaterialTheme.motionScheme.defaultSpatialSpec(),
-                    ),
+                    // appearing; a photo is an object, and objects arrive and settle.
+                    //
+                    // slideInVertically's offset lambda runs outside composition (it's
+                    // called by the animation, not composed), so the px distance is
+                    // converted with a plain captured Density rather than
+                    // LocalDensity.current inside the lambda.
+                    enter = collapseEnter() +
+                        slideInVertically(
+                            animationSpec = spring(
+                                dampingRatio = Spring.DampingRatioLowBouncy,
+                                stiffness = Spring.StiffnessMediumLow,
+                            ),
+                        ) { with(heroPhotoDensity) { -HeroPhotoSlideDistance.roundToPx() } } +
+                        scaleIn(
+                            initialScale = 0.85f,
+                            animationSpec = spring(
+                                dampingRatio = Spring.DampingRatioLowBouncy,
+                                stiffness = Spring.StiffnessMediumLow,
+                            ),
+                        ),
+                    exit = collapseExit() +
+                        slideOutVertically(
+                            animationSpec = MaterialTheme.motionScheme.defaultSpatialSpec(),
+                        ) { with(heroPhotoDensity) { -HeroPhotoSlideDistance.roundToPx() } } +
+                        scaleOut(
+                            targetScale = 0.9f,
+                            animationSpec = MaterialTheme.motionScheme.defaultSpatialSpec(),
+                        ),
                 ) {
                     HeroPhotoBackdrop(v, imageUrl, height, aspectRatio = 16f / 9f)
                 }
@@ -6051,6 +6087,12 @@ private fun animatedChargeFrac(target: Float): Float {
 private val HeroDropEasing = CubicBezierEasing(0.05f, 0.7f, 0.1f, 1f)
 private val HeroBounceEasing = CubicBezierEasing(0.34f, 1.56f, 0.64f, 1f)
 private const val HeroSideDelay = 0.25f
+
+/** How far above its resting position the hero photo starts (entrance) / travels to
+ *  (exit) -- see the AnimatedVisibility wrapping [HeroPhotoBackdrop]. Real enough to
+ *  read as arriving from somewhere, short enough that it doesn't fight the card's own
+ *  height reveal for what the eye follows. */
+private val HeroPhotoSlideDistance = 28.dp
 
 /**
  * The COLLAPSED percentage and range, drawn as trailing content on the pebble's own title Row.
