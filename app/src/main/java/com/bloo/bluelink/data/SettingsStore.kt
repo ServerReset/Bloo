@@ -185,6 +185,16 @@ class SettingsStore(private val context: Context) {
         val PEBBLE_OUTLINE = stringPreferencesKey("pebble_outline")
         val SHOW_SEARCH = stringPreferencesKey("show_search")
         val SEAMLESS_INSTALL_SHIZUKU = stringPreferencesKey("seamless_install_shizuku")
+        // Fractions (0f..1f) of the cover screen's own drag range, not raw dp -- the
+        // physical cover display doesn't change size between sessions, but a fraction
+        // still degrades gracefully if it ever did, where a raw dp coordinate could
+        // clamp to a corner it wasn't actually dropped near. Kept OUT of the Appearance
+        // bundle deliberately: that flow is collected by most of the app's UI (theme,
+        // colors, ...), so writing to it on every drag delta -- which this needs to
+        // survive a killed process, not just a rotation -- would recompose far more
+        // than a floating circle's own position ever should.
+        val SEARCH_BUBBLE_X = stringPreferencesKey("search_bubble_x")
+        val SEARCH_BUBBLE_Y = stringPreferencesKey("search_bubble_y")
         val AURORA = stringPreferencesKey("aurora_background")
         val AURORA_MOTION = stringPreferencesKey("aurora_motion")
         val AURORA_COLOR_MODE = stringPreferencesKey("aurora_color_mode")
@@ -474,6 +484,30 @@ class SettingsStore(private val context: Context) {
         editTracked {
             val k = stringPreferencesKey("door_since_$vin")
             if (value == null) it.remove(k) else it[k] = value.toString()
+        }
+    }
+
+    /**
+     * Where the user last parked the cover screen's floating search bubble, as
+     * fractions (0f..1f) of its own drag range -- null until it has been dragged
+     * at least once. A plain one-shot suspend read, not a collected Flow: the
+     * bubble's own composable seeds itself from this once (see SearchLayer),
+     * it does not need to react live to a value only that same composable ever
+     * writes.
+     */
+    suspend fun searchBubblePosition(): Pair<Float, Float>? {
+        val prefs = context.settingsDataStore.data.first()
+        val x = prefs[Keys.SEARCH_BUBBLE_X]?.toFloatOrNull() ?: return null
+        val y = prefs[Keys.SEARCH_BUBBLE_Y]?.toFloatOrNull() ?: return null
+        return x to y
+    }
+
+    /** Persists the bubble's resting fractions -- called once per drag gesture
+     *  (on release), not per frame, from SearchLayer's onDragEnd. */
+    suspend fun setSearchBubblePosition(xFrac: Float, yFrac: Float) {
+        editTracked {
+            it[Keys.SEARCH_BUBBLE_X] = xFrac.toString()
+            it[Keys.SEARCH_BUBBLE_Y] = yFrac.toString()
         }
     }
 

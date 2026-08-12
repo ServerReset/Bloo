@@ -2374,21 +2374,6 @@ internal fun SearchLayer(
     // not worth a runtime "no Saver found" on some Compose version.
     var dragX by rememberSaveable { mutableStateOf(Float.NaN) }
     var dragY by rememberSaveable { mutableStateOf(Float.NaN) }
-    // Cleared the moment flip mode is LEFT (compact goes false), not on every
-    // recomposition -- dragging still survives a rotation or a recomposition
-    // while still folded, which is the memory the comment above is about. What
-    // it doesn't survive is unfolding: reported as "drag it, go back to normal,
-    // fold again -- it isn't on the edge any more" when it stayed missing.
-    // dragX/dragY are already gated to compact-only for READING (see bubbleX/Y
-    // below), so a stale value here was invisible on the phone screen but still
-    // sitting there for the next fold to pick back up -- the edge was never
-    // actually restored, just hidden until flip mode came back.
-    LaunchedEffect(compact) {
-        if (!compact) {
-            dragX = Float.NaN
-            dragY = Float.NaN
-        }
-    }
     // True only between finger-down and finger-up on the bubble. The position
     // animation is BYPASSED while it is true -- see the spec choice below.
     var dragging by remember { mutableStateOf(false) }
@@ -2449,6 +2434,26 @@ internal fun SearchLayer(
         val maxY = (maxHeight - bubble - edge - bottomInset).coerceAtLeast(edge)
         val restX = maxX
         val restY = maxY
+        // Restore the user's last-parked spot from durable storage, once -- if this
+        // composition doesn't already have one in memory. rememberSaveable's dragX/
+        // dragY survive a LIVE session (rotation, a mode switch while the process
+        // stays alive), but not a killed-and-restarted process, which is routine for
+        // a flip phone that's been closed a while: reported as "drag it, leave flip
+        // mode, come back -- it's not where I put it", which a purely in-memory Saver
+        // can't fix on its own. Stored and restored as FRACTIONS of the drag range
+        // (see SettingsStore's own doc), not raw dp, so this stays correct even if
+        // minX/maxX/minY/maxY come out slightly different than when it was saved.
+        // Plain arithmetic lerp rather than androidx.compose.ui.unit.lerp: this file
+        // already imports a same-named lerp for TextStyle, and importing both would
+        // collide.
+        LaunchedEffect(Unit) {
+            if (dragX.isNaN()) {
+                vm.searchBubblePosition()?.let { (xFrac, yFrac) ->
+                    dragX = (minX + (maxX - minX) * xFrac).value
+                    dragY = (minY + (maxY - minY) * yFrac).value
+                }
+            }
+        }
         // dragX/dragY are ONLY consulted in compact (flip) mode. They are one
         // shared pair of saved floats -- dragging is only possible in flip
         // mode, but before this gate the normal-mode bubble read the exact
@@ -2635,6 +2640,18 @@ internal fun SearchLayer(
                         nearest == toTop -> dragY = minY.value
                         else -> dragY = maxY.value
                     }
+                    // Persisted durably (see SettingsStore.setSearchBubblePosition),
+                    // not just left in rememberSaveable -- once per gesture release,
+                    // not per drag frame. Guarded against a zero-width/height range
+                    // (a degenerate tiny screen) rather than dividing by it.
+                    val spanX = (maxX - minX).value
+                    val spanY = (maxY - minY).value
+                    if (spanX > 0f && spanY > 0f) {
+                        vm.setSearchBubblePosition(
+                            ((dragX - minX.value) / spanX).coerceIn(0f, 1f),
+                            ((dragY - minY.value) / spanY).coerceIn(0f, 1f),
+                        )
+                    }
                 }
                 dragging = false
                 haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
@@ -2729,28 +2746,24 @@ private fun SearchPill(
             // a photo hero picks up whatever is behind it and stops looking
             // like a control at all; at this size there is not enough of it for
             // the glass effect to read as glass.
-            // A collapsed pill gets a filled tonal container and its matching
-            // content colour. It used to be a near-transparent surface with a
-            // hairline and onSurfaceVariant text, which on a dark settings
-            // screen is a grey word inside a grey outline -- indistinguishable
-            // from a disabled control, which is what the screenshot showed.
-            color = when {
-                form == SearchForm.PILL && !expanded -> scheme.secondaryContainer
-                // compact keeps its own override -- the 40dp cover-screen circle this
-                // comment describes -- everything else now takes the shared default
-                // rather than its own hand-picked 0.86, which had no comment of its
-                // own explaining why it differed from every other floating surface.
-                else -> scheme.surfaceContainerHighest.copy(
-                    alpha = if (compact) glassContainerAlpha(0.97f) else glassContainerAlpha(),
-                )
-            },
-            contentColor = if (form == SearchForm.PILL && !expanded) {
-                scheme.onSecondaryContainer
-            } else {
-                scheme.onSurface
-            },
+            //
+            // The Settings-screen collapsed pill (form == PILL && !expanded) used to
+            // get its own opaque tonal container (secondaryContainer/onSecondaryContainer,
+            // no border) instead of this standard frosted fill -- reported as an
+            // inconsistent, different-looking search control on that one screen.
+            // The original reason for the override no longer applies: it was fixed
+            // there because a near-transparent surface with a hairline and
+            // onSurfaceVariant text read as "indistinguishable from a disabled
+            // control", but the standard treatment below already reads onSurface
+            // (not the dimmer onSurfaceVariant) with a visible gradient-lit border --
+            // the same legibility fix, just applied consistently instead of as a
+            // one-screen special case.
+            color = scheme.surfaceContainerHighest.copy(
+                alpha = if (compact) glassContainerAlpha(0.97f) else glassContainerAlpha(),
+            ),
+            contentColor = scheme.onSurface,
             tonalElevation = if (expanded) 10.dp else 6.dp,
-            border = if (form == SearchForm.PILL && !expanded) null else BorderStroke(
+            border = BorderStroke(
                 if (expanded) 1.5.dp else 1.dp,
                 // Static. This is an argument to Surface, i.e. COMPOSITION
                 // scope -- it used to multiply in glowPulse, which meant every

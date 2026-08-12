@@ -3444,6 +3444,12 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     fun setPebbleOutline(value: Boolean) = viewModelScope.launch { settingsStore.setPebbleOutline(value) }
     fun setShowSearch(value: Boolean) = viewModelScope.launch { settingsStore.setShowSearch(value) }
 
+    /** Where the cover screen's floating search bubble was last dragged to (fractions
+     *  of its own drag range), or null if never dragged. See SettingsStore's own doc. */
+    suspend fun searchBubblePosition(): Pair<Float, Float>? = settingsStore.searchBubblePosition()
+    fun setSearchBubblePosition(xFrac: Float, yFrac: Float) =
+        viewModelScope.launch { settingsStore.setSearchBubblePosition(xFrac, yFrac) }
+
     /** Toggle the opt-in Shizuku silent-install path (device-local; see SettingsStore).
      *  Turning it ON prompts for the Shizuku permission immediately — that request is
      *  also what makes Bloo appear in the Shizuku manager's app list (declaring the
