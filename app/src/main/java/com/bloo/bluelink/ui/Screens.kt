@@ -6213,33 +6213,49 @@ private fun HeroMorphReadout(
         // title Row (see HeroCollapsedNumbers), because that is the only way to guarantee they sit
         // on the name's line -- so this copy must be invisible until that one has gone, or both
         // are on screen at once and the morph reads as a double image.
-        Row(
+        //
+        // BoxWithConstraints, not Row directly, so this anchor can hand HeroNumbers its own
+        // measured width. Before the travelling overlay has anchors from BOTH ends to lerp
+        // between (see `hoisted` below), THIS row is what's actually on screen for however many
+        // frames that takes -- on a real device, the card's own size can depend on an image
+        // still loading, so cardCoords can lag well past the first frame. HeroNumbers defaults
+        // to no width, and with none its SpaceBetween arrangement has nothing to distribute
+        // across, so the percentage and range/status rendered packed together at the row's left
+        // edge -- correct for the COLLAPSED anchor (which wants exactly that, beside the car
+        // name) but wrong here, where the expanded card wants the range pinned to the right
+        // edge. Reported from a real device: range and status sat beside the percentage on the
+        // first expand and only moved once the card was closed and reopened, i.e. exactly the
+        // frames this row is the visible one rather than the overlay.
+        BoxWithConstraints(
             Modifier
                 .padding(start = numbersStart)
                 // fillMaxWidth so this anchor reports the readout's real span rather
                 // than its own wrapped content width. The overlay lerps to that
-                // width, and it is what puts the range against the right edge; a
-                // wrapped anchor would have left it packed beside the percentage.
-                // Harmless when not hoisted -- the children stay left-packed, which
-                // is exactly how this row already looked.
+                // width, and it is what puts the range against the right edge.
                 .fillMaxWidth()
                 .graphicsLayer {
                     alpha = if (numbersHoisted) 0f
                     else ((t - 0.35f) / 0.65f).coerceIn(0f, 1f)
                 }
                 .onGloballyPositioned(onNumbersPositioned),
-            verticalAlignment = Alignment.Bottom,
         ) {
-            // ONE definition of the numbers, shared with the collapsed anchor and the
-            // travelling overlay -- see [HeroNumbers]. This row's job is now only to
-            // be MEASURED: it lays the numbers out where the expanded card wants them
-            // and reports that, and the overlay draws the copy anyone actually sees.
-            //
-            // Rendering the same composable here rather than a hand-kept twin is what
-            // makes the anchor trustworthy: if this drew a different size from the
-            // overlay, the interpolation would be between two points that describe
-            // different things, and the numbers would drift as the card opened.
-            HeroNumbers(data, t)
+            Row(verticalAlignment = Alignment.Bottom) {
+                // ONE definition of the numbers, shared with the collapsed anchor and the
+                // travelling overlay -- see [HeroNumbers]. This row's job is now only to
+                // be MEASURED: it lays the numbers out where the expanded card wants them
+                // and reports that, and the overlay draws the copy anyone actually sees.
+                //
+                // Rendering the same composable here rather than a hand-kept twin is what
+                // makes the anchor trustworthy: if this drew a different size from the
+                // overlay, the interpolation would be between two points that describe
+                // different things, and the numbers would drift as the card opened.
+                //
+                // `width = maxWidth`, from the BoxWithConstraints above: the same width
+                // fillMaxWidth already reserved, now actually reaching HeroNumbers's own
+                // SpaceBetween Row so it can push the range right BEFORE the overlay takes
+                // over, not only after.
+                HeroNumbers(data, t, width = maxWidth)
+            }
         }
         // Plug-in hybrid's fuel tank: expanded only, same reasoning as the state line. Fades
         // in over the back half of the morph so it does not compete with the numbers growing.
