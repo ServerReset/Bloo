@@ -8,7 +8,6 @@ import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
-import androidx.compose.animation.core.tween
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 // No `motionScheme` import: it is a member of the MaterialTheme object (verified as
 // MaterialTheme.getMotionScheme in the resolved material3 AAR), as are defaultEffectsSpec
@@ -171,27 +170,21 @@ internal const val AdvancedModeStiffness = 130f
  * AnimatedVisibility can only wait for animations in its OWN Transition, so an independent
  * animation is invisible to it and its content can be removed before that one finishes.
  *
- * The fade is a plain [tween], not an effects spec, which is a deliberate departure from
- * this token's own "durations come from the theme, not invented" rule -- and the reason is
- * that rule failing this one specific case. Requested as "content should fade in as the
- * pebble uncovers it": at `defaultEffectsSpec` the fade finished well before the height
- * reveal (`defaultSpatialSpec`, longer), so whatever the growing clip boundary uncovered
- * LATE in the expansion was already close to full alpha and just appeared. Moving the fade
- * to `slowEffectsSpec` -- still a themed tier, one step up -- was tried first and reported
- * back as not actually noticeable: MotionScheme's own fast/default/slow effects tiers are
- * close enough together that "one tier slower" wasn't a visible departure from the fade
- * finishing early. [FADE_MS] is picked to genuinely span close to the spatial spring's own
- * settle time instead of trusting an unmeasured theme tier to.
+ * A "content should fade in as the pebble uncovers it" step-in effect was tried here twice
+ * (first `slowEffectsSpec`, then an explicit 500ms tween) and asked to be removed after
+ * neither read as the effect wanted -- a single shared alpha for the whole revealed block
+ * can only ever make the WHOLE block dimmer-then-brighter together, never give newly
+ * uncovered content its own independent fade-in distinct from what's already visible above
+ * it, which is what "steps in as it's uncovered" actually needs. Back to the plain
+ * `defaultEffectsSpec` this token had before either attempt.
  */
-private const val FADE_MS = 500
-
 @Composable
 internal fun collapseEnter(expandFrom: Alignment.Vertical = Alignment.Top): EnterTransition =
-    fadeIn(tween(FADE_MS)) +
+    fadeIn(MaterialTheme.motionScheme.defaultEffectsSpec<Float>()) +
         expandVertically(MaterialTheme.motionScheme.defaultSpatialSpec<IntSize>(), expandFrom = expandFrom)
 
 /** Mirror of [collapseEnter]; see there for why both halves are springs. */
 @Composable
 internal fun collapseExit(shrinkTowards: Alignment.Vertical = Alignment.Top): ExitTransition =
-    fadeOut(tween(FADE_MS)) +
+    fadeOut(MaterialTheme.motionScheme.defaultEffectsSpec<Float>()) +
         shrinkVertically(MaterialTheme.motionScheme.defaultSpatialSpec<IntSize>(), shrinkTowards = shrinkTowards)

@@ -302,6 +302,17 @@ internal object WidgetBlueprint {
         val wantsMap = config.showMap && facts.hasCoords && facts.hasMapBitmap
         val wantsButtons = facts.actionCount > 0
         val wantsInfo = facts.infoFieldCount > 0
+        // Computed here, ahead of the allocator, rather than only at the hero decision
+        // further down -- see that val's own comment for what it means. Used here to
+        // give the hero band a bigger FLOOR up front on a wide-not-tall tile, not just
+        // a bigger weighted share of whatever slack happens to be left over: reported
+        // twice now, first as a ring where a bar belonged, then -- after ring was
+        // simply blocked without this -- as no gauge at all, because the ordinary
+        // floor (minLineHero) plus a weighted slice of slack often lands short of what
+        // a bar actually needs (minBarHero), and blocking ring left nothing to fall
+        // back to. Reserving the bar's own floor from the start means the allocator
+        // doesn't have to get lucky with slack for this shape to get its gauge.
+        val wideNotTall = grid.cols > grid.rows
 
         // Priority order. Controls-priority promotes the buttons above the
         // hero and the info stack, but never above a minimal hero: a
@@ -360,19 +371,24 @@ internal object WidgetBlueprint {
                 (if (stacked) Scale.buttonGap(size) * (buttonRun - 1) else 0.dp) +
                 BUTTON_BREATHING
             val infoCeiling = minInfoRow(size, ts) * facts.infoFieldCount.coerceAtLeast(1)
+            // See `wideNotTall`'s own comment: on a wide-not-tall tile the hero's FLOOR
+            // is the bar's own minimum, not the plain text line's -- guaranteeing the
+            // band the allocator hands out is already enough for a bar, rather than
+            // hoping a weighted share of leftover slack happens to reach it.
+            val heroFloor = if (wideNotTall) minBarHero(size, ts) else minLineHero(size, ts)
             if (controls) {
                 if (wantsButtons) {
                     add(Want(Module.BUTTONS, minButtons(size), weight = 0.5f, max = buttonCeiling))
                 }
                 if (wantsHero) {
-                    add(Want(Module.HERO, minLineHero(size, ts), weight = 2f, max = heroCeiling))
+                    add(Want(Module.HERO, heroFloor, weight = 2f, max = heroCeiling))
                 }
                 if (wantsInfo) {
                     add(Want(Module.INFO, minInfoRow(size, ts), weight = 0.5f, max = infoCeiling))
                 }
             } else {
                 if (wantsHero) {
-                    add(Want(Module.HERO, minLineHero(size, ts), weight = 3f, max = heroCeiling))
+                    add(Want(Module.HERO, heroFloor, weight = 3f, max = heroCeiling))
                 }
                 if (wantsInfo) {
                     add(Want(Module.INFO, minInfoRow(size, ts), weight = 1f, max = infoCeiling))
@@ -461,30 +477,19 @@ internal object WidgetBlueprint {
         val ringCandidate = minOf(heroH, innerW)
         val sideBySide = !controls && grid.rows in 2..3 && grid.cols >= 4 &&
             innerW >= 240.dp && heroH < MIN_RING
-        // A direct read of the GRID shape, not a derived band ratio -- "wide but not
-        // tall", in the words this was reported in. RING_ASPECT below answers a related
-        // but narrower question (is the HERO BAND's own reserved height a meaningful
-        // fraction of the tile's width), and it is derived from the allocator's slack
-        // split, which several sizes' worth of hand-verification already showed can
-        // clear that ratio while the tile is still visibly landscape overall -- the
-        // band ratio and "does this look wide" are not the same test. `wideNotTall`
-        // is: more columns than rows means more width to spend than height, full
-        // stop, independent of how the allocator happened to split that height up.
-        //
-        // Deliberately NOT applied to the `sideBySide` ring branch immediately below.
-        // `sideBySide` shapes (7x2/7x3) are wide-not-tall by this same definition, but
-        // that branch answers a different question than RING_ASPECT/the fallback below
-        // do: `blueprint.sideBySide` also picks the whole tile's ARRANGEMENT (see
-        // WidgetCanvas's SideBySide composable) -- hero in a narrow side column beside
-        // the text, not a hero band stacked above other rows -- and a wide horizontal
-        // BAR does not fit a narrow side column at all. Blocking ring there without
-        // giving the side-by-side arrangement anything else that fits would resurrect
-        // the exact blank-tile bug this branch exists to prevent, just via LINE/NONE
-        // this time instead of ring never being reachable. The reported "wide but not
-        // tall, should be a bar" shape is the ordinary STACKED layout (header, hero,
-        // map/info, buttons each their own band) -- RING_ASPECT and the fallback below,
-        // not this one.
-        val wideNotTall = grid.cols > grid.rows
+        // `wideNotTall` (computed earlier, alongside the other `wants*` flags -- see
+        // its own comment there for the full reasoning) is deliberately NOT applied to
+        // the `sideBySide` ring branch immediately below. `sideBySide` shapes (7x2/7x3)
+        // are wide-not-tall by the same definition, but that branch answers a
+        // different question than RING_ASPECT does: `blueprint.sideBySide` also picks
+        // the whole tile's ARRANGEMENT (see WidgetCanvas's SideBySide composable) --
+        // hero in a narrow side column beside the text, not a hero band stacked above
+        // other rows -- and a wide horizontal BAR does not fit a narrow side column at
+        // all. Blocking ring there without giving the side-by-side arrangement
+        // anything else that fits would resurrect the exact blank-tile bug this branch
+        // exists to prevent. The reported "wide but not tall, should be a bar" shape
+        // is the ordinary STACKED layout (header, hero, map/info, buttons each their
+        // own band) -- RING_ASPECT below, not this one.
         val hero = when {
             !wantsHero || heroH <= 0.dp -> Hero.NONE
             // Side-by-side gives the hero the ROW's height, not the band's, so
