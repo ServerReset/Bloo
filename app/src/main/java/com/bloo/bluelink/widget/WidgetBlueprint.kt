@@ -466,7 +466,9 @@ internal object WidgetBlueprint {
             // Side-by-side gives the hero the ROW's height, not the band's, so
             // a short wide tile can still carry a real ring beside its text --
             // this is the 7x2 / 7x3 case the old widget rendered as a blank.
-            sideBySide && minOf(innerH, innerW / 3) >= MIN_RING -> Hero.RING
+            // `!wantsMap` for the same reason as the aspect-ratio branch below: a
+            // map on the same tile as a ring reads as two competing shapes.
+            sideBySide && minOf(innerH, innerW / 3) >= MIN_RING && !wantsMap -> Hero.RING
             // BEFORE the ring, not after, and the order is the whole point. A
             // ring is bounded by the NARROW axis (its diameter cannot exceed
             // innerW), so on a 60dp-wide, 300dp-tall tile it passes the 24dp ring
@@ -482,7 +484,17 @@ internal object WidgetBlueprint {
             // was describing. Requiring the band to be at least this fraction of the
             // width is what routes those shapes to the bar, which uses the axis the
             // tile actually has.
-            ringCandidate >= RING_WORTH_IT && heroH >= innerW * RING_ASPECT -> Hero.RING
+            //
+            // `!wantsMap` on top of that ratio check for the same complaint, one
+            // shape further: a map already draws a wide horizontal band right below
+            // the hero, so a ring above it reads as two competing round-vs-rectangular
+            // shapes stacked on each other, and the ring is the smaller, weaker one --
+            // "should be a bar not a circle for this layout", reported against exactly
+            // this shape (hero + range row + map + buttons). The bar shares the map's
+            // own axis instead of fighting it, the same reasoning RING_ASPECT already
+            // uses for the width axis generally, just forced whenever a map is also on
+            // the tile rather than left to the aspect ratio alone.
+            ringCandidate >= RING_WORTH_IT && heroH >= innerW * RING_ASPECT && !wantsMap -> Hero.RING
             heroH >= minBarHero(size, ts) -> Hero.BAR
             // Below the bar's floor a small ring still beats a bare text line: it is
             // the last thing that reads as a GAUGE, and MIN_RING is exactly the point

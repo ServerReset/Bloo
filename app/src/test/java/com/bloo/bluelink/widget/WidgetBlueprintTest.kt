@@ -320,4 +320,31 @@ class WidgetBlueprintTest {
             )
         }
     }
+
+    /**
+     * Reported from a real device: a tile with a map already drawn below the hero
+     * still chose a ring, which reads as two competing round-vs-rectangular shapes
+     * stacked on top of each other -- "should be a bar not a circle for this layout".
+     *
+     * Only the mid-to-large sizes here, deliberately, not the full sweep: a ring is
+     * still the right call once the hero band is too short even for the bar's own
+     * floor (a small ring beats a bare text line, same reasoning as when there's no
+     * map at all), which a couple of the smallest grid sizes with a map still hit.
+     * These sizes -- roomy enough for header, hero, map and buttons together, which
+     * is exactly the shape reported -- have no such excuse, so BAR must win outright.
+     */
+    @Test
+    fun `a roomy tile with a map picks the bar hero, not a ring`() {
+        for (c in 4..WidgetGrid.MAX_COLS) {
+            for (r in 3..WidgetGrid.MAX_ROWS) {
+                val size = WidgetGrid.nominalSize(c, r)
+                val config = WidgetConfig(vin = "test", showMap = true)
+                val bp = WidgetBlueprint.plan(size, config, WidgetBlueprint.Facts())
+                assertTrue(
+                    bp.hero != WidgetBlueprint.Hero.RING,
+                    "${c}x$r has a map and room to spare but still chose a ring hero",
+                )
+            }
+        }
+    }
 }
