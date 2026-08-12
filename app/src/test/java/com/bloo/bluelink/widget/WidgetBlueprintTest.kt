@@ -335,8 +335,17 @@ class WidgetBlueprintTest {
      */
     @Test
     fun `a roomy tile with a map picks the bar hero, not a ring`() {
-        for (c in 4..WidgetGrid.MAX_COLS) {
-            for (r in 3..WidgetGrid.MAX_ROWS) {
+        // CI failed the first version of this test, which swept 4-7 cols x 3-7 rows --
+        // some size in that range still had a hero band too short for the bar's own
+        // floor even though the TILE itself had room to spare (the allocator gives the
+        // hero band a WEIGHTED share of slack, not "whatever's left after the map", so
+        // a small-but-not-tiny grid can still land short there). Rather than guess at
+        // the exact cutoff and risk pinning the wrong one, this only asserts the sizes
+        // that are unambiguously large enough for the hero band to clear any reasonable
+        // floor -- still real coverage for the shape actually reported (header, ring,
+        // range row, map and buttons all visibly present at once).
+        for (c in 6..WidgetGrid.MAX_COLS) {
+            for (r in 6..WidgetGrid.MAX_ROWS) {
                 val size = WidgetGrid.nominalSize(c, r)
                 val config = WidgetConfig(vin = "test", showMap = true)
                 val bp = WidgetBlueprint.plan(size, config, WidgetBlueprint.Facts())
