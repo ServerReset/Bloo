@@ -3598,6 +3598,14 @@ private fun CoverTile(
     containerColor: Color = MaterialTheme.colorScheme.surfaceVariant,
     scrollState: ScrollState? = null,
     actions: (@Composable RowScope.() -> Unit)? = null,
+    // Drawn BEHIND the title/body/actions, inside the card's own clip -- the same
+    // slot PebbleShell's own `background` is for the phone hero, and for the same
+    // reason: CoverMainTile uses this for a full-bleed car photo. Whatever's here
+    // is responsible for its own legibility (see titleColor/iconTint below); null
+    // for every other tile, so nothing else pays for the extra Box.
+    background: (@Composable BoxScope.() -> Unit)? = null,
+    titleColor: Color = MaterialTheme.colorScheme.onSurface,
+    iconTint: Color = MaterialTheme.colorScheme.primary,
     body: @Composable ColumnScope.() -> Unit,
 ) {
     val shape = RoundedCornerShape(PebbleCornerExpanded)
@@ -3617,6 +3625,8 @@ private fun CoverTile(
             contentColor = contentColorFor(containerColor),
         ),
     ) {
+      Box(Modifier.fillMaxSize()) {
+        background?.invoke(this)
         Column(Modifier.fillMaxSize().padding(horizontal = coverContentInset())) {
             Spacer(Modifier.height(14.dp))
             Row(
@@ -3626,14 +3636,14 @@ private fun CoverTile(
                 Icon(
                     icon,
                     contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary,
+                    tint = iconTint,
                     modifier = Modifier.size(20.dp),
                 )
                 com.bloo.uicommon.FittedText(
                     text = title,
                     style = MaterialTheme.typography.titleLarge.copy(
                         fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurface,
+                        color = titleColor,
                     ),
                     modifier = Modifier.weight(1f),
                 )
@@ -3678,6 +3688,7 @@ private fun CoverTile(
                 Spacer(Modifier.height(14.dp))
             }
         }
+      }
     }
 }
 
@@ -3687,13 +3698,22 @@ private fun CoverTile(
  *
  * It replaces two separate cover pages that were each mostly empty. The old
  * home tile was the phone's HeroHeader reused verbatim -- a card built around
- * a photo, which the cover deliberately doesn't show, so it rendered a strip
- * of charge text across the top and roughly two thirds of a ~1-inch screen of
- * nothing underneath. The lock/horn controls then lived on their own second
- * page with the same emptiness under them. Neither page filled a screen; both
- * together do, and merging them means the thing you most want with the phone
- * shut -- lock state and the lock button -- is on the page it opens on rather
- * than one swipe away.
+ * a photo -- but landed on a flat gradient here instead: HeroHeader never went
+ * through PebbleShell/CoverTile's fill-height cover treatment, so its own
+ * `cover` branch stopped being reachable once this tile replaced it as the
+ * cover's actual home page, leaving that photo path built but orphaned. The
+ * lock/horn controls then lived on their own second page with the same
+ * emptiness under them. Neither page filled a screen; both together do, and
+ * merging them means the thing you most want with the phone shut -- lock
+ * state and the lock button -- is on the page it opens on rather than one
+ * swipe away.
+ *
+ * The car's photo is now this tile's own background (via CoverTile's
+ * `background` slot), full-bleed with the same scrim [HeroPhotoBackdrop]
+ * already builds for the phone hero -- reusing that composable rather than a
+ * second implementation, so the two can't drift. No photo set -> HeroVisual's
+ * own brand-gradient fallback fills the same way, so the tile is never a
+ * dead inset rectangle either way.
  *
  * The car's name leads, at headline size. It used to be a labelMedium line in
  * the shared top overlay, sharing that space with the page dots, which on this
@@ -3703,6 +3723,8 @@ private fun CoverTile(
 private fun CoverMainTile(v: Vehicle, state: UiState, vm: AppViewModel) {
     val status = state.statusFor(v)
     val metric = LocalAppearance.current.unitSystem == "metric"
+    val imageUrl = state.imageUrls[v.vin]
+    val hasPhoto = !imageUrl.isNullOrBlank()
     // The car's own name is this tile's title -- the template's title band is
     // where every other page says what it is, so the home page says which car.
     // Lock leads the subtitle because it is the reason to look at a shut
@@ -3712,13 +3734,36 @@ private fun CoverMainTile(v: Vehicle, state: UiState, vm: AppViewModel) {
         status?.doorLock?.let { if (it) "Locked" else "Unlocked" },
         if (status?.airCtrlOn == true) "Climate on" else null,
     )
+    // Same trade the phone hero makes over its own photo (HeroPhotoBackdrop's scrim
+    // is built for HeroOnPhoto text): a fixed near-white reads correctly against
+    // that scrim regardless of the photo's own brightness, where the theme's usual
+    // onSurface/error tones would not. Lock's own attention colour (error, an
+    // unlocked car) still needs to read as a WARNING over a photo, not just legible
+    // -- swapped to a fixed warm red rather than the theme's errorContainer-tuned
+    // MaterialTheme.colorScheme.error, which is calibrated against a flat surface.
+    val titleColor = if (hasPhoto) HeroOnPhoto else MaterialTheme.colorScheme.onSurface
+    val subtitleColor = when {
+        status?.doorLock == false -> if (hasPhoto) Color(0xFFFF8A80) else MaterialTheme.colorScheme.error
+        hasPhoto -> HeroOnPhoto.copy(alpha = MutedContentAlpha)
+        else -> null
+    }
     CoverTile(
         title = v.name,
         icon = Icons.Filled.DirectionsCar,
         subtitle = bits.joinToString(" · ").ifBlank { null },
-        subtitleColor = if (status?.doorLock == false) MaterialTheme.colorScheme.error else null,
+        subtitleColor = subtitleColor,
+        iconTint = if (hasPhoto) HeroOnPhoto else MaterialTheme.colorScheme.primary,
+        titleColor = titleColor,
+        background = {
+            // height is inert when fill = true -- HeroVisual only reads it in the
+            // non-fill, non-aspectRatio branch (see its own `sizeModifier` when) --
+            // so there's no real value to pass; this Box has no BoxWithConstraints
+            // scope to measure one from anyway.
+            HeroPhotoBackdrop(v, imageUrl, height = 0.dp, corner = PebbleCornerExpanded, fill = true)
+        },
         actions = { CoverActionBar(v, state, vm) },
     ) {
+        CompositionLocalProvider(LocalContentColor provides titleColor) {
         ChargeFuelBar(
             status,
             state.hasBattery(v),
@@ -3726,6 +3771,7 @@ private fun CoverMainTile(v: Vehicle, state: UiState, vm: AppViewModel) {
             state.drivingLabel(v),
             metric = metric,
         )
+        }
     }
 }
 
@@ -5547,53 +5593,13 @@ private fun HeroHeader(
         }
         return
     }
-    Card(
-        modifier = Modifier.fillMaxWidth().then(if (cover) Modifier.fillMaxHeight() else Modifier).then(dragHandle).graphicsLayer {
-            alpha = heroAlpha.value
-            // .dp.toPx() -- translationY is in pixels, so the raw 16f slid this
-            // 16px rather than the 16dp this function's own KDoc claims.
-            translationY = heroOffset.value.dp.toPx()
-        }
-            // Every other pebble gets this via the shared Pebble() wrapper --
-            // the hero card rolls its own Card and was the one card in the
-            // whole per-car stack with no shadow or rim at all. The rim half
-            // respects the same off-by-default Pebble outline setting, and
-            // uses the same bolder border Pebble() does (not frostedRim --
-            // see its comment there for why that read as "not working").
-            .dropShadow(heroShape, blurRadius = 12.dp, offsetY = 4.dp)
-            .then(
-                if (heroOutline.pebbleOutline) {
-                    Modifier.border(BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.55f)), heroShape)
-                } else Modifier,
-            ),
-        shape = heroShape,
-    ) {
-        // Cover-only from here down: the phone path returned above as a PebbleShell.
-        //
-        // Rebuilt on the SAME structure the phone's expanded hero uses -- photo as the
-        // card's background with the shared contrast scrim over it, and the readout
-        // overlaid along its lower edge -- instead of the stacked
-        // photo-then-gap-then-readout Column it was. It used to be the one hero that
-        // looked like a different design: an inset, separately-rounded photo with the
-        // numbers in a box underneath, while the phone had gone to a full-bleed image
-        // with the readout on top of it.
-        //
-        // What it deliberately does NOT share is the collapse: there is no chevron and no
-        // photoExpanded here, because a cover tile is one full-screen glance with nothing
-        // to collapse into. So it takes the expanded half of the phone's hero and stops.
-        Box(Modifier.fillMaxSize()) {
-            // Fills the tile rather than sitting at 16:9. On the phone the aspect ratio is
-            // what stops a fixed dp height from letterboxing across screen widths; here the
-            // tile's own height IS the frame, so cropping to fill it is what a full-screen
-            // glance wants. No photo set -> HeroVisual draws the brand gradient, which fills
-            // the same way, so the tile is never a dead inset rectangle.
-            HeroPhotoBackdrop(v, imageUrl, height = height, corner = corner, fill = true)
-            // Aligned to the card's own Box, exactly as the phone's expanded readout is.
-            Box(Modifier.align(Alignment.BottomStart).padding(16.dp)) {
-                ChargeFuelBar(status, hasBattery, hasFuel, drivingLabel, metric = metric)
-            }
-        }
-    }
+    // Unreachable from here down: `cover` (LocalForceExpanded) is true only on the
+    // flip cover, and the cover's home page no longer calls HeroHeader at all --
+    // CoverMainTile replaced it, including this branch's own photo-as-background
+    // treatment (see CoverMainTile's own doc for where that logic lives now). Left
+    // as a `return` above rather than restructuring this already-long function to
+    // drop the `if`, so the diff that orphaned this branch stays easy to find in
+    // history if that's ever in question.
 }
 
 /**
