@@ -6239,6 +6239,13 @@ private fun HeroMorphReadout(
                 }
                 .onGloballyPositioned(onNumbersPositioned),
         ) {
+            // Captured here, in BoxWithConstraintsScope, rather than read as `maxWidth`
+            // inside the Row below -- Row's own content lambda is a RowScope, which does
+            // not inherit BoxWithConstraintsScope's implicit receiver, so `maxWidth` there
+            // does not resolve to this constraint at all (caught by the Kotlin compiler,
+            // not by inspection: "cannot be called in this context with an implicit
+            // receiver").
+            val numbersWidth = maxWidth
             Row(verticalAlignment = Alignment.Bottom) {
                 // ONE definition of the numbers, shared with the collapsed anchor and the
                 // travelling overlay -- see [HeroNumbers]. This row's job is now only to
@@ -6250,11 +6257,11 @@ private fun HeroMorphReadout(
                 // overlay, the interpolation would be between two points that describe
                 // different things, and the numbers would drift as the card opened.
                 //
-                // `width = maxWidth`, from the BoxWithConstraints above: the same width
+                // `width = numbersWidth`, from the BoxWithConstraints above: the same width
                 // fillMaxWidth already reserved, now actually reaching HeroNumbers's own
                 // SpaceBetween Row so it can push the range right BEFORE the overlay takes
                 // over, not only after.
-                HeroNumbers(data, t, width = maxWidth)
+                HeroNumbers(data, t, width = numbersWidth)
             }
         }
         // Plug-in hybrid's fuel tank: expanded only, same reasoning as the state line. Fades
