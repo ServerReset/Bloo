@@ -3555,7 +3555,15 @@ private fun CoverHero(
             Text(
                 subline,
                 style = MaterialTheme.typography.bodyMedium,
-                color = LocalContentColor.current.copy(alpha = MutedContentAlpha),
+                // Not MutedContentAlpha (0.7): CoverHero only ever renders inside an
+                // already cover-gated branch (FuelPebble, LocationPebble,
+                // AiSummaryPebble, ...), where the ambient content color is already
+                // the dimmer onSurfaceVariant role (the pebble's default container is
+                // surfaceVariant) -- 0.7 on top compounds into the same "overly gray"
+                // pattern StatusRow's label had. This is the hero every cover page
+                // actually opens with, so it's a bigger legibility cost than a list
+                // row's label.
+                color = LocalContentColor.current.copy(alpha = 0.92f),
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
             )
@@ -6083,7 +6091,15 @@ private fun chargeReadoutOf(
         statusColor = when {
             charging -> ChargeGreen
             drivingLabel == "Driving" || drivingLabel == "Running" -> MaterialTheme.colorScheme.primary
-            else -> LocalContentColor.current.copy(alpha = MutedContentAlpha)
+            // MutedContentAlpha compounds with the cover's already-dim default
+            // container content color (surfaceVariant -> onSurfaceVariant) the same
+            // way StatusRow's label and CoverHero's subline did -- this is the idle
+            // "Battery"/"Fuel" caption directly under the headline percentage on the
+            // Charge/Fuel cover tile, high-visibility real estate for how washed out
+            // it read.
+            else -> LocalContentColor.current.copy(
+                alpha = if (LocalForceExpanded.current) 0.92f else MutedContentAlpha,
+            )
         },
         charging = charging,
         emphasizeStatus = charging || drivingLabel == "Driving",
@@ -9499,11 +9515,24 @@ private fun TripsPebble(v: Vehicle, state: UiState, vm: AppViewModel, dragHandle
 
 @Composable
 private fun TripRow(trip: EvTrip, metric: Boolean = false) {
+    // TripsPebble renders this list straight under the cover's CoverHero with no
+    // color override of its own, so every Text below inherits whatever the
+    // pebble's own container hands out -- surfaceVariant's onSurfaceVariant by
+    // default. Pinning the primary date/distance line to full onSurface (it was
+    // entirely unstyled before, not just muted) is the same "the important half
+    // shouldn't be barely distinguishable from the caption below it" fix
+    // StatusRow's own value already has.
+    val primaryColor = MaterialTheme.colorScheme.onSurface
     Column(Modifier.fillMaxWidth()) {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-            Text(tripDate(trip.startdate), style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
+            Text(
+                tripDate(trip.startdate),
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.SemiBold,
+                color = primaryColor,
+            )
             trip.distance?.let {
-                Text(formatTripDistance(it, metric), style = MaterialTheme.typography.bodyMedium)
+                Text(formatTripDistance(it, metric), style = MaterialTheme.typography.bodyMedium, color = primaryColor)
             }
         }
         val pace = remember(trip, metric) { buildList {
@@ -9518,15 +9547,24 @@ private fun TripRow(trip: EvTrip, metric: Boolean = false) {
             trip.avgspeed?.value?.let { add("avg ${formatSpeedMph(it, metric)}") }
             trip.maxspeed?.value?.let { add("max ${formatSpeedMph(it, metric)}") }
         } }
+        // Same color-role swap as DiagnosticsPebble's indented rows: onSurfaceVariant
+        // is already full-alpha as a raw color, so its dimness is the ROLE, not
+        // something an alpha bump alone would fix. Boosted on the cover, where this
+        // whole list has no other contrast handling of its own.
+        val captionColor = if (LocalForceExpanded.current) {
+            MaterialTheme.colorScheme.onSurface.copy(alpha = 0.85f)
+        } else {
+            MaterialTheme.colorScheme.onSurfaceVariant
+        }
         if (pace.isNotEmpty()) {
-            Text(pace.joinToString(" · "), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(pace.joinToString(" · "), style = MaterialTheme.typography.bodySmall, color = captionColor)
         }
         val energy = remember(trip) { buildList {
             trip.usedKwh?.let { add("$it kWh used") }
             trip.regenKwh?.takeIf { it > 0 }?.let { add("$it kWh regen") }
         } }
         if (energy.isNotEmpty()) {
-            Text(energy.joinToString(" · "), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(energy.joinToString(" · "), style = MaterialTheme.typography.bodySmall, color = captionColor)
         }
     }
 }
@@ -9898,6 +9936,23 @@ private fun DiagnosticsPebble(v: Vehicle, status: VehicleStatus?, state: UiState
         }
         rows.forEach { row ->
             if (row.indent) {
+                // DiagnosticsPebble has no cover-vs-phone split of its own -- this whole
+                // ~12-row list renders on the cover too, below the health-verdict hero.
+                // The label stayed at the fixed dim onSurfaceVariant role there, same
+                // class of issue StatusRow's label had; boosted on the cover the same
+                // way. The value used to be entirely unstyled (inheriting the pebble's
+                // own ambient onSurfaceVariant content color) rather than pinned to a
+                // legible tone the way StatusRow's own value already is -- an indented
+                // sub-row's VALUE is still the thing a user is actually checking.
+                // onSurfaceVariant is already full-alpha as a raw theme color -- its
+                // dimness is the ROLE itself (a lower-contrast RGB against the
+                // surface), not an alpha multiply, so unlike StatusRow/CoverHero this
+                // needed a color swap, not an alpha bump, to actually read stronger.
+                val indentLabelColor = if (LocalForceExpanded.current) {
+                    MaterialTheme.colorScheme.onSurface.copy(alpha = 0.85f)
+                } else {
+                    MaterialTheme.colorScheme.onSurfaceVariant
+                }
                 Row(
                     Modifier.fillMaxWidth().padding(start = 20.dp),
                     verticalAlignment = Alignment.CenterVertically,
@@ -9913,7 +9968,7 @@ private fun DiagnosticsPebble(v: Vehicle, status: VehicleStatus?, state: UiState
                         row.label,
                         Modifier.weight(1f),
                         style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        color = indentLabelColor,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
@@ -9921,6 +9976,7 @@ private fun DiagnosticsPebble(v: Vehicle, status: VehicleStatus?, state: UiState
                     Text(
                         row.value,
                         style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurface,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                         modifier = Modifier.weight(1f, fill = false),
@@ -11449,7 +11505,17 @@ internal fun StatusRow(label: String, value: String) {
             label,
             Modifier.weight(1f),
             style = MaterialTheme.typography.bodyMedium,
-            color = LocalContentColor.current.copy(alpha = MutedContentAlpha),
+            // MutedContentAlpha (0.7) on the phone, where LocalContentColor is usually
+            // full onSurface and 0.7 reads as a deliberately secondary label. On the
+            // cover every pebble's default container is surfaceVariant, whose paired
+            // content tone is ALREADY the dimmer onSurfaceVariant role -- StatusRow is
+            // the single most-reused row in the app (Diagnostics, Trips, Charge,
+            // Weather, ...), so this one compounding was the largest contributor to
+            // "flip mode is a contrast nightmare". 0.92 on the cover, unchanged
+            // elsewhere: same fix CoverTile's own subtitle already got.
+            color = LocalContentColor.current.copy(
+                alpha = if (LocalForceExpanded.current) 0.92f else MutedContentAlpha,
+            ),
             // Without a cap, at a large display size the value cell (below) used to
             // take its full intrinsic width first, starving this weighted label into
             // a sliver — and a single-word label ("Coordinates", "Email", "VIN")
