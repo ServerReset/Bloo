@@ -3652,7 +3652,17 @@ private fun CoverTile(
                 Text(
                     subtitle,
                     style = MaterialTheme.typography.bodyMedium,
-                    color = subtitleColor ?: LocalContentColor.current.copy(alpha = MutedContentAlpha),
+                    // Not MutedContentAlpha (0.7) atop the Card's own contentColor: that
+                    // color is contentColorFor(containerColor), and the default
+                    // containerColor is surfaceVariant, whose paired content tone is
+                    // onSurfaceVariant -- already a lower-contrast MD3 role before any
+                    // alpha is applied. Muting it further compounds two dimming steps
+                    // into text that reported as "overly gray" on several cover pages,
+                    // where this subtitle is a full line right under the title (not a
+                    // small list-row label, the case MutedContentAlpha was tuned for).
+                    // 0.92 keeps it visually secondary to the title without reading as
+                    // washed out on a small, quick-glance screen.
+                    color = subtitleColor ?: LocalContentColor.current.copy(alpha = 0.92f),
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )

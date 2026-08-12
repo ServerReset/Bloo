@@ -2374,6 +2374,21 @@ internal fun SearchLayer(
     // not worth a runtime "no Saver found" on some Compose version.
     var dragX by rememberSaveable { mutableStateOf(Float.NaN) }
     var dragY by rememberSaveable { mutableStateOf(Float.NaN) }
+    // Cleared the moment flip mode is LEFT (compact goes false), not on every
+    // recomposition -- dragging still survives a rotation or a recomposition
+    // while still folded, which is the memory the comment above is about. What
+    // it doesn't survive is unfolding: reported as "drag it, go back to normal,
+    // fold again -- it isn't on the edge any more" when it stayed missing.
+    // dragX/dragY are already gated to compact-only for READING (see bubbleX/Y
+    // below), so a stale value here was invisible on the phone screen but still
+    // sitting there for the next fold to pick back up -- the edge was never
+    // actually restored, just hidden until flip mode came back.
+    LaunchedEffect(compact) {
+        if (!compact) {
+            dragX = Float.NaN
+            dragY = Float.NaN
+        }
+    }
     // True only between finger-down and finger-up on the bubble. The position
     // animation is BYPASSED while it is true -- see the spec choice below.
     var dragging by remember { mutableStateOf(false) }
