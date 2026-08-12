@@ -169,14 +169,24 @@ internal const val AdvancedModeStiffness = 130f
  * Related trap, since heroT is an animate*AsState living OUTSIDE these transitions:
  * AnimatedVisibility can only wait for animations in its OWN Transition, so an independent
  * animation is invisible to it and its content can be removed before that one finishes.
+ *
+ * The fade uses `slowEffectsSpec`, not `defaultEffectsSpec` -- still effects, deliberately,
+ * for the overshoot reason above; only the TIER changed. Requested as "content should fade
+ * in as the pebble uncovers it": at the default tier the fade (short) finished well before
+ * the height reveal (default spatial, longer), so whatever the growing clip boundary
+ * uncovered LATE in the expansion was already close to full alpha and just appeared, rather
+ * than visibly fading like the content revealed early on did. Slowing the fade to roughly
+ * match the height's own duration keeps alpha still climbing for the whole reveal, so
+ * content further down the block is genuinely still fading in when the clip boundary passes
+ * it, not just appearing pre-lit.
  */
 @Composable
 internal fun collapseEnter(expandFrom: Alignment.Vertical = Alignment.Top): EnterTransition =
-    fadeIn(MaterialTheme.motionScheme.defaultEffectsSpec<Float>()) +
+    fadeIn(MaterialTheme.motionScheme.slowEffectsSpec<Float>()) +
         expandVertically(MaterialTheme.motionScheme.defaultSpatialSpec<IntSize>(), expandFrom = expandFrom)
 
 /** Mirror of [collapseEnter]; see there for why both halves are springs. */
 @Composable
 internal fun collapseExit(shrinkTowards: Alignment.Vertical = Alignment.Top): ExitTransition =
-    fadeOut(MaterialTheme.motionScheme.defaultEffectsSpec<Float>()) +
+    fadeOut(MaterialTheme.motionScheme.slowEffectsSpec<Float>()) +
         shrinkVertically(MaterialTheme.motionScheme.defaultSpatialSpec<IntSize>(), shrinkTowards = shrinkTowards)

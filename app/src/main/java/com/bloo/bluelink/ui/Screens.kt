@@ -5105,6 +5105,26 @@ private fun HeroHeader(
             label = "heroMorph",
         )
 
+        // The status line's ("Parked"/"Charging...") own fade, on its OWN clock rather than
+        // heroT: requested as "half a second longer before it fades in" -- the line was
+        // reading as arriving too eagerly, at the same moment the card itself starts
+        // opening. Delayed only going IN (photoExpanded true); collapsing fades it out
+        // immediately, so the card doesn't look like it's still finishing an entrance while
+        // it closes. This is a real wall-clock delay (tween + delayMillis), not a fraction
+        // of heroT, because heroT is spring-driven with no fixed duration to carve a
+        // fraction out of. By the time it starts, the height reveal (still on heroT) has
+        // long since finished, so there's no repeat of the clip-vs-alpha mismatch fixed
+        // just before this -- the slot is already fully sized and the text just fades into
+        // it cleanly.
+        val statusAlpha by animateFloatAsState(
+            targetValue = if (photoExpanded) 1f else 0f,
+            animationSpec = tween(
+                durationMillis = 250,
+                delayMillis = if (photoExpanded) 500 else 0,
+            ),
+            label = "heroStatusFade",
+        )
+
         // ---- The travelling numbers -------------------------------------------
         //
         // ONE instance of the percentage and range, drawn by the overlay below and
@@ -5331,6 +5351,7 @@ private fun HeroHeader(
                             heroT,
                             onNumbersPositioned = report(expandedNumbers),
                             numbersHoisted = hoisted,
+                            statusAlpha = statusAlpha,
                             // Collapsed, the numbers start after the name; expanded, they own the
                             // left edge. Only this Row shifts -- the bar underneath does not.
                             // Zero: this copy only ever shows EXPANDED, where it owns the card's
@@ -5370,6 +5391,7 @@ private fun HeroHeader(
                             HeroNumbers(
                                 readout, heroT,
                                 width = with(LocalDensity.current) { w.toDp() },
+                                statusAlpha = statusAlpha,
                             )
                         }
                     }
@@ -6147,6 +6169,11 @@ private fun HeroNumbers(
     // subcomposition cost, see the call site. Ignored when [width] is set; the two are
     // mutually exclusive ways of getting the same SpaceBetween arrangement a real width.
     fillWidth: Boolean = false,
+    // The status line's own fade -- see the top-level `statusAlpha` this defaults from for
+    // why it isn't just `t`. Defaults to `t` so the collapsed anchor (which calls this with
+    // t = 0f and never shows the line at all, see the `t > 0.01f` guard below) and the
+    // CoverTile call site need no changes.
+    statusAlpha: Float = t,
 ) {
     val type = MaterialTheme.typography
     val pctStyle = lerp(type.titleMedium, type.displayMedium, t)
@@ -6201,14 +6228,16 @@ private fun HeroNumbers(
             // one frame. clipToBounds because the Text keeps its intrinsic height as
             // the slot shrinks.
             //
-            // Alpha now tracks the SAME t as the height reveal (plain `t`, not an offset
-            // 0.2..1 window) rather than racing it on its own curve. Offset, the fade and
-            // the clip-reveal disagreed about how much of the line should be visible at any
-            // given t -- e.g. at t=0.5 the box was already half-revealed but the text was
-            // only 37% opaque, so a half-clipped glyph was also half-transparent, which
-            // read as the line stuttering into view rather than smoothly fading in. On the
-            // way out it is the same disagreement in reverse. Matching the two removes that
-            // -- the text is exactly as opaque as the slot is tall, throughout.
+            // Alpha uses [statusAlpha], not `t` directly -- see the top-level `val
+            // statusAlpha` for why (a deliberate half-second-longer delay before the line
+            // fades in, requested after an earlier version tied alpha straight to `t` and
+            // it read as arriving too eagerly). It's still safe against the clip-vs-alpha
+            // mismatch that WAS here (alpha on an offset 0.2..1 window while height-reveal
+            // ran on plain `t`, so a half-clipped glyph was also half-transparent and read
+            // as stuttering): statusAlpha stays at exactly 0 -- not partway -- for the
+            // whole delay, and by the time it starts moving, `t` (and so the height reveal)
+            // has long since finished, so there is no partial-clip-plus-partial-opacity
+            // combination left to produce.
             val statusSlot = with(LocalDensity.current) { type.labelLarge.lineHeight.toDp() }
             Box(
                 Modifier
@@ -6224,7 +6253,7 @@ private fun HeroNumbers(
                         style = type.labelLarge,
                         color = statusColor,
                         maxLines = 1,
-                        modifier = Modifier.graphicsLayer { alpha = t.coerceIn(0f, 1f) },
+                        modifier = Modifier.graphicsLayer { alpha = statusAlpha.coerceIn(0f, 1f) },
                     )
                 }
             }
@@ -6246,6 +6275,10 @@ private fun HeroMorphReadout(
     /** True once the overlay draws the real numbers. This row keeps measuring and
      *  positioning so it stays a valid anchor, and stops painting. */
     numbersHoisted: Boolean = false,
+    /** The status line's own fade, on its own delayed clock -- see the caller's
+     *  `statusAlpha` for why it isn't just `t`. Defaults to `t` so the CoverTile call
+     *  site (a fixed t = 1f, nothing animating) keeps behaving exactly as before. */
+    statusAlpha: Float = t,
 ) {
     val type = MaterialTheme.typography
     // Real type steps, lerped -- not a graphicsLayer scale -- and the reason is DEPENDENT
@@ -6330,7 +6363,7 @@ private fun HeroMorphReadout(
             // so HeroNumbers' own inner SpaceBetween Row just needs to be told to match it
             // (see [HeroNumbers]'s own `fillWidth` param) rather than being handed the number
             // back through a subcomposition.
-            HeroNumbers(data, t, fillWidth = true)
+            HeroNumbers(data, t, fillWidth = true, statusAlpha = statusAlpha)
         }
         // Plug-in hybrid's fuel tank: expanded only, same reasoning as the state line. Fades
         // in over the back half of the morph so it does not compete with the numbers growing.
