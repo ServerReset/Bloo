@@ -4725,6 +4725,19 @@ private fun VerticalPagerDots(
     var scrubbing by remember { mutableStateOf(false) }
     var scrubStartPage by remember { mutableIntStateOf(0) }
     var scrubAccumY by remember { mutableFloatStateOf(0f) }
+    // `current` closed over by a long-lived gesture coroutine, not read fresh each
+    // gesture: Modifier.pointerInput(count) below only cancels-and-relaunches its
+    // block when `count` (tiles.size) changes, not when `current` does -- ordinary
+    // tile swipes change neither, and this composable's own car page survives many
+    // of them (the outer car HorizontalPager keeps a neighbour alive via
+    // beyondViewportPageCount). So the coroutine launched once, captured whatever
+    // `current` was at that moment, and every long-press afterward -- regardless
+    // of which tile was actually showing by then -- started the scrub from that
+    // one frozen value. Reported as "hold the rail and it resets you to [a fixed]
+    // page". rememberUpdatedState is the standard fix for exactly this: the
+    // coroutine still only restarts on `count` changing, but reads .value fresh
+    // on every gesture instead of the parameter it closed over at launch.
+    val currentState = rememberUpdatedState(current)
     val density = LocalDensity.current
     val jumpScope = rememberCoroutineScope()
     // Shorter travel per page = a more sensitive scrub.
@@ -4781,7 +4794,7 @@ private fun VerticalPagerDots(
                     longPress.consume()
                     scrubbing = true
                     coverScrubbing?.value = true
-                    scrubStartPage = current
+                    scrubStartPage = currentState.value
                     scrubAccumY = 0f
                     try {
                         verticalDrag(longPress.id) { change ->
