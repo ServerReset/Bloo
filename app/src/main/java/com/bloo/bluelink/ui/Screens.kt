@@ -43,6 +43,7 @@ import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.CubicBezierEasing
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.VectorConverter
@@ -5305,20 +5306,33 @@ private fun HeroHeader(
                         )
                     }
                 }
-                // THE numbers. One instance, travelling between the two anchors --
-                // and the travel is a plain lerp because both anchors are points in
-                // this same Box's space.
+                // THE numbers. One instance, travelling between the two anchors.
                 //
-                // Drawn LAST so it sits above the photo and the readout, and outside
-                // the readout's own Box so the readout's paddings (which lerp) cannot
-                // drag it: its position comes only from where the two ends actually
-                // measured.
+                // NOT a plain lerp on both axes together any more -- that reads as the
+                // numbers cutting a straight diagonal line from beside the name to the
+                // card's lower-right, which is accurate but flat. The two axes now ride
+                // their own easings off the SAME heroT (still one spring, one duration --
+                // nothing here is a second animation that could fall out of sync with the
+                // photo/bar): height drops first, on an easing that is mostly done by the
+                // midpoint, and only once most of that drop has happened does the sideways
+                // travel start, on an easing that overshoots past its target and settles
+                // back -- a bounce, not a stop. Width rides the same easing as X, since
+                // width IS what pushes the range to the right; keeping them on one curve
+                // is what makes the range's right edge and the block's own drift agree.
                 val from = collapsedNumbers.value
                 val to = expandedNumbers.value
                 if (hoisted && from != null && to != null) {
-                    val x = androidx.compose.ui.util.lerp(from.left, to.left, heroT)
-                    val y = androidx.compose.ui.util.lerp(from.top, to.top, heroT)
-                    val w = androidx.compose.ui.util.lerp(from.width, to.width, heroT)
+                    val yT = HeroDropEasing.transform(heroT)
+                    // Held at the start until the drop is mostly finished (HeroSideDelay),
+                    // then re-normalized to 0..1 over what's left of heroT so the sideways
+                    // travel still completes exactly when heroT reaches 1 -- same overall
+                    // duration as before, just sequenced within it rather than run
+                    // alongside it the whole way.
+                    val xRaw = ((heroT - HeroSideDelay) / (1f - HeroSideDelay)).coerceIn(0f, 1f)
+                    val xT = HeroBounceEasing.transform(xRaw)
+                    val x = androidx.compose.ui.util.lerp(from.left, to.left, xT)
+                    val y = androidx.compose.ui.util.lerp(from.top, to.top, yT)
+                    val w = androidx.compose.ui.util.lerp(from.width, to.width, xT)
                     Box(
                         Modifier.offset { IntOffset(x.roundToInt(), y.roundToInt()) },
                     ) {
@@ -6022,6 +6036,22 @@ private fun animatedChargeFrac(target: Float): Float {
  * `Canvas`, in a single layout pass. The version that felt laggy was ~8 paragraph layouts
  * DOUBLED by a lookahead pass.
  */
+/**
+ * The two-phase easings for the travelling numbers' position (see the `from`/`to` Box below):
+ * height drops on [HeroDropEasing] -- Material's own "emphasized decelerate" curve, fast at the
+ * start and mostly settled by the midpoint of heroT -- and only once [HeroSideDelay] of heroT has
+ * passed does the sideways travel begin, on [HeroBounceEasing]. That one's y-control points sit
+ * outside 0..1 on purpose (a plain ease-in/ease-out curve cannot do this: its control points are
+ * clamped inside the unit square by construction, so the interpolated value can never exceed its
+ * endpoints) -- with them, the curve genuinely overshoots past 1.0 before easing back down, which
+ * is what a bounce IS: past the target, then a small correction back onto it. Both are driven by
+ * the one `heroT` spring the photo/bar already use, so the numbers never fall out of duration with
+ * everything else on the card -- only the SHAPE of their path within that duration changes.
+ */
+private val HeroDropEasing = CubicBezierEasing(0.05f, 0.7f, 0.1f, 1f)
+private val HeroBounceEasing = CubicBezierEasing(0.34f, 1.56f, 0.64f, 1f)
+private const val HeroSideDelay = 0.25f
+
 /**
  * The COLLAPSED percentage and range, drawn as trailing content on the pebble's own title Row.
  *
