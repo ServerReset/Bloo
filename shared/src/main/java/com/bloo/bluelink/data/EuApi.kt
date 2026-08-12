@@ -388,7 +388,7 @@ class EuApi(private val brand: Brand) {
      * KiaUvoApiEU/ApiImplType1). Everything reads defensively so a firmware that
      * omits a field yields a missing value, never a crash.
      */
-    private fun parseStatus(vh: JsonObject): VehicleStatus {
+    internal fun parseStatus(vh: JsonObject): VehicleStatus {
         val green = vh["Green"] as? JsonObject
         val cabin = vh["Cabin"] as? JsonObject
         val body = vh["Body"] as? JsonObject
@@ -397,7 +397,27 @@ class EuApi(private val brand: Brand) {
         val electronics = vh["Electronics"] as? JsonObject
 
         val soc = green.path("BatteryManagement", "BatteryRemain", "Ratio").dbl()?.toInt()
-        val plug = green.path("ChargingDoor", "State").int()
+        // NOT ChargingDoor.State -- that is the charge-port DOOR's own open/closed flag,
+        // confirmed against the reference this file is ported from (ApiImplType1.py):
+        // `charging_door_state in [0, 2] -> door closed, == 1 -> door open`, nothing to
+        // do with whether a cable is actually connected. Using it here meant popping the
+        // port door open with nothing plugged in read as "Plugged in (DC fast)" -- enabling
+        // the start/stop-charge button and showing the DC limit pill on a car with no
+        // cable attached at all, and the reverse on any car whose door auto-closes over an
+        // inserted cable.
+        //
+        // ConnectorFastening.State is the reference's actual plug-detection field (it's
+        // the LAST of two candidate assignments to ev_battery_is_plugged_in there, so it's
+        // the one that wins). It is only ever a plugged/unplugged bool, though -- neither
+        // this field nor anything else in the reference distinguishes AC from DC once
+        // connected, so [EvStatus.batteryPlugin]'s AC/DC label is approximated as DC (1)
+        // whenever a cable is present rather than genuinely known. That is a real
+        // limitation, not a guess dressed up as one: Bloo's own AC-vs-DC UI presents this
+        // as fact, so it can misname an AC session, but that is a strictly smaller error
+        // than the previous one -- it never claims "unplugged" while charging, or
+        // "plugged in" while it is not.
+        val plug = green.path("ChargingInformation", "ConnectorFastening", "State").int()
+            ?.let { if (it != 0) 1 else 0 }
         val chargeRemain = green.path("ChargingInformation", "Charging", "RemainTime").dbl()
         val rangeKm = (drivetrain.path("FuelSystem", "DTE", "Total")
             ?: drivetrain.path("FuelSystem", "DTE", "EV")).dbl()
@@ -455,7 +475,10 @@ class EuApi(private val brand: Brand) {
                 backRight = win2.path("Right", "Open").int(),
             ),
             dte = rangeKm?.let { Dte(it.kmToMi(), 3) },
-            battery = electronics.path("Battery", "Level").int()?.let { Battery12V(batSoc = it) },
+            battery = normalizeBattery12V(
+                electronics.path("Battery", "Level").int(),
+                electronics.path("Battery", "SensorReliability").int(),
+            )?.let { Battery12V(batSoc = it) },
             evStatus = evStatus,
             dateTime = vh.path("Date").str(),
             tirePressureLamp = (chassis.path("Axle") as? JsonObject)?.let {
@@ -641,8 +664,31 @@ class EuApi(private val brand: Brand) {
         (this as? JsonPrimitive)?.let { it.booleanOrNull ?: it.intOrNull?.let { v -> v != 0 } }
 
     /** CCS2 reports distance in km; Bloo stores miles everywhere and converts to
-     *  km only at display time (see FormatUtils.formatDistance) — normalise here. */
-    private fun Double.kmToMi(): Double = this * 0.621371
+     *  km only at display time (see FormatUtils.formatDistance) — normalise here.
+     *  Divides by [KM_PER_MI] rather than its own `* 0.621371` literal -- CanadaApi
+     *  had exactly this and was fixed to the shared constant so the two directions
+     *  are exact inverses by construction; this file had drifted back to the old
+     *  style independently. The two literals happen to agree to within 9e-7 mi/km
+     *  (no rounded on-screen figure currently differs), but there's no reason for
+     *  a second source of truth to exist at all. */
+    private fun Double.kmToMi(): Double = this / KM_PER_MI
+
+    /**
+     * Filters the 12V auxiliary battery reading the way the reference project's own
+     * `normalize_battery_soc` does, which this file's raw `.int()` read skipped
+     * entirely: `Electronics.Battery.SensorReliability == 1` means the CCS2 stack is
+     * flagging the reading itself as unreliable (an expected state after a 12V reset
+     * or during an ICCU fault on IONIQ 5 / Kia EV, not an error to surface), and a raw
+     * value outside 0..100 is a sentinel (255/0xFF, -1) rather than a real percentage.
+     * Either case has to become "unknown" (null), not a number -- [Battery12V.health]
+     * reads `batSoc >= 75 -> "Good"` with no floor check of its own, so an unfiltered
+     * 255 would have rendered "255% . Good".
+     */
+    internal fun normalizeBattery12V(level: Int?, sensorReliability: Int?): Int? {
+        if (sensorReliability == 1) return null
+        if (level == null || level !in 0..100) return null
+        return level
+    }
 
     private fun JsonElement?.path(vararg keys: String): JsonElement? {
         var cur: JsonElement? = this
