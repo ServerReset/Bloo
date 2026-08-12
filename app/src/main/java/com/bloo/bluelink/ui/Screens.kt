@@ -5114,21 +5114,24 @@ private fun HeroHeader(
         )
 
         // The status line's ("Parked"/"Charging...") own fade, on its OWN clock rather than
-        // heroT: requested as "half a second longer before it fades in" -- the line was
-        // reading as arriving too eagerly, at the same moment the card itself starts
-        // opening. Delayed only going IN (photoExpanded true); collapsing fades it out
-        // immediately, so the card doesn't look like it's still finishing an entrance while
-        // it closes. This is a real wall-clock delay (tween + delayMillis), not a fraction
-        // of heroT, because heroT is spring-driven with no fixed duration to carve a
-        // fraction out of. By the time it starts, the height reveal (still on heroT) has
-        // long since finished, so there's no repeat of the clip-vs-alpha mismatch fixed
-        // just before this -- the slot is already fully sized and the text just fades into
-        // it cleanly.
+        // heroT: originally delayed a full 500ms (requested as "half a second longer
+        // before it fades in" -- the line was reading as arriving too eagerly, at the
+        // same moment the card itself starts opening) and then reported as too long a
+        // wait once that shipped, so trimmed to 250ms -- still a real, deliberate beat
+        // after the card starts opening rather than simultaneous with it, just not a
+        // hang. Delayed only going IN (photoExpanded true); collapsing fades it out
+        // immediately, so the card doesn't look like it's still finishing an entrance
+        // while it closes. This is a real wall-clock delay (tween + delayMillis), not a
+        // fraction of heroT, because heroT is spring-driven with no fixed duration to
+        // carve a fraction out of. By the time it starts, the height reveal (still on
+        // heroT) has long since finished even at this shorter delay, so there's no
+        // repeat of the clip-vs-alpha mismatch fixed just before this -- the slot is
+        // already fully sized and the text just fades into it cleanly.
         val statusAlpha by animateFloatAsState(
             targetValue = if (photoExpanded) 1f else 0f,
             animationSpec = tween(
-                durationMillis = 250,
-                delayMillis = if (photoExpanded) 500 else 0,
+                durationMillis = 200,
+                delayMillis = if (photoExpanded) 250 else 0,
             ),
             label = "heroStatusFade",
         )
@@ -6237,9 +6240,9 @@ private fun HeroNumbers(
             // the slot shrinks.
             //
             // Alpha uses [statusAlpha], not `t` directly -- see the top-level `val
-            // statusAlpha` for why (a deliberate half-second-longer delay before the line
-            // fades in, requested after an earlier version tied alpha straight to `t` and
-            // it read as arriving too eagerly). It's still safe against the clip-vs-alpha
+            // statusAlpha` for why (a deliberate short delay before the line fades in,
+            // requested after an earlier version tied alpha straight to `t` and it read
+            // as arriving too eagerly). It's still safe against the clip-vs-alpha
             // mismatch that WAS here (alpha on an offset 0.2..1 window while height-reveal
             // ran on plain `t`, so a half-clipped glyph was also half-transparent and read
             // as stuttering): statusAlpha stays at exactly 0 -- not partway -- for the
