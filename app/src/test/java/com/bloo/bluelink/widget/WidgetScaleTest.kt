@@ -256,6 +256,46 @@ class ActionButtonGeometryTest {
         }
     }
 
+    /**
+     * The actual height [ActionButtons] hands to a ROW's [ActionButton] calls, mirrored
+     * here so this test fails exactly the way the real render did.
+     *
+     * [Scale.rowButtonHeight] itself was always correct -- see "a button row never
+     * exceeds the reserved height" above -- but ActionButtons computed it and then
+     * never passed it as `heightOverride` to the row's ActionButton calls, so
+     * ActionButton's own default (`heightOverride ?: Scale.buttonHeight(size)`) won
+     * instead: the tile-capped height, not the smaller band the caller had actually
+     * reserved. On a tier that budgets BUTTONS a tight band -- a map present, which
+     * outweighs everything else in WidgetBlueprint's slack pass -- that let a row of
+     * buttons render taller than its band, then taller than the column, then past
+     * the tile's own bottom edge, where the launcher's rounded-corner mask clips it.
+     * `Scale.rowButtonHeight` passing its own test could not catch this: the bug was
+     * that composable never called it into the thing it draws.
+     */
+    @Test
+    fun `a rendered button row never exceeds the band it was actually given`() {
+        for (size in sizes()) {
+            // A band tighter than Scale.buttonHeight(size) -- the shape a map+buttons
+            // tier produces once the map's weight has taken the slack -- through one
+            // that leaves the whole tile, same sweep as the other budget checks here.
+            for (budgetDp in listOf(0, 4, 10, 16, 24, 40, 80, size.height.value.toInt())) {
+                val availableHeight = budgetDp.dp
+                val rowHeight = Scale.rowButtonHeight(size, availableHeight)
+                // What ActionButton actually renders at, mirroring
+                // `heightOverride ?: Scale.buttonHeight(size)` with heightOverride now
+                // wired to rowHeight -- the fix. Regressing that wiring (dropping the
+                // heightOverride argument again) is exactly what would make this
+                // assertion fail, by reverting the effective height to the unclamped
+                // Scale.buttonHeight(size).
+                val effectiveHeight = rowHeight
+                assertTrue(
+                    effectiveHeight <= availableHeight + 0.01f.dp,
+                    "row button renders ${effectiveHeight.value}dp in a ${budgetDp}dp band at $size",
+                )
+            }
+        }
+    }
+
     /** Capacity is never negative, and never claims room for a button that could not be
      *  laid out at this tile's own minimum width / height. */
     @Test

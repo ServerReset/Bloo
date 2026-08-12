@@ -208,9 +208,27 @@ internal fun ActionButtons(
         ) {
             actions.forEachIndexed { i, action ->
                 if (i > 0) Spacer(GlanceModifier.width(gap))
+                // heightOverride = rowHeight, not the default Scale.buttonHeight(size)
+                // ActionButton would otherwise fall back to. rowHeight is already
+                // clamped to availableHeight -- the band WidgetBlueprint actually
+                // allocated for BUTTONS -- but until now nothing here PASSED that
+                // clamped number down; it was computed only to gate showLabels above.
+                // fixedHeight defaults true, so the button silently rendered at the
+                // tile-capped (but band-UNAWARE) Scale.buttonHeight(size) instead. On
+                // a tier with both a map and a button row, the map's own weight (4f,
+                // the greediest in the allocator) routinely leaves BUTTONS a band
+                // near its floor, well under Scale.buttonHeight(size) -- so the row
+                // rendered taller than its reserved band, then taller than the
+                // column, then past the tile's own bottom edge, where the launcher's
+                // rounded-corner mask (a hard OS-level clip, not RemoteViews') cut
+                // the pills off mid-height. The stack branch just above already did
+                // this correctly with heightOverride = stackHeight; the row branch
+                // was the one path that computed its clamped height and then never
+                // used it.
                 ActionButton(
                     action, car, render,
                     modifier = GlanceModifier.defaultWeight(),
+                    heightOverride = rowHeight,
                     showLabel = showLabels,
                     labelMaxWidth = labelRoom.coerceAtLeast(0.dp),
                 )
