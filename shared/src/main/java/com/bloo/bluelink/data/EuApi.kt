@@ -474,14 +474,37 @@ class EuApi(private val brand: Brand) {
     suspend fun stopClimate(session: EuSession, v: EuVehicleSummary, controlToken: String) =
         control(session, v, controlToken, "temperature", buildJsonObject { put("command", "stop") })
 
-    /** Start climate / pre-conditioning. Temperature arrives as Fahrenheit
-     *  ([ClimateRequest.tempF]) and is sent as a Celsius half-degree. Seats are
-     *  left off (state 0). Body shape from ApiImplType1's ccs2 temperature start;
-     *  drvSeatLoc "L" assumes a left-hand-drive (mainland EU) car. */
+    /**
+     * Start climate / pre-conditioning. Temperature arrives as Fahrenheit
+     * ([ClimateRequest.tempF]) and is sent as a Celsius half-degree. Body shape
+     * from ApiImplType1's ccs2 temperature start.
+     *
+     * The seat states carry the user's actual settings now; they were pinned to
+     * 0 (off), so a European owner could set seat heat in the app and the car
+     * would never receive it. The encoding is [SeatLevel.apiValue] -- the same
+     * 0 / 3-5 cool / 6-8 heat scale BlueLinkApi already posts as
+     * `drvSeatHeatState` -- and the payload's SHAPE is unchanged, which is what
+     * keeps this low-risk: every key here was already being sent and verified
+     * against a live car, only the values were fixed at zero. If EU climate
+     * starts failing, this pair of lines is the thing to put back.
+     *
+     * `drvSeatLoc` and the driver/passenger mapping are derived together from
+     * [deviceDriveSide], because they have to agree: the payload names the two
+     * front seats by ROLE while Bloo names them by SIDE, so on a right-hand-drive
+     * car the driver's seat is the front RIGHT one. Sending "L" while mapping the
+     * driver to the left seat is self-consistent and was correct for every market
+     * Bloo supported before Europe; sending it to a car in Britain would put the
+     * driver's heat setting on the empty passenger seat.
+     */
     suspend fun startClimate(
         session: EuSession, v: EuVehicleSummary, controlToken: String, req: ClimateRequest,
     ) {
         val celsius = Math.round((req.tempF - 32) * 5.0 / 9.0 * 2) / 2.0
+        val driveSide = deviceDriveSide()
+        val driverSeat =
+            if (driveSide == DriveSide.RIGHT) req.seatFrontRight else req.seatFrontLeft
+        val passengerSeat =
+            if (driveSide == DriveSide.RIGHT) req.seatFrontLeft else req.seatFrontRight
         val cmd = buildJsonObject {
             put("command", "start")
             put("ignitionDuration", req.durationMinutes)
@@ -489,12 +512,15 @@ class EuApi(private val brand: Brand) {
             put("hvacTempType", 1)
             put("hvacTemp", celsius)
             put("sideRearMirrorHeating", 0)
-            put("drvSeatLoc", "L")
+            put("drvSeatLoc", driveSide.ccs2Code)
             put("seatClimateInfo", buildJsonObject {
-                put("drvSeatClimateState", 0)
-                put("psgSeatClimateState", 0)
-                put("rrSeatClimateState", 0)
-                put("rlSeatClimateState", 0)
+                // Front pair by ROLE, so it flips with the drive side. The rear
+                // pair is named by side in the payload too (rl/rr), so those map
+                // straight across and never swap.
+                put("drvSeatClimateState", driverSeat.apiValue)
+                put("psgSeatClimateState", passengerSeat.apiValue)
+                put("rrSeatClimateState", req.seatRearRight.apiValue)
+                put("rlSeatClimateState", req.seatRearLeft.apiValue)
             })
             put("tempUnit", "C")
             put("windshieldFrontDefogState", req.defrost)
