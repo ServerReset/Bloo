@@ -185,7 +185,44 @@ enum class Brand(
      */
     val supportsTrips: Boolean get() = this == HYUNDAI || this == GENESIS
 
+
     companion object {
+        /** The sign-in regions, as the keys the login pickers select by. */
+        const val REGION_US = "US"
+        const val REGION_CA = "CA"
+        const val REGION_EU = "EU"
+
+        /**
+         * The brands offered for a sign-in region, in display order.
+         *
+         * Shared because the phone and the watch both ask this question, and a
+         * second hand-written copy is how the watch ended up offering only the
+         * three US brands long after Canada shipped: a Canadian owner signing in
+         * on the watch could only pick a US brand, and their credentials failed
+         * against the wrong backend with nothing explaining why. Europe would
+         * have inherited the same gap.
+         */
+        fun brandsForRegion(region: String): List<Brand> = when (region) {
+            REGION_CA -> listOf(HYUNDAI_CA, GENESIS_CA, KIA_CA)
+            // Europe ships Hyundai only for now; Kia/Genesis EU ride the same
+            // backend and join this list once they can be verified.
+            REGION_EU -> listOf(HYUNDAI_EU)
+            else -> listOf(HYUNDAI, GENESIS, KIA)
+        }
+
+        /** The region a brand belongs to -- the inverse of [brandsForRegion], so a
+         *  picker can open on the region of whatever brand it was handed. */
+        fun regionOf(brand: Brand): String = when {
+            brand.isCanada -> REGION_CA
+            brand.isEurope -> REGION_EU
+            else -> REGION_US
+        }
+
+        /** The brand's label without its region suffix, for a picker that already
+         *  says which region you are in. "Hyundai (Canada)" -> "Hyundai". */
+        fun shortLabel(brand: Brand): String =
+            brand.label.removeSuffix(" (Canada)").removeSuffix(" (Europe)")
+
         // Looks up an enum entry by its exact `name` (e.g. "KIA"); falls back to
         // HYUNDAI (the original, pre-multi-brand default) if `name` is null or
         // doesn't match any current entry, so a legacy/blank stored value never

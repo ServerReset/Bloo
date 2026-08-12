@@ -58,6 +58,7 @@ import com.bloo.wear.WearViewModel
 @Composable
 fun LoginScreen(vm: WearViewModel, ui: WearUi) {
     var brand by remember { mutableStateOf(Brand.HYUNDAI) }
+    var region by remember { mutableStateOf(Brand.regionOf(brand)) }
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var pin by remember { mutableStateOf("") }
@@ -105,14 +106,36 @@ fun LoginScreen(vm: WearViewModel, ui: WearUi) {
                 }
             }
 
-            // Brand selector (defaults to HYUNDAI).
+            // Region, then brand -- the same two steps the phone's sign-in uses,
+            // reading the same Brand.brandsForRegion list.
+            //
+            // This screen offered the three US brands only, which was written
+            // before Canada existed and never revisited: a Canadian owner signing
+            // in here could pick nothing but a US brand, and their credentials
+            // then failed against the wrong backend with nothing on screen
+            // explaining why. Europe would have inherited exactly that.
             item {
                 MorphSegmented(
                     options = listOf(
-                        WearSegmentOption(Brand.HYUNDAI.name, "Hyundai"),
-                        WearSegmentOption(Brand.GENESIS.name, "Genesis"),
-                        WearSegmentOption(Brand.KIA.name, "Kia"),
+                        WearSegmentOption(Brand.REGION_US, "US"),
+                        WearSegmentOption(Brand.REGION_CA, "Canada"),
+                        WearSegmentOption(Brand.REGION_EU, "Europe"),
                     ),
+                    selectedKey = region,
+                    onSelect = { key ->
+                        region = key
+                        // Each region's backend and sign-in shape differ, so the
+                        // brand cannot survive a region change.
+                        brand = Brand.brandsForRegion(key).first()
+                    },
+                )
+            }
+
+            // Brand selector for the chosen region (defaults to HYUNDAI).
+            item {
+                val options = Brand.brandsForRegion(region)
+                MorphSegmented(
+                    options = options.map { WearSegmentOption(it.name, Brand.shortLabel(it)) },
                     selectedKey = brand.name,
                     onSelect = { key -> brand = Brand.valueOf(key) },
                 )

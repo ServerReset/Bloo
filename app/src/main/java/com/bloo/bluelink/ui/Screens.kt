@@ -1905,11 +1905,7 @@ private fun LoginScreen(
                             region = key
                             // Reset to the region's first (only, for EU) brand,
                             // since each region's backend/sign-in shape differs.
-                            brand = when (key) {
-                                "CA" -> Brand.HYUNDAI_CA
-                                "EU" -> Brand.HYUNDAI_EU
-                                else -> Brand.HYUNDAI
-                            }
+                            brand = Brand.brandsForRegion(key).first()
                         },
                     )
 
@@ -1918,16 +1914,13 @@ private fun LoginScreen(
                         style = MaterialTheme.typography.labelLarge,
                         color = scheme.onSurface,
                     )
-                    val brandOptions = when (region) {
-                        "CA" -> listOf(Brand.HYUNDAI_CA, Brand.GENESIS_CA, Brand.KIA_CA)
-                        // Europe ships Hyundai only for now (Kia/Genesis EU ride the
-                        // same backend and can be added here once verifiable).
-                        "EU" -> listOf(Brand.HYUNDAI_EU)
-                        else -> listOf(Brand.HYUNDAI, Brand.GENESIS, Brand.KIA)
-                    }
+                    // Brand.brandsForRegion, shared with the watch's own picker --
+                    // which was a hand-written copy of this list, and had silently
+                    // stopped at the three US brands.
+                    val brandOptions = Brand.brandsForRegion(region)
                     MorphSegmented(
                         options = brandOptions.map { b ->
-                            SegmentOption(b.name, b.label.removeSuffix(" (Canada)").removeSuffix(" (Europe)"), null)
+                            SegmentOption(b.name, Brand.shortLabel(b), null)
                         },
                         selectedKey = brand.name,
                         onSelect = { key -> brand = Brand.valueOf(key) },

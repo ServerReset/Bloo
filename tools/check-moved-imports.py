@@ -137,6 +137,14 @@ def locals_of(body):
     """
     out = {d.group(1) for line in body.split('\n') if (d := ANY_DECL_RE.match(line))}
     out |= set(re.findall(r'\b(\w+)\s*:\s*[A-Z]', body))
+    # Function-type parameters: `onClick: () -> Unit`, `onSelect: (String) -> Unit`.
+    # The rule above only recognises a parameter whose type starts with an
+    # uppercase letter, so these were invisible as locals -- and a body that then
+    # forwards one (`onClick = onClick`) looked like a reference to something
+    # unimported. That is how a watch login screen with an `onClick` parameter got
+    # reported the moment an unrelated file in the same commit happened to shed
+    # lines and become a donor.
+    out |= set(re.findall(r'\b(\w+)\s*:\s*\(', body))
     out |= set(re.findall(r'\b(?:val|var)\s+(\w+)', body))
     out |= set(re.findall(r'\bfor\s*\(\s*\(?\s*([\w\s,]+?)\s*\)?\s+in\b', body))
     out |= {n.strip() for group in re.findall(r'\bfor\s*\(\s*\(([^)]*)\)\s+in\b', body)

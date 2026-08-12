@@ -1,6 +1,7 @@
 package com.bloo.bluelink.data
 
 import kotlin.test.Test
+import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
@@ -101,5 +102,48 @@ class BrandCapabilityTest {
         for (b in Brand.entries.filter { it != Brand.KIA }) {
             assertTrue(b.requiresPin, "$b needs a PIN")
         }
+    }
+
+    // ---- Sign-in regions ----
+
+    /**
+     * Every brand is reachable from exactly one region.
+     *
+     * The watch's picker was a hand-written copy of this list and had stopped at
+     * the three US brands, so a Canadian owner could not sign in on the watch at
+     * all -- they could only pick a US brand, whose backend then rejected their
+     * credentials with nothing on screen to explain it. Both pickers read
+     * brandsForRegion now, and this holds it to covering everything.
+     */
+    @Test
+    fun `every brand belongs to exactly one sign-in region`() {
+        val regions = listOf(Brand.REGION_US, Brand.REGION_CA, Brand.REGION_EU)
+        val offered = regions.flatMap { Brand.brandsForRegion(it) }
+        assertEquals(
+            Brand.entries.toSet(), offered.toSet(),
+            "every brand must be offered by some region",
+        )
+        assertEquals(offered.size, offered.toSet().size, "no brand in two regions")
+    }
+
+    /** regionOf is the inverse of brandsForRegion, so a picker handed any brand
+     *  opens on the region that actually lists it. */
+    @Test
+    fun `regionOf round-trips with brandsForRegion`() {
+        for (b in Brand.entries) {
+            assertTrue(
+                b in Brand.brandsForRegion(Brand.regionOf(b)),
+                "$b should be listed by its own region ${Brand.regionOf(b)}",
+            )
+        }
+    }
+
+    /** The picker already names the region, so the label should not repeat it. */
+    @Test
+    fun `short labels drop the region suffix`() {
+        assertEquals("Hyundai", Brand.shortLabel(Brand.HYUNDAI_CA))
+        assertEquals("Hyundai", Brand.shortLabel(Brand.HYUNDAI_EU))
+        assertEquals("Kia", Brand.shortLabel(Brand.KIA_CA))
+        assertEquals("Hyundai", Brand.shortLabel(Brand.HYUNDAI))
     }
 }
