@@ -525,18 +525,21 @@ internal object WidgetBlueprint {
             // tile plainly wasn't square-ish or taller-than-wide.
             ringCandidate >= RING_WORTH_IT && heroH >= innerW * RING_ASPECT && !wantsMap && !wideNotTall -> Hero.RING
             heroH >= minBarHero(size, ts) -> Hero.BAR
-            // Below the bar's floor a small ring still beats a bare text line: it is
+            // Below the bar's floor a small ring still beats a bare text line -- it is
             // the last thing that reads as a GAUGE, and MIN_RING is exactly the point
-            // where it stops being one -- UNLESS the tile has a map or is wide-not-tall,
-            // in which case the fallback below (LINE, or NONE) is preferred over a ring
-            // for the same reason as every other branch here: this shape doesn't get a
-            // circle. This was the branch that actually broke the FIRST fix: it had no
-            // `!wantsMap` guard at all when the RING_ASPECT branch above gained one, so
-            // a small map-bearing tile whose hero band fell short of the bar's floor
-            // still fell through to a ring here regardless of the map -- a size where
-            // the branch above genuinely didn't apply, not a slim margin on the ratio
-            // check, sailed straight past it into this one.
-            ringCandidate >= MIN_RING && !wantsMap && !wideNotTall -> Hero.RING
+            // where it stops being one. Deliberately UNGUARDED by `!wantsMap`/
+            // `!wideNotTall`, unlike the two branches above: those answer "is a ring
+            // the wrong SHAPE for this tile when a bar would look better", which is a
+            // real question only once a bar actually fits. This one only fires once
+            // bar has already been ruled out for lacking room, where the choice isn't
+            // ring-vs-bar any more, it's ring-vs-nothing -- and a small ring still beats
+            // that. A previous version of this guard blocked it here too, on the theory
+            // that it was the branch letting ring slip through on a map-bearing tile;
+            // it wasn't -- the branch above had already ruled that tile out by the time
+            // this one is reached -- and blocking it left tiles that fit neither ring
+            // nor bar showing NO gauge at all, which is a worse outcome than the ring
+            // this exists to fall back to. Reported from a real device.
+            ringCandidate >= MIN_RING -> Hero.RING
             heroH >= minLineHero(size, ts) -> Hero.LINE
             else -> Hero.NONE
         }

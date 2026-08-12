@@ -5127,10 +5127,16 @@ private fun HeroHeader(
         // heroT) has long since finished even at this shorter delay, so there's no
         // repeat of the clip-vs-alpha mismatch fixed just before this -- the slot is
         // already fully sized and the text just fades into it cleanly.
+        // durationMillis raised from 200 to 350: reported as not fading in at all after
+        // the delay was trimmed, and 200ms is short enough on a real device's frame
+        // pacing to read as a snap rather than a fade, especially right after a 250ms
+        // wait primes the eye to expect a discrete change. 350ms is closer to what the
+        // original 500ms-delay version's own fadeIn spec would have taken to settle,
+        // just without the long wait in front of it.
         val statusAlpha by animateFloatAsState(
             targetValue = if (photoExpanded) 1f else 0f,
             animationSpec = tween(
-                durationMillis = 200,
+                durationMillis = 350,
                 delayMillis = if (photoExpanded) 250 else 0,
             ),
             label = "heroStatusFade",
