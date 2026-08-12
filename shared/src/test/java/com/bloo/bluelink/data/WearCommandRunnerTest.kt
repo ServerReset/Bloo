@@ -33,6 +33,7 @@ class WearCommandRunnerTest {
         locked: Boolean? = null,
         climateOn: Boolean? = null,
         charging: Boolean? = null,
+        brandIndicator: String = "H",
     ) = VehicleSnapshot(
         vin = "VIN1",
         name = "Test Car",
@@ -41,6 +42,7 @@ class WearCommandRunnerTest {
         locked = locked,
         charging = charging,
         climateOn = climateOn,
+        brandIndicator = brandIndicator,
     )
 
     // ---- resolveToggle: does a toggle pick the direction the user expects? ----
@@ -138,6 +140,39 @@ class WearCommandRunnerTest {
         assertEquals(true, afterCharge.charging)
         assertEquals(true, afterCharge.locked)
         assertNull(afterCharge.climateOn)
+    }
+
+    /**
+     * A brand that cannot report climate state ([Brand.reportsClimateState] false --
+     * today, only Hyundai EU) must never predict a climate boolean, in either
+     * direction, from any of the three climate verbs -- it must predict `null`
+     * ("unknown"), exactly as [WearCommandRunner.execute]'s own brand-aware
+     * `climateFlag` helper already does for its optimistic write.
+     *
+     * This is the widget/tile call path's counterpart to that fix: both
+     * [com.bloo.bluelink.widget.WidgetCommandAction] and `TileCommandRunner` call
+     * [optimistic] directly rather than going through [WearCommandRunner.execute],
+     * so painting a confident "Climate on" for a car whose backend can never
+     * confirm it was reachable straight from a widget tap. Lock and charge are
+     * unaffected -- EU reports both -- which the middle assertions pin so a
+     * blanket `climateKnown` check applied to the wrong field would fail loudly.
+     */
+    @Test
+    fun optimisticNeverGuessesClimateForABrandThatCannotReportIt() {
+        val onCar = snap(climateOn = true, brandIndicator = "HEU")
+        val offCar = snap(climateOn = false, brandIndicator = "HEU")
+        val unknownCar = snap(climateOn = null, brandIndicator = "HEU")
+
+        assertNull(WearCommandRunner.optimistic(onCar, WearAction.CLIMATE_OFF).climateOn)
+        assertNull(WearCommandRunner.optimistic(offCar, WearAction.CLIMATE_ON).climateOn)
+        assertNull(WearCommandRunner.optimistic(unknownCar, WearAction.TOGGLE_CLIMATE).climateOn)
+        assertNull(WearCommandRunner.optimistic(onCar, WearAction.TOGGLE_CLIMATE).climateOn)
+
+        // Lock and charge are untouched by the climate gate.
+        val lockOff = WearCommandRunner.optimistic(snap(locked = false, brandIndicator = "HEU"), WearAction.LOCK)
+        assertEquals(true, lockOff.locked)
+        val chargeOff = WearCommandRunner.optimistic(snap(charging = false, brandIndicator = "HEU"), WearAction.CHARGE_ON)
+        assertEquals(true, chargeOff.charging)
     }
 
     /** The momentary and non-stateful verbs make the car do something visible but

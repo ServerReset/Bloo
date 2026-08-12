@@ -169,18 +169,36 @@ object WearCommandRunner {
         else -> snap
     }
 
-    /** The snapshot a command is expected to produce, for instant optimistic UI. */
-    fun optimistic(snap: VehicleSnapshot, action: String): VehicleSnapshot = when (action) {
-        WearAction.TOGGLE_LOCK -> snap.copy(locked = !(snap.locked ?: false))
-        WearAction.LOCK -> snap.copy(locked = true)
-        WearAction.UNLOCK -> snap.copy(locked = false)
-        WearAction.TOGGLE_CLIMATE -> snap.copy(climateOn = !(snap.climateOn ?: false))
-        WearAction.CLIMATE_ON -> snap.copy(climateOn = true)
-        WearAction.CLIMATE_OFF -> snap.copy(climateOn = false)
-        WearAction.TOGGLE_CHARGE -> snap.copy(charging = !(snap.charging ?: false))
-        WearAction.CHARGE_ON -> snap.copy(charging = true)
-        WearAction.CHARGE_OFF -> snap.copy(charging = false)
-        else -> snap
+    /**
+     * The snapshot a command is expected to produce, for instant optimistic UI.
+     *
+     * Climate is gated by [Brand.reportsClimateState], the same flag [execute]'s own
+     * `climateFlag` helper reads. This function used to write an unconditional
+     * true/false for every brand -- correct for the brands whose status refresh can
+     * confirm or correct it, but not for Europe, whose `airCtrlOn` is always null.
+     * [execute] already routed its OWN optimistic write through the brand-aware
+     * check; this is the other caller of the same idea (widget taps, tile taps),
+     * reachable straight from [com.bloo.bluelink.widget.WidgetCommandAction] and
+     * `TileCommandRunner` -- both call this directly rather than going through
+     * `execute()`, so a Hyundai EU widget/tile button was still free to paint a
+     * climate state on ("Climate on", teal highlight) that the car can never
+     * actually confirm, for however long the real command takes to land.
+     */
+    fun optimistic(snap: VehicleSnapshot, action: String): VehicleSnapshot {
+        val climateKnown = Brand.fromIndicator(snap.brandIndicator).reportsClimateState
+        return when (action) {
+            WearAction.TOGGLE_LOCK -> snap.copy(locked = !(snap.locked ?: false))
+            WearAction.LOCK -> snap.copy(locked = true)
+            WearAction.UNLOCK -> snap.copy(locked = false)
+            WearAction.TOGGLE_CLIMATE ->
+                snap.copy(climateOn = if (climateKnown) !(snap.climateOn ?: false) else null)
+            WearAction.CLIMATE_ON -> snap.copy(climateOn = if (climateKnown) true else null)
+            WearAction.CLIMATE_OFF -> snap.copy(climateOn = if (climateKnown) false else null)
+            WearAction.TOGGLE_CHARGE -> snap.copy(charging = !(snap.charging ?: false))
+            WearAction.CHARGE_ON -> snap.copy(charging = true)
+            WearAction.CHARGE_OFF -> snap.copy(charging = false)
+            else -> snap
+        }
     }
 
     /**
