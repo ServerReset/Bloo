@@ -6,13 +6,16 @@ import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.graphics.Bitmap
 import android.net.Uri
 import android.os.Build
 import android.provider.Settings
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
+import androidx.core.graphics.drawable.IconCompat
 import com.bloo.bluelink.R
+import com.bloo.bluelink.widget.WidgetPhoto
 
 /** Posts Bloo's local alerts (service due, door left open, car left running). */
 object Notifications {
@@ -335,6 +338,34 @@ object LiveCharge {
     }
 
     /**
+     * Deep-links to the OS Developer options screen -- `Settings.ACTION_APPLICATION_DEVELOPMENT_SETTINGS`.
+     *
+     * Exists for one specific, confirmed-on-a-real-device reason: at least through One UI 8.5,
+     * Samsung gates whether a Live Update actually renders as a chip behind its OWN switch,
+     * "Live notifications for all apps" -- found in Developer options, not the generic
+     * per-app Live Updates permission [isPromotable] already checks. A device can pass every
+     * row of the promotion checklist plus [isPromotable] returning true and still never show
+     * a chip because this Samsung-only gate is off, with nothing in the standard Android
+     * notification APIs able to see or report that state. There is no known intent extra to
+     * jump straight to that one row -- Developer options is a flat, OEM-arranged list -- so
+     * this can only land on the screen, not the exact toggle; [SettingsScreen]'s
+     * troubleshooting steps tell the user what to look for once there.
+     *
+     * If Developer options themselves aren't enabled yet, this intent resolves to nothing on
+     * most OEM builds rather than opening a blocked screen -- silently, same as the two
+     * runCatching calls elsewhere in this file. There is no reliable settings action for "the
+     * screen you enable Developer options from" across OEM skins (Samsung places the
+     * build-number tap under About phone > Software information, not the stock location), so
+     * the troubleshooting text spells out the manual path instead of guessing an intent that
+     * might resolve to the wrong screen on a given OEM.
+     */
+    fun openDeveloperOptions(context: Context) {
+        val intent = Intent(Settings.ACTION_APPLICATION_DEVELOPMENT_SETTINGS)
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        runCatching { context.startActivity(intent) }
+    }
+
+    /**
      * Convenience overload: derive the five charge fields from an [EvStatus] and delegate.
      *
      * The three callers named below -- AppViewModel's post-refresh hook, AlertWorker, and
@@ -418,6 +449,14 @@ object LiveCharge {
             return
         }
         if (runCatching { settings.liveChargeDismissed(vin) }.getOrDefault(false)) return
+        // The same photo the hero card shows, reused as the notification's large icon --
+        // ties the bar back to the actual car instead of a generic icon. Always a local
+        // file (see SettingsStore.imageUrl's own doc), so this is disk I/O, never a
+        // network fetch, and WidgetPhoto.decodeCached already downsamples + LRU-caches it
+        // for exactly this "decode a car photo outside Compose" job -- the widget's own
+        // photo background uses the same call. runCatching because a missing/corrupt file
+        // must never cost the bar itself; a null large icon is a graceful no-op.
+        val carPhoto = runCatching { settings.imageUrl(vin)?.let { WidgetPhoto.decodeCached(it) } }.getOrNull()
         update(
             context = context,
             vin = vin,
@@ -428,6 +467,7 @@ object LiveCharge {
             pluggedInLabel = pluggedInLabel,
             enabled = true,
             chargeLimit = chargeLimit,
+            carPhoto = carPhoto,
         )
     }
 
@@ -454,6 +494,10 @@ object LiveCharge {
         /** The charge limit for whichever plug is connected, if reported --
          *  drawn as a point marker on the bar. */
         chargeLimit: Int? = null,
+        /** The car's own photo, already decoded (see [sync]) -- shown as the notification's
+         *  large icon so the bar reads as THIS car, the same way the hero card's photo does.
+         *  Null falls back to the plain small icon with nothing extra, never an error. */
+        carPhoto: Bitmap? = null,
     ) {
         val id = idFor(vin)
         // Check THIS feature's own channel, not the alerts channel: the charging bar posts to
@@ -494,6 +538,13 @@ object LiveCharge {
         } else {
             style.setProgressIndeterminate(true)
         }
+        // A small car glyph riding the bar at the current fill point -- the same one the
+        // status bar's small icon uses, so this doesn't need a second asset drawn just for
+        // this. Google's own sample for this API rides a full-colour vehicle icon; this one
+        // stays the monochrome mask ic_stat_bloo already is rather than adding a colour
+        // variant on spec, since the tracker icon is cosmetic and a missing/wrong-format
+        // second asset is not a risk worth taking for it.
+        style.setProgressTrackerIcon(IconCompat.createWithResource(context, R.drawable.ic_stat_bloo))
 
         // "82% · to 80% · 1h 20m left · Plugged in (AC)" -- only the pieces
         // the car actually reported, joined with no stray separator for a
@@ -552,6 +603,12 @@ object LiveCharge {
             .setContentTitle("$carName is charging")
             .setContentText(detail.ifBlank { "Charging" })
             .setCategory(NotificationCompat.CATEGORY_PROGRESS)
+            // The hero card's own photo, when there is one -- see [sync]. Large icon, not a
+            // background: a promoted notification can never have a custom background image,
+            // because that means customContentView (RemoteViews), and RemoteViews is promotion
+            // condition 6's explicit disqualifier. This is the closest a promoted notification
+            // can get to "looks like the hero card" without giving up promotion to get there.
+            .apply { carPhoto?.let { setLargeIcon(it) } }
             // VISIBILITY_PUBLIC, restored from the working version. Without it the
             // default is VISIBILITY_PRIVATE, and a secured lock screen hides a private
             // notification's content -- on the lock screen and the always-on display,

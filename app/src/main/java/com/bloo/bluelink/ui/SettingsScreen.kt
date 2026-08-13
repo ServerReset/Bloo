@@ -1085,19 +1085,39 @@ internal fun SettingsScreen(vm: AppViewModel) {
                 // system decision this app cannot force -- Android 16+ has a
                 // real API to check the user's per-app toggle for it, though,
                 // so query it instead of guessing.
-                if (notif.charging && Build.VERSION.SDK_INT >= 36) {
-                    val ctx = LocalContext.current
-                    if (!LiveCharge.isPromotable(ctx)) {
-                        Text(
-                            "Not showing in the status bar? Tap to fix",
-                            style = MaterialTheme.typography.labelSmall,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier
-                                .clickable { LiveCharge.openLiveUpdateSettings(ctx) }
-                                .padding(vertical = 4.dp)
-                                .padding(bottom = 6.dp),
-                        )
+                if (notif.charging) {
+                    var showTroubleshoot by remember { mutableStateOf(false) }
+                    if (Build.VERSION.SDK_INT >= 36) {
+                        val ctx = LocalContext.current
+                        if (!LiveCharge.isPromotable(ctx)) {
+                            Text(
+                                "Not showing in the status bar? Tap to fix",
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier
+                                    .clickable { LiveCharge.openLiveUpdateSettings(ctx) }
+                                    .padding(vertical = 4.dp)
+                                    .padding(bottom = 4.dp),
+                            )
+                        }
+                    }
+                    // Still shown even when isPromotable is already true: that check only
+                    // covers the generic Android permission, and at least one real OEM (see
+                    // LiveUpdateTroubleshootDialog) gates the chip behind a second switch that
+                    // permission can't see -- confirmed on a real device this app had no way
+                    // to detect from here.
+                    Text(
+                        "Live update not showing up? Troubleshooting steps",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier
+                            .clickable { showTroubleshoot = true }
+                            .padding(vertical = 4.dp)
+                            .padding(bottom = 6.dp),
+                    )
+                    if (showTroubleshoot) {
+                        LiveUpdateTroubleshootDialog(onDismiss = { showTroubleshoot = false })
                     }
                 }
                 HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
@@ -1697,6 +1717,72 @@ internal fun SettingsScreen(vm: AppViewModel) {
             }
         }
   }
+}
+
+/**
+ * Ordered troubleshooting steps for "the charging bar shows but never promotes to a
+ * status-bar/lock-screen chip" -- the one Live Updates failure mode this app can neither
+ * detect nor fix from code, because every cause past the first two lives outside the
+ * documented Android APIs (see [LiveCharge]'s class doc: all nine code-checkable promotion
+ * conditions are satisfied unconditionally by [LiveCharge.update]).
+ *
+ * Step 4 is Samsung-only and was not theoretical: confirmed live on a real Samsung phone
+ * running One UI 8.5 (fully patched, well past the general Live Updates rollout) that the
+ * chip stayed dark even with every documented condition met AND [LiveCharge.isPromotable]
+ * already reporting true, because One UI hides a SECOND gate -- "Live notifications for all
+ * apps" -- inside Developer options, off by default, invisible to the standard
+ * `canPostPromotedNotifications()` API this app already checks. Flipping it was the fix.
+ * [LiveUpdateTroubleshootDialog] can't detect that state itself (no such API exists to
+ * query), only point at where to look.
+ */
+@Composable
+private fun LiveUpdateTroubleshootDialog(onDismiss: () -> Unit) {
+    val context = LocalContext.current
+    val isSamsung = remember { Build.MANUFACTURER.lowercase() == "samsung" }
+    GlassAlertDialog(
+        onDismissRequest = onDismiss,
+        icon = Icons.Filled.Info,
+        title = "Live update not showing?",
+        text = {
+            Text("A few things to check, in order:", style = MaterialTheme.typography.bodyMedium)
+            Spacer(Modifier.height(10.dp))
+            TroubleshootStep(1, "Make sure \"Live charging updates\" is on above, and the car is actually charging -- the bar only exists while charging is true.")
+            TroubleshootStep(2, "Below Android 16, the chip can never appear anywhere -- only the plain progress bar in the shade. That's expected, not a bug.")
+            TroubleshootStep(3, "On Android 16+, use the \"Tap to fix\" link above if it's showing -- that's the OS's own per-app Live Updates permission.")
+            if (isSamsung) {
+                TroubleshootStep(
+                    4,
+                    "Samsung phones have a SECOND, separate switch this app can't see or set: " +
+                        "Settings → Developer options → a \"Live notifications\" toggle " +
+                        "(exact wording varies by One UI version). If Developer options aren't " +
+                        "enabled yet: Settings → About phone → tap \"Build number\" 7 times.",
+                )
+            }
+        },
+        buttons = {
+            if (isSamsung) {
+                MorphButton(
+                    onClick = { LiveCharge.openDeveloperOptions(context) },
+                    modifier = Modifier.fillMaxWidth(),
+                ) { Text("Open Developer options") }
+            }
+            MorphTextButton("Close", onDismiss, modifier = Modifier.fillMaxWidth())
+        },
+    )
+}
+
+@Composable
+private fun TroubleshootStep(number: Int, text: String) {
+    Row(modifier = Modifier.padding(bottom = 10.dp)) {
+        Text(
+            "$number.",
+            style = MaterialTheme.typography.bodyMedium,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.width(20.dp),
+        )
+        Text(text, style = MaterialTheme.typography.bodyMedium)
+    }
 }
 
 /** One reorderable car entry in Settings; tap to expand its setup + photo. */

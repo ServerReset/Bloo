@@ -2175,7 +2175,7 @@ private fun OtpCodeField(code: String, onCodeChange: (String) -> Unit) {
  * that used to visually tie them together.
  */
 @Composable
-private fun GlassAlertDialog(
+internal fun GlassAlertDialog(
     onDismissRequest: () -> Unit,
     title: String,
     text: @Composable ColumnScope.() -> Unit,
