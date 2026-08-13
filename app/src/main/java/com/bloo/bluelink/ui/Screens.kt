@@ -51,6 +51,9 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.FastOutLinearInEasing
 import androidx.compose.animation.core.LinearOutSlowInEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -5756,8 +5759,11 @@ internal fun UpdateAvailableTile(state: UiState, vm: AppViewModel, dragHandle: M
                 Icon(statusIcon, contentDescription = null, tint = statusTint, modifier = Modifier.size(20.dp))
                 Text(statusText, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
             }
-            // Live download progress bar.
-            if (state.updateDownloading) {
+            // Live download progress bar. Own PopVisible rather than a bare `if` --
+            // this bar arrives and leaves while the tile is already open (download
+            // starts, download finishes), which is exactly the "pops in/out on its
+            // own" case PopVisible exists for.
+            PopVisible(visible = state.updateDownloading) {
                 val p = downloadProgress
                 if (p != null) {
                     LinearProgressIndicator(progress = { p }, modifier = Modifier.fillMaxWidth())
@@ -5767,29 +5773,32 @@ internal fun UpdateAvailableTile(state: UiState, vm: AppViewModel, dragHandle: M
             }
             // Release notes ("What's new"), capped, with a "Full notes" link to the
             // release page when there's more than we show.
-            info.run.releaseNotes?.let { notes ->
-                // "Full notes" rides in the section header rather than taking a
-                // whole row of its own below the excerpt — one less stacked block
-                // in a tile that already carries status, notes and two dismissals.
-                Row(verticalAlignment = Alignment.CenterVertically) {
+            PopVisible(visible = info.run.releaseNotes != null) {
+                val notes = info.run.releaseNotes.orEmpty()
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    // "Full notes" rides in the section header rather than taking a
+                    // whole row of its own below the excerpt — one less stacked block
+                    // in a tile that already carries status, notes and two dismissals.
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            "What's new",
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = scheme.onSurfaceVariant,
+                            modifier = Modifier.weight(1f),
+                        )
+                        MorphTextButton("Full notes", onClick = {
+                            runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(info.run.htmlUrl))) }
+                        })
+                    }
                     Text(
-                        "What's new",
-                        style = MaterialTheme.typography.labelSmall,
-                        fontWeight = FontWeight.Bold,
+                        notes.trim(),
+                        style = MaterialTheme.typography.bodySmall,
                         color = scheme.onSurfaceVariant,
-                        modifier = Modifier.weight(1f),
+                        maxLines = 5,
+                        overflow = TextOverflow.Ellipsis,
                     )
-                    MorphTextButton("Full notes", onClick = {
-                        runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(info.run.htmlUrl))) }
-                    })
                 }
-                Text(
-                    notes.trim(),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = scheme.onSurfaceVariant,
-                    maxLines = 5,
-                    overflow = TextOverflow.Ellipsis,
-                )
             }
             // Progressive install help: only in the tap-through (non-seamless) path, and
             // only as an opt-in disclosure — the Play-Protect steps are scaffolding, not
@@ -5797,7 +5806,7 @@ internal fun UpdateAvailableTile(state: UiState, vm: AppViewModel, dragHandle: M
             if (!seamless) {
                 var showHelp by rememberSaveable(info.run.runNumber) { mutableStateOf(false) }
                 MorphTextButton(if (showHelp) "Hide install help" else "Trouble installing?", onClick = { showHelp = !showHelp })
-                AnimatedVisibility(visible = showHelp) {
+                PopVisible(visible = showHelp) {
                     Surface(
                         shape = RoundedCornerShape(12.dp),
                         color = scheme.surfaceContainerHighest,
@@ -6507,7 +6516,12 @@ private fun HeroMorphReadout(
                 Text("Fuel $fuelPct%", style = type.bodyMedium, color = fuelColor, maxLines = 1)
             }
         }
-        ChargeSegmentBar(frac = animatedChargeFrac(data.frac), limitPct = data.limitPct, stuckAtLimit = data.stuckAtLimit)
+        ChargeSegmentBar(
+            frac = animatedChargeFrac(data.frac),
+            limitPct = data.limitPct,
+            stuckAtLimit = data.stuckAtLimit,
+            charging = data.charging,
+        )
     }
 }
 
@@ -6542,9 +6556,27 @@ private fun HeroMorphReadout(
  * The limit split still animates: the fill springs to its target the same way it
  * always did, and the limit split slides to a new position rather than snapping
  * between two frames if the limit itself changes while charging.
+ *
+ * Two more animations, phone-only ("more motion on the phone card... keep others
+ * static but visually matching" -- the widget and the notification are real
+ * RemoteViews/Glance surfaces with no animation APIs to reach for, so this is the
+ * one place any of this can live):
+ *  - the fill's own colour springs between green and blue rather than snapping the
+ *    instant [stuckAtLimit] flips, so reaching the limit reads as the bar arriving
+ *    somewhere rather than a hard colour cut mid-frame;
+ *  - while [charging] is true, a soft highlight sweeps once across the filled
+ *    segment on a loop -- the one piece of genuinely ambient motion on this card,
+ *    there specifically to read as "still happening" during the long stretches
+ *    where the fill itself has already settled and isn't moving on its own.
  */
 @Composable
-private fun ChargeSegmentBar(frac: Float, limitPct: Int?, stuckAtLimit: Boolean, modifier: Modifier = Modifier) {
+private fun ChargeSegmentBar(
+    frac: Float,
+    limitPct: Int?,
+    stuckAtLimit: Boolean,
+    charging: Boolean,
+    modifier: Modifier = Modifier,
+) {
     val scheme = MaterialTheme.colorScheme
     val limit = limitPct?.takeIf { it in 1..99 }
     val trackColor = scheme.onSurface.copy(alpha = 0.16f)
@@ -6557,11 +6589,20 @@ private fun ChargeSegmentBar(frac: Float, limitPct: Int?, stuckAtLimit: Boolean,
     // separately-rounded shape, not instead of it.
     val farBackdropColor = Color.Black.copy(alpha = 0.35f)
     val trackDimColor = scheme.onSurface.copy(alpha = 0.08f)
-    val fillBrush = if (stuckAtLimit) {
-        listOf(ChargeBlueDark, ChargeBlue)
-    } else {
-        listOf(ChargeGreenDark, ChargeGreen)
-    }
+    // Sprung, not a plain `if`: this used to pick the two-item colour list outright,
+    // so a car finishing its last percent to the limit cut from green to blue on
+    // whatever single frame stuckAtLimit flipped. Springing both gradient stops gives
+    // that moment an actual transition instead of a colour popping mid-draw.
+    val fillDark by androidx.compose.animation.animateColorAsState(
+        targetValue = if (stuckAtLimit) ChargeBlueDark else ChargeGreenDark,
+        animationSpec = spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessLow),
+        label = "chargeFillDark",
+    )
+    val fillLight by androidx.compose.animation.animateColorAsState(
+        targetValue = if (stuckAtLimit) ChargeBlue else ChargeGreen,
+        animationSpec = spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessLow),
+        label = "chargeFillLight",
+    )
     // Animatable, not animateFloatAsState, for the same reason the old marker's slide
     // was: snap to the first-ever value (no previous position to animate FROM when a
     // limit first appears), spring for every change after that.
@@ -6575,6 +6616,23 @@ private fun ChargeSegmentBar(frac: Float, limitPct: Int?, stuckAtLimit: Boolean,
             limitSeen = true
             limitAnim.snapTo(target)
         }
+    }
+    // The charging shimmer's own travelling position, 0 at the fill's start and 1 at
+    // its end -- built (not just gated) only while charging, so an idle/parked car
+    // pays nothing for an InfiniteTransition it will never render: no ticket, no
+    // per-frame invalidation, nothing running in the background of a page that's
+    // sitting on a fully charged or unplugged car.
+    val shimmerX = if (charging) {
+        val shimmer = rememberInfiniteTransition(label = "chargeShimmer")
+        val x by shimmer.animateFloat(
+            initialValue = -0.6f,
+            targetValue = 1.6f,
+            animationSpec = infiniteRepeatable(tween(1800, easing = LinearEasing), RepeatMode.Restart),
+            label = "chargeShimmerX",
+        )
+        x
+    } else {
+        null
     }
     // DRAWN, not composed -- see the git history here for why: this used to be a
     // BoxWithConstraints holding a Row of Boxes plus an offset child for the marker, and
@@ -6601,10 +6659,37 @@ private fun ChargeSegmentBar(frac: Float, limitPct: Int?, stuckAtLimit: Boolean,
         )
         if (layout.fillWidth > 0f) {
             drawRoundRect(
-                brush = Brush.horizontalGradient(fillBrush, startX = 0f, endX = layout.fillWidth),
+                brush = Brush.horizontalGradient(
+                    listOf(fillDark, fillLight),
+                    startX = 0f,
+                    endX = layout.fillWidth,
+                ),
                 size = Size(layout.fillWidth, h),
                 cornerRadius = radius,
             )
+            // The shimmer band: transparent everywhere except a soft white peak that
+            // travels with shimmerX. Drawn as a SECOND rounded rect the same size as
+            // the fill (rather than a separate clip) -- drawRoundRect only lights up
+            // the pixels its own shape covers, so this rides on top of the gradient
+            // above without needing to clip anything itself. A linear (not radial)
+            // brush with Transparent at both ends is safe to position anywhere,
+            // including bandCenter values outside the fill's own bounds, because
+            // Brush.linearGradient clamps to its end colour past start/end -- which
+            // is Transparent here -- so there is no stop-ordering math to get wrong
+            // as the band enters and leaves.
+            if (shimmerX != null) {
+                val bandWidth = layout.fillWidth * 0.35f
+                val bandCenter = layout.fillWidth * shimmerX
+                drawRoundRect(
+                    brush = Brush.linearGradient(
+                        colors = listOf(Color.Transparent, Color.White.copy(alpha = 0.30f), Color.Transparent),
+                        start = Offset(bandCenter - bandWidth, 0f),
+                        end = Offset(bandCenter + bandWidth, 0f),
+                    ),
+                    size = Size(layout.fillWidth, h),
+                    cornerRadius = radius,
+                )
+            }
         }
         if (layout.hasSingleTrack) {
             // No limit at all, or already at/past it: one remaining segment, the
@@ -10414,33 +10499,41 @@ private fun ClimatePebble(
         // tile and the watch: ~10°F off ambient normally, or the car's most
         // aggressive setting on a genuinely extreme day, always within what the
         // car's own climate range actually accepts.
-        if (weather != null) {
-            val ambientF = ambientFahrenheit(weather.tempC)
-            val smartTarget = smartClimateTargetF(ambientF)
-            val targetLabel = degLabel(smartTarget.toString(), fahrenheit)
-            val ambientLabel = degLabel(ambientF.toString(), fahrenheit)
-            val smartLabel = if (smartClimateIsCooling(ambientF)) "Cool to $targetLabel" else "Heat to $targetLabel"
-            SectionLabel("Smart climate")
-            MorphButton(
-                onClick = {
-                    tempF = smartTarget
-                    defrost = false
-                    activePresetId = null
-                    vm.startClimate(v, currentReq.copy(tempF = smartTarget, defrost = false))
-                },
-                enabled = !pending && !climateOn,
-                modifier = Modifier.fillMaxWidth(),
-                contentPadding = PaddingValues(vertical = 12.dp),
-            ) {
-                Icon(Icons.Filled.AcUnit, contentDescription = null, modifier = Modifier.size(18.dp))
-                Spacer(Modifier.width(8.dp))
-                Text(smartLabel, fontWeight = FontWeight.SemiBold)
+        // Its own PopVisible: weather can arrive AFTER the pebble is already open (it's
+        // a separate fetch), so this section pops in live rather than only ever being
+        // present from the first frame.
+        PopVisible(visible = weather != null) {
+            val w = weather
+            if (w != null) {
+                val ambientF = ambientFahrenheit(w.tempC)
+                val smartTarget = smartClimateTargetF(ambientF)
+                val targetLabel = degLabel(smartTarget.toString(), fahrenheit)
+                val ambientLabel = degLabel(ambientF.toString(), fahrenheit)
+                val smartLabel = if (smartClimateIsCooling(ambientF)) "Cool to $targetLabel" else "Heat to $targetLabel"
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    SectionLabel("Smart climate")
+                    MorphButton(
+                        onClick = {
+                            tempF = smartTarget
+                            defrost = false
+                            activePresetId = null
+                            vm.startClimate(v, currentReq.copy(tempF = smartTarget, defrost = false))
+                        },
+                        enabled = !pending && !climateOn,
+                        modifier = Modifier.fillMaxWidth(),
+                        contentPadding = PaddingValues(vertical = 12.dp),
+                    ) {
+                        Icon(Icons.Filled.AcUnit, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text(smartLabel, fontWeight = FontWeight.SemiBold)
+                    }
+                    Text(
+                        "It's $ambientLabel where your car is. Smart climate is targeting $targetLabel.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = LocalContentColor.current.copy(alpha = MutedContentAlpha),
+                    )
+                }
             }
-            Text(
-                "It's $ambientLabel where your car is. Smart climate is targeting $targetLabel.",
-                style = MaterialTheme.typography.bodySmall,
-                color = LocalContentColor.current.copy(alpha = MutedContentAlpha),
-            )
         }
 
         SectionLabel("Controls")
@@ -11064,7 +11157,9 @@ private fun ChargePebble(v: Vehicle, status: VehicleStatus?, enabled: Boolean, s
             // No trailing Spacer — the cover shell's spacedBy(10.dp) owns the gap, so
             // the hero-to-content rhythm matches every CoverHero tile (was 26dp here).
         }
-        if (plugged) {
+        // Its own PopVisible: this row arrives/leaves live while the pebble is open --
+        // plugging or unplugging the car doesn't require re-expanding to see it change.
+        PopVisible(visible = plugged) {
             chargerLabel(ev?.batteryPlugin)?.let { StatusRow("Charger", it) }
         }
         // Charge-limit editing is shown only for brands that can actually report the

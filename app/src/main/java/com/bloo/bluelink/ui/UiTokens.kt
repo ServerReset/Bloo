@@ -2,11 +2,17 @@
 
 package com.bloo.bluelink.ui
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.AnimatedVisibilityScope
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 // No `motionScheme` import: it is a member of the MaterialTheme object (verified as
@@ -15,6 +21,7 @@ import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
@@ -186,14 +193,80 @@ internal const val AdvancedModeStiffness = 130f
  * uncovered content its own independent fade-in distinct from what's already visible above
  * it, which is what "steps in as it's uncovered" actually needs. Back to the plain
  * `defaultEffectsSpec` this token had before either attempt.
+ *
+ * The OPEN half of the height, though, DOES use a dedicated bounce spring rather than
+ * `defaultSpatialSpec` -- asked for explicitly ("an animation on the box that like
+ * bounces"), and picked over layering a second scale-pulse on top of the resize for the
+ * same reason a second animateContentSize was rejected two comments up: two independently
+ * sprung animations chasing the same box fight each other every frame. One spring, tuned to
+ * actually overshoot, both delivers the bounce and stays the single source of truth for the
+ * card's bounds.
+ *
+ * The CLOSE half deliberately does NOT reuse that same bouncy spring. shrinkVertically drives
+ * an IntSize animating towards zero; an underdamped spring overshoots its target in both
+ * directions, and undershooting a zero height is a negative size a layout node cannot report,
+ * so the frames near the end of a bouncy collapse would clamp to zero early and then sit
+ * there while the spring's math thinks it's still moving -- a stutter, not a bounce. Closing
+ * keeps the calmer default spec; the bounce reads on the way open, where there's headroom
+ * past the target for the overshoot to actually be visible.
  */
+private const val PebbleBounceDamping = 0.6f
+private val PebbleBounceStiffness = Spring.StiffnessMediumLow
+
 @Composable
 internal fun collapseEnter(expandFrom: Alignment.Vertical = Alignment.Top): EnterTransition =
     fadeIn(MaterialTheme.motionScheme.defaultEffectsSpec<Float>()) +
-        expandVertically(MaterialTheme.motionScheme.defaultSpatialSpec<IntSize>(), expandFrom = expandFrom)
+        expandVertically(
+            spring(dampingRatio = PebbleBounceDamping, stiffness = PebbleBounceStiffness),
+            expandFrom = expandFrom,
+        )
 
-/** Mirror of [collapseEnter]; see there for why both halves are springs. */
+/** Mirror of [collapseEnter]; see there for why both halves are springs, and for why only
+ *  the OPEN direction bounces. */
 @Composable
 internal fun collapseExit(shrinkTowards: Alignment.Vertical = Alignment.Top): ExitTransition =
     fadeOut(MaterialTheme.motionScheme.defaultEffectsSpec<Float>()) +
         shrinkVertically(MaterialTheme.motionScheme.defaultSpatialSpec<IntSize>(), shrinkTowards = shrinkTowards)
+
+/**
+ * Independent pop-in/pop-out for ONE row-level element that appears or disappears while its
+ * pebble is already open -- a sync badge landing, a preset chip becoming available, a
+ * conditional row switching on. Deliberately separate from [collapseEnter]/[collapseExit],
+ * which animate a pebble's body as a single block and, per the doc there, cannot stagger: two
+ * prior attempts tried to fake a "steps in as it's uncovered" effect with one shared alpha
+ * over the whole revealed block and both were reverted, because a shared alpha can only dim
+ * the WHOLE block together. This is the different, viable version of that ask -- every call
+ * site gets its OWN [AnimatedVisibility] and its own transition state, so row B popping in
+ * does not wait on row A's animation or share its alpha with it.
+ *
+ * Scale-and-fade, not height-based. A pebble body already animates ITS size via
+ * `animateContentSize` (see the comment on that modifier in PebbleShell) whenever content
+ * inside it changes -- adding expandVertically/shrinkVertically on a row nested inside that
+ * would be a second, independently-sprung party changing the same height at the same time,
+ * which is exactly the double-animation stutter documented at [collapseEnter]. A pop that
+ * changes how the row DRAWS (scale, alpha) rather than the space it occupies rides on top of
+ * that outer size animation instead of contending with it.
+ *
+ * [PebbleBounceDamping] again for the scale half, so a popped-in row overshoots slightly and
+ * settles -- matching the card's own open bounce rather than introducing a second, unrelated
+ * feel for "things arriving."
+ */
+@Composable
+internal fun PopVisible(
+    visible: Boolean,
+    modifier: Modifier = Modifier,
+    content: @Composable AnimatedVisibilityScope.() -> Unit,
+) {
+    AnimatedVisibility(
+        visible = visible,
+        modifier = modifier,
+        enter = fadeIn(MaterialTheme.motionScheme.defaultEffectsSpec<Float>()) +
+            scaleIn(
+                spring(dampingRatio = PebbleBounceDamping, stiffness = PebbleBounceStiffness),
+                initialScale = 0.8f,
+            ),
+        exit = fadeOut(MaterialTheme.motionScheme.defaultEffectsSpec<Float>()) +
+            scaleOut(MaterialTheme.motionScheme.defaultSpatialSpec<Float>(), targetScale = 0.8f),
+        content = content,
+    )
+}
