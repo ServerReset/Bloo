@@ -6504,30 +6504,36 @@ private fun HeroMorphReadout(
 }
 
 /**
- * The hero's charge bar: three plain segments -- filled up to the current charge,
- * a track segment up to the limit, and a dimmer track segment past it -- or two
- * when the charge is already at (or past) its limit, since there's no "still
- * charging toward the limit" zone left to show separately.
+ * The hero's charge bar: three plain, FLUSH segments -- filled up to the current
+ * charge, a track segment up to the limit, and a darker-backdrop dim segment past
+ * it -- or two when the charge is already at (or past) its limit, since there's no
+ * "still charging toward the limit" zone left to show separately. One unbroken
+ * shape throughout: no gaps anywhere, only the outer two ends of the whole bar are
+ * ever rounded (a single clip around the whole draw pass, everything inside it a
+ * plain rectangle).
  *
- * Replaces the earlier gap-and-dot design (a seam where the fill ended, plus a
- * small circular marker drawn on top at the limit): that version's own doc
- * explained why the marker was chosen over a second split -- charge sitting AT
- * its limit (the common case) put both devices on the same pixel, "a 5dp hole
- * under a 14dp dot." This version's OWN limit split does not have that
- * collision: when the charge is at or past its limit there is only ONE split
- * left (there is nothing left to divide between "will still charge" and "won't"),
- * so the exact case that broke the old two-device design is precisely the case
- * this one collapses down to a single, unambiguous line. Requested directly
- * after the notification's own tracker-icon version of this bar read as
- * cluttered on a real device.
+ * Replaces two earlier designs in turn:
+ *  1. A seam where the fill ended, plus a small circular marker drawn on top at
+ *     the limit -- charge sitting AT its limit (the common case) put both devices
+ *     on the same pixel, "a 5dp hole under a 14dp dot."
+ *  2. A three-segment version that put a physical GAP at the limit split to fix
+ *     (1)'s marker-vs-fill collision and a real "can't tell the two track shades
+ *     apart" complaint that followed once the marker was gone -- but a short
+ *     middle piece bounded by a gap on both sides is indistinguishable from three
+ *     separately-rounded pills at a glance, which was reported as its own, worse
+ *     complaint. THIS version keeps the fix (three segments, not a marker) and
+ *     drops the gap: the far segment now gets a genuinely darker BACKDROP colour
+ *     painted first, with the ordinary dim tint layered on top of it, so the
+ *     zone reads as distinct through colour and darkness alone rather than a
+ *     physical break -- the bar stays one continuous shape either way.
  *
  * Blue fill instead of green when the charge has reached its limit -- "topped
  * up," not "still filling" -- regardless of whether the car is actively
  * reporting a charging session, so the colour stays accurate hours after the
  * car finished charging to that limit, not just while plugged in.
  *
- * Both splits animate: the fill springs to its target the same way it always
- * did, and the limit split slides to a new position rather than snapping
+ * The limit split still animates: the fill springs to its target the same way it
+ * always did, and the limit split slides to a new position rather than snapping
  * between two frames if the limit itself changes while charging.
  */
 @Composable
@@ -6535,8 +6541,16 @@ private fun ChargeSegmentBar(frac: Float, limitPct: Int?, stuckAtLimit: Boolean,
     val scheme = MaterialTheme.colorScheme
     val limit = limitPct?.takeIf { it in 1..99 }
     val trackColor = scheme.onSurface.copy(alpha = 0.16f)
-    // Half the near-track's alpha -- the same "quieter, not a different hue" treatment
-    // used for the limit-point's track everywhere else this bar's shape is echoed.
+    // The past-the-limit zone: a genuinely darker BACKDROP (fixed black, not a
+    // theme colour -- this card sits on an arbitrary car photo as often as a flat
+    // surface, and a black scrim is what already keeps text legible over that same
+    // photo elsewhere on this exact card, so it reads as "darker" regardless of
+    // what's underneath) painted first, with the ordinary dim tint layered on top of
+    // it. Two colours, not one: a single translucent tint at any alpha still reads
+    // as "the same track, slightly quieter" rather than a genuinely different zone,
+    // which was the request after the gap-based version (see below) read as
+    // separate rounded pills instead of one bar.
+    val farBackdropColor = Color.Black.copy(alpha = 0.35f)
     val trackDimColor = scheme.onSurface.copy(alpha = 0.08f)
     val fillBrush = if (stuckAtLimit) {
         listOf(ChargeBlueDark, ChargeBlue)
@@ -6582,7 +6596,14 @@ private fun ChargeSegmentBar(frac: Float, limitPct: Int?, stuckAtLimit: Boolean,
                 filledFrac = frac,
                 limitFrac = limit?.let { limitAnim.value },
                 stuckAtLimit = stuckAtLimit,
-                gap = ChargeLimitSplitGap.toPx(),
+                // No gap -- see the class doc: a physical break at the limit split
+                // fixed the earlier "can't tell the two track shades apart" complaint,
+                // but reading three PHYSICALLY separate pieces (each with its own
+                // rounded ends, since a short middle piece bounded by a gap on both
+                // sides is indistinguishable from three individually-rounded pills at
+                // a glance) was worse than the problem it solved. The darker backdrop
+                // below carries the distinction now instead of the gap.
+                gap = 0f,
             )
             if (layout.fillWidth > 0f) {
                 drawRect(
@@ -6592,32 +6613,40 @@ private fun ChargeSegmentBar(frac: Float, limitPct: Int?, stuckAtLimit: Boolean,
             }
             if (layout.hasSingleTrack) {
                 // No limit at all, or already at/past it: one remaining segment, the
-                // ordinary track colour when there's no limit to speak of, the DIM track
-                // when the charge is stuck there -- the whole remainder past the current
-                // charge means "won't fill further" in that case, not "still on the way".
+                // ordinary track colour when there's no limit to speak of, the DARKER
+                // backdrop + dim tint when the charge is stuck there -- the whole
+                // remainder past the current charge means "won't fill further" in
+                // that case, not "still on the way".
                 if (layout.singleTrackWidth > 0f) {
-                    drawRect(
-                        color = if (layout.singleTrackDim) trackDimColor else trackColor,
-                        topLeft = Offset(layout.singleTrackStart, 0f),
-                        size = Size(layout.singleTrackWidth, h),
-                    )
+                    val at = Offset(layout.singleTrackStart, 0f)
+                    val sz = Size(layout.singleTrackWidth, h)
+                    if (layout.singleTrackDim) {
+                        drawRect(color = farBackdropColor, topLeft = at, size = sz)
+                        drawRect(color = trackDimColor, topLeft = at, size = sz)
+                    } else {
+                        drawRect(color = trackColor, topLeft = at, size = sz)
+                    }
                 }
             } else {
-                // Two remaining segments: current -> limit (still filling toward it) and
-                // limit -> 100% (won't fill past it), split at the limit's own (animated)
-                // position. A real gap at THIS split, not just a colour change -- the two
-                // track shades alone (0.16/0.08 alpha) turned out too close to tell apart
-                // by eye once actually rendered small, on a real device, which read as one
-                // plain track instead of two: colour was doing a job only a physical break
-                // reliably does, the same reason the bar's very first design used a gap at
-                // all. Reported from a real device after the alpha-only version shipped.
-                // Only at the limit split -- the current-charge split stays flush, as
-                // asked for.
+                // Two remaining segments, flush: current -> limit (still filling toward
+                // it) and limit -> 100% (won't fill past it). No gap between them -- an
+                // earlier version put a physical break at this split, which fixed the
+                // original complaint that the two track shades alone were too close to
+                // tell apart, but then read as three separate rounded pills rather than
+                // one continuous bar (a short middle piece bounded by a gap on both
+                // sides is indistinguishable from one at a glance). The darker backdrop
+                // does that job now instead: the far segment gets its own solid-ish
+                // background PAINTED FIRST, with the ordinary dim tint layered on top,
+                // so it reads as a genuinely different zone through colour and darkness
+                // alone, with the bar staying one unbroken shape.
                 if (layout.midWidth > 0f) {
                     drawRect(color = trackColor, topLeft = Offset(layout.midStart, 0f), size = Size(layout.midWidth, h))
                 }
                 if (layout.farWidth > 0f) {
-                    drawRect(color = trackDimColor, topLeft = Offset(layout.farStart, 0f), size = Size(layout.farWidth, h))
+                    val at = Offset(layout.farStart, 0f)
+                    val sz = Size(layout.farWidth, h)
+                    drawRect(color = farBackdropColor, topLeft = at, size = sz)
+                    drawRect(color = trackDimColor, topLeft = at, size = sz)
                 }
             }
         }
@@ -6627,8 +6656,11 @@ private fun ChargeSegmentBar(frac: Float, limitPct: Int?, stuckAtLimit: Boolean,
 /**
  * Pure segment-boundary math for [ChargeSegmentBar], pulled out of its DrawScope
  * specifically so it can be unit-tested without a Compose runtime -- see
- * ChargeSegmentBarTest. [limitFrac]/[stuckAtLimit] mirror the composable's own params,
- * [gap] is the physical break reserved at the limit split (see [ChargeLimitSplitGap]).
+ * ChargeSegmentBarTest. [limitFrac]/[stuckAtLimit] mirror the composable's own params.
+ * [gap] is a physical break reserved at the limit split, kept as a general parameter
+ * for the tests that exercise it even though [ChargeSegmentBar] itself now always
+ * calls this with `gap = 0f` -- the bar is flush throughout; see that composable's
+ * own doc for why the gap it used to draw with is gone.
  */
 internal data class ChargeBarLayout(
     val fillWidth: Float,
