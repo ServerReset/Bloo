@@ -719,7 +719,14 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             }
         }
         // Probe on-device Gemini Nano once; the AI toggle only appears if present.
-        viewModelScope.launch {
+        // Dispatchers.IO -- like the Shizuku probe right below, and for the same
+        // reason its own comment states but this one didn't follow: ai.isSupported()
+        // touches a `by lazy` Summarizer client on first call (Ai.kt), constructing
+        // an ML Kit client synchronously before the real suspension point, and
+        // viewModelScope defaults to Dispatchers.Main.immediate. That construction
+        // cost was landing on the main thread at exactly the moment of the reported
+        // cold-start lag, alongside every other init-block probe.
+        viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
             val supported = ai.isSupported()
             if (supported) {
                 _state.update {
