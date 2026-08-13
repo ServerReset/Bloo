@@ -26,6 +26,11 @@ import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 // and defaultSpatialSpec on MotionScheme. Screens.kt imports none of them either.
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
+// State<T>'s `by` delegate isn't a member -- it resolves to this file-scope operator
+// extension, which the compiler will not find without an explicit import (unlike most of
+// this file's other extension functions, which show up as unresolved-reference errors
+// instead of this one's more oblique "has no method getValue... cannot serve as a delegate").
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
