@@ -28,9 +28,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.TransformOrigin
-import androidx.compose.ui.layout.HorizontalAlignmentLine
 import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.layout.Measured
+import androidx.compose.ui.layout.VerticalAlignmentLine
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntSize
@@ -297,9 +297,15 @@ internal fun PopVisible(
 private object NoOpColumnScope : ColumnScope {
     override fun Modifier.weight(weight: Float, fill: Boolean): Modifier = this
     override fun Modifier.align(alignment: Alignment.Horizontal): Modifier = this
-    override fun Modifier.alignBy(alignmentLine: HorizontalAlignmentLine): Modifier = this
+    // VerticalAlignmentLine, not Horizontal -- Column stacks children top-to-bottom, so the
+    // alignment line it aligns children BY is one that carries an X offset (a "vertical"
+    // line, in Compose's naming: the line runs vertically, at some horizontal position).
+    // HorizontalAlignmentLine (a Y offset, the FirstBaseline/LastBaseline shape) is what
+    // RowScope aligns by instead -- confirmed by CI, which also rejected the alignByBaseline()
+    // override right below the line this replaced: ColumnScope has no such shortcut, since
+    // "align by baseline" is specifically a Row concept.
+    override fun Modifier.alignBy(alignmentLine: VerticalAlignmentLine): Modifier = this
     override fun Modifier.alignBy(alignmentLineBlock: (Measured) -> Int): Modifier = this
-    override fun Modifier.alignByBaseline(): Modifier = this
 }
 
 /** How much of the shared progress each row's own stagger window is offset by, end to end --
