@@ -4,11 +4,13 @@ package com.bloo.bluelink.ui
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.AnimatedVisibilityScope
+import androidx.compose.animation.EnterExitState
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
-import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.Transition
+import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandVertically
@@ -24,8 +26,6 @@ import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 // and defaultSpatialSpec on MotionScheme. Screens.kt imports none of them either.
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -36,7 +36,6 @@ import androidx.compose.ui.layout.VerticalAlignmentLine
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import kotlinx.coroutines.delay
 
 /**
  * The phone UI's shared design vocabulary: the sizes, colours and motion that more than one
@@ -221,9 +220,11 @@ internal const val AdvancedModeStiffness = 130f
  * negative size, which a layout node cannot report. A layout engine clamps that to zero
  * instead, which is a stutter (the spring's own math thinks it's still below zero and moving,
  * but what's on screen just sits at zero until the spring catches back up), not a bounce.
- * [PebbleCloseBounceDamping] is deliberately much closer to critically damped than the open
- * spring -- enough overshoot to read as "the same object bouncing," small enough that the
- * undershoot toward zero stays tiny and harmless rather than clamping.
+ * [PebbleCloseBounceDamping] is a LITTLE closer to critically damped than the open spring --
+ * enough that the undershoot toward zero stays small -- but not by much: 0.85 was the first
+ * value tried here specifically to be safe against the clamp/stutter above, and it erred so
+ * far toward safe that the close bounce was reported as not there at all. 0.72 is the
+ * smaller, one-step correction back toward the open spring's own 0.68.
  *
  * Overshoot fraction is set by damping ratio alone (stiffness only changes how FAST the
  * spring gets there, not how far past the target it swings). History on [PebbleBounceDamping]:
@@ -233,14 +234,14 @@ internal const val AdvancedModeStiffness = 130f
  * lingers. 0.75 + StiffnessMediumLow overcorrected into invisible again. 0.6 + StiffnessLow
  * landed as visible bounce, but with the corners on a different spring (fixed since -- see
  * PebbleShell) it read as disconnected from the card rather than too big; asked to be "a bit
- * less drastic" once that was fixed, so damping nudges up once more, to 0.68.
+ * less drastic" once that was fixed, so damping nudged up once more, to 0.68.
  */
 // internal, not private: PebbleShell's own corner-radius morph (animateDpAsState, Screens.kt)
 // shares these exact springs too -- see that call site for why. Two different physics
 // animating the height and the corners of the SAME card at once is what read as "the bounce
 // doesn't feel connected to the pebble actually opening" rather than one coherent motion.
 internal val PebbleBounceDamping = 0.68f
-internal val PebbleCloseBounceDamping = 0.85f
+internal val PebbleCloseBounceDamping = 0.72f
 internal val PebbleBounceStiffness = Spring.StiffnessLow
 
 @Composable
@@ -345,14 +346,28 @@ private const val PebbleStaggerSpan = 0.85f
  * only covered the handful of call sites that had been individually converted; this instead
  * makes EVERY row of EVERY pebble cascade, for free, by changing the one shared container.
  *
- * ONE [Animatable] drives every child, rather than each row owning an [AnimatedVisibility]/
- * `Animatable` of its own -- a pebble can have a dozen rows, and a dozen independent
- * animation tickets is a dozen times the per-frame cost of one shared progress value that
- * every child's [Placeable.PlacementScope.placeWithLayer] block reads and remaps into its
- * own little window (see [PebbleStaggerSpan]). That remap is what turns one linear 0..1
- * value into a cascade: row *i* of *n* doesn't start moving until progress passes
- * `i/n * PebbleStaggerSpan`, and is fully settled by the time progress reaches
- * `i/n * PebbleStaggerSpan + (1 - PebbleStaggerSpan)`.
+ * ONE animated value drives every child, rather than each row owning an [AnimatedVisibility]
+ * of its own -- a pebble can have a dozen rows, and a dozen independent animation tickets is
+ * a dozen times the per-frame cost of one shared progress value that every child's
+ * [Placeable.PlacementScope.placeWithLayer] block reads and remaps into its own little window
+ * (see [PebbleStaggerSpan]). That remap is what turns one linear 0..1 value into a cascade:
+ * row *i* of *n* doesn't start moving until progress passes `i/n * PebbleStaggerSpan`, and is
+ * fully settled by the time progress reaches `i/n * PebbleStaggerSpan + (1 - PebbleStaggerSpan)`.
+ *
+ * That progress comes from [transition] -- the SAME `Transition<EnterExitState>` the caller's
+ * own [AnimatedVisibility] is already running for its height/fade, passed in from inside that
+ * call's content lambda (where it's available as `AnimatedVisibilityScope.transition`) -- NOT
+ * a private [Animatable] driven by its own `LaunchedEffect`, which is what the first version
+ * of this did and which is why "the collapse effect doesn't work" was a real bug, not a tuning
+ * problem: `AnimatedVisibility` only waits for animations that live in its OWN `Transition`
+ * before removing its content from composition (this file's own note on [collapseEnter] had
+ * already flagged this exact trap). A private `Animatable` is invisible to that -- the card
+ * would finish shrinking and get torn out of composition on whatever its OWN schedule was,
+ * mid-fade, regardless of how long the row animation asked for. Registering this progress
+ * with `transition.animateFloat` instead means it graduates into a first-class participant in
+ * that same `Transition`: `AnimatedVisibility` cannot consider the exit "finished" -- and so
+ * cannot remove the content -- until THIS animation reports finished too. No duration to
+ * guess, no race to lose.
  *
  * A custom [Layout] rather than a real `Column`, because the per-child transform has to be
  * applied at PLACEMENT (`placeWithLayer`'s `layerBlock`), and that API belongs to
@@ -364,73 +379,55 @@ private const val PebbleStaggerSpan = 0.85f
  * height -- so swapping it in changes nothing about layout, only about how each child draws
  * in on its way in.
  *
- * Scale-and-fade per child, same as [PopVisible] and for the same reason: this sits inside
- * an outer `AnimatedVisibility` (the pebble's own [collapseEnter]/[collapseExit]) that is
- * ALREADY animating the container's height, and a per-child height change here would be a
- * second party fighting that same dimension.
+ * Scale-and-fade per child, same as [PopVisible] and for the same reason: the outer
+ * `AnimatedVisibility` is ALREADY animating the container's height, and a per-child height
+ * change here would be a second party fighting that same dimension.
  */
 @Composable
 internal fun StaggeredRevealColumn(
-    visible: Boolean,
+    transition: Transition<EnterExitState>,
     modifier: Modifier = Modifier,
     verticalGap: Dp = 8.dp,
     content: @Composable ColumnScope.() -> Unit,
 ) {
-    // Always 0f, NOT `if (visible) 1f else 0f`. This composable is only ever entered through
-    // the outer AnimatedVisibility's own enter -- collapseExit fully REMOVES it from
-    // composition when a pebble finishes closing (see that transition's own doc), so the
-    // very first composition of a freshly-opened pebble already has `visible = true`. Seeding
-    // progress at 1f for that case skipped the reveal outright: the LaunchedEffect below then
-    // called animateTo(1f) while progress was ALREADY 1f, a no-op, so every row appeared at
-    // full size/alpha from frame one and the cascade never played. Seeding at 0f always and
-    // letting the effect below animate up to 1f on that same first composition is what
-    // actually starts the stagger.
-    val progress = remember { Animatable(0f) }
-    LaunchedEffect(visible) {
-        if (visible) {
-            // A short head start for the CARD, not the rows -- asked for explicitly: the pop
-            // should read as arriving just after the pebble has started opening, not racing
-            // it from the same frame. collapseEnter's own bounce has no fixed duration (it's
-            // a spring, not a tween), so this can't be timed to "wait until the card is
-            // exactly this far open" -- a flat delay is what's available, short enough that
-            // the rows are still clearly popping in DURING the open rather than only once
-            // it's fully settled.
-            delay(90)
-            progress.animateTo(
-                1f,
-                // A dedicated tween, NOT PebbleBounceDamping/Stiffness -- this used to share
-                // the card's own bounce spring, which ties the cascade's total duration to
-                // however fast/slow that spring happens to be tuned. Decoupled so the stagger
-                // reads on its own regardless of what the card height spring is doing.
+    // targetValueByState, not a plain visible/1f-0f Animatable -- transition.animateFloat
+    // seeds and drives this off transition.currentState, which for a freshly-ENTERING pebble
+    // is PreEnter (mapped to 0f here), NOT Visible -- so the seeding bug the old Animatable-
+    // based version needed a hand-written workaround for ("must seed at 0f, never
+    // conditionally") simply doesn't exist with this API: the library already gets the first
+    // frame right.
+    val progress by transition.animateFloat(
+        label = "pebbleRowCascade",
+        transitionSpec = {
+            if (targetState == EnterExitState.Visible) {
+                // A short head start for the CARD, not the rows -- asked for explicitly: the
+                // pop should read as arriving just after the pebble has started opening, not
+                // racing it from the same frame. collapseEnter's own bounce has no fixed
+                // duration (it's a spring, not a tween), so this can't be timed to "wait until
+                // the card is exactly this far open" -- a flat delay is what's available,
+                // short enough that the rows are still clearly popping in DURING the open
+                // rather than only once it's fully settled.
                 //
-                // LinearEasing on this OUTER tween, deliberately, even though the result
-                // should still look eased -- each row's own `local` below is a REMAP of a
-                // narrow slice of this value into its own 0..1, and remapping a slice of an
-                // already-eased curve gives that slice a distorted, not-actually-eased shape
-                // (steep in some windows, flat in others, depending on where in the outer
-                // curve the slice happened to land). A linear outer value makes every row's
-                // slice equally linear, so applying ONE consistent ease per row (the
-                // smoothstep in the placement block below) gives every row's own pop the
-                // identical shape -- which is what makes them read as repeated, distinct
-                // STEPS rather than one blurry wave with a randomly uneven feel.
-                animationSpec = tween(durationMillis = 480, easing = LinearEasing),
-            )
-        } else {
-            // NO delay, and a much shorter duration than the open side, for a reason that
-            // isn't about feel: AnimatedVisibility can only wait for animations that live in
-            // its OWN Transition (see the "Related trap" note on collapseEnter/collapseExit)
-            // -- this Animatable is a completely separate one, so the outer AnimatedVisibility
-            // has no idea it exists and will finish removing this whole subtree from
-            // composition the moment ITS OWN exit transition (collapseExit) settles,
-            // regardless of what this coroutine is still doing. That's what "the collapse
-            // effect doesn't work" was: a 480ms fade-out racing a shorter card-shrink that won
-            // every time, so the rows were torn out of composition mid-fade and never visibly
-            // finished. 180ms comfortably fits inside collapseExit's own duration (a spring,
-            // but a critically-damped-ish one with no overshoot to stretch it out further), so
-            // the rows are fully faded before the card removes them.
-            progress.animateTo(0f, tween(durationMillis = 180, easing = LinearEasing))
-        }
-    }
+                // LinearEasing, deliberately, even though the result should still look eased
+                // -- each row's own `local` below is a REMAP of a narrow slice of this value
+                // into its own 0..1, and remapping a slice of an already-eased curve gives
+                // that slice a distorted, not-actually-eased shape (steep in some windows,
+                // flat in others, depending on where in the source curve the slice happened
+                // to land). A linear source makes every row's slice equally linear, so
+                // applying ONE consistent ease per row (the smoothstep in the placement block
+                // below) gives every row's own pop the identical shape -- which is what makes
+                // them read as repeated, distinct STEPS rather than one blurry wave.
+                tween(durationMillis = 480, delayMillis = 90, easing = LinearEasing)
+            } else {
+                // Closing has no delay and a shorter duration than opening -- now a stylistic
+                // choice (a snappier close reads right next to a slightly more deliberate
+                // open), not a race against being torn out of composition early: since this
+                // progress lives in the SAME Transition as the card's own height/fade, the
+                // card physically cannot finish exiting before this does.
+                tween(durationMillis = 220, easing = LinearEasing)
+            }
+        },
+    ) { state -> if (state == EnterExitState.Visible) 1f else 0f }
     val gapPx = with(LocalDensity.current) { verticalGap.roundToPx() }
     // Takes `content` with the same ColumnScope receiver PebbleShell's own body always has
     // (every pebble's content lambda is already typed that way), via NoOpColumnScope below --
@@ -450,14 +447,14 @@ internal fun StaggeredRevealColumn(
             var y = 0
             placeables.forEachIndexed { i, p ->
                 val start = if (n <= 1) 0f else (i.toFloat() / n) * PebbleStaggerSpan
-                // progress.value is read INSIDE the layerBlock, not out here in the placement
-                // body -- layerBlock is deferred to the draw phase, so reading it there means
-                // only drawing re-runs as the spring ticks. Reading it out here instead (where
+                // `progress` is read INSIDE the layerBlock, not out here in the placement body
+                // -- layerBlock is deferred to the draw phase, so reading it there means only
+                // drawing re-runs as the transition ticks. Reading it out here instead (where
                 // `start`/`y` are computed) would make the STATE read part of layout, and every
-                // one of the spring's frames would re-trigger a full remeasure of every child
-                // in this pebble to move a value that only ever changes how they're drawn.
+                // one of the transition's frames would re-trigger a full remeasure of every
+                // child in this pebble to move a value that only ever changes how they're drawn.
                 p.placeWithLayer(0, y) {
-                    val raw = ((progress.value - start) / (1f - PebbleStaggerSpan)).coerceIn(0f, 1f)
+                    val raw = ((progress - start) / (1f - PebbleStaggerSpan)).coerceIn(0f, 1f)
                     // Smoothstep, applied per row rather than trusting the outer tween's own
                     // easing -- see the LinearEasing comment above for why: this is what gives
                     // every row's individual pop the same eased shape regardless of where its

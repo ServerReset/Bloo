@@ -9559,8 +9559,15 @@ internal fun PebbleShell(
                         // together the instant the block-level AnimatedVisibility above reveals
                         // it. See that composable's own doc for why this is the ONE place that
                         // needed changing to give every pebble's rows this for free.
+                        //
+                        // `transition` here is `AnimatedVisibilityScope.transition` -- this
+                        // lambda's implicit receiver, since it's the content of the
+                        // AnimatedVisibility right above. Passing THAT (not a boolean) is what
+                        // lets the row cascade register itself as part of the same Transition
+                        // driving this card's own height/fade, so the card can't finish
+                        // closing before the rows do -- see StaggeredRevealColumn's own doc.
                         StaggeredRevealColumn(
-                            visible = expanded,
+                            transition = transition,
                             // AnimatedVisibility only animates the whole block
                             // appearing and disappearing; content that changes
                             // WHILE expanded (an install step arriving, notes
