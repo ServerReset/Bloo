@@ -325,26 +325,45 @@ internal object WidgetBlueprint {
         // don't have that rounding ambiguity.
         val wideNotTall = size.width > size.height
 
-        // A square tile has no WIDTH advantage over a ring the way a wideNotTall one
-        // does -- that is still wideNotTall's own job below, gating RING_ASPECT -- but
-        // it shares the exact same STARVATION problem `heroFloor` exists to fix: on a
-        // content-dense square tile (header, buttons, an info stack, a footer all
-        // wanting their own floor out of the same budget), the hero band routinely
-        // lands short of BOTH the ring's own RING_WORTH_IT threshold and the bar's
-        // floor, and a tiny last-resort ring is a worse answer there than a slightly
-        // smaller bar, the same call already made for a wide tile.
+        // Second and third reports against the exact same starvation problem
+        // `heroFloor` exists to fix, neither one actually wide-not-tall:
         //
-        // Reported on a real 3x3 (180x180, an EXACT square under WidgetGrid's own
-        // formula) widget with the default config: the hero band won only ~25dp after
-        // header/info/buttons/footer took their share, clearing MIN_RING (24dp) but
-        // neither RING_WORTH_IT (44dp) nor the bar's own floor (~35dp) -- so it fell to
-        // the small-ring fallback though a bar was one weighted redistribution away
-        // from fitting. Reserving the bar's floor up front, same fix as wideNotTall's,
-        // gets it there. Deliberately only widens the FLOOR, not the RING_ASPECT gate
-        // itself (still `!wideNotTall`, unchanged) -- a big, roomy square tile whose
-        // hero band clears RING_ASPECT on its own merits keeps its ring; only a
-        // starved one is pushed to the bar instead of the token circle.
-        val wideOrSquare = size.width >= size.height
+        //  - A real 3x3 widget (180x180, an EXACT square under WidgetGrid's own
+        //    formula) with the default config -- wideNotTall (`width > height`,
+        //    strict) is false for an exact square, so it got the small floor.
+        //  - A real "four wide, three tall" widget, reported wide-not-tall by eye but
+        //    whose ACTUAL measured size (this launcher's real cell pitch, not
+        //    WidgetGrid's nominal 70n-30 formula) turned out only a little taller than
+        //    wide rather than wider than tall -- simulating the allocator's own
+        //    arithmetic across a grid of nearby real sizes found dozens of them, not
+        //    just that one exact point, still landing in the same trap: the hero band
+        //    clears MIN_RING (24dp) but neither RING_WORTH_IT (44dp) nor the bar's own
+        //    floor (~35dp), so it falls to the small-ring last resort though a bar was
+        //    one weighted redistribution away from fitting. wideNotTall answering "is
+        //    this SPECIFIC point wider than tall" turned out to be exactly the kind of
+        //    real-device-measurement fragility its own comment already warned about
+        //    for the grid-cell-rounding version it replaced.
+        //
+        // `barCapable` asks a different, more robust question: not "is this tile's
+        // ORIENTATION landscape", but "is this tile WIDE ENOUGH for a bar to be
+        // geometrically plausible at all" -- the same VBAR_MAX_WIDTH line the hero
+        // decision below already draws for the opposite edge (below it a horizontal
+        // bar has no room to be one and VBAR takes over instead). Above that line a
+        // bar is always at least possible, regardless of whether the tile happens to
+        // be a few dp taller than it is wide, so reserving its floor there is never
+        // reserving room for a shape that couldn't be drawn anyway.
+        //
+        // Deliberately only widens the FLOOR, not RING_ASPECT's own gate (still
+        // `!wideNotTall`, unchanged) -- a big, roomy tile whose hero band clears
+        // RING_ASPECT on its own merits keeps its ring; only a starved one is pushed
+        // to the bar instead of the token circle. Verified by simulating this exact
+        // arithmetic outside the codebase across every nominal grid size crossed with
+        // every config/facts combination this file's own test suite sweeps, plus a
+        // dense neighbourhood of real-device sizes around the reported 4x3 -- zero
+        // remaining "starved to a ring" outcomes, and nothing already passing (the
+        // tall-narrow VBAR case, the wide-tile-never-VBAR case, the roomy-map-picks-
+        // bar case, the wide-not-tall case) regressed.
+        val barCapable = innerW >= VBAR_MAX_WIDTH
 
         // Priority order. Controls-priority promotes the buttons above the
         // hero and the info stack, but never above a minimal hero: a
@@ -403,12 +422,12 @@ internal object WidgetBlueprint {
                 (if (stacked) Scale.buttonGap(size) * (buttonRun - 1) else 0.dp) +
                 BUTTON_BREATHING
             val infoCeiling = minInfoRow(size, ts) * facts.infoFieldCount.coerceAtLeast(1)
-            // See `wideNotTall`'s and `wideOrSquare`'s own comments: on a tile that is
-            // at least as wide as it is tall, the hero's FLOOR is the bar's own
-            // minimum, not the plain text line's -- guaranteeing the band the
-            // allocator hands out is already enough for a bar, rather than hoping a
-            // weighted share of leftover slack happens to reach it.
-            val heroFloor = if (wideOrSquare) minBarHero(size, ts) else minLineHero(size, ts)
+            // See `barCapable`'s own comment: whenever a bar is geometrically
+            // plausible at all, the hero's FLOOR is the bar's own minimum, not the
+            // plain text line's -- guaranteeing the band the allocator hands out is
+            // already enough for a bar, rather than hoping a weighted share of
+            // leftover slack happens to reach it.
+            val heroFloor = if (barCapable) minBarHero(size, ts) else minLineHero(size, ts)
             if (controls) {
                 if (wantsButtons) {
                     add(Want(Module.BUTTONS, minButtons(size), weight = 0.5f, max = buttonCeiling))

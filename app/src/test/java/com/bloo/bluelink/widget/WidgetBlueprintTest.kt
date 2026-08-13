@@ -361,12 +361,13 @@ class WidgetBlueprintTest {
      * Reported from a real device: a plain 3x3 widget, default config, still showed a
      * ring. 3x3 is an EXACT square under WidgetGrid's own 70n-30 formula (180x180dp) --
      * `wideNotTall` (`width > height`, strict) is false there, so it never had the bar
-     * floor `wideOrSquare` (`width >= height`) now reserves. Without it the hero band
-     * won only ~25dp against a header, buttons, an info stack and a footer all wanting
-     * their own floor out of the same 156dp, clearing MIN_RING (24dp) but neither
-     * RING_WORTH_IT (44dp) nor the bar's own floor (~35dp) -- so it fell to the
-     * small-ring fallback though a bar was one weighted redistribution away from
-     * fitting.
+     * floor. `barCapable` (`innerW >= VBAR_MAX_WIDTH`, i.e. "wide enough for a bar to
+     * be geometrically plausible at all") now reserves it regardless of orientation.
+     * Without it the hero band won only ~25dp against a header, buttons, an info stack
+     * and a footer all wanting their own floor out of the same 156dp, clearing MIN_RING
+     * (24dp) but neither RING_WORTH_IT (44dp) nor the bar's own floor (~35dp) -- so it
+     * fell to the small-ring fallback though a bar was one weighted redistribution away
+     * from fitting.
      */
     @Test
     fun `a plain 3x3 widget picks the bar hero, not a ring`() {
@@ -376,6 +377,36 @@ class WidgetBlueprintTest {
             bp.hero == WidgetBlueprint.Hero.BAR,
             "3x3 chose ${bp.hero}, not a bar",
         )
+    }
+
+    /**
+     * Reported a second time, this time against a "four wide, three tall" widget --
+     * which is genuinely wideNotTall at WidgetGrid's own NOMINAL 250x180 (250 > 180), so
+     * that exact point already picked BAR even before this fix. The report was real
+     * anyway: a launcher's actual reported cell pitch does not have to match the
+     * nominal 70n-30 formula, and simulating this file's own arithmetic across a dense
+     * neighbourhood of real sizes around the nominal 4x3 point found dozens that are a
+     * little TALLER than wide in real dp (a very plausible launcher-measurement
+     * outcome) still falling into the exact same starvation trap the 3x3 fix addressed
+     * -- `wideNotTall` being false by even 1dp was enough to lose the reservation.
+     *
+     * `barCapable` fixes this class of report generally rather than pinning another
+     * single point: it does not care whether the tile is a few dp taller than wide,
+     * only whether a bar could physically fit at all. Swept as a real neighbourhood,
+     * not one point, because that IS what made the previous (orientation-based) fix
+     * insufficient here.
+     */
+    @Test
+    fun `sizes near a real 4x3 widget pick the bar hero, not a ring`() {
+        val bad = mutableListOf<String>()
+        for (wOffset in -30..30 step 5) {
+            for (hOffset in -30..30 step 5) {
+                val size = DpSize((250 + wOffset).dp, (180 + hOffset).dp)
+                val bp = WidgetBlueprint.plan(size, WidgetConfig(vin = "test"), WidgetBlueprint.Facts())
+                if (bp.hero == WidgetBlueprint.Hero.RING) bad += "${size.width.value}x${size.height.value}"
+            }
+        }
+        assertTrue(bad.isEmpty(), "still chose a ring near a real 4x3: $bad")
     }
 
     /**

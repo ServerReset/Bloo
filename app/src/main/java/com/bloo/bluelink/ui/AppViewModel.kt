@@ -494,6 +494,11 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     @Volatile
     private var pendingShortcut: Pair<String, String>? = null
 
+    /** One-shot: has [refreshLiveChargeBar] forgotten this process's live-charge
+     *  dismissals yet? See that function's own comment for why. */
+    @Volatile
+    private var liveChargeDismissalsResetThisSession = false
+
     private val _state = MutableStateFlow(UiState())
     val state: StateFlow<UiState> = _state.asStateFlow()
 
@@ -1950,6 +1955,28 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
      */
     private suspend fun refreshLiveChargeBar(vehicles: List<Vehicle>) {
         if (!settingsStore.notificationPrefs().charging) return
+        // The first time this runs in a fresh process -- cold start, including right
+        // after installing an app update, since that is also a fresh process -- forget
+        // any earlier swipe-dismiss. A dismiss exists to silence the BACKGROUND poll
+        // worker for the rest of an unattended charging session (see LiveCharge.sync's
+        // own doc: reposting behind the user's back every five minutes is exactly the
+        // annoyance it was added to stop) -- it was never meant to survive the user
+        // deliberately opening the app again. Reported from a real device: swiped the
+        // live notification away, updated the app, reopened it, and with the car still
+        // charging the whole time -- so `charging` never went false, the ONLY other
+        // place a dismissal is forgotten (see sync()'s own `!charging` branch) -- it
+        // stayed gone. Guarded per-VIN (liveChargeDismissed check before the write, not
+        // an unconditional setLiveChargeDismissed) for the same reason sync()'s own
+        // !charging branch is: skip the durable write entirely for the common case
+        // where there was nothing to clear.
+        if (!liveChargeDismissalsResetThisSession) {
+            liveChargeDismissalsResetThisSession = true
+            vehicles.forEach { v ->
+                runCatching {
+                    if (settingsStore.liveChargeDismissed(v.vin)) settingsStore.setLiveChargeDismissed(v.vin, false)
+                }
+            }
+        }
         val statuses = _state.value.statuses
         var anyCharging = false
         vehicles.forEach { v ->
