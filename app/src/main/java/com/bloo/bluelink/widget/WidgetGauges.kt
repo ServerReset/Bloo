@@ -139,71 +139,109 @@ internal fun StatusGlyph(car: VehicleSnapshot, theme: WidgetTheme, sizeDp: Int) 
 @Composable
 internal fun ChargeBar(car: VehicleSnapshot, theme: WidgetTheme, width: Dp, height: Dp) {
     val pct = (car.percent ?: 0).coerceIn(0, 100)
-    val frac = pct / 100f
     val limit = car.chargeLimitPct?.takeIf { it in 1..99 }
     // Independent of car.charging -- see the phone's ChargeReadout.stuckAtLimit for why:
     // a car reported charged to its limit reads blue even hours later, unplugged.
     val stuckAtLimit = limit != null && pct >= limit
-    // Floored at the bar's own height when there is ANY charge, so a low one reads as a
-    // rounded nub rather than a hairline: below that the 50% corner radius eats the
-    // whole shape and 3% looks identical to 0%. Capped at `width` so the floor can't
-    // overrun a narrow slot.
-    val filled = if (frac <= 0f) 0.dp else minOf(width, maxOf(width * frac, height))
     val fillColor = if (stuckAtLimit) theme.chargeAtLimit else theme.charge
+    // The actual segment math lives in widgetChargeBarLayout, a plain function with no
+    // Glance/Compose dependency, specifically so it's unit-testable -- see
+    // WidgetChargeBarLayoutTest, which sweeps a wide range of width x percent x limit
+    // combinations asserting the three-segment case genuinely produces three
+    // positive-width segments, not just that the formula looks right by eye.
+    val layout = widgetChargeBarLayout(width, height, pct / 100f, limit, stuckAtLimit)
     Row(modifier = GlanceModifier.width(width).height(height)) {
-        if (filled > 0.dp) {
+        if (layout.filled > 0.dp) {
             Box(
-                modifier = GlanceModifier.width(filled).height(height)
+                modifier = GlanceModifier.width(layout.filled).height(height)
                     .cornerRadius(height / 2).background(fillColor),
             ) {}
         }
-        if (limit == null || stuckAtLimit) {
+        if (layout.hasSingleTrack) {
             // One remaining segment: the ordinary track when there's no limit to speak
             // of, the DIM track when the charge is stuck there -- the whole remainder
             // past the current charge means "won't fill further" in that case, not
             // "still on the way".
-            val rest = (width - filled).coerceAtLeast(0.dp)
-            if (rest > 0.dp) {
+            if (layout.singleTrackWidth > 0.dp) {
                 Box(
-                    modifier = GlanceModifier.width(rest).height(height)
+                    modifier = GlanceModifier.width(layout.singleTrackWidth).height(height)
                         .cornerRadius(height / 2)
-                        .background(if (limit == null) theme.surfaceVariant else theme.surfaceVariantDim),
+                        .background(if (layout.singleTrackDim) theme.surfaceVariantDim else theme.surfaceVariant),
                 ) {}
             }
         } else {
             // Two remaining segments, split at the limit: current -> limit (still
-            // filling toward it), limit -> 100% (won't fill past it). `mid`/`far` are
-            // each other's complement of `rest` MINUS the gap below, so the three
-            // pieces (mid, gap, far) always still sum to `rest` regardless of where
-            // the limit falls relative to the current charge.
-            //
-            // A real gap between them, not just the colour difference -- the two
-            // track shades alone turned out too close to tell apart once actually
-            // rendered at a widget's small bar height on a real device, which read as
-            // one plain track instead of two. Same fix as the phone's own
-            // ChargeSegmentBar, same reasoning: colour was doing a job only a
-            // physical break reliably does. Skipped on a narrow slot, same threshold
-            // the old limit marker used this width for.
-            val rest = (width - filled).coerceAtLeast(0.dp)
-            val gap = if (width >= 60.dp) 3.dp else 0.dp
-            val limitX = (width * (limit / 100f)).coerceIn(filled, width)
-            val mid = (limitX - filled - gap / 2).coerceIn(0.dp, rest)
-            val far = (rest - mid - (if (mid > 0.dp) gap else 0.dp)).coerceAtLeast(0.dp)
-            if (mid > 0.dp) {
+            // filling toward it), limit -> 100% (won't fill past it), with a real gap
+            // between them -- the two track shades alone turned out too close to tell
+            // apart once actually rendered at a widget's small bar height on a real
+            // device, which read as one plain track instead of two. Same fix as the
+            // phone's own ChargeSegmentBar, same reasoning: colour was doing a job only
+            // a physical break reliably does.
+            if (layout.mid > 0.dp) {
                 Box(
-                    modifier = GlanceModifier.width(mid).height(height)
+                    modifier = GlanceModifier.width(layout.mid).height(height)
                         .cornerRadius(height / 2).background(theme.surfaceVariant),
                 ) {}
-                Spacer(GlanceModifier.width(gap))
+                Spacer(GlanceModifier.width(layout.gap))
             }
-            if (far > 0.dp) {
+            if (layout.far > 0.dp) {
                 Box(
-                    modifier = GlanceModifier.width(far).height(height)
+                    modifier = GlanceModifier.width(layout.far).height(height)
                         .cornerRadius(height / 2).background(theme.surfaceVariantDim),
                 ) {}
             }
         }
     }
+}
+
+/**
+ * Pure segment-boundary math for [ChargeBar], pulled out of the composable specifically
+ * so it can be unit-tested without a Glance/Compose runtime -- see
+ * WidgetChargeBarLayoutTest. Mirrors the phone's own `chargeBarLayout` (Screens.kt) --
+ * same shape, same reasoning, different unit system (Glance has no fractional Dp width,
+ * so this works in whole Dp throughout rather than px).
+ */
+internal data class WidgetChargeBarLayout(
+    val filled: Dp,
+    /** True for the collapsed one-segment remainder (no limit at all, or already at/past
+     *  it) -- [mid]/[far] are both 0 in that case, and vice versa. */
+    val hasSingleTrack: Boolean,
+    val singleTrackWidth: Dp,
+    /** Dim track when stuck at the limit, ordinary track when there's no limit to speak
+     *  of -- only meaningful when [hasSingleTrack]. */
+    val singleTrackDim: Boolean,
+    val mid: Dp,
+    val gap: Dp,
+    val far: Dp,
+)
+
+internal fun widgetChargeBarLayout(width: Dp, height: Dp, frac: Float, limit: Int?, stuckAtLimit: Boolean): WidgetChargeBarLayout {
+    // Floored at the bar's own height when there is ANY charge, so a low one reads as a
+    // rounded nub rather than a hairline: below that the 50% corner radius eats the
+    // whole shape and 3% looks identical to 0%. Capped at `width` so the floor can't
+    // overrun a narrow slot.
+    val clampedFrac = frac.coerceIn(0f, 1f)
+    val filled = if (clampedFrac <= 0f) 0.dp else minOf(width, maxOf(width * clampedFrac, height))
+    if (limit == null || stuckAtLimit) {
+        val rest = (width - filled).coerceAtLeast(0.dp)
+        return WidgetChargeBarLayout(
+            filled = filled, hasSingleTrack = true, singleTrackWidth = rest, singleTrackDim = limit != null,
+            mid = 0.dp, gap = 0.dp, far = 0.dp,
+        )
+    }
+    // `mid`/`far` are each other's complement of `rest` MINUS the gap, so the three
+    // pieces (mid, gap, far) always still sum to `rest` regardless of where the limit
+    // falls relative to the current charge. Gap skipped on a narrow slot, same
+    // threshold the old limit marker used this width for.
+    val rest = (width - filled).coerceAtLeast(0.dp)
+    val gap = if (width >= 60.dp) 3.dp else 0.dp
+    val limitX = (width * (limit / 100f)).coerceIn(filled, width)
+    val mid = (limitX - filled - gap / 2).coerceIn(0.dp, rest)
+    val far = (rest - mid - (if (mid > 0.dp) gap else 0.dp)).coerceAtLeast(0.dp)
+    return WidgetChargeBarLayout(
+        filled = filled, hasSingleTrack = false, singleTrackWidth = 0.dp, singleTrackDim = false,
+        mid = mid, gap = gap, far = far,
+    )
 }
 
 /**
