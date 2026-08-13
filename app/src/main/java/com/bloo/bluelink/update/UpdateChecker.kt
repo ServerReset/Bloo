@@ -15,8 +15,22 @@ data class UpdateInfo(val run: WorkflowRun)
 sealed class UpdateCheckResult {
     /** A newer build was found. */
     data class Available(val info: UpdateInfo) : UpdateCheckResult()
-    /** No newer build found (current is latest). */
+    /** No newer build found (current is latest) -- a REAL, network-verified answer. */
     data object UpToDate : UpdateCheckResult()
+    /**
+     * No network call was made at all -- the debounce or an active snooze short-circuited
+     * before ever asking GitHub, so this says nothing about whether an update exists.
+     *
+     * Split out from [UpToDate] because callers were treating the two as the same thing,
+     * and they answer different questions: [UpToDate] means "checked, nothing newer";
+     * this means "didn't check, don't know." A caller holding a still-valid `Available`
+     * from an earlier check must not let a [Skipped] result overwrite it -- that was
+     * exactly the bug (see AppViewModel.checkForUpdate's own comment on this case): pull-
+     * to-refresh calls [checkPhone] unforced, so any refresh landing inside the previous
+     * check's 1-minute debounce window got told "up to date" and cleared a pending update
+     * the debounce never actually re-verified.
+     */
+    data object Skipped : UpdateCheckResult()
     /** The check failed (network/API error). */
     data class Failed(val error: String?) : UpdateCheckResult()
 }
@@ -38,13 +52,21 @@ object UpdateChecker {
      * 1. If this build wasn't stamped with a CI run number at all
      *    (`BUILD_RUN_NUMBER <= 0`, e.g. a local debug build not built via CI),
      *    there's no meaningful baseline to compare against, so always report
-     *    up-to-date rather than ever flagging a local build as outdated.
+     *    up-to-date rather than ever flagging a local build as outdated. This one
+     *    really is [UpdateCheckResult.UpToDate], not [UpdateCheckResult.Skipped]:
+     *    there is no CI baseline to ever check against, on this build, ever --
+     *    unlike the debounce/snooze cases below, a later call can't turn this
+     *    into a real check, so it isn't "don't know yet," it's "nothing to know."
      * 2. Unless [force] is set, debounce rapid re-checks: if the last check was
-     *    under a minute ago, skip hitting the network again. `force` bypasses
-     *    this so an explicit user-initiated "check now" always goes through.
+     *    under a minute ago, skip hitting the network again and report
+     *    [UpdateCheckResult.Skipped] -- NOT [UpdateCheckResult.UpToDate], which
+     *    would tell a caller holding a still-valid `Available` from that earlier
+     *    check that it's safe to forget it. `force` bypasses this so an explicit
+     *    user-initiated "check now" always goes through.
      * 3. Unless [force] is set, respect an active snooze window (see [snooze])
      *    -- the user asked to not be reminded until a later time, so a due
-     *    background/cold-start check silently no-ops during that window too.
+     *    background/cold-start check silently no-ops (also [UpdateCheckResult.Skipped])
+     *    during that window too.
      * 4. Otherwise, actually fetches the latest successful CI run for the
      *    build's own branch (falling back to [UpdateApi.DEFAULT_BRANCH] if this
      *    build didn't record one) via [UpdateApi.fetchLatestSuccessfulRun], and
@@ -75,7 +97,7 @@ object UpdateChecker {
                 snoozeUntil = store.snoozeUntil(),
                 minIntervalMs = 60_000L,
             )
-        ) return UpdateCheckResult.UpToDate
+        ) return UpdateCheckResult.Skipped
 
         val run = UpdateApi.fetchLatestSuccessfulRun(UpdateGate.resolveBranch(BuildConfig.BUILD_BRANCH))
         // Stamp unconditionally -- even a failed fetch counts against the debounce, so a

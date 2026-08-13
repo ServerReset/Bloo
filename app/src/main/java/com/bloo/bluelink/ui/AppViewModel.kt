@@ -1720,18 +1720,31 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                     is com.bloo.bluelink.update.UpdateCheckResult.Failed ->
                         if (surfaceResult) _state.update { it.copy(message = "Couldn't reach GitHub to check for updates.", messageType = "error") }
                     // else: silent -- next refresh tries again
+                    is com.bloo.bluelink.update.UpdateCheckResult.Skipped -> {
+                        // No network call happened at all (debounce or an active snooze), so
+                        // this says nothing about whether an update exists -- must NOT touch
+                        // updateAvailable. It used to arrive here as UpToDate, indistinguishable
+                        // from a genuine "checked, nothing newer" -- so a pull-to-refresh that
+                        // landed inside the previous check's 1-minute debounce window (the
+                        // common case: cold start finds an update, user immediately pulls to
+                        // refresh to confirm) cleared the tile for an update that was still
+                        // there, never actually re-verified. Reported from a real device.
+                        //
+                        // surfaceResult is effectively never true here in practice --
+                        // checkForUpdateManually always passes force = true, which bypasses the
+                        // debounce/snooze entirely -- but if that ever changes, staying silent
+                        // (like Failed's own "not force" reasoning) beats claiming a checked
+                        // result that didn't happen.
+                    }
                     is com.bloo.bluelink.update.UpdateCheckResult.UpToDate -> {
                         _state.update {
                             // Never yank the tile out from under work already in
-                            // flight. UpToDate is returned for a genuine "nothing
-                            // newer" AND for a snooze short-circuit, so a refresh
-                            // during a download or install used to clear
-                            // updateAvailable and take the whole tile with it --
-                            // the progress UI vanished mid-install with no way
-                            // back to it, which is what a refresh looked like it
-                            // was doing. A ready-to-install APK is kept for the
-                            // same reason: the user still has an Install button
-                            // to press.
+                            // flight. A ready-to-install APK is kept for the same
+                            // reason: the user still has an Install button to press.
+                            // (This branch is now a network-VERIFIED "nothing newer" --
+                            // the debounce/snooze short-circuit moved to Skipped above --
+                            // so clearing the tile here is always a real answer, not a
+                            // guess made from silence.)
                             if (it.updateDownloading || it.updateInstalling || it.updateApkReady) it
                             else it.copy(updateAvailable = null, updateApkReady = false, updateTileDismissed = false)
                         }
