@@ -9284,20 +9284,19 @@ internal fun PebbleShell(
     val haptics = LocalHaptics.current
     // Collapsed = pill-soft corners; expanded morphs to a tighter rounded square. Direction
     // picks between the SAME two springs collapseEnter/collapseExit use for the height, rather
-    // than one flat SoftDamping spec for both directions -- that flat spec used to run
-    // regardless of direction, so the corners settled smoothly on the way open WHILE the
-    // height was still overshooting/bouncing: two different physics on the same card at the
-    // same time, which is what read as "the bounce doesn't feel connected to the pebble
-    // actually opening" rather than one coherent motion. Both directions bounce now, each on
-    // the SAME spring its own height transition uses (collapseEnter's on the way open,
-    // collapseExit's more heavily damped one on the way closed -- see that pair's doc for why
-    // closing needs a different damping at all).
+    // than one flat spec for both directions -- that used to run regardless of direction, so
+    // the corners settled on their own schedule while the height was doing something else
+    // (bouncing open, or -- when closing briefly bounced too -- overshooting shut in a way
+    // that read as disconnected from the collapse itself). Matching each direction's spring
+    // exactly is what keeps the corners and the height reading as one card in both directions,
+    // even though open bounces and close (deliberately, now) doesn't -- see collapseExit's own
+    // doc for why closing settled on a calm spring instead.
     val corner by animateDpAsState(
         targetValue = if (expanded) PebbleCornerExpanded else PebbleCornerCollapsed,
         animationSpec = if (expanded) {
             spring(dampingRatio = PebbleBounceDamping, stiffness = PebbleBounceStiffness)
         } else {
-            spring(dampingRatio = PebbleCloseBounceDamping, stiffness = PebbleBounceStiffness)
+            spring(dampingRatio = PebbleCloseDamping, stiffness = PebbleBounceStiffness)
         },
         label = "pebbleCorner",
     )
@@ -9570,15 +9569,15 @@ internal fun PebbleShell(
                             }
                         }
                     }
-                    // Normal pebbles: animate the body fading + sliding open/closed.
-                    // Collapse springs like the expand does. It used to be a flat 160ms tween
-                    // against a spring open, which is what made closing feel like a snap next
-                    // to a smooth open -- now both halves come from the theme's motion scheme,
-                    // so that symmetry is structural instead of two hand-matched numbers.
+                    // Normal pebbles: animate the body sliding open/closed. fade = false on
+                    // the exit -- StaggeredRevealColumn's rows own their own fade now (see
+                    // collapseExit's own doc for why running a SECOND, block-level fade at the
+                    // same time buried that per-row one and made closing look like it had no
+                    // content animation at all).
                     AnimatedVisibility(
                         visible = expanded,
                         enter = collapseEnter(),
-                        exit = collapseExit(),
+                        exit = collapseExit(fade = false),
                     ) {
                         // StaggeredRevealColumn, not a plain Column: every row pops in/out on
                         // its own as this cascades open/closed, instead of every row appearing

@@ -218,18 +218,19 @@ internal const val AdvancedModeStiffness = 130f
  * actually overshoot, both delivers the bounce and stays the single source of truth for the
  * card's bounds.
  *
- * The CLOSE half now bounces too, on explicit request, but on its OWN, more heavily damped
- * spring ([PebbleCloseBounceDamping]) rather than reusing the open one. shrinkVertically
- * drives an IntSize animating towards zero, and an underdamped spring overshoots its target
- * in BOTH directions -- so undershooting near zero height would mean asking for a genuinely
- * negative size, which a layout node cannot report. A layout engine clamps that to zero
- * instead, which is a stutter (the spring's own math thinks it's still below zero and moving,
- * but what's on screen just sits at zero until the spring catches back up), not a bounce.
- * [PebbleCloseBounceDamping] is a LITTLE closer to critically damped than the open spring --
- * enough that the undershoot toward zero stays small -- but not by much: 0.85 was the first
- * value tried here specifically to be safe against the clamp/stutter above, and it erred so
- * far toward safe that the close bounce was reported as not there at all. 0.72 is the
- * smaller, one-step correction back toward the open spring's own 0.68.
+ * The CLOSE half went through its own arc: plain (the original), then given its own,
+ * more-damped bounce on explicit request, tuned twice (0.85, then 0.72) trying to make that
+ * bounce read as connected to the card rather than tacked on -- and it never did. The report
+ * that settled it: "the spring on it collapsing feels disjoined from the closing itself."
+ * Bouncing on the way IN reads as arrival -- there's real headroom past the target for an
+ * overshoot to land in. Bouncing on the way OUT, toward a target of zero, doesn't have an
+ * equivalent physical read: there's nothing past "gone" for an overshoot to mean, so however
+ * it was damped it kept reading as an effect layered onto the collapse rather than something
+ * that WAS the collapse. Back to [PebbleCloseDamping] at 1.0 (critically damped, no
+ * overshoot) -- the calm collapse this had before any of that, now sharing [PebbleBounceStiffness]
+ * with the open spring (and with the corner morph, still) purely so the TIMING still feels
+ * like one card, even though the SHAPE of the motion is deliberately different in each
+ * direction now.
  *
  * Overshoot fraction is set by damping ratio alone (stiffness only changes how FAST the
  * spring gets there, not how far past the target it swings). History on [PebbleBounceDamping]:
@@ -246,7 +247,7 @@ internal const val AdvancedModeStiffness = 130f
 // animating the height and the corners of the SAME card at once is what read as "the bounce
 // doesn't feel connected to the pebble actually opening" rather than one coherent motion.
 internal val PebbleBounceDamping = 0.68f
-internal val PebbleCloseBounceDamping = 0.72f
+internal val PebbleCloseDamping = Spring.DampingRatioNoBouncy
 internal val PebbleBounceStiffness = Spring.StiffnessLow
 
 @Composable
@@ -257,16 +258,28 @@ internal fun collapseEnter(expandFrom: Alignment.Vertical = Alignment.Top): Ente
             expandFrom = expandFrom,
         )
 
-/** Mirror of [collapseEnter]; see there for why both halves are springs, and for why the
- *  CLOSE direction bounces on its own, more heavily damped spring rather than reusing the
- *  open one. */
+/**
+ * Mirror of [collapseEnter]; see there for why the CLOSE direction settles calmly
+ * ([PebbleCloseDamping]) rather than bouncing like the open one does.
+ *
+ * [fade] defaults true (every other caller of this wants the whole block to fade as it
+ * leaves, same as always), but [PebbleShell] passes false for its own body: that body's rows
+ * now own their OWN fade individually (see [StaggeredRevealColumn]), and running the
+ * block-level fadeOut here AT THE SAME TIME as that per-row fade meant two overlapping
+ * opacity animations landing on the same pixels at once -- the coarser, whole-block one
+ * dominated what was actually visible, and the finer per-row cascade underneath it was
+ * indistinguishable from noise. That is what "closing has no animation on the content" was:
+ * a real animation, rendered invisible by a redundant one sitting on top of it. With [fade]
+ * off here, the per-row fade is the ONLY thing animating opacity, so it's what's actually seen.
+ */
 @Composable
-internal fun collapseExit(shrinkTowards: Alignment.Vertical = Alignment.Top): ExitTransition =
-    fadeOut(MaterialTheme.motionScheme.defaultEffectsSpec<Float>()) +
-        shrinkVertically(
-            spring(dampingRatio = PebbleCloseBounceDamping, stiffness = PebbleBounceStiffness),
-            shrinkTowards = shrinkTowards,
-        )
+internal fun collapseExit(shrinkTowards: Alignment.Vertical = Alignment.Top, fade: Boolean = true): ExitTransition {
+    val shrink = shrinkVertically(
+        spring(dampingRatio = PebbleCloseDamping, stiffness = PebbleBounceStiffness),
+        shrinkTowards = shrinkTowards,
+    )
+    return if (fade) fadeOut(MaterialTheme.motionScheme.defaultEffectsSpec<Float>()) + shrink else shrink
+}
 
 /**
  * Independent pop-in/pop-out for ONE row-level element that appears or disappears while its
