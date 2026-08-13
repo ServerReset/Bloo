@@ -7,8 +7,10 @@ import androidx.compose.animation.AnimatedVisibilityScope
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -221,17 +223,18 @@ internal const val AdvancedModeStiffness = 130f
  * past the target for the overshoot to actually be visible.
  *
  * Overshoot fraction is set by [PebbleBounceDamping] alone (stiffness only changes how FAST
- * the spring gets there, not how far past the target it swings). 0.6 first shipped and read
- * as too subtle to register as a bounce at all; [Spring.DampingRatioMediumBouncy] (0.5) with
- * [Spring.StiffnessLow] went the other way and read as too MUCH bounce -- StiffnessLow gives
- * the swing enough travel time to be seen, but that same slowness also stretches out how long
- * the overshoot lingers, so a moderate overshoot fraction still reads as exaggerated. Settled
- * on [Spring.DampingRatioLowBouncy] (0.75, Compose's own "a little bounce, not a lot" tier)
- * paired with [Spring.StiffnessMediumLow] (faster than StiffnessLow) -- less overshoot AND
- * less time spent in it, which is what actually reads as "a bounce" rather than "a wobble."
+ * the spring gets there, not how far past the target it swings). History on this one number:
+ * 0.6 damping + StiffnessMediumLow first shipped and read as too subtle to register as a
+ * bounce at all. 0.5 (MediumBouncy) + StiffnessLow went the other way and read as too MUCH --
+ * StiffnessLow gave the swing enough travel time to be seen, but also stretched out how long
+ * the overshoot lingers. Dialing BOTH knobs down at once (0.75 + StiffnessMediumLow) to fix
+ * that overcorrected into no visible bounce at all -- confirmed on-device, twice now, so this
+ * stays a ONE-variable change at a time from here: [Spring.StiffnessLow] is kept (it was the
+ * confirmed-visible half of the "too much" version), and damping alone moves from 0.5 to 0.6,
+ * roughly halving the overshoot (~16% to ~9%) without touching how long it takes to happen.
  */
-private val PebbleBounceDamping = Spring.DampingRatioLowBouncy
-private val PebbleBounceStiffness = Spring.StiffnessMediumLow
+private val PebbleBounceDamping = 0.6f
+private val PebbleBounceStiffness = Spring.StiffnessLow
 
 @Composable
 internal fun collapseEnter(expandFrom: Alignment.Vertical = Alignment.Top): EnterTransition =
@@ -371,7 +374,13 @@ internal fun StaggeredRevealColumn(
     LaunchedEffect(visible) {
         progress.animateTo(
             if (visible) 1f else 0f,
-            animationSpec = spring(dampingRatio = PebbleBounceDamping, stiffness = PebbleBounceStiffness),
+            // A dedicated tween, NOT PebbleBounceDamping/Stiffness -- this used to share the
+            // card's own bounce spring, which ties the cascade's total duration to however
+            // fast/slow that spring happens to be tuned. Deliberately decoupled and slowed
+            // down to 420ms so the stagger reads clearly on its own regardless of what the
+            // card height spring is doing at the same time, rather than being however much
+            // time is left over after the two animations' timings happen to line up.
+            animationSpec = tween(durationMillis = 420, easing = FastOutSlowInEasing),
         )
     }
     val gapPx = with(LocalDensity.current) { verticalGap.roundToPx() }
@@ -402,8 +411,12 @@ internal fun StaggeredRevealColumn(
                 p.placeWithLayer(0, y) {
                     val local = ((progress.value - start) / (1f - PebbleStaggerSpan)).coerceIn(0f, 1f)
                     alpha = local
-                    scaleX = 0.85f + 0.15f * local
-                    scaleY = 0.85f + 0.15f * local
+                    // 0.7 -> 1.0, not 0.85 -> 1.0: a 15%-of-size scale change is easy to miss
+                    // next to the alpha fade doing most of the visible work: wider so the pop
+                    // reads as its own distinct motion rather than a fade with a barely-there
+                    // size wobble riding along.
+                    scaleX = 0.7f + 0.3f * local
+                    scaleY = 0.7f + 0.3f * local
                     transformOrigin = TransformOrigin(0f, 0.5f)
                 }
                 y += p.height + gapPx
