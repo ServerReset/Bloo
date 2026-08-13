@@ -5756,49 +5756,120 @@ internal fun UpdateAvailableTile(state: UiState, vm: AppViewModel, dragHandle: M
                 seamless -> Triple(Icons.Filled.Bolt, "Installs silently via Shizuku, no prompts", scheme.onSurfaceVariant)
                 else -> Triple(Icons.Filled.SystemUpdate, deltaLabel, scheme.primary)
             }
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Icon(statusIcon, contentDescription = null, tint = statusTint, modifier = Modifier.size(20.dp))
-                Text(statusText, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+            // Sprung, not a snap -- the tint is what carries "this got a step further along"
+            // (neutral -> ChargeGreen once the APK is ready), so it gets the same treatment
+            // the charge bar's own fill-colour spring does rather than cutting on one frame.
+            val animatedStatusTint by androidx.compose.animation.animateColorAsState(
+                targetValue = statusTint,
+                animationSpec = spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessLow),
+                label = "updateStatusTint",
+            )
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                // A tonal badge behind the icon, not a bare glyph -- the same "icon gets its
+                // own coloured circle" weight CoverHero gives every stat it leads with,
+                // which this tile otherwise lacked next to every pebble that opens on one.
+                Box(
+                    Modifier
+                        .size(36.dp)
+                        .clip(CircleShape)
+                        .background(animatedStatusTint.copy(alpha = 0.15f)),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    // AnimatedContent, not a bare Icon swap -- installing -> downloading ->
+                    // ready is a real sequence of distinct states, and a plain `when` cut
+                    // between their icons on one frame while everything else on this card is
+                    // now springing and cascading into place.
+                    AnimatedContent(
+                        targetState = statusIcon,
+                        transitionSpec = { (fadeIn() + scaleIn(initialScale = 0.6f)) togetherWith (fadeOut() + scaleOut(targetScale = 0.6f)) },
+                        label = "updateStatusIcon",
+                    ) { icon ->
+                        Icon(icon, contentDescription = null, tint = animatedStatusTint, modifier = Modifier.size(20.dp))
+                    }
+                }
+                AnimatedContent(
+                    targetState = statusText,
+                    transitionSpec = {
+                        (fadeIn(tween(180)) + slideInVertically { it / 3 }) togetherWith
+                            (fadeOut(tween(120)) + slideOutVertically { -it / 3 })
+                    },
+                    label = "updateStatusText",
+                    modifier = Modifier.weight(1f),
+                ) { text ->
+                    Text(text, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                }
             }
             // Live download progress bar. Own PopVisible rather than a bare `if` --
             // this bar arrives and leaves while the tile is already open (download
             // starts, download finishes), which is exactly the "pops in/out on its
             // own" case PopVisible exists for.
             PopVisible(visible = state.updateDownloading) {
-                val p = downloadProgress
-                if (p != null) {
-                    LinearProgressIndicator(progress = { p }, modifier = Modifier.fillMaxWidth())
-                } else {
-                    LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+                // A taller, fully-rounded bar in its own tonal track, with the live percent
+                // riding alongside it -- the plain default-height LinearProgressIndicator
+                // read as a stray system control dropped into a card that otherwise draws
+                // every other number (build, delta) as its own styled readout.
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    val p = downloadProgress
+                    // CircleShape on the Surface, not a strokeCap param on the indicator
+                    // itself -- clipping the whole track to a pill gives both ends the same
+                    // rounded read without depending on exactly which LinearProgressIndicator
+                    // overloads this BOM happens to expose a strokeCap parameter on.
+                    Surface(
+                        modifier = Modifier.weight(1f).height(8.dp),
+                        shape = CircleShape,
+                        color = scheme.onSurface.copy(alpha = 0.12f),
+                    ) {
+                        if (p != null) {
+                            LinearProgressIndicator(progress = { p }, modifier = Modifier.fillMaxSize(), trackColor = Color.Transparent)
+                        } else {
+                            LinearProgressIndicator(modifier = Modifier.fillMaxSize(), trackColor = Color.Transparent)
+                        }
+                    }
+                    if (p != null) {
+                        com.bloo.uicommon.AnimatedValue(
+                            "${(p * 100).roundToInt()}%",
+                            style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
+                            reduceMotion = LocalReduceMotion.current,
+                        )
+                    }
                 }
             }
             // Release notes ("What's new"), capped, with a "Full notes" link to the
             // release page when there's more than we show.
             PopVisible(visible = info.run.releaseNotes != null) {
                 val notes = info.run.releaseNotes.orEmpty()
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    // "Full notes" rides in the section header rather than taking a
-                    // whole row of its own below the excerpt — one less stacked block
-                    // in a tile that already carries status, notes and two dismissals.
-                    Row(verticalAlignment = Alignment.CenterVertically) {
+                // Its own tonal card, matching the install-help disclosure just below it --
+                // bare text here made the release notes read as an unstyled afterthought
+                // next to that block's Surface treatment.
+                Surface(
+                    shape = RoundedCornerShape(12.dp),
+                    color = scheme.surfaceContainerHighest,
+                    contentColor = scheme.onSurface,
+                ) {
+                    Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        // "Full notes" rides in the section header rather than taking a
+                        // whole row of its own below the excerpt — one less stacked block
+                        // in a tile that already carries status, notes and two dismissals.
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                "What's new",
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = scheme.onSurfaceVariant,
+                                modifier = Modifier.weight(1f),
+                            )
+                            MorphTextButton("Full notes", onClick = {
+                                runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(info.run.htmlUrl))) }
+                            })
+                        }
                         Text(
-                            "What's new",
-                            style = MaterialTheme.typography.labelSmall,
-                            fontWeight = FontWeight.Bold,
+                            notes.trim(),
+                            style = MaterialTheme.typography.bodySmall,
                             color = scheme.onSurfaceVariant,
-                            modifier = Modifier.weight(1f),
+                            maxLines = 5,
+                            overflow = TextOverflow.Ellipsis,
                         )
-                        MorphTextButton("Full notes", onClick = {
-                            runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(info.run.htmlUrl))) }
-                        })
                     }
-                    Text(
-                        notes.trim(),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = scheme.onSurfaceVariant,
-                        maxLines = 5,
-                        overflow = TextOverflow.Ellipsis,
-                    )
                 }
             }
             // Progressive install help: only in the tap-through (non-seamless) path, and
@@ -9185,10 +9256,22 @@ internal fun PebbleShell(
     content: @Composable ColumnScope.() -> Unit,
 ) {
     val haptics = LocalHaptics.current
-    // Collapsed = pill-soft corners; expanded morphs to a tighter rounded square.
+    // Collapsed = pill-soft corners; expanded morphs to a tighter rounded square. Direction
+    // picks between the SAME two springs collapseEnter/collapseExit use for the height, rather
+    // than one flat SoftDamping spec for both directions -- that flat spec used to run
+    // regardless of direction, so the corners settled smoothly on the way open WHILE the
+    // height was still overshooting/bouncing: two different physics on the same card at the
+    // same time, which is what read as "the bounce doesn't feel connected to the pebble
+    // actually opening" rather than one coherent motion. Opening now bounces on both;
+    // closing is calm on both, matching collapseExit's own reason for not bouncing the height
+    // shut (see that transition's doc).
     val corner by animateDpAsState(
         targetValue = if (expanded) PebbleCornerExpanded else PebbleCornerCollapsed,
-        animationSpec = spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessLow),
+        animationSpec = if (expanded) {
+            spring(dampingRatio = PebbleBounceDamping, stiffness = PebbleBounceStiffness)
+        } else {
+            spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessLow)
+        },
         label = "pebbleCorner",
     )
     val fillHeight = LocalPebbleFillHeight.current

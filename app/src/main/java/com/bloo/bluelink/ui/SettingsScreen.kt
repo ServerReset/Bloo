@@ -1459,53 +1459,73 @@ internal fun SettingsScreen(vm: AppViewModel) {
             // a browser fallback source, and the optional Shizuku silent-install toggle
             // gated to just its row so the card itself never vanishes).
             SettingsCard("Updates", Icons.Filled.SystemUpdate) {
-                val updateTint = when {
-                    state.updateAvailable != null -> MaterialTheme.colorScheme.tertiary
-                    else -> MaterialTheme.colorScheme.onSurfaceVariant
-                }
+                val updateTint by androidx.compose.animation.animateColorAsState(
+                    targetValue = when {
+                        state.updateAvailable != null -> MaterialTheme.colorScheme.tertiary
+                        else -> MaterialTheme.colorScheme.onSurfaceVariant
+                    },
+                    // Sprung rather than snapped -- "up to date" turning tertiary the instant
+                    // a check lands is the one moment this card actually has news, and a cut
+                    // read as flat next to how much of the rest of the app now springs.
+                    animationSpec = spring(
+                        dampingRatio = SoftDamping,
+                        stiffness = androidx.compose.animation.core.Spring.StiffnessLow,
+                    ),
+                    label = "settingsUpdateTint",
+                )
                 // The installed build number carries the card as a hero stat, the
                 // same big-number language the garage hero uses for %/range —
                 // instead of a label/value row buried under a paragraph. The state
                 // rides alongside as a tonal chip rather than a second text line.
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Column(Modifier.weight(1f)) {
-                        RollingNumber(
-                            text = if (vm.currentBuildNumber > 0) "${vm.currentBuildNumber}" else "dev",
-                            style = MaterialTheme.typography.displaySmall,
-                            fontWeight = FontWeight.Bold,
-                        )
-                        // Branch only when it isn't the mainline the app normally
-                        // builds from — buildLabel already encodes that rule, so
-                        // reuse it rather than re-deriving "is this main?" here.
-                        val branchSuffix = com.bloo.bluelink.data
-                            .buildLabel(vm.currentBuildNumber, com.bloo.bluelink.BuildConfig.BUILD_BRANCH)
-                            .substringAfter(" · ", "")
-                        Text(
-                            if (branchSuffix.isNotBlank()) "this build · $branchSuffix" else "this build",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                    Spacer(Modifier.width(12.dp))
-                    Row(
-                        Modifier
-                            .clip(CircleShape)
-                            .background(updateTint.copy(alpha = 0.15f))
-                            .padding(horizontal = 12.dp, vertical = 8.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Icon(Icons.Filled.SystemUpdate, contentDescription = null, tint = updateTint, modifier = Modifier.size(16.dp))
-                        Spacer(Modifier.width(6.dp))
-                        Text(
-                            when {
-                                state.updateChecking -> "Checking…"
-                                state.updateAvailable != null -> "Build ${state.updateAvailable!!.run.runNumber} ready"
-                                else -> "Up to date"
-                            },
-                            style = MaterialTheme.typography.labelMedium,
-                            color = updateTint,
-                            fontWeight = FontWeight.Bold,
-                        )
+                //
+                // Its own tonal Surface, not a bare Row on the card's own background --
+                // gives the hero stat visual depth/separation from the buttons below it,
+                // the same "carved-out" treatment the update PEBBLE gives its own numbers.
+                Surface(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(16.dp),
+                    color = MaterialTheme.colorScheme.surfaceContainerHighest,
+                ) {
+                    Row(Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Column(Modifier.weight(1f)) {
+                            RollingNumber(
+                                text = if (vm.currentBuildNumber > 0) "${vm.currentBuildNumber}" else "dev",
+                                style = MaterialTheme.typography.displaySmall,
+                                fontWeight = FontWeight.Bold,
+                            )
+                            // Branch only when it isn't the mainline the app normally
+                            // builds from — buildLabel already encodes that rule, so
+                            // reuse it rather than re-deriving "is this main?" here.
+                            val branchSuffix = com.bloo.bluelink.data
+                                .buildLabel(vm.currentBuildNumber, com.bloo.bluelink.BuildConfig.BUILD_BRANCH)
+                                .substringAfter(" · ", "")
+                            Text(
+                                if (branchSuffix.isNotBlank()) "this build · $branchSuffix" else "this build",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                        Spacer(Modifier.width(12.dp))
+                        Row(
+                            Modifier
+                                .clip(CircleShape)
+                                .background(updateTint.copy(alpha = 0.15f))
+                                .padding(horizontal = 12.dp, vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Icon(Icons.Filled.SystemUpdate, contentDescription = null, tint = updateTint, modifier = Modifier.size(16.dp))
+                            Spacer(Modifier.width(6.dp))
+                            AnimatedContent(
+                                targetState = when {
+                                    state.updateChecking -> "Checking…"
+                                    state.updateAvailable != null -> "Build ${state.updateAvailable!!.run.runNumber} ready"
+                                    else -> "Up to date"
+                                },
+                                label = "settingsUpdateChipText",
+                            ) { text ->
+                                Text(text, style = MaterialTheme.typography.labelMedium, color = updateTint, fontWeight = FontWeight.Bold)
+                            }
+                        }
                     }
                 }
                 Spacer(Modifier.height(14.dp))

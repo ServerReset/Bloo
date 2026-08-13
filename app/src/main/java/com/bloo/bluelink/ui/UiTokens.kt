@@ -7,7 +7,7 @@ import androidx.compose.animation.AnimatedVisibilityScope
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
@@ -233,8 +233,12 @@ internal const val AdvancedModeStiffness = 130f
  * confirmed-visible half of the "too much" version), and damping alone moves from 0.5 to 0.6,
  * roughly halving the overshoot (~16% to ~9%) without touching how long it takes to happen.
  */
-private val PebbleBounceDamping = 0.6f
-private val PebbleBounceStiffness = Spring.StiffnessLow
+// internal, not private: PebbleShell's own corner-radius morph (animateDpAsState, Screens.kt)
+// shares this exact spring now too -- see that call site for why. Two different physics
+// animating the height and the corners of the SAME card at once is what read as "the bounce
+// doesn't feel connected to the pebble actually opening" rather than one coherent motion.
+internal val PebbleBounceDamping = 0.6f
+internal val PebbleBounceStiffness = Spring.StiffnessLow
 
 @Composable
 internal fun collapseEnter(expandFrom: Alignment.Vertical = Alignment.Top): EnterTransition =
@@ -315,10 +319,14 @@ private object NoOpColumnScope : ColumnScope {
 }
 
 /** How much of the shared progress each row's own stagger window is offset by, end to end --
- *  see [StaggeredRevealColumn]. 0.6 means the LAST row doesn't even start popping in until
- *  the shared progress is 60% of the way there, so by the time it finishes the first rows are
- *  already settled: a real front-to-back cascade instead of every row moving in lockstep. */
-private const val PebbleStaggerSpan = 0.6f
+ *  see [StaggeredRevealColumn]. 0.85, not 0.6: at 0.6 every row's own 40%-wide window
+ *  overlapped its neighbours' (row *i+1* was already moving before row *i* finished), which is
+ *  what read as "one big block" fading rather than distinct steps -- reported after the first
+ *  version shipped. At 0.85 each row gets a narrow 15%-wide window instead: for up to 5 rows
+ *  (most pebbles) consecutive windows don't overlap at all, so row *i* is fully settled before
+ *  row *i+1* even starts; past 5 they overlap only slightly, and the window is still narrow
+ *  enough to read as its own quick step rather than blending into a wave. */
+private const val PebbleStaggerSpan = 0.85f
 
 /**
  * Drop-in replacement for [PebbleShell]'s plain `Column` of body rows: gives every DIRECT
@@ -376,11 +384,19 @@ internal fun StaggeredRevealColumn(
             if (visible) 1f else 0f,
             // A dedicated tween, NOT PebbleBounceDamping/Stiffness -- this used to share the
             // card's own bounce spring, which ties the cascade's total duration to however
-            // fast/slow that spring happens to be tuned. Deliberately decoupled and slowed
-            // down to 420ms so the stagger reads clearly on its own regardless of what the
-            // card height spring is doing at the same time, rather than being however much
-            // time is left over after the two animations' timings happen to line up.
-            animationSpec = tween(durationMillis = 420, easing = FastOutSlowInEasing),
+            // fast/slow that spring happens to be tuned. Decoupled so the stagger reads on its
+            // own regardless of what the card height spring is doing at the same time.
+            //
+            // LinearEasing on this OUTER tween, deliberately, even though the result should
+            // still look eased -- each row's own `local` below is a REMAP of a narrow slice of
+            // this value into its own 0..1, and remapping a slice of an already-eased curve
+            // gives that slice a distorted, not-actually-eased shape (steep in some windows,
+            // flat in others, depending on where in the outer curve the slice happened to
+            // land). A linear outer value makes every row's slice equally linear, so applying
+            // ONE consistent ease per row (the smoothstep in the placement block below) gives
+            // every row's own pop the identical shape -- which is what makes them read as
+            // repeated, distinct STEPS rather than one blurry wave with a randomly uneven feel.
+            animationSpec = tween(durationMillis = 480, easing = LinearEasing),
         )
     }
     val gapPx = with(LocalDensity.current) { verticalGap.roundToPx() }
@@ -409,7 +425,12 @@ internal fun StaggeredRevealColumn(
                 // one of the spring's frames would re-trigger a full remeasure of every child
                 // in this pebble to move a value that only ever changes how they're drawn.
                 p.placeWithLayer(0, y) {
-                    val local = ((progress.value - start) / (1f - PebbleStaggerSpan)).coerceIn(0f, 1f)
+                    val raw = ((progress.value - start) / (1f - PebbleStaggerSpan)).coerceIn(0f, 1f)
+                    // Smoothstep, applied per row rather than trusting the outer tween's own
+                    // easing -- see the LinearEasing comment above for why: this is what gives
+                    // every row's individual pop the same eased shape regardless of where its
+                    // narrow window happens to land in the overall sequence.
+                    val local = raw * raw * (3f - 2f * raw)
                     alpha = local
                     // 0.7 -> 1.0, not 0.85 -> 1.0: a 15%-of-size scale change is easy to miss
                     // next to the alpha fade doing most of the visible work: wider so the pop
