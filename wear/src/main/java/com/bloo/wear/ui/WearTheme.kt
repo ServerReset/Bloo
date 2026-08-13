@@ -47,6 +47,9 @@ val LocalReduceMotion = staticCompositionLocalOf { false }
  */
 object WearColors {
     val chargeGreen = Color(BlooColors.chargeGreen)
+    /** The charge ring's fill once the pack is AT its own limit -- "topped up," not
+     *  "still filling." See ChargeRing and the phone's ChargeReadout.stuckAtLimit. */
+    val chargeBlue  = Color(BlooColors.chargeBlue)
     val heat        = Color(BlooColors.heat)
     val cool        = Color(BlooColors.cool)
 }

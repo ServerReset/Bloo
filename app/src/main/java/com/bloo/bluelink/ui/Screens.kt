@@ -287,11 +287,14 @@ import androidx.compose.ui.draw.rotate
 import androidx.lifecycle.repeatOnLifecycle
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.geometry.RoundRect
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.clipPath
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.nativeCanvas
@@ -6049,6 +6052,13 @@ private class ChargeReadout(
     val frac: Float,
     /** The AC/DC charge limit to mark, when plugged in and below full. */
     val limitPct: Int?,
+    /**
+     * The pack has reached (or passed) its own configured limit -- "topped up," not
+     * "still filling." Independent of [charging]: a car reported as charged to its
+     * limit stays blue on this reading even hours later, unplugged, until either the
+     * percentage or the limit itself changes -- there is no live session to lose.
+     */
+    val stuckAtLimit: Boolean,
     /** Plug-in hybrid only: the fuel tank alongside the pack. Null when there is no
      *  tank to show, so callers need no second `hasBattery && hasFuel` test. */
     val fuelPct: Int?,
@@ -6066,6 +6076,7 @@ private fun chargeReadoutOf(
     val pct = status?.percentFor(hasBattery)
     val range = status?.rangeMiFor(hasBattery)
     val charging = hasBattery && status?.evStatus?.batteryCharge == true
+    val limitPct = status?.evStatus?.targetForCurrentPlug()?.takeIf { it in 1..99 }
     // Charging time + type, shown in the badge slot (replacing parked/driving,
     // which is hidden while charging) so the pebble doesn't grow taller.
     val chargeMinutes = status?.evStatus?.minutesToFull
@@ -6104,7 +6115,8 @@ private fun chargeReadoutOf(
         charging = charging,
         emphasizeStatus = charging || drivingLabel == "Driving",
         frac = ((pct ?: 0).coerceIn(0, 100)) / 100f,
-        limitPct = status?.evStatus?.targetForCurrentPlug()?.takeIf { it in 1..99 },
+        limitPct = limitPct,
+        stuckAtLimit = pct != null && limitPct != null && pct >= limitPct,
         fuelPct = status?.fuelLevel?.takeIf { hasBattery && hasFuel },
     )
 }
@@ -6482,61 +6494,53 @@ private fun HeroMorphReadout(
                 Text("Fuel $fuelPct%", style = type.bodyMedium, color = fuelColor, maxLines = 1)
             }
         }
-        ChargeSegmentBar(frac = animatedChargeFrac(data.frac), limitPct = data.limitPct)
+        ChargeSegmentBar(frac = animatedChargeFrac(data.frac), limitPct = data.limitPct, stuckAtLimit = data.stuckAtLimit)
     }
 }
 
 /**
- * The hero's charge bar: one segment up to the charge limit, a gap, then the
- * part of the pack the car has been told not to fill.
+ * The hero's charge bar: three plain segments -- filled up to the current charge,
+ * a track segment up to the limit, and a dimmer track segment past it -- or two
+ * when the charge is already at (or past) its limit, since there's no "still
+ * charging toward the limit" zone left to show separately.
  *
- * This replaces a marker drawn ON TOP of a single continuous bar -- first a
- * dot, then a notch. Both had the same problem: the limit is a boundary
- * between two different meanings ("will charge" / "won't"), and an overlay
- * has to fight the fill for the same pixels exactly where it matters most,
- * as the charge arrives at the limit. Making it the seam between two
- * segments means the marker can't collide with anything, because it isn't
- * drawn -- it's the gap. Same shape the widget's own charge bar and the
- * watch ring use, so every surface says it the same way.
+ * Replaces the earlier gap-and-dot design (a seam where the fill ended, plus a
+ * small circular marker drawn on top at the limit): that version's own doc
+ * explained why the marker was chosen over a second split -- charge sitting AT
+ * its limit (the common case) put both devices on the same pixel, "a 5dp hole
+ * under a 14dp dot." This version's OWN limit split does not have that
+ * collision: when the charge is at or past its limit there is only ONE split
+ * left (there is nothing left to divide between "will still charge" and "won't"),
+ * so the exact case that broke the old two-device design is precisely the case
+ * this one collapses down to a single, unambiguous line. Requested directly
+ * after the notification's own tracker-icon version of this bar read as
+ * cluttered on a real device.
  *
- * The seam animates: changing the limit while charging slides the split to
- * its new position and the fill re-proportions into it, rather than the bar
- * snapping to a different shape between two frames.
+ * Blue fill instead of green when the charge has reached its limit -- "topped
+ * up," not "still filling" -- regardless of whether the car is actively
+ * reporting a charging session, so the colour stays accurate hours after the
+ * car finished charging to that limit, not just while plugged in.
+ *
+ * Both splits animate: the fill springs to its target the same way it always
+ * did, and the limit split slides to a new position rather than snapping
+ * between two frames if the limit itself changes while charging.
  */
 @Composable
-private fun ChargeSegmentBar(frac: Float, limitPct: Int?, modifier: Modifier = Modifier) {
+private fun ChargeSegmentBar(frac: Float, limitPct: Int?, stuckAtLimit: Boolean, modifier: Modifier = Modifier) {
     val scheme = MaterialTheme.colorScheme
-    // The split is at the CHARGE, not the limit. Green is what's in the pack,
-    // grey is what isn't, and the gap between them is where the level is --
-    // which is the one thing the bar has to say at a glance, and the thing an
-    // earlier version of this got wrong by splitting at the limit instead.
-    // The limit is a MARKER on that bar, not a division of it.
-    val filledFrac = frac.coerceIn(0f, 1f)
     val limit = limitPct?.takeIf { it in 1..99 }
-    // The common case is the charge sitting AT its limit -- a car set to 80%
-    // and charged to 80%. The split and the marker then land on the same
-    // pixel, and drawing both put a 5dp hole under a 14dp dot: two devices
-    // saying one thing, rendered as damage. Near the split the gap yields and
-    // the marker alone carries it.
-    val atSplit = limit != null && abs(limit / 100f - filledFrac) < 0.03f
-    val gap by animateDpAsState(
-        // No gap at the extremes either: an empty or full pack has nothing to
-        // separate, and a notch hard against a rounded cap reads as a fault.
-        targetValue = if (filledFrac > 0.02f && filledFrac < 0.98f && !atSplit) 5.dp else 0.dp,
-        animationSpec = spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessLow),
-        label = "chargeSplitGap",
-    )
-    // The marker slides to a new limit as a FRACTION, resolved in the draw scope. It used
-    // to be an animated Dp offset on a child Box, which made every frame of that slide a
-    // layout pass; the value it wants is a position, and a position costs nothing to draw.
-    //
-    // Animatable rather than animateFloatAsState, and the reason is a behaviour the old
-    // code got for free: it created its animation INSIDE `if (limit != null)`, so the state
-    // was newly remembered whenever a limit appeared and therefore started AT its target.
-    // A plain animateFloatAsState here sits at 0f while the car is unplugged, so plugging
-    // in would slide the marker across the whole bar from 0% -- an animation of a value
-    // that never had a previous value. So: snap the first time a limit is known, spring
-    // for every change after that.
+    val trackColor = scheme.onSurface.copy(alpha = 0.16f)
+    // Half the near-track's alpha -- the same "quieter, not a different hue" treatment
+    // used for the limit-point's track everywhere else this bar's shape is echoed.
+    val trackDimColor = scheme.onSurface.copy(alpha = 0.08f)
+    val fillBrush = if (stuckAtLimit) {
+        listOf(ChargeBlueDark, ChargeBlue)
+    } else {
+        listOf(ChargeGreenDark, ChargeGreen)
+    }
+    // Animatable, not animateFloatAsState, for the same reason the old marker's slide
+    // was: snap to the first-ever value (no previous position to animate FROM when a
+    // limit first appears), spring for every change after that.
     val limitAnim = remember { Animatable(0f) }
     var limitSeen by remember { mutableStateOf(false) }
     LaunchedEffect(limit) {
@@ -6548,106 +6552,62 @@ private fun ChargeSegmentBar(frac: Float, limitPct: Int?, modifier: Modifier = M
             limitAnim.snapTo(target)
         }
     }
-    val trackColor = scheme.onSurface.copy(alpha = 0.16f)
-    // The halo is the card's own surface colour, so the marker reads as a small window cut
-    // into the bar -- visibly different from BOTH the green fill and the grey track,
-    // whatever it is sitting on. The core is onSurface. Both FIXED, never swapped by which
-    // side of the fill the marker lands on: see drawChargeLimitDot for why.
-    val haloColor = scheme.surface
-    val coreColor = scheme.onSurface
-    // DRAWN, not composed. This was a BoxWithConstraints holding a Row of two Boxes plus an
-    // offset child for the marker, and BoxWithConstraints is SUBCOMPOSITION. That was found
-    // while chasing dropped frames in the hero's collapse -- a shared-element attempt was
-    // re-measuring this bar every frame, so every frame paid a subcomposition. The shared
-    // element is gone, but this stays: four draw calls in one pass, nothing here needs to be
-    // a layout node, and the fill and marker animations now invalidate draw and not
-    // composition. Cheaper in every state, not just mid-transition.
+    // DRAWN, not composed -- see the git history here for why: this used to be a
+    // BoxWithConstraints holding a Row of Boxes plus an offset child for the marker, and
+    // BoxWithConstraints is SUBCOMPOSITION, which cost a re-measure on every frame of the
+    // fill/marker animations. One clipped Canvas pass costs nothing per frame that isn't
+    // already being paid for the fill's own animateFloatAsState.
     Canvas(modifier.fillMaxWidth().height(ChargeBarHeight)) {
         val h = size.height
         val radius = CornerRadius(h / 2f)
-        val gapPx = gap.toPx()
-        val usable = (size.width - gapPx).coerceAtLeast(0f)
-        // Floored at the bar's own height when there is ANY charge: below that
-        // the 50% corner radius eats the whole shape, so 3% and 0% draw the
-        // same nothing. Capped at `usable` so the floor can't overrun the bar,
-        // and `rest` derived from the result so the two always still sum to it.
-        val filled = if (filledFrac <= 0f) 0f else minOf(usable, maxOf(usable * filledFrac, h))
-        val rest = (usable - filled).coerceAtLeast(0f)
-        if (filled > 0f) {
-            drawRoundRect(
-                // Spans the FILL, not the whole bar, which is what clipping the old
-                // gradient-backed Box to its own width did.
-                brush = Brush.horizontalGradient(
-                    listOf(ChargeGreenDark, ChargeGreen),
-                    startX = 0f,
-                    endX = filled,
-                ),
-                size = Size(filled, h),
-                cornerRadius = radius,
-            )
-        }
-        if (rest > 0f) {
-            drawRoundRect(
-                color = trackColor,
-                topLeft = Offset(filled + (if (filled > 0f) gapPx else 0f), 0f),
-                size = Size(rest, h),
-                cornerRadius = radius,
-            )
-        }
-        if (limit != null) {
-            // The limit's x in the bar's own coordinates -- past the split it has to clear
-            // the gap too, or the marker drifts off the value it is marking by exactly the
-            // gap's width. Clamped so the whole dot stays on the bar: its centre is the
-            // value, so at a 95% limit an uncorrected centre puts half the circle past the
-            // right edge. The widget's copy of this already clamped and the phone's didn't.
-            val outer = ChargeLimitDotSize.toPx() / 2f
-            // Read inside the draw lambda, so the slide is draw-phase only.
-            val lf = limitAnim.value
-            val cx = (usable * lf + (if (lf > filledFrac) gapPx else 0f))
-                .coerceIn(outer, (size.width - outer).coerceAtLeast(outer))
-            drawChargeLimitDot(Offset(cx, h / 2f), outer, haloColor, coreColor)
+        // Whole-bar rounded clip, so every segment inside it can be a plain rectangle --
+        // three flush rectangles read as one continuous pill as long as only the outer
+        // two corners are ever rounded, which clipping to the full shape guarantees
+        // regardless of how many segments end up between them.
+        clipPath(Path().apply { addRoundRect(RoundRect(Rect(Offset.Zero, size), radius)) }) {
+            val filledFrac = frac.coerceIn(0f, 1f)
+            // Floored at the bar's own height when there is ANY charge: below that the
+            // 50% corner radius (from the clip) eats the whole shape, so 3% and 0% would
+            // otherwise draw the same nothing.
+            val filledX = if (filledFrac <= 0f) 0f else minOf(size.width, maxOf(size.width * filledFrac, h))
+            if (filledX > 0f) {
+                drawRect(
+                    brush = Brush.horizontalGradient(fillBrush, startX = 0f, endX = filledX),
+                    size = Size(filledX, h),
+                )
+            }
+            if (limit == null || stuckAtLimit) {
+                // No limit at all, or already at/past it: one remaining segment, the
+                // ordinary track colour when there's no limit to speak of, the DIM track
+                // when the charge is stuck there -- the whole remainder past the current
+                // charge means "won't fill further" in that case, not "still on the way".
+                val rest = (size.width - filledX).coerceAtLeast(0f)
+                if (rest > 0f) {
+                    drawRect(
+                        color = if (limit == null) trackColor else trackDimColor,
+                        topLeft = Offset(filledX, 0f),
+                        size = Size(rest, h),
+                    )
+                }
+            } else {
+                // Two remaining segments: current -> limit (still filling toward it) and
+                // limit -> 100% (won't fill past it), split at the limit's own (animated)
+                // position. Coerced so a transient animation frame where the fill is
+                // still catching up to a just-lowered limit can't draw a negative-width
+                // middle segment -- it just collapses to the dim segment alone for that
+                // one frame, never a crash or a backwards rectangle.
+                val limitX = (size.width * limitAnim.value).coerceIn(filledX, size.width)
+                val mid = (limitX - filledX).coerceAtLeast(0f)
+                if (mid > 0f) {
+                    drawRect(color = trackColor, topLeft = Offset(filledX, 0f), size = Size(mid, h))
+                }
+                val far = (size.width - limitX).coerceAtLeast(0f)
+                if (far > 0f) {
+                    drawRect(color = trackDimColor, topLeft = Offset(limitX, 0f), size = Size(far, h))
+                }
+            }
         }
     }
-}
-
-/**
- * The charge-limit marker: a small circle sitting ON the bar at the limit. A DrawScope
- * extension rather than a composable, because the bar that hosts it is now drawn in one
- * pass -- see ChargeSegmentBar for why a layout node per element was costing frames.
- *
- * A dot, not a seam. The bar's own split already means something -- where the
- * charge currently is -- and a second division cannot mean a second thing
- * without the reader having to work out which is which. A marker sits on top
- * and says "here", which is all a limit needs to say.
- *
- * FIXED colours, on purpose, not swapped by which side of the fill the dot
- * lands on. Two versions of this tried flipping the ring and core between the
- * fill colour and the surface colour depending on position -- first ring
- * always `surface`, then ring/core swapped by side -- and both had the same
- * failure mode once the charge reached the limit: whichever pairing was
- * "correct" for the fill side made the ring and core the SAME colour, so the
- * marker rendered as either a solid disc or a same-coloured hole punched
- * through the green, at exactly the state this bar is in most often (a car
- * charged to its own limit). A marker that changes what it looks like
- * depending on where it's standing is also just harder to recognise at a
- * glance than one that doesn't.
- *
- * The halo is the card's own surface colour, so it reads as a small window
- * cut into the bar -- visibly different from BOTH the green fill and the grey
- * track, whatever it's sitting on. The core is `onSurface`, which Material's
- * own colour system guarantees contrasts against `surface`. Neither depends
- * on the bar's state, so the dot looks like one thing everywhere on the bar.
- */
-private fun DrawScope.drawChargeLimitDot(
-    center: Offset,
-    outerRadius: Float,
-    halo: Color,
-    core: Color,
-) {
-    drawCircle(halo, radius = outerRadius, center = center)
-    // 3dp of halo all round, which is what the old composable's padding between its two
-    // clipped circles was. Floored above zero so a very small bar can't erase the core.
-    drawCircle(core, radius = (outerRadius - 3.dp.toPx()).coerceAtLeast(1f), center = center)
 }
 
 // Colours, sizes and motion specs shared across screens live in UiTokens.kt.

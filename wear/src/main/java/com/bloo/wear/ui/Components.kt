@@ -281,15 +281,27 @@ fun ChargeRing(
     limitPercent: Int? = null,
 ) {
     val ringDesc = percent?.let { "Charge $it percent" } ?: "Charge level unknown"
+    val limit = limitPercent?.takeIf { it in 1..99 }
+    // Independent of `charging` -- see the phone's ChargeReadout.stuckAtLimit: a car
+    // reported charged to its own limit reads blue even hours later, unplugged.
+    // Checked ahead of the tier bands below and wins outright over all of them --
+    // LOW/CRITICAL don't co-occur with a charge already at a (normally 80-100%)
+    // limit in practice, but "topped up" is the more specific, more useful thing to
+    // say whenever it's true.
+    val stuckAtLimit = limit != null && (percent ?: 0) >= limit
     // Shared bands (com.bloo.bluelink.data.chargeTier). This ring previously had only
     // a critical band and no amber one, so a car at 20% showed the ordinary accent here
     // while the watch's own tile showed the same car in amber.
-    val ringColor = when (com.bloo.bluelink.data.chargeTier(percent, charging)) {
-        com.bloo.bluelink.data.ChargeTier.CHARGING -> WearColors.chargeGreen
-        com.bloo.bluelink.data.ChargeTier.CRITICAL -> MaterialTheme.colorScheme.error
-        com.bloo.bluelink.data.ChargeTier.LOW -> Color(com.bloo.bluelink.data.BlooColors.warn)
-        com.bloo.bluelink.data.ChargeTier.NORMAL,
-        com.bloo.bluelink.data.ChargeTier.UNKNOWN -> MaterialTheme.colorScheme.primary
+    val ringColor = if (stuckAtLimit) {
+        WearColors.chargeBlue
+    } else {
+        when (com.bloo.bluelink.data.chargeTier(percent, charging)) {
+            com.bloo.bluelink.data.ChargeTier.CHARGING -> WearColors.chargeGreen
+            com.bloo.bluelink.data.ChargeTier.CRITICAL -> MaterialTheme.colorScheme.error
+            com.bloo.bluelink.data.ChargeTier.LOW -> Color(com.bloo.bluelink.data.BlooColors.warn)
+            com.bloo.bluelink.data.ChargeTier.NORMAL,
+            com.bloo.bluelink.data.ChargeTier.UNKNOWN -> MaterialTheme.colorScheme.primary
+        }
     }
     // Spring, not tween: ChargeRing was the one hero element animating linearly in
     // an otherwise spring-driven app, so its fill felt mechanical next to every
@@ -313,7 +325,6 @@ fun ChargeRing(
             modifier = Modifier.size(size),
             colors = ProgressIndicatorDefaults.colors(indicatorColor = animatedColor),
         )
-        val limit = limitPercent?.takeIf { it in 1..99 }
         if (limit != null) {
             // Animated for the same reason the phone's seam is: changing the
             // limit while charging should move it, not teleport it.
@@ -322,10 +333,11 @@ fun ChargeRing(
                 animationSpec = spring(dampingRatio = com.bloo.uicommon.SoftDamping, stiffness = Spring.StiffnessLow),
                 label = "chargeLimitAngle",
             )
-            // A DOT on the ring, matching the dot on the bar everywhere else
-            // this value is drawn (phone hero, widget bar, widget ring, live
-            // notification). It used to be a gap cut through the ring, which
-            // read as a break in the gauge rather than a mark on it.
+            // A DOT on the ring -- kept as its own device rather than switched to a
+            // split like the linear bars elsewhere now use: CircularProgressIndicator
+            // has no multi-colour-arc API to split cleanly the way a Canvas-drawn bar
+            // can, and a gap cut through the ring (the version this replaced) read as
+            // a break in the gauge rather than a mark on it.
             //
             // Painted rather than cleared: this is a composed indicator, not a
             // bitmap we own, so the "hole" the dot sits in is drawn in the

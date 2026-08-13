@@ -13,7 +13,6 @@ import android.provider.Settings
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
-import androidx.core.graphics.drawable.IconCompat
 import com.bloo.bluelink.R
 import com.bloo.bluelink.widget.WidgetPhoto
 
@@ -264,8 +263,13 @@ object LiveCharge {
     // one charge surface that actively interrupts the user) showed a different green from every
     // glanceable surface. Consolidated so a future palette change moves all of them together.
     private const val CHARGE_GREEN = BlooColors.chargeGreen
+    // The bar's "topped up" fill, once the pack is at (or past) its own configured
+    // limit -- the same shared token every other surface that draws this bar now uses.
+    private const val CHARGE_BLUE = BlooColors.chargeBlue
     private const val TRACK = 0x40FFFFFF
-    private const val LIMIT_POINT = 0xFFFFFFFF.toInt()
+    // Half TRACK's alpha -- the "won't fill past here" segment, past either the limit
+    // or (once the charge is already there) the current charge itself.
+    private const val TRACK_DIM = 0x20FFFFFF
 
     private fun idFor(vin: String) = ("live_charge_$vin").hashCode()
 
@@ -491,8 +495,8 @@ object LiveCharge {
         minutesToFull: Int? = null,
         pluggedInLabel: String? = null,
         enabled: Boolean = true,
-        /** The charge limit for whichever plug is connected, if reported --
-         *  drawn as a point marker on the bar. */
+        /** The charge limit for whichever plug is connected, if reported -- drawn as
+         *  a split in the bar (and turns its fill blue once reached). */
         chargeLimit: Int? = null,
         /** The car's own photo, already decoded (see [sync]) -- shown as the notification's
          *  large icon so the bar reads as THIS car, the same way the hero card's photo does.
@@ -513,14 +517,32 @@ object LiveCharge {
         val limit = chargeLimit?.takeIf { it in 1..99 }
         if (percent != null) {
             val pct = percent.coerceIn(0, 100)
-            // Two segments: charged so far, and the remainder -- a zero-length
-            // segment at either 0% or 100% is skipped rather than passed
-            // through, since the API contract for a zero-length segment isn't
-            // documented and there's no reason to rely on it when a single
-            // full-length segment says the same thing unambiguously.
+            // Independent of `charging` -- a car reported charged to its own limit
+            // reads blue even hours later, unplugged, same as every other surface
+            // that draws this bar (see the phone's ChargeReadout.stuckAtLimit).
+            val stuck = limit != null && pct >= limit
+            // Up to three segments -- filled to the current charge, track to the
+            // limit, dim track past it -- or two once the charge is already at (or
+            // past) its own limit, since there's no "still filling toward it" zone
+            // left to show separately at that point. Replaces the old two-segment
+            // fill/remainder split plus a Point marker at the limit: that pairing
+            // read as a cluttered tracker glyph riding the bar on a real device, and
+            // collapsing the split-not-marker case down to ONE segment whenever the
+            // charge sits exactly at its limit sidesteps the reason a marker was
+            // used there in the first place (two devices landing on the same pixel).
+            // Zero-length segments are skipped throughout, same reasoning as
+            // before: the API contract for one isn't documented, and an empty
+            // segment says nothing a shorter list doesn't already say.
             val segments = buildList {
-                if (pct > 0) add(NotificationCompat.ProgressStyle.Segment(pct).setColor(CHARGE_GREEN))
-                if (pct < 100) add(NotificationCompat.ProgressStyle.Segment(100 - pct).setColor(TRACK))
+                if (pct > 0) add(NotificationCompat.ProgressStyle.Segment(pct).setColor(if (stuck) CHARGE_BLUE else CHARGE_GREEN))
+                when {
+                    limit == null -> if (pct < 100) add(NotificationCompat.ProgressStyle.Segment(100 - pct).setColor(TRACK))
+                    stuck -> if (pct < 100) add(NotificationCompat.ProgressStyle.Segment(100 - pct).setColor(TRACK_DIM))
+                    else -> {
+                        if (limit > pct) add(NotificationCompat.ProgressStyle.Segment(limit - pct).setColor(TRACK))
+                        if (limit < 100) add(NotificationCompat.ProgressStyle.Segment(100 - limit).setColor(TRACK_DIM))
+                    }
+                }
             }
             // setStyledByProgress(FALSE), which is what the version confirmed working on
             // a real device used. True lets the platform style the bar from the progress
@@ -530,21 +552,9 @@ object LiveCharge {
             style.setStyledByProgress(false)
                 .setProgressSegments(segments)
                 .setProgress(pct)
-            if (limit != null) {
-                style.setProgressPoints(
-                    listOf(NotificationCompat.ProgressStyle.Point(limit).setColor(LIMIT_POINT)),
-                )
-            }
         } else {
             style.setProgressIndeterminate(true)
         }
-        // A small car glyph riding the bar at the current fill point -- the same one the
-        // status bar's small icon uses, so this doesn't need a second asset drawn just for
-        // this. Google's own sample for this API rides a full-colour vehicle icon; this one
-        // stays the monochrome mask ic_stat_bloo already is rather than adding a colour
-        // variant on spec, since the tracker icon is cosmetic and a missing/wrong-format
-        // second asset is not a risk worth taking for it.
-        style.setProgressTrackerIcon(IconCompat.createWithResource(context, R.drawable.ic_stat_bloo))
 
         // "82% · to 80% · 1h 20m left · Plugged in (AC)" -- only the pieces
         // the car actually reported, joined with no stray separator for a

@@ -48,6 +48,11 @@ import androidx.compose.ui.unit.dp
 internal val ChargeGreen = Color(com.bloo.bluelink.data.BlooColors.chargeGreen)
 internal val ChargeGreenDark = Color(com.bloo.bluelink.data.BlooColors.chargeGreenDark)
 
+/** The charge bar's "topped up" state: the pack has reached its own configured limit,
+ *  so the fill reads as done rather than still climbing. See ChargeSegmentBar. */
+internal val ChargeBlue = Color(com.bloo.bluelink.data.BlooColors.chargeBlue)
+internal val ChargeBlueDark = Color(com.bloo.bluelink.data.BlooColors.chargeBlueDark)
+
 /** The app's muted/secondary-text alpha, applied over LocalContentColor. */
 internal const val MutedContentAlpha = 0.7f
 
@@ -74,8 +79,8 @@ internal val PebbleHeaderHeight = ControlHeight
 internal val PebbleCornerCollapsed = 38.dp
 internal val PebbleCornerExpanded = 20.dp
 
-/** The charge bar's height, and the limit marker's diameter, shared by every surface that
- *  draws this bar so the proportions read as one component rather than five near-misses. */
+/** The charge bar's height, shared by every surface that draws this bar so the
+ *  proportions read as one component rather than five near-misses. */
 internal val ChargeBarHeight = 18.dp
 
 /**
@@ -89,7 +94,6 @@ internal val ChargeBarHeight = 18.dp
  * previous time; one name means the reservation cannot drift from the thing it reserves for.
  */
 internal val HeroReadoutBottomInset = 14.dp
-internal val ChargeLimitDotSize = 14.dp
 
 /** Gap between settings cards. Lives inside SettingsCard as bottom padding rather than in
  *  the parent's arrangement, so a card collapsing to zero height takes its gap with it --

@@ -15,6 +15,8 @@ object BlooColors {
     // Color(Int) expect, so no conversion is needed at the call site.
     const val chargeGreen     = 0xFF2EBD59.toInt() // battery/charge indicator, "good" state
     const val chargeGreenDark = 0xFF1B8A41.toInt() // darker variant for dark backgrounds/contrast
+    const val chargeBlue      = 0xFF0A84FF.toInt() // charge bar fill once the pack is AT its own limit -- "topped up," not "still filling"
+    const val chargeBlueDark  = 0xFF0A5FBF.toInt() // darker variant for dark backgrounds/contrast
     const val heat            = 0xFFE5484D.toInt() // heating indicator / hot temp warning
     const val cool            = 0xFF2E78FF.toInt() // cooling indicator / cold temp
     const val tempMid         = 0xFF66BB6A.toInt() // mid-range cabin/outside temperature

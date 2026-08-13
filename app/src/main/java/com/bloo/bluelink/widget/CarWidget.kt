@@ -417,6 +417,12 @@ internal data class WidgetTheme(
     val surfaceVariant: ColorProvider,
     val trackArgb: Int,
     val charge: ColorProvider,
+    /** The charge bar's fill once the pack is AT its own limit -- "topped up," not
+     *  "still filling." See ChargeBar and the phone's ChargeReadout.stuckAtLimit. */
+    val chargeAtLimit: ColorProvider,
+    /** [surfaceVariant], dimmed further -- the charge bar's "won't fill past here"
+     *  segment, past either the limit or (when already there) the current charge. */
+    val surfaceVariantDim: ColorProvider,
     val unlocked: ColorProvider,
     val climate: ColorProvider,
     /** Multiplier applied to every font size the widget derives from its
@@ -465,6 +471,12 @@ internal data class WidgetTheme(
             val onSurface = if (isDark) Color(0xFFF2F2F5) else Color(0xFF1B1C20)
             val onSurfaceVariant = if (isDark) Color(0xFFC6C6CC) else Color(0xFF5C5E66)
             val surfaceVariant = if (isDark) Color(0xFF2A2C32) else Color(0xFFE7E7EC)
+            // Blended toward the (untinted, opaque) background rather than a flat alpha
+            // drop -- surfaceVariant is itself opaque here, drawn straight onto whatever
+            // solid background this render resolved to, so a transparency-based "dim"
+            // would show through to that background anyway; blending gets the same
+            // quieter result without depending on what happens to be underneath.
+            val surfaceVariantDim = androidx.compose.ui.graphics.lerp(surfaceVariant, background, 0.55f)
             return WidgetTheme(
                 isDark = isDark,
                 accent = accent,
@@ -484,6 +496,8 @@ internal data class WidgetTheme(
                 // empty segment reads as clearly part of the same shape.
                 trackArgb = if (isDark) 0x4DFFFFFF else 0x33000000,
                 charge = ColorProvider(Color(BlooColors.chargeGreen)),
+                chargeAtLimit = ColorProvider(Color(BlooColors.chargeBlue)),
+                surfaceVariantDim = ColorProvider(surfaceVariantDim),
                 unlocked = ColorProvider(Color(BlooColors.heat)),
                 climate = ColorProvider(Color(BlooColors.climateTeal)),
             )
@@ -512,8 +526,14 @@ internal data class WidgetTheme(
             onSurface = ColorProvider(Color.White),
             onSurfaceVariant = ColorProvider(Color(0xFFE4E4E8)),
             surfaceVariant = ColorProvider(Color(0x3DFFFFFF)),
+            // Half surfaceVariant's own alpha, the same ratio surfaceVariantDim uses
+            // against surfaceVariant in resolve() -- a translucent white over a photo
+            // dims by going MORE transparent, not by blending toward an opaque
+            // background that doesn't exist on this path.
+            surfaceVariantDim = ColorProvider(Color(0x1FFFFFFF)),
             accentProvider = ColorProvider(glassy(accent)),
             charge = ColorProvider(glassy(Color(BlooColors.chargeGreen))),
+            chargeAtLimit = ColorProvider(glassy(Color(BlooColors.chargeBlue))),
             unlocked = ColorProvider(glassy(Color(BlooColors.heat))),
             climate = ColorProvider(glassy(Color(BlooColors.climateTeal))),
         )
