@@ -6,6 +6,7 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.AnimatedVisibilityScope
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.expandVertically
@@ -14,15 +15,24 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
 import androidx.compose.animation.shrinkVertically
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 // No `motionScheme` import: it is a member of the MaterialTheme object (verified as
 // MaterialTheme.getMotionScheme in the resolved material3 AAR), as are defaultEffectsSpec
 // and defaultSpatialSpec on MotionScheme. Screens.kt imports none of them either.
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.TransformOrigin
+import androidx.compose.ui.layout.HorizontalAlignmentLine
+import androidx.compose.ui.layout.Layout
+import androidx.compose.ui.layout.Measured
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 
@@ -209,9 +219,16 @@ internal const val AdvancedModeStiffness = 130f
  * there while the spring's math thinks it's still moving -- a stutter, not a bounce. Closing
  * keeps the calmer default spec; the bounce reads on the way open, where there's headroom
  * past the target for the overshoot to actually be visible.
+ *
+ * Overshoot fraction is set by [PebbleBounceDamping] alone (stiffness only changes how FAST
+ * the spring gets there, not how far past the target it swings) -- 0.6 turned out too close
+ * to critically damped to actually read as a bounce on a real device, so this is
+ * [Spring.DampingRatioMediumBouncy] (0.5), the same named tier Compose ships for "this should
+ * unmistakably bounce," paired with [Spring.StiffnessLow] rather than MediumLow so there's
+ * enough travel time to see the swing happen instead of it resolving in a handful of frames.
  */
-private const val PebbleBounceDamping = 0.6f
-private val PebbleBounceStiffness = Spring.StiffnessMediumLow
+private val PebbleBounceDamping = Spring.DampingRatioMediumBouncy
+private val PebbleBounceStiffness = Spring.StiffnessLow
 
 @Composable
 internal fun collapseEnter(expandFrom: Alignment.Vertical = Alignment.Top): EnterTransition =
@@ -269,4 +286,110 @@ internal fun PopVisible(
             scaleOut(MaterialTheme.motionScheme.defaultSpatialSpec<Float>(), targetScale = 0.8f),
         content = content,
     )
+}
+
+/** Lets [StaggeredRevealColumn] accept a `content` lambda typed for `ColumnScope` --
+ *  every pebble's body is already written against that receiver -- without actually being a
+ *  Column. `weight`/`align`/`alignBy` all become no-ops, which is exactly what a REAL
+ *  Column.weight already reduces to here: it only redistributes space in a height-bounded
+ *  Column, and this container has always been wrap-content (see the note at the call site
+ *  in [StaggeredRevealColumn]). */
+private object NoOpColumnScope : ColumnScope {
+    override fun Modifier.weight(weight: Float, fill: Boolean): Modifier = this
+    override fun Modifier.align(alignment: Alignment.Horizontal): Modifier = this
+    override fun Modifier.alignBy(alignmentLine: HorizontalAlignmentLine): Modifier = this
+    override fun Modifier.alignBy(alignmentLineBlock: (Measured) -> Int): Modifier = this
+    override fun Modifier.alignByBaseline(): Modifier = this
+}
+
+/** How much of the shared progress each row's own stagger window is offset by, end to end --
+ *  see [StaggeredRevealColumn]. 0.6 means the LAST row doesn't even start popping in until
+ *  the shared progress is 60% of the way there, so by the time it finishes the first rows are
+ *  already settled: a real front-to-back cascade instead of every row moving in lockstep. */
+private const val PebbleStaggerSpan = 0.6f
+
+/**
+ * Drop-in replacement for [PebbleShell]'s plain `Column` of body rows: gives every DIRECT
+ * CHILD its own independent pop-in/pop-out as the pebble opens and closes, cascading
+ * top-to-bottom, without any of PebbleShell's ~15 callers having to change a single row of
+ * their own content -- that is the whole point of putting this here rather than asking
+ * every pebble to wrap its own rows in [PopVisible]. "No animation on the text and UI
+ * elements in the pebbles as they're revealed or hidden" was reported after [PopVisible]
+ * only covered the handful of call sites that had been individually converted; this instead
+ * makes EVERY row of EVERY pebble cascade, for free, by changing the one shared container.
+ *
+ * ONE [Animatable] drives every child, rather than each row owning an [AnimatedVisibility]/
+ * `Animatable` of its own -- a pebble can have a dozen rows, and a dozen independent
+ * animation tickets is a dozen times the per-frame cost of one shared progress value that
+ * every child's [Placeable.PlacementScope.placeWithLayer] block reads and remaps into its
+ * own little window (see [PebbleStaggerSpan]). That remap is what turns one linear 0..1
+ * value into a cascade: row *i* of *n* doesn't start moving until progress passes
+ * `i/n * PebbleStaggerSpan`, and is fully settled by the time progress reaches
+ * `i/n * PebbleStaggerSpan + (1 - PebbleStaggerSpan)`.
+ *
+ * A custom [Layout] rather than a real `Column`, because the per-child transform has to be
+ * applied at PLACEMENT (`placeWithLayer`'s `layerBlock`), and that API belongs to
+ * `Placeable.PlacementScope` -- there is no way to reach it by composing ordinary children
+ * with a `Modifier` the way every other row-level effect in this file works. The measure
+ * policy below deliberately mirrors what a loose (non-`fillMaxHeight`) `Column` with
+ * `Arrangement.spacedBy(verticalGap)` already does for [PebbleShell]'s body -- same width
+ * behaviour (children get the incoming max width, nothing stretched), same wrap-content
+ * height -- so swapping it in changes nothing about layout, only about how each child draws
+ * in on its way in.
+ *
+ * Scale-and-fade per child, same as [PopVisible] and for the same reason: this sits inside
+ * an outer `AnimatedVisibility` (the pebble's own [collapseEnter]/[collapseExit]) that is
+ * ALREADY animating the container's height, and a per-child height change here would be a
+ * second party fighting that same dimension.
+ */
+@Composable
+internal fun StaggeredRevealColumn(
+    visible: Boolean,
+    modifier: Modifier = Modifier,
+    verticalGap: Dp = 8.dp,
+    content: @Composable ColumnScope.() -> Unit,
+) {
+    val progress = remember { Animatable(if (visible) 1f else 0f) }
+    LaunchedEffect(visible) {
+        progress.animateTo(
+            if (visible) 1f else 0f,
+            animationSpec = spring(dampingRatio = PebbleBounceDamping, stiffness = PebbleBounceStiffness),
+        )
+    }
+    val gapPx = with(LocalDensity.current) { verticalGap.roundToPx() }
+    // Takes `content` with the same ColumnScope receiver PebbleShell's own body always has
+    // (every pebble's content lambda is already typed that way), via NoOpColumnScope below --
+    // real Column.weight is a no-op here regardless of that shim, because it only redistributes
+    // space in a HEIGHT-BOUNDED Column, and this container has always been wrap-content (the
+    // one place PebbleShell bounds its height, fillHeight+expanded, returns through CoverTile
+    // before it ever reaches this code). The shim exists purely so `content` type-checks against
+    // callers written for `ColumnScope`, not to add real weight/align support.
+    Layout(content = { NoOpColumnScope.content() }, modifier = modifier) { measurables, constraints ->
+        val childConstraints = constraints.copy(minWidth = 0, minHeight = 0)
+        val placeables = measurables.map { it.measure(childConstraints) }
+        val width = (placeables.maxOfOrNull { it.width } ?: 0).coerceAtMost(constraints.maxWidth)
+        val gaps = gapPx * (placeables.size - 1).coerceAtLeast(0)
+        val height = (placeables.sumOf { it.height } + gaps).coerceIn(constraints.minHeight, constraints.maxHeight)
+        layout(width, height) {
+            val n = placeables.size
+            var y = 0
+            placeables.forEachIndexed { i, p ->
+                val start = if (n <= 1) 0f else (i.toFloat() / n) * PebbleStaggerSpan
+                // progress.value is read INSIDE the layerBlock, not out here in the placement
+                // body -- layerBlock is deferred to the draw phase, so reading it there means
+                // only drawing re-runs as the spring ticks. Reading it out here instead (where
+                // `start`/`y` are computed) would make the STATE read part of layout, and every
+                // one of the spring's frames would re-trigger a full remeasure of every child
+                // in this pebble to move a value that only ever changes how they're drawn.
+                p.placeWithLayer(0, y) {
+                    val local = ((progress.value - start) / (1f - PebbleStaggerSpan)).coerceIn(0f, 1f)
+                    alpha = local
+                    scaleX = 0.85f + 0.15f * local
+                    scaleY = 0.85f + 0.15f * local
+                    transformOrigin = TransformOrigin(0f, 0.5f)
+                }
+                y += p.height + gapPx
+            }
+        }
+    }
 }

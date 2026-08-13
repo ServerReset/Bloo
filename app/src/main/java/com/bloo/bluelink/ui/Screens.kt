@@ -9470,16 +9470,22 @@ internal fun PebbleShell(
                         enter = collapseEnter(),
                         exit = collapseExit(),
                     ) {
-                        Column(
+                        // StaggeredRevealColumn, not a plain Column: every row pops in/out on
+                        // its own as this cascades open/closed, instead of every row appearing
+                        // together the instant the block-level AnimatedVisibility above reveals
+                        // it. See that composable's own doc for why this is the ONE place that
+                        // needed changing to give every pebble's rows this for free.
+                        StaggeredRevealColumn(
+                            visible = expanded,
                             // AnimatedVisibility only animates the whole block
                             // appearing and disappearing; content that changes
                             // WHILE expanded (an install step arriving, notes
                             // loading) still jumped the card's height. This
                             // animates those in place too.
-                            Modifier.animateContentSize(
+                            modifier = Modifier.animateContentSize(
                                 spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessMediumLow),
                             ).padding(start = 16.dp, end = 16.dp, bottom = 16.dp, top = 4.dp),
-                            verticalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalGap = 8.dp,
                             content = content,
                         )
                     }
