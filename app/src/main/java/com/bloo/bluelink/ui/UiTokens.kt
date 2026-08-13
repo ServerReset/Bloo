@@ -331,6 +331,21 @@ private object NoOpColumnScope : ColumnScope {
     override fun Modifier.alignBy(alignmentLineBlock: (Measured) -> Int): Modifier = this
 }
 
+/**
+ * A gentle "back ease": rises past 1.0 near the end before settling back down to it, the same
+ * overshoot-then-settle shape a spring has, without needing an actual spring (a real spring
+ * driving SCALE here would be a third independently-timed animation on top of the shared
+ * [Transition] progress each row already reads -- exactly the "two systems" problem this
+ * exists to avoid, just moved one layer down). Standard cubic back-ease formula, [overshoot]
+ * kept small (Compose's canonical constant is ~1.70158, which reads as a much showier pop
+ * than a row-sized element wants) so the effect stays a subtle "settle," not a wobble.
+ */
+private fun pebbleRowOvershoot(t: Float, overshoot: Float = 1.15f): Float {
+    val c3 = overshoot + 1f
+    val x = t - 1f
+    return 1f + c3 * x * x * x + overshoot * x * x
+}
+
 /** How much of the shared progress each row's own stagger window is offset by, end to end --
  *  see [StaggeredRevealColumn]. 0.85, not 0.6: at 0.6 every row's own 40%-wide window
  *  overlapped its neighbours' (row *i+1* was already moving before row *i* finished), which is
@@ -465,18 +480,29 @@ internal fun StaggeredRevealColumn(
                 // child in this pebble to move a value that only ever changes how they're drawn.
                 p.placeWithLayer(0, y) {
                     val raw = ((progress - start) / (1f - PebbleStaggerSpan)).coerceIn(0f, 1f)
-                    // Smoothstep, applied per row rather than trusting the outer tween's own
-                    // easing -- see the LinearEasing comment above for why: this is what gives
-                    // every row's individual pop the same eased shape regardless of where its
-                    // narrow window happens to land in the overall sequence.
+                    // Smoothstep for ALPHA specifically -- opacity has nowhere to overshoot TO
+                    // (a value past 1 just clips back to fully opaque), so a plain ease with no
+                    // overshoot is the right shape for it either way.
                     val local = raw * raw * (3f - 2f * raw)
                     alpha = local
+                    // SCALE gets its own [pebbleRowOvershoot] shape instead of reusing `local`
+                    // -- asked for explicitly ("the bounce on it feel like different systems"):
+                    // the card itself overshoots and settles (PebbleBounceDamping), but a plain
+                    // smoothstep glides straight to its target with no overshoot at all, so the
+                    // rows and the card read as two different kinds of motion even when they're
+                    // triggered by the same open/close. A small scale overshoot gives every row
+                    // the same overshoot-then-settle CHARACTER as the card, not just the same
+                    // rough timing -- which is what actually reads as "one system," on both the
+                    // way in and the way out (this shape is symmetric in `raw`, so closing pops
+                    // each row very slightly larger before it shrinks away, mirroring how it
+                    // grew slightly larger than its target on the way in).
+                    val scaleT = pebbleRowOvershoot(raw)
                     // 0.7 -> 1.0, not 0.85 -> 1.0: a 15%-of-size scale change is easy to miss
                     // next to the alpha fade doing most of the visible work: wider so the pop
                     // reads as its own distinct motion rather than a fade with a barely-there
                     // size wobble riding along.
-                    scaleX = 0.7f + 0.3f * local
-                    scaleY = 0.7f + 0.3f * local
+                    scaleX = 0.7f + 0.3f * scaleT
+                    scaleY = 0.7f + 0.3f * scaleT
                     transformOrigin = TransformOrigin(0f, 0.5f)
                 }
                 y += p.height + gapPx
