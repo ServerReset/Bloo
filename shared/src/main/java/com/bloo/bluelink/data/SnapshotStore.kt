@@ -132,13 +132,22 @@ fun VehicleSnapshot.merged(status: VehicleStatus): VehicleSnapshot {
         // never refreshed while plugged in. The dot that marks it is on five
         // surfaces now; four of them were reading a field nothing kept current.
         //
-        // NOT the `new ?: old` shape the fields above use, deliberately.
-        // Unplugged genuinely means "no limit applies", not "unknown", so a
-        // status that carries EV data is trusted completely -- including its
-        // nulls, which is what makes the marker disappear when you unplug. A
-        // status with no evStatus at all (a gas car, a partial fetch) is the
-        // only case where the old value stands.
-        chargeLimitPct = if (ev != null) ev.targetForCurrentPlug() else chargeLimitPct,
+        // NOT the `new ?: old` shape the fields above use, deliberately. A status
+        // with no evStatus at all (a gas car, a partial fetch) is still the only
+        // case where the old value stands.
+        //
+        // displayChargeLimit, not targetForCurrentPlug -- this WAS
+        // "unplugged genuinely means no limit applies, so trust an unplugged
+        // status's null completely", on the reasoning that the old limit MARKER
+        // should disappear once you unplug. That reasoning doesn't hold any more:
+        // the marker is gone, replaced by a three-segment bar that's meant to show
+        // the car's own configured limit "always," not just mid-session (see the
+        // blue stuck-at-limit fill, which was explicitly asked to work the same way
+        // regardless of active charging) -- so an EV status that's merely unplugged
+        // right now still resolves to its AC default via displayChargeLimit rather
+        // than genuinely clearing the field. Reported from a real device: a parked,
+        // unplugged car's hero card lost its whole limit-aware bar.
+        chargeLimitPct = if (ev != null) ev.displayChargeLimit() else chargeLimitPct,
         // merged() folds in a status we JUST fetched, so this data is now current.
         fetchedAt = System.currentTimeMillis(),
     )

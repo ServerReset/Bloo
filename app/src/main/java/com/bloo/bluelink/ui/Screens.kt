@@ -387,6 +387,7 @@ import com.bloo.bluelink.data.formatDistance
 import com.bloo.bluelink.data.formatSpeed
 import com.bloo.bluelink.data.formatSpeedMph
 import com.bloo.bluelink.data.formatTripDistance
+import com.bloo.bluelink.data.displayChargeLimit
 import com.bloo.bluelink.data.targetForCurrentPlug
 import com.bloo.bluelink.data.isGen5W
 import com.bloo.bluelink.data.serviceDue
@@ -6076,7 +6077,11 @@ private fun chargeReadoutOf(
     val pct = status?.percentFor(hasBattery)
     val range = status?.rangeMiFor(hasBattery)
     val charging = hasBattery && status?.evStatus?.batteryCharge == true
-    val limitPct = status?.evStatus?.targetForCurrentPlug()?.takeIf { it in 1..99 }
+    // displayChargeLimit, not targetForCurrentPlug directly: the latter is null the
+    // instant nothing is plugged in, which used to silently drop the whole bar back to
+    // a plain unsplit track (and lose the blue "topped up" state) for every parked car
+    // -- see that function's own doc. Reported from a real device.
+    val limitPct = status?.evStatus?.displayChargeLimit()?.takeIf { it in 1..99 }
     // Charging time + type, shown in the badge slot (replacing parked/driving,
     // which is hidden while charging) so the pebble doesn't grow taller.
     val chargeMinutes = status?.evStatus?.minutesToFull

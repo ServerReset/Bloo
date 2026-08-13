@@ -52,7 +52,7 @@ import com.bloo.bluelink.data.toClimateSync
 import com.bloo.bluelink.data.Vehicle
 import com.bloo.bluelink.data.VehicleSnapshot
 import com.bloo.bluelink.data.VehicleStatus
-import com.bloo.bluelink.data.targetForCurrentPlug
+import com.bloo.bluelink.data.displayChargeLimit
 import com.bloo.bluelink.data.Weather
 import com.bloo.bluelink.data.WeatherApi
 import androidx.glance.appwidget.updateAll
@@ -2050,7 +2050,11 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             licensePlate = _state.value.licensePlates[v.vin],
             lastServiceMiles = _state.value.lastServiceMiles[v.vin],
             serviceIntervalMiles = _state.value.serviceIntervalMiles[v.vin],
-            chargeLimitPct = status?.evStatus?.targetForCurrentPlug(),
+            // displayChargeLimit, not targetForCurrentPlug directly -- see that
+            // function's own doc: the widget/watch both read this field, and it used to
+            // go null the instant the car was unplugged, silently dropping their charge
+            // bars back to a plain unsplit track for every parked car.
+            chargeLimitPct = status?.evStatus?.displayChargeLimit(),
         )
     }
 

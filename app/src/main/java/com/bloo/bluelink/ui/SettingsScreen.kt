@@ -374,7 +374,7 @@ import com.bloo.bluelink.data.formatDistance
 import com.bloo.bluelink.data.formatSpeed
 import com.bloo.bluelink.data.formatSpeedMph
 import com.bloo.bluelink.data.formatTripDistance
-import com.bloo.bluelink.data.targetForCurrentPlug
+import com.bloo.bluelink.data.displayChargeLimit
 import com.bloo.bluelink.data.isGen5W
 import com.bloo.bluelink.data.serviceDue
 import com.bloo.bluelink.data.parseOdometerMiles
@@ -3222,8 +3222,10 @@ private fun SettingsSearchResults(
             st?.evStatus?.batteryStatus?.let { b ->
                 add("Battery · ${v.name}", "battery charge soc percent ${v.name}") { StatusRow("Battery", "$b%") }
             }
-            // Current-plug target if plugged in, else the configured AC home limit.
-            val limit = st?.evStatus?.targetForCurrentPlug() ?: st?.evStatus?.reservChargeInfos?.level(1)
+            // Current-plug target if plugged in, else the configured AC home limit --
+            // now the shared EvStatus.displayChargeLimit(), this call site's own fallback
+            // generalized so every surface agrees rather than re-deriving it.
+            val limit = st?.evStatus?.displayChargeLimit()
             limit?.let { l -> add("Charge limit · ${v.name}", "charge limit target ${v.name}") { StatusRow("Charge limit", "$l%") } }
         } else {
             st?.fuelLevel?.let { f ->

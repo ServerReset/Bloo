@@ -509,6 +509,29 @@ fun EvStatus.targetForCurrentPlug(): Int? = when (batteryPlugin) {
     else -> null
 }
 
+/**
+ * The charge limit to SHOW at a glance, on any surface that draws the charge bar
+ * whether or not the car happens to be plugged in right now: [targetForCurrentPlug]
+ * when there's an active plug to report, else the car's AC limit as the sensible
+ * default the rest of the time.
+ *
+ * [targetForCurrentPlug] answers "which plug is connected and what's ITS target" --
+ * exactly right for a live charging session, but null the instant the car is
+ * unplugged, which used to mean a parked car's hero card silently lost its whole
+ * limit-aware bar (falling back to a plain, un-split track with no blue "topped up"
+ * state) even though the car's own configured limit hadn't gone anywhere. AC over DC
+ * as the fallback: it's the everyday/overnight charging scenario every car has a
+ * target for, where DC fast-charge limits are the exception most cars only report
+ * once actually connected to one.
+ *
+ * Reported from a real device: a parked, unplugged car at 77% correctly has no
+ * CURRENT plug to report a limit for, but the bar still needs ONE to draw the
+ * three-segment shape (or the blue stuck-at-limit fill) users asked to see "always,"
+ * not just mid-session -- see ChargeReadout.stuckAtLimit's own doc for that same
+ * "always" requirement, which this same gap was quietly breaking for parked cars.
+ */
+fun EvStatus.displayChargeLimit(): Int? = targetForCurrentPlug() ?: reservChargeInfos?.level(1)
+
 /** True when any charger is connected (any non-zero [EvStatus.batteryPlugin],
  *  per the 0=unplugged/1=DC/2=AC encoding documented on
  *  [EvStatus.pluggedInLabel]); a missing plug value is treated as unplugged. */

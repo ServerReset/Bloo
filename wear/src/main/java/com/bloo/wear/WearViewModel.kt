@@ -35,7 +35,7 @@ import com.bloo.bluelink.data.openLabels
 import com.bloo.bluelink.data.percentFor
 import com.bloo.bluelink.data.rangeMiFor
 import com.bloo.bluelink.data.repositoryFor
-import com.bloo.bluelink.data.targetForCurrentPlug
+import com.bloo.bluelink.data.displayChargeLimit
 import com.bloo.bluelink.data.toWearCommand
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -2287,7 +2287,11 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
             timeToFullMin = ev?.minutesToFull,
             acLimit = ev?.reservChargeInfos?.level(1),
             dcLimit = ev?.reservChargeInfos?.level(0),
-            chargeLimit = ev?.targetForCurrentPlug() ?: snap?.chargeLimitPct,
+            // displayChargeLimit, not targetForCurrentPlug -- see that function's own
+            // doc: it already falls back to the AC default when nothing's plugged in,
+            // which snap?.chargeLimitPct here still catches for the rarer case of no
+            // live ev status at all (a failed fetch, not just an unplugged car).
+            chargeLimit = ev?.displayChargeLimit() ?: snap?.chargeLimitPct,
             // "Updated X ago" should reflect when the DATA was actually fetched. The
             // watch's own fetchedAt[vin] is set only when the watch fetches live status
             // itself; a paired watch showing a phone snapshot had no such stamp, so it

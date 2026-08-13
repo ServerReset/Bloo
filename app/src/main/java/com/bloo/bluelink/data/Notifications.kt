@@ -455,7 +455,12 @@ object LiveCharge {
         percent = ev?.batteryStatus,
         minutesToFull = ev?.minutesToFull,
         pluggedInLabel = ev?.pluggedInLabel,
-        chargeLimit = ev?.targetForCurrentPlug(),
+        // displayChargeLimit, not targetForCurrentPlug directly, for the same reason
+        // every other display of this value now does -- see that function's own doc.
+        // This bar only ever exists while charging = true, which normally implies a
+        // plug is connected, but the fallback costs nothing and covers the rare case
+        // of a status inconsistency between the two fields.
+        chargeLimit = ev?.displayChargeLimit(),
     )
 
     /**
