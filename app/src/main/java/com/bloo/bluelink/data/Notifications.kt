@@ -375,6 +375,57 @@ object LiveCharge {
     }
 
     /**
+     * Whether the OS will currently let Bloo run its background work (AlertWorker's
+     * 30-minute poll, and the 5-minute chain this poll kicks off once it finds a car
+     * charging) on schedule -- the standard Android "battery optimization" exemption,
+     * `PowerManager.isIgnoringBatteryOptimizations`.
+     *
+     * This is a DIFFERENT question from everything else in this file. The nine-row
+     * promotion checklist and [isPromotable] are about whether an ALREADY-POSTED
+     * notification can become a status-bar chip; this is about whether the periodic
+     * work that would post or update it in the first place gets to run at all while
+     * the app isn't open. A car that starts charging with Bloo backgrounded and no
+     * exemption can sit for up to the full 30-minute AlertWorker interval -- or
+     * longer, since a non-exempt app's periodic work is exactly what Doze defers --
+     * before anything notices, which reads as "the live notification isn't
+     * triggering," not as a promotion problem. Reported from a real device.
+     */
+    fun isBackgroundUnrestricted(context: Context): Boolean {
+        val pm = context.getSystemService(android.os.PowerManager::class.java) ?: return true
+        return pm.isIgnoringBatteryOptimizations(context.packageName)
+    }
+
+    /**
+     * Requests the standard Android battery-optimization exemption directly --
+     * `Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS`, which prompts the user
+     * with a system "Allow" dialog rather than merely opening a settings page they'd
+     * have to find the right toggle on themselves. Requires
+     * `REQUEST_IGNORE_BATTERY_OPTIMIZATIONS` in the manifest (a normal, non-runtime
+     * permission) to resolve at all.
+     *
+     * Falls back to the app's own battery-settings page if the direct-request intent
+     * isn't resolvable (an OEM build without it), same "always land somewhere useful"
+     * contract as [openLiveUpdateSettings].
+     *
+     * This is ONLY the standard Android mechanism. At least Samsung layers its OWN,
+     * separate "put unused apps to sleep" restriction on top, which this exemption
+     * does not touch and which has no known intent to jump straight to -- that is
+     * exactly the kind of second, invisible-to-this-app OEM gate [isPromotable]'s own
+     * doc already describes for a different feature, so the troubleshooting text
+     * spells out the manual Samsung path too rather than claiming this one request
+     * covers everything.
+     */
+    fun requestBackgroundUnrestricted(context: Context) {
+        val intent = Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS)
+            .setData(Uri.parse("package:${context.packageName}"))
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        if (runCatching { context.startActivity(intent); true }.getOrDefault(false)) return
+        val fallback = Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS)
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        runCatching { context.startActivity(fallback) }
+    }
+
+    /**
      * Convenience overload: derive the five charge fields from an [EvStatus] and delegate.
      *
      * The three callers named below -- AppViewModel's post-refresh hook, AlertWorker, and

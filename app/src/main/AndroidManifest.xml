@@ -9,6 +9,18 @@
          the charging bar to reach the status-bar chip and lock screen. -->
     <uses-permission android:name="android.permission.POST_PROMOTED_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.VIBRATE" />
+    <!-- Lets Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS show its "Allow"
+         dialog directly (LiveCharge.requestBackgroundUnrestricted) instead of only a
+         settings page the user has to find the toggle on themselves: a normal
+         permission, no runtime prompt of its own, but the request intent won't
+         resolve without it declared. Google's own Play policy restricts this
+         permission's USE (not its declaration) to apps with a core function that
+         genuinely needs to run unattended in the background, which describes exactly
+         why it's needed here: the live charging bar and the door/service alerts are
+         both background WorkManager polls this app cannot do without. Moot for
+         distribution either way: Bloo isn't on the Play Store, so that policy
+         doesn't gate this build at all. -->
+    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
     <!-- Optional: only used to set the weather location to the device's position.
          The app works fine without it (a place can be typed in Settings instead). -->
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
