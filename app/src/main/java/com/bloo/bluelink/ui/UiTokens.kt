@@ -424,12 +424,17 @@ internal fun StaggeredRevealColumn(
                 // them read as repeated, distinct STEPS rather than one blurry wave.
                 tween(durationMillis = 480, delayMillis = 90, easing = LinearEasing)
             } else {
-                // Closing has no delay and a shorter duration than opening -- now a stylistic
-                // choice (a snappier close reads right next to a slightly more deliberate
-                // open), not a race against being torn out of composition early: since this
-                // progress lives in the SAME Transition as the card's own height/fade, the
-                // card physically cannot finish exiting before this does.
-                tween(durationMillis = 220, easing = LinearEasing)
+                // No delay on the way out, but NOT a short duration either -- 220ms first
+                // shipped on the (now outdated) assumption that shorter was safer against
+                // being torn out of composition early. That race is gone (this progress lives
+                // in the SAME Transition as the card's own height/fade now), but 220ms turned
+                // out to have created a NEW problem: divided across PebbleStaggerSpan's narrow
+                // per-row windows, each row got roughly 220ms * (1 - 0.85) =~ 33ms to fade in
+                // -- too fast to read as a step at all, so the whole cascade looked like one
+                // instant cut rather than a hide animation. 400ms gives each row a ~60ms
+                // window instead, close to the ~similar per-row math the OPEN side's 480ms
+                // already uses (480ms * 0.15 =~ 72ms) rather than a fraction of it.
+                tween(durationMillis = 400, easing = LinearEasing)
             }
         },
     ) { state -> if (state == EnterExitState.Visible) 1f else 0f }

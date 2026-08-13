@@ -5744,17 +5744,21 @@ internal fun UpdateAvailableTile(state: UiState, vm: AppViewModel, dragHandle: M
             // delta already lives in the header summary; here we say what's happening
             // NOW. Ready uses ChargeGreen as a success tick; everything else stays
             // neutral (no charging-green Bolt cross-metaphor).
-            val (statusIcon, statusText, statusTint) = when {
-                state.updateInstalling -> Triple(Icons.Filled.SystemUpdate, "Installing silently via Shizuku…", scheme.onSurfaceVariant)
-                state.updateDownloading -> Triple(
-                    Icons.Filled.Download,
-                    downloadProgress?.let { "Downloading ${(it * 100).roundToInt()}%" } ?: "Downloading…",
-                    scheme.onSurfaceVariant,
-                )
-                state.updateApkReady && seamless -> Triple(Icons.Filled.CheckCircle, "Downloaded · installs silently via Shizuku", ChargeGreen)
-                state.updateApkReady -> Triple(Icons.Filled.CheckCircle, "Downloaded · tap Install", ChargeGreen)
-                seamless -> Triple(Icons.Filled.Bolt, "Installs silently via Shizuku, no prompts", scheme.onSurfaceVariant)
-                else -> Triple(Icons.Filled.SystemUpdate, deltaLabel, scheme.primary)
+            //
+            // statusKind, not the rendered string, is what drives the AnimatedContent below --
+            // it stays "downloading" for the WHOLE download instead of becoming a new string
+            // on every percentage tick, which is what used to make "Downloading 45%" slide/fade
+            // out and "Downloading 46%" slide/fade in as if they were two different states:
+            // the static word was animating right along with the number that actually changed.
+            // Only the percent itself is a moving target now (rendered with its own
+            // AnimatedValue below), and the sentence around it stays put.
+            val (statusIcon, statusKind, statusTint) = when {
+                state.updateInstalling -> Triple(Icons.Filled.SystemUpdate, "installing", scheme.onSurfaceVariant)
+                state.updateDownloading -> Triple(Icons.Filled.Download, "downloading", scheme.onSurfaceVariant)
+                state.updateApkReady && seamless -> Triple(Icons.Filled.CheckCircle, "ready_seamless", ChargeGreen)
+                state.updateApkReady -> Triple(Icons.Filled.CheckCircle, "ready", ChargeGreen)
+                seamless -> Triple(Icons.Filled.Bolt, "seamless", scheme.onSurfaceVariant)
+                else -> Triple(Icons.Filled.SystemUpdate, "update", scheme.primary)
             }
             // Sprung, not a snap -- the tint is what carries "this got a step further along"
             // (neutral -> ChargeGreen once the APK is ready), so it gets the same treatment
@@ -5788,15 +5792,37 @@ internal fun UpdateAvailableTile(state: UiState, vm: AppViewModel, dragHandle: M
                     }
                 }
                 AnimatedContent(
-                    targetState = statusText,
+                    targetState = statusKind,
                     transitionSpec = {
                         (fadeIn(tween(180)) + slideInVertically { it / 3 }) togetherWith
                             (fadeOut(tween(120)) + slideOutVertically { -it / 3 })
                     },
                     label = "updateStatusText",
                     modifier = Modifier.weight(1f),
-                ) { text ->
-                    Text(text, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                ) { kind ->
+                    val textStyle = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold)
+                    when (kind) {
+                        "installing" -> Text("Installing silently via Shizuku…", style = textStyle)
+                        "downloading" -> Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text("Downloading", style = textStyle)
+                            downloadProgress?.let { p ->
+                                Text(" ", style = textStyle)
+                                // Its own AnimatedValue, not part of this AnimatedContent's own
+                                // string -- this is the one piece of the line that legitimately
+                                // changes every tick, so it's the only piece that should move;
+                                // "Downloading" itself stays a completely static Text next to it.
+                                com.bloo.uicommon.AnimatedValue(
+                                    "${(p * 100).roundToInt()}%",
+                                    style = textStyle,
+                                    reduceMotion = LocalReduceMotion.current,
+                                )
+                            } ?: Text("…", style = textStyle)
+                        }
+                        "ready_seamless" -> Text("Downloaded · installs silently via Shizuku", style = textStyle)
+                        "ready" -> Text("Downloaded · tap Install", style = textStyle)
+                        "seamless" -> Text("Installs silently via Shizuku, no prompts", style = textStyle)
+                        else -> Text(deltaLabel, style = textStyle)
+                    }
                 }
             }
             // Live download progress bar. Own PopVisible rather than a bare `if` --
