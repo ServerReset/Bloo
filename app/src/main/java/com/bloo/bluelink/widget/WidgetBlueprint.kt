@@ -325,6 +325,27 @@ internal object WidgetBlueprint {
         // don't have that rounding ambiguity.
         val wideNotTall = size.width > size.height
 
+        // A square tile has no WIDTH advantage over a ring the way a wideNotTall one
+        // does -- that is still wideNotTall's own job below, gating RING_ASPECT -- but
+        // it shares the exact same STARVATION problem `heroFloor` exists to fix: on a
+        // content-dense square tile (header, buttons, an info stack, a footer all
+        // wanting their own floor out of the same budget), the hero band routinely
+        // lands short of BOTH the ring's own RING_WORTH_IT threshold and the bar's
+        // floor, and a tiny last-resort ring is a worse answer there than a slightly
+        // smaller bar, the same call already made for a wide tile.
+        //
+        // Reported on a real 3x3 (180x180, an EXACT square under WidgetGrid's own
+        // formula) widget with the default config: the hero band won only ~25dp after
+        // header/info/buttons/footer took their share, clearing MIN_RING (24dp) but
+        // neither RING_WORTH_IT (44dp) nor the bar's own floor (~35dp) -- so it fell to
+        // the small-ring fallback though a bar was one weighted redistribution away
+        // from fitting. Reserving the bar's floor up front, same fix as wideNotTall's,
+        // gets it there. Deliberately only widens the FLOOR, not the RING_ASPECT gate
+        // itself (still `!wideNotTall`, unchanged) -- a big, roomy square tile whose
+        // hero band clears RING_ASPECT on its own merits keeps its ring; only a
+        // starved one is pushed to the bar instead of the token circle.
+        val wideOrSquare = size.width >= size.height
+
         // Priority order. Controls-priority promotes the buttons above the
         // hero and the info stack, but never above a minimal hero: a
         // controls tile that shows four buttons and NOTHING about the car --
@@ -382,11 +403,12 @@ internal object WidgetBlueprint {
                 (if (stacked) Scale.buttonGap(size) * (buttonRun - 1) else 0.dp) +
                 BUTTON_BREATHING
             val infoCeiling = minInfoRow(size, ts) * facts.infoFieldCount.coerceAtLeast(1)
-            // See `wideNotTall`'s own comment: on a wide-not-tall tile the hero's FLOOR
-            // is the bar's own minimum, not the plain text line's -- guaranteeing the
-            // band the allocator hands out is already enough for a bar, rather than
-            // hoping a weighted share of leftover slack happens to reach it.
-            val heroFloor = if (wideNotTall) minBarHero(size, ts) else minLineHero(size, ts)
+            // See `wideNotTall`'s and `wideOrSquare`'s own comments: on a tile that is
+            // at least as wide as it is tall, the hero's FLOOR is the bar's own
+            // minimum, not the plain text line's -- guaranteeing the band the
+            // allocator hands out is already enough for a bar, rather than hoping a
+            // weighted share of leftover slack happens to reach it.
+            val heroFloor = if (wideOrSquare) minBarHero(size, ts) else minLineHero(size, ts)
             if (controls) {
                 if (wantsButtons) {
                     add(Want(Module.BUTTONS, minButtons(size), weight = 0.5f, max = buttonCeiling))

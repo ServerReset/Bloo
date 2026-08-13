@@ -358,6 +358,27 @@ class WidgetBlueprintTest {
     }
 
     /**
+     * Reported from a real device: a plain 3x3 widget, default config, still showed a
+     * ring. 3x3 is an EXACT square under WidgetGrid's own 70n-30 formula (180x180dp) --
+     * `wideNotTall` (`width > height`, strict) is false there, so it never had the bar
+     * floor `wideOrSquare` (`width >= height`) now reserves. Without it the hero band
+     * won only ~25dp against a header, buttons, an info stack and a footer all wanting
+     * their own floor out of the same 156dp, clearing MIN_RING (24dp) but neither
+     * RING_WORTH_IT (44dp) nor the bar's own floor (~35dp) -- so it fell to the
+     * small-ring fallback though a bar was one weighted redistribution away from
+     * fitting.
+     */
+    @Test
+    fun `a plain 3x3 widget picks the bar hero, not a ring`() {
+        val size = WidgetGrid.nominalSize(3, 3)
+        val bp = WidgetBlueprint.plan(size, WidgetConfig(vin = "test"), WidgetBlueprint.Facts())
+        assertTrue(
+            bp.hero == WidgetBlueprint.Hero.BAR,
+            "3x3 chose ${bp.hero}, not a bar",
+        )
+    }
+
+    /**
      * The same "wide but not tall, should be a bar not a circle" report, but WITHOUT a
      * map -- a wide, short-ish tile (more columns than rows) still chose a ring purely
      * from its own hero band's aspect ratio. Unlike the map case, this doesn't need a
