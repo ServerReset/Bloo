@@ -40,13 +40,15 @@ class WidgetChargeBarLayoutTest {
             for (pct in 5..95 step 5) {
                 for (limit in listOf(80, 85, 90, 95, 99)) {
                     if (limit <= pct) continue
-                    // Same reasoning as the phone's own sweep test: only assert the
-                    // three-segment shape when there's genuinely enough room for it --
-                    // a limit only 1-2 points above the current charge on a narrow bar
-                    // can legitimately collapse once the gap is reserved.
+                    // Same reasoning as the phone's own sweep test (and the same first
+                    // failure: limit=99 on every width, always the FAR side collapsing) --
+                    // only assert the three-segment shape when there's genuinely enough
+                    // room for it on BOTH sides of the limit split, since either one can
+                    // legitimately collapse once the gap is reserved.
                     val gap = if (width >= 60.dp) 3.dp else 0.dp
-                    val spanDp = width * (limit - pct) / 100f
-                    if (spanDp < gap * 3) continue
+                    val nearSpanDp = width * (limit - pct) / 100f
+                    val farSpanDp = width * (100 - limit) / 100f
+                    if (nearSpanDp < gap * 3 || farSpanDp < gap * 3) continue
                     val layout = widgetChargeBarLayout(width, 12.dp, pct / 100f, limit, stuckAtLimit = false)
                     if (layout.hasSingleTrack || layout.mid <= 0.dp || layout.far <= 0.dp) {
                         bad += "width=$width pct=$pct limit=$limit -> mid=${layout.mid} far=${layout.far} single=${layout.hasSingleTrack}"

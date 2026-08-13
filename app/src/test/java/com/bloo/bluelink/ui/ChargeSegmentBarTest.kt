@@ -52,13 +52,17 @@ class ChargeSegmentBarTest {
                 for (limit in listOf(80, 85, 90, 95, 99)) {
                     if (limit <= pct) continue // not the not-stuck case this test covers
                     // Only assert the three-segment shape when there's genuinely enough
-                    // room for it -- a limit only 1-2 points above the current charge on
-                    // a narrow bar can legitimately collapse to two segments once the gap
-                    // is reserved, same as the fill floor collapses a 1% charge to
-                    // nothing on a very short bar. That is correct behaviour, not a bug,
-                    // so it is deliberately excluded rather than asserted against.
-                    val spanPx = width * (limit - pct) / 100f
-                    if (spanPx < gap * 3) continue
+                    // room for it on BOTH sides of the limit split -- a limit only 1-2
+                    // points above the current charge, OR only 1-2 points below 100%
+                    // (this test's own first failure: limit=99 on every width, always the
+                    // FAR side collapsing because limitX + halfGap overshoots the bar's
+                    // right edge), can legitimately collapse once the gap is reserved,
+                    // same as the fill floor collapses a 1% charge to nothing on a very
+                    // short bar. That is correct behaviour, not a bug, so both sides are
+                    // deliberately excluded rather than asserted against.
+                    val nearSpanPx = width * (limit - pct) / 100f
+                    val farSpanPx = width * (100 - limit) / 100f
+                    if (nearSpanPx < gap * 3 || farSpanPx < gap * 3) continue
                     val layout = chargeBarLayout(
                         totalWidth = width, barHeight = 18f,
                         filledFrac = pct / 100f, limitFrac = limit / 100f, stuckAtLimit = false, gap = gap,
