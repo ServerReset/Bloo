@@ -173,17 +173,28 @@ internal fun ChargeBar(car: VehicleSnapshot, theme: WidgetTheme, width: Dp, heig
         } else {
             // Two remaining segments, split at the limit: current -> limit (still
             // filling toward it), limit -> 100% (won't fill past it). `mid`/`far` are
-            // each other's complement of `rest`, so the two always still sum to the bar
-            // regardless of where the limit falls relative to the current charge.
+            // each other's complement of `rest` MINUS the gap below, so the three
+            // pieces (mid, gap, far) always still sum to `rest` regardless of where
+            // the limit falls relative to the current charge.
+            //
+            // A real gap between them, not just the colour difference -- the two
+            // track shades alone turned out too close to tell apart once actually
+            // rendered at a widget's small bar height on a real device, which read as
+            // one plain track instead of two. Same fix as the phone's own
+            // ChargeSegmentBar, same reasoning: colour was doing a job only a
+            // physical break reliably does. Skipped on a narrow slot, same threshold
+            // the old limit marker used this width for.
             val rest = (width - filled).coerceAtLeast(0.dp)
+            val gap = if (width >= 60.dp) 3.dp else 0.dp
             val limitX = (width * (limit / 100f)).coerceIn(filled, width)
-            val mid = (limitX - filled).coerceIn(0.dp, rest)
-            val far = (rest - mid).coerceAtLeast(0.dp)
+            val mid = (limitX - filled - gap / 2).coerceIn(0.dp, rest)
+            val far = (rest - mid - (if (mid > 0.dp) gap else 0.dp)).coerceAtLeast(0.dp)
             if (mid > 0.dp) {
                 Box(
                     modifier = GlanceModifier.width(mid).height(height)
                         .cornerRadius(height / 2).background(theme.surfaceVariant),
                 ) {}
+                Spacer(GlanceModifier.width(gap))
             }
             if (far > 0.dp) {
                 Box(

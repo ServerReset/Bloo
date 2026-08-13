@@ -6592,18 +6592,29 @@ private fun ChargeSegmentBar(frac: Float, limitPct: Int?, stuckAtLimit: Boolean,
             } else {
                 // Two remaining segments: current -> limit (still filling toward it) and
                 // limit -> 100% (won't fill past it), split at the limit's own (animated)
-                // position. Coerced so a transient animation frame where the fill is
-                // still catching up to a just-lowered limit can't draw a negative-width
-                // middle segment -- it just collapses to the dim segment alone for that
-                // one frame, never a crash or a backwards rectangle.
+                // position. A real gap at THIS split, not just a colour change -- the two
+                // track shades alone (0.16/0.08 alpha) turned out too close to tell apart
+                // by eye once actually rendered small, on a real device, which read as one
+                // plain track instead of two: colour was doing a job only a physical break
+                // reliably does, the same reason the bar's very first design used a gap at
+                // all. Reported from a real device after the alpha-only version shipped.
+                // Only at the limit split -- the current-charge split stays flush, as
+                // asked for.
                 val limitX = (size.width * limitAnim.value).coerceIn(filledX, size.width)
-                val mid = (limitX - filledX).coerceAtLeast(0f)
+                val halfGap = ChargeLimitSplitGap.toPx() / 2f
+                // Coerced on both ends so a transient animation frame (the fill still
+                // catching up to a just-lowered limit, or the limit sitting right next to
+                // the fill) can't draw a negative-width segment -- it just yields the gap
+                // first, same as the extremes handling everywhere else this bar animates.
+                val midEnd = (limitX - halfGap).coerceIn(filledX, limitX)
+                val mid = (midEnd - filledX).coerceAtLeast(0f)
                 if (mid > 0f) {
                     drawRect(color = trackColor, topLeft = Offset(filledX, 0f), size = Size(mid, h))
                 }
-                val far = (size.width - limitX).coerceAtLeast(0f)
+                val farStart = (limitX + halfGap).coerceIn(limitX, size.width)
+                val far = (size.width - farStart).coerceAtLeast(0f)
                 if (far > 0f) {
-                    drawRect(color = trackDimColor, topLeft = Offset(limitX, 0f), size = Size(far, h))
+                    drawRect(color = trackDimColor, topLeft = Offset(farStart, 0f), size = Size(far, h))
                 }
             }
         }

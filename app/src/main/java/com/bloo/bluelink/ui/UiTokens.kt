@@ -83,6 +83,12 @@ internal val PebbleCornerExpanded = 20.dp
  *  proportions read as one component rather than five near-misses. */
 internal val ChargeBarHeight = 18.dp
 
+/** The physical break at the LIMIT split (not the current-charge split, which stays
+ *  flush) -- the two track shades either side of it are close enough in alpha that
+ *  colour alone did not read as two distinct zones on a real device; a real gap
+ *  does, regardless of alpha, screen, or what the bar happens to be sitting on. */
+internal val ChargeLimitSplitGap = 3.dp
+
 /**
  * Gap between the hero's collapsed readout and the bottom edge of its card.
  *

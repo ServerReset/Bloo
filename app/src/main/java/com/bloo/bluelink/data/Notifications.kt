@@ -267,9 +267,14 @@ object LiveCharge {
     // limit -- the same shared token every other surface that draws this bar now uses.
     private const val CHARGE_BLUE = BlooColors.chargeBlue
     private const val TRACK = 0x40FFFFFF
-    // Half TRACK's alpha -- the "won't fill past here" segment, past either the limit
-    // or (once the charge is already there) the current charge itself.
-    private const val TRACK_DIM = 0x20FFFFFF
+    // The "won't fill past here" segment, past either the limit or (once the charge
+    // is already there) the current charge itself. Well under half TRACK's alpha,
+    // not just half -- half turned out too close to TRACK to read as a second, dimmer
+    // zone once actually rendered on a real device (see the phone's ChargeSegmentBar
+    // for the same finding there); NotificationCompat.ProgressStyle has no explicit
+    // inter-segment gap to fall back on the way the phone/widget bars do, so the
+    // colour step here has to carry the whole distinction on its own.
+    private const val TRACK_DIM = 0x14FFFFFF
 
     private fun idFor(vin: String) = ("live_charge_$vin").hashCode()
 
