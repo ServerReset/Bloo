@@ -7776,7 +7776,33 @@ private fun PebbleList(v: Vehicle, state: UiState, vm: AppViewModel, exclude: Se
  *  covers everything above the fold on a phone so the visible region never stubs. */
 private const val EAGER_PEBBLES = 3
 
-/** Renders one pebble by section name (used by the list and the hot spot). */
+/**
+ * Renders one pebble by section name (used by the list and the hot spot).
+ *
+ * Every pebble function below takes the WHOLE [UiState], not just the fields it
+ * reads -- `state` is a data class, so its equality (and therefore Compose's
+ * recomposition-skip check) fails on ANY field changing anywhere in the app, not
+ * just the fields a given pebble actually uses. A weather refresh for a car
+ * that isn't even on screen, an AI probe finishing, another car's status
+ * arriving -- every one of those forced every visible pebble on every visible
+ * car page to recompose, which is a big part of why the whole app reads as
+ * laggy for several seconds after cold start or a car switch: that's exactly
+ * the window where the most independent state updates land in quick
+ * succession (cached-status restore, per-car status fetches, AI/Shizuku/update
+ * probes, weather).
+ *
+ * Each branch below wraps the `state` it hands its pebble in
+ * `remember(<the exact fields that pebble reads>) { state }` -- when none of
+ * those keys changed since last time, `remember` returns the SAME state
+ * reference as before, so the pebble sees an unchanged parameter and Compose
+ * skips recomposing it, even though a genuinely newer `state` exists one frame
+ * up. The pebble's own body is untouched; only what gets handed to it here is
+ * cached. Keys were catalogued by reading every pebble function's body in
+ * full (including what its own helper calls like `statusFor`/`isPending`
+ * transitively read) rather than guessed -- a missed key would be a real
+ * stale-UI bug, so each list below is the pebble's complete, verified
+ * dependency set, not a guess at "probably enough."
+ */
 @Composable
 private fun SinglePebble(section: String, v: Vehicle, state: UiState, vm: AppViewModel, dragHandle: Modifier) {
     val status = state.statusFor(v)
@@ -7784,31 +7810,92 @@ private fun SinglePebble(section: String, v: Vehicle, state: UiState, vm: AppVie
     val enabled = !state.loading
     val mSingle = LocalAppearance.current.unitSystem == "metric"
     when (section) {
-        "summary" -> HeroHeader(
-            v, status, state.imageUrls[v.vin], state.hasBattery(v), state.hasFuel(v), vm,
-            state.drivingLabel(v), dragHandle = dragHandle, metric = mSingle,
-            photoExpanded = state.isPebbleExpanded(v.vin, com.bloo.bluelink.data.HERO_PHOTO_SECTION),
-        )
+        "summary" -> {
+            // HeroHeader itself takes no `state` param -- its dependency is entirely
+            // in the derived arguments built here, so THOSE are what's memoized.
+            val heroState = remember(
+                status, state.imageUrls[v.vin], state.hasBattery(v), state.hasFuel(v),
+                state.locations[v.vin], state.isPebbleExpanded(v.vin, com.bloo.bluelink.data.HERO_PHOTO_SECTION),
+            ) { state }
+            HeroHeader(
+                v, status, heroState.imageUrls[v.vin], heroState.hasBattery(v), heroState.hasFuel(v), vm,
+                heroState.drivingLabel(v), dragHandle = dragHandle, metric = mSingle,
+                photoExpanded = heroState.isPebbleExpanded(v.vin, com.bloo.bluelink.data.HERO_PHOTO_SECTION),
+            )
+        }
         // Its own reorderable/pinnable slot now, like every other pebble --
         // only actually present in the list while state.updateAvailable != null
-        // (see PebbleList's filter and the two hotspot-eligibility checks).
-        "update" -> UpdateAvailableTile(state, vm, dragHandle)
-        "controls" -> ControlsPebble(v, state, vm, dragHandle)
-        "climate" -> ClimatePebble(v, status, seats, state, vm, dragHandle)
+        // (see PebbleList's filter and the two hotspot-eligibility checks). Global,
+        // not per-car fields, but still worth memoizing: this section is rendered
+        // on every car page, so an unrelated per-car state change (another car's
+        // status, weather, AI) would otherwise recompose it just as often as any
+        // other pebble.
+        "update" -> {
+            val updateState = remember(
+                state.updateAvailable, state.updateTileDismissed, state.shizukuAvailable,
+                state.updateInstalling, state.updateDownloading, state.updateApkReady,
+                state.updatePendingDismiss,
+            ) { state }
+            UpdateAvailableTile(updateState, vm, dragHandle)
+        }
+        "controls" -> {
+            val controlsState = remember(status, state.isPending(v.vin, "doors"), state.isPending(v.vin, "hornLights")) { state }
+            ControlsPebble(v, controlsState, vm, dragHandle)
+        }
+        "climate" -> {
+            val climateState = remember(
+                status, seats, state.isPending(v.vin, "climate"), state.climatePresets[v.vin],
+                state.climateSync[v.vin], state.locations[v.vin], state.carWeather[v.vin],
+                state.homeWeather, state.settingsMode, state.isPebbleExpanded(v.vin, "climate"),
+                state.defaultClimatePresets[v.vin],
+            ) { state }
+            ClimatePebble(v, status, seats, climateState, vm, dragHandle)
+        }
         // The "charge" slot is the powertrain's energy pebble: charging for an
         // EV/PHEV, a fuel readout for a gas/hybrid car (no charge UI at all).
         "charge" -> if (state.hasBattery(v)) {
-            ChargePebble(v, status, enabled, state, vm, dragHandle)
+            val chargeState = remember(
+                status, enabled, state.isPending(v.vin, "charge"), state.isPending(v.vin, "chargeLimit"),
+                state.hasBattery(v), state.hasFuel(v), state.locations[v.vin],
+                state.isPebbleExpanded(v.vin, "charge"),
+            ) { state }
+            ChargePebble(v, status, enabled, chargeState, vm, dragHandle)
         } else {
-            FuelPebble(v, status, state, vm, dragHandle)
+            val fuelState = remember(status, state.refreshing, state.isPebbleExpanded(v.vin, "charge")) { state }
+            FuelPebble(v, status, fuelState, vm, dragHandle)
         }
-        "location" -> LocationPebble(v, state, vm, dragHandle)
-        "weather" -> WeatherPebble(v, state, vm, dragHandle)
+        "location" -> {
+            val locationState = remember(
+                state.locations[v.vin], state.placeNames[v.vin], state.isPending(v.vin, "locate"),
+                state.carWeather[v.vin], state.isPebbleExpanded(v.vin, "location"),
+            ) { state }
+            LocationPebble(v, locationState, vm, dragHandle)
+        }
+        "weather" -> {
+            val weatherState = remember(state.homeWeather, state.isPebbleExpanded(v.vin, "weather")) { state }
+            WeatherPebble(v, weatherState, vm, dragHandle)
+        }
         // Trip history rides on the EV trip-details endpoint, so EVs only.
-        "trips" -> TripsPebble(v, state, vm, dragHandle)
-        "info" -> InfoPebble(v, status, state, vm, dragHandle)
-        "diagnostics" -> DiagnosticsPebble(v, status, state, vm, dragHandle)
-        "ai" -> AiPebble(v, state, vm, dragHandle)
+        "trips" -> {
+            val tripsState = remember(state.trips[v.vin], state.isPending(v.vin, "trips"), state.isPebbleExpanded(v.vin, "trips")) { state }
+            TripsPebble(v, tripsState, vm, dragHandle)
+        }
+        "info" -> {
+            val infoState = remember(
+                status, state.locations[v.vin], state.licensePlates[v.vin], state.lastServiceMiles[v.vin],
+                state.serviceIntervalMiles[v.vin], state.refreshing, state.hasBattery(v),
+                state.placeNames[v.vin], state.fetchedAt(v), state.isPebbleExpanded(v.vin, "info"),
+            ) { state }
+            InfoPebble(v, status, infoState, vm, dragHandle)
+        }
+        "diagnostics" -> {
+            val diagnosticsState = remember(status, state.hasBattery(v), state.isPebbleExpanded(v.vin, "diagnostics")) { state }
+            DiagnosticsPebble(v, status, diagnosticsState, vm, dragHandle)
+        }
+        "ai" -> {
+            val aiState = remember(v.vin in state.aiBusy, state.aiSummaries[v.vin], state.isPebbleExpanded(v.vin, "ai")) { state }
+            AiPebble(v, aiState, vm, dragHandle)
+        }
         else -> Spacer(Modifier.fillMaxWidth())
     }
 }
