@@ -383,9 +383,12 @@ private const val PebbleStaggerSpan = 0.85f
  * of its own -- a pebble can have a dozen rows, and a dozen independent animation tickets is
  * a dozen times the per-frame cost of one shared progress value that every child's
  * [Placeable.PlacementScope.placeWithLayer] block reads and remaps into its own little window
- * (see [PebbleStaggerSpan]). That remap is what turns one linear 0..1 value into a cascade:
- * row *i* of *n* doesn't start moving until progress passes `i/n * PebbleStaggerSpan`, and is
- * fully settled by the time progress reaches `i/n * PebbleStaggerSpan + (1 - PebbleStaggerSpan)`.
+ * (see [PebbleStaggerSpan]). That remap is what turns one linear 0..1 value into a cascade,
+ * ON THE WAY IN: row *i* of *n* doesn't start moving until progress passes
+ * `i/n * PebbleStaggerSpan`, and is fully settled by the time progress reaches
+ * `i/n * PebbleStaggerSpan + (1 - PebbleStaggerSpan)`. On the way OUT every row instead reads
+ * the SAME un-windowed progress directly -- see the `closing` local in the function body for
+ * why staggering the close the same way actively made it worse, not just less staggered.
  *
  * That progress comes from [transition] -- the SAME `Transition<EnterExitState>` the caller's
  * own [AnimatedVisibility] is already running for its height/fade, passed in from inside that
@@ -466,6 +469,16 @@ internal fun StaggeredRevealColumn(
             }
         },
     ) { state -> if (state == EnterExitState.Visible) 1f else 0f }
+    // Windowing (see [PebbleStaggerSpan]) only applies on the way IN. On the way out it was
+    // making things WORSE, not just less staggered: a row whose window starts late (`start`
+    // close to 0.85) has `raw` pinned at its clamped max of 1 for almost the entire close --
+    // progress has to fall below that row's own `start` before `raw` even begins dropping --
+    // so most rows sat fully opaque for most of the collapse and then cut to invisible in the
+    // last sliver of it, which reads as "nothing is happening, then it's just gone," not a
+    // fade. Closing instead maps every row to the SAME un-windowed value: `progress` itself,
+    // smoothly 1 -> 0 across the whole close duration, so every row visibly fades together for
+    // the entire collapse rather than a handful of them cutting out unnoticed near the end.
+    val closing = transition.targetState != EnterExitState.Visible
     val gapPx = with(LocalDensity.current) { verticalGap.roundToPx() }
     // Takes `content` with the same ColumnScope receiver PebbleShell's own body always has
     // (every pebble's content lambda is already typed that way), via NoOpColumnScope below --
@@ -492,7 +505,13 @@ internal fun StaggeredRevealColumn(
                 // one of the transition's frames would re-trigger a full remeasure of every
                 // child in this pebble to move a value that only ever changes how they're drawn.
                 p.placeWithLayer(0, y) {
-                    val raw = ((progress - start) / (1f - PebbleStaggerSpan)).coerceIn(0f, 1f)
+                    // No windowing on the way out (see the `closing` comment above) --
+                    // `progress` itself, un-remapped, is every row's shared raw value.
+                    val raw = if (closing) {
+                        progress.coerceIn(0f, 1f)
+                    } else {
+                        ((progress - start) / (1f - PebbleStaggerSpan)).coerceIn(0f, 1f)
+                    }
                     // Smoothstep for ALPHA specifically -- opacity has nowhere to overshoot TO
                     // (a value past 1 just clips back to fully opaque), so a plain ease with no
                     // overshoot is the right shape for it either way.
