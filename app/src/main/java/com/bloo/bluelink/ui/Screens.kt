@@ -3221,9 +3221,20 @@ internal fun GarageScreen(state: UiState, vm: AppViewModel) {
                         // whole object unequal and every pebble taking it whole recomposes.
                         // Do NOT "fix" that by dropping @Immutable: an unstable object is
                         // compared by reference instead, which is strictly less permissive.
-                        // The fix is to pass pebbles narrower parameters than the whole
-                        // UiState. currentIndex already lives outside it, so a plain
-                        // car-switch settle should change nothing a pebble reads.
+                        //
+                        // Fixed: SinglePebble now wraps the `state` it hands each pebble in
+                        // remember(<that pebble's own catalogued fields>) { state }, so an
+                        // unrelated field changing (another car's weather, an AI/update
+                        // probe, a status fetch for a page that isn't even visible) no
+                        // longer forces every pebble on every in-composition page to
+                        // recompose -- only the ones whose own dependencies actually
+                        // changed. currentIndex already lives outside UiState, so a plain
+                        // car-switch settle changes nothing any pebble reads at all, and now
+                        // that holds for pebble recomposition too, not just for triggering a
+                        // new UiState emission in the first place. Reported as real,
+                        // measurable cold-start/car-switch lag on a real device; see
+                        // SinglePebble's own doc for the full reasoning and the per-pebble
+                        // dependency lists.
                         beyondViewportPageCount = 1,
                     ) { page ->
                         // Same fade/scale transition the expanded single-car pager
@@ -7631,10 +7642,16 @@ private fun CarHeaderRow(v: Vehicle, state: UiState, onExpand: (() -> Unit)?, re
 private fun CriticalContent(v: Vehicle, state: UiState, vm: AppViewModel) {
     val status = state.statusFor(v)
     val hMetric = LocalAppearance.current.unitSystem == "metric"
+    // Same fix as SinglePebble's "summary" branch, same reasoning: HeroHeader takes no
+    // `state` itself, so what's memoized is the derived arguments built here.
+    val heroState = remember(
+        status, state.imageUrls[v.vin], state.hasBattery(v), state.hasFuel(v),
+        state.locations[v.vin], state.isPebbleExpanded(v.vin, com.bloo.bluelink.data.HERO_PHOTO_SECTION),
+    ) { state }
     HeroHeader(
-        v, status, state.imageUrls[v.vin], state.hasBattery(v), state.hasFuel(v), vm,
-        state.drivingLabel(v), metric = hMetric,
-        photoExpanded = state.isPebbleExpanded(v.vin, com.bloo.bluelink.data.HERO_PHOTO_SECTION),
+        v, status, heroState.imageUrls[v.vin], heroState.hasBattery(v), heroState.hasFuel(v), vm,
+        heroState.drivingLabel(v), metric = hMetric,
+        photoExpanded = heroState.isPebbleExpanded(v.vin, com.bloo.bluelink.data.HERO_PHOTO_SECTION),
     )
     // Update tile lives in the "pebbles" column's PebbleList as its own
     // reorderable/pinnable "update" section now, not hardcoded into this
