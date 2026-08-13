@@ -221,14 +221,17 @@ internal const val AdvancedModeStiffness = 130f
  * past the target for the overshoot to actually be visible.
  *
  * Overshoot fraction is set by [PebbleBounceDamping] alone (stiffness only changes how FAST
- * the spring gets there, not how far past the target it swings) -- 0.6 turned out too close
- * to critically damped to actually read as a bounce on a real device, so this is
- * [Spring.DampingRatioMediumBouncy] (0.5), the same named tier Compose ships for "this should
- * unmistakably bounce," paired with [Spring.StiffnessLow] rather than MediumLow so there's
- * enough travel time to see the swing happen instead of it resolving in a handful of frames.
+ * the spring gets there, not how far past the target it swings). 0.6 first shipped and read
+ * as too subtle to register as a bounce at all; [Spring.DampingRatioMediumBouncy] (0.5) with
+ * [Spring.StiffnessLow] went the other way and read as too MUCH bounce -- StiffnessLow gives
+ * the swing enough travel time to be seen, but that same slowness also stretches out how long
+ * the overshoot lingers, so a moderate overshoot fraction still reads as exaggerated. Settled
+ * on [Spring.DampingRatioLowBouncy] (0.75, Compose's own "a little bounce, not a lot" tier)
+ * paired with [Spring.StiffnessMediumLow] (faster than StiffnessLow) -- less overshoot AND
+ * less time spent in it, which is what actually reads as "a bounce" rather than "a wobble."
  */
-private val PebbleBounceDamping = Spring.DampingRatioMediumBouncy
-private val PebbleBounceStiffness = Spring.StiffnessLow
+private val PebbleBounceDamping = Spring.DampingRatioLowBouncy
+private val PebbleBounceStiffness = Spring.StiffnessMediumLow
 
 @Composable
 internal fun collapseEnter(expandFrom: Alignment.Vertical = Alignment.Top): EnterTransition =
@@ -355,7 +358,16 @@ internal fun StaggeredRevealColumn(
     verticalGap: Dp = 8.dp,
     content: @Composable ColumnScope.() -> Unit,
 ) {
-    val progress = remember { Animatable(if (visible) 1f else 0f) }
+    // Always 0f, NOT `if (visible) 1f else 0f`. This composable is only ever entered through
+    // the outer AnimatedVisibility's own enter -- collapseExit fully REMOVES it from
+    // composition when a pebble finishes closing (see that transition's own doc), so the
+    // very first composition of a freshly-opened pebble already has `visible = true`. Seeding
+    // progress at 1f for that case skipped the reveal outright: the LaunchedEffect below then
+    // called animateTo(1f) while progress was ALREADY 1f, a no-op, so every row appeared at
+    // full size/alpha from frame one and the cascade never played. Seeding at 0f always and
+    // letting the effect below animate up to 1f on that same first composition is what
+    // actually starts the stagger.
+    val progress = remember { Animatable(0f) }
     LaunchedEffect(visible) {
         progress.animateTo(
             if (visible) 1f else 0f,
