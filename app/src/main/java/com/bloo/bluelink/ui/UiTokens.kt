@@ -35,8 +35,8 @@ import androidx.compose.ui.layout.Measured
 import androidx.compose.ui.layout.VerticalAlignmentLine
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Dp
-import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.delay
 
 /**
  * The phone UI's shared design vocabulary: the sizes, colours and motion that more than one
@@ -214,30 +214,33 @@ internal const val AdvancedModeStiffness = 130f
  * actually overshoot, both delivers the bounce and stays the single source of truth for the
  * card's bounds.
  *
- * The CLOSE half deliberately does NOT reuse that same bouncy spring. shrinkVertically drives
- * an IntSize animating towards zero; an underdamped spring overshoots its target in both
- * directions, and undershooting a zero height is a negative size a layout node cannot report,
- * so the frames near the end of a bouncy collapse would clamp to zero early and then sit
- * there while the spring's math thinks it's still moving -- a stutter, not a bounce. Closing
- * keeps the calmer default spec; the bounce reads on the way open, where there's headroom
- * past the target for the overshoot to actually be visible.
+ * The CLOSE half now bounces too, on explicit request, but on its OWN, more heavily damped
+ * spring ([PebbleCloseBounceDamping]) rather than reusing the open one. shrinkVertically
+ * drives an IntSize animating towards zero, and an underdamped spring overshoots its target
+ * in BOTH directions -- so undershooting near zero height would mean asking for a genuinely
+ * negative size, which a layout node cannot report. A layout engine clamps that to zero
+ * instead, which is a stutter (the spring's own math thinks it's still below zero and moving,
+ * but what's on screen just sits at zero until the spring catches back up), not a bounce.
+ * [PebbleCloseBounceDamping] is deliberately much closer to critically damped than the open
+ * spring -- enough overshoot to read as "the same object bouncing," small enough that the
+ * undershoot toward zero stays tiny and harmless rather than clamping.
  *
- * Overshoot fraction is set by [PebbleBounceDamping] alone (stiffness only changes how FAST
- * the spring gets there, not how far past the target it swings). History on this one number:
- * 0.6 damping + StiffnessMediumLow first shipped and read as too subtle to register as a
- * bounce at all. 0.5 (MediumBouncy) + StiffnessLow went the other way and read as too MUCH --
- * StiffnessLow gave the swing enough travel time to be seen, but also stretched out how long
- * the overshoot lingers. Dialing BOTH knobs down at once (0.75 + StiffnessMediumLow) to fix
- * that overcorrected into no visible bounce at all -- confirmed on-device, twice now, so this
- * stays a ONE-variable change at a time from here: [Spring.StiffnessLow] is kept (it was the
- * confirmed-visible half of the "too much" version), and damping alone moves from 0.5 to 0.6,
- * roughly halving the overshoot (~16% to ~9%) without touching how long it takes to happen.
+ * Overshoot fraction is set by damping ratio alone (stiffness only changes how FAST the
+ * spring gets there, not how far past the target it swings). History on [PebbleBounceDamping]:
+ * 0.6 + StiffnessMediumLow first shipped and read as too subtle to register as a bounce at
+ * all. 0.5 (MediumBouncy) + StiffnessLow went the other way and read as too MUCH -- StiffnessLow
+ * gave the swing enough travel time to be seen, but also stretched out how long the overshoot
+ * lingers. 0.75 + StiffnessMediumLow overcorrected into invisible again. 0.6 + StiffnessLow
+ * landed as visible bounce, but with the corners on a different spring (fixed since -- see
+ * PebbleShell) it read as disconnected from the card rather than too big; asked to be "a bit
+ * less drastic" once that was fixed, so damping nudges up once more, to 0.68.
  */
 // internal, not private: PebbleShell's own corner-radius morph (animateDpAsState, Screens.kt)
-// shares this exact spring now too -- see that call site for why. Two different physics
+// shares these exact springs too -- see that call site for why. Two different physics
 // animating the height and the corners of the SAME card at once is what read as "the bounce
 // doesn't feel connected to the pebble actually opening" rather than one coherent motion.
-internal val PebbleBounceDamping = 0.6f
+internal val PebbleBounceDamping = 0.68f
+internal val PebbleCloseBounceDamping = 0.85f
 internal val PebbleBounceStiffness = Spring.StiffnessLow
 
 @Composable
@@ -248,12 +251,16 @@ internal fun collapseEnter(expandFrom: Alignment.Vertical = Alignment.Top): Ente
             expandFrom = expandFrom,
         )
 
-/** Mirror of [collapseEnter]; see there for why both halves are springs, and for why only
- *  the OPEN direction bounces. */
+/** Mirror of [collapseEnter]; see there for why both halves are springs, and for why the
+ *  CLOSE direction bounces on its own, more heavily damped spring rather than reusing the
+ *  open one. */
 @Composable
 internal fun collapseExit(shrinkTowards: Alignment.Vertical = Alignment.Top): ExitTransition =
     fadeOut(MaterialTheme.motionScheme.defaultEffectsSpec<Float>()) +
-        shrinkVertically(MaterialTheme.motionScheme.defaultSpatialSpec<IntSize>(), shrinkTowards = shrinkTowards)
+        shrinkVertically(
+            spring(dampingRatio = PebbleCloseBounceDamping, stiffness = PebbleBounceStiffness),
+            shrinkTowards = shrinkTowards,
+        )
 
 /**
  * Independent pop-in/pop-out for ONE row-level element that appears or disappears while its
@@ -380,24 +387,49 @@ internal fun StaggeredRevealColumn(
     // actually starts the stagger.
     val progress = remember { Animatable(0f) }
     LaunchedEffect(visible) {
-        progress.animateTo(
-            if (visible) 1f else 0f,
-            // A dedicated tween, NOT PebbleBounceDamping/Stiffness -- this used to share the
-            // card's own bounce spring, which ties the cascade's total duration to however
-            // fast/slow that spring happens to be tuned. Decoupled so the stagger reads on its
-            // own regardless of what the card height spring is doing at the same time.
-            //
-            // LinearEasing on this OUTER tween, deliberately, even though the result should
-            // still look eased -- each row's own `local` below is a REMAP of a narrow slice of
-            // this value into its own 0..1, and remapping a slice of an already-eased curve
-            // gives that slice a distorted, not-actually-eased shape (steep in some windows,
-            // flat in others, depending on where in the outer curve the slice happened to
-            // land). A linear outer value makes every row's slice equally linear, so applying
-            // ONE consistent ease per row (the smoothstep in the placement block below) gives
-            // every row's own pop the identical shape -- which is what makes them read as
-            // repeated, distinct STEPS rather than one blurry wave with a randomly uneven feel.
-            animationSpec = tween(durationMillis = 480, easing = LinearEasing),
-        )
+        if (visible) {
+            // A short head start for the CARD, not the rows -- asked for explicitly: the pop
+            // should read as arriving just after the pebble has started opening, not racing
+            // it from the same frame. collapseEnter's own bounce has no fixed duration (it's
+            // a spring, not a tween), so this can't be timed to "wait until the card is
+            // exactly this far open" -- a flat delay is what's available, short enough that
+            // the rows are still clearly popping in DURING the open rather than only once
+            // it's fully settled.
+            delay(90)
+            progress.animateTo(
+                1f,
+                // A dedicated tween, NOT PebbleBounceDamping/Stiffness -- this used to share
+                // the card's own bounce spring, which ties the cascade's total duration to
+                // however fast/slow that spring happens to be tuned. Decoupled so the stagger
+                // reads on its own regardless of what the card height spring is doing.
+                //
+                // LinearEasing on this OUTER tween, deliberately, even though the result
+                // should still look eased -- each row's own `local` below is a REMAP of a
+                // narrow slice of this value into its own 0..1, and remapping a slice of an
+                // already-eased curve gives that slice a distorted, not-actually-eased shape
+                // (steep in some windows, flat in others, depending on where in the outer
+                // curve the slice happened to land). A linear outer value makes every row's
+                // slice equally linear, so applying ONE consistent ease per row (the
+                // smoothstep in the placement block below) gives every row's own pop the
+                // identical shape -- which is what makes them read as repeated, distinct
+                // STEPS rather than one blurry wave with a randomly uneven feel.
+                animationSpec = tween(durationMillis = 480, easing = LinearEasing),
+            )
+        } else {
+            // NO delay, and a much shorter duration than the open side, for a reason that
+            // isn't about feel: AnimatedVisibility can only wait for animations that live in
+            // its OWN Transition (see the "Related trap" note on collapseEnter/collapseExit)
+            // -- this Animatable is a completely separate one, so the outer AnimatedVisibility
+            // has no idea it exists and will finish removing this whole subtree from
+            // composition the moment ITS OWN exit transition (collapseExit) settles,
+            // regardless of what this coroutine is still doing. That's what "the collapse
+            // effect doesn't work" was: a 480ms fade-out racing a shorter card-shrink that won
+            // every time, so the rows were torn out of composition mid-fade and never visibly
+            // finished. 180ms comfortably fits inside collapseExit's own duration (a spring,
+            // but a critically-damped-ish one with no overshoot to stretch it out further), so
+            // the rows are fully faded before the card removes them.
+            progress.animateTo(0f, tween(durationMillis = 180, easing = LinearEasing))
+        }
     }
     val gapPx = with(LocalDensity.current) { verticalGap.roundToPx() }
     // Takes `content` with the same ColumnScope receiver PebbleShell's own body always has

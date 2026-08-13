@@ -9262,15 +9262,16 @@ internal fun PebbleShell(
     // regardless of direction, so the corners settled smoothly on the way open WHILE the
     // height was still overshooting/bouncing: two different physics on the same card at the
     // same time, which is what read as "the bounce doesn't feel connected to the pebble
-    // actually opening" rather than one coherent motion. Opening now bounces on both;
-    // closing is calm on both, matching collapseExit's own reason for not bouncing the height
-    // shut (see that transition's doc).
+    // actually opening" rather than one coherent motion. Both directions bounce now, each on
+    // the SAME spring its own height transition uses (collapseEnter's on the way open,
+    // collapseExit's more heavily damped one on the way closed -- see that pair's doc for why
+    // closing needs a different damping at all).
     val corner by animateDpAsState(
         targetValue = if (expanded) PebbleCornerExpanded else PebbleCornerCollapsed,
         animationSpec = if (expanded) {
             spring(dampingRatio = PebbleBounceDamping, stiffness = PebbleBounceStiffness)
         } else {
-            spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessLow)
+            spring(dampingRatio = PebbleCloseBounceDamping, stiffness = PebbleBounceStiffness)
         },
         label = "pebbleCorner",
     )
