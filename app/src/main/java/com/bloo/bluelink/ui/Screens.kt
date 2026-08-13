@@ -287,14 +287,11 @@ import androidx.compose.ui.draw.rotate
 import androidx.lifecycle.repeatOnLifecycle
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
-import androidx.compose.ui.geometry.RoundRect
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.graphics.drawscope.clipPath
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.nativeCanvas
@@ -6504,28 +6501,27 @@ private fun HeroMorphReadout(
 }
 
 /**
- * The hero's charge bar: three plain, FLUSH segments -- filled up to the current
- * charge, a track segment up to the limit, and a darker-backdrop dim segment past
- * it -- or two when the charge is already at (or past) its limit, since there's no
- * "still charging toward the limit" zone left to show separately. One unbroken
- * shape throughout: no gaps anywhere, only the outer two ends of the whole bar are
- * ever rounded (a single clip around the whole draw pass, everything inside it a
- * plain rectangle).
+ * The hero's charge bar: three separately-rounded segments -- filled up to the
+ * current charge, a track segment up to the limit, and a darker-backdrop dim
+ * segment past it -- or two when the charge is already at (or past) its limit,
+ * since there's no "still charging toward the limit" zone left to show
+ * separately. Each piece is its own fully-rounded pill with a real gap either
+ * side of it, explicitly requested over an earlier flush, one-continuous-shape
+ * version: "I want it to be three rounded segments instead of one continuous
+ * bar."
  *
- * Replaces two earlier designs in turn:
+ * Earlier designs, in order, and why each was replaced:
  *  1. A seam where the fill ended, plus a small circular marker drawn on top at
  *     the limit -- charge sitting AT its limit (the common case) put both devices
  *     on the same pixel, "a 5dp hole under a 14dp dot."
- *  2. A three-segment version that put a physical GAP at the limit split to fix
- *     (1)'s marker-vs-fill collision and a real "can't tell the two track shades
- *     apart" complaint that followed once the marker was gone -- but a short
- *     middle piece bounded by a gap on both sides is indistinguishable from three
- *     separately-rounded pills at a glance, which was reported as its own, worse
- *     complaint. THIS version keeps the fix (three segments, not a marker) and
- *     drops the gap: the far segment now gets a genuinely darker BACKDROP colour
- *     painted first, with the ordinary dim tint layered on top of it, so the
- *     zone reads as distinct through colour and darkness alone rather than a
- *     physical break -- the bar stays one continuous shape either way.
+ *  2. Three segments with a gap only at the limit split, the rest flush -- fixed
+ *     (1)'s collision, but read as an uneven mix of one joined piece and one
+ *     separate piece rather than a consistent shape.
+ *  3. All three segments flush, no gap anywhere, legibility carried by a darker
+ *     backdrop instead of any physical break -- this was mistakenly taken from
+ *     a reference image showing a smooth SINGLE bar, but the actual request was
+ *     for the "smooth rounded corners" style applied to each of three DISTINCT
+ *     pieces, not one continuous shape. This version.
  *
  * Blue fill instead of green when the charge has reached its limit -- "topped
  * up," not "still filling" -- regardless of whether the car is actively
@@ -6546,10 +6542,8 @@ private fun ChargeSegmentBar(frac: Float, limitPct: Int?, stuckAtLimit: Boolean,
     // surface, and a black scrim is what already keeps text legible over that same
     // photo elsewhere on this exact card, so it reads as "darker" regardless of
     // what's underneath) painted first, with the ordinary dim tint layered on top of
-    // it. Two colours, not one: a single translucent tint at any alpha still reads
-    // as "the same track, slightly quieter" rather than a genuinely different zone,
-    // which was the request after the gap-based version (see below) read as
-    // separate rounded pills instead of one bar.
+    // it -- carries the "won't fill past here" distinction alongside its own
+    // separately-rounded shape, not instead of it.
     val farBackdropColor = Color.Black.copy(alpha = 0.35f)
     val trackDimColor = scheme.onSurface.copy(alpha = 0.08f)
     val fillBrush = if (stuckAtLimit) {
@@ -6574,80 +6568,63 @@ private fun ChargeSegmentBar(frac: Float, limitPct: Int?, stuckAtLimit: Boolean,
     // DRAWN, not composed -- see the git history here for why: this used to be a
     // BoxWithConstraints holding a Row of Boxes plus an offset child for the marker, and
     // BoxWithConstraints is SUBCOMPOSITION, which cost a re-measure on every frame of the
-    // fill/marker animations. One clipped Canvas pass costs nothing per frame that isn't
-    // already being paid for the fill's own animateFloatAsState.
+    // fill/marker animations. One Canvas pass costs nothing per frame that isn't already
+    // being paid for the fill's own animateFloatAsState.
     Canvas(modifier.fillMaxWidth().height(ChargeBarHeight)) {
         val h = size.height
         val radius = CornerRadius(h / 2f)
-        // Whole-bar rounded clip, so every segment inside it can be a plain rectangle --
-        // three flush rectangles read as one continuous pill as long as only the outer
-        // two corners are ever rounded, which clipping to the full shape guarantees
-        // regardless of how many segments end up between them.
-        clipPath(Path().apply { addRoundRect(RoundRect(Rect(Offset.Zero, size), radius)) }) {
-            // The actual segment math lives in chargeBarLayout, a plain function with no
-            // Compose/DrawScope dependency, specifically so it's unit-testable -- this
-            // Canvas lambda cannot be. See ChargeSegmentBarTest, which sweeps a wide range
-            // of width x percent x limit combinations asserting the three-segment case
-            // (fill, track-to-limit, dim-track-past-it) genuinely produces three
-            // positive-width segments, not just that the formula looks right by eye.
-            val layout = chargeBarLayout(
-                totalWidth = size.width,
-                barHeight = h,
-                filledFrac = frac,
-                limitFrac = limit?.let { limitAnim.value },
-                stuckAtLimit = stuckAtLimit,
-                // No gap -- see the class doc: a physical break at the limit split
-                // fixed the earlier "can't tell the two track shades apart" complaint,
-                // but reading three PHYSICALLY separate pieces (each with its own
-                // rounded ends, since a short middle piece bounded by a gap on both
-                // sides is indistinguishable from three individually-rounded pills at
-                // a glance) was worse than the problem it solved. The darker backdrop
-                // below carries the distinction now instead of the gap.
-                gap = 0f,
+        // The actual segment math lives in chargeBarLayout, a plain function with no
+        // Compose/DrawScope dependency, specifically so it's unit-testable -- this
+        // Canvas lambda cannot be. See ChargeSegmentBarTest, which sweeps a wide range
+        // of width x percent x limit combinations asserting the three-segment case
+        // (fill, track-to-limit, dim-track-past-it) genuinely produces three
+        // positive-width, correctly-gapped segments, not just that the formula looks
+        // right by eye.
+        val layout = chargeBarLayout(
+            totalWidth = size.width,
+            barHeight = h,
+            filledFrac = frac,
+            limitFrac = limit?.let { limitAnim.value },
+            stuckAtLimit = stuckAtLimit,
+            gap = ChargeSegmentGap.toPx(),
+        )
+        if (layout.fillWidth > 0f) {
+            drawRoundRect(
+                brush = Brush.horizontalGradient(fillBrush, startX = 0f, endX = layout.fillWidth),
+                size = Size(layout.fillWidth, h),
+                cornerRadius = radius,
             )
-            if (layout.fillWidth > 0f) {
-                drawRect(
-                    brush = Brush.horizontalGradient(fillBrush, startX = 0f, endX = layout.fillWidth),
-                    size = Size(layout.fillWidth, h),
+        }
+        if (layout.hasSingleTrack) {
+            // No limit at all, or already at/past it: one remaining segment, the
+            // ordinary track colour when there's no limit to speak of, the DARKER
+            // backdrop + dim tint when the charge is stuck there -- the whole
+            // remainder past the current charge means "won't fill further" in
+            // that case, not "still on the way".
+            if (layout.singleTrackWidth > 0f) {
+                val at = Offset(layout.singleTrackStart, 0f)
+                val sz = Size(layout.singleTrackWidth, h)
+                if (layout.singleTrackDim) {
+                    drawRoundRect(color = farBackdropColor, topLeft = at, size = sz, cornerRadius = radius)
+                    drawRoundRect(color = trackDimColor, topLeft = at, size = sz, cornerRadius = radius)
+                } else {
+                    drawRoundRect(color = trackColor, topLeft = at, size = sz, cornerRadius = radius)
+                }
+            }
+        } else {
+            // Two remaining segments, each its own rounded piece: current -> limit
+            // (still filling toward it) and limit -> 100% (won't fill past it).
+            if (layout.midWidth > 0f) {
+                drawRoundRect(
+                    color = trackColor, topLeft = Offset(layout.midStart, 0f),
+                    size = Size(layout.midWidth, h), cornerRadius = radius,
                 )
             }
-            if (layout.hasSingleTrack) {
-                // No limit at all, or already at/past it: one remaining segment, the
-                // ordinary track colour when there's no limit to speak of, the DARKER
-                // backdrop + dim tint when the charge is stuck there -- the whole
-                // remainder past the current charge means "won't fill further" in
-                // that case, not "still on the way".
-                if (layout.singleTrackWidth > 0f) {
-                    val at = Offset(layout.singleTrackStart, 0f)
-                    val sz = Size(layout.singleTrackWidth, h)
-                    if (layout.singleTrackDim) {
-                        drawRect(color = farBackdropColor, topLeft = at, size = sz)
-                        drawRect(color = trackDimColor, topLeft = at, size = sz)
-                    } else {
-                        drawRect(color = trackColor, topLeft = at, size = sz)
-                    }
-                }
-            } else {
-                // Two remaining segments, flush: current -> limit (still filling toward
-                // it) and limit -> 100% (won't fill past it). No gap between them -- an
-                // earlier version put a physical break at this split, which fixed the
-                // original complaint that the two track shades alone were too close to
-                // tell apart, but then read as three separate rounded pills rather than
-                // one continuous bar (a short middle piece bounded by a gap on both
-                // sides is indistinguishable from one at a glance). The darker backdrop
-                // does that job now instead: the far segment gets its own solid-ish
-                // background PAINTED FIRST, with the ordinary dim tint layered on top,
-                // so it reads as a genuinely different zone through colour and darkness
-                // alone, with the bar staying one unbroken shape.
-                if (layout.midWidth > 0f) {
-                    drawRect(color = trackColor, topLeft = Offset(layout.midStart, 0f), size = Size(layout.midWidth, h))
-                }
-                if (layout.farWidth > 0f) {
-                    val at = Offset(layout.farStart, 0f)
-                    val sz = Size(layout.farWidth, h)
-                    drawRect(color = farBackdropColor, topLeft = at, size = sz)
-                    drawRect(color = trackDimColor, topLeft = at, size = sz)
-                }
+            if (layout.farWidth > 0f) {
+                val at = Offset(layout.farStart, 0f)
+                val sz = Size(layout.farWidth, h)
+                drawRoundRect(color = farBackdropColor, topLeft = at, size = sz, cornerRadius = radius)
+                drawRoundRect(color = trackDimColor, topLeft = at, size = sz, cornerRadius = radius)
             }
         }
     }
@@ -6657,10 +6634,11 @@ private fun ChargeSegmentBar(frac: Float, limitPct: Int?, stuckAtLimit: Boolean,
  * Pure segment-boundary math for [ChargeSegmentBar], pulled out of its DrawScope
  * specifically so it can be unit-tested without a Compose runtime -- see
  * ChargeSegmentBarTest. [limitFrac]/[stuckAtLimit] mirror the composable's own params.
- * [gap] is a physical break reserved at the limit split, kept as a general parameter
- * for the tests that exercise it even though [ChargeSegmentBar] itself now always
- * calls this with `gap = 0f` -- the bar is flush throughout; see that composable's
- * own doc for why the gap it used to draw with is gone.
+ * [gap] is the physical break reserved on BOTH sides of every internal boundary --
+ * between the fill and whatever follows it, and (when there's a limit and it hasn't
+ * been reached) between that and the far segment too -- so every piece comes out as
+ * its own separately-rounded segment rather than any two of them reading as one
+ * joined shape.
  */
 internal data class ChargeBarLayout(
     val fillWidth: Float,
@@ -6688,36 +6666,43 @@ internal fun chargeBarLayout(
 ): ChargeBarLayout {
     val clampedFrac = filledFrac.coerceIn(0f, 1f)
     // Floored at the bar's own height when there is ANY charge: below that the 50%
-    // corner radius (from the caller's clip) eats the whole shape, so 3% and 0% would
-    // otherwise draw the same nothing.
-    val filledX = if (clampedFrac <= 0f) 0f else minOf(totalWidth, maxOf(totalWidth * clampedFrac, barHeight))
+    // corner radius eats the whole shape, so 3% and 0% would otherwise draw the same
+    // nothing. This is the CONCEPTUAL current-charge boundary -- the fill segment's
+    // own width is derived from it below, shrunk by half the gap.
+    val filledXRaw = if (clampedFrac <= 0f) 0f else minOf(totalWidth, maxOf(totalWidth * clampedFrac, barHeight))
+    val halfGap = gap / 2f
+    // Every segment's own bound is coerced against its neighbour's, the same pattern
+    // repeated at each boundary: shrink towards the gap first, never past 0 width and
+    // never past the far edge of the bar, so a transient animation frame (the fill
+    // still catching up to a just-lowered limit, the limit sitting right next to the
+    // fill, a charge near 0% or 100%) can only ever yield the gap or a zero-width
+    // segment, never a negative one or an overflow.
+    val fillWidth = (filledXRaw - halfGap).coerceAtLeast(0f)
+
     if (limitFrac == null || stuckAtLimit) {
-        val rest = (totalWidth - filledX).coerceAtLeast(0f)
+        val trackStart = minOf(totalWidth, filledXRaw + halfGap)
+        val trackWidth = (totalWidth - trackStart).coerceAtLeast(0f)
         return ChargeBarLayout(
-            fillWidth = filledX,
+            fillWidth = fillWidth,
             hasSingleTrack = true,
-            singleTrackStart = filledX,
-            singleTrackWidth = rest,
+            singleTrackStart = trackStart,
+            singleTrackWidth = trackWidth,
             singleTrackDim = limitFrac != null,
             midStart = 0f, midWidth = 0f, farStart = 0f, farWidth = 0f,
         )
     }
-    val limitX = (totalWidth * limitFrac).coerceIn(filledX, totalWidth)
-    val halfGap = gap / 2f
-    // Coerced on both ends so a transient animation frame (the fill still catching up to
-    // a just-lowered limit, or the limit sitting right next to the fill) can't produce a
-    // negative-width segment -- it just yields the gap first, same as the extremes
-    // handling everywhere else this bar animates.
-    val midEnd = (limitX - halfGap).coerceIn(filledX, limitX)
-    val mid = (midEnd - filledX).coerceAtLeast(0f)
-    val farStart = (limitX + halfGap).coerceIn(limitX, totalWidth)
-    val far = (totalWidth - farStart).coerceAtLeast(0f)
+    val limitXRaw = (totalWidth * limitFrac).coerceIn(filledXRaw, totalWidth)
+    val midStart = minOf(totalWidth, filledXRaw + halfGap)
+    val midEnd = (limitXRaw - halfGap).coerceIn(midStart, totalWidth)
+    val midWidth = (midEnd - midStart).coerceAtLeast(0f)
+    val farStart = (limitXRaw + halfGap).coerceIn(limitXRaw, totalWidth)
+    val farWidth = (totalWidth - farStart).coerceAtLeast(0f)
     return ChargeBarLayout(
-        fillWidth = filledX,
+        fillWidth = fillWidth,
         hasSingleTrack = false,
         singleTrackStart = 0f, singleTrackWidth = 0f, singleTrackDim = false,
-        midStart = filledX, midWidth = mid,
-        farStart = farStart, farWidth = far,
+        midStart = midStart, midWidth = midWidth,
+        farStart = farStart, farWidth = farWidth,
     )
 }
 

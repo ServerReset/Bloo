@@ -83,6 +83,11 @@ internal val PebbleCornerExpanded = 20.dp
  *  proportions read as one component rather than five near-misses. */
 internal val ChargeBarHeight = 18.dp
 
+/** The gap reserved on both sides of every internal boundary in the charge bar, so
+ *  each segment (fill, track-to-limit, dim-track-past-it) is its own visibly
+ *  separate, independently-rounded piece rather than any two reading as one shape. */
+internal val ChargeSegmentGap = 5.dp
+
 /**
  * Gap between the hero's collapsed readout and the bottom edge of its card.
  *

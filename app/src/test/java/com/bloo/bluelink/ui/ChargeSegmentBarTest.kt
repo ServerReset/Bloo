@@ -5,10 +5,10 @@ import kotlin.test.assertTrue
 
 /**
  * Pins [chargeBarLayout] -- the plain segment-boundary math [ChargeSegmentBar] draws
- * from -- against the exact shape it's meant to produce: a real gap at the limit split,
- * genuinely three positive-width segments when there's room for them, and no segment
- * ever overflowing or going negative regardless of how narrow the bar or how the
- * percent/limit happen to land.
+ * from -- against the exact shape it's meant to produce: a real gap on both sides of
+ * every internal boundary, genuinely three positive-width segments when there's room
+ * for them, and no segment ever overflowing or going negative regardless of how narrow
+ * the bar or how the percent/limit happen to land.
  *
  * Written after "make sure that the bar will display in three segments like it's
  * supposed to" -- a Compose Canvas draw call cannot be unit-tested directly (no Compose
@@ -33,10 +33,10 @@ class ChargeSegmentBarTest {
             assertTrue(layout.fillWidth > 0f, "width=$width has no fill segment")
             assertTrue(layout.midWidth > 0f, "width=$width has no current->limit track segment")
             assertTrue(layout.farWidth > 0f, "width=$width has no limit->100% dim segment")
-            // The three pieces (plus the one gap between mid and far) must not overflow
-            // the bar, and must not leave an unaccounted-for gap ANYWHERE but the one
-            // reserved spot.
-            val consumed = layout.fillWidth + layout.midWidth + gap + layout.farWidth
+            // The three pieces plus BOTH gaps (fill<->mid, mid<->far) must not overflow
+            // the bar, and must not leave an unaccounted-for gap anywhere but those two
+            // reserved spots.
+            val consumed = layout.fillWidth + gap + layout.midWidth + gap + layout.farWidth
             assertTrue(
                 kotlin.math.abs(consumed - width) < 0.5f,
                 "width=$width consumed $consumed, expected ~$width (fill=${layout.fillWidth} mid=${layout.midWidth} far=${layout.farWidth})",

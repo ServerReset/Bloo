@@ -6,9 +6,9 @@ import kotlin.test.assertTrue
 
 /**
  * Pins [widgetChargeBarLayout] -- the plain segment-boundary math [ChargeBar] draws
- * from -- against the same shape the phone's ChargeSegmentBarTest pins: a real gap at
- * the limit split, genuinely three positive-width segments when there's room for them,
- * and no segment ever overflowing or going negative.
+ * from -- against the same shape the phone's ChargeSegmentBarTest pins: a real gap on
+ * both sides of every internal boundary, genuinely three positive-width segments when
+ * there's room for them, and no segment ever overflowing or going negative.
  *
  * Written after "make sure that the bar will display in three segments like it's
  * supposed to" -- Glance composables can't be unit-tested directly (no Glance/Compose
@@ -25,7 +25,8 @@ class WidgetChargeBarLayoutTest {
             assertTrue(layout.filled > 0.dp, "width=$width has no fill segment")
             assertTrue(layout.mid > 0.dp, "width=$width has no current->limit track segment")
             assertTrue(layout.far > 0.dp, "width=$width has no limit->100% dim segment")
-            val consumed = layout.filled + layout.mid + layout.gap + layout.far
+            // Two gaps now (fill<->mid, mid<->far), not one.
+            val consumed = layout.filled + layout.gap + layout.mid + layout.gap + layout.far
             assertTrue(
                 (consumed - width).value.let { kotlin.math.abs(it) } < 0.5f,
                 "width=$width consumed $consumed, expected ~$width (filled=${layout.filled} mid=${layout.mid} far=${layout.far})",
@@ -44,8 +45,10 @@ class WidgetChargeBarLayoutTest {
                     // failure: limit=99 on every width, always the FAR side collapsing) --
                     // only assert the three-segment shape when there's genuinely enough
                     // room for it on BOTH sides of the limit split, since either one can
-                    // legitimately collapse once the gap is reserved.
-                    val gap = if (width >= 60.dp) 3.dp else 0.dp
+                    // legitimately collapse once the gap is reserved. 5.dp matches the
+                    // production SEGMENT_GAP (WidgetGauges.kt) exactly, applied
+                    // unconditionally now regardless of width.
+                    val gap = 5.dp
                     val nearSpanDp = width * (limit - pct) / 100f
                     val farSpanDp = width * (100 - limit) / 100f
                     if (nearSpanDp < gap * 3 || farSpanDp < gap * 3) continue

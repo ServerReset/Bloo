@@ -16,6 +16,7 @@ import androidx.glance.layout.Alignment
 import androidx.glance.layout.Box
 import androidx.glance.layout.Column
 import androidx.glance.layout.Row
+import androidx.glance.layout.Spacer
 import androidx.glance.layout.height
 import androidx.glance.layout.size
 import androidx.glance.layout.width
@@ -121,22 +122,20 @@ internal fun StatusGlyph(car: VehicleSnapshot, theme: WidgetTheme, sizeDp: Int) 
 /**
  * The horizontal charge bar under [BarHero]'s number.
  *
- * Three plain flush segments -- filled up to the current charge, track up to
- * the limit, a darker-backdrop dim track past it -- or two when the charge is
+ * Three separately-rounded segments -- filled up to the current charge, track up
+ * to the limit, a darker-backdrop dim track past it -- or two when the charge is
  * already at (or past) its own limit, since there's no "still filling toward the
  * limit" zone left once it's already there. Ported from the phone's own
- * ChargeSegmentBar, which explains the whole progression (a marker, then a
- * gapped three-segment version, now this flush one) in full -- this file has
- * always mirrored whichever design that one landed on, and does again here.
+ * ChargeSegmentBar, which explains the whole progression (a marker, then gapped,
+ * then flush, now separately-rounded again) in full -- this file has always
+ * mirrored whichever design that one landed on, and does again here.
  *
- * Glance has no per-corner rounding and no clip path, so unlike the phone's
- * Canvas version each segment is its own independently-rounded box rather than
- * one shape with only its outer ends rounded -- the one seam this surface can't
- * fully remove. Flush with no gap between them keeps that seam small rather
- * than widening it into its own visible break, which is exactly why the gap
- * this design used to reserve at the limit split is gone: legibility there now
- * comes from [ChargeBarFarSegment]'s darker backdrop instead. Glance also has
- * no fractional width, but the exact slot width is known here, so every
+ * Glance corner-rounds each box independently anyway (no clip-path API to round
+ * only the bar's outer ends the way the phone's Canvas can choose to), so this
+ * surface was already halfway to "three separate pills" by construction --
+ * explicitly requested over a flush, gapless version this file used to draw
+ * instead. A real [Spacer] now sits between every piece to match. Glance also
+ * has no fractional width, but the exact slot width is known here, so every
  * segment is computed in dp rather than guessed.
  */
 @Composable
@@ -151,7 +150,8 @@ internal fun ChargeBar(car: VehicleSnapshot, theme: WidgetTheme, width: Dp, heig
     // Glance/Compose dependency, specifically so it's unit-testable -- see
     // WidgetChargeBarLayoutTest, which sweeps a wide range of width x percent x limit
     // combinations asserting the three-segment case genuinely produces three
-    // positive-width segments, not just that the formula looks right by eye.
+    // positive-width, correctly-gapped segments, not just that the formula looks
+    // right by eye.
     val layout = widgetChargeBarLayout(width, height, pct / 100f, limit, stuckAtLimit)
     Row(modifier = GlanceModifier.width(width).height(height)) {
         if (layout.filled > 0.dp) {
@@ -166,6 +166,7 @@ internal fun ChargeBar(car: VehicleSnapshot, theme: WidgetTheme, width: Dp, heig
             // whole remainder past the current charge means "won't fill further" in
             // that case, not "still on the way".
             if (layout.singleTrackWidth > 0.dp) {
+                Spacer(GlanceModifier.width(layout.gap))
                 if (layout.singleTrackDim) {
                     ChargeBarFarSegment(layout.singleTrackWidth, height, theme)
                 } else {
@@ -176,21 +177,17 @@ internal fun ChargeBar(car: VehicleSnapshot, theme: WidgetTheme, width: Dp, heig
                 }
             }
         } else {
-            // Two remaining segments, FLUSH: current -> limit (still filling toward
-            // it), limit -> 100% (won't fill past it). No gap between them -- an
-            // earlier version put a physical break at this split, which fixed a real
-            // "can't tell the two track shades apart" complaint, but then read as
-            // separately-rounded pills rather than one bar (a real complaint on the
-            // phone's identically-shaped ChargeSegmentBar, which this file always
-            // mirrors). The darker backdrop below does that legibility job now
-            // instead, through colour and darkness rather than a physical break.
+            // Two remaining segments, each its own rounded piece: current -> limit
+            // (still filling toward it), limit -> 100% (won't fill past it).
             if (layout.mid > 0.dp) {
+                Spacer(GlanceModifier.width(layout.gap))
                 Box(
                     modifier = GlanceModifier.width(layout.mid).height(height)
                         .cornerRadius(height / 2).background(theme.surfaceVariant),
                 ) {}
             }
             if (layout.far > 0.dp) {
+                Spacer(GlanceModifier.width(layout.gap))
                 ChargeBarFarSegment(layout.far, height, theme)
             }
         }
@@ -200,12 +197,12 @@ internal fun ChargeBar(car: VehicleSnapshot, theme: WidgetTheme, width: Dp, heig
 /**
  * The past-the-limit segment: a genuinely darker BACKDROP box, with the ordinary
  * dim tint nested inside it at the same size -- two layered colours, like the
- * phone's own two `drawRect` calls, rather than one translucent tint that reads as
- * "the same track, slightly quieter" instead of a distinct zone. Glance still
- * corner-rounds this box independently (no clip-path API to round only the bar's
- * outer ends the way the phone's Canvas does), which is the one seam this surface
- * cannot fully remove -- but with no gap on either side any more, it is a small one
- * rather than reading as its own separate rounded pill.
+ * phone's own two `drawRoundRect` calls, rather than one translucent tint that
+ * reads as "the same track, slightly quieter" instead of a distinct zone. Its own
+ * independent corner-rounding (Glance has no clip-path API to round only the
+ * bar's outer ends the way the phone's Canvas can choose to) is no longer a
+ * limitation to work around here -- every segment is meant to read as its own
+ * separately-rounded piece now, gapped from its neighbours by the caller.
  */
 @Composable
 private fun ChargeBarFarSegment(width: Dp, height: Dp, theme: WidgetTheme) {
@@ -241,32 +238,38 @@ internal data class WidgetChargeBarLayout(
     val far: Dp,
 )
 
+/** Same value as the phone's own ChargeSegmentGap (UiTokens.kt) -- not imported
+ *  cross-package, matching this file's existing convention of keeping its own
+ *  size constants local rather than reaching into the phone UI package. */
+private val SEGMENT_GAP = 5.dp
+
 internal fun widgetChargeBarLayout(width: Dp, height: Dp, frac: Float, limit: Int?, stuckAtLimit: Boolean): WidgetChargeBarLayout {
     // Floored at the bar's own height when there is ANY charge, so a low one reads as a
     // rounded nub rather than a hairline: below that the 50% corner radius eats the
-    // whole shape and 3% looks identical to 0%. Capped at `width` so the floor can't
-    // overrun a narrow slot.
+    // whole shape and 3% looks identical to 0%. This is the CONCEPTUAL current-charge
+    // boundary -- the fill segment's own width is derived from it below, shrunk by
+    // half the gap, mirroring the phone's own chargeBarLayout exactly (see its doc).
     val clampedFrac = frac.coerceIn(0f, 1f)
-    val filled = if (clampedFrac <= 0f) 0.dp else minOf(width, maxOf(width * clampedFrac, height))
+    val filledRaw = if (clampedFrac <= 0f) 0.dp else minOf(width, maxOf(width * clampedFrac, height))
+    val halfGap = SEGMENT_GAP / 2
+    val filled = (filledRaw - halfGap).coerceAtLeast(0.dp)
     if (limit == null || stuckAtLimit) {
-        val rest = (width - filled).coerceAtLeast(0.dp)
+        val trackStart = minOf(width, filledRaw + halfGap)
+        val trackWidth = (width - trackStart).coerceAtLeast(0.dp)
         return WidgetChargeBarLayout(
-            filled = filled, hasSingleTrack = true, singleTrackWidth = rest, singleTrackDim = limit != null,
-            mid = 0.dp, gap = 0.dp, far = 0.dp,
+            filled = filled, hasSingleTrack = true, singleTrackWidth = trackWidth, singleTrackDim = limit != null,
+            mid = 0.dp, gap = SEGMENT_GAP, far = 0.dp,
         )
     }
-    // `mid`/`far` are each other's complement of `rest` -- flush, gap always 0.dp now
-    // (kept as a field rather than removed outright, so this still mirrors the
-    // phone's own chargeBarLayout shape exactly; see ChargeBar's own doc for why the
-    // gap this used to reserve is gone).
-    val rest = (width - filled).coerceAtLeast(0.dp)
-    val gap = 0.dp
-    val limitX = (width * (limit / 100f)).coerceIn(filled, width)
-    val mid = (limitX - filled - gap / 2).coerceIn(0.dp, rest)
-    val far = (rest - mid - (if (mid > 0.dp) gap else 0.dp)).coerceAtLeast(0.dp)
+    val limitXRaw = (width * (limit / 100f)).coerceIn(filledRaw, width)
+    val midStart = minOf(width, filledRaw + halfGap)
+    val midEnd = (limitXRaw - halfGap).coerceIn(midStart, width)
+    val mid = (midEnd - midStart).coerceAtLeast(0.dp)
+    val farStart = (limitXRaw + halfGap).coerceIn(limitXRaw, width)
+    val far = (width - farStart).coerceAtLeast(0.dp)
     return WidgetChargeBarLayout(
         filled = filled, hasSingleTrack = false, singleTrackWidth = 0.dp, singleTrackDim = false,
-        mid = mid, gap = gap, far = far,
+        mid = mid, gap = SEGMENT_GAP, far = far,
     )
 }
 
