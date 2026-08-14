@@ -2087,38 +2087,11 @@ internal fun SettingsScreen(
             // returning FROM (swiping to a car does that), and "Back to the app"
             // literally isn't true here: this already is the app's main screen.
             if (!embedded) FloatingIcon(Icons.Filled.ArrowBack, "Back to the app", { vm.closeSettings() })
-            // Only when nothing is hoisting this pill elsewhere (the standalone
-            // route): embedded mode's identity pill is GarageScreen's own floating
-            // car-name pill instead (see onNameHiddenChanged above), the whole
-            // point being one shared element rather than this one PLUS a second,
-            // scroll-triggered one duplicating it. And even here it's no longer
-            // permanently visible -- SettingsHeaderRow above is now the standalone
-            // route's own inline header, so this pill uses the exact same
-            // scroll-triggered hand-off (settingsNameHidden) the embedded route's
-            // hoisted pill does, on the same headerHandoffSpring, instead of
-            // sitting on screen the whole time next to a header saying the same
-            // thing twice.
-            if (onNameHiddenChanged == null) {
-                // Same shape, chrome and PillAvatar "picture" slot as the floating
-                // car-name pill (Screens.kt) -- was name text alone, the one
-                // floating identity pill in the app that didn't carry a picture,
-                // which read as a plainer, different kind of object next to the
-                // pill you land on it FROM when swiping in from a car. A gear glyph
-                // in the same tonal circle a car's own photo sits in gives Settings
-                // the identical "picture + name" shape, so the pill itself doesn't
-                // change type crossing between the two, only what it says. And now
-                // the same MorphingIdentityPill mechanics too: it slides/scales in
-                // from SettingsHeaderRow's own invisible title placeholder above,
-                // one continuous element rather than a header that vanishes plus an
-                // unrelated pill that fades in beside it.
-                MorphingIdentityPill(
-                    nameHidden = settingsNameHidden,
-                    startOffset = DpOffset(12.dp, 12.dp),
-                    onClick = { settingsScope.launch { settingsGridState.animateScrollToItem(0) } },
-                ) { t ->
-                    MorphingIdentityContent("Settings", null, Icons.Filled.Settings, MaterialTheme.colorScheme.tertiary, null, t)
-                }
-            }
+            // The identity pill itself is NOT here -- MorphingIdentityPill needs an
+            // implicit BoxScope receiver (for its own Modifier.align) that this Row
+            // doesn't provide even though it's nested inside one, so it's rendered
+            // as this Row's own sibling below instead, matching where every other
+            // caller (Screens.kt) places it too.
             Spacer(Modifier.weight(1f))
             // A real segmented control (not a single button that only ever
             // names the OTHER mode) so the CURRENT mode is always obvious at a
@@ -2153,6 +2126,32 @@ internal fun SettingsScreen(
                 )
             }
             Spacer(Modifier.width(8.dp))
+        }
+        // Only when nothing is hoisting this pill elsewhere (the standalone route):
+        // embedded mode's identity pill is GarageScreen's own floating car-name pill
+        // instead (see onNameHiddenChanged above), the whole point being one shared
+        // element rather than this one PLUS a second, scroll-triggered one
+        // duplicating it. And even here it's no longer permanently visible --
+        // SettingsHeaderRow above is now the standalone route's own inline header, so
+        // this pill uses the exact same scroll-triggered hand-off (settingsNameHidden)
+        // the embedded route's hoisted pill does, on the same headerHandoffSpring,
+        // instead of sitting on screen the whole time next to a header saying the
+        // same thing twice. Same shape, chrome and PillAvatar "picture" slot as the
+        // floating car-name pill (Screens.kt) -- a gear glyph in the same tonal
+        // circle a car's own photo sits in gives Settings the identical "picture +
+        // name" shape, so the pill itself doesn't change type crossing between the
+        // two, only what it says. And now the same MorphingIdentityPill mechanics
+        // too: it slides/scales in from SettingsHeaderRow's own invisible title
+        // placeholder above, one continuous element rather than a header that
+        // vanishes plus an unrelated pill that fades in beside it.
+        if (onNameHiddenChanged == null) {
+            MorphingIdentityPill(
+                nameHidden = settingsNameHidden,
+                startOffset = DpOffset(12.dp, 12.dp),
+                onClick = { settingsScope.launch { settingsGridState.animateScrollToItem(0) } },
+            ) { t ->
+                MorphingIdentityContent("Settings", null, Icons.Filled.Settings, MaterialTheme.colorScheme.tertiary, null, t)
+            }
         }
         // First-run coach mark pointing at the back arrow.
         if (state.showSettingsCoach) {
