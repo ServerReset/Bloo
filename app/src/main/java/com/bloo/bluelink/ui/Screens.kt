@@ -3252,7 +3252,23 @@ internal fun GarageScreen(state: UiState, vm: AppViewModel) {
                         vm.consumeLandOnSettingsPage()
                     }
                 }
-                LaunchedEffect(pager, perPage) {
+                // Keyed on totalBlocks too, not just pager/perPage: this effect's
+                // own collect{} closes over realBlock/pageCount/settingsAsPage as
+                // they were the moment it (re)started. Toggling Appearance.
+                // settingsAsPage from a search result while GarageScreen stays
+                // mounted the whole time (see that toggle's own comment -- it
+                // deliberately doesn't require a fresh mount) changes totalBlocks
+                // without touching pager's identity or perPage, so without this
+                // key the running coroutine kept using a stale, pre-toggle
+                // settingsAsPage (permanently false, so onSettingsPageSlot could
+                // never become true and the search bubble never morphed to a
+                // pill) AND a stale pageCount/realBlock pairing that no longer
+                // matched the pager's own (live) virtual page count -- a
+                // mismatched modulus that could resolve `block` to an unrelated
+                // number and fire selectIndex with a bogus index. Restarting here
+                // rebinds the closure to the current values the instant the slot
+                // count changes.
+                LaunchedEffect(pager, perPage, totalBlocks) {
                     snapshotFlow { pager.settledPage }.collect { page ->
                         // Guarded: the Settings slot isn't a car block, and
                         // selectIndex/currentIndex only ever mean "which car" --
