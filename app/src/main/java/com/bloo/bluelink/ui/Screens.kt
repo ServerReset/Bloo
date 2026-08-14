@@ -7995,7 +7995,15 @@ private fun Refreshable(
 private fun CarHeaderRow(v: Vehicle, state: UiState, onExpand: (() -> Unit)?, reserveEnd: Boolean) {
     Row(
         Modifier.fillMaxWidth().then(if (reserveEnd) Modifier.padding(end = 52.dp) else Modifier),
-        verticalAlignment = Alignment.CenterVertically,
+        // Top, not CenterVertically -- the text column is three lines (name,
+        // model, last-updated) of very different weight, and centering the
+        // button against all three of them put its visual centre down around
+        // the model/updated lines instead of level with the name, the one
+        // line it actually reads as paired with. Top-aligns the button's own
+        // top edge with the name's, the same "icon keys off the title, not
+        // the whole block" alignment every other icon-beside-a-text-column
+        // pairing in this app already uses.
+        verticalAlignment = Alignment.Top,
     ) {
         Column(Modifier.weight(1f)) {
             Text(
