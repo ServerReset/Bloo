@@ -572,6 +572,29 @@ internal fun SettingsScreen(vm: AppViewModel) {
             Column {
             // Accounts (one per brand; Hyundai + Genesis can both be signed in).
             SettingsCard("Accounts", Icons.Filled.Person) {
+                // Same icon-badge + status-line header as every other card that's had
+                // this pass applied -- was straight into "Not signed in" or a wall of
+                // per-account blocks with nothing summarizing how many were connected.
+                val acctTint = if (state.accounts.isNotEmpty()) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.onSurfaceVariant
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(
+                        Modifier.size(40.dp).background(acctTint.copy(alpha = 0.15f), CircleShape),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(Icons.Filled.Person, contentDescription = null, tint = acctTint, modifier = Modifier.size(22.dp))
+                    }
+                    Spacer(Modifier.width(12.dp))
+                    Column {
+                        Text("Signed in", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                        Text(
+                            if (state.accounts.isEmpty()) "No accounts" else "${state.accounts.size} account${if (state.accounts.size == 1) "" else "s"}",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = acctTint,
+                            fontWeight = FontWeight.Medium,
+                        )
+                    }
+                }
+                Spacer(Modifier.height(14.dp))
                 if (state.accounts.isEmpty()) {
                     Text(
                         "Not signed in",
@@ -648,6 +671,31 @@ internal fun SettingsScreen(vm: AppViewModel) {
             // user knob, and hiding it behind Advanced made it easy to miss.
             if (state.aiSupported) {
                 SettingsCard("AI", Icons.Filled.AutoAwesome) {
+                    // Same icon-badge + status-line header as the rest of this pass.
+                    val aiTint = if (state.aiEnabled) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.onSurfaceVariant
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Box(
+                            Modifier.size(40.dp).background(aiTint.copy(alpha = 0.15f), CircleShape),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Icon(Icons.Filled.AutoAwesome, contentDescription = null, tint = aiTint, modifier = Modifier.size(22.dp))
+                        }
+                        Spacer(Modifier.width(12.dp))
+                        Column {
+                            Text("On-device AI", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                            Text(
+                                when {
+                                    !state.aiEnabled -> "Off"
+                                    state.aiAuto -> "On · auto-summarize"
+                                    else -> "On"
+                                },
+                                style = MaterialTheme.typography.labelMedium,
+                                color = aiTint,
+                                fontWeight = FontWeight.Medium,
+                            )
+                        }
+                    }
+                    Spacer(Modifier.height(14.dp))
                     ToggleRow("On-device AI (Gemini Nano)", state.aiEnabled) { vm.setAiEnabled(it) }
                     Text(
                         "Adds an AI summary pebble to each car and lets you ask the search " +
@@ -657,8 +705,11 @@ internal fun SettingsScreen(vm: AppViewModel) {
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                     // Advanced-only: a power-user nuance on top of the basic
-                    // AI toggle above, not something a novice needs to see.
-                    if (state.aiEnabled && advanced) {
+                    // AI toggle above, not something a novice needs to see. PopVisible,
+                    // not a bare `if` -- was snapping in/out with the toggle above with
+                    // no animation at all.
+                    PopVisible(visible = state.aiEnabled && advanced) {
+                      Column {
                         ToggleRow("Summarize automatically", state.aiAuto) { vm.setAiAuto(it) }
                         Text(
                             if (state.aiAuto) {
@@ -670,6 +721,7 @@ internal fun SettingsScreen(vm: AppViewModel) {
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
+                      }
                     }
                 }
             }
@@ -985,8 +1037,10 @@ internal fun SettingsScreen(vm: AppViewModel) {
             // Display scale
             SettingsCard("Display", Icons.Filled.Straighten) {
                 // Advanced-only: a power-user knob, unlike the Units picker
-                // below it which every user needs regardless of mode.
-                if (advanced) {
+                // below it which every user needs regardless of mode. PopVisible,
+                // not a bare `if` -- was snapping in/out with the mode switch.
+                PopVisible(visible = advanced) {
+                  Column {
                     var uiScaleDraft by remember(appearance.uiScale) { mutableFloatStateOf(appearance.uiScale) }
                     StepRow("Text & layout scale", "${(uiScaleDraft * 100).roundToInt()}%")
                     AnimatedSlider(
@@ -997,6 +1051,7 @@ internal fun SettingsScreen(vm: AppViewModel) {
                         onValueSettled = { uiScaleDraft = (it * 10).roundToInt() / 10f; vm.setUiScaleSoon(uiScaleDraft) },
                     )
                     Spacer(Modifier.height(12.dp))
+                  }
                 }
                 // SIMPLE, not advanced: this changes what is on the car screen
                 // every time you open the app, which is the test for whether a
@@ -1426,6 +1481,34 @@ internal fun SettingsScreen(vm: AppViewModel) {
 
             // Theme
             SettingsCard("Theme", Icons.Filled.Palette) {
+                // Same icon-badge + status-line header as the rest of this pass.
+                val themeTint = MaterialTheme.colorScheme.tertiary
+                val themeLabel = when (appearance.themeMode) {
+                    ThemeMode.SYSTEM -> "System"
+                    ThemeMode.SYSTEM_AMOLED -> "System +AMOLED"
+                    ThemeMode.LIGHT -> "Light"
+                    ThemeMode.DARK -> "Dark"
+                    ThemeMode.AMOLED -> "AMOLED"
+                }
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(
+                        Modifier.size(40.dp).background(themeTint.copy(alpha = 0.15f), CircleShape),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(Icons.Filled.Palette, contentDescription = null, tint = themeTint, modifier = Modifier.size(22.dp))
+                    }
+                    Spacer(Modifier.width(12.dp))
+                    Column {
+                        Text("Display mode", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                        Text(
+                            if (appearance.auroraBackground) "$themeLabel · Aurora" else themeLabel,
+                            style = MaterialTheme.typography.labelMedium,
+                            color = themeTint,
+                            fontWeight = FontWeight.Medium,
+                        )
+                    }
+                }
+                Spacer(Modifier.height(14.dp))
                 // Short segment labels; AMOLED is "pure black" for OLED screens.
                 // "+AMOLED" follows the system light/dark switch exactly like
                 // System does, but swaps in AMOLED's true-black surfaces for its
@@ -1720,14 +1803,18 @@ internal fun SettingsScreen(vm: AppViewModel) {
                     if (granted) vm.useDeviceLocationForWeather()
                     else vm.reportError("Location permission denied. Type a place instead")
                 }
-                appearance.weatherLabel?.let { label ->
+                // PopVisible, not a bare `?.let` -- was snapping in/out with zero
+                // animation whenever a place got set or cleared.
+                PopVisible(visible = appearance.weatherLabel != null) {
+                  Column {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Icon(Icons.Filled.LocationOn, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
                         Spacer(Modifier.width(6.dp))
-                        Text(label, Modifier.weight(1f), fontWeight = FontWeight.SemiBold)
+                        Text(appearance.weatherLabel.orEmpty(), Modifier.weight(1f), fontWeight = FontWeight.SemiBold)
                         MorphTextButton("Clear", onClick = { vm.clearWeatherLocation() })
                     }
                     Spacer(Modifier.height(10.dp))
+                  }
                 }
                 OutlinedTextField(
                     value = weatherQuery,
