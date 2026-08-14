@@ -1173,8 +1173,12 @@ internal fun SettingsScreen(vm: AppViewModel) {
                 // system decision this app cannot force -- Android 16+ has a
                 // real API to check the user's per-app toggle for it, though,
                 // so query it instead of guessing.
-                if (notif.charging) {
+                // PopVisible, not a bare `if` -- same consistency fix as the minute
+                // fields below: this whole troubleshooting block used to snap in/out
+                // with the charging toggle with no animation at all.
+                PopVisible(visible = notif.charging) {
                     var showTroubleshoot by remember { mutableStateOf(false) }
+                    Column {
                     // Version-independent, unlike the chip-promotion check below: this is
                     // about whether the background poll that would post/update the bar at
                     // all gets to run while the app isn't open, which matters on every
@@ -1226,21 +1230,26 @@ internal fun SettingsScreen(vm: AppViewModel) {
                     if (showTroubleshoot) {
                         LiveUpdateTroubleshootDialog(onDismiss = { showTroubleshoot = false })
                     }
+                    }
                 }
                 HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
                 Spacer(Modifier.height(10.dp))
 
                 ToggleRow("Service due alerts", notif.service) { vm.setNotifyService(it) }
                 ToggleRow("Door-left-open alerts", notif.doorOpen) { vm.setNotifyDoor(it) }
-                if (notif.doorOpen) {
+                // PopVisible, not a bare `if` -- these three minute fields used to snap in
+                // and out with zero animation, the one inconsistency left in a card whose
+                // header now springs and whose sibling cards (the update pebble, search
+                // results) all pop their own conditional rows the same way.
+                PopVisible(visible = notif.doorOpen) {
                     MinutesField(notif.doorOpenMinutes, "Door-open minutes", vm::setDoorOpenMinutes)
                 }
                 ToggleRow("Car-running alerts", notif.running) { vm.setNotifyRunning(it) }
-                if (notif.running) {
+                PopVisible(visible = notif.running) {
                     MinutesField(notif.runningMinutes, "Running minutes", vm::setRunningMinutes)
                 }
                 ToggleRow("Left-unlocked alerts", notif.unlocked) { vm.setNotifyUnlocked(it) }
-                if (notif.unlocked) {
+                PopVisible(visible = notif.unlocked) {
                     MinutesField(notif.unlockedMinutes, "Unlocked minutes", vm::setUnlockedMinutes)
                 }
                 Text(
@@ -1388,14 +1397,18 @@ internal fun SettingsScreen(vm: AppViewModel) {
                             }
                         },
                     )
-                    if (appearance.biometricLock) {
-                        Spacer(Modifier.height(6.dp))
-                        SettingsSegmentedRow(
-                            label = "Lock the app",
-                            options = LockTiming.entries.map { t -> SegmentOption(t.name, t.label, null) },
-                            selectedKey = appearance.lockTiming.name,
-                            onSelect = { key -> runCatching { vm.setLockTiming(LockTiming.valueOf(key)) } },
-                        )
+                    // PopVisible, not a bare `if` -- same consistency fix as the
+                    // Notifications card's minute fields right above this one.
+                    PopVisible(visible = appearance.biometricLock) {
+                        Column {
+                            Spacer(Modifier.height(6.dp))
+                            SettingsSegmentedRow(
+                                label = "Lock the app",
+                                options = LockTiming.entries.map { t -> SegmentOption(t.name, t.label, null) },
+                                selectedKey = appearance.lockTiming.name,
+                                onSelect = { key -> runCatching { vm.setLockTiming(LockTiming.valueOf(key)) } },
+                            )
+                        }
                     }
                 } else {
                     Text(
