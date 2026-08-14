@@ -6,6 +6,7 @@ import androidx.glance.action.Action
 import androidx.glance.appwidget.action.actionStartActivity
 import com.bloo.bluelink.MainActivity
 import com.bloo.bluelink.R
+import com.bloo.bluelink.Shortcuts
 import com.bloo.bluelink.data.VehicleSnapshot
 import com.bloo.bluelink.data.coordString
 import com.bloo.bluelink.data.formatDistance
@@ -133,5 +134,23 @@ internal fun iconFor(action: WidgetAction): Int = when (action) {
 
 // Glance's reified actionStartActivity<T>() overload isn't available here, so
 // build the Intent explicitly (the (Intent, …) overload is the stable one).
-internal fun openAction(context: Context): Action =
-    actionStartActivity(Intent(context, MainActivity::class.java))
+//
+// [vin] threads the tap through the exact same deep-link app-icon shortcuts
+// already use (Shortcuts.ACTION + EXTRA_VIN/EXTRA_CMD, parsed by
+// MainActivity.handleShortcutIntent -> AppViewModel.handleShortcut) with
+// cmd = "open", the one command that's deliberately a no-op beyond selecting
+// the car (see handleShortcut's own comment: "'open' just selects the car").
+// Without it, tapping a widget's own background/photo -- the whole-card tap
+// target added so empty space wasn't dead space -- opened the app to
+// whatever car it last happened to be showing, not the one the widget was
+// actually a picture of. Null (the EmptyState case, no car to point at)
+// falls back to a plain launch exactly as before.
+internal fun openAction(context: Context, vin: String? = null): Action {
+    val intent = Intent(context, MainActivity::class.java)
+    if (vin != null) {
+        intent.action = Shortcuts.ACTION
+        intent.putExtra(Shortcuts.EXTRA_VIN, vin)
+        intent.putExtra(Shortcuts.EXTRA_CMD, "open")
+    }
+    return actionStartActivity(intent)
+}

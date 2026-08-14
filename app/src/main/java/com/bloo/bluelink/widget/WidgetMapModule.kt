@@ -72,7 +72,7 @@ internal fun ColumnScope.MapFill(render: Render, room: Dp) {
         // and it was the one large region that did nothing.
         modifier = GlanceModifier.fillMaxWidth().defaultWeight()
             .cornerRadius(innerCorner(render.config))
-            .clickable(openAction(LocalContext.current)),
+            .clickable(openAction(LocalContext.current, render.car?.vin)),
     )
     Spacer(GlanceModifier.height(8.dp))
 }
@@ -127,6 +127,6 @@ internal fun MapModule(render: Render, room: Dp) {
         modifier = GlanceModifier.fillMaxWidth()
             .height(imageHeight)
             .cornerRadius(innerCorner(render.config))
-            .clickable(openAction(LocalContext.current)),
+            .clickable(openAction(LocalContext.current, render.car?.vin)),
     )
 }

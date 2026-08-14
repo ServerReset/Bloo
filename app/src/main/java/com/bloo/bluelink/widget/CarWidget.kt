@@ -316,7 +316,7 @@ class CarWidget : GlanceAppWidget() {
         // still take priority for their own bounds; RemoteViews resolves an
         // overlapping tap to the innermost view that registered one.
         Box(
-            modifier = GlanceModifier.fillMaxSize().cornerRadius(corner).clickable(openAction(LocalContext.current)),
+            modifier = GlanceModifier.fillMaxSize().cornerRadius(corner).clickable(openAction(LocalContext.current, car.vin)),
         ) {
             if (photo != null) {
                 Image(

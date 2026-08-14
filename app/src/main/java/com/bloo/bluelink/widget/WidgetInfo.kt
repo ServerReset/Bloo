@@ -81,7 +81,7 @@ internal fun HeaderRow(
         Scale.pillSize(LocalSize.current) + 8.dp
     } else 0.dp
     val textWidth = (availableWidth - pillReserve - 4.dp).coerceAtLeast(16.dp)
-    Row(modifier = GlanceModifier.fillMaxWidth().clickable(openAction(LocalContext.current)), verticalAlignment = Alignment.CenterVertically) {
+    Row(modifier = GlanceModifier.fillMaxWidth().clickable(openAction(LocalContext.current, car.vin)), verticalAlignment = Alignment.CenterVertically) {
         Column(modifier = GlanceModifier.defaultWeight()) {
             // singleLine: Scale.headerHeight reserves exactly one title + one subtitle
             // line, so neither may wrap -- a wrapped name would make the header 3 lines

@@ -288,7 +288,7 @@ internal fun ActionButton(
         else -> theme.accentProvider
     }
     val click = when (action.kind) {
-        WidgetAction.Kind.NAV -> openAction(LocalContext.current)
+        WidgetAction.Kind.NAV -> openAction(LocalContext.current, car.vin)
         WidgetAction.Kind.REFRESH -> actionRunCallback<WidgetRefreshAction>(
             actionParametersOf(WidgetKeys.VIN to car.vin),
         )
