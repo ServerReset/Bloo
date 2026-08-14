@@ -3155,7 +3155,6 @@ internal fun GarageScreen(state: UiState, vm: AppViewModel) {
                 }
             } else {
                 val pageCount = (count + perPage - 1) / perPage
-                val initialBlock = (currentIndex.coerceIn(0, count - 1)) / perPage
                 // One extra real "block" tacked onto the end for Settings, when the
                 // user has opted into reaching it by swiping instead of the gear
                 // button (Appearance.settingsAsPage) -- WrapPagerState.realCount is
@@ -3167,12 +3166,29 @@ internal fun GarageScreen(state: UiState, vm: AppViewModel) {
                 // Settings slot rather than a car.
                 val settingsAsPage = appearance.settingsAsPage
                 val totalBlocks = if (settingsAsPage) pageCount + 1 else pageCount
+                // Normally the car currentIndex was already parked on. The one
+                // exception is state.landOnSettingsPage (see its own doc): Settings
+                // itself just switched settingsAsPage on and asked to be followed,
+                // so this fresh mount seeds straight onto the just-created Settings
+                // slot instead of whichever car was selected before Settings was
+                // ever opened -- otherwise the user would land on a car for one
+                // frame before having to go find the page themselves.
+                val initialBlock = if (state.landOnSettingsPage && settingsAsPage) {
+                    pageCount
+                } else {
+                    (currentIndex.coerceIn(0, count - 1)) / perPage
+                }
                 // Infinite wrap-around: WrapPagerState.realCount is the BLOCK count
                 // here (ceil(count / perPage), plus the Settings slot if enabled), and
                 // the real vehicle index for a page is realBlock(page) * perPage.
                 val wrap = rememberWrapPager(totalBlocks, initialBlock)
                 val pager = wrap.pager
                 fun realBlock(virtualPage: Int) = wrap.real(virtualPage)
+                // One-shot consume: this composable only just mounted (returning
+                // from Screen.Settings unmounts and remounts GarageScreen fresh,
+                // which is what makes initialBlock above actually take effect as a
+                // seed), so the flag has done its one job the moment this runs.
+                LaunchedEffect(Unit) { vm.consumeLandOnSettingsPage() }
                 LaunchedEffect(pager, perPage) {
                     snapshotFlow { pager.settledPage }.collect { page ->
                         // Guarded: the Settings slot isn't a car block, and
@@ -7640,7 +7656,20 @@ private fun ExpandedCar(v: Vehicle, state: UiState, vm: AppViewModel, flipped: B
             visible = nameHidden,
             enter = fadeIn(),
             exit = fadeOut(),
-            modifier = Modifier.align(Alignment.TopEnd).statusBarsPadding().padding(8.dp),
+            // ExpandedCar (this wide/dual-column layout) is only ever reached
+            // through GarageScreen's expandedIdx != null branch, and that same
+            // condition is what keeps GarageScreen's own floating gear AND
+            // flip-columns buttons on screen unconditionally -- including with
+            // Appearance.settingsAsPage on, which hides the gear button
+            // everywhere else but explicitly not here (see that button's own
+            // comment). So unlike VehicleDetailContent's single-column pill
+            // (TopStart, nothing competing there), this one is GUARANTEED both
+            // buttons are present the whole time it can be visible: gear's own
+            // 12dp+48dp footprint plus flip-columns' 52dp+12dp+48dp footprint
+            // put together span the rightmost 112dp. Was a flat 8dp, which put
+            // this pill directly underneath both buttons the moment a wide
+            // screen's expanded car got scrolled.
+            modifier = Modifier.align(Alignment.TopEnd).statusBarsPadding().padding(top = 8.dp, end = 116.dp),
         ) {
             CarNamePill(v.name) { scope.launch { controlsScroll.animateScrollTo(0) } }
         }

@@ -1098,7 +1098,29 @@ internal fun SettingsScreen(vm: AppViewModel, embedded: Boolean = false) {
                 )
                 // SIMPLE, not advanced -- same test as Search above: this changes
                 // how you get to Settings every single time, not a knob set once.
-                ToggleRow("Settings as a swipeable page", appearance.settingsAsPage) { vm.setSettingsAsPage(it) }
+                //
+                // Flipping this while actually standing in Settings used to leave
+                // you exactly where you were until the NEXT time you left and came
+                // back -- turn it on from the standalone route and nothing visibly
+                // happened; turn it off from the embedded page and the pager's own
+                // correction (see Screens.kt) stranded you on whichever car the
+                // block math now resolved to. Both branches below follow Settings
+                // to its new presentation immediately instead, so the switch reads
+                // as "Settings just changed shape" rather than "go find it again":
+                // turning on from the standalone route closes it landing straight
+                // on the pager's new Settings slot (closeSettings' own
+                // landOnSettingsPage, consumed once by GarageScreen); turning off
+                // from the embedded page opens the standalone route in its place,
+                // back arrow included, before the pager gets a chance to bounce
+                // you to a car instead.
+                ToggleRow("Settings as a swipeable page", appearance.settingsAsPage) { turningOn ->
+                    vm.setSettingsAsPage(turningOn)
+                    if (turningOn && !embedded) {
+                        vm.closeSettings(landOnSettingsPage = true)
+                    } else if (!turningOn && embedded) {
+                        vm.openSettings()
+                    }
+                }
                 Text(
                     "Reach Settings by swiping past your last car instead of the gear " +
                         "button -- one continuous pager, with Settings as its own page at " +

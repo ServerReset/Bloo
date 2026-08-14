@@ -203,6 +203,14 @@ data class UiState(
     val aiSearchReply: String? = null,
     /** First-run coach mark on the Settings screen (points at the back arrow). */
     val showSettingsCoach: Boolean = false,
+    /** One-shot: set by [AppViewModel.closeSettings] when Settings itself just
+     *  switched INTO page mode and asked to be followed there, so flipping
+     *  Appearance.settingsAsPage from inside Settings reads as one continuous
+     *  move (still looking at Settings, just presented differently) instead of
+     *  "close Settings, land on whichever car was last selected, then go find
+     *  the page yourself." Consumed once by GarageScreen's collapsed pager
+     *  (see its own LaunchedEffect) via [AppViewModel.consumeLandOnSettingsPage]. */
+    val landOnSettingsPage: Boolean = false,
     /** Gentle hint shown on the garage right after onboarding, nudging the user
      *  toward Settings to fine-tune each car. */
     val showSettingsHint: Boolean = false,
@@ -3209,15 +3217,28 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     /** Navigate to the Settings screen (the car carousel keeps its state
      *  behind it, restored as-is by [closeSettings]). */
     fun openSettings() = _state.update { it.copy(screen = Screen.Settings) }
-    fun closeSettings() {
+    /** [landOnSettingsPage] threads through to [UiState.landOnSettingsPage] --
+     *  see its own doc. Only ever passed true from SettingsScreen's own
+     *  settingsAsPage toggle, right after switching it on while standing on
+     *  the standalone route; every other caller (the back arrow, the
+     *  BackHandler) leaves it at the default false, an ordinary return to
+     *  whichever car was showing before. */
+    fun closeSettings(landOnSettingsPage: Boolean = false) {
         // Always return to the card/grid view (collapse any expanded car).
         _state.update {
             it.copy(
                 screen = if (it.vehicles.isEmpty()) Screen.Empty else Screen.Garage,
                 expandedIndex = null,
                 showSettingsCoach = false,
+                landOnSettingsPage = landOnSettingsPage,
             )
         }
+    }
+    /** Clears the one-shot [UiState.landOnSettingsPage] flag once GarageScreen's
+     *  collapsed pager has used it to seed its initial page -- guarded so a
+     *  redundant call (it was already false) doesn't emit a no-op UiState update. */
+    fun consumeLandOnSettingsPage() {
+        if (_state.value.landOnSettingsPage) _state.update { it.copy(landOnSettingsPage = false) }
     }
 
     // Appearance/preference setters (setThemeMode through setColorPalette,
