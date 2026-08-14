@@ -2698,7 +2698,16 @@ internal fun SearchLayer(
         // and came back -- the wobble that made growing into the bar look
         // loose rather than deliberate. Width and height still share their
         // spring, so the shape stays coherent while it changes.
-        val sizeSpec = spring<Dp>(dampingRatio = 0.62f, stiffness = Spring.StiffnessMediumLow)
+        //
+        // PebbleBounceDamping/PebbleBounceStiffness, not this element's own
+        // hand-tuned numbers -- this used to carry its own separately-picked
+        // damping ratios (0.62 here, 0.72 below), close to but not actually the
+        // same values the pebble bounce settled on, which is exactly what "not
+        // standard across every surface" was pointing at: two controls that both
+        // bounce but by measurably different amounts read as two different
+        // design systems, not one. Reusing the literal shared tokens is what
+        // makes this ACTUALLY the same spring, not just a similar-looking one.
+        val sizeSpec = spring<Dp>(dampingRatio = PebbleBounceDamping, stiffness = PebbleBounceStiffness)
         // A spring is right for the morph and WRONG for a drag: routing the
         // finger's position through one meant the bubble trailed behind the
         // touch for the whole gesture and then coasted past it on release --
@@ -2706,19 +2715,14 @@ internal fun SearchLayer(
         // While the finger is down the position snaps (1:1 with touch); the
         // moment it lifts, the spring is back to carry the settle.
         val posSpec = if (dragging) snap<Dp>() else {
-            // Bouncier than the size spring, and deliberately so: this is what
-            // plays when the bubble snaps to an edge on release, and a snap
-            // with no overshoot reads as the value being SET, not as the
-            // bubble landing somewhere. A bit of give past the edge and back
-            // is what makes it read as physical contact -- it bounced off
-            // the edge -- rather than a UI correcting a number.
-            //
-            // DampingRatioMediumBouncy (0.5) was more of that "give" than intended,
-            // though -- reported alongside SearchPill's own two springs as "overly
-            // bouncy" overall. 0.72 keeps the edge-contact read (still a real,
-            // visible overshoot) without it being the loudest thing on screen every
-            // time the bubble is dropped.
-            spring<Dp>(dampingRatio = 0.72f, stiffness = Spring.StiffnessMedium)
+            // Bouncier than a critically-damped snap, and deliberately so: this is
+            // what plays when the bubble snaps to an edge on release, and a snap
+            // with no overshoot reads as the value being SET, not as the bubble
+            // landing somewhere. A bit of give past the edge and back is what
+            // makes it read as physical contact -- it bounced off the edge --
+            // rather than a UI correcting a number. Same shared bounce spring as
+            // `sizeSpec` above, for the same "one system" reason.
+            spring<Dp>(dampingRatio = PebbleBounceDamping, stiffness = PebbleBounceStiffness)
         }
         // key(compact) so entering or leaving flip mode RESTARTS these
         // animations at their new target rather than animating to it. The cover
@@ -2733,11 +2737,15 @@ internal fun SearchLayer(
         val x = key(compact) { animateDpAsState(targetX, posSpec, label = "searchX").value }
         val y = key(compact) { animateDpAsState(targetY, posSpec, label = "searchY").value }
 
-        // Dismiss scrim. Below the pill in this Box, so it never eats its taps.
+        // Dismiss scrim. Below the pill in this Box, so it never eats its taps. Same
+        // effects spec collapseEnter/collapseExit use for every pebble's own fade,
+        // not its own hand-picked tween durations (180ms/140ms) -- one fade curve
+        // for "something is fading" across the whole app, not a slightly different
+        // one wherever a fade happened to get added separately.
         AnimatedVisibility(
             visible = open,
-            enter = fadeIn(tween(180)),
-            exit = fadeOut(tween(140)),
+            enter = fadeIn(MaterialTheme.motionScheme.defaultEffectsSpec<Float>()),
+            exit = fadeOut(MaterialTheme.motionScheme.defaultEffectsSpec<Float>()),
             modifier = Modifier.matchParentSize(),
         ) {
             Box(
@@ -2941,17 +2949,21 @@ private fun SearchPill(
     // control) read as noticeably more bounce than either spring alone would suggest --
     // reported as "overly bouncy," and this is the same lesson the pebble bounce work
     // already paid for: 0.5 reads as a lot on a real device, repeatedly, not occasionally.
-    // Entrance keeps some spring (it plays once, arriving) but dialed back; press feedback
-    // drops nearly all of it -- a frequent, repeated micro-interaction is exactly where
-    // extra bounce stops feeling playful and starts feeling like noise.
+    // Entrance keeps some spring (it plays once, arriving) but now on the literal shared
+    // PebbleBounceDamping/Stiffness tokens rather than its own separately-tuned numbers --
+    // an "arrival" pop is the same kind of event a pebble opening is, so it gets the exact
+    // same spring, not a lookalike. Press feedback drops nearly all bounce (PebbleCloseDamping,
+    // i.e. no overshoot) and stays on its own fast StiffnessHigh -- a frequent, repeated
+    // micro-interaction is exactly where extra bounce stops feeling playful and starts
+    // feeling like noise, and it no longer compounds with the entrance spring above it.
     val entrance by animateFloatAsState(
         targetValue = if (appeared) 1f else 0.55f,
-        animationSpec = spring(dampingRatio = 0.72f, stiffness = Spring.StiffnessMediumLow),
+        animationSpec = spring(dampingRatio = PebbleBounceDamping, stiffness = PebbleBounceStiffness),
         label = "searchEntrance",
     )
     val pressScale by animateFloatAsState(
         targetValue = if (pressed) 0.94f else 1f,
-        animationSpec = spring(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = Spring.StiffnessHigh),
+        animationSpec = spring(dampingRatio = PebbleCloseDamping, stiffness = Spring.StiffnessHigh),
         label = "searchPress",
     )
     // No ambient glow. This used to carry a travelling-hotspot bloom that
@@ -3170,21 +3182,28 @@ private fun SearchSuggestions(state: UiState, compact: Boolean = false, onPick: 
         color = MaterialTheme.colorScheme.onSurface,
     )
     FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        examples.forEach { example ->
-            Surface(
-                onClick = { onPick(example) },
-                shape = RoundedCornerShape(50),
-                color = MaterialTheme.colorScheme.secondaryContainer,
-                contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
-                modifier = Modifier.dropShadow(RoundedCornerShape(50), blurRadius = 8.dp, offsetY = 3.dp),
-            ) {
-                Box {
-                    Text(
-                        example,
-                        Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
-                        style = MaterialTheme.typography.labelLarge,
-                        fontWeight = FontWeight.SemiBold,
-                    )
+        // Same staggered pop as the search RESULT cards (staggeredResultVisible), reused
+        // as-is: this list is just as much a "search UI" element as the results below it,
+        // and giving one a cascade while the other snaps in flat is exactly the kind of
+        // per-surface inconsistency that was reported.
+        val examplesKey = examples.joinToString("|")
+        examples.forEachIndexed { i, example ->
+            PopVisible(visible = staggeredResultVisible(examplesKey, i)) {
+                Surface(
+                    onClick = { onPick(example) },
+                    shape = RoundedCornerShape(50),
+                    color = MaterialTheme.colorScheme.secondaryContainer,
+                    contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                    modifier = Modifier.dropShadow(RoundedCornerShape(50), blurRadius = 8.dp, offsetY = 3.dp),
+                ) {
+                    Box {
+                        Text(
+                            example,
+                            Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
+                            style = MaterialTheme.typography.labelLarge,
+                            fontWeight = FontWeight.SemiBold,
+                        )
+                    }
                 }
             }
         }
