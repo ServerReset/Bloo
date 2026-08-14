@@ -3605,10 +3605,28 @@ internal fun GarageScreen(state: UiState, vm: AppViewModel) {
                                     Modifier
                                         .heightIn(min = 48.dp)
                                         .animateContentSize(spring(dampingRatio = 0.5f, stiffness = Spring.StiffnessMediumLow))
-                                        .padding(horizontal = 16.dp, vertical = 9.dp),
+                                        .padding(start = 8.dp, end = 16.dp, top = 9.dp, bottom = 9.dp),
                                     verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
                                 ) {
+                                    // Its own crossfade, not tied to the name's -- a
+                                    // slide reads right for text (it visibly moves
+                                    // aside), but sliding a circular photo the same
+                                    // way drags it half out of its own clip on every
+                                    // swipe. A plain fade keeps the avatar reading as
+                                    // "the picture just changed" instead of "part of
+                                    // it flew off".
+                                    AnimatedContent(
+                                        targetState = currentIndex,
+                                        transitionSpec = { fadeIn(tween(200)) togetherWith fadeOut(tween(120)) },
+                                        label = "carNamePillPhoto",
+                                    ) { idx ->
+                                        PillAvatar(
+                                            photo = vehicles.getOrNull(idx)?.let { state.imageUrls[it.vin] },
+                                            icon = Icons.Filled.DirectionsCar,
+                                            tint = MaterialTheme.colorScheme.primary,
+                                        )
+                                    }
                                     AnimatedContent(
                                         targetState = currentIndex,
                                         transitionSpec = {
@@ -7724,7 +7742,7 @@ private fun VehicleDetailContent(
                 exit = fadeOut(),
                 modifier = Modifier.align(Alignment.TopStart).statusBarsPadding().padding(8.dp),
             ) {
-                CarNamePill(v.name) { scope.launch { scroll.animateScrollTo(0) } }
+                CarNamePill(v.name, state.imageUrls[v.vin]) { scope.launch { scroll.animateScrollTo(0) } }
             }
         }
     }
@@ -7842,7 +7860,7 @@ private fun ExpandedCar(v: Vehicle, state: UiState, vm: AppViewModel, flipped: B
             // screen's expanded car got scrolled.
             modifier = Modifier.align(Alignment.TopEnd).statusBarsPadding().padding(top = 8.dp, end = 116.dp),
         ) {
-            CarNamePill(v.name) { scope.launch { controlsScroll.animateScrollTo(0) } }
+            CarNamePill(v.name, state.imageUrls[v.vin]) { scope.launch { controlsScroll.animateScrollTo(0) } }
         }
         }
     }
@@ -7850,26 +7868,62 @@ private fun ExpandedCar(v: Vehicle, state: UiState, vm: AppViewModel, flipped: B
 }
 
 /**
- * The floating name pill shown at the top of a scrolled-past hero: a rounded glass
- * [Surface] carrying the car's name that scrolls the view back to the top when tapped.
- * The compact and wide hero layouts both reveal one (differing only in which corner it
- * aligns to and which scroll state resets), so the chrome -- the glass fill, ambient
- * ring, drop shadow and frosted rim, and the 48dp tap target -- lives here once.
+ * Small circular avatar for a floating identity pill -- a car's own photo, or
+ * a themed icon in a tonal circle when there isn't one (a car with no photo
+ * set, or a non-car pill like Settings' own). This is the "picture" half of
+ * the floating name pill: previously every one of these pills was name text
+ * alone, with nothing to glance at before reading it, so a fast swipe
+ * between cars (or between a car and Settings) read as the same pill
+ * relabelling itself rather than a genuinely different thing sliding into
+ * view. `internal`, not `private`, so SettingsScreen's own title pill can use
+ * the identical shape/fallback language for its "picture" slot.
  */
 @Composable
-private fun CarNamePill(name: String, onClick: () -> Unit) {
+internal fun PillAvatar(photo: String?, icon: ImageVector, tint: Color, size: Dp = 28.dp) {
+    Box(Modifier.size(size).clip(CircleShape), contentAlignment = Alignment.Center) {
+        if (!photo.isNullOrBlank()) {
+            AsyncImage(
+                model = rememberPhotoModel(photo),
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize(),
+            )
+        } else {
+            Box(Modifier.fillMaxSize().background(tint.copy(alpha = 0.22f)), contentAlignment = Alignment.Center) {
+                Icon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(size * 0.58f))
+            }
+        }
+    }
+}
+
+/**
+ * The floating name pill shown at the top of a scrolled-past hero: a rounded glass
+ * [Surface] carrying the car's own [PillAvatar] and name, that scrolls the view back
+ * to the top when tapped. The compact and wide hero layouts both reveal one (differing
+ * only in which corner it aligns to and which scroll state resets), so the chrome --
+ * the glass fill, ambient ring, drop shadow and frosted rim, and the 48dp tap target --
+ * lives here once.
+ */
+@Composable
+private fun CarNamePill(name: String, photo: String?, onClick: () -> Unit) {
     // Every caller of this shared pill (the collapsed single-car header's
     // hoisted pill, ExpandedCar's own) was missing the tap haptic every
     // other tappable pill/chip in the app already has.
     val haptics = LocalHaptics.current
+    val pillShape = RoundedCornerShape(50)
     Surface(
         onClick = { haptics?.click(); onClick() },
-        shape = RoundedCornerShape(50),
+        shape = pillShape,
         color = MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = glassContainerAlpha()),
         contentColor = MaterialTheme.colorScheme.onSurface,
-        modifier = Modifier.ambientRing(RoundedCornerShape(50)).dropShadow(RoundedCornerShape(50)).frostedRim(RoundedCornerShape(50)),
+        modifier = Modifier.ambientRing(pillShape).dropShadow(pillShape).frostedRim(pillShape),
     ) {
-        Box(Modifier.height(48.dp).padding(horizontal = 14.dp), contentAlignment = Alignment.Center) {
+        Row(
+            Modifier.height(48.dp).padding(start = 6.dp, end = 14.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            PillAvatar(photo, Icons.Filled.DirectionsCar, MaterialTheme.colorScheme.primary)
             Text(name, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold)
         }
     }

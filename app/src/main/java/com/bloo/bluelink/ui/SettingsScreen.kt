@@ -2003,17 +2003,32 @@ internal fun SettingsScreen(vm: AppViewModel, embedded: Boolean = false) {
             // returning FROM (swiping to a car does that), and "Back to the app"
             // literally isn't true here: this already is the app's main screen.
             if (!embedded) FloatingIcon(Icons.Filled.ArrowBack, "Back to the app", { vm.closeSettings() })
+            // Same shape, chrome and PillAvatar "picture" slot as the floating
+            // car-name pill (Screens.kt) -- was name text alone, the one
+            // floating identity pill in the app that didn't carry a picture,
+            // which read as a plainer, different kind of object next to the
+            // pill you land on it FROM when swiping in from a car. A gear
+            // glyph in the same tonal circle a car's own photo sits in gives
+            // Settings the identical "picture + name" shape, so the pill
+            // itself doesn't change type crossing between the two, only what
+            // it says.
+            val settingsPillHaptics = LocalHaptics.current
+            val settingsPillShape = RoundedCornerShape(50)
             Surface(
-                onClick = { settingsScope.launch { settingsGridState.animateScrollToItem(0) } },
-                shape = RoundedCornerShape(50),
+                onClick = { settingsPillHaptics?.click(); settingsScope.launch { settingsGridState.animateScrollToItem(0) } },
+                shape = settingsPillShape,
                 color = MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = glassContainerAlpha()),
                 contentColor = MaterialTheme.colorScheme.onSurface,
-                modifier = Modifier.ambientRing(RoundedCornerShape(50)).dropShadow(RoundedCornerShape(50)).frostedRim(RoundedCornerShape(50)),
+                modifier = Modifier.ambientRing(settingsPillShape).dropShadow(settingsPillShape).frostedRim(settingsPillShape),
             ) {
-                Box {
+                Row(
+                    Modifier.height(48.dp).padding(start = 6.dp, end = 16.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    PillAvatar(photo = null, icon = Icons.Filled.Settings, tint = MaterialTheme.colorScheme.tertiary)
                     Text(
                         "Settings",
-                        Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.SemiBold,
                     )
