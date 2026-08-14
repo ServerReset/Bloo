@@ -667,15 +667,24 @@ fun BlooApp(vm: AppViewModel) {
         val cover = isCompactCoverScreen()
         val notifPrefs by vm.notifications.collectAsState()
         // On the garage (and the cover) it is the user's switch. In Settings it
-        // is always there -- that is how you find a setting.
-        if (searchable && !state.locked && (appearance.showSearch || target == Screen.Settings)) {
+        // is always there -- that is how you find a setting. `|| state.onSettingsPageSlot`
+        // on both lines below extends that same rule to Settings-as-an-embedded-page
+        // (Appearance.settingsAsPage): without it, reaching Settings by swiping instead of
+        // the gear button fell back to the ordinary garage-screen showSearch preference
+        // (search could disappear entirely there for anyone with that off) and the search
+        // element itself stayed shaped like a garage "bubble" instead of morphing into the
+        // settings "pill" the moment the standalone route wasn't what put you there --
+        // exactly the kind of un-seamless style transition between the two ways of
+        // reaching Settings this exists to prevent.
+        val effectivelyInSettings = target == Screen.Settings || state.onSettingsPageSlot
+        if (searchable && !state.locked && (appearance.showSearch || effectivelyInSettings)) {
             Box(Modifier.fillMaxSize().padding(padding)) {
                 SearchLayer(
                     vm = vm,
                     state = state,
                     appearance = appearance,
                     notif = notifPrefs,
-                    onSettings = target == Screen.Settings && !cover,
+                    onSettings = effectivelyInSettings && !cover,
                     compact = cover,
                 )
             }
@@ -3251,8 +3260,21 @@ internal fun GarageScreen(state: UiState, vm: AppViewModel) {
                         // lands where you left it instead of snapping to car 0.
                         val block = realBlock(page)
                         if (block < pageCount) vm.selectIndex((block * perPage).coerceIn(0, count - 1))
+                        // See UiState.onSettingsPageSlot's own doc -- this is what
+                        // lets SearchLayer's floating bubble/pill morph track the
+                        // embedded Settings page the same way it already tracks
+                        // the standalone route, instead of staying a garage
+                        // "bubble" the whole time it's on screen.
+                        vm.setOnSettingsPageSlot(settingsAsPage && block == pageCount)
                     }
                 }
+                // Resets the flag above the moment this pager itself leaves
+                // composition (navigating away from the garage entirely) --
+                // without it, closing Settings-as-embedded by navigating to some
+                // OTHER screen (not a car, not standalone Settings) could leave
+                // a stale `true` behind with nothing left to correct it, since
+                // the collect{} above stops running once this composable is gone.
+                DisposableEffect(Unit) { onDispose { vm.setOnSettingsPageSlot(false) } }
                 // The above only pushes the pager's own settles into
                 // currentIndex, never the other direction -- so an
                 // external change (a widget/shortcut tap selecting a specific

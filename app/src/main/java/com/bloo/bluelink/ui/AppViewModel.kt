@@ -211,6 +211,18 @@ data class UiState(
      *  the page yourself." Consumed once by GarageScreen's collapsed pager
      *  (see its own LaunchedEffect) via [AppViewModel.consumeLandOnSettingsPage]. */
     val landOnSettingsPage: Boolean = false,
+    /** Whether the garage's collapsed pager is currently settled on its
+     *  Settings slot (Appearance.settingsAsPage) -- kept in sync by
+     *  GarageScreen's own pager-settle effect. AppRoot ORs this into the same
+     *  "are we looking at Settings" signal `screen == Screen.Settings` already
+     *  drives, so SearchLayer's floating bubble/pill morph reflects reality
+     *  while the embedded page is showing too, not just the standalone route.
+     *  Without it the search element stayed a garage "bubble" the whole time
+     *  the embedded Settings page was on screen, then visibly snapped to a
+     *  "pill" only once you swiped back off it and the flag caught up on
+     *  something else entirely -- exactly the kind of un-seamless style
+     *  transition this exists to prevent. */
+    val onSettingsPageSlot: Boolean = false,
     /** Gentle hint shown on the garage right after onboarding, nudging the user
      *  toward Settings to fine-tune each car. */
     val showSettingsHint: Boolean = false,
@@ -3239,6 +3251,14 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
      *  redundant call (it was already false) doesn't emit a no-op UiState update. */
     fun consumeLandOnSettingsPage() {
         if (_state.value.landOnSettingsPage) _state.update { it.copy(landOnSettingsPage = false) }
+    }
+    /** Kept in sync by GarageScreen's own pager-settle effect -- see
+     *  [UiState.onSettingsPageSlot]'s own doc. Guarded the same way, so
+     *  settling on the same kind of page repeatedly (two cars in a row, or
+     *  two settles on the Settings slot) doesn't emit a redundant UiState
+     *  update every time. */
+    fun setOnSettingsPageSlot(value: Boolean) {
+        if (_state.value.onSettingsPageSlot != value) _state.update { it.copy(onSettingsPageSlot = value) }
     }
 
     // Appearance/preference setters (setThemeMode through setColorPalette,
