@@ -305,10 +305,8 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalConfiguration
-import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
-import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
@@ -2756,22 +2754,30 @@ internal fun SearchLayer(
     // True only between finger-down and finger-up on the bubble. The position
     // animation is BYPASSED while it is true -- see the spec choice below.
     var dragging by remember { mutableStateOf(false) }
-    val haptics = LocalHapticFeedback.current
+    // The app's own tuned vocabulary (Haptics.kt), not the generic platform
+    // LocalHapticFeedback this used to reach for -- search is one of the most
+    // prominent, most-animated surfaces in the app (it morphs shape, position AND
+    // opens a whole panel) and was the one major interaction still running on a
+    // borrowed system-default feel instead of the app's own composed effects
+    // everything else (pebbles, toggles, buttons) uses.
+    val haptics = LocalHaptics.current
 
     BackHandler(enabled = open) { query = ""; focused = false }
-    // A tick when it opens and when it closes. The morph is the visual half of
-    // a state change the user just caused; the tick is the half they feel, and
-    // it lands on the frame the shape starts moving rather than when it
-    // arrives, so the gesture reads as having been received immediately.
+    // A click when it opens, a tick when it closes -- the same asymmetry
+    // PebbleShell's own header tap uses (expand is the weightier confirm; collapse
+    // is the lighter step), so search reads as one more instance of the app's
+    // single expand/collapse feel rather than its own separate gesture language.
+    // The morph is the visual half of a state change the user just caused; the
+    // haptic is the half they feel, and it lands on the frame the shape starts
+    // moving rather than when it arrives, so the gesture reads as having been
+    // received immediately.
     // Armed only after the first composition: a LaunchedEffect keyed on a
     // boolean also runs when that boolean is simply born false, so without
     // this the app buzzes once on launch, for nothing happening.
     var hapticArmed by remember { mutableStateOf(false) }
     LaunchedEffect(open) {
         if (hapticArmed) {
-            haptics.performHapticFeedback(
-                if (open) HapticFeedbackType.LongPress else HapticFeedbackType.TextHandleMove,
-            )
+            if (open) haptics?.click() else haptics?.tick()
         }
         hapticArmed = true
     }
@@ -3047,7 +3053,11 @@ internal fun SearchLayer(
                     }
                 }
                 dragging = false
-                haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                // click(), not the generic platform feedback this used to fire --
+                // matches the edge-snap spring's own "bounced off the edge" physical
+                // read (see posSpec's doc above) with a real confirm-weight landing
+                // instead of a borrowed system default.
+                haptics?.click()
             },
             modifier = Modifier.align(Alignment.TopStart).offset(x = x, y = y),
         )
@@ -3312,6 +3322,9 @@ private fun SearchPill(
  */
 @Composable
 private fun SearchSuggestions(state: UiState, compact: Boolean = false, onPick: (String) -> Unit) {
+    // Plain Surface chips, not MorphButton -- so unlike most taps in this app they
+    // don't get a click() automatically and needed it wired in by hand.
+    val haptics = LocalHaptics.current
     val carName = state.vehicles.firstOrNull()?.name
     // Short forms when the room is short -- on a cover screen with the keyboard
     // up, "odometer for Ioniq 5" wraps to two lines and pushes the next chip
@@ -3354,7 +3367,7 @@ private fun SearchSuggestions(state: UiState, compact: Boolean = false, onPick: 
         examples.forEachIndexed { i, example ->
             PopVisible(visible = staggeredResultVisible(examplesKey, i)) {
                 Surface(
-                    onClick = { onPick(example) },
+                    onClick = { haptics?.click(); onPick(example) },
                     shape = RoundedCornerShape(50),
                     color = MaterialTheme.colorScheme.secondaryContainer,
                     contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
