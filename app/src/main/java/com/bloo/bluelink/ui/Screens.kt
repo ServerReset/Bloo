@@ -2561,6 +2561,7 @@ internal fun LockOverlay(vm: AppViewModel) {
     LaunchedEffect(Unit) { authenticate() }
 
     val noRipple = remember { MutableInteractionSource() }
+    val haptics = LocalHaptics.current
     Box(
         Modifier
             .fillMaxSize()
@@ -2570,7 +2571,7 @@ internal fun LockOverlay(vm: AppViewModel) {
     ) {
         // Floating back arrow -> login.
         Surface(
-            onClick = { vm.lockToLogin() },
+            onClick = { haptics?.click(); vm.lockToLogin() },
             shape = CircleShape,
             color = Color.White.copy(alpha = 0.16f),
             contentColor = Color.White,
@@ -7849,8 +7850,12 @@ private fun ExpandedCar(v: Vehicle, state: UiState, vm: AppViewModel, flipped: B
  */
 @Composable
 private fun CarNamePill(name: String, onClick: () -> Unit) {
+    // Every caller of this shared pill (the collapsed single-car header's
+    // hoisted pill, ExpandedCar's own) was missing the tap haptic every
+    // other tappable pill/chip in the app already has.
+    val haptics = LocalHaptics.current
     Surface(
-        onClick = onClick,
+        onClick = { haptics?.click(); onClick() },
         shape = RoundedCornerShape(50),
         color = MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = glassContainerAlpha()),
         contentColor = MaterialTheme.colorScheme.onSurface,
