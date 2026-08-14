@@ -11468,49 +11468,66 @@ private fun LocationPebble(v: Vehicle, state: UiState, vm: AppViewModel, dragHan
         ) {
             Text("Tap Locate to query the car's current position.")
         }
-        location?.let { loc ->
-            // COVER SCREEN: lead with the place-name hero (the cover drops the header
-            // where the place summary otherwise shows), and shrink the map so hero +
-            // map + coords + weather + button fit without overflowing the ~1-inch tile.
-            if (coverGlance) {
-                // The subline used to always be the raw coordinate string, even
-                // once `place` had resolved into the headline right next to it --
-                // showing an address and its own coordinates in the same glance.
-                // Only fall back to coordinates here while nothing better exists
-                // yet; once an address resolves, it's the only thing shown.
-                CoverHero(
-                    icon = Icons.Filled.LocationOn,
-                    value = place ?: "Located",
-                    subline = if (place == null) "Resolving address…" else null,
-                )
-            }
-            CarMap(
-                loc,
-                Modifier
-                    .fillMaxWidth()
-                    .height(if (coverGlance) 130.dp else 220.dp)
-                    .clip(RoundedCornerShape(18.dp)),
-            )
-            // Same reasoning as the cover hero above: a resolved address is
-            // already the pebble's header/summary, so a permanent raw-coordinate
-            // row here was redundant with it every single time -- exactly what
-            // "should be an address, not coordinates" was pointing at. Only shown
-            // as a fallback while geocoding hasn't (yet, or ever) resolved a name.
-            if (!coverGlance && place == null) StatusRow("Location", loc.coordString())
-            // Weather where the car is parked. Fetched lazily once we have a fix.
-            LaunchedEffect(loc.latitude, loc.longitude) { vm.loadCarWeather(v) }
-            state.carWeather[v.vin]?.let { w ->
-                WeatherStripe(w, fahrenheit, place ?: "At the car")
-            }
-            CommandButton("Open in maps", Icons.Filled.Map, Modifier.fillMaxWidth(), true) {
-                val uri = Uri.parse(
-                    "geo:${loc.latitude},${loc.longitude}" +
-                        "?q=${loc.latitude},${loc.longitude}(My car)"
-                )
-                runCatching {
-                    context.startActivity(
-                        Intent(Intent.ACTION_VIEW, uri).apply { addFlags(Intent.FLAG_ACTIVITY_NEW_TASK) },
+        // Mirror of the "not located yet" AnimatedVisibility above -- same
+        // pebble, same boolean flip, only the empty side had the treatment.
+        AnimatedVisibility(
+            visible = location != null,
+            enter = collapseEnter(Alignment.Bottom),
+            exit = collapseExit(Alignment.Bottom),
+        ) {
+            val loc = location
+            if (loc != null) {
+                Column {
+                // COVER SCREEN: lead with the place-name hero (the cover drops the header
+                // where the place summary otherwise shows), and shrink the map so hero +
+                // map + coords + weather + button fit without overflowing the ~1-inch tile.
+                if (coverGlance) {
+                    // The subline used to always be the raw coordinate string, even
+                    // once `place` had resolved into the headline right next to it --
+                    // showing an address and its own coordinates in the same glance.
+                    // Only fall back to coordinates here while nothing better exists
+                    // yet; once an address resolves, it's the only thing shown.
+                    CoverHero(
+                        icon = Icons.Filled.LocationOn,
+                        value = place ?: "Located",
+                        subline = if (place == null) "Resolving address…" else null,
                     )
+                }
+                CarMap(
+                    loc,
+                    Modifier
+                        .fillMaxWidth()
+                        .height(if (coverGlance) 130.dp else 220.dp)
+                        .clip(RoundedCornerShape(18.dp)),
+                )
+                // Same reasoning as the cover hero above: a resolved address is
+                // already the pebble's header/summary, so a permanent raw-coordinate
+                // row here was redundant with it every single time -- exactly what
+                // "should be an address, not coordinates" was pointing at. Only shown
+                // as a fallback while geocoding hasn't (yet, or ever) resolved a name.
+                if (!coverGlance && place == null) StatusRow("Location", loc.coordString())
+                // Weather where the car is parked. Fetched lazily once we have a fix.
+                LaunchedEffect(loc.latitude, loc.longitude) { vm.loadCarWeather(v) }
+                // Its own PopVisible: weather can arrive AFTER this pebble is already
+                // open (it's a separate fetch triggered above), so this row pops in
+                // live rather than only ever being present from the first frame --
+                // same idiom the Climate pebble's smart-climate section uses.
+                val weather = state.carWeather[v.vin]
+                PopVisible(visible = weather != null) {
+                    val w = weather
+                    if (w != null) WeatherStripe(w, fahrenheit, place ?: "At the car")
+                }
+                CommandButton("Open in maps", Icons.Filled.Map, Modifier.fillMaxWidth(), true) {
+                    val uri = Uri.parse(
+                        "geo:${loc.latitude},${loc.longitude}" +
+                            "?q=${loc.latitude},${loc.longitude}(My car)"
+                    )
+                    runCatching {
+                        context.startActivity(
+                            Intent(Intent.ACTION_VIEW, uri).apply { addFlags(Intent.FLAG_ACTIVITY_NEW_TASK) },
+                        )
+                    }
+                }
                 }
             }
         }
