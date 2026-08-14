@@ -26,11 +26,19 @@ import androidx.compose.ui.unit.dp
 import kotlin.math.PI
 import kotlin.math.sin
 
+/** Numbers that trigger [WiggleText]'s travelling-wave bounce -- see that
+ *  function's own doc for why the list stays this short. */
+private val WIGGLE_NUMBERS = listOf("67", "42")
+
+/** Trailing unit characters [WiggleText] tolerates after a wiggle number
+ *  ("67°", "67F", "42mi" -- degrees, and the one-letter temperature units). */
+private val UNIT_SUFFIXES = charArrayOf('F', 'C', '°')
+
 /**
- * Renders [text] normally — but when the displayed number is exactly 67, the
- * digits bounce up and down in a travelling wave. Callers must resolve
- * [Color.Unspecified] and merge fontWeight into [style] before calling, so this
- * function always receives a fully-specified style.
+ * Renders [text] normally — but when the displayed number is one of
+ * [WIGGLE_NUMBERS], the digits bounce up and down in a travelling wave.
+ * Callers must resolve [Color.Unspecified] and merge fontWeight into [style]
+ * before calling, so this function always receives a fully-specified style.
  *
  * [reduceMotion] has no default, deliberately — see [AnimatedValue], where the
  * default this used to have cost three call sites.
@@ -42,15 +50,22 @@ fun WiggleText(
     maxLines: Int = 1,
     reduceMotion: Boolean,
 ) {
-    // Fires only when the trimmed text is exactly "67", optionally followed by a
-    // single trailing unit character ("67", "67°", "67F", "67C"). Matching the
-    // whole string this way -- rather than filtering digits out and parsing what's
-    // left -- means multi-number strings like "6-7", "6 7" or "1670" never collapse
-    // to "67" and falsely trigger the wave.
+    // Fires only when the trimmed text is exactly one of WIGGLE_NUMBERS, optionally
+    // followed by a single trailing unit character ("67", "67°", "67F", "42mi").
+    // Matching the whole string this way -- rather than filtering digits out and
+    // parsing what's left -- means multi-number strings like "6-7", "6 7" or "1670"
+    // never collapse to "67" and falsely trigger the wave.
+    //
+    // 42 joined 67 for the same reason 67 was here alone: a number that means
+    // something to whoever's holding the phone, waiting for a bounce that has
+    // nothing to do with the car underneath it. Kept short and universal on
+    // purpose -- this isn't the place for an ever-growing list of in-jokes, just
+    // the rare few that are genuinely widely recognized.
     val trimmed = text.trim()
-    val isSixSeven = trimmed == "67" ||
-        (trimmed.length == 3 && trimmed.startsWith("67") && trimmed.last() in charArrayOf('F', 'C', '°'))
-    if (!isSixSeven || reduceMotion) {
+    val wiggles = WIGGLE_NUMBERS.any { n ->
+        trimmed == n || (trimmed.length == n.length + 1 && trimmed.startsWith(n) && trimmed.last() in UNIT_SUFFIXES)
+    }
+    if (!wiggles || reduceMotion) {
         // BasicText defaults to TextOverflow.Clip -- a value long enough to
         // exceed maxLines (a long status string routed through AnimatedValue,
         // not just short numeric readouts) hard-clipped instead of trailing
@@ -63,7 +78,7 @@ fun WiggleText(
     // effectively a free-running clock in radians driving the sine wave below.
     // LinearEasing keeps the sweep rate constant so the wave travels smoothly
     // rather than speeding up/slowing down.
-    val transition = rememberInfiniteTransition(label = "wiggle67")
+    val transition = rememberInfiniteTransition(label = "wiggleFunNumber")
     val phase by transition.animateFloat(
         initialValue = 0f,
         targetValue = (2 * PI).toFloat(),
@@ -94,7 +109,7 @@ fun WiggleText(
 
 /**
  * Animates value changes with a fade + vertical slide, using [WiggleText] for
- * rendering so the "67 bounce" works inside the transition.
+ * rendering so its fun-number bounce works inside the transition.
  *
  * [reduceMotion] has no default, deliberately. It used to default to false, and
  * three of the four live call sites took that default: the phone's [StatusRow] --
