@@ -3164,7 +3164,19 @@ internal fun GarageScreen(state: UiState, vm: AppViewModel) {
                 // renderer. block == pageCount (never a valid car block index, which
                 // only ever run 0 until pageCount-1) is what marks it as the
                 // Settings slot rather than a car.
-                val settingsAsPage = appearance.settingsAsPage
+                // appearance.settingsAsPage || state.landOnSettingsPage, not
+                // appearance.settingsAsPage alone: the preference write behind that
+                // flag goes through DataStore, and DataStore is genuinely async --
+                // the frame right after closeSettings(landOnSettingsPage = true)
+                // (itself a synchronous UiState update) can still read the OLD
+                // value here for a beat, before the write finishes its round trip
+                // back through the Flow. Without the OR, totalBlocks below would
+                // stay at the OLD (no-Settings-slot) count on that first frame,
+                // making initialBlock's `pageCount` seed a few lines down point at
+                // a block that doesn't exist yet -- landOnSettingsPage is
+                // unambiguous proof the slot is about to exist regardless of
+                // which frame the DataStore write actually lands on.
+                val settingsAsPage = appearance.settingsAsPage || state.landOnSettingsPage
                 val totalBlocks = if (settingsAsPage) pageCount + 1 else pageCount
                 // Normally the car currentIndex was already parked on. The one
                 // exception is state.landOnSettingsPage (see its own doc): Settings
@@ -3210,7 +3222,28 @@ internal fun GarageScreen(state: UiState, vm: AppViewModel) {
                 // "look at this car now," so jump (no animated fly-through
                 // across a potentially large virtual-page delta) the instant
                 // currentIndex moves out from under the page actually shown.
+                //
+                // Both this and the totalBlocks effect below skip their own very
+                // first firing (each with its own remember'd flag -- two
+                // independent flags rather than one shared one, so there is no
+                // ordering to get right between separate LaunchedEffects racing to
+                // set it). LaunchedEffect always runs its body once on first
+                // composition regardless of whether its key "changed" from
+                // anything, and initialBlock above has ALREADY seeded the correct
+                // starting page for every case, landOnSettingsPage included -- so
+                // an unguarded first firing here did not correct drift, it
+                // OVERWROTE that seed, unconditionally snapping back to
+                // currentIndex's own block the instant the pager mounted. That
+                // silently defeated landOnSettingsPage every time (Settings looked
+                // like it never actually got followed) and, worse, chained into
+                // the settle-observer above calling selectIndex for that block --
+                // which on a multi-car-per-page grid is not always literally
+                // currentIndex when the two don't share a block boundary, so the
+                // "correction" could self-report as a genuine, uninitiated car
+                // change on the very frame the screen appeared.
+                val skipFirstIndexSnap = remember { mutableStateOf(true) }
                 LaunchedEffect(currentIndex) {
+                    if (skipFirstIndexSnap.value) { skipFirstIndexSnap.value = false; return@LaunchedEffect }
                     val targetBlock = currentIndex.coerceIn(0, count - 1) / perPage
                     wrap.snapToReal(targetBlock)
                 }
@@ -3228,7 +3261,11 @@ internal fun GarageScreen(state: UiState, vm: AppViewModel) {
                 // snap (not fly-through) back to the block currentIndex actually
                 // means, which is exactly "stay on the same car" when a car was
                 // showing, and "return to the last car you had" when Settings was.
+                // Skips its own first firing too -- see the currentIndex effect's
+                // comment just above for why.
+                val skipFirstBlocksSnap = remember { mutableStateOf(true) }
                 LaunchedEffect(totalBlocks) {
+                    if (skipFirstBlocksSnap.value) { skipFirstBlocksSnap.value = false; return@LaunchedEffect }
                     val targetBlock = currentIndex.coerceIn(0, count - 1) / perPage
                     wrap.snapToReal(targetBlock)
                 }
