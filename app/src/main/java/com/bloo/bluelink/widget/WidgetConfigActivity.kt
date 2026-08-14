@@ -28,6 +28,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
@@ -228,6 +229,13 @@ private fun ConfigScreen(
 
             // --- Advanced-only sections ---
             if (advanced) {
+                // A visible seam between "the options everyone sees" above and the
+                // six extra sections below -- without it this screen was one
+                // undifferentiated scroll of pickers the moment Advanced turned
+                // them all on at once, which read as far more than it actually
+                // is. Same hairline every list divider in the app uses.
+                Spacer(Modifier.height(18.dp))
+                SectionDivider()
                 Spacer(Modifier.height(16.dp))
                 SectionLabel("Info shown")
                 ChipFlow {
@@ -237,8 +245,20 @@ private fun ConfigScreen(
                         }
                     }
                 }
+                Spacer(Modifier.height(3.dp))
+                // A field toggled on here only actually appears once the layout
+                // has room for it -- same "declines rather than shrinking into
+                // illegibility" contract the ring, hero number and info rows all
+                // follow (see WidgetScale.kt). Said outright, because without
+                // it a small placed widget makes every checked box here look
+                // broken: turn a field on, nothing changes, no explanation why.
+                Text(
+                    "Fields show when the placed widget has room; a small widget may not fit all of them.",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
 
-                Spacer(Modifier.height(8.dp))
+                Spacer(Modifier.height(14.dp))
                 // Both only appear where a layout has room for them anyway;
                 // turning them off buys that space back for the ring and stats.
                 ToggleLine("Show name and status header", showHeader) { showHeader = it }
@@ -246,6 +266,8 @@ private fun ConfigScreen(
                 ToggleLine("Show last-updated footer", showFooter) { showFooter = it }
 
                 // --- Shape ---
+                Spacer(Modifier.height(18.dp))
+                SectionDivider()
                 Spacer(Modifier.height(16.dp))
                 SectionLabel("Corners")
                 MorphSegmented(
@@ -272,6 +294,8 @@ private fun ConfigScreen(
                 }
 
                 // --- Background opacity ---
+                Spacer(Modifier.height(18.dp))
+                SectionDivider()
                 Spacer(Modifier.height(16.dp))
                 SectionLabel("Background")
                 if (photoBackground) {
@@ -298,6 +322,8 @@ private fun ConfigScreen(
                 }
 
                 // --- Text size ---
+                Spacer(Modifier.height(18.dp))
+                SectionDivider()
                 Spacer(Modifier.height(16.dp))
                 SectionLabel("Text size")
                 MorphSegmented(
@@ -311,7 +337,22 @@ private fun ConfigScreen(
                         .minBy { kotlin.math.abs(it - textScale) }.toString(),
                     onSelect = { textScale = it.toFloat() },
                 )
+                Spacer(Modifier.height(3.dp))
+                // fittedSp's own floor (WidgetScale.kt: never smaller than 78% of
+                // its style, never below 9sp) shrinks any line that would
+                // otherwise overflow -- which on a small placed widget can pull
+                // "Largest" most of the way back down to what "Normal" already
+                // looked like. Genuinely applied, just capped by the same space
+                // every other module here respects; said outright so a bigger
+                // choice with no visible size change doesn't read as ignored.
+                Text(
+                    "On small widgets, text may shrink back down to fit -- there just isn't room for the largest size.",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
 
+                Spacer(Modifier.height(18.dp))
+                SectionDivider()
                 Spacer(Modifier.height(16.dp))
                 SectionLabel("Accent")
                 // Color swatches, not text chips -- matches the app's own theme
@@ -325,6 +366,8 @@ private fun ConfigScreen(
                     }
                 }
 
+                Spacer(Modifier.height(18.dp))
+                SectionDivider()
                 Spacer(Modifier.height(16.dp))
                 SectionLabel("Theme")
                 ChipFlow {
@@ -372,6 +415,13 @@ private fun ConfigScreen(
             Spacer(Modifier.height(12.dp))
         }
     }
+}
+
+/** A faint full-width rule between the advanced-only sections -- the only
+ *  thing standing between "six extra sections in a row" and "one undivided
+ *  wall of pickers" once Advanced turns them all on at once. */
+@Composable private fun SectionDivider() {
+    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
 }
 
 @Composable private fun SectionLabel(text: String) {
