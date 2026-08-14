@@ -2666,7 +2666,13 @@ internal fun SearchLayer(
             // bubble landing somewhere. A bit of give past the edge and back
             // is what makes it read as physical contact -- it bounced off
             // the edge -- rather than a UI correcting a number.
-            spring<Dp>(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium)
+            //
+            // DampingRatioMediumBouncy (0.5) was more of that "give" than intended,
+            // though -- reported alongside SearchPill's own two springs as "overly
+            // bouncy" overall. 0.72 keeps the edge-contact read (still a real,
+            // visible overshoot) without it being the loudest thing on screen every
+            // time the bubble is dropped.
+            spring<Dp>(dampingRatio = 0.72f, stiffness = Spring.StiffnessMedium)
         }
         // key(compact) so entering or leaving flip mode RESTARTS these
         // animations at their new target rather than animating to it. The cover
@@ -2883,14 +2889,23 @@ private fun SearchPill(
     // the cover screen. The ball lands in its corner rather than sliding to it.
     var appeared by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) { appeared = true }
+    // DampingRatioMediumBouncy (0.5) on BOTH of these compounded badly: they multiply into
+    // the same scaleX/scaleY below, so a press landing anywhere near the entrance pop (or
+    // just the two overshoots being visually close together on a small, frequently-tapped
+    // control) read as noticeably more bounce than either spring alone would suggest --
+    // reported as "overly bouncy," and this is the same lesson the pebble bounce work
+    // already paid for: 0.5 reads as a lot on a real device, repeatedly, not occasionally.
+    // Entrance keeps some spring (it plays once, arriving) but dialed back; press feedback
+    // drops nearly all of it -- a frequent, repeated micro-interaction is exactly where
+    // extra bounce stops feeling playful and starts feeling like noise.
     val entrance by animateFloatAsState(
         targetValue = if (appeared) 1f else 0.55f,
-        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMediumLow),
+        animationSpec = spring(dampingRatio = 0.72f, stiffness = Spring.StiffnessMediumLow),
         label = "searchEntrance",
     )
     val pressScale by animateFloatAsState(
         targetValue = if (pressed) 0.94f else 1f,
-        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessHigh),
+        animationSpec = spring(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = Spring.StiffnessHigh),
         label = "searchPress",
     )
     // No ambient glow. This used to carry a travelling-hotspot bloom that
