@@ -40,7 +40,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -425,7 +424,15 @@ private fun ConfigScreen(
             // -- which car this widget follows isn't part of "how it looks,"
             // and silently un-pinning it would be a much bigger surprise than
             // anything this button is actually for.
-            var confirmReset by rememberSaveable { mutableStateOf(false) }
+            // Plain remember, not rememberSaveable -- every field this button
+            // resets (actions, infoFields, showRing, corner, ...) is plain
+            // remember too, so none of them survive a configuration change
+            // (rotation). Saveable here alone would have let a rotation while
+            // armed keep showing "Tap again to reset" even though the fields
+            // it was about to touch had already been silently reset back to
+            // `initial` underneath it -- the confirm state and the state it
+            // confirms against need to rise and fall together.
+            var confirmReset by remember { mutableStateOf(false) }
             LaunchedEffect(confirmReset) {
                 if (confirmReset) {
                     kotlinx.coroutines.delay(4000)
