@@ -35,10 +35,12 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -55,6 +57,7 @@ import com.bloo.bluelink.ui.BlooTheme
 import com.bloo.bluelink.ui.MorphButton
 import com.bloo.bluelink.ui.MorphChip
 import com.bloo.bluelink.ui.MorphSegmented
+import com.bloo.bluelink.ui.MorphTextButton
 import com.bloo.bluelink.ui.SegmentOption
 import kotlinx.coroutines.launch
 
@@ -412,6 +415,48 @@ private fun ConfigScreen(
                 },
                 modifier = Modifier.fillMaxWidth(),
             ) { Text("Save", fontWeight = FontWeight.SemiBold) }
+            Spacer(Modifier.height(8.dp))
+            // A single confirm-to-fire text button, not a whole extra dialog --
+            // with this many knobs on one screen (this is what "seems like a
+            // bit much" was pointing at for the advanced sections above), there
+            // was no way back to a known-good state short of removing and
+            // re-adding the widget entirely. Resets every LOOK/BEHAVIOUR field
+            // to WidgetConfig()'s own defaults; deliberately leaves `vin` alone
+            // -- which car this widget follows isn't part of "how it looks,"
+            // and silently un-pinning it would be a much bigger surprise than
+            // anything this button is actually for.
+            var confirmReset by rememberSaveable { mutableStateOf(false) }
+            LaunchedEffect(confirmReset) {
+                if (confirmReset) {
+                    kotlinx.coroutines.delay(4000)
+                    confirmReset = false
+                }
+            }
+            MorphTextButton(
+                if (confirmReset) "Tap again to reset" else "Reset appearance",
+                onClick = {
+                    if (confirmReset) {
+                        val defaults = WidgetConfig()
+                        actions.clear(); actions.addAll(defaults.actions)
+                        infoFields.clear(); infoFields.addAll(defaults.infoFields)
+                        showRing = defaults.showRing
+                        showMap = defaults.showMap
+                        photoBackground = defaults.photoBackground
+                        priority = defaults.priority
+                        corner = defaults.effectiveCorner
+                        backgroundOpacity = defaults.safeBackgroundOpacity
+                        textScale = defaults.safeTextScale
+                        showHeader = defaults.showHeader
+                        showFooter = defaults.showFooter
+                        accent = defaults.accent
+                        theme = defaults.theme
+                        confirmReset = false
+                    } else {
+                        confirmReset = true
+                    }
+                },
+                modifier = Modifier.fillMaxWidth(),
+            )
             Spacer(Modifier.height(12.dp))
         }
     }
