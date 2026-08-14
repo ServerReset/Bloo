@@ -1134,8 +1134,12 @@ internal fun SettingsScreen(vm: AppViewModel) {
                         Modifier.size(40.dp).background(notifTint.copy(alpha = 0.15f), CircleShape),
                         contentAlignment = Alignment.Center,
                     ) {
+                        // Icons.Filled.Notifications only -- NotificationsActive/Off aren't
+                        // in this project's icon set (confirmed by CI), so the on/off read
+                        // comes from the tint + status line alone, same as every other
+                        // header here that doesn't have a distinct icon per state.
                         Icon(
-                            if (alertsOn > 0) Icons.Filled.NotificationsActive else Icons.Filled.NotificationsOff,
+                            Icons.Filled.Notifications,
                             contentDescription = null,
                             tint = notifTint,
                             modifier = Modifier.size(22.dp),
