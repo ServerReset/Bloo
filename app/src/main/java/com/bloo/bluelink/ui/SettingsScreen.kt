@@ -112,6 +112,10 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.VerticalPager
+import androidx.compose.foundation.lazy.staggeredgrid.LazyVerticalStaggeredGrid
+import androidx.compose.foundation.lazy.staggeredgrid.StaggeredGridCells
+import androidx.compose.foundation.lazy.staggeredgrid.StaggeredGridItemSpan
+import androidx.compose.foundation.lazy.staggeredgrid.rememberLazyStaggeredGridState
 import androidx.compose.foundation.pager.PagerState
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.ScrollState
@@ -560,7 +564,13 @@ internal fun SettingsScreen(vm: AppViewModel, embedded: Boolean = false) {
     val context = LocalContext.current
     val clipboard = LocalClipboardManager.current
     val canBio = remember { vm.canUseBiometrics() }
-    val settingsScroll = rememberScrollState()
+    // LazyVerticalStaggeredGrid, not a plain scrolling Column -- see the grid's
+    // own comment below for why. StaggeredGridCells.Adaptive naturally resolves
+    // to exactly one column on a phone-width screen (the same visual result the
+    // old Column gave every existing install) and multiple side by side once
+    // there's genuinely room, so this one grid covers both instead of two
+    // separate layouts to keep in sync.
+    val settingsGridState = rememberLazyStaggeredGridState()
     val settingsScope = rememberCoroutineScope()
 
     // System back returns to the garage, not out of the app.
@@ -587,19 +597,34 @@ internal fun SettingsScreen(vm: AppViewModel, embedded: Boolean = false) {
   // is what should run instead.
   if (!embedded) BackHandler { vm.closeSettings() }
   BackdropHost {
-        // On wide screens (tablets, landscape), cap width and centre so lines
-        // don't stretch wall-to-wall.
+        // A real multi-column grid on wide screens (tablets, landscape, foldables
+        // unfolded) instead of one narrow centred column with empty space on
+        // both sides -- Adaptive(380.dp) resolves to exactly one column at
+        // ordinary phone widths (the same layout every existing install already
+        // had) and grows to two or three side by side once there's genuinely
+        // room, so cards actually use the space a tablet has instead of just
+        // stretching the same single stack wider. Staggered (masonry), not a
+        // fixed-row grid: every SettingsCard is independently collapsible, so
+        // neighbouring cards are almost never the same height, and a fixed-row
+        // grid would force every card in a row to the tallest one's height --
+        // exactly the "wrong tool" a masonry layout exists to avoid.
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
-        Column(
-            Modifier
-                .widthIn(max = 640.dp)
+        LazyVerticalStaggeredGrid(
+            columns = StaggeredGridCells.Adaptive(minSize = 380.dp),
+            state = settingsGridState,
+            modifier = Modifier
+                .widthIn(max = 1100.dp)
                 .fillMaxWidth()
-                .verticalScroll(settingsScroll)
                 .padding(horizontal = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+            verticalItemSpacing = 12.dp,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             // Content scrolls behind the status bar; clear the floating pills.
-            Spacer(Modifier.height(topInset + 56.dp))
+            // Full-line: this is the grid's own leading spacer, not a card, so
+            // it needs the full row rather than being squeezed into one column.
+            item(span = StaggeredGridItemSpan.FullLine) {
+                Spacer(Modifier.height(topInset + 56.dp))
+            }
             run {
                 val advanced = state.settingsMode == "advanced"
             // Every advanced-only card now uses the SAME collapseEnter()/collapseExit()
@@ -613,17 +638,23 @@ internal fun SettingsScreen(vm: AppViewModel, embedded: Boolean = false) {
             // is what lets this share the real bounce spring instead of avoiding it.
             // No `Arrangement.spacedBy` -- SettingsCard carries the gap itself, see there.
             //
-            // And no `animateContentSize` either. It used to wrap this Column on the
-            // reasoning that all three settles should share one feel, but every child that
-            // changes height here already animates its own (collapseEnter/collapseExit's
+            // And no `animateContentSize` on any of it either. Every card that changes
+            // height here already animates its own (collapseEnter/collapseExit's
             // expandVertically/shrinkVertically, plus PebbleShell's own internal reveal --
             // SettingsCard is a thin wrapper around it now). Stacking a second,
-            // independently-sprung height animation over those makes each frame of the
-            // inner ones a fresh "content size changed" event for the outer one to chase,
-            // so the Column lags behind its own content and then catches up -- which is
-            // the other half of what looked like a snap. PebbleShell documents the
-            // identical trap; this is the same mistake, here.
-            Column {
+            // independently-sprung height animation over one of these `item {}` blocks
+            // would make each frame of the inner one a fresh "content size changed" event
+            // for the outer one to chase, so it would lag behind its own content and then
+            // catch up -- which is the other half of what looked like a snap when this
+            // used to be one plain Column instead of grid items. PebbleShell documents the
+            // identical trap; this was the same mistake, once, here.
+            //
+            // Each card below is its own `item {}` rather than a bare child of a Column --
+            // see the LazyVerticalStaggeredGrid this whole sequence now lives in, above --
+            // so the grid can place it in whichever column has room, independent of every
+            // other card's height. `advanced`, declared here in this enclosing `run {}`,
+            // stays in scope for all of them exactly as it did before.
+            item {
             // Accounts (one per brand; Hyundai + Genesis can both be signed in).
             SettingsCard("Accounts", Icons.Filled.Person, vm) {
                 // Same icon-badge + status-line header as every other card that's had
@@ -707,6 +738,8 @@ internal fun SettingsScreen(vm: AppViewModel, embedded: Boolean = false) {
                     modifier = Modifier.padding(top = 8.dp),
                 )
             }
+            }
+            item {
 
             // On-device AI - only when the device supports Gemini Nano. Always
             // shown (not advanced-only): it's a headline feature, not a power-
@@ -755,6 +788,8 @@ internal fun SettingsScreen(vm: AppViewModel, embedded: Boolean = false) {
                     }
                 }
             }
+            }
+            item {
 
             // (The "Updates" card now lives after Notifications — its natural home —
             // ungated so its controls show with or without Shizuku. See below.)
@@ -788,6 +823,8 @@ internal fun SettingsScreen(vm: AppViewModel, embedded: Boolean = false) {
                     }
                 }
             }
+            }
+            item {
 
             // Cars: drag to reorder, tap a car to expand its setup + photo. With a
             // single car there's nothing to order, so it's just shown expanded.
@@ -848,6 +885,8 @@ internal fun SettingsScreen(vm: AppViewModel, embedded: Boolean = false) {
                     }
                 }
             }
+            }
+            item {
 
             // Backup / Sync
             SettingsCard("Backup & sync", Icons.Filled.CloudSync, vm) {
@@ -1063,6 +1102,8 @@ internal fun SettingsScreen(vm: AppViewModel, embedded: Boolean = false) {
                   }
                 }
             }
+            }
+            item {
 
             // Display scale
             SettingsCard("Display", Icons.Filled.Straighten, vm) {
@@ -1140,6 +1181,8 @@ internal fun SettingsScreen(vm: AppViewModel, embedded: Boolean = false) {
                     onSelect = { vm.setUnitSystem(it) },
                 )
             }
+            }
+            item {
 
             // Font
             // SIMPLE, not advanced. This card is where Atkinson Hyperlegible
@@ -1159,6 +1202,8 @@ internal fun SettingsScreen(vm: AppViewModel, embedded: Boolean = false) {
                     }
                 }
             }
+            }
+            item {
 
             // Links
             AnimatedVisibility(visible = staggeredAdvancedVisible(advanced, 2), enter = collapseEnter(), exit = collapseExit()) {
@@ -1174,6 +1219,8 @@ internal fun SettingsScreen(vm: AppViewModel, embedded: Boolean = false) {
                 )
             }
             }
+            }
+            item {
 
             // Logs
             AnimatedVisibility(visible = staggeredAdvancedVisible(advanced, 3), enter = collapseEnter(), exit = collapseExit()) {
@@ -1249,6 +1296,8 @@ internal fun SettingsScreen(vm: AppViewModel, embedded: Boolean = false) {
                 }
             }
             }
+            }
+            item {
 
             // Notifications
             SettingsCard("Notifications", Icons.Filled.Notifications, vm) {
@@ -1372,6 +1421,8 @@ internal fun SettingsScreen(vm: AppViewModel, embedded: Boolean = false) {
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
+            }
+            item {
 
             // Quick Settings tiles -- per-tile config is power-user territory,
             // same tier as App shortcuts/Cars above.
@@ -1417,6 +1468,8 @@ internal fun SettingsScreen(vm: AppViewModel, embedded: Boolean = false) {
                 QuickTilesManager(state, vm)
             }
             }
+            }
+            item {
 
             // Security
             SettingsCard("Security", Icons.Filled.Lock, vm) {
@@ -1518,11 +1571,15 @@ internal fun SettingsScreen(vm: AppViewModel, embedded: Boolean = false) {
                     )
                 }
             }
+            }
+            item {
 
             // Sounds & vibration
             SettingsCard("Sounds & vibration", Icons.Filled.Vibration, vm) {
                 ToggleRow("Haptic feedback", appearance.hapticsEnabled) { vm.setHapticsEnabled(it) }
             }
+            }
+            item {
 
             // Theme
             SettingsCard("Theme", Icons.Filled.Palette, vm) {
@@ -1711,6 +1768,8 @@ internal fun SettingsScreen(vm: AppViewModel, embedded: Boolean = false) {
                   }
                 }
             }
+            }
+            item {
 
             // Updates — always shown (the update tile still auto-appears under the
             // hero, but this is the manual home: which build you're on, a force-check,
@@ -1826,6 +1885,8 @@ internal fun SettingsScreen(vm: AppViewModel, embedded: Boolean = false) {
                     }
                 }
             }
+            }
+            item {
 
             // Weather
             SettingsCard("Weather", Icons.Filled.WbSunny, vm) {
@@ -1886,8 +1947,12 @@ internal fun SettingsScreen(vm: AppViewModel, embedded: Boolean = false) {
                     }
                 }
             }
-          }
+            }
         }
+          // Full-line, same reason as the leading spacer above: this is the
+          // grid's own trailing footer, not a card.
+          item(span = StaggeredGridItemSpan.FullLine) {
+          Column {
           // About / installed build — the one place the phone shows which build it's
           // running (the update tile shows the AVAILABLE build; this shows the current
           // one). Based on the GitHub Actions run number baked in at CI build time;
@@ -1905,6 +1970,8 @@ internal fun SettingsScreen(vm: AppViewModel, embedded: Boolean = false) {
           // edge (see below, outside this scrolling column) -- reserve space
           // here so scrolled content never sits behind it.
           Spacer(Modifier.height(bottomInset + 132.dp))
+          }
+          }
         }
         } // Box (wide-screen centering)
         // Same blurred scrim GarageScreen uses behind the system clock/battery
@@ -1928,7 +1995,7 @@ internal fun SettingsScreen(vm: AppViewModel, embedded: Boolean = false) {
             // literally isn't true here: this already is the app's main screen.
             if (!embedded) FloatingIcon(Icons.Filled.ArrowBack, "Back to the app", { vm.closeSettings() })
             Surface(
-                onClick = { settingsScope.launch { settingsScroll.animateScrollTo(0) } },
+                onClick = { settingsScope.launch { settingsGridState.animateScrollToItem(0) } },
                 shape = RoundedCornerShape(50),
                 color = MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = glassContainerAlpha()),
                 contentColor = MaterialTheme.colorScheme.onSurface,

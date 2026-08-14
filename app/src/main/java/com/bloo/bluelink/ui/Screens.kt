@@ -3224,11 +3224,24 @@ internal fun GarageScreen(state: UiState, vm: AppViewModel) {
                 val wrap = rememberWrapPager(totalBlocks, initialBlock)
                 val pager = wrap.pager
                 fun realBlock(virtualPage: Int) = wrap.real(virtualPage)
-                // One-shot consume: this composable only just mounted (returning
-                // from Screen.Settings unmounts and remounts GarageScreen fresh,
-                // which is what makes initialBlock above actually take effect as a
-                // seed), so the flag has done its one job the moment this runs.
-                LaunchedEffect(Unit) { vm.consumeLandOnSettingsPage() }
+                // Authoritative, not just a fire-and-hope seed: initialBlock above
+                // already gets this right on the fast path (a genuinely fresh mount,
+                // which returning from Screen.Settings normally is), but that value
+                // is only ever honoured the very FIRST time rememberWrapPager builds
+                // its underlying pager for this composable instance -- if anything
+                // about Compose's own state retention across the AnimatedContent
+                // screen transition ever meant this pager wasn't quite as fresh as
+                // assumed, a seed-only fix would silently do nothing and Settings
+                // would look like it was never actually followed. This actively
+                // MOVES the pager there instead of hoping the seed took, which costs
+                // nothing extra in the common case (wrap.snapToReal no-ops when
+                // already there) and is the actual fix in the uncommon one.
+                LaunchedEffect(state.landOnSettingsPage) {
+                    if (state.landOnSettingsPage) {
+                        if (settingsAsPage) wrap.snapToReal(pageCount)
+                        vm.consumeLandOnSettingsPage()
+                    }
+                }
                 LaunchedEffect(pager, perPage) {
                     snapshotFlow { pager.settledPage }.collect { page ->
                         // Guarded: the Settings slot isn't a car block, and
@@ -3272,6 +3285,15 @@ internal fun GarageScreen(state: UiState, vm: AppViewModel) {
                 val skipFirstIndexSnap = remember { mutableStateOf(true) }
                 LaunchedEffect(currentIndex) {
                     if (skipFirstIndexSnap.value) { skipFirstIndexSnap.value = false; return@LaunchedEffect }
+                    // Not on Garage any more (mid exit-transition to another screen,
+                    // Settings included): this composition's `state` param keeps
+                    // updating live even while AnimatedContent slides its ALREADY-
+                    // STALE content off screen, so without this guard a snap here
+                    // still visibly moves the pager underneath its own exit
+                    // animation -- see the totalBlocks effect below for the exact
+                    // trigger (settingsAsPage flipping mid-exit) and why it read as
+                    // jank rather than a clean transition.
+                    if (state.screen != Screen.Garage) return@LaunchedEffect
                     val targetBlock = currentIndex.coerceIn(0, count - 1) / perPage
                     wrap.snapToReal(targetBlock)
                 }
@@ -3290,10 +3312,21 @@ internal fun GarageScreen(state: UiState, vm: AppViewModel) {
                 // means, which is exactly "stay on the same car" when a car was
                 // showing, and "return to the last car you had" when Settings was.
                 // Skips its own first firing too -- see the currentIndex effect's
-                // comment just above for why.
+                // comment just above for why. Also skips once this screen is on
+                // its way out (same reason, same fix): toggling the switch OFF
+                // from the embedded page calls vm.openSettings() immediately, which
+                // starts the OUTER Garage -> Settings slide the instant it runs --
+                // but appearance.settingsAsPage's own DataStore write can still
+                // land a beat or two INTO that slide, while this now-exiting
+                // composition is still live and still reacting to real state
+                // changes. totalBlocks changing at that exact moment used to fire
+                // this effect and snap the pager to a different page while its
+                // (already stale, already animating off screen) content was
+                // visibly sliding away -- the reported "janky" transition.
                 val skipFirstBlocksSnap = remember { mutableStateOf(true) }
                 LaunchedEffect(totalBlocks) {
                     if (skipFirstBlocksSnap.value) { skipFirstBlocksSnap.value = false; return@LaunchedEffect }
+                    if (state.screen != Screen.Garage) return@LaunchedEffect
                     val targetBlock = currentIndex.coerceIn(0, count - 1) / perPage
                     wrap.snapToReal(targetBlock)
                 }
@@ -5864,6 +5897,15 @@ internal fun UpdateAvailableTile(state: UiState, vm: AppViewModel, dragHandle: M
                 icon = if (state.updateApkReady) Icons.Filled.SystemUpdate else Icons.Filled.Download,
                 pending = state.updateDownloading || state.updateInstalling,
                 enabled = !state.updateInstalling,
+                // Same ChargeGreen/white pairing ChargePebble's own headerAction
+                // uses for its "charging" active state -- this button used to stay
+                // the same neutral, low-contrast default container/text regardless
+                // of state, so the one moment this tile has a real "tap this now"
+                // call to action (the download finished, install is one tap away)
+                // looked identical to every other, less urgent state.
+                active = state.updateApkReady,
+                activeContainer = ChargeGreen,
+                activeContent = Color.White,
                 onClick = {
                     when {
                         state.updateApkReady -> vm.installDownloadedUpdate()
