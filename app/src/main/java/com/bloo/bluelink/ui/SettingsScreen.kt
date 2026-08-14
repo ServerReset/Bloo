@@ -1123,6 +1123,36 @@ internal fun SettingsScreen(vm: AppViewModel) {
 
             // Notifications
             SettingsCard("Notifications", Icons.Filled.Notifications) {
+                // Icon-badge + status-line header, matching Backup & sync/Updates --
+                // this card used to open straight into a wall of toggles with no
+                // at-a-glance read of how many alerts were actually live.
+                val alertToggles = listOf(notif.charging, notif.service, notif.doorOpen, notif.running, notif.unlocked)
+                val alertsOn = alertToggles.count { it }
+                val notifTint = if (alertsOn > 0) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.onSurfaceVariant
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(
+                        Modifier.size(40.dp).background(notifTint.copy(alpha = 0.15f), CircleShape),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(
+                            if (alertsOn > 0) Icons.Filled.NotificationsActive else Icons.Filled.NotificationsOff,
+                            contentDescription = null,
+                            tint = notifTint,
+                            modifier = Modifier.size(22.dp),
+                        )
+                    }
+                    Spacer(Modifier.width(12.dp))
+                    Column {
+                        Text("Alerts", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                        Text(
+                            if (alertsOn == 0) "All off" else "$alertsOn of ${alertToggles.size} on",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = notifTint,
+                            fontWeight = FontWeight.Medium,
+                        )
+                    }
+                }
+                Spacer(Modifier.height(14.dp))
                 // First, not last: every other switch in this card is an
                 // ALERT the user hopes never fires. This is a live surface
                 // they watch on purpose while the car charges.
@@ -1265,6 +1295,35 @@ internal fun SettingsScreen(vm: AppViewModel) {
 
             // Security
             SettingsCard("Security", Icons.Filled.Lock) {
+                // Same icon-badge + status-line header Notifications/Backup & sync use --
+                // this card used to open straight into a segmented row with no glanceable
+                // read of whether the app lock is actually on.
+                val locked = canBio && appearance.biometricLock
+                val securityTint = if (locked) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.onSurfaceVariant
+                val securityStatus = when {
+                    !canBio -> "No fingerprint enrolled"
+                    locked -> "Locked · ${appearance.lockTiming.label}"
+                    else -> "Not locked"
+                }
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(
+                        Modifier.size(40.dp).background(securityTint.copy(alpha = 0.15f), CircleShape),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(
+                            if (locked) Icons.Filled.Lock else Icons.Filled.LockOpen,
+                            contentDescription = null,
+                            tint = securityTint,
+                            modifier = Modifier.size(22.dp),
+                        )
+                    }
+                    Spacer(Modifier.width(12.dp))
+                    Column {
+                        Text("App lock", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                        Text(securityStatus, style = MaterialTheme.typography.labelMedium, color = securityTint, fontWeight = FontWeight.Medium)
+                    }
+                }
+                Spacer(Modifier.height(14.dp))
                 if (canBio) {
                     SettingsSegmentedRow(
                         label = "Require fingerprint to open",
