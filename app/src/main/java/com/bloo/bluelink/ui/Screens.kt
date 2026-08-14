@@ -914,14 +914,22 @@ private fun OnboardingScreen(vm: AppViewModel) {
                     enter = fadeIn(tween(180)) + expandHorizontally(tween(180)),
                     exit = fadeOut(tween(120)) + shrinkHorizontally(tween(120)),
                 ) {
-                    OutlinedCard(
+                    // MorphButton, not a plain OutlinedCard -- this was the one
+                    // button in the entire app still built on stock Material
+                    // chrome instead of the shared pill<->rounded-square press
+                    // feel (haptic click, corner morph, press-scale) every other
+                    // button gets, onboarding included right next to it.
+                    // active=false gives it MorphButton's own secondary/outline
+                    // treatment, matching how every other Back/secondary action
+                    // in the app already reaches for the same component rather
+                    // than a bespoke look-alike for "the quieter one."
+                    MorphButton(
                         onClick = ::goBack,
                         modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(16.dp),
+                        contentPadding = PaddingValues(vertical = 16.dp),
+                        border = BorderStroke(1.dp, scheme.outlineVariant),
                     ) {
-                        Box(Modifier.fillMaxWidth().padding(vertical = 14.dp), contentAlignment = Alignment.Center) {
-                            Text("Back", style = MaterialTheme.typography.titleMedium)
-                        }
+                        Text("Back", style = MaterialTheme.typography.titleMedium)
                     }
                 }
                 MorphButton(
@@ -1106,21 +1114,28 @@ private fun OnboardingSetupPage(vm: AppViewModel, state: UiState, context: andro
         },
         done = syncEnabled,
     ) {
-        if (syncEnabled) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(Icons.Filled.CheckCircle, contentDescription = null, tint = scheme.primary, modifier = Modifier.size(18.dp))
-                Spacer(Modifier.width(8.dp))
-                Text("Drive sync enabled", fontWeight = FontWeight.SemiBold, color = scheme.primary)
-            }
-        } else {
-            MorphButton(
-                onClick = { showDriveDialog = true },
-                modifier = Modifier.fillMaxWidth(),
-                contentPadding = PaddingValues(vertical = 12.dp),
-            ) {
-                Icon(Icons.Filled.Cloud, contentDescription = null, modifier = Modifier.size(18.dp))
-                Spacer(Modifier.width(8.dp))
-                Text("Set up Drive sync", fontWeight = FontWeight.SemiBold)
+        // AnimatedContent, not a bare if/else -- this used to snap straight
+        // from the "Set up Drive sync" button to the "enabled" row the instant
+        // the dialog finished, the one un-animated content swap left in a step
+        // whose sibling cards (notifications, fingerprint) at least keep the
+        // same MorphButton in place and only recolor it.
+        AnimatedContent(targetState = syncEnabled, label = "onboardingSyncDone") { enabled ->
+            if (enabled) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Filled.CheckCircle, contentDescription = null, tint = scheme.primary, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text("Drive sync enabled", fontWeight = FontWeight.SemiBold, color = scheme.primary)
+                }
+            } else {
+                MorphButton(
+                    onClick = { showDriveDialog = true },
+                    modifier = Modifier.fillMaxWidth(),
+                    contentPadding = PaddingValues(vertical = 12.dp),
+                ) {
+                    Icon(Icons.Filled.Cloud, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text("Set up Drive sync", fontWeight = FontWeight.SemiBold)
+                }
             }
         }
     }
@@ -1263,8 +1278,9 @@ private fun OnboardingCarPage(
 
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Text("Extras", style = MaterialTheme.typography.labelMedium, color = scheme.primary, fontWeight = FontWeight.SemiBold)
+        val extrasHaptics = LocalHaptics.current
         Surface(
-            onClick = { vm.setSeatFlag(vehicle, "sw", !sc.steeringWheel) },
+            onClick = { extrasHaptics?.click(); vm.setSeatFlag(vehicle, "sw", !sc.steeringWheel) },
             shape = RoundedCornerShape(50),
             color = if (sc.steeringWheel) scheme.secondaryContainer else scheme.surfaceContainerHighest,
             contentColor = if (sc.steeringWheel) scheme.onSecondaryContainer else scheme.onSurface,
@@ -1431,14 +1447,21 @@ private fun CarFeatureWizard(
                     enter = fadeIn(tween(180)) + expandHorizontally(tween(180)),
                     exit = fadeOut(tween(120)) + shrinkHorizontally(tween(120)),
                 ) {
-                    OutlinedCard(
+                    // MorphButton, not OutlinedCard -- same fix as the main
+                    // OnboardingScreen's own Back button (this wizard is the
+                    // near-identical "a car showed up after first run" cousin
+                    // of that flow, and had copied the same stock-chrome
+                    // button along with everything else). Picks up MorphButton's
+                    // own haptic click for free too, which this Back button
+                    // was missing outright -- unlike goNext below, whose
+                    // MorphButton already had it.
+                    MorphButton(
                         onClick = ::goBack,
                         modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(16.dp),
+                        contentPadding = PaddingValues(vertical = 14.dp),
+                        border = BorderStroke(1.dp, scheme.outlineVariant),
                     ) {
-                        Box(Modifier.fillMaxWidth().padding(vertical = 14.dp), contentAlignment = Alignment.Center) {
-                            Text("Back", style = MaterialTheme.typography.titleMedium)
-                        }
+                        Text("Back", style = MaterialTheme.typography.titleMedium)
                     }
                 }
                 MorphButton(
@@ -1489,6 +1512,7 @@ private fun WizardPowertrainPage(
             "fuel level for gas, or both for plug-in hybrids.",
     )
     val current = state.powertrainOf(vehicle)
+    val haptics = LocalHaptics.current
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         com.bloo.bluelink.data.Powertrain.entries.forEach { pt ->
             val selected = current == pt
@@ -1499,7 +1523,10 @@ private fun WizardPowertrainPage(
                 com.bloo.bluelink.data.Powertrain.EV -> Triple("", "Electric", "Battery-only, no fuel tank")
             }
             Surface(
-                onClick = { vm.setPowertrain(vehicle, pt) },
+                // This wizard's one selection row with no haptic feedback --
+                // every sibling in the flow (Back/Next, the seat/steering
+                // toggles, WizardToggleChip) has one now.
+                onClick = { haptics?.click(); vm.setPowertrain(vehicle, pt) },
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(16.dp),
                 color = if (selected) scheme.primaryContainer else scheme.surfaceContainerHigh,
@@ -1604,8 +1631,9 @@ private fun WizardSeatRow(
 @Composable
 private fun WizardToggleChip(label: String, selected: Boolean, onClick: () -> Unit) {
     val scheme = MaterialTheme.colorScheme
+    val haptics = LocalHaptics.current
     Surface(
-        onClick = onClick,
+        onClick = { haptics?.click(); onClick() },
         shape = RoundedCornerShape(50),
         color = if (selected) scheme.secondaryContainer else scheme.surfaceContainerHighest,
         contentColor = if (selected) scheme.onSecondaryContainer else scheme.onSurfaceVariant,
