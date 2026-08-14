@@ -1915,7 +1915,12 @@ internal fun SettingsScreen(vm: AppViewModel, embedded: Boolean = false) {
         // comment above the Column's top spacer). Skipped on a folding
         // phone's compact cover screen, matching GarageScreen/LockOverlay:
         // that tiny layout doesn't draw content under the status bar at all.
-        if (!isCompactCoverScreen()) StatusBarScrim()
+        // Also skipped when embedded: this page sits inside GarageScreen's own
+        // HorizontalPager, which already draws its own StatusBarScrim on top of
+        // every page in it (cars included) -- drawing a second one here stacked
+        // the same scrim twice for exactly this one page, reading as a subtly
+        // darker/hazier status-bar band than every car page beside it.
+        if (!isCompactCoverScreen() && !embedded) StatusBarScrim()
         // Floating back-arrow + "Settings" label + simple/advanced button.
         Row(
             Modifier.fillMaxWidth().align(Alignment.TopStart).statusBarsPadding(),

@@ -3198,6 +3198,24 @@ internal fun GarageScreen(state: UiState, vm: AppViewModel) {
                     val targetBlock = currentIndex.coerceIn(0, count - 1) / perPage
                     wrap.snapToReal(targetBlock)
                 }
+                // Toggling Appearance.settingsAsPage changes totalBlocks -- and
+                // therefore `wrap`'s realCount, the modulo divisor real() uses --
+                // out from under the pager's raw (unmoved) virtual position. That
+                // divisor changing while the position doesn't is exactly what a
+                // "seam" is: real(pager.currentPage) resolves to a DIFFERENT block
+                // than the one on screen a moment ago, so flipping the switch
+                // could silently reshuffle which car you land on, or -- toggling
+                // off while parked on the Settings slot itself, which no longer
+                // exists under the new count -- strand the pager on an arbitrary
+                // block instead of the last real car you were actually on. Same
+                // fix as the currentIndex effect above and for the same reason:
+                // snap (not fly-through) back to the block currentIndex actually
+                // means, which is exactly "stay on the same car" when a car was
+                // showing, and "return to the last car you had" when Settings was.
+                LaunchedEffect(totalBlocks) {
+                    val targetBlock = currentIndex.coerceIn(0, count - 1) / perPage
+                    wrap.snapToReal(targetBlock)
+                }
                 // Hoisted pill state for single-car-per-page (perPage == 1) mode.
                 var carNameVisible by remember { mutableStateOf(false) }
                 var scrollToTopFn by remember { mutableStateOf<(suspend () -> Unit)?>(null) }
@@ -3383,8 +3401,19 @@ internal fun GarageScreen(state: UiState, vm: AppViewModel) {
                     }
                     // Hoisted car-name pill — centered at top, slides in/out vertically.
                     if (perPage == 1) {
+                        // onNameHiddenChanged only fires from a car page (see its own
+                        // guard above); swiping onto the Settings slot never touches
+                        // carNameVisible, so without this it would keep showing
+                        // whichever car was last on screen, floating at the exact
+                        // same top-start corner SettingsScreen's own "Settings"
+                        // title/back-arrow lives in -- two headers stacked on top of
+                        // each other. Settled, not current: matches every other
+                        // "which page is this" read in this pager (see the settle
+                        // effect above), so it only drops mid-swipe, not the instant
+                        // Settings peeks in from the edge.
+                        val onSettingsSlot = settingsAsPage && realBlock(pager.settledPage) == pageCount
                         AnimatedVisibility(
-                            visible = carNameVisible,
+                            visible = carNameVisible && !onSettingsSlot,
                             enter = fadeIn(tween(220)) + slideInVertically(tween(220)) { -it },
                             exit = fadeOut(tween(160)) + slideOutVertically(tween(160)) { -it / 2 },
                             modifier = Modifier.align(Alignment.TopStart).statusBarsPadding().padding(8.dp),
