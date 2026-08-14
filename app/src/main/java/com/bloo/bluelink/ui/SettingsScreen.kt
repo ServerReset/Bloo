@@ -645,13 +645,16 @@ internal fun SettingsScreen(
     // separate layouts to keep in sync.
     val settingsGridState = rememberLazyStaggeredGridState()
     val settingsScope = rememberCoroutineScope()
-    // Same "has the header scrolled out of view" signal VehicleDetailContent
-    // computes for its own hoisted pill, just off a LazyStaggeredGridState
-    // instead of a plain ScrollState: item 0 is the grid's own leading
-    // spacer and item 1 is SettingsHeaderRow itself (see the grid below), so
-    // only once the first VISIBLE item is past *both* -- index > 1, not just
-    // > 0 -- has the header genuinely scrolled fully offscreen.
-    val settingsNameHidden by remember { derivedStateOf { settingsGridState.firstVisibleItemIndex > 1 } }
+    // Same "has the header started scrolling out of view" signal
+    // VehicleDetailContent computes for its own hoisted pill, just off a
+    // LazyStaggeredGridState instead of a plain ScrollState: item 0 is the
+    // grid's own leading spacer (see the grid below), so once the first
+    // VISIBLE item is past it, the header has begun scrolling away. Was
+    // index > 1 (past SettingsHeaderRow, item 1, too) -- waiting for the
+    // whole header to clear engaged the pill's morph far too late; now that
+    // it's a continuous morph off this same signal, engaging as soon as the
+    // header starts moving is the point.
+    val settingsNameHidden by remember { derivedStateOf { settingsGridState.firstVisibleItemIndex > 0 } }
     if (onNameHiddenChanged != null) {
         LaunchedEffect(settingsNameHidden) {
             onNameHiddenChanged(settingsNameHidden) { settingsGridState.animateScrollToItem(0) }
@@ -2167,6 +2170,12 @@ internal fun SettingsScreen(
                 nameHidden = settingsNameHidden,
                 headerPosition = headerPos,
                 onClick = { settingsScope.launch { settingsGridState.animateScrollToItem(0) } },
+                // Only when standalone (embedded never draws a back arrow, so
+                // there's nothing there to collide with): without this, the
+                // collapsed pill's home slot lands directly on top of the back
+                // arrow at that same top-left corner instead of beside it, the
+                // way it always used to sit in the same Row.
+                homeStartPadding = if (!embedded) 60.dp else 0.dp,
             ) { t ->
                 MorphingIdentityContent("Settings", null, Icons.Filled.Settings, MaterialTheme.colorScheme.tertiary, null, t)
             }

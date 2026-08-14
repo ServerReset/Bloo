@@ -7734,9 +7734,14 @@ private fun VehicleDetailContent(
     val scroll = rememberScrollState()
     val scope = rememberCoroutineScope()
     val density = LocalDensity.current
-    // Show the floating name pill once the car name has scrolled out of view.
+    // Show the floating name pill once the car name has started scrolling out
+    // of view -- was topInset + 56.dp, which meant waiting for nearly the
+    // whole header to clear before the pill engaged at all. Now that the pill
+    // is a continuous morph off this same signal (see MorphingIdentityPill),
+    // there's no reason to wait that long: engaging early is the whole point
+    // of a morph that tracks the header's real position as it goes.
     val nameHidden by remember {
-        derivedStateOf { scroll.value > with(density) { (topInset + 56.dp).toPx() } }
+        derivedStateOf { scroll.value > with(density) { (topInset + 16.dp).toPx() } }
     }
     // Propagate nameHidden to the parent when a callback is supplied (hoisted pill).
     if (onNameHiddenChanged != null) {
@@ -7985,6 +7990,13 @@ internal fun BoxScope.MorphingIdentityPill(
     // site's own comment for why a percent shape visibly lags there.
     shape: Shape = RoundedCornerShape(50),
     animateContentSize: Boolean = false,
+    // Extra start padding on this pill's own home slot, ON TOP OF the usual
+    // statusBarsPadding+8dp -- for a caller whose own top-left corner is
+    // ALREADY claimed by something else floating there (the standalone
+    // Settings route's own back arrow, at that identical corner). Without
+    // this, the collapsed pill lands directly on top of that arrow instead
+    // of beside it, the way it always used to sit in the same Row.
+    homeStartPadding: Dp = 0.dp,
     content: @Composable RowScope.(t: Float) -> Unit,
 ) {
     val haptics = LocalHaptics.current
@@ -7995,23 +8007,27 @@ internal fun BoxScope.MorphingIdentityPill(
     )
     val tc = t.coerceIn(0f, 1f)
     // This pill's own fixed slot, measured rather than assumed -- a plain,
-    // unanimated Spacer at the exact same statusBarsPadding+8dp every
-    // floating pill in the app anchors to, so `delta` below is always the
-    // real on-screen distance between the header and this pill's home,
-    // whatever insets/padding/RTL layout this particular screen has.
+    // unanimated Spacer at the exact same statusBarsPadding+8dp+homeStartPadding
+    // slot the animated Surface below shares, so `delta` is always the real
+    // on-screen distance between the header and this pill's home, whatever
+    // insets/padding/RTL layout this particular screen has.
     var homePosition by remember { mutableStateOf(Offset.Zero) }
     Spacer(
         Modifier
             .align(Alignment.TopStart)
             .statusBarsPadding()
-            .padding(8.dp)
+            .padding(start = 8.dp + homeStartPadding, top = 8.dp, end = 8.dp, bottom = 8.dp)
             .onGloballyPositioned { homePosition = it.positionInRoot() },
     )
-    // Offset.Zero is Offset's default before the header ever reports its own
-    // position (first frame, or a caller that never wires onNamePositioned)
-    // -- treat that as "no measurement yet" and sit at the pill's own home
-    // rather than flying in from the literal top-left corner of the screen.
-    val delta = if (headerPosition == Offset.Zero) Offset.Zero else headerPosition - homePosition
+    // Neither measurement has landed yet on the very first frame or two (both
+    // start at Offset.Zero and only update once onGloballyPositioned actually
+    // fires) -- rendering anyway used the pill's own un-shrunk, un-offset
+    // resting state as a fallback, which is full titleLarge size sitting
+    // right in this pill's tiny home corner: a flash of oversized text
+    // overlapping whatever else floats there. Staying fully transparent until
+    // both are real removes that flash instead of guessing a fallback.
+    val measured = headerPosition != Offset.Zero && homePosition != Offset.Zero
+    val delta = if (measured) headerPosition - homePosition else Offset.Zero
     // How much smaller labelLarge (the pill's own text size) reads next to
     // titleLarge (the header's) -- scaling a Text measured once at its larger
     // size down via graphicsLayer, rather than lerping the raw font size, is
@@ -8027,7 +8043,7 @@ internal fun BoxScope.MorphingIdentityPill(
         modifier = Modifier
             .align(Alignment.TopStart)
             .statusBarsPadding()
-            .padding(8.dp)
+            .padding(start = 8.dp + homeStartPadding, top = 8.dp, end = 8.dp, bottom = 8.dp)
             .offset {
                 IntOffset(
                     (delta.x * (1f - tc)).roundToInt(),
@@ -8035,6 +8051,7 @@ internal fun BoxScope.MorphingIdentityPill(
                 )
             }
             .graphicsLayer {
+                alpha = if (measured) 1f else 0f
                 scaleX = 1f - (1f - compactScale) * tc
                 scaleY = 1f - (1f - compactScale) * tc
                 transformOrigin = TransformOrigin(0f, 0f)
@@ -8336,14 +8353,24 @@ private fun Refreshable(
 /**
  * Shared spring signature for the car/Settings header <-> floating name pill
  * hand-off -- the header shrinks out and the pill grows in on the exact same
- * physics, the same spring [PebbleShell]'s own hero-title grow
- * (`growTitleOnExpand`) uses, so both morphs read as one continuous motion
- * rather than two independently-tuned animations that happen to overlap.
+ * physics, so both morphs read as one continuous motion rather than two
+ * independently-tuned animations that happen to overlap.
+ *
+ * Was [PebbleShell]'s own hero-title-grow spring (`growTitleOnExpand`,
+ * dampingRatio 0.62) verbatim -- a good fit THERE because that title only
+ * ever changes scale in place. Reused here for a pill that ALSO translates
+ * across the screen (the header's real position to its own home slot,
+ * potentially 60-100dp), an underdamped spring overshooting on a moving
+ * target reads as a much more noticeable wobble/overshoot than the same
+ * bounce on a stationary scale does. Damped further (0.62 -> 0.85, close to
+ * critical) for a settle that still isn't a hard stop but no longer visibly
+ * overshoots its own landing spot mid-flight.
+ *
  * `internal`, not `private` -- SettingsScreen's own in-content header uses the
  * identical spring for its own shrink/hand-off to stay visually unified.
  */
 internal val headerHandoffSpring: FiniteAnimationSpec<Float> =
-    spring(dampingRatio = 0.62f, stiffness = Spring.StiffnessVeryLow)
+    spring(dampingRatio = 0.85f, stiffness = Spring.StiffnessLow)
 
 /**
  * Car name/model + a Driving/Parked badge, with an optional expand button.
