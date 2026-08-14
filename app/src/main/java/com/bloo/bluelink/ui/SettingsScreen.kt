@@ -3500,6 +3500,16 @@ private fun SettingsSearchResults(
     add("Search on the car screen", "search bubble car screen cover home garage ask command") {
         ToggleRow("Search on the car screen", appearance.showSearch) { vm.setShowSearch(it) }
     }
+    // Plain ToggleRow here, same as every entry above -- this mirror doesn't
+    // reproduce the Display card's own seamless cross-navigation (jumping
+    // straight to the pager/standalone route on flip), it only ever offers
+    // the setting itself, exactly like Search on the car screen right above
+    // it never re-navigates from a search result either. Added because this
+    // was the one Display toggle missing from the catalog entirely -- it
+    // existed in the card but had no way to be found by typing for it.
+    add("Settings as a swipeable page", "gear button pager swipe car screen navigation") {
+        ToggleRow("Settings as a swipeable page", appearance.settingsAsPage) { vm.setSettingsAsPage(it) }
+    }
     // --- Per-car ---
     state.vehicles.forEach { v ->
         val st = state.statusFor(v)
