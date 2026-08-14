@@ -796,16 +796,29 @@ internal fun SettingsScreen(vm: AppViewModel, embedded: Boolean = false) {
                         PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly),
                     )
                 }
-                SettingsCard(if (single) "Car" else "Cars", vm = vm) {
-                    if (single) {
-                        val v = state.vehicles[0]
+                if (single) {
+                    // With one car, CarSettingsCard IS the section's card --
+                    // forceExpanded already gives it the exact same always-open,
+                    // no-chevron header every other top-level SettingsCard has.
+                    // Wrapping it in another SettingsCard("Car") on top used to
+                    // stack two pebble headers both announcing the same car for
+                    // no reason (one titled "Car", the other the car's own
+                    // name) -- redundant chrome with nothing to expand,
+                    // collapse or reorder underneath it.
+                    val v = state.vehicles[0]
+                    // Same gap-lives-inside-the-card fix SettingsCard's own wrapper
+                    // uses (see its doc comment) and the same heading() semantics,
+                    // reproduced by hand since this bypasses SettingsCard itself.
+                    Box(Modifier.fillMaxWidth().padding(bottom = SettingsCardGap).semantics { heading() }) {
                         CarSettingsCard(
                             v = v, state = state, vm = vm,
                             expanded = true, dragging = false, dragHandle = Modifier,
-                            collapsible = false, showHandle = false,
+                            collapsible = false,
                             onToggle = {}, onPickPhoto = { pick(v.vin) },
                         )
-                    } else {
+                    }
+                } else {
+                    SettingsCard("Cars", vm = vm) {
                         ReorderColumn(
                             items = state.vehicles,
                             keyOf = { it.vin },
@@ -2115,224 +2128,191 @@ private fun CarSettingsCard(
     onToggle: () -> Unit,
     onPickPhoto: () -> Unit,
     collapsible: Boolean = true,
-    showHandle: Boolean = true,
 ) {
     val seats = state.seatConfigs[v.vin] ?: SeatConfig()
     val cardBg by androidx.compose.animation.animateColorAsState(
         if (dragging) MaterialTheme.colorScheme.secondaryContainer
-        else MaterialTheme.colorScheme.surfaceColorAtElevation(2.dp),
+        else MaterialTheme.colorScheme.surfaceVariant,
         animationSpec = tween(200),
         label = "carCardBg",
     )
-    Card(
-        Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = cardBg),
+    // The exact same collapsible pebble every car's own pebble list on the
+    // garage screen uses -- same bounce-open/calm-close springs, same corner
+    // morph, same per-row staggered reveal, same "hold the header to drag"
+    // idiom (no separate drag-handle icon; PebbleShell never draws one, and
+    // this card used to be the only place in Settings that did). It used to
+    // be its own bespoke Card + Row + AnimatedVisibility, a lookalike that
+    // drifted from every other pebble's motion any time that shared spec
+    // changed, which is what "standard" was pointing at.
+    //
+    // The collapsed header traded the old car-photo thumbnail for the same
+    // icon + title + summary shape every other pebble uses -- the photo
+    // itself is unchanged and still front-and-centre in the Photo group
+    // below once expanded, so nothing about it is actually lost, only where
+    // it first appears.
+    PebbleShell(
+        expanded = expanded,
+        onToggle = onToggle,
+        icon = Icons.Filled.DirectionsCar,
+        title = v.name,
+        vm = vm,
+        dragHandle = dragHandle,
+        summary = "${v.model} · ${state.powertrainLabel(v)}",
+        containerColor = cardBg,
+        forceExpanded = !collapsible,
     ) {
-        // No animateContentSize on this Column -- the body below is already
-        // wrapped in its own AnimatedVisibility with expandVertically/
-        // shrinkVertically, which smoothly animates that same height delta on
-        // its own. A second, independently-sprung animateContentSize here on
-        // top of it fought that animation every frame (each step of the inner
-        // spring is itself a "content size changed" event the outer one then
-        // re-animates towards), which is what made this card's collapse/
-        // expand read as janky/double-animated instead of one clean motion.
-        Column(Modifier.padding(12.dp)) {
-            Row(
-                Modifier.fillMaxWidth()
-                    .then(if (collapsible) Modifier.clickable { onToggle() } else Modifier)
-                    .then(dragHandle),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                if (showHandle) {
-                    Icon(
-                        Icons.Filled.DragHandle,
-                        contentDescription = "Drag to reorder",
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    Spacer(Modifier.width(10.dp))
-                }
-                // A thumbnail of whatever photo is set (or the same tonal
-                // gradient/car-icon fallback CarTilesHeader uses elsewhere) --
-                // this card used to be pure text with no visual trace of the
-                // photo it lets you change, so a new photo never actually
-                // showed up anywhere until you closed Settings and looked at
-                // the garage screen.
-                val thumbImg = state.imageUrls[v.vin]
-                CarThumb(img = thumbImg, size = 44.dp, cornerRadius = 14.dp, iconSize = 20.dp)
-                Spacer(Modifier.width(12.dp))
-                Column(Modifier.weight(1f)) {
-                    Text(v.name, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Bold)
-                    Text(
-                        "${v.model} · ${state.powertrainLabel(v)}",
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-                if (collapsible) {
-                    MorphExpandButton(expanded = expanded, onToggle = onToggle)
+        SettingsGroup("Powertrain") {
+            PowertrainPicker(current = state.powertrainOf(v)) { pt -> vm.setPowertrain(v, pt) }
+        }
+
+        SettingsGroup("Climate features") {
+            Text(
+                "The remote climate command controls four seat positions. Enable " +
+                    "heating and/or cooling for the seats your car actually has.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            SeatPositions.forEach { pos ->
+                SeatConfigRow(pos.label, pos.heat(seats), pos.cool(seats),
+                    { vm.setSeatFlag(v, pos.heatKey, it) }, { vm.setSeatFlag(v, pos.coolKey, it) })
+            }
+            ToggleRow("Heated steering wheel", seats.steeringWheel) { vm.setSeatFlag(v, "sw", it) }
+        }
+
+        if (state.settingsMode == "advanced") SettingsGroup("Default climate start") {
+            val carPresets = state.climatePresets[v.vin].orEmpty()
+            val currentDefault = state.defaultClimatePresets[v.vin] ?: "smart"
+            Text(
+                "When the climate Start button is tapped (collapsed view), " +
+                    "the app runs your chosen preset or smart climate.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Spacer(Modifier.height(4.dp))
+            MorphSegmented(
+                options = buildList {
+                    add(SegmentOption("smart", "Smart", null))
+                    carPresets.forEach { p -> add(SegmentOption(p.id, p.name, null)) }
+                },
+                selectedKey = currentDefault,
+                onSelect = { key -> vm.setDefaultClimatePreset(v.vin, key.takeIf { it != "smart" }) },
+            )
+        }
+
+        // Per-car palette override: existed in SettingsStore/AppViewModel
+        // (setCarPaletteId) with no UI entry point anywhere -- only shown
+        // once there's at least one custom palette to actually choose.
+        val appearance = LocalAppearance.current
+        if (state.settingsMode == "advanced" && appearance.customPalettes.isNotEmpty()) {
+            SettingsGroup("Palette override") {
+                Text(
+                    "Give this car its own colour palette instead of the app-wide theme.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(Modifier.height(4.dp))
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    appearance.customPalettes.forEach { palette ->
+                        val selected = appearance.carCustomPaletteIds[v.vin] == palette.id
+                        CustomPaletteSwatch(
+                            palette = palette,
+                            selected = selected,
+                            onClick = { vm.setCarPaletteId(v.vin, if (selected) null else palette.id) },
+                            onEdit = {},
+                        )
+                    }
                 }
             }
-            AnimatedVisibility(
-                visible = expanded,
-                enter = collapseEnter(Alignment.Bottom),
-                exit = collapseExit(Alignment.Bottom),
-            ) {
-                Column(Modifier.padding(top = 12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    SettingsGroup("Powertrain") {
-                        PowertrainPicker(current = state.powertrainOf(v)) { pt -> vm.setPowertrain(v, pt) }
+        }
+
+        SettingsGroup("Photo") {
+            val storedImage = state.imageUrls[v.vin]
+            // A live preview instead of just "Custom photo set" as plain
+            // text -- there was no way to actually see the effect of a
+            // photo change without leaving Settings and finding this car
+            // on the garage screen.
+            if (!storedImage.isNullOrBlank()) {
+                AsyncImage(
+                    model = rememberPhotoModel(storedImage),
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(120.dp)
+                        .clip(RoundedCornerShape(14.dp)),
+                )
+            }
+            if (storedImage != null && storedImage.startsWith("/")) {
+                Text(
+                    "Custom photo set",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            } else {
+                OutlinedTextField(
+                    value = storedImage ?: "",
+                    onValueChange = { vm.setVehicleImage(v.vin, it) },
+                    label = { Text("Image URL (blank = gradient)") },
+                    singleLine = true,
+                    shape = FieldShape,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                MorphTextButton("Choose photo", onClick = onPickPhoto)
+                if (state.imageUrls[v.vin] != null) {
+                    MorphTextButton("Clear", onClick = { vm.setVehicleImage(v.vin, "") })
+                }
+            }
+        }
+
+        // Identity & service tracking and pebble visibility are both
+        // power-user record-keeping, not something a first-time or
+        // casual user needs to see every time they open a car's
+        // settings -- Simple mode now only shows what actually changes
+        // which controls appear (photo, powertrain, seat/climate
+        // features), matching Default climate start/Palette override
+        // above.
+        if (state.settingsMode == "advanced") {
+            SettingsGroup("Identity & service") {
+                SelectionContainer { StatusRow("VIN", v.vin) }
+                OutlinedTextField(
+                    value = state.licensePlates[v.vin] ?: "",
+                    onValueChange = { vm.setLicensePlate(v.vin, it) },
+                    label = { Text("License plate") },
+                    singleLine = true,
+                    shape = FieldShape,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    MilesField(state.lastServiceMiles[v.vin], "Last service (mi)", Modifier.weight(1f)) {
+                        vm.setLastServiceMiles(v.vin, it)
                     }
-
-                    SettingsGroup("Climate features") {
-                        Text(
-                            "The remote climate command controls four seat positions. Enable " +
-                                "heating and/or cooling for the seats your car actually has.",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                        SeatPositions.forEach { pos ->
-                            SeatConfigRow(pos.label, pos.heat(seats), pos.cool(seats),
-                                { vm.setSeatFlag(v, pos.heatKey, it) }, { vm.setSeatFlag(v, pos.coolKey, it) })
-                        }
-                        ToggleRow("Heated steering wheel", seats.steeringWheel) { vm.setSeatFlag(v, "sw", it) }
-                    }
-
-                    if (state.settingsMode == "advanced") SettingsGroup("Default climate start") {
-                            val carPresets = state.climatePresets[v.vin].orEmpty()
-                            val currentDefault = state.defaultClimatePresets[v.vin] ?: "smart"
-                            Text(
-                                "When the climate Start button is tapped (collapsed view), " +
-                                    "the app runs your chosen preset or smart climate.",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                            Spacer(Modifier.height(4.dp))
-                            MorphSegmented(
-                                options = buildList {
-                                    add(SegmentOption("smart", "Smart", null))
-                                    carPresets.forEach { p -> add(SegmentOption(p.id, p.name, null)) }
-                                },
-                                selectedKey = currentDefault,
-                                onSelect = { key -> vm.setDefaultClimatePreset(v.vin, key.takeIf { it != "smart" }) },
-                            )
-                        }
-
-                    // Per-car palette override: existed in SettingsStore/AppViewModel
-                    // (setCarPaletteId) with no UI entry point anywhere -- only shown
-                    // once there's at least one custom palette to actually choose.
-                    val appearance = LocalAppearance.current
-                    if (state.settingsMode == "advanced" && appearance.customPalettes.isNotEmpty()) {
-                        SettingsGroup("Palette override") {
-                            Text(
-                                "Give this car its own colour palette instead of the app-wide theme.",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                            Spacer(Modifier.height(4.dp))
-                            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                appearance.customPalettes.forEach { palette ->
-                                    val selected = appearance.carCustomPaletteIds[v.vin] == palette.id
-                                    CustomPaletteSwatch(
-                                        palette = palette,
-                                        selected = selected,
-                                        onClick = { vm.setCarPaletteId(v.vin, if (selected) null else palette.id) },
-                                        onEdit = {},
-                                    )
-                                }
-                            }
-                        }
-                    }
-
-                    SettingsGroup("Photo") {
-                        val storedImage = state.imageUrls[v.vin]
-                        // A live preview instead of just "Custom photo set" as plain
-                        // text -- there was no way to actually see the effect of a
-                        // photo change without leaving Settings and finding this car
-                        // on the garage screen.
-                        if (!storedImage.isNullOrBlank()) {
-                            AsyncImage(
-                                model = rememberPhotoModel(storedImage),
-                                contentDescription = null,
-                                contentScale = ContentScale.Crop,
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .height(120.dp)
-                                    .clip(RoundedCornerShape(14.dp)),
-                            )
-                        }
-                        if (storedImage != null && storedImage.startsWith("/")) {
-                            Text(
-                                "Custom photo set",
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        } else {
-                            OutlinedTextField(
-                                value = storedImage ?: "",
-                                onValueChange = { vm.setVehicleImage(v.vin, it) },
-                                label = { Text("Image URL (blank = gradient)") },
-                                singleLine = true,
-                                shape = FieldShape,
-                                modifier = Modifier.fillMaxWidth(),
-                            )
-                        }
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            MorphTextButton("Choose photo", onClick = onPickPhoto)
-                            if (state.imageUrls[v.vin] != null) {
-                                MorphTextButton("Clear", onClick = { vm.setVehicleImage(v.vin, "") })
-                            }
-                        }
-                    }
-
-                    // Identity & service tracking and pebble visibility are both
-                    // power-user record-keeping, not something a first-time or
-                    // casual user needs to see every time they open a car's
-                    // settings -- Simple mode now only shows what actually changes
-                    // which controls appear (photo, powertrain, seat/climate
-                    // features), matching Default climate start/Palette override
-                    // above.
-                    if (state.settingsMode == "advanced") {
-                        SettingsGroup("Identity & service") {
-                            SelectionContainer { StatusRow("VIN", v.vin) }
-                            OutlinedTextField(
-                                value = state.licensePlates[v.vin] ?: "",
-                                onValueChange = { vm.setLicensePlate(v.vin, it) },
-                                label = { Text("License plate") },
-                                singleLine = true,
-                                shape = FieldShape,
-                                modifier = Modifier.fillMaxWidth(),
-                            )
-                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                MilesField(state.lastServiceMiles[v.vin], "Last service (mi)", Modifier.weight(1f)) {
-                                    vm.setLastServiceMiles(v.vin, it)
-                                }
-                                MilesField(state.serviceIntervalMiles[v.vin], "Interval (mi)", Modifier.weight(1f)) {
-                                    vm.setServiceIntervalMiles(v.vin, it)
-                                }
-                            }
-                        }
-
-                        SettingsGroup("Sections shown") {
-                            val labels = mapOf(
-                                "charge" to "Charge / fuel",
-                                "climate" to "Climate",
-                                "location" to "Location",
-                                "weather" to "Weather",
-                                "trips" to "Trips",
-                                "info" to "Car info",
-                                "diagnostics" to "Diagnostics",
-                                "ai" to "AI summary",
-                            )
-                            com.bloo.bluelink.data.HIDEABLE_SECTIONS
-                                // The AI toggle only matters when AI is enabled for this device.
-                                .filter { it != "ai" || state.aiEnabled }
-                                .forEach { sec ->
-                                    ToggleRow(labels[sec] ?: sec, !state.isPebbleHidden(v.vin, sec)) { show ->
-                                        vm.setSectionHidden(v, sec, !show)
-                                    }
-                                }
-                        }
+                    MilesField(state.serviceIntervalMiles[v.vin], "Interval (mi)", Modifier.weight(1f)) {
+                        vm.setServiceIntervalMiles(v.vin, it)
                     }
                 }
+            }
+
+            SettingsGroup("Sections shown") {
+                val labels = mapOf(
+                    "charge" to "Charge / fuel",
+                    "climate" to "Climate",
+                    "location" to "Location",
+                    "weather" to "Weather",
+                    "trips" to "Trips",
+                    "info" to "Car info",
+                    "diagnostics" to "Diagnostics",
+                    "ai" to "AI summary",
+                )
+                com.bloo.bluelink.data.HIDEABLE_SECTIONS
+                    // The AI toggle only matters when AI is enabled for this device.
+                    .filter { it != "ai" || state.aiEnabled }
+                    .forEach { sec ->
+                        ToggleRow(labels[sec] ?: sec, !state.isPebbleHidden(v.vin, sec)) { show ->
+                            vm.setSectionHidden(v, sec, !show)
+                        }
+                    }
             }
         }
     }
