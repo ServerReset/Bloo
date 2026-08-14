@@ -3625,15 +3625,28 @@ private fun SettingsSearchResults(
     add("Search on the car screen", "search bubble car screen cover home garage ask command") {
         ToggleRow("Search on the car screen", appearance.showSearch) { vm.setShowSearch(it) }
     }
-    // Plain ToggleRow here, same as every entry above -- this mirror doesn't
-    // reproduce the Display card's own seamless cross-navigation (jumping
-    // straight to the pager/standalone route on flip), it only ever offers
-    // the setting itself, exactly like Search on the car screen right above
-    // it never re-navigates from a search result either. Added because this
-    // was the one Display toggle missing from the catalog entirely -- it
-    // existed in the card but had no way to be found by typing for it.
+    // Unlike every other entry here, this ONE still needs a slice of the
+    // Display card's own cross-navigation -- search is reachable from the
+    // garage screen too, not just from inside Settings, so toggling this on
+    // from a search result was a real, easy-to-hit way to trip the exact
+    // "kicked out instead of moved to the right place" bug the Display card's
+    // own toggle was fixed for: the preference flipped with no visible
+    // navigation, and only the NEXT time Settings was reached did it turn up
+    // somewhere unexpected. Turning ON always follows it there now, safe to
+    // call from any screen: closeSettings(landOnSettingsPage = true) is a
+    // harmless no-op navigation if already on the garage, and the pager's own
+    // authoritative landing effect (Screens.kt) snaps onto the new Settings
+    // slot regardless of whether this composition is fresh or already
+    // mounted. Turning OFF stays a plain preference change -- if this result
+    // was reached while actually parked on the embedded page, the pager's own
+    // existing drift-correction already lands back on a car gracefully once
+    // the slot disappears; there's nothing to fix on the way out that isn't
+    // already handled.
     add("Settings as a swipeable page", "gear button pager swipe car screen navigation") {
-        ToggleRow("Settings as a swipeable page", appearance.settingsAsPage) { vm.setSettingsAsPage(it) }
+        ToggleRow("Settings as a swipeable page", appearance.settingsAsPage) { turningOn ->
+            vm.setSettingsAsPage(turningOn)
+            if (turningOn) vm.closeSettings(landOnSettingsPage = true)
+        }
     }
     add("Units", "unit system metric imperial temperature distance speed miles km") {
         SettingsSegmentedRow(
