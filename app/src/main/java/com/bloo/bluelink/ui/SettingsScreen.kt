@@ -3568,6 +3568,43 @@ private fun SettingsSearchResults(
     add("Settings as a swipeable page", "gear button pager swipe car screen navigation") {
         ToggleRow("Settings as a swipeable page", appearance.settingsAsPage) { vm.setSettingsAsPage(it) }
     }
+    add("Units", "unit system metric imperial temperature distance speed miles km") {
+        SettingsSegmentedRow(
+            label = "Units",
+            options = listOf(
+                SegmentOption("imperial", "Imperial", null),
+                SegmentOption("metric", "Metric", null),
+            ),
+            selectedKey = appearance.unitSystem,
+            onSelect = { vm.setUnitSystem(it) },
+        )
+    }
+    add("Font", "typeface atkinson hyperlegible google sans accessibility low vision") {
+        val labels = mapOf(
+            FontChoice.SYSTEM to "System default",
+            FontChoice.ATKINSON to "Atkinson Hyperlegible",
+            FontChoice.GOOGLE_SANS to "Google Sans",
+        )
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            FontChoice.entries.forEach { choice ->
+                ChoiceRow(labels.getValue(choice), appearance.fontChoice == choice) { vm.setFontChoice(choice) }
+            }
+        }
+    }
+    add("Display mode", "theme light dark amoled system appearance") {
+        SettingsSegmentedRow(
+            label = "Appearance",
+            options = listOf(
+                SegmentOption(ThemeMode.SYSTEM.name, "System", null),
+                SegmentOption(ThemeMode.SYSTEM_AMOLED.name, "+AMOLED", null),
+                SegmentOption(ThemeMode.LIGHT.name, "Light", null),
+                SegmentOption(ThemeMode.DARK.name, "Dark", null),
+                SegmentOption(ThemeMode.AMOLED.name, "AMOLED", null),
+            ),
+            selectedKey = appearance.themeMode.name,
+            onSelect = { vm.setThemeMode(ThemeMode.valueOf(it)) },
+        )
+    }
     add("Aurora background", "gradient animated theme background glow") {
         ToggleRow("Aurora background", appearance.auroraBackground) { vm.setAuroraBackground(it) }
     }
