@@ -138,13 +138,6 @@ internal val SoftDamping get() = com.bloo.uicommon.SoftDamping
 internal val PillCornerPercent get() = com.bloo.uicommon.PillCornerPercent
 internal val MorphedCornerPercent get() = com.bloo.uicommon.MorphedCornerPercent
 
-/** Shared spring stiffness for the Simple/Advanced mode switch's card expand/collapse (the
- *  outer settings column, each card's own animateContentSize, and the advanced-only cards'
- *  enter/exit) -- slower than Spring.StiffnessLow for a slightly longer, calmer settle,
- *  paired with [SoftDamping] for minimal bounce. All of these must share one spec or the
- *  pieces visibly settle at different times/feels. */
-internal const val AdvancedModeStiffness = 130f
-
 /**
  * The app's collapse/expand transition, supplied by the Material theme.
  *
@@ -167,13 +160,14 @@ internal const val AdvancedModeStiffness = 130f
  *    a snap next to a smooth open; six tweened both halves.
  *
  * The Settings screen's Simple/Advanced toggle used to be the one deliberate holdout here,
- * on its own calmer [AdvancedModeStiffness] spec, reasoned as "it reveals a lot at once."
- * It now uses these same tokens too -- what actually made revealing a lot at once feel
- * chaotic turned out to be several cards all overshooting on the same frame, not the bounce
- * itself, and `staggeredAdvancedVisible` (SettingsScreen.kt) fixes that directly by giving
- * each card a small index-based head start instead of avoiding the bounce altogether.
- * [AdvancedModeStiffness] still exists for [SettingsCard]'s own in-place `animateContentSize`
- * (a genuinely different case: smoothing a resize already in progress, not this transition).
+ * on its own calmer, now-deleted `AdvancedModeStiffness` spec, reasoned as "it reveals a lot
+ * at once." It now uses these same tokens too -- what actually made revealing a lot at once
+ * feel chaotic turned out to be several cards all overshooting on the same frame, not the
+ * bounce itself, and `staggeredAdvancedVisible` (SettingsScreen.kt) fixes that directly by
+ * giving each card a small index-based head start instead of avoiding the bounce altogether.
+ * [SettingsCard] itself is gone too, as a bespoke `Card` + `animateContentSize` -- it's now a
+ * thin wrapper around [PebbleShell], the exact same expandable-pebble system this token
+ * pair drives, so there's no second "in-place resize" spec left needing its own constant.
  *
  * [expandFrom] is a parameter and not a constant because it is a layout fact, not a timing
  * one: a body under a header should grow downward from its top, while a bubble anchored

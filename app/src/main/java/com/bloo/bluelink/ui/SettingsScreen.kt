@@ -563,15 +563,16 @@ internal fun SettingsScreen(vm: AppViewModel) {
             // And no `animateContentSize` either. It used to wrap this Column on the
             // reasoning that all three settles should share one feel, but every child that
             // changes height here already animates its own (collapseEnter/collapseExit's
-            // expandVertically/shrinkVertically, plus SettingsCard's own inner
-            // animateContentSize). Stacking a second, independently-sprung height animation
-            // over those makes each frame of the inner ones a fresh "content size changed"
-            // event for the outer one to chase, so the Column lags behind its own content
-            // and then catches up -- which is the other half of what looked like a snap.
-            // PebbleShell documents the identical trap; this is the same mistake, here.
+            // expandVertically/shrinkVertically, plus PebbleShell's own internal reveal --
+            // SettingsCard is a thin wrapper around it now). Stacking a second,
+            // independently-sprung height animation over those makes each frame of the
+            // inner ones a fresh "content size changed" event for the outer one to chase,
+            // so the Column lags behind its own content and then catches up -- which is
+            // the other half of what looked like a snap. PebbleShell documents the
+            // identical trap; this is the same mistake, here.
             Column {
             // Accounts (one per brand; Hyundai + Genesis can both be signed in).
-            SettingsCard("Accounts", Icons.Filled.Person) {
+            SettingsCard("Accounts", Icons.Filled.Person, vm) {
                 // Same icon-badge + status-line header as every other card that's had
                 // this pass applied -- was straight into "Not signed in" or a wall of
                 // per-account blocks with nothing summarizing how many were connected.
@@ -670,7 +671,7 @@ internal fun SettingsScreen(vm: AppViewModel) {
             // shown (not advanced-only): it's a headline feature, not a power-
             // user knob, and hiding it behind Advanced made it easy to miss.
             if (state.aiSupported) {
-                SettingsCard("AI", Icons.Filled.AutoAwesome) {
+                SettingsCard("AI", Icons.Filled.AutoAwesome, vm) {
                     // Same icon-badge + status-line header as the rest of this pass.
                     val aiTint = if (state.aiEnabled) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.onSurfaceVariant
                     Row(verticalAlignment = Alignment.CenterVertically) {
@@ -732,7 +733,7 @@ internal fun SettingsScreen(vm: AppViewModel) {
             // App-icon shortcuts (long-press the launcher icon)
             AnimatedVisibility(visible = staggeredAdvancedVisible(advanced, 0), enter = collapseEnter(), exit = collapseExit()) {
                 var shortcutsExpanded by remember { mutableStateOf(false) }
-                SettingsCard("App shortcuts", Icons.Filled.Bolt) {
+                SettingsCard("App shortcuts", Icons.Filled.Bolt, vm) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(
                             "Quick-access shortcuts from the launcher icon",
@@ -784,7 +785,7 @@ internal fun SettingsScreen(vm: AppViewModel) {
                         PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly),
                     )
                 }
-                SettingsCard(if (single) "Car" else "Cars") {
+                SettingsCard(if (single) "Car" else "Cars", vm = vm) {
                     if (single) {
                         val v = state.vehicles[0]
                         CarSettingsCard(
@@ -812,7 +813,7 @@ internal fun SettingsScreen(vm: AppViewModel) {
             }
 
             // Backup / Sync
-            SettingsCard("Backup & sync", Icons.Filled.CloudSync) {
+            SettingsCard("Backup & sync", Icons.Filled.CloudSync, vm) {
                 var showDriveDialog by remember { mutableStateOf(false) }
                 val settingsImportLauncher = rememberLauncherForActivityResult(
                     ActivityResultContracts.GetContent(),
@@ -1035,7 +1036,7 @@ internal fun SettingsScreen(vm: AppViewModel) {
             }
 
             // Display scale
-            SettingsCard("Display", Icons.Filled.Straighten) {
+            SettingsCard("Display", Icons.Filled.Straighten, vm) {
                 // Advanced-only: a power-user knob, unlike the Units picker
                 // below it which every user needs regardless of mode. PopVisible,
                 // not a bare `if` -- was snapping in/out with the mode switch.
@@ -1084,7 +1085,7 @@ internal fun SettingsScreen(vm: AppViewModel) {
             // accessibility choice behind a mode called "advanced" is a
             // choice the people who need it are least likely to find. The
             // rest of the card costs nothing to show alongside it.
-            SettingsCard("Font", Icons.Filled.TextFields) {
+            SettingsCard("Font", Icons.Filled.TextFields, vm) {
                 val labels = mapOf(
                     FontChoice.SYSTEM to "System default",
                     FontChoice.ATKINSON to "Atkinson Hyperlegible",
@@ -1099,7 +1100,7 @@ internal fun SettingsScreen(vm: AppViewModel) {
 
             // Links
             AnimatedVisibility(visible = staggeredAdvancedVisible(advanced, 2), enter = collapseEnter(), exit = collapseExit()) {
-            SettingsCard("Links", Icons.Filled.OpenInNew) {
+            SettingsCard("Links", Icons.Filled.OpenInNew, vm) {
                 SettingsSegmentedRow(
                     label = "Open links",
                     options = listOf(
@@ -1114,7 +1115,7 @@ internal fun SettingsScreen(vm: AppViewModel) {
 
             // Logs
             AnimatedVisibility(visible = staggeredAdvancedVisible(advanced, 3), enter = collapseEnter(), exit = collapseExit()) {
-            SettingsCard("Logs", Icons.Filled.Info) {
+            SettingsCard("Logs", Icons.Filled.Info, vm) {
                 var logsExpanded by remember { mutableStateOf(false) }
                 val lineCount = logs.size
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -1177,7 +1178,7 @@ internal fun SettingsScreen(vm: AppViewModel) {
             }
 
             // Notifications
-            SettingsCard("Notifications", Icons.Filled.Notifications) {
+            SettingsCard("Notifications", Icons.Filled.Notifications, vm) {
                 // Icon-badge + status-line header, matching Backup & sync/Updates --
                 // this card used to open straight into a wall of toggles with no
                 // at-a-glance read of how many alerts were actually live.
@@ -1319,7 +1320,7 @@ internal fun SettingsScreen(vm: AppViewModel) {
             // Quick Settings tiles -- per-tile config is power-user territory,
             // same tier as App shortcuts/Cars above.
             AnimatedVisibility(visible = staggeredAdvancedVisible(advanced, 4), enter = collapseEnter(), exit = collapseExit()) {
-            SettingsCard("Quick tiles", Icons.Filled.Dashboard) {
+            SettingsCard("Quick tiles", Icons.Filled.Dashboard, vm) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(Icons.Filled.Bolt, contentDescription = null, modifier = Modifier.size(20.dp), tint = MaterialTheme.colorScheme.primary)
                     Spacer(Modifier.width(8.dp))
@@ -1362,7 +1363,7 @@ internal fun SettingsScreen(vm: AppViewModel) {
             }
 
             // Security
-            SettingsCard("Security", Icons.Filled.Lock) {
+            SettingsCard("Security", Icons.Filled.Lock, vm) {
                 // Same icon-badge + status-line header Notifications/Backup & sync use --
                 // this card used to open straight into a segmented row with no glanceable
                 // read of whether the app lock is actually on.
@@ -1475,12 +1476,12 @@ internal fun SettingsScreen(vm: AppViewModel) {
             }
 
             // Sounds & vibration
-            SettingsCard("Sounds & vibration", Icons.Filled.Vibration) {
+            SettingsCard("Sounds & vibration", Icons.Filled.Vibration, vm) {
                 ToggleRow("Haptic feedback", appearance.hapticsEnabled) { vm.setHapticsEnabled(it) }
             }
 
             // Theme
-            SettingsCard("Theme", Icons.Filled.Palette) {
+            SettingsCard("Theme", Icons.Filled.Palette, vm) {
                 // Same icon-badge + status-line header as the rest of this pass.
                 val themeTint = MaterialTheme.colorScheme.tertiary
                 val themeLabel = when (appearance.themeMode) {
@@ -1683,7 +1684,7 @@ internal fun SettingsScreen(vm: AppViewModel) {
             // hero, but this is the manual home: which build you're on, a force-check,
             // a browser fallback source, and the optional Shizuku silent-install toggle
             // gated to just its row so the card itself never vanishes).
-            SettingsCard("Updates", Icons.Filled.SystemUpdate) {
+            SettingsCard("Updates", Icons.Filled.SystemUpdate, vm) {
                 val updateTint by androidx.compose.animation.animateColorAsState(
                     targetValue = when {
                         state.updateAvailable != null -> MaterialTheme.colorScheme.tertiary
@@ -1795,7 +1796,7 @@ internal fun SettingsScreen(vm: AppViewModel) {
             }
 
             // Weather
-            SettingsCard("Weather", Icons.Filled.WbSunny) {
+            SettingsCard("Weather", Icons.Filled.WbSunny, vm) {
                 var weatherQuery by remember { mutableStateOf("") }
                 val locationPermission = rememberLauncherForActivityResult(
                     ActivityResultContracts.RequestPermission(),
@@ -4216,77 +4217,65 @@ private fun AddTilePill(label: String, onClick: () -> Unit) {
     }
 }
 
+/**
+ * Re-architected onto [PebbleShell] -- the exact expandable-card system every garage
+ * pebble uses (bounce-open / calm-close springs, the staggered per-row reveal via
+ * [StaggeredRevealColumn], the tonal `surfaceVariant` fill, the morphing pill<->square
+ * corner radius) -- instead of the bespoke always-expanded `Card` + `animateContentSize`
+ * this used to be. Settings was otherwise the one screen in the app whose collapsible
+ * surfaces didn't actually collapse and ran on their own separate motion spec (the
+ * now-deleted `AdvancedModeStiffness`/[SoftDamping]) rather than the shared bounce
+ * tokens ([PebbleBounceDamping]/[PebbleCloseDamping]) every other expandable surface
+ * in the app converged on this session.
+ *
+ * Every card starts EXPANDED (`rememberSaveable` keyed on its own [title], so a
+ * rotation or a process restore puts it back where the user left it) -- nothing that
+ * was visible before this change is hidden by default. The only real behaviour change
+ * is that a card's header is now a genuine toggle: tapping it collapses the card, the
+ * same as every pebble in the garage, instead of Settings being the one screen where
+ * every section stayed permanently open whether you cared about it or not.
+ *
+ * [vm] is threaded through purely because [PebbleShell] requires it in its own
+ * signature (unused in that function's body today, kept for signature parity with
+ * [Pebble]) -- every call site already has it in scope, since every one of them runs
+ * inside `SettingsScreen(vm: AppViewModel)`.
+ *
+ * [icon] stays nullable at the call-site API (unchanged from before) but PebbleShell's
+ * own `icon` parameter is not, so a null here falls back to a generic settings glyph --
+ * in practice this only ever fires for the single "Car"/"Cars" card, which had no icon
+ * of its own to begin with.
+ */
 @Composable
-internal fun SettingsCard(title: String, icon: ImageVector? = null, content: @Composable () -> Unit) {
-    val shape = RoundedCornerShape(PebbleCornerExpanded)
-    val outline = LocalAppearance.current.pebbleOutline
-    Card(
+internal fun SettingsCard(title: String, icon: ImageVector? = null, vm: AppViewModel, content: @Composable () -> Unit) {
+    var expanded by rememberSaveable(title) { mutableStateOf(true) }
+    // heading() on the outer wrapper, not inside PebbleShell's own header Text -- PebbleShell
+    // doesn't expose a hook into its title's own Modifier, so this is applied one level up
+    // instead. PebbleShell's header row is already ONE merged TalkBack stop (tap-to-toggle),
+    // so marking that whole stop as a heading preserves the "headings" navigation shortcut
+    // across Settings' ~15 cards that the old Card-based header set up explicitly for.
+    Box(
         Modifier
             .fillMaxWidth()
-            // The inter-card gap lives HERE, inside the card, and not as the parent
+            // The inter-card gap lives HERE, inside this wrapper, and not as the parent
             // Column's `Arrangement.spacedBy`. That is not a style preference, it is the
-            // fix for the Advanced->Simple collapse leaving gaps behind.
-            //
-            // spacedBy inserts its spacing between EVERY pair of children regardless of
-            // their height, so each of the seven advanced sections -- an AnimatedVisibility
-            // shrunk all the way to zero height -- still contributed a full 10dp. Up to
-            // 70dp of gap between cards that were no longer there, held for the whole
-            // (deliberately slow) shrink, and then removed in one frame when the nodes left
-            // composition. That is the "extra space between the cards, then it snaps".
-            //
-            // As the card's own bottom padding it is part of the content AnimatedVisibility
-            // measures, so it shrinks with the card instead of outliving it. Before
-            // dropShadow in the chain, so the shadow still draws inside the gap rather than
-            // being inset by it.
+            // fix for the Advanced->Simple collapse leaving gaps behind: `spacedBy` inserts
+            // its spacing between EVERY pair of children regardless of their height, so an
+            // advanced-only card shrunk to zero by its own outer AnimatedVisibility still
+            // contributed a full gap that `spacedBy` held open on its own schedule and then
+            // dropped in one frame once the node left composition -- "extra space between
+            // the cards, then it snaps". Living on this wrapper instead means the gap sits
+            // INSIDE that same outer AnimatedVisibility and shrinks away with the card.
             .padding(bottom = SettingsCardGap)
-            // The same shadow and optional rim every pebble in the app gets.
-            // Settings was the one screen whose cards were bare Material
-            // Cards -- flat, cornered differently from everything else, with
-            // no depth at all -- so the screen read as belonging to a
-            // different app than the garage it opens from.
-            .dropShadow(shape, blurRadius = 12.dp, offsetY = 4.dp)
-            .then(
-                if (outline) {
-                    Modifier.border(BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.55f)), shape)
-                } else Modifier,
-            ),
-        shape = shape,
+            .semantics { heading() },
     ) {
-        Column(
-            Modifier
-                .padding(16.dp)
-                .animateContentSize(spring(dampingRatio = SoftDamping, stiffness = AdvancedModeStiffness)),
-        ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                // An icon per section, matching how every pebble names itself.
-                // Fifteen identically-styled text headings in one long scroll
-                // are hard to navigate by eye -- you read each one to find the
-                // one you want. A glyph is recognisable at a glance and at
-                // speed, which is the entire job of a heading in a list this
-                // long.
-                if (icon != null) {
-                    Icon(
-                        icon,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(20.dp),
-                    )
-                    Spacer(Modifier.width(10.dp))
-                }
-                // Role.Heading lets TalkBack's "headings" navigation control jump
-                // section-to-section across Settings' ~15 SettingsCards instead of
-                // linearly swiping through every row of every card to get anywhere
-                // -- there was no heading structure anywhere in the phone app.
-                Text(
-                    title,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier.semantics { heading() },
-                )
-            }
-            Spacer(Modifier.height(10.dp))
-            content()
-        }
+        PebbleShell(
+            expanded = expanded,
+            onToggle = { expanded = !expanded },
+            icon = icon ?: Icons.Filled.Settings,
+            title = title,
+            vm = vm,
+            content = { content() },
+        )
     }
 }
 
