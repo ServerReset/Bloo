@@ -1987,7 +1987,16 @@ internal fun SettingsScreen(vm: AppViewModel, embedded: Boolean = false) {
         if (!isCompactCoverScreen() && !embedded) StatusBarScrim()
         // Floating back-arrow + "Settings" label + simple/advanced button.
         Row(
-            Modifier.fillMaxWidth().align(Alignment.TopStart).statusBarsPadding(),
+            Modifier.fillMaxWidth().align(Alignment.TopStart).statusBarsPadding()
+                // FloatingIcon's own 12dp outer padding is what has always kept
+                // the "Settings" pill clear of the true screen edge -- but that
+                // Icon is skipped entirely when embedded, and this Row has no
+                // start padding of its own to fall back on, so the pill sat
+                // flush against the edge (and the device's own rounded corner/
+                // cutout) with nothing reserving room for it. Reproduces the
+                // same 12dp by hand only when there's no FloatingIcon here to
+                // provide it for free.
+                .then(if (embedded) Modifier.padding(start = 12.dp) else Modifier),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             // No back arrow when embedded -- there's no separate screen it would be
