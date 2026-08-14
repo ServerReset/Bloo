@@ -18,7 +18,6 @@ import com.bloo.bluelink.data.SessionStore
 import com.bloo.bluelink.data.SettingsStore
 import com.bloo.bluelink.data.SnapshotStore
 import com.bloo.bluelink.data.VehicleStatus
-import com.bloo.bluelink.data.targetForCurrentPlug
 import com.bloo.bluelink.wear.WearBridge
 import kotlinx.coroutines.sync.withLock
 import java.util.concurrent.TimeUnit

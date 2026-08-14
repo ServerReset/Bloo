@@ -40,10 +40,16 @@ class TileActionActivity : FragmentActivity() {
         val index = intent.getIntExtra(EXTRA_INDEX, 0)
 
         lifecycleScope.launch {
-            val snap = withContext(Dispatchers.IO) {
-                SnapshotStore(appCtx).current().vehicles.firstOrNull { it.vin == vin }
+            // One dispatcher hop for both independent reads, not two back to
+            // back -- this activity exists specifically to open, enqueue, and
+            // close as fast as possible, so an extra Dispatchers.IO handoff
+            // on that path is worth skipping even though each read alone is
+            // cheap.
+            val (snap, target) = withContext(Dispatchers.IO) {
+                val snap = SnapshotStore(appCtx).current().vehicles.firstOrNull { it.vin == vin }
+                val target = SettingsStore(appCtx).tileClimateTarget(index)
+                snap to target
             }
-            val target = withContext(Dispatchers.IO) { SettingsStore(appCtx).tileClimateTarget(index) }
             Toast.makeText(appCtx, TileCommandRunner.ackText(cmd, snap), Toast.LENGTH_SHORT).show()
             TileCommandWorker.enqueue(appCtx, vin, cmd, target)
             finishNoAnim()

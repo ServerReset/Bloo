@@ -57,7 +57,6 @@ abstract class BlooTileService : TileService() {
      */
     override fun onStartListening() {
         super.onStartListening()
-        scope.launch { render() }
         // Repaint while visible, instead of relying on someone to poke us.
         //
         // Nothing can poke us from outside: TileService.requestListeningState is only
@@ -76,11 +75,21 @@ abstract class BlooTileService : TileService() {
         // whatever their source: the command worker's optimistic write, a background
         // poller landing mid-shade, or a sync import.
         //
-        // Cancelled in onStopListening, because render() touches qsTile and that is only
-        // valid between onStartListening and onStopListening.
+        // One job, not two: the initial paint used to be its own untracked
+        // scope.launch { render() }, separate from watchJob below -- so
+        // onStopListening (which only ever cancelled watchJob) had nothing to
+        // cancel if the shade closed again while that first render() was
+        // still suspended on a cold DataStore read. render() resuming after
+        // that point touches qsTile outside the window the class's own docs
+        // say is safe, and tile.updateTile() throwing on a now-invalid binder
+        // would crash the process with no CoroutineExceptionHandler here to
+        // catch it. Folding the immediate paint into watchJob itself means
+        // there is exactly one job touching qsTile, and cancelling it always
+        // cancels ALL of it, whichever suspend point it's parked at.
         watchJob = scope.launch {
+            render()
             SnapshotStore(applicationContext).payload
-                .drop(1) // the launch above already painted the current value
+                .drop(1) // the render() above already painted the current value
                 .collect { runCatching { render() } }
         }
     }
