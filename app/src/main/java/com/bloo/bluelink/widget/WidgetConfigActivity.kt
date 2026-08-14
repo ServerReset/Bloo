@@ -515,6 +515,10 @@ private fun ConfigScreen(
         animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
         label = "accentSwatchRing",
     )
+    // The one selectable control on this whole screen not built on MorphChip
+    // (every SelectChip/ToggleChip/ToggleLine gets its haptic for free from
+    // it) -- a raw .clickable with no haptic of its own.
+    val haptics = com.bloo.bluelink.ui.LocalHaptics.current
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
         Box(
             modifier = Modifier
@@ -524,7 +528,7 @@ private fun ConfigScreen(
                 .padding(ring)
                 .clip(CircleShape)
                 .background(color)
-                .clickable(onClick = onClick),
+                .clickable(onClick = { haptics?.click(); onClick() }),
             contentAlignment = Alignment.Center,
         ) {
             if (selected) {
