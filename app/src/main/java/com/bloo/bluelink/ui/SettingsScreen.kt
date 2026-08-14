@@ -556,7 +556,20 @@ private fun StatusHeaderRow(icon: ImageVector, tint: Color, title: String, statu
  */
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
-internal fun SettingsScreen(vm: AppViewModel, embedded: Boolean = false) {
+internal fun SettingsScreen(
+    vm: AppViewModel,
+    embedded: Boolean = false,
+    // Hoists the "Settings" identity pill to GarageScreen's own floating
+    // car-name pill when supplied (embedded mode only -- see the call site in
+    // Screens.kt) instead of rendering the always-visible one below, exactly
+    // mirroring VehicleDetailContent's own onNameHiddenChanged. This is what
+    // unifies the floating pill across car pages and the embedded Settings
+    // page into the one element: same Surface, same PillAvatar, same
+    // scroll-to-hide behaviour, and it participates in that pill's own page
+    // count instead of Settings being the one page in this pager with a
+    // permanently-visible header nothing else has.
+    onNameHiddenChanged: ((Boolean, suspend () -> Unit) -> Unit)? = null,
+) {
     val appearance = LocalAppearance.current
     val notif by vm.notifications.collectAsState()
     val state by vm.state.collectAsState()
@@ -572,6 +585,17 @@ internal fun SettingsScreen(vm: AppViewModel, embedded: Boolean = false) {
     // separate layouts to keep in sync.
     val settingsGridState = rememberLazyStaggeredGridState()
     val settingsScope = rememberCoroutineScope()
+    // Same "has the header scrolled out of view" signal VehicleDetailContent
+    // computes for its own hoisted pill, just off a LazyStaggeredGridState
+    // instead of a plain ScrollState: item 0 is the grid's own leading
+    // spacer (see the grid below), so once the first VISIBLE item is
+    // anything past it, the header region is genuinely offscreen.
+    val settingsNameHidden by remember { derivedStateOf { settingsGridState.firstVisibleItemIndex > 0 } }
+    if (onNameHiddenChanged != null) {
+        LaunchedEffect(settingsNameHidden) {
+            onNameHiddenChanged(settingsNameHidden) { settingsGridState.animateScrollToItem(0) }
+        }
+    }
 
     // System back returns to the garage, not out of the app.
     var pickTarget by remember { mutableStateOf<String?>(null) }
@@ -2003,35 +2027,43 @@ internal fun SettingsScreen(vm: AppViewModel, embedded: Boolean = false) {
             // returning FROM (swiping to a car does that), and "Back to the app"
             // literally isn't true here: this already is the app's main screen.
             if (!embedded) FloatingIcon(Icons.Filled.ArrowBack, "Back to the app", { vm.closeSettings() })
-            // Same shape, chrome and PillAvatar "picture" slot as the floating
-            // car-name pill (Screens.kt) -- was name text alone, the one
-            // floating identity pill in the app that didn't carry a picture,
-            // which read as a plainer, different kind of object next to the
-            // pill you land on it FROM when swiping in from a car. A gear
-            // glyph in the same tonal circle a car's own photo sits in gives
-            // Settings the identical "picture + name" shape, so the pill
-            // itself doesn't change type crossing between the two, only what
-            // it says.
-            val settingsPillHaptics = LocalHaptics.current
-            val settingsPillShape = RoundedCornerShape(50)
-            Surface(
-                onClick = { settingsPillHaptics?.click(); settingsScope.launch { settingsGridState.animateScrollToItem(0) } },
-                shape = settingsPillShape,
-                color = MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = glassContainerAlpha()),
-                contentColor = MaterialTheme.colorScheme.onSurface,
-                modifier = Modifier.ambientRing(settingsPillShape).dropShadow(settingsPillShape).frostedRim(settingsPillShape),
-            ) {
-                Row(
-                    Modifier.height(48.dp).padding(start = 6.dp, end = 16.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+            // Only when nothing is hoisting this pill elsewhere (the
+            // standalone route): embedded mode's identity pill is
+            // GarageScreen's own floating car-name pill instead (see
+            // onNameHiddenChanged above), the whole point being one shared
+            // element rather than this permanently-visible one PLUS a second,
+            // scroll-triggered one duplicating it.
+            if (onNameHiddenChanged == null) {
+                // Same shape, chrome and PillAvatar "picture" slot as the floating
+                // car-name pill (Screens.kt) -- was name text alone, the one
+                // floating identity pill in the app that didn't carry a picture,
+                // which read as a plainer, different kind of object next to the
+                // pill you land on it FROM when swiping in from a car. A gear
+                // glyph in the same tonal circle a car's own photo sits in gives
+                // Settings the identical "picture + name" shape, so the pill
+                // itself doesn't change type crossing between the two, only what
+                // it says.
+                val settingsPillHaptics = LocalHaptics.current
+                val settingsPillShape = RoundedCornerShape(50)
+                Surface(
+                    onClick = { settingsPillHaptics?.click(); settingsScope.launch { settingsGridState.animateScrollToItem(0) } },
+                    shape = settingsPillShape,
+                    color = MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = glassContainerAlpha()),
+                    contentColor = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.ambientRing(settingsPillShape).dropShadow(settingsPillShape).frostedRim(settingsPillShape),
                 ) {
-                    PillAvatar(photo = null, icon = Icons.Filled.Settings, tint = MaterialTheme.colorScheme.tertiary)
-                    Text(
-                        "Settings",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.SemiBold,
-                    )
+                    Row(
+                        Modifier.height(48.dp).padding(start = 6.dp, end = 16.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        PillAvatar(photo = null, icon = Icons.Filled.Settings, tint = MaterialTheme.colorScheme.tertiary)
+                        Text(
+                            "Settings",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.SemiBold,
+                        )
+                    }
                 }
             }
             Spacer(Modifier.weight(1f))

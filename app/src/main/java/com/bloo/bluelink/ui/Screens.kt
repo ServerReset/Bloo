@@ -3463,7 +3463,19 @@ internal fun GarageScreen(state: UiState, vm: AppViewModel) {
                         if (settingsAsPage && block == pageCount) {
                             // The extra slot: Settings itself, embedded rather than
                             // navigated to -- see SettingsScreen's own `embedded` doc.
-                            SettingsScreen(vm, embedded = true)
+                            // Same onNameHiddenChanged hoist as a car page below --
+                            // this is what makes the floating identity pill one
+                            // shared element instead of Settings carrying its own
+                            // permanently-visible copy.
+                            SettingsScreen(
+                                vm, embedded = true,
+                                onNameHiddenChanged = if (perPage == 1) { hidden, scrollFn ->
+                                    if (page == pager.settledPage) {
+                                        carNameVisible = hidden
+                                        scrollToTopFn = scrollFn
+                                    }
+                                } else null,
+                            )
                         } else {
                         Row(Modifier.fillMaxSize()) {
                             for (i in start until end) {
@@ -3557,21 +3569,19 @@ internal fun GarageScreen(state: UiState, vm: AppViewModel) {
                             LoadingIndicator()
                         }
                     }
-                    // Hoisted car-name pill — centered at top, slides in/out vertically.
+                    // Hoisted identity pill — centered at top, slides in/out vertically.
+                    // "Hoisted" now covers both a car page AND the embedded Settings
+                    // slot (see both onNameHiddenChanged call sites above): one
+                    // element, one page count, rather than a car-only pill plus
+                    // Settings carrying its own separate, permanently-visible copy.
                     if (perPage == 1) {
-                        // onNameHiddenChanged only fires from a car page (see its own
-                        // guard above); swiping onto the Settings slot never touches
-                        // carNameVisible, so without this it would keep showing
-                        // whichever car was last on screen, floating at the exact
-                        // same top-start corner SettingsScreen's own "Settings"
-                        // title/back-arrow lives in -- two headers stacked on top of
-                        // each other. Settled, not current: matches every other
-                        // "which page is this" read in this pager (see the settle
-                        // effect above), so it only drops mid-swipe, not the instant
-                        // Settings peeks in from the edge.
-                        val onSettingsSlot = settingsAsPage && realBlock(pager.settledPage) == pageCount
+                        // Settled, not current: matches every other "which page is
+                        // this" read in this pager (see the settle effect above), so
+                        // the pill's own content only updates mid-swipe once a page
+                        // actually wins, not on every frame of the drag.
+                        val settledBlock = realBlock(pager.settledPage)
                         AnimatedVisibility(
-                            visible = carNameVisible && !onSettingsSlot,
+                            visible = carNameVisible,
                             enter = fadeIn(tween(220)) + slideInVertically(tween(220)) { -it },
                             exit = fadeOut(tween(160)) + slideOutVertically(tween(160)) { -it / 2 },
                             modifier = Modifier.align(Alignment.TopStart).statusBarsPadding().padding(8.dp),
@@ -3615,20 +3625,29 @@ internal fun GarageScreen(state: UiState, vm: AppViewModel) {
                                     // way drags it half out of its own clip on every
                                     // swipe. A plain fade keeps the avatar reading as
                                     // "the picture just changed" instead of "part of
-                                    // it flew off".
+                                    // it flew off". targetState is settledBlock, not
+                                    // currentIndex -- currentIndex deliberately never
+                                    // changes while parked on the Settings slot (see
+                                    // the settle effect's own guard), so it alone
+                                    // could never drive this pill INTO showing
+                                    // Settings at all.
                                     AnimatedContent(
-                                        targetState = currentIndex,
+                                        targetState = settledBlock,
                                         transitionSpec = { fadeIn(tween(200)) togetherWith fadeOut(tween(120)) },
                                         label = "carNamePillPhoto",
-                                    ) { idx ->
-                                        PillAvatar(
-                                            photo = vehicles.getOrNull(idx)?.let { state.imageUrls[it.vin] },
-                                            icon = Icons.Filled.DirectionsCar,
-                                            tint = MaterialTheme.colorScheme.primary,
-                                        )
+                                    ) { block ->
+                                        if (settingsAsPage && block == pageCount) {
+                                            PillAvatar(photo = null, icon = Icons.Filled.Settings, tint = MaterialTheme.colorScheme.tertiary)
+                                        } else {
+                                            PillAvatar(
+                                                photo = vehicles.getOrNull(block)?.let { state.imageUrls[it.vin] },
+                                                icon = Icons.Filled.DirectionsCar,
+                                                tint = MaterialTheme.colorScheme.primary,
+                                            )
+                                        }
                                     }
                                     AnimatedContent(
-                                        targetState = currentIndex,
+                                        targetState = settledBlock,
                                         transitionSpec = {
                                             val dir = if (targetState > initialState) 1 else -1
                                             (slideInHorizontally(tween(200)) { it * dir / 3 } +
@@ -3636,22 +3655,26 @@ internal fun GarageScreen(state: UiState, vm: AppViewModel) {
                                                 fadeOut(tween(120))
                                         },
                                         label = "carNamePill",
-                                    ) { idx ->
+                                    ) { block ->
                                         Text(
-                                            vehicles.getOrNull(idx)?.name ?: "",
+                                            if (settingsAsPage && block == pageCount) "Settings" else vehicles.getOrNull(block)?.name ?: "",
                                             style = MaterialTheme.typography.labelLarge,
                                             fontWeight = FontWeight.SemiBold,
                                             maxLines = 1,
                                         )
                                     }
-                                    if (vehicles.size > 1) {
+                                    // totalBlocks, not vehicles.size -- the Settings
+                                    // slot is one more page in the same sequence, so
+                                    // it counts too (see PagerDotsFor above, which
+                                    // already does the same swap).
+                                    if (totalBlocks > 1) {
                                         AnimatedContent(
-                                            targetState = currentIndex,
+                                            targetState = settledBlock,
                                             transitionSpec = { fadeIn(tween(200)) togetherWith fadeOut(tween(120)) },
                                             label = "carNamePillCount",
-                                        ) { idx ->
+                                        ) { block ->
                                             Text(
-                                                "${idx + 1} / ${vehicles.size}",
+                                                "${block + 1} / $totalBlocks",
                                                 style = MaterialTheme.typography.labelSmall,
                                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                             )
