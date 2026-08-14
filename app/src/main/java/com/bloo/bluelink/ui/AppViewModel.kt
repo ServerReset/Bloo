@@ -3495,6 +3495,10 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     fun setPebbleOutline(value: Boolean) = viewModelScope.launch { settingsStore.setPebbleOutline(value) }
     fun setShowSearch(value: Boolean) = viewModelScope.launch { settingsStore.setShowSearch(value) }
 
+    /** Whether Settings is reached by swiping past the last car in the garage's own
+     *  pager instead of the floating gear button. See Appearance.settingsAsPage. */
+    fun setSettingsAsPage(value: Boolean) = viewModelScope.launch { settingsStore.setSettingsAsPage(value) }
+
     /** Where the cover screen's floating search bubble was last dragged to (fractions
      *  of its own drag range), or null if never dragged. See SettingsStore's own doc. */
     suspend fun searchBubblePosition(): Pair<Float, Float>? = settingsStore.searchBubblePosition()

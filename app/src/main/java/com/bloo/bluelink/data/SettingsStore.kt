@@ -185,6 +185,7 @@ class SettingsStore(private val context: Context) {
         val PEBBLE_OUTLINE = stringPreferencesKey("pebble_outline")
         val SHOW_SEARCH = stringPreferencesKey("show_search")
         val SEAMLESS_INSTALL_SHIZUKU = stringPreferencesKey("seamless_install_shizuku")
+        val SETTINGS_AS_PAGE = stringPreferencesKey("settings_as_page")
         // Fractions (0f..1f) of the cover screen's own drag range, not raw dp -- the
         // physical cover display doesn't change size between sessions, but a fraction
         // still degrades gracefully if it ever did, where a raw dp coordinate could
@@ -274,6 +275,12 @@ class SettingsStore(private val context: Context) {
          *  device-local capability (Shizuku may not be present on other devices), so
          *  it never roams via Drive sync (see SyncMerge.DEVICE_LOCAL_KEYS). */
         val seamlessInstallShizuku: Boolean = false,
+        /** When on, Settings is reached by swiping past your last car in the garage's
+         *  own pager instead of the floating gear button -- one continuous pager with
+         *  Settings as its own extra page, rather than a separate screen you navigate
+         *  to. Off by default (the floating button), matching every existing install's
+         *  current behaviour; this only changes anything for someone who opts in. */
+        val settingsAsPage: Boolean = false,
         /** Watch's own PIN lock enabled/timing -- a backup record only, mirrored
          *  from the watch. See [SettingsStore.Keys.WATCH_PIN_ENABLED]'s comment. */
         val watchPinLockEnabled: Boolean = false,
@@ -334,6 +341,7 @@ class SettingsStore(private val context: Context) {
             pebbleOutline = prefs[Keys.PEBBLE_OUTLINE]?.toBooleanStrictOrNull() ?: false,
             showSearch = prefs[Keys.SHOW_SEARCH]?.toBooleanStrictOrNull() ?: true,
             seamlessInstallShizuku = prefs[Keys.SEAMLESS_INSTALL_SHIZUKU]?.toBooleanStrictOrNull() ?: false,
+            settingsAsPage = prefs[Keys.SETTINGS_AS_PAGE]?.toBooleanStrictOrNull() ?: false,
         )
     }
 
@@ -361,6 +369,10 @@ class SettingsStore(private val context: Context) {
 
     suspend fun setSeamlessInstallShizuku(value: Boolean) {
         editTracked { it[Keys.SEAMLESS_INSTALL_SHIZUKU] = value.toString() }
+    }
+
+    suspend fun setSettingsAsPage(value: Boolean) {
+        editTracked { it[Keys.SETTINGS_AS_PAGE] = value.toString() }
     }
 
     suspend fun setBiometricLock(enabled: Boolean) {

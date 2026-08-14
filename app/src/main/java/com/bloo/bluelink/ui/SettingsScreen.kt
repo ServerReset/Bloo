@@ -500,9 +500,18 @@ private fun staggeredResultVisible(resetKey: Any, index: Int): Boolean {
     return visible
 }
 
+/**
+ * [embedded] is true when this is rendered as GarageScreen's own extra pager page
+ * (Appearance.settingsAsPage) rather than the separate `Screen.Settings` route --
+ * swiping to a car IS "back" in that mode, so the screen-navigation chrome that only
+ * makes sense standalone (the BackHandler that closes a route which was never opened,
+ * the floating "back to the app" arrow) is skipped. Nothing else about this composable
+ * changes: same cards, same search integration, same everything -- it's genuinely the
+ * same screen, just reached a different way.
+ */
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
-internal fun SettingsScreen(vm: AppViewModel) {
+internal fun SettingsScreen(vm: AppViewModel, embedded: Boolean = false) {
     val appearance = LocalAppearance.current
     val notif by vm.notifications.collectAsState()
     val state by vm.state.collectAsState()
@@ -530,7 +539,12 @@ internal fun SettingsScreen(vm: AppViewModel) {
   // with it. Back here means only what it always meant underneath: return to
   // the garage. SearchLayer composes after this screen, so while search is
   // open ITS handler is the one that runs first.
-  BackHandler { vm.closeSettings() }
+  //
+  // Skipped when embedded: there is no separate route here to close (this IS
+  // the garage, just parked on its own pager page), so the default system-back
+  // behaviour underneath (GarageScreen's own handling, or the app backgrounding)
+  // is what should run instead.
+  if (!embedded) BackHandler { vm.closeSettings() }
   BackdropHost {
         // On wide screens (tablets, landscape), cap width and centre so lines
         // don't stretch wall-to-wall.
@@ -1061,6 +1075,17 @@ internal fun SettingsScreen(vm: AppViewModel) {
                     "A search bubble at the bottom of the car screen and the cover screen. " +
                         "Ask about the car (\"battery level\"), run a command (\"lock my car\"), " +
                         "or jump to a setting. Settings always has it.",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(bottom = 10.dp),
+                )
+                // SIMPLE, not advanced -- same test as Search above: this changes
+                // how you get to Settings every single time, not a knob set once.
+                ToggleRow("Settings as a swipeable page", appearance.settingsAsPage) { vm.setSettingsAsPage(it) }
+                Text(
+                    "Reach Settings by swiping past your last car instead of the gear " +
+                        "button -- one continuous pager, with Settings as its own page at " +
+                        "the end instead of a separate screen.",
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(bottom = 10.dp),
@@ -1884,7 +1909,10 @@ internal fun SettingsScreen(vm: AppViewModel) {
             Modifier.fillMaxWidth().align(Alignment.TopStart).statusBarsPadding(),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            FloatingIcon(Icons.Filled.ArrowBack, "Back to the app", { vm.closeSettings() })
+            // No back arrow when embedded -- there's no separate screen it would be
+            // returning FROM (swiping to a car does that), and "Back to the app"
+            // literally isn't true here: this already is the app's main screen.
+            if (!embedded) FloatingIcon(Icons.Filled.ArrowBack, "Back to the app", { vm.closeSettings() })
             Surface(
                 onClick = { settingsScope.launch { settingsScroll.animateScrollTo(0) } },
                 shape = RoundedCornerShape(50),

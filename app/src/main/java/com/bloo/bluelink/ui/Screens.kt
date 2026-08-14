@@ -3158,15 +3158,32 @@ internal fun GarageScreen(state: UiState, vm: AppViewModel) {
             } else {
                 val pageCount = (count + perPage - 1) / perPage
                 val initialBlock = (currentIndex.coerceIn(0, count - 1)) / perPage
+                // One extra real "block" tacked onto the end for Settings, when the
+                // user has opted into reaching it by swiping instead of the gear
+                // button (Appearance.settingsAsPage) -- WrapPagerState.realCount is
+                // already just "how many real things this cycles through," so it
+                // costs nothing else here to hand it one more than the car-block
+                // count and treat that extra index specially below and in the page
+                // renderer. block == pageCount (never a valid car block index, which
+                // only ever run 0 until pageCount-1) is what marks it as the
+                // Settings slot rather than a car.
+                val settingsAsPage = appearance.settingsAsPage
+                val totalBlocks = if (settingsAsPage) pageCount + 1 else pageCount
                 // Infinite wrap-around: WrapPagerState.realCount is the BLOCK count
-                // here (ceil(count / perPage)), and the real vehicle index for a page
-                // is realBlock(page) * perPage.
-                val wrap = rememberWrapPager(pageCount, initialBlock)
+                // here (ceil(count / perPage), plus the Settings slot if enabled), and
+                // the real vehicle index for a page is realBlock(page) * perPage.
+                val wrap = rememberWrapPager(totalBlocks, initialBlock)
                 val pager = wrap.pager
                 fun realBlock(virtualPage: Int) = wrap.real(virtualPage)
                 LaunchedEffect(pager, perPage) {
                     snapshotFlow { pager.settledPage }.collect { page ->
-                        vm.selectIndex((realBlock(page) * perPage).coerceIn(0, count - 1))
+                        // Guarded: the Settings slot isn't a car block, and
+                        // selectIndex/currentIndex only ever mean "which car" --
+                        // settling there should leave whatever car was last
+                        // selected exactly as it was, so swiping back to a car
+                        // lands where you left it instead of snapping to car 0.
+                        val block = realBlock(page)
+                        if (block < pageCount) vm.selectIndex((block * perPage).coerceIn(0, count - 1))
                     }
                 }
                 // The above only pushes the pager's own settles into
@@ -3251,7 +3268,8 @@ internal fun GarageScreen(state: UiState, vm: AppViewModel) {
                         // screen's equivalent). This, the default view most people
                         // see swiping between cars day to day, previously had no
                         // per-page transform at all, just a plain flat scroll.
-                        val start = realBlock(page) * perPage
+                        val block = realBlock(page)
+                        val start = block * perPage
                         val end = minOf(start + perPage, count)
                         // The "is this the settled page" test used to live here, as
                         // `page == pager.settledPage`. Discrete, yes -- but it still
@@ -3281,6 +3299,11 @@ internal fun GarageScreen(state: UiState, vm: AppViewModel) {
                         // The transition this was meant to improve is not worth
                         // the gesture it happens during: a swipe that tracks the
                         // finger exactly IS the effect.
+                        if (settingsAsPage && block == pageCount) {
+                            // The extra slot: Settings itself, embedded rather than
+                            // navigated to -- see SettingsScreen's own `embedded` doc.
+                            SettingsScreen(vm, embedded = true)
+                        } else {
                         Row(Modifier.fillMaxSize()) {
                             for (i in start until end) {
                                 val gv = vehicles[i]
@@ -3324,14 +3347,17 @@ internal fun GarageScreen(state: UiState, vm: AppViewModel) {
                             }
                             repeat(perPage - (end - start)) { Spacer(Modifier.weight(1f)) }
                         }
+                        }
                     }
                     StatusBarScrim()
-                    // Floating animated page indicator (no thin top bar).
-                    if (pageCount > 1) {
+                    // Floating animated page indicator (no thin top bar). totalBlocks,
+                    // not pageCount -- the dots include the Settings slot (one more,
+                    // trailing dot) when settingsAsPage is on, same as any other page.
+                    if (totalBlocks > 1) {
                         PagerDotsFor(
                             pager = pager,
                             real = { realBlock(it) },
-                            count = pageCount,
+                            count = totalBlocks,
                             modifier = Modifier.align(Alignment.TopCenter).statusBarsPadding().padding(top = 10.dp)
                                 .graphicsLayer { alpha = dotsAlphaState.value },
                             onRefresh = { vm.refreshStatus(vehicles[currentIndex]) },
@@ -3456,12 +3482,21 @@ internal fun GarageScreen(state: UiState, vm: AppViewModel) {
                     .offset { IntOffset(0, refreshShiftState.value.roundToPx()) },
             )
         }
-        FloatingIcon(
-            icon = Icons.Filled.Settings,
-            description = "Settings",
-            onClick = { vm.openSettings() },
-            modifier = Modifier.align(Alignment.TopEnd).statusBarsPadding(),
-        )
+        // Hidden when Settings is reached by swiping instead (Appearance.settingsAsPage)
+        // -- the pager's own extra page is the discovery mechanism in that mode, so a
+        // second, redundant entry point here would contradict the "either/or" the
+        // setting itself offers. BUT kept while a car is expanded (expandedIdx != null):
+        // that pager has finger-swipe disabled entirely (see its own comment above), so
+        // there is no swipe alternative there at all -- hiding this unconditionally
+        // would make Settings genuinely unreachable from the expanded view.
+        if (!appearance.settingsAsPage || expandedIdx != null) {
+            FloatingIcon(
+                icon = Icons.Filled.Settings,
+                description = "Settings",
+                onClick = { vm.openSettings() },
+                modifier = Modifier.align(Alignment.TopEnd).statusBarsPadding(),
+            )
+        }
     }
     }
 }
