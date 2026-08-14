@@ -5985,7 +5985,19 @@ internal fun UpdateAvailableTile(state: UiState, vm: AppViewModel, dragHandle: M
                     label = "updateStatusText",
                     modifier = Modifier.weight(1f),
                 ) { kind ->
-                    val textStyle = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold)
+                    // color resolved explicitly, not left Color.Unspecified -- the
+                    // "Downloading X%" AnimatedValue below renders through BasicText,
+                    // which (unlike Text) does NOT fall back to LocalContentColor for
+                    // an unspecified color; it fell back to Android's own paint
+                    // default (black) instead, on a dark pebble background essentially
+                    // invisible. Every plain Text() sharing this style already got the
+                    // right colour by accident (Text does resolve Unspecified); this
+                    // is fixing it at the source instead of only where it happened to
+                    // get caught.
+                    val textStyle = MaterialTheme.typography.titleMedium.copy(
+                        fontWeight = FontWeight.Bold,
+                        color = LocalContentColor.current,
+                    )
                     when (kind) {
                         "installing" -> Text("Installing silently via Shizuku…", style = textStyle)
                         "downloading" -> Row(verticalAlignment = Alignment.CenterVertically) {
@@ -6039,7 +6051,15 @@ internal fun UpdateAvailableTile(state: UiState, vm: AppViewModel, dragHandle: M
                     if (p != null) {
                         com.bloo.uicommon.AnimatedValue(
                             "${(p * 100).roundToInt()}%",
-                            style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
+                            // color resolved explicitly -- see the textStyle comment
+                            // above for why an unspecified color here rendered this
+                            // percent invisible against the pebble's dark background
+                            // instead of inheriting the card's own content colour the
+                            // way a plain Text() would have.
+                            style = MaterialTheme.typography.labelMedium.copy(
+                                fontWeight = FontWeight.Bold,
+                                color = LocalContentColor.current,
+                            ),
                             reduceMotion = LocalReduceMotion.current,
                         )
                     }
@@ -10875,9 +10895,18 @@ private fun ClimatePebble(
         ) {
             Row(Modifier.fillMaxWidth().padding(bottom = 6.dp), horizontalArrangement = Arrangement.SpaceBetween) {
                 Text("Set temperature", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                // color resolved explicitly to onSurface -- same fix, same reason as
+                // the update pebble's own AnimatedValue calls: BasicText (which this
+                // renders through) doesn't fall back to LocalContentColor the way a
+                // plain Text() does, so this rendered unreadably dark instead of
+                // standing out against the muted label beside it -- the value, not
+                // the label, is the important half of this row.
                 com.bloo.uicommon.AnimatedValue(
                     degLabel(tempF.toString(), fahrenheit),
-                    style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold),
+                    style = MaterialTheme.typography.bodySmall.copy(
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface,
+                    ),
                     reduceMotion = LocalReduceMotion.current,
                 )
             }
