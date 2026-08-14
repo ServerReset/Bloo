@@ -3447,7 +3447,20 @@ internal fun GarageScreen(state: UiState, vm: AppViewModel) {
                                         VehicleDetailContent(
                                             gv, state, vm,
                                             onExpand = if (canExpand) ({ vm.expand(i) }) else null,
-                                            reserveHeaderEnd = canExpand && i == end - 1,
+                                            // Dynamic, not a flat "last car always leaves
+                                            // room": the persistent gear button this is
+                                            // dodging is itself hidden right here, in the
+                                            // collapsed grid, whenever settingsAsPage is on
+                                            // (see that button's own condition below --
+                                            // expandedIdx is always null in this branch, so
+                                            // its "|| expandedIdx != null" half never
+                                            // applies). Reserving the gap for a button
+                                            // that isn't there just left the last car's own
+                                            // expand button sitting noticeably further from
+                                            // the true corner than every other car's, for
+                                            // no reason once nothing was actually competing
+                                            // with it.
+                                            reserveHeaderEnd = canExpand && i == end - 1 && !appearance.settingsAsPage,
                                             // Only the SETTLED page drives the hoisted
                                             // name-pill state. Without the `settled` gate,
                                             // a beyondViewportPageCount=1 pre-composed
