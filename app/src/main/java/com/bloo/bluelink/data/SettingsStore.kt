@@ -1406,9 +1406,21 @@ class SettingsStore(private val context: Context) {
                 setSyncSyncedEver(true)
             }
         }
-        // The pull-from-primary lever is one-shot: consume it whether or not there
-        // was anything to adopt, so a later normal merge doesn't keep re-adopting.
-        if (pullPrimary) setSyncPullPrimary(false)
+        // The pull-from-primary lever is one-shot: consume it once there was a REAL
+        // chance to adopt, whether or not anything actually needed adopting -- so a
+        // later normal merge doesn't keep re-adopting. That is NOT the same as
+        // consuming it unconditionally: if this pass's download failed
+        // (downloadError != null, remoteJson stayed null), there was never a real
+        // chance -- shouldImport was false only because we couldn't read the file,
+        // not because there was nothing to pull. Clearing the flag anyway silently
+        // drops the user's explicit "pull from primary" request: the very next
+        // sync (the periodic worker, hours later, or a plain "Sync now") would run
+        // an ordinary protected merge instead, with nothing telling the user their
+        // request never actually happened. `!syncedEver` right above doesn't have
+        // this problem -- it's derived from persisted state, not a flag this
+        // function clears itself, so a failed pass naturally retries it next time;
+        // this one-shot flag needs the same self-healing property.
+        if (pullPrimary && downloadError == null) setSyncPullPrimary(false)
 
         val now = System.currentTimeMillis()
         var uploadError: String? = null

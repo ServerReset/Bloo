@@ -857,7 +857,11 @@ internal fun SettingsScreen(vm: AppViewModel) {
                         modifier = Modifier.fillMaxWidth(),
                         onClick = { showSyncDiagnostics = !showSyncDiagnostics },
                     )
-                    AnimatedVisibility(visible = showSyncDiagnostics) {
+                    AnimatedVisibility(
+                        visible = showSyncDiagnostics,
+                        enter = collapseEnter(Alignment.Bottom),
+                        exit = collapseExit(Alignment.Bottom),
+                    ) {
                         Column {
                             Spacer(Modifier.height(8.dp))
                             Column(
@@ -1020,7 +1024,11 @@ internal fun SettingsScreen(vm: AppViewModel) {
                         Modifier.weight(1f),
                         style = MaterialTheme.typography.bodyMedium,
                     )
-                    AnimatedVisibility(logsExpanded) {
+                    // PopVisible, not a bare AnimatedVisibility -- this is a small row-level
+                    // element popping in next to the header, independent of the (much
+                    // larger) disclosure body right below it, which is what PopVisible
+                    // exists for rather than the whole-block collapseEnter/collapseExit pair.
+                    PopVisible(logsExpanded) {
                         Row {
                             MorphTextButton("Copy", onClick = {
                                 clipboard.setText(AnnotatedString(logs.joinToString("\n")))
@@ -1333,7 +1341,11 @@ internal fun SettingsScreen(vm: AppViewModel) {
                     // color section below, instead of a bare `if` -- this whole
                     // Motion/Colour block otherwise just materialized the instant
                     // the toggle above flipped on.
-                    AnimatedVisibility(visible = appearance.auroraBackground) {
+                    AnimatedVisibility(
+                        visible = appearance.auroraBackground,
+                        enter = collapseEnter(),
+                        exit = collapseExit(),
+                    ) {
                         Column {
                             Spacer(Modifier.height(8.dp))
                             Text("Motion", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.primary)
@@ -1358,7 +1370,11 @@ internal fun SettingsScreen(vm: AppViewModel) {
                                 selectedKey = appearance.auroraColorMode,
                                 onSelect = { vm.setAuroraColorMode(it) },
                             )
-                            AnimatedVisibility(visible = appearance.auroraColorMode == "custom") {
+                            AnimatedVisibility(
+                                visible = appearance.auroraColorMode == "custom",
+                                enter = collapseEnter(),
+                                exit = collapseExit(),
+                            ) {
                                 Column {
                                     Spacer(Modifier.height(8.dp))
                                     OutlinedTextField(
@@ -1389,7 +1405,11 @@ internal fun SettingsScreen(vm: AppViewModel) {
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
-                    AnimatedVisibility(visible = !appearance.dynamicColor) {
+                    AnimatedVisibility(
+                        visible = !appearance.dynamicColor,
+                        enter = collapseEnter(),
+                        exit = collapseExit(),
+                    ) {
                         Column {
                             Spacer(Modifier.height(8.dp))
                             Text("Built-in palettes", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
