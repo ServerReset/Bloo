@@ -3454,6 +3454,8 @@ private fun SettingsSearchResults(
 ) {
     val tokens = query.lowercase().split(RxSearchTokens)
         .filter { it.isNotBlank() && it !in SearchStopwords }
+    // Same source the main Settings screen uses for its own Security card gate.
+    val canBio = remember { vm.canUseBiometrics() }
 
     val entries = ArrayList<SearchEntry>()
     fun add(title: String, keywords: String, content: @Composable () -> Unit) {
@@ -3463,6 +3465,62 @@ private fun SettingsSearchResults(
     // --- App-wide settings ---
     add("Haptic feedback", "vibration vibrate buzz sound") {
         ToggleRow("Haptic feedback", appearance.hapticsEnabled) { vm.setHapticsEnabled(it) }
+    }
+    // Two of Security's own controls, missing from here entirely -- "fingerprint"
+    // and "lock" are exactly the words someone would type for this. Reproduces
+    // the real card's logic verbatim (down to the same confirm-to-disable
+    // biometric prompt, not a bare toggle) rather than a simplified stand-in,
+    // since a security control is the one place a search shortcut skipping a
+    // step the real row enforces would be a genuine regression, not just a
+    // visual inconsistency.
+    if (canBio) {
+        val bioContext = LocalContext.current
+        add("Require fingerprint to open", "biometric lock security app unlock") {
+            SettingsSegmentedRow(
+                label = "Require fingerprint to open",
+                options = listOf(
+                    SegmentOption("off", "Off", null),
+                    SegmentOption("on", "On", null),
+                ),
+                selectedKey = if (appearance.biometricLock) "on" else "off",
+                onSelect = { key ->
+                    if (key == "on") {
+                        bioContext.findFragmentActivity()?.let { activity ->
+                            showBiometricPrompt(
+                                activity = activity,
+                                title = "Enable fingerprint lock",
+                                subtitle = "Confirm to require it on launch",
+                                onSuccess = { vm.setBiometricLock(true) },
+                                onError = { },
+                            )
+                        }
+                    } else {
+                        val activity = bioContext.findFragmentActivity()
+                        if (activity == null) {
+                            vm.reportInfo("Couldn't verify it's you. The lock is still on.")
+                        } else {
+                            showBiometricPrompt(
+                                activity = activity,
+                                title = "Disable fingerprint lock",
+                                subtitle = "Confirm to stop requiring it",
+                                onSuccess = { vm.setBiometricLock(false) },
+                                onError = { },
+                            )
+                        }
+                    }
+                },
+            )
+        }
+        if (appearance.biometricLock) {
+            add("Lock timing", "lock the app grace period timeout re-lock security") {
+                SettingsSegmentedRow(
+                    label = "Lock the app",
+                    options = LockTiming.entries.map { t -> SegmentOption(t.name, t.label, null) },
+                    selectedKey = appearance.lockTiming.name,
+                    onSelect = { key -> runCatching { vm.setLockTiming(LockTiming.valueOf(key)) } },
+                )
+            }
+        }
     }
     add("Text & layout scale", "display size zoom bigger") {
         var uiScaleDraft by remember(appearance.uiScale) { mutableFloatStateOf(appearance.uiScale) }
