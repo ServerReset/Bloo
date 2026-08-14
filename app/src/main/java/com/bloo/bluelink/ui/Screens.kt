@@ -2904,18 +2904,10 @@ internal fun isCompactCoverScreen(): Boolean {
     return cfg.screenWidthDp < COVER_SCREEN_WIDTH_DP && cfg.screenHeightDp < COVER_SCREEN_HEIGHT_DP
 }
 
-/** Scales a "reference" spacing/padding value for the compact cover-screen
- *  layout so a tiny cover screen (a Z Flip's ~260dp-wide square) doesn't lose
- *  proportionally more room to fixed insets than a larger one (a Z Flip 6 or
- *  Razr+'s taller cover) does. [refWidthDp] is the width the base value was
- *  tuned against; clamped to +-40% so this nudges spacing rather than
- *  drastically re-laying things out at either extreme. */
-@Composable
-private fun coverScaled(base: Dp, refWidthDp: Float = 280f): Dp {
-    val widthDp = LocalConfiguration.current.screenWidthDp.toFloat()
-    val factor = (widthDp / refWidthDp).coerceIn(0.6f, 1.4f)
-    return base * factor
-}
+// (coverScaled removed: its one caller -- a .padding(coverScaled(16.dp)) on
+// the compact cover layout -- was removed in a later pass and nothing else
+// ever called it, leaving this pure dead weight: a real, working function
+// with a full doc comment for a question nothing in the file asks any more.)
 
 // (cameraBumpPadding removed: it was a thin PaddingValues-rewrap of
 // cutoutClearanceDp()'s own EdgeDp, and its one remaining caller,
