@@ -294,6 +294,7 @@ import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.LayoutCoordinates
@@ -546,6 +547,51 @@ private fun StatusHeaderRow(icon: ImageVector, tint: Color, title: String, statu
 }
 
 /**
+ * Settings' own in-content header: title + a short context line, matching
+ * [CarHeaderRow][com.bloo.bluelink.ui] exactly in visual weight (titleLarge/
+ * Bold name, bodySmall/onSurfaceVariant subtitle) so Settings reads as
+ * another page in the pager, not a differently-designed screen bolted onto
+ * it. Shrinks/fades/lifts on [nameHidden] via the identical
+ * [headerHandoffSpring] a car's own header uses, so scrolling past it hands
+ * off to the floating "Settings" pill with the same felt motion.
+ */
+@Composable
+private fun SettingsHeaderRow(state: UiState, nameHidden: Boolean) {
+    val hideT by animateFloatAsState(
+        targetValue = if (nameHidden) 1f else 0f,
+        animationSpec = headerHandoffSpring,
+        label = "settingsHeaderHide",
+    )
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 4.dp)
+            .graphicsLayer {
+                alpha = 1f - hideT
+                val scale = 1f - hideT * 0.08f
+                scaleX = scale
+                scaleY = scale
+                translationY = -hideT * 10.dp.toPx()
+                transformOrigin = TransformOrigin(0f, 0f)
+            },
+    ) {
+        Text(
+            "Settings",
+            style = MaterialTheme.typography.titleLarge,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.onSurface,
+        )
+        val carCount = state.vehicles.size
+        val modeLabel = if (state.settingsMode == "advanced") "Advanced" else "Simple"
+        Text(
+            "$carCount car${if (carCount == 1) "" else "s"} · $modeLabel mode",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+}
+
+/**
  * [embedded] is true when this is rendered as GarageScreen's own extra pager page
  * (Appearance.settingsAsPage) rather than the separate `Screen.Settings` route --
  * swiping to a car IS "back" in that mode, so the screen-navigation chrome that only
@@ -588,9 +634,10 @@ internal fun SettingsScreen(
     // Same "has the header scrolled out of view" signal VehicleDetailContent
     // computes for its own hoisted pill, just off a LazyStaggeredGridState
     // instead of a plain ScrollState: item 0 is the grid's own leading
-    // spacer (see the grid below), so once the first VISIBLE item is
-    // anything past it, the header region is genuinely offscreen.
-    val settingsNameHidden by remember { derivedStateOf { settingsGridState.firstVisibleItemIndex > 0 } }
+    // spacer and item 1 is SettingsHeaderRow itself (see the grid below), so
+    // only once the first VISIBLE item is past *both* -- index > 1, not just
+    // > 0 -- has the header genuinely scrolled fully offscreen.
+    val settingsNameHidden by remember { derivedStateOf { settingsGridState.firstVisibleItemIndex > 1 } }
     if (onNameHiddenChanged != null) {
         LaunchedEffect(settingsNameHidden) {
             onNameHiddenChanged(settingsNameHidden) { settingsGridState.animateScrollToItem(0) }
@@ -643,11 +690,21 @@ internal fun SettingsScreen(
             verticalItemSpacing = 12.dp,
             horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            // Content scrolls behind the status bar; clear the floating pills.
-            // Full-line: this is the grid's own leading spacer, not a card, so
-            // it needs the full row rather than being squeezed into one column.
+            // Content scrolls behind the status bar; clear the floating back-arrow/
+            // segmented-toggle bar above. Full-line: this is the grid's own leading
+            // spacer, not a card, so it needs the full row rather than being squeezed
+            // into one column.
             item(span = StaggeredGridItemSpan.FullLine) {
                 Spacer(Modifier.height(topInset + 56.dp))
+            }
+            // Settings' own in-content header -- same visual weight (and the same
+            // scroll-triggered shrink into the floating pill) a car page's own
+            // CarHeaderRow has, so this reads as another page in the pager instead
+            // of a differently-designed screen bolted on. Item 0 above is what
+            // settingsNameHidden keys off of for the pill hand-off; this is item 1,
+            // so it's the first thing that scrolls away once the pill takes over.
+            item(span = StaggeredGridItemSpan.FullLine) {
+                SettingsHeaderRow(state, settingsNameHidden)
             }
             run {
                 val advanced = state.settingsMode == "advanced"
@@ -2027,42 +2084,57 @@ internal fun SettingsScreen(
             // returning FROM (swiping to a car does that), and "Back to the app"
             // literally isn't true here: this already is the app's main screen.
             if (!embedded) FloatingIcon(Icons.Filled.ArrowBack, "Back to the app", { vm.closeSettings() })
-            // Only when nothing is hoisting this pill elsewhere (the
-            // standalone route): embedded mode's identity pill is
-            // GarageScreen's own floating car-name pill instead (see
-            // onNameHiddenChanged above), the whole point being one shared
-            // element rather than this permanently-visible one PLUS a second,
-            // scroll-triggered one duplicating it.
+            // Only when nothing is hoisting this pill elsewhere (the standalone
+            // route): embedded mode's identity pill is GarageScreen's own floating
+            // car-name pill instead (see onNameHiddenChanged above), the whole
+            // point being one shared element rather than this one PLUS a second,
+            // scroll-triggered one duplicating it. And even here it's no longer
+            // permanently visible -- SettingsHeaderRow above is now the standalone
+            // route's own inline header, so this pill uses the exact same
+            // scroll-triggered hand-off (settingsNameHidden) the embedded route's
+            // hoisted pill does, on the same headerHandoffSpring, instead of
+            // sitting on screen the whole time next to a header saying the same
+            // thing twice.
             if (onNameHiddenChanged == null) {
-                // Same shape, chrome and PillAvatar "picture" slot as the floating
-                // car-name pill (Screens.kt) -- was name text alone, the one
-                // floating identity pill in the app that didn't carry a picture,
-                // which read as a plainer, different kind of object next to the
-                // pill you land on it FROM when swiping in from a car. A gear
-                // glyph in the same tonal circle a car's own photo sits in gives
-                // Settings the identical "picture + name" shape, so the pill
-                // itself doesn't change type crossing between the two, only what
-                // it says.
-                val settingsPillHaptics = LocalHaptics.current
-                val settingsPillShape = RoundedCornerShape(50)
-                Surface(
-                    onClick = { settingsPillHaptics?.click(); settingsScope.launch { settingsGridState.animateScrollToItem(0) } },
-                    shape = settingsPillShape,
-                    color = MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = glassContainerAlpha()),
-                    contentColor = MaterialTheme.colorScheme.onSurface,
-                    modifier = Modifier.ambientRing(settingsPillShape).dropShadow(settingsPillShape).frostedRim(settingsPillShape),
+                AnimatedVisibility(
+                    visible = settingsNameHidden,
+                    enter = fadeIn(headerHandoffSpring) + scaleIn(
+                        headerHandoffSpring, initialScale = 0.82f, transformOrigin = TransformOrigin(0f, 0.5f),
+                    ),
+                    exit = fadeOut(tween(140)) + scaleOut(
+                        tween(140), targetScale = 0.9f, transformOrigin = TransformOrigin(0f, 0.5f),
+                    ),
                 ) {
-                    Row(
-                        Modifier.height(48.dp).padding(start = 6.dp, end = 16.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    // Same shape, chrome and PillAvatar "picture" slot as the floating
+                    // car-name pill (Screens.kt) -- was name text alone, the one
+                    // floating identity pill in the app that didn't carry a picture,
+                    // which read as a plainer, different kind of object next to the
+                    // pill you land on it FROM when swiping in from a car. A gear
+                    // glyph in the same tonal circle a car's own photo sits in gives
+                    // Settings the identical "picture + name" shape, so the pill
+                    // itself doesn't change type crossing between the two, only what
+                    // it says.
+                    val settingsPillHaptics = LocalHaptics.current
+                    val settingsPillShape = RoundedCornerShape(50)
+                    Surface(
+                        onClick = { settingsPillHaptics?.click(); settingsScope.launch { settingsGridState.animateScrollToItem(0) } },
+                        shape = settingsPillShape,
+                        color = MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = glassContainerAlpha()),
+                        contentColor = MaterialTheme.colorScheme.onSurface,
+                        modifier = Modifier.ambientRing(settingsPillShape).dropShadow(settingsPillShape).frostedRim(settingsPillShape),
                     ) {
-                        PillAvatar(photo = null, icon = Icons.Filled.Settings, tint = MaterialTheme.colorScheme.tertiary)
-                        Text(
-                            "Settings",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.SemiBold,
-                        )
+                        Row(
+                            Modifier.height(48.dp).padding(start = 6.dp, end = 16.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        ) {
+                            PillAvatar(photo = null, icon = Icons.Filled.Settings, tint = MaterialTheme.colorScheme.tertiary)
+                            Text(
+                                "Settings",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.SemiBold,
+                            )
+                        }
                     }
                 }
             }

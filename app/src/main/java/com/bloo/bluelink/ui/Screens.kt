@@ -43,6 +43,7 @@ import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.FiniteAnimationSpec
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.VectorConverter
@@ -3582,8 +3583,16 @@ internal fun GarageScreen(state: UiState, vm: AppViewModel) {
                         val settledBlock = realBlock(pager.settledPage)
                         AnimatedVisibility(
                             visible = carNameVisible,
-                            enter = fadeIn(tween(220)) + slideInVertically(tween(220)) { -it },
-                            exit = fadeOut(tween(160)) + slideOutVertically(tween(160)) { -it / 2 },
+                            // Same spring hand-off CarHeaderRow itself shrinks out with
+                            // (see headerHandoffSpring) -- this pill growing in from the
+                            // header's own top-left corner is meant to read as that
+                            // header's continuation, not an unrelated element fading in.
+                            enter = fadeIn(headerHandoffSpring) + scaleIn(
+                                headerHandoffSpring, initialScale = 0.82f, transformOrigin = TransformOrigin(0f, 0f),
+                            ),
+                            exit = fadeOut(tween(140)) + scaleOut(
+                                tween(140), targetScale = 0.9f, transformOrigin = TransformOrigin(0f, 0f),
+                            ),
                             modifier = Modifier.align(Alignment.TopStart).statusBarsPadding().padding(8.dp),
                         ) {
                             // A percent-based RoundedCornerShape(50) (radius = half of
@@ -7749,7 +7758,7 @@ private fun VehicleDetailContent(
         ) {
             // Inset spacers (not padding) so content scrolls *behind* the bars.
             Spacer(Modifier.height(topInset + 8.dp))
-            CarHeaderRow(v, state, onExpand, reserveHeaderEnd)
+            CarHeaderRow(v, state, onExpand, reserveHeaderEnd, nameHidden)
             // summary (image+gauge) and controls are reorderable pebbles too. The full
             // pebble column always renders while swiping; smoothness comes from
             // PebbleList's own one-frame lazy-fill (filled/EAGER_PEBBLES) + the pager's
@@ -7757,12 +7766,19 @@ private fun VehicleDetailContent(
             PebbleList(v, state, vm)
             Spacer(Modifier.height(bottomInset + 16.dp))
         }
-        // Only show the inline pill when no parent is managing it.
+        // Only show the inline pill when no parent is managing it. Grows in from the
+        // header's own top-left corner with the exact spring CarHeaderRow shrinks out
+        // with above, so the two read as one continuous hand-off instead of a header
+        // that vanishes and an unrelated pill that separately appears.
         if (onNameHiddenChanged == null) {
             androidx.compose.animation.AnimatedVisibility(
                 visible = nameHidden,
-                enter = fadeIn(),
-                exit = fadeOut(),
+                enter = fadeIn(headerHandoffSpring) + scaleIn(
+                    headerHandoffSpring, initialScale = 0.82f, transformOrigin = TransformOrigin(0f, 0f),
+                ),
+                exit = fadeOut(tween(140)) + scaleOut(
+                    tween(140), targetScale = 0.9f, transformOrigin = TransformOrigin(0f, 0f),
+                ),
                 modifier = Modifier.align(Alignment.TopStart).statusBarsPadding().padding(8.dp),
             ) {
                 CarNamePill(v.name, state.imageUrls[v.vin]) { scope.launch { scroll.animateScrollTo(0) } }
@@ -7794,14 +7810,6 @@ private fun ExpandedCar(v: Vehicle, state: UiState, vm: AppViewModel, flipped: B
             it in state.sectionsFor(v) && state.isSectionAvailable(v, it)
         }
     val hotDrag = remember { HotSeatDrag() }
-    val controls: @Composable ColumnScope.() -> Unit = {
-        CarHeaderRow(v, state, onExpand = null, reserveEnd = false)
-        CriticalContent(v, state, vm)
-        HotspotSlot(v, hotspot, state, vm)
-    }
-    val pebbles: @Composable ColumnScope.() -> Unit = {
-        PebbleList(v, state, vm, exclude = setOfNotNull("summary", "controls", hotspot))
-    }
     // Hoisted (not recreated on flip) so each column keeps its own scroll position
     // when the columns swap sides, and so the floating name pill below can always
     // watch the column that currently holds CarHeaderRow, wherever it is.
@@ -7813,9 +7821,19 @@ private fun ExpandedCar(v: Vehicle, state: UiState, vm: AppViewModel, flipped: B
     val scope = rememberCoroutineScope()
     // Mirrors the single-column view's floating name pill: appears once the header
     // has scrolled out of view, so a wide-screen user never loses track of which
-    // car a long dual-column page belongs to.
+    // car a long dual-column page belongs to. Also fed into CarHeaderRow itself
+    // below, so the header's own shrink-and-fade tracks the exact same signal
+    // that grows this pill in.
     val nameHidden by remember {
         derivedStateOf { controlsScroll.value > with(density) { (topInset + 52.dp + 40.dp).toPx() } }
+    }
+    val controls: @Composable ColumnScope.() -> Unit = {
+        CarHeaderRow(v, state, onExpand = null, reserveEnd = false, nameHidden = nameHidden)
+        CriticalContent(v, state, vm)
+        HotspotSlot(v, hotspot, state, vm)
+    }
+    val pebbles: @Composable ColumnScope.() -> Unit = {
+        PebbleList(v, state, vm, exclude = setOfNotNull("summary", "controls", hotspot))
     }
     CompositionLocalProvider(LocalHotSeatDrag provides hotDrag) {
     // Was hardcoded hideIndicator = true -- the same "grid-only" flag that
@@ -7866,8 +7884,13 @@ private fun ExpandedCar(v: Vehicle, state: UiState, vm: AppViewModel, flipped: B
         }
         androidx.compose.animation.AnimatedVisibility(
             visible = nameHidden,
-            enter = fadeIn(),
-            exit = fadeOut(),
+            // Same header hand-off spring as the single-column view's pill.
+            enter = fadeIn(headerHandoffSpring) + scaleIn(
+                headerHandoffSpring, initialScale = 0.82f, transformOrigin = TransformOrigin(0f, 0.5f),
+            ),
+            exit = fadeOut(tween(140)) + scaleOut(
+                tween(140), targetScale = 0.9f, transformOrigin = TransformOrigin(0f, 0.5f),
+            ),
             // ExpandedCar (this wide/dual-column layout) is only ever reached
             // through GarageScreen's expandedIdx != null branch, and that same
             // condition is what keeps GarageScreen's own floating gear AND
@@ -8135,11 +8158,47 @@ private fun Refreshable(
     }
 }
 
-/** Car name/model + a Driving/Parked badge, with an optional expand button. */
+/**
+ * Shared spring signature for the car/Settings header <-> floating name pill
+ * hand-off -- the header shrinks out and the pill grows in on the exact same
+ * physics, the same spring [PebbleShell]'s own hero-title grow
+ * (`growTitleOnExpand`) uses, so both morphs read as one continuous motion
+ * rather than two independently-tuned animations that happen to overlap.
+ * `internal`, not `private` -- SettingsScreen's own in-content header uses the
+ * identical spring for its own shrink/hand-off to stay visually unified.
+ */
+internal val headerHandoffSpring: FiniteAnimationSpec<Float> =
+    spring(dampingRatio = 0.62f, stiffness = Spring.StiffnessVeryLow)
+
+/**
+ * Car name/model + a Driving/Parked badge, with an optional expand button.
+ *
+ * [nameHidden] drives the same hand-off this app's floating name pill makes:
+ * as the header scrolls out of view (the caller's own scroll-position signal,
+ * the same one that reveals [CarNamePill]), this shrinks/fades/lifts itself
+ * with the identical spring [PebbleShell.growTitleOnExpand] uses for its own
+ * hero-title grow, so the header reads as morphing INTO the pill rather than
+ * the two animating independently of each other.
+ */
 @Composable
-private fun CarHeaderRow(v: Vehicle, state: UiState, onExpand: (() -> Unit)?, reserveEnd: Boolean) {
+private fun CarHeaderRow(v: Vehicle, state: UiState, onExpand: (() -> Unit)?, reserveEnd: Boolean, nameHidden: Boolean = false) {
+    val hideT by animateFloatAsState(
+        targetValue = if (nameHidden) 1f else 0f,
+        animationSpec = headerHandoffSpring,
+        label = "carHeaderHide",
+    )
     Row(
-        Modifier.fillMaxWidth().then(if (reserveEnd) Modifier.padding(end = 52.dp) else Modifier),
+        Modifier
+            .fillMaxWidth()
+            .then(if (reserveEnd) Modifier.padding(end = 52.dp) else Modifier)
+            .graphicsLayer {
+                alpha = 1f - hideT
+                val scale = 1f - hideT * 0.08f
+                scaleX = scale
+                scaleY = scale
+                translationY = -hideT * 10.dp.toPx()
+                transformOrigin = TransformOrigin(0f, 0f)
+            },
         // Top, not CenterVertically -- the text column is three lines (name,
         // model, last-updated) of very different weight, and centering the
         // button against all three of them put its visual centre down around
