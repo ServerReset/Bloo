@@ -331,6 +331,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.composed
 import androidx.compose.ui.layout.onPlaced
 import androidx.compose.ui.layout.positionInParent
+import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.round
 import androidx.compose.ui.unit.IntSize
@@ -551,35 +552,37 @@ private fun StatusHeaderRow(icon: ImageVector, tint: Color, title: String, statu
  * [CarHeaderRow][com.bloo.bluelink.ui] exactly in visual weight (titleLarge/
  * Bold name, bodySmall/onSurfaceVariant subtitle) so Settings reads as
  * another page in the pager, not a differently-designed screen bolted onto
- * it. Shrinks/fades/lifts on [nameHidden] via the identical
- * [headerHandoffSpring] a car's own header uses, so scrolling past it hands
- * off to the floating "Settings" pill with the same felt motion.
+ * it. The "Settings" title here is drawn at `alpha = 0` on purpose, same as
+ * [CarHeaderRow]'s own name -- it only reserves the font-metric-accurate
+ * layout space the real, visible title (the floating identity pill,
+ * [MorphingIdentityPill][com.bloo.bluelink.ui]) occupies at `nameHidden =
+ * false`, sliding/scaling into its collapsed pill form as [nameHidden] flips,
+ * one continuous element rather than two independently-animated copies of
+ * "Settings". The context line doesn't have a floating equivalent, so it
+ * still shrinks/fades/lifts away on its own via [headerHandoffSpring].
  */
 @Composable
-private fun SettingsHeaderRow(state: UiState, nameHidden: Boolean) {
+private fun SettingsHeaderRow(state: UiState, nameHidden: Boolean, onNamePositioned: ((Offset) -> Unit)? = null) {
     val hideT by animateFloatAsState(
         targetValue = if (nameHidden) 1f else 0f,
         animationSpec = headerHandoffSpring,
         label = "settingsHeaderHide",
     )
-    Column(
-        Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 4.dp)
-            .graphicsLayer {
-                alpha = 1f - hideT
-                val scale = 1f - hideT * 0.08f
-                scaleX = scale
-                scaleY = scale
-                translationY = -hideT * 10.dp.toPx()
-                transformOrigin = TransformOrigin(0f, 0f)
-            },
-    ) {
+    Column(Modifier.fillMaxWidth().padding(horizontal = 4.dp)) {
         Text(
             "Settings",
             style = MaterialTheme.typography.titleLarge,
             fontWeight = FontWeight.Bold,
             color = MaterialTheme.colorScheme.onSurface,
+            modifier = Modifier
+                .alpha(0f)
+                .then(
+                    if (onNamePositioned != null) {
+                        Modifier.onGloballyPositioned { onNamePositioned(it.positionInRoot()) }
+                    } else {
+                        Modifier
+                    },
+                ),
         )
         val carCount = state.vehicles.size
         val modeLabel = if (state.settingsMode == "advanced") "Advanced" else "Simple"
@@ -587,6 +590,14 @@ private fun SettingsHeaderRow(state: UiState, nameHidden: Boolean) {
             "$carCount car${if (carCount == 1) "" else "s"} · $modeLabel mode",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.graphicsLayer {
+                alpha = 1f - hideT
+                val scale = 1f - hideT * 0.08f
+                scaleX = scale
+                scaleY = scale
+                translationY = -hideT * 10.dp.toPx()
+                transformOrigin = TransformOrigin(0f, 0f)
+            },
         )
     }
 }
@@ -615,6 +626,9 @@ internal fun SettingsScreen(
     // count instead of Settings being the one page in this pager with a
     // permanently-visible header nothing else has.
     onNameHiddenChanged: ((Boolean, suspend () -> Unit) -> Unit)? = null,
+    // Mirrors onNameHiddenChanged's own hoist -- GarageScreen needs the header's
+    // measured position too, to morph its hoisted pill in from the right spot.
+    onNamePositioned: ((Offset) -> Unit)? = null,
 ) {
     val appearance = LocalAppearance.current
     val notif by vm.notifications.collectAsState()
@@ -643,6 +657,10 @@ internal fun SettingsScreen(
             onNameHiddenChanged(settingsNameHidden) { settingsGridState.animateScrollToItem(0) }
         }
     }
+    // Local copy of the title's measured position for the standalone route's OWN
+    // pill (below); also forwarded outward via onNamePositioned when embedded and
+    // GarageScreen is hoisting the pill instead.
+    var headerPos by remember { mutableStateOf(Offset.Zero) }
 
     // System back returns to the garage, not out of the app.
     var pickTarget by remember { mutableStateOf<String?>(null) }
@@ -704,7 +722,10 @@ internal fun SettingsScreen(
             // settingsNameHidden keys off of for the pill hand-off; this is item 1,
             // so it's the first thing that scrolls away once the pill takes over.
             item(span = StaggeredGridItemSpan.FullLine) {
-                SettingsHeaderRow(state, settingsNameHidden)
+                SettingsHeaderRow(
+                    state, settingsNameHidden,
+                    onNamePositioned = { pos -> headerPos = pos; onNamePositioned?.invoke(pos) },
+                )
             }
             run {
                 val advanced = state.settingsMode == "advanced"
@@ -2084,60 +2105,11 @@ internal fun SettingsScreen(
             // returning FROM (swiping to a car does that), and "Back to the app"
             // literally isn't true here: this already is the app's main screen.
             if (!embedded) FloatingIcon(Icons.Filled.ArrowBack, "Back to the app", { vm.closeSettings() })
-            // Only when nothing is hoisting this pill elsewhere (the standalone
-            // route): embedded mode's identity pill is GarageScreen's own floating
-            // car-name pill instead (see onNameHiddenChanged above), the whole
-            // point being one shared element rather than this one PLUS a second,
-            // scroll-triggered one duplicating it. And even here it's no longer
-            // permanently visible -- SettingsHeaderRow above is now the standalone
-            // route's own inline header, so this pill uses the exact same
-            // scroll-triggered hand-off (settingsNameHidden) the embedded route's
-            // hoisted pill does, on the same headerHandoffSpring, instead of
-            // sitting on screen the whole time next to a header saying the same
-            // thing twice.
-            if (onNameHiddenChanged == null) {
-                AnimatedVisibility(
-                    visible = settingsNameHidden,
-                    enter = fadeIn(headerHandoffSpring) + scaleIn(
-                        headerHandoffSpring, initialScale = 0.82f, transformOrigin = TransformOrigin(0f, 0.5f),
-                    ),
-                    exit = fadeOut(tween(140)) + scaleOut(
-                        tween(140), targetScale = 0.9f, transformOrigin = TransformOrigin(0f, 0.5f),
-                    ),
-                ) {
-                    // Same shape, chrome and PillAvatar "picture" slot as the floating
-                    // car-name pill (Screens.kt) -- was name text alone, the one
-                    // floating identity pill in the app that didn't carry a picture,
-                    // which read as a plainer, different kind of object next to the
-                    // pill you land on it FROM when swiping in from a car. A gear
-                    // glyph in the same tonal circle a car's own photo sits in gives
-                    // Settings the identical "picture + name" shape, so the pill
-                    // itself doesn't change type crossing between the two, only what
-                    // it says.
-                    val settingsPillHaptics = LocalHaptics.current
-                    val settingsPillShape = RoundedCornerShape(50)
-                    Surface(
-                        onClick = { settingsPillHaptics?.click(); settingsScope.launch { settingsGridState.animateScrollToItem(0) } },
-                        shape = settingsPillShape,
-                        color = MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = glassContainerAlpha()),
-                        contentColor = MaterialTheme.colorScheme.onSurface,
-                        modifier = Modifier.ambientRing(settingsPillShape).dropShadow(settingsPillShape).frostedRim(settingsPillShape),
-                    ) {
-                        Row(
-                            Modifier.height(48.dp).padding(start = 6.dp, end = 16.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        ) {
-                            PillAvatar(photo = null, icon = Icons.Filled.Settings, tint = MaterialTheme.colorScheme.tertiary)
-                            Text(
-                                "Settings",
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.SemiBold,
-                            )
-                        }
-                    }
-                }
-            }
+            // The identity pill itself is NOT here -- MorphingIdentityPill needs an
+            // implicit BoxScope receiver (for its own Modifier.align) that this Row
+            // doesn't provide even though it's nested inside one, so it's rendered
+            // as this Row's own sibling below instead, matching where every other
+            // caller (Screens.kt) places it too.
             Spacer(Modifier.weight(1f))
             // A real segmented control (not a single button that only ever
             // names the OTHER mode) so the CURRENT mode is always obvious at a
@@ -2172,6 +2144,32 @@ internal fun SettingsScreen(
                 )
             }
             Spacer(Modifier.width(8.dp))
+        }
+        // Only when nothing is hoisting this pill elsewhere (the standalone route):
+        // embedded mode's identity pill is GarageScreen's own floating car-name pill
+        // instead (see onNameHiddenChanged above), the whole point being one shared
+        // element rather than this one PLUS a second, scroll-triggered one
+        // duplicating it. And even here it's no longer permanently visible --
+        // SettingsHeaderRow above is now the standalone route's own inline header, so
+        // this pill uses the exact same scroll-triggered hand-off (settingsNameHidden)
+        // the embedded route's hoisted pill does, on the same headerHandoffSpring,
+        // instead of sitting on screen the whole time next to a header saying the
+        // same thing twice. Same shape, chrome and PillAvatar "picture" slot as the
+        // floating car-name pill (Screens.kt) -- a gear glyph in the same tonal
+        // circle a car's own photo sits in gives Settings the identical "picture +
+        // name" shape, so the pill itself doesn't change type crossing between the
+        // two, only what it says. And now the same MorphingIdentityPill mechanics
+        // too: it slides/scales in from SettingsHeaderRow's own invisible title
+        // placeholder above, one continuous element rather than a header that
+        // vanishes plus an unrelated pill that fades in beside it.
+        if (onNameHiddenChanged == null) {
+            MorphingIdentityPill(
+                nameHidden = settingsNameHidden,
+                headerPosition = headerPos,
+                onClick = { settingsScope.launch { settingsGridState.animateScrollToItem(0) } },
+            ) { t ->
+                MorphingIdentityContent("Settings", null, Icons.Filled.Settings, MaterialTheme.colorScheme.tertiary, null, t)
+            }
         }
         // First-run coach mark pointing at the back arrow.
         if (state.showSettingsCoach) {
