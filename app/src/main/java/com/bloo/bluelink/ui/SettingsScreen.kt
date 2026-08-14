@@ -500,6 +500,48 @@ private fun staggeredResultVisible(resetKey: Any, index: Int): Boolean {
 }
 
 /**
+ * The tonal icon badge + bold title + colour-coded status line used at the top
+ * of several SettingsCard bodies (Accounts, AI, Backup & sync, Notifications,
+ * Security, Theme) to give an at-a-glance read of the card's current state
+ * before it's opened any further.
+ *
+ * [icon], [tint] and [status] all animate on change -- the same transition
+ * PebbleShell's own header summary uses for its `summary` text -- rather than
+ * snapping instantly the moment the setting behind them flips. Every other
+ * piece of state change in Settings springs or fades; a status line that
+ * just jump-cut to "Off" when everything around it animates was the one
+ * inconsistency left.
+ */
+@Composable
+private fun StatusHeaderRow(icon: ImageVector, tint: Color, title: String, status: String) {
+    val animTint by androidx.compose.animation.animateColorAsState(tint, label = "statusHeaderTint")
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Box(
+            Modifier.size(40.dp).background(animTint.copy(alpha = 0.15f), CircleShape),
+            contentAlignment = Alignment.Center,
+        ) {
+            AnimatedContent(targetState = icon, label = "statusHeaderIcon") { i ->
+                Icon(i, contentDescription = null, tint = animTint, modifier = Modifier.size(22.dp))
+            }
+        }
+        Spacer(Modifier.width(12.dp))
+        Column {
+            Text(title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+            AnimatedContent(
+                targetState = status,
+                transitionSpec = {
+                    (fadeIn(tween(180)) + slideInVertically { it / 3 }) togetherWith
+                        (fadeOut(tween(120)) + slideOutVertically { -it / 3 })
+                },
+                label = "statusHeaderText",
+            ) { s ->
+                Text(s, style = MaterialTheme.typography.labelMedium, color = animTint, fontWeight = FontWeight.Medium)
+            }
+        }
+    }
+}
+
+/**
  * [embedded] is true when this is rendered as GarageScreen's own extra pager page
  * (Appearance.settingsAsPage) rather than the separate `Screen.Settings` route --
  * swiping to a car IS "back" in that mode, so the screen-navigation chrome that only
@@ -588,24 +630,12 @@ internal fun SettingsScreen(vm: AppViewModel, embedded: Boolean = false) {
                 // this pass applied -- was straight into "Not signed in" or a wall of
                 // per-account blocks with nothing summarizing how many were connected.
                 val acctTint = if (state.accounts.isNotEmpty()) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.onSurfaceVariant
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Box(
-                        Modifier.size(40.dp).background(acctTint.copy(alpha = 0.15f), CircleShape),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        Icon(Icons.Filled.Person, contentDescription = null, tint = acctTint, modifier = Modifier.size(22.dp))
-                    }
-                    Spacer(Modifier.width(12.dp))
-                    Column {
-                        Text("Signed in", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
-                        Text(
-                            if (state.accounts.isEmpty()) "No accounts" else "${state.accounts.size} account${if (state.accounts.size == 1) "" else "s"}",
-                            style = MaterialTheme.typography.labelMedium,
-                            color = acctTint,
-                            fontWeight = FontWeight.Medium,
-                        )
-                    }
-                }
+                StatusHeaderRow(
+                    icon = Icons.Filled.Person,
+                    tint = acctTint,
+                    title = "Signed in",
+                    status = if (state.accounts.isEmpty()) "No accounts" else "${state.accounts.size} account${if (state.accounts.size == 1) "" else "s"}",
+                )
                 Spacer(Modifier.height(14.dp))
                 if (state.accounts.isEmpty()) {
                     Text(
@@ -685,28 +715,16 @@ internal fun SettingsScreen(vm: AppViewModel, embedded: Boolean = false) {
                 SettingsCard("AI", Icons.Filled.AutoAwesome, vm) {
                     // Same icon-badge + status-line header as the rest of this pass.
                     val aiTint = if (state.aiEnabled) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.onSurfaceVariant
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Box(
-                            Modifier.size(40.dp).background(aiTint.copy(alpha = 0.15f), CircleShape),
-                            contentAlignment = Alignment.Center,
-                        ) {
-                            Icon(Icons.Filled.AutoAwesome, contentDescription = null, tint = aiTint, modifier = Modifier.size(22.dp))
-                        }
-                        Spacer(Modifier.width(12.dp))
-                        Column {
-                            Text("On-device AI", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
-                            Text(
-                                when {
-                                    !state.aiEnabled -> "Off"
-                                    state.aiAuto -> "On · auto-summarize"
-                                    else -> "On"
-                                },
-                                style = MaterialTheme.typography.labelMedium,
-                                color = aiTint,
-                                fontWeight = FontWeight.Medium,
-                            )
-                        }
-                    }
+                    StatusHeaderRow(
+                        icon = Icons.Filled.AutoAwesome,
+                        tint = aiTint,
+                        title = "On-device AI",
+                        status = when {
+                            !state.aiEnabled -> "Off"
+                            state.aiAuto -> "On · auto-summarize"
+                            else -> "On"
+                        },
+                    )
                     Spacer(Modifier.height(14.dp))
                     ToggleRow("On-device AI (Gemini Nano)", state.aiEnabled) { vm.setAiEnabled(it) }
                     Text(
@@ -743,34 +761,29 @@ internal fun SettingsScreen(vm: AppViewModel, embedded: Boolean = false) {
 
             // App-icon shortcuts (long-press the launcher icon)
             AnimatedVisibility(visible = staggeredAdvancedVisible(advanced, 0), enter = collapseEnter(), exit = collapseExit()) {
-                var shortcutsExpanded by remember { mutableStateOf(false) }
                 SettingsCard("App shortcuts", Icons.Filled.Bolt, vm) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(
-                            "Quick-access shortcuts from the launcher icon",
-                            Modifier.weight(1f),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                        MorphExpandButton(expanded = shortcutsExpanded, onToggle = { shortcutsExpanded = !shortcutsExpanded })
-                    }
-                    AnimatedVisibility(
-                        visible = shortcutsExpanded,
-                        enter = collapseEnter(Alignment.Bottom),
-                        exit = collapseExit(Alignment.Bottom),
-                    ) {
-                        Column {
-                            Spacer(Modifier.height(8.dp))
-                            state.vehicles.forEach { v ->
-                                Spacer(Modifier.height(4.dp))
-                                Text(v.name, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
-                                com.bloo.bluelink.Shortcuts.ACTIONS.forEach { cmd ->
-                                    ToggleRow(
-                                        com.bloo.bluelink.Shortcuts.actionLabel(cmd),
-                                        state.isShortcutEnabled(v.vin, cmd),
-                                    ) { vm.setShortcutEnabled(v.vin, cmd, it) }
-                                }
-                            }
+                    // No inner MorphExpandButton any more -- this used to have its
+                    // own second chevron gating the per-vehicle toggles below,
+                    // stacked directly under the card's own PebbleShell chevron
+                    // (which didn't exist yet when this was written; SettingsCard
+                    // was a static, always-open Card back then, and the inner
+                    // toggle was the ONLY way to fold this away). Now that the
+                    // card itself opens and closes, a second tap just to see the
+                    // toggles it opened FOR was two controls doing one job.
+                    Text(
+                        "Quick-access shortcuts from the launcher icon",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    state.vehicles.forEach { v ->
+                        Spacer(Modifier.height(4.dp))
+                        Text(v.name, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                        com.bloo.bluelink.Shortcuts.ACTIONS.forEach { cmd ->
+                            ToggleRow(
+                                com.bloo.bluelink.Shortcuts.actionLabel(cmd),
+                                state.isShortcutEnabled(v.vin, cmd),
+                            ) { vm.setShortcutEnabled(v.vin, cmd, it) }
                         }
                     }
                 }
@@ -866,27 +879,19 @@ internal fun SettingsScreen(vm: AppViewModel, embedded: Boolean = false) {
                 }
                 // At-a-glance status header: the state icon in a tonal circle
                 // (matching the app's card-header language) + a bold title and a
-                // colour-coded one-line state.
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Box(
-                        Modifier
-                            .size(40.dp)
-                            .background(driveTint.copy(alpha = 0.15f), CircleShape),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        Icon(driveIcon, contentDescription = null, tint = driveTint, modifier = Modifier.size(22.dp))
-                    }
-                    Spacer(Modifier.width(12.dp))
-                    Column(Modifier.weight(1f)) {
-                        Text("Automatic Drive sync", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
-                        val statusLabel = when {
-                            !driveConfigured -> "Not set up"
-                            state.syncError != null -> "Sync failed"
-                            else -> com.bloo.bluelink.data.relativeLabel(state.lastSyncMs).takeIf { it.isNotBlank() }?.let { "Synced $it" } ?: "Active"
-                        }
-                        Text(statusLabel, style = MaterialTheme.typography.labelMedium, color = driveTint, fontWeight = FontWeight.Medium)
-                    }
-                }
+                // colour-coded one-line state. Icon included: driveIcon itself
+                // changes (cloud-sync/cloud-done/cloud-off) along with the tint,
+                // so StatusHeaderRow's own icon crossfade covers it too.
+                StatusHeaderRow(
+                    icon = driveIcon,
+                    tint = driveTint,
+                    title = "Automatic Drive sync",
+                    status = when {
+                        !driveConfigured -> "Not set up"
+                        state.syncError != null -> "Sync failed"
+                        else -> com.bloo.bluelink.data.relativeLabel(state.lastSyncMs).takeIf { it.isNotBlank() }?.let { "Synced $it" } ?: "Active"
+                    },
+                )
                 Spacer(Modifier.height(14.dp))
                 if (showDriveDialog) {
                     DriveSyncSetupDialog(
@@ -1175,7 +1180,18 @@ internal fun SettingsScreen(vm: AppViewModel, embedded: Boolean = false) {
                             Spacer(Modifier.width(4.dp))
                         }
                     }
-                    MorphExpandButton(expanded = logsExpanded, onToggle = { logsExpanded = !logsExpanded })
+                    // A labelled text button, not a second MorphExpandButton chevron --
+                    // this card's own PebbleShell header already has one of those, and
+                    // a lookalike chevron right underneath it read as two stacked
+                    // controls for the same thing. This one still guards something the
+                    // outer chevron doesn't: a potentially long, monospace raw log dump
+                    // that shouldn't blast into view every time the card itself opens,
+                    // so it keeps its own disclosure -- just spelled out in words
+                    // instead of an icon that mimics the outer one.
+                    MorphTextButton(
+                        if (logsExpanded) "Hide" else "Show",
+                        onClick = { logsExpanded = !logsExpanded },
+                    )
                 }
                 AnimatedVisibility(
                     visible = logsExpanded,
@@ -1220,33 +1236,16 @@ internal fun SettingsScreen(vm: AppViewModel, embedded: Boolean = false) {
                 val alertToggles = listOf(notif.charging, notif.service, notif.doorOpen, notif.running, notif.unlocked)
                 val alertsOn = alertToggles.count { it }
                 val notifTint = if (alertsOn > 0) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.onSurfaceVariant
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Box(
-                        Modifier.size(40.dp).background(notifTint.copy(alpha = 0.15f), CircleShape),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        // Icons.Filled.Notifications only -- NotificationsActive/Off aren't
-                        // in this project's icon set (confirmed by CI), so the on/off read
-                        // comes from the tint + status line alone, same as every other
-                        // header here that doesn't have a distinct icon per state.
-                        Icon(
-                            Icons.Filled.Notifications,
-                            contentDescription = null,
-                            tint = notifTint,
-                            modifier = Modifier.size(22.dp),
-                        )
-                    }
-                    Spacer(Modifier.width(12.dp))
-                    Column {
-                        Text("Alerts", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
-                        Text(
-                            if (alertsOn == 0) "All off" else "$alertsOn of ${alertToggles.size} on",
-                            style = MaterialTheme.typography.labelMedium,
-                            color = notifTint,
-                            fontWeight = FontWeight.Medium,
-                        )
-                    }
-                }
+                // Icons.Filled.Notifications only -- NotificationsActive/Off aren't in
+                // this project's icon set (confirmed by CI), so the on/off read comes
+                // from the tint + status line alone, same as every other header here
+                // that doesn't have a distinct icon per state.
+                StatusHeaderRow(
+                    icon = Icons.Filled.Notifications,
+                    tint = notifTint,
+                    title = "Alerts",
+                    status = if (alertsOn == 0) "All off" else "$alertsOn of ${alertToggles.size} on",
+                )
                 Spacer(Modifier.height(14.dp))
                 // First, not last: every other switch in this card is an
                 // ALERT the user hopes never fires. This is a live surface
@@ -1409,24 +1408,12 @@ internal fun SettingsScreen(vm: AppViewModel, embedded: Boolean = false) {
                     locked -> "Locked · ${appearance.lockTiming.label}"
                     else -> "Not locked"
                 }
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Box(
-                        Modifier.size(40.dp).background(securityTint.copy(alpha = 0.15f), CircleShape),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        Icon(
-                            if (locked) Icons.Filled.Lock else Icons.Filled.LockOpen,
-                            contentDescription = null,
-                            tint = securityTint,
-                            modifier = Modifier.size(22.dp),
-                        )
-                    }
-                    Spacer(Modifier.width(12.dp))
-                    Column {
-                        Text("App lock", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
-                        Text(securityStatus, style = MaterialTheme.typography.labelMedium, color = securityTint, fontWeight = FontWeight.Medium)
-                    }
-                }
+                StatusHeaderRow(
+                    icon = if (locked) Icons.Filled.Lock else Icons.Filled.LockOpen,
+                    tint = securityTint,
+                    title = "App lock",
+                    status = securityStatus,
+                )
                 Spacer(Modifier.height(14.dp))
                 if (canBio) {
                     SettingsSegmentedRow(
@@ -1526,24 +1513,12 @@ internal fun SettingsScreen(vm: AppViewModel, embedded: Boolean = false) {
                     ThemeMode.DARK -> "Dark"
                     ThemeMode.AMOLED -> "AMOLED"
                 }
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Box(
-                        Modifier.size(40.dp).background(themeTint.copy(alpha = 0.15f), CircleShape),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        Icon(Icons.Filled.Palette, contentDescription = null, tint = themeTint, modifier = Modifier.size(22.dp))
-                    }
-                    Spacer(Modifier.width(12.dp))
-                    Column {
-                        Text("Display mode", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
-                        Text(
-                            if (appearance.auroraBackground) "$themeLabel · Aurora" else themeLabel,
-                            style = MaterialTheme.typography.labelMedium,
-                            color = themeTint,
-                            fontWeight = FontWeight.Medium,
-                        )
-                    }
-                }
+                StatusHeaderRow(
+                    icon = Icons.Filled.Palette,
+                    tint = themeTint,
+                    title = "Display mode",
+                    status = if (appearance.auroraBackground) "$themeLabel · Aurora" else themeLabel,
+                )
                 Spacer(Modifier.height(14.dp))
                 // Short segment labels; AMOLED is "pure black" for OLED screens.
                 // "+AMOLED" follows the system light/dark switch exactly like
