@@ -3510,6 +3510,35 @@ private fun SettingsSearchResults(
     add("Settings as a swipeable page", "gear button pager swipe car screen navigation") {
         ToggleRow("Settings as a swipeable page", appearance.settingsAsPage) { vm.setSettingsAsPage(it) }
     }
+    add("Aurora background", "gradient animated theme background glow") {
+        ToggleRow("Aurora background", appearance.auroraBackground) { vm.setAuroraBackground(it) }
+    }
+    add("Dynamic color", "material you wallpaper theme color") {
+        ToggleRow("Dynamic color (Material You)", appearance.dynamicColor) { vm.setDynamicColor(it) }
+    }
+    add("Pebble outline", "border rim card theme appearance") {
+        ToggleRow("Pebble outline", appearance.pebbleOutline) { vm.setPebbleOutline(it) }
+    }
+    // Same top-level gate the AI card itself uses -- these two only mean
+    // anything on a device Gemini Nano actually supports, same reason the
+    // card is hidden entirely rather than shown disabled.
+    if (state.aiSupported) {
+        add("On-device AI", "gemini nano ai summary assistant privacy on-device") {
+            ToggleRow("On-device AI (Gemini Nano)", state.aiEnabled) { vm.setAiEnabled(it) }
+        }
+        add("Summarize automatically", "ai auto summary refresh") {
+            ToggleRow("Summarize automatically", state.aiAuto) { vm.setAiAuto(it) }
+        }
+    }
+    // Same gate as the row itself (Backup & sync): only meaningful with
+    // Shizuku actually installed and running.
+    if (state.shizukuAvailable) {
+        add("Install updates seamlessly", "shizuku silent install update") {
+            ToggleRow("Install updates seamlessly (Shizuku)", appearance.seamlessInstallShizuku) {
+                vm.setSeamlessInstallShizuku(it)
+            }
+        }
+    }
     // --- Per-car ---
     state.vehicles.forEach { v ->
         val st = state.statusFor(v)
