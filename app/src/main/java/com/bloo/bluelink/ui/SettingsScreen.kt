@@ -429,11 +429,15 @@ import androidx.compose.ui.graphics.toArgb
  * outside the scroll so it can stay pinned to the bottom of the screen.
  *
  * Two things apply globally across the whole screen:
- *  - Simple vs. Advanced mode (`state.settingsMode`): several cards/sections
- *    are wrapped in `AnimatedVisibility(visible = advanced, ...)` using one
- *    shared `advancedEnter`/`advancedExit` transition spec, so toggling the
- *    mode reveals or hides every advanced-only section in visual lockstep
- *    rather than each one animating independently.
+ *  - Simple vs. Advanced mode (`state.settingsMode`): every advanced-only
+ *    card/section is wrapped in `AnimatedVisibility(visible =
+ *    staggeredAdvancedVisible(advanced, index), enter = collapseEnter(),
+ *    exit = collapseExit())` -- the SAME bounce-open/calm-close springs every
+ *    pebble in the garage uses, with `staggeredAdvancedVisible` giving each
+ *    card a small index-based head start so switching into Advanced mode
+ *    cascades card by card instead of all seven overshooting on the same
+ *    frame. Leaving Advanced mode has no stagger -- see that function's own
+ *    doc for why hiding in sequence reads as broken rather than polished.
  *  - Settings search: `query` (live, updates every keystroke, purely for
  *    filtering the on-screen list of matching settings) is intentionally
  *    kept separate from `submittedQuery` (only set on an explicit
@@ -445,6 +449,59 @@ import androidx.compose.ui.graphics.toArgb
  * surface" in the app treats back); only once search is already idle does
  * back return to the garage.
  */
+
+/**
+ * Delays an advanced-only card's own entrance by `index * STAGGER_STEP_MS` once [advanced]
+ * flips true, so switching into Advanced mode cascades card by card instead of every
+ * advanced-only section overshooting on the exact same frame -- the same "one shared
+ * progress, remapped per item" idea [StaggeredRevealColumn] uses for a pebble's rows,
+ * adapted here for a handful of independent [AnimatedVisibility] instances rather than one
+ * Layout's worth of children (there's no single shared container to run a Layout-based
+ * cascade over: these are whole, separately-composed [SettingsCard]s scattered through one
+ * long screen, not rows of one component).
+ *
+ * The flip back to Simple mode is immediate -- no stagger, no delay -- on purpose, not by
+ * omission: [StaggeredRevealColumn]'s own close side went through exactly this mistake
+ * first. Staggering a HIDE means most items sit fully visible doing nothing while they wait
+ * their turn, then disappear abruptly right at the end, which reads as broken rather than
+ * polished (see that composable's doc for the fuller account). Revealing in sequence looks
+ * deliberate; hiding in sequence looks like a bug, so only the reveal gets one.
+ */
+private const val STAGGER_STEP_MS = 45L
+
+@Composable
+private fun staggeredAdvancedVisible(advanced: Boolean, index: Int): Boolean {
+    var visible by remember { mutableStateOf(advanced) }
+    LaunchedEffect(advanced) {
+        if (advanced) {
+            delay(index * STAGGER_STEP_MS)
+            visible = true
+        } else {
+            visible = false
+        }
+    }
+    return visible
+}
+
+/** Same idea as [staggeredAdvancedVisible], for [SettingsSearchResults]'s result cards
+ *  instead of the Advanced-mode cards: each result gets a small index-based head start
+ *  once [resetKey] (the ranked result set) changes, so a fresh search reads as results
+ *  arriving one after another rather than the whole list snapping in at once. No stagger
+ *  on the way OUT here either -- there is no "way out" to stagger, since a result that's
+ *  no longer in the list is simply never composed again; there's nothing to hide in
+ *  sequence the way [staggeredAdvancedVisible]'s own doc warns against. */
+private const val SEARCH_RESULT_STAGGER_MS = 35L
+
+@Composable
+private fun staggeredResultVisible(resetKey: Any, index: Int): Boolean {
+    var visible by remember(resetKey) { mutableStateOf(false) }
+    LaunchedEffect(resetKey) {
+        delay(index * SEARCH_RESULT_STAGGER_MS)
+        visible = true
+    }
+    return visible
+}
+
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 internal fun SettingsScreen(vm: AppViewModel) {
@@ -492,31 +549,20 @@ internal fun SettingsScreen(vm: AppViewModel) {
             Spacer(Modifier.height(topInset + 56.dp))
             run {
                 val advanced = state.settingsMode == "advanced"
-            // Shared transition for every advanced-only card/section below, so
-            // switching Simple/Advanced reveals or tucks them away smoothly
-            // instead of an abrupt appear/disappear (the outer Column's own
-            // animateContentSize only smooths the resulting height change
-            // around them, not their own appearance).
-            // A slower, near-critical settle (SoftDamping = 0.82, barely any
-            // overshoot) instead of the previous MediumBouncy (0.2, very
-            // bouncy) -- the mode switch read as too springy/fast; this reads
-            // as a calmer, slightly longer settle instead. Shared with
-            // CarSettingsCard/SettingsCard's own animateContentSize below so
-            // all three settle at the same feel instead of visibly disagreeing.
-            // The HEIGHT keeps AdvancedModeStiffness -- a deliberately calmer settle than
-            // the theme's, for a disclosure that reveals a lot at once (see below). The
-            // FADE moves to the theme's effects spec, because a tweened alpha over a
-            // sprung height is the split collapseEnter's doc calls out: this toggle is
-            // re-tappable, so its fade wants velocity continuity too.
-            val advancedEnter = fadeIn(MaterialTheme.motionScheme.defaultEffectsSpec<Float>()) +
-                expandVertically(spring(dampingRatio = SoftDamping, stiffness = AdvancedModeStiffness))
-            val advancedExit = fadeOut(MaterialTheme.motionScheme.defaultEffectsSpec<Float>()) +
-                shrinkVertically(spring(dampingRatio = SoftDamping, stiffness = AdvancedModeStiffness))
+            // Every advanced-only card now uses the SAME collapseEnter()/collapseExit()
+            // every pebble in the garage uses (see UiTokens.kt) -- this used to be its
+            // own bespoke, calmer spec (AdvancedModeStiffness) kept deliberately apart
+            // from the pebble bounce because "it reveals a lot at once." That reasoning
+            // predates the fix below: what actually made revealing a lot at once feel
+            // chaotic was seven cards animating in perfect lockstep, all overshooting
+            // together on the same frame -- not the bounce itself. staggeredAdvancedVisible
+            // fixes THAT directly (each card gets a small index-based head start), which
+            // is what lets this share the real bounce spring instead of avoiding it.
             // No `Arrangement.spacedBy` -- SettingsCard carries the gap itself, see there.
             //
             // And no `animateContentSize` either. It used to wrap this Column on the
             // reasoning that all three settles should share one feel, but every child that
-            // changes height here already animates its own (advancedEnter/advancedExit's
+            // changes height here already animates its own (collapseEnter/collapseExit's
             // expandVertically/shrinkVertically, plus SettingsCard's own inner
             // animateContentSize). Stacking a second, independently-sprung height animation
             // over those makes each frame of the inner ones a fresh "content size changed"
@@ -632,7 +678,7 @@ internal fun SettingsScreen(vm: AppViewModel) {
             // ungated so its controls show with or without Shizuku. See below.)
 
             // App-icon shortcuts (long-press the launcher icon)
-            AnimatedVisibility(visible = advanced, enter = advancedEnter, exit = advancedExit) {
+            AnimatedVisibility(visible = staggeredAdvancedVisible(advanced, 0), enter = collapseEnter(), exit = collapseExit()) {
                 var shortcutsExpanded by remember { mutableStateOf(false) }
                 SettingsCard("App shortcuts", Icons.Filled.Bolt) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
@@ -903,7 +949,7 @@ internal fun SettingsScreen(vm: AppViewModel) {
                 // fallback (moving settings by hand, a local backup outside
                 // Drive) next to the always-on automatic sync above, which is
                 // what most people actually want and shouldn't be buried.
-                AnimatedVisibility(visible = advanced, enter = advancedEnter, exit = advancedExit) {
+                AnimatedVisibility(visible = staggeredAdvancedVisible(advanced, 1), enter = collapseEnter(), exit = collapseExit()) {
                   Column {
                     Spacer(Modifier.height(14.dp))
                     HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
@@ -997,7 +1043,7 @@ internal fun SettingsScreen(vm: AppViewModel) {
             }
 
             // Links
-            AnimatedVisibility(visible = advanced, enter = advancedEnter, exit = advancedExit) {
+            AnimatedVisibility(visible = staggeredAdvancedVisible(advanced, 2), enter = collapseEnter(), exit = collapseExit()) {
             SettingsCard("Links", Icons.Filled.OpenInNew) {
                 SettingsSegmentedRow(
                     label = "Open links",
@@ -1012,7 +1058,7 @@ internal fun SettingsScreen(vm: AppViewModel) {
             }
 
             // Logs
-            AnimatedVisibility(visible = advanced, enter = advancedEnter, exit = advancedExit) {
+            AnimatedVisibility(visible = staggeredAdvancedVisible(advanced, 3), enter = collapseEnter(), exit = collapseExit()) {
             SettingsCard("Logs", Icons.Filled.Info) {
                 var logsExpanded by remember { mutableStateOf(false) }
                 val lineCount = logs.size
@@ -1174,7 +1220,7 @@ internal fun SettingsScreen(vm: AppViewModel) {
 
             // Quick Settings tiles -- per-tile config is power-user territory,
             // same tier as App shortcuts/Cars above.
-            AnimatedVisibility(visible = advanced, enter = advancedEnter, exit = advancedExit) {
+            AnimatedVisibility(visible = staggeredAdvancedVisible(advanced, 4), enter = collapseEnter(), exit = collapseExit()) {
             SettingsCard("Quick tiles", Icons.Filled.Dashboard) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(Icons.Filled.Bolt, contentDescription = null, modifier = Modifier.size(20.dp), tint = MaterialTheme.colorScheme.primary)
@@ -1328,7 +1374,7 @@ internal fun SettingsScreen(vm: AppViewModel) {
                 // Aurora's motion/colour-mode/custom-hex sub-options are
                 // power-user territory, not something a simple-mode user needs
                 // (the built-in solid-surface background covers everyone else).
-                AnimatedVisibility(visible = advanced, enter = advancedEnter, exit = advancedExit) {
+                AnimatedVisibility(visible = staggeredAdvancedVisible(advanced, 5), enter = collapseEnter(), exit = collapseExit()) {
                   Column {
                     Spacer(Modifier.height(10.dp))
                     ToggleRow("Aurora background", appearance.auroraBackground) { vm.setAuroraBackground(it) }
@@ -1390,7 +1436,7 @@ internal fun SettingsScreen(vm: AppViewModel) {
                     }
                   }
                 }
-                AnimatedVisibility(visible = advanced, enter = advancedEnter, exit = advancedExit) {
+                AnimatedVisibility(visible = staggeredAdvancedVisible(advanced, 6), enter = collapseEnter(), exit = collapseExit()) {
                   // AnimatedVisibility lays out a single child, not an implicit
                   // Column of its content lambda's composables -- without this
                   // wrapper the Spacer/Divider/Toggle/Slider siblings below would
@@ -3349,11 +3395,39 @@ private fun SettingsSearchResults(
             )
         }
     } else {
-        results.forEach { e ->
-            Card(resultCardModifier, shape = resultCardShape, colors = resultCardColors) {
-                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text(e.title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
-                    e.content()
+        // Restarts the stagger whenever the actual SET of results changes -- not on every
+        // keystroke, which would re-pop a list that hasn't actually moved just because the
+        // user is still typing the same word. Titles joined is cheap and exactly captures
+        // "did the ranked list change," which is the only thing that should trigger this.
+        val resultsKey = results.joinToString("|") { it.title }
+        results.forEachIndexed { i, e ->
+            PopVisible(visible = staggeredResultVisible(resultsKey, i)) {
+                Card(resultCardModifier, shape = resultCardShape, colors = resultCardColors) {
+                    Row(Modifier.padding(16.dp)) {
+                        // A small icon badge per result, the same "leading circle" language
+                        // the update pebble and settings hero stats use -- these cards used
+                        // to open straight on bold text with nothing to distinguish a
+                        // toggle-able setting from an informational readout at a glance.
+                        Box(
+                            Modifier
+                                .size(28.dp)
+                                .clip(CircleShape)
+                                .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.14f)),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Icon(
+                                Icons.Filled.Search,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(15.dp),
+                            )
+                        }
+                        Spacer(Modifier.width(12.dp))
+                        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Text(e.title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                            e.content()
+                        }
+                    }
                 }
             }
         }

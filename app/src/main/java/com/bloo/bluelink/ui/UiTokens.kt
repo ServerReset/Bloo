@@ -166,9 +166,14 @@ internal const val AdvancedModeStiffness = 130f
  *    differed. Four also SPRANG open and TWEENED shut, which is what made closing feel like
  *    a snap next to a smooth open; six tweened both halves.
  *
- * The one deliberate holdout is `advancedEnter`/`advancedExit` in the settings screen, which
- * keeps [AdvancedModeStiffness] for the height because it reveals a lot at once and wants a
- * calmer settle. It takes its FADE from the same effects spec as this.
+ * The Settings screen's Simple/Advanced toggle used to be the one deliberate holdout here,
+ * on its own calmer [AdvancedModeStiffness] spec, reasoned as "it reveals a lot at once."
+ * It now uses these same tokens too -- what actually made revealing a lot at once feel
+ * chaotic turned out to be several cards all overshooting on the same frame, not the bounce
+ * itself, and `staggeredAdvancedVisible` (SettingsScreen.kt) fixes that directly by giving
+ * each card a small index-based head start instead of avoiding the bounce altogether.
+ * [AdvancedModeStiffness] still exists for [SettingsCard]'s own in-place `animateContentSize`
+ * (a genuinely different case: smoothing a resize already in progress, not this transition).
  *
  * [expandFrom] is a parameter and not a constant because it is a layout fact, not a timing
  * one: a body under a header should grow downward from its top, while a bubble anchored
