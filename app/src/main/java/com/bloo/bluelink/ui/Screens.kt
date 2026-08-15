@@ -3643,7 +3643,8 @@ internal fun GarageScreen(state: UiState, vm: AppViewModel) {
                                 Text(
                                     if (settingsAsPage && block == pageCount) "Settings" else vehicles.getOrNull(block)?.name ?: "",
                                     style = IdentityPillTextStyle,
-                                    fontWeight = FontWeight.SemiBold,
+                                    // Bold, matching MorphingIdentityContent's own -- see its comment.
+                                    fontWeight = FontWeight.Bold,
                                     maxLines = 1,
                                 )
                             }
@@ -7983,7 +7984,15 @@ internal fun BoxScope.MorphingIdentityPill(
         Modifier
             .align(Alignment.TopStart)
             .statusBarsPadding()
-            .padding(start = 8.dp + homeStartPadding, top = 8.dp, end = 8.dp, bottom = 8.dp)
+            // start = 16.dp, matching VehicleDetailContent's own
+            // `.padding(horizontal = 16.dp)` around CarHeaderRow (and close
+            // enough to SettingsHeaderRow's 16dp grid padding + its own 4dp
+            // inset) -- this pill's home slot needs to line up with where the
+            // real, alpha=0'd header text actually sits, or the "same
+            // element" illusion at t=0 reads as a text block that's jumped
+            // sideways rather than one that just grew. Was 8dp, half that
+            // real offset.
+            .padding(start = 16.dp + homeStartPadding, top = 8.dp, end = 8.dp, bottom = 8.dp)
             .graphicsLayer {
                 // lerp(expandScale, 1f, tc) by hand -- avoids an ambiguous-import
                 // clash between androidx.compose.ui.unit.lerp (Dp, already
@@ -8065,7 +8074,12 @@ internal fun RowScope.MorphingIdentityContent(
     Box(Modifier.size(IdentityPillAvatarSize * tc)) {
         if (tc > 0.01f) PillAvatar(photo, icon, tint, size = IdentityPillAvatarSize * tc)
     }
-    Text(name, style = IdentityPillTextStyle, fontWeight = FontWeight.SemiBold, maxLines = 1)
+    // Bold, not SemiBold -- CarHeaderRow/SettingsHeaderRow both draw the real
+    // (alpha=0'd) name at FontWeight.Bold. At t=0 this text IS supposed to
+    // read as that same header, just scaled up by expandScale; a lighter
+    // weight here made the two visibly different fonts mid-morph instead of
+    // one continuous piece of text getting bigger.
+    Text(name, style = IdentityPillTextStyle, fontWeight = FontWeight.Bold, maxLines = 1)
     if (pageLabel != null) {
         Box(Modifier.graphicsLayer { alpha = ((tc - 0.5f) / 0.5f).coerceIn(0f, 1f) }) {
             Text(pageLabel, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
