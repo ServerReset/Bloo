@@ -7560,6 +7560,15 @@ internal fun BackdropHost(content: @Composable BoxScope.() -> Unit) {
  * Single-column car view (phones, and each column of the grid). Everything
  * scrolls together in one [Column] inside [Refreshable] (header row, then
  * the reorderable [PebbleList]).
+ *
+ * Once [CarHeaderRow]'s own name has scrolled out of view, an identical copy
+ * of it fades in fixed at the top-left of the screen -- not a pill, not a
+ * scaled/morphing element, just the same text sitting in the exact spot the
+ * real one occupied (`statusBarsPadding()` + the column's own 16dp start
+ * padding, no extra offset). Because it's a plain static copy of text that
+ * never moves or resizes, there's no per-frame position tracking and nothing
+ * to keep in sync with a live scroll offset -- only the one boolean
+ * (`nameHidden`) it fades on.
  */
 @Composable
 private fun VehicleDetailContent(
@@ -7573,6 +7582,14 @@ private fun VehicleDetailContent(
     val topInset = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
     val bottomInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
     val scroll = rememberScrollState()
+    val scope = rememberCoroutineScope()
+    val density = LocalDensity.current
+    val haptics = LocalHaptics.current
+    // Same threshold CarHeaderRow's name has always scrolled past by: once the
+    // name (plus a little slack) has gone by, the floating copy takes over.
+    val nameHidden by remember {
+        derivedStateOf { scroll.value > with(density) { (topInset + 16.dp).toPx() } }
+    }
     Refreshable(v, state, vm, hideIndicator = hideIndicator) {
         Column(
             Modifier
@@ -7592,6 +7609,24 @@ private fun VehicleDetailContent(
             // beyondViewportPageCount=1 pre-compose, not from an in-transit skeleton.
             PebbleList(v, state, vm)
             Spacer(Modifier.height(bottomInset + 16.dp))
+        }
+        androidx.compose.animation.AnimatedVisibility(
+            visible = nameHidden,
+            enter = fadeIn(tween(200)),
+            exit = fadeOut(tween(150)),
+            modifier = Modifier.align(Alignment.TopStart).statusBarsPadding().padding(start = 16.dp),
+        ) {
+            Text(
+                v.name,
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface,
+                maxLines = 1,
+                modifier = Modifier.clickable {
+                    haptics?.click()
+                    scope.launch { scroll.animateScrollTo(0) }
+                },
+            )
         }
     }
 }
