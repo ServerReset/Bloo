@@ -7663,13 +7663,17 @@ private fun VehicleDetailContent(
     val haptics = LocalHaptics.current
     val topInsetPx = with(density) { topInset.toPx() }
     // The fixed corner slot -- this is the PILL's own top-left, not the
-    // text's: 12dp clear of the status bar on both axes, matching
-    // FloatingIcon's own default outerPadding EXACTLY (its Surface is a
-    // 48dp circle at that same offset) -- see the chrome Box below for why
-    // this specifically has to be the pill's origin rather than wherever
-    // the text glyphs happen to sit once padded.
+    // text's (see the chrome Box below for why that distinction matters).
+    // Y matches FloatingIcon's own default outerPadding (12dp clear of the
+    // status bar) -- both are floating chrome anchored near the top of the
+    // screen, so that vertical rhythm is real. X does NOT: FloatingIcon
+    // sits in the opposite (top-RIGHT) corner, so matching its value here
+    // shares no actual edge with anything -- it only succeeded in
+    // misaligning this pill from the pebble cards scrolling underneath it,
+    // which all share the content column's own 16dp horizontal padding.
+    // 16dp lines this pill's own left edge up with theirs instead.
     val cornerYPx = with(density) { (topInset + 12.dp).toPx() }
-    val cornerXPx = with(density) { 12.dp.toPx() }
+    val cornerXPx = with(density) { 16.dp.toPx() }
     val onSurface = MaterialTheme.colorScheme.onSurface
     // The hero title's own real, measured position/colour IN WINDOW-ROOT
     // coordinates, kept live by HeroTitleFlight below -- null/Unspecified
@@ -10036,13 +10040,27 @@ private fun SplitExpandButton(
     )
     val leftInteraction = remember { MutableInteractionSource() }
     val leftPressed by leftInteraction.collectIsPressedAsState()
-    // Morph to rounded-rect when action is active, pressed, OR pebble is expanded.
-    val morphed = action.active || leftPressed || expanded
+    val rightInteraction = remember { MutableInteractionSource() }
+    val rightPressed by rightInteraction.collectIsPressedAsState()
+    // Left and right each morph to rounded-rect on THEIR OWN state, not a
+    // single shared boolean -- action.active only ever describes the LEFT
+    // button (the action currently running), so it used to also square off
+    // the chevron's own outer-right corner right along with it, even though
+    // nothing about the chevron itself had changed. `expanded` still
+    // affects both: opening the pebble's body is a whole-row state, not
+    // either button's own.
+    val leftMorphed = action.active || leftPressed || expanded
+    val rightMorphed = rightPressed || expanded
 
-    val outer by animateDpAsState(
-        if (morphed) 16.dp else 50.dp,
+    val leftOuter by animateDpAsState(
+        if (leftMorphed) 16.dp else 50.dp,
         spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessLow),
-        label = "splitOuter",
+        label = "splitOuterLeft",
+    )
+    val rightOuter by animateDpAsState(
+        if (rightMorphed) 16.dp else 50.dp,
+        spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessLow),
+        label = "splitOuterRight",
     )
     val inner = 6.dp
 
@@ -10109,7 +10127,7 @@ private fun SplitExpandButton(
             interactionSource = leftInteraction,
             color = leftBg,
             contentColor = leftFg,
-            shape = RoundedCornerShape(topStart = outer, bottomStart = outer, topEnd = inner, bottomEnd = inner),
+            shape = RoundedCornerShape(topStart = leftOuter, bottomStart = leftOuter, topEnd = inner, bottomEnd = inner),
             modifier = Modifier.fillMaxHeight().then(
                 if (action.label.isEmpty() && action.contentDescription != null) {
                     Modifier.semantics { contentDescription = action.contentDescription!! }
@@ -10155,9 +10173,10 @@ private fun SplitExpandButton(
         // Right half — chevron nub.
         Surface(
             onClick = { if (expanded) haptics?.tick() else haptics?.click(); onToggle() },
+            interactionSource = rightInteraction,
             color = buttonContainer(),
             contentColor = MaterialTheme.colorScheme.onSurface,
-            shape = RoundedCornerShape(topStart = inner, bottomStart = inner, topEnd = outer, bottomEnd = outer),
+            shape = RoundedCornerShape(topStart = inner, bottomStart = inner, topEnd = rightOuter, bottomEnd = rightOuter),
             // The icon's own contentDescription below is the NEXT action
             // ("Expand"/"Collapse"); this is the CURRENT state -- without it
             // TalkBack only ever hears what tapping will do, never whether the
