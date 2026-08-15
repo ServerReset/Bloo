@@ -258,7 +258,6 @@ import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.MutableState
-import androidx.compose.runtime.State
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
@@ -5432,7 +5431,7 @@ private fun HeroHeader(
                 }
             }
 
-        // Reports this title's own real, measured position/colour/alpha to a
+        // Reports this title's own real, measured position/colour to a
         // VehicleDetailContent ancestor's floating name, if one is providing
         // it (null everywhere else -- ExpandedCar's own pebble list excludes
         // "summary" entirely, so this only ever applies here). See
@@ -5458,7 +5457,14 @@ private fun HeroHeader(
             } else {
                 Modifier
             },
-            titleAlpha = heroTitleFlight?.alpha?.value ?: 1f,
+            // Permanently invisible, not crossfaded -- there is exactly ONE
+            // visible copy of this title whenever a flight controller is
+            // present (VehicleDetailContent's own floating Text, drawn AT
+            // this title's live position/colour via HeroTitleFlight above),
+            // so this one never draws glyphs at all rather than fading two
+            // copies in and out of sync with each other. See
+            // HeroTitleFlight's own doc.
+            titleAlpha = if (heroTitleFlight != null) 0f else 1f,
             // The ONLY pebble that grows its title. Here the title is the car's NAME and the
             // card becomes a photo of that car, so the name scaling up reads as the card taking
             // over. On "Location" or "Diagnostics" it is a heading resizing for no reason.
@@ -7575,30 +7581,24 @@ internal fun BackdropHost(content: @Composable BoxScope.() -> Unit) {
 
 /**
  * What [HeroHeader]'s own title (the car's name, drawn ON the photo card via
- * [PebbleShell]) reports back to [VehicleDetailContent] so the floating name
- * can fly FROM the hero card's real, measured title -- not a guessed
- * position -- and fade the hero's own copy out as the floating one takes
- * over. `onPositioned` and `color` are read every layout pass (including
- * while the hero is scrolled out of the viewport; `verticalScroll` keeps
- * off-screen children measured, just visually clipped), so they're always
- * the hero title's live, current on-screen bounds and colour -- `color` in
- * particular is what lets the floating copy actually START looking like
- * the SAME text (the hero's title is drawn white, over its photo; the
- * floating one needs to begin at that same white before it settles into
- * the app's normal text colour away from the photo, or it reads as a
- * different, unrelated piece of text rather than one continuous element
- * leaving the card). `alpha` is read the other direction -- [HeroHeader]
- * fades its own title out by exactly the amount the floating copy has
- * faded in, so the two never both read as fully opaque at once.
+ * [PebbleShell]) reports back to [VehicleDetailContent], so the floating
+ * [Text] in [VehicleDetailContent] can BE the car's name -- the only copy
+ * that ever draws glyphs -- rather than a second, independent [Text] with
+ * its own alpha faded to fake standing in for the first one. Whenever a
+ * flight controller is provided at all, [PebbleShell]'s own title goes
+ * permanently invisible (see `titleAlpha` at the call site) -- not
+ * crossfaded with anything, just never drawn, because the floating copy is
+ * ALREADY sitting exactly on top of it (see [onPositioned]) the entire time
+ * it's on screen.
+ *
+ * `onPositioned` and `color` are read every layout pass (including while
+ * the hero is scrolled out of the viewport; `verticalScroll` keeps
+ * off-screen children measured, just visually clipped), so the floating
+ * copy can track the hero title's live position and colour continuously
+ * for as long as it's genuinely attached to it -- not a value captured
+ * once and then left to drift out of sync with further scrolling.
  */
-private class HeroTitleFlight(
-    val onPositioned: (Offset) -> Unit,
-    val alpha: State<Float>,
-    // MutableState, not a callback like onPositioned -- HeroHeader writes
-    // this every recomposition of its own title colour (a plain lerp, cheap
-    // to just re-set rather than wrap in a setter function).
-    val color: MutableState<Color>,
-)
+private class HeroTitleFlight(val onPositioned: (Offset) -> Unit, val color: MutableState<Color>)
 
 /** Null (the default) everywhere except inside [VehicleDetailContent]. */
 private val LocalHeroTitleFlight = compositionLocalOf<HeroTitleFlight?> { null }
@@ -7608,22 +7608,23 @@ private val LocalHeroTitleFlight = compositionLocalOf<HeroTitleFlight?> { null }
  * scrolls together in one [Column] inside [Refreshable] (header row, then
  * the reorderable [PebbleList]).
  *
- * The car's name genuinely leaves the hero photo card and flies to a fixed
- * corner, not a copy fading in beside a copy fading out: [HeroTitleFlight]
- * reports the hero card's own title's real on-screen position every layout
- * pass, so the instant it scrolls off screen, [flightStart] freezes that
- * exact spot and the floating [Text] here springs (with a real bounce, not
- * a cut) from it into the fixed top-left slot -- then stays there,
- * genuinely static, not still nudging with further scrolling. Scrolling
- * back reverses the same spring, from the corner back to that same frozen
- * start point, and the hero's own title fades back in to take over again.
+ * The car's name is drawn by exactly ONE [Text], ever: this one. The hero
+ * card's own title never draws glyphs at all while this is active (see the
+ * `titleAlpha = 0f` at [HeroHeader]'s [PebbleShell] call) -- there is no
+ * second copy to fade in or out, so nothing needs hiding or crossfading.
+ * [HeroTitleFlight] reports the hero title's real, live position and colour
+ * every layout pass, and THIS Text is simply drawn there -- indistinguishable
+ * from being the hero's own title, because as far as anyone can see, it is.
  *
- * [dockProgress] is the one thing that ever animates: 0 means "at
- * [flightStart]" and 1 means "docked in the fixed corner". The position
- * actually drawn is a straight lerp between those two FIXED points by
- * [dockProgress] -- unlike a live-tracked target, neither endpoint moves
- * once a flight is underway, which is what makes "static once docked"
- * actually true rather than an approximation.
+ * [dockProgress] is the one thing that ever animates: 0 means "drawn exactly
+ * at the hero title's live position/colour" and 1 means "docked in the
+ * fixed corner, in the app's normal text colour". The position and colour
+ * actually drawn are a straight lerp between those two by [dockProgress] --
+ * the "attached" end of that lerp is the hero title's CURRENT live values,
+ * recomputed every layout pass, so this Text tracks it exactly for as long
+ * as it's genuinely still part of the card; once [dockProgress] reaches 1
+ * that live term cancels out of the lerp entirely, so it's genuinely static
+ * once docked despite still reading a live value underneath.
  */
 @Composable
 private fun VehicleDetailContent(
@@ -7645,17 +7646,15 @@ private fun VehicleDetailContent(
     // inset the content column's own horizontal padding uses.
     val cornerYPx = with(density) { (topInset + 8.dp).toPx() }
     val cornerXPx = with(density) { 16.dp.toPx() }
-    // The hero title's own real, measured position IN WINDOW-ROOT
-    // coordinates, kept live by HeroTitleFlight.onPositioned below -- null
-    // until the hero has laid out at least once. A plain mutableStateOf, not
-    // something read anywhere in composition: every write here is only ever
-    // consumed inside the offset{} lambda further down (layout phase), so
-    // updating it every scroll frame re-lays-out just that one floating Box,
-    // not this whole composable.
+    val onSurface = MaterialTheme.colorScheme.onSurface
+    // The hero title's own real, measured position/colour IN WINDOW-ROOT
+    // coordinates, kept live by HeroTitleFlight below -- null/Unspecified
+    // until the hero has laid out at least once.
     val heroTitlePosition = remember { mutableStateOf<Offset?>(null) }
+    val heroTitleColor = remember { mutableStateOf(Color.Unspecified) }
     // This composable's OWN root position -- needed to convert
     // heroTitlePosition (root coordinates) into a LOCAL offset for the
-    // floating Box below. Modifier.offset{} moves an element relative to
+    // floating Text below. Modifier.offset{} moves an element relative to
     // wherever its parent already placed it, not to an absolute screen
     // position -- on a phone this container fills the screen so the two
     // coincide, but the exact same VehicleDetailContent also runs as one
@@ -7673,23 +7672,8 @@ private fun VehicleDetailContent(
     val nameHidden by remember {
         derivedStateOf { (heroTitlePosition.value?.y ?: Float.MAX_VALUE) < topInsetPx }
     }
-    // The hero title's own live colour (it's drawn white over its photo, so
-    // this is the app's normal onSurface only when the car has no photo --
-    // see HeroTitleFlight's own doc for why this matters).
-    val heroTitleColor = remember { mutableStateOf(Color.Unspecified) }
-    // Where the flight begins -- captured ONCE, the instant the hero title
-    // leaves the viewport, not tracked live for the rest of the trip. The
-    // floating text commits to that one start point/colour and flies to the
-    // corner from it; further scrolling doesn't retarget it mid-flight, and
-    // once docked it's genuinely static, not still nudging with the scroll.
-    val flightStart = remember { mutableStateOf<Offset?>(null) }
-    val flightStartColor = remember { mutableStateOf(Color.Unspecified) }
     val dockProgress = remember { Animatable(0f) }
     LaunchedEffect(nameHidden) {
-        if (nameHidden) {
-            flightStart.value = heroTitlePosition.value?.let { it - containerPosition.value }
-            flightStartColor.value = heroTitleColor.value
-        }
         // A real spring, not a tween -- dampingRatio well under 1 so it
         // visibly overshoots and settles rather than gliding to a stop,
         // which is what makes this read as the text getting yanked into (or
@@ -7699,15 +7683,8 @@ private fun VehicleDetailContent(
             spring(dampingRatio = 0.55f, stiffness = Spring.StiffnessMediumLow),
         )
     }
-    // The hero's OWN title fades out by exactly as much as the floating copy
-    // fades in -- see HeroTitleFlight's own doc.
-    val heroTitleAlpha = remember { derivedStateOf { 1f - dockProgress.value.coerceIn(0f, 1f) } }
-    val heroFlight = remember(heroTitleAlpha) {
-        HeroTitleFlight(
-            onPositioned = { heroTitlePosition.value = it },
-            alpha = heroTitleAlpha,
-            color = heroTitleColor,
-        )
+    val heroFlight = remember {
+        HeroTitleFlight(onPositioned = { heroTitlePosition.value = it }, color = heroTitleColor)
     }
     Refreshable(v, state, vm, hideIndicator = hideIndicator) {
         CompositionLocalProvider(LocalHeroTitleFlight provides heroFlight) {
@@ -7741,36 +7718,35 @@ private fun VehicleDetailContent(
         Box(
             Modifier
                 .align(Alignment.TopStart)
-                // Layout-phase reads only (flightStart.value,
-                // dockProgress.value) -- this Box alone re-lays-out on an
-                // animation frame, not VehicleDetailContent's whole
+                // Layout-phase reads only (heroTitlePosition.value,
+                // dockProgress.value) -- this Box alone re-lays-out on a
+                // scroll or animation frame, not VehicleDetailContent's whole
                 // composition, the same reason the pull-to-refresh indicator
                 // above reads its own live values inside offset{} instead of
                 // the composable body.
                 .offset {
-                    val start = flightStart.value ?: Offset(cornerXPx, cornerYPx)
+                    val attached = heroTitlePosition.value?.let { it - containerPosition.value }
+                        ?: Offset(cornerXPx, cornerYPx)
                     val t = dockProgress.value
-                    val x = start.x + (cornerXPx - start.x) * t
-                    val y = start.y + (cornerYPx - start.y) * t
+                    val x = attached.x + (cornerXPx - attached.x) * t
+                    val y = attached.y + (cornerYPx - attached.y) * t
                     IntOffset(x.roundToInt(), y.roundToInt())
-                }
-                // Invisible until the hero title starts fading out, then
-                // fades in by the same amount -- see HeroTitleFlight's doc.
-                // Coerced: dockProgress's own spring can overshoot past 0/1.
-                .graphicsLayer { alpha = dockProgress.value.coerceIn(0f, 1f) },
+                },
         ) {
-            val onSurface = MaterialTheme.colorScheme.onSurface
-            // Starts at the hero title's own captured colour (white, over its
-            // photo) and lerps to the app's normal text colour as it docks --
-            // otherwise the floating copy would pop straight to a completely
-            // different colour the instant it appears, undercutting the
-            // "this IS the same text" illusion the whole flight is for.
-            val startColor = flightStartColor.value.let { if (it == Color.Unspecified) onSurface else it }
             Text(
                 v.name,
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.Bold,
-                color = lerp(startColor, onSurface, dockProgress.value.coerceIn(0f, 1f)),
+                // Starts at the hero title's own live colour (white, over its
+                // photo) and lerps to the app's normal text colour as it
+                // docks -- same reasoning as the position lerp above: this
+                // IS the hero's title, so it tracks its colour exactly for
+                // as long as it's attached, and only diverges as it leaves.
+                color = lerp(
+                    heroTitleColor.value.let { if (it == Color.Unspecified) onSurface else it },
+                    onSurface,
+                    dockProgress.value.coerceIn(0f, 1f),
+                ),
                 maxLines = 1,
                 modifier = Modifier.clickable {
                     haptics?.click()
