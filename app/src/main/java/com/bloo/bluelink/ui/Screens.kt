@@ -258,6 +258,7 @@ import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.MutableState
+import androidx.compose.runtime.State
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
@@ -7597,19 +7598,19 @@ private val LocalHeroTitleFlight = compositionLocalOf<HeroTitleFlight?> { null }
  * The car's name genuinely leaves the hero photo card and flies to a fixed
  * corner, not a copy fading in beside a copy fading out: [HeroTitleFlight]
  * reports the hero card's own title's real on-screen position every layout
- * pass, and the floating [Text] here is drawn AT that exact position --
- * indistinguishable from the hero's own title -- for as long as it's still
- * in view. Once it's scrolled far enough off screen, it peels off and
- * springs (with a real bounce, not a cut) into the fixed top-left slot and
- * stays there; scrolling back reverses the same spring and lands it back on
- * the hero title's live position rather than snapping to a fixed point.
+ * pass, so the instant it scrolls off screen, [flightStart] freezes that
+ * exact spot and the floating [Text] here springs (with a real bounce, not
+ * a cut) from it into the fixed top-left slot -- then stays there,
+ * genuinely static, not still nudging with further scrolling. Scrolling
+ * back reverses the same spring, from the corner back to that same frozen
+ * start point, and the hero's own title fades back in to take over again.
  *
- * [dockProgress] is the one thing that ever animates: 0 means "glued to the
- * hero title's live measured position" and 1 means "docked in the fixed
- * corner". The position actually drawn is a straight lerp between those two
- * points by [dockProgress] -- the "attached" end of that lerp is
- * recomputed from the CURRENT measured position on every layout pass, so
- * even scrolling further mid-flight never leaves it chasing a stale target.
+ * [dockProgress] is the one thing that ever animates: 0 means "at
+ * [flightStart]" and 1 means "docked in the fixed corner". The position
+ * actually drawn is a straight lerp between those two FIXED points by
+ * [dockProgress] -- unlike a live-tracked target, neither endpoint moves
+ * once a flight is underway, which is what makes "static once docked"
+ * actually true rather than an approximation.
  */
 @Composable
 private fun VehicleDetailContent(
@@ -7659,8 +7660,17 @@ private fun VehicleDetailContent(
     val nameHidden by remember {
         derivedStateOf { (heroTitlePosition.value?.y ?: Float.MAX_VALUE) < topInsetPx }
     }
+    // Where the flight begins -- captured ONCE, the instant the hero title
+    // leaves the viewport, not tracked live for the rest of the trip. The
+    // floating text commits to that one start point and flies to the corner
+    // from it; further scrolling doesn't retarget it mid-flight, and once
+    // docked it's genuinely static, not still nudging with the scroll.
+    val flightStart = remember { mutableStateOf<Offset?>(null) }
     val dockProgress = remember { Animatable(0f) }
     LaunchedEffect(nameHidden) {
+        if (nameHidden) {
+            flightStart.value = heroTitlePosition.value?.let { it - containerPosition.value }
+        }
         // A real spring, not a tween -- dampingRatio well under 1 so it
         // visibly overshoots and settles rather than gliding to a stop,
         // which is what makes this read as the text getting yanked into (or
@@ -7708,20 +7718,17 @@ private fun VehicleDetailContent(
         Box(
             Modifier
                 .align(Alignment.TopStart)
-                // Layout-phase reads only (heroTitlePosition.value,
-                // dockProgress.value) -- this Box alone re-lays-out on a
-                // scroll or animation frame, not VehicleDetailContent's whole
+                // Layout-phase reads only (flightStart.value,
+                // dockProgress.value) -- this Box alone re-lays-out on an
+                // animation frame, not VehicleDetailContent's whole
                 // composition, the same reason the pull-to-refresh indicator
                 // above reads its own live values inside offset{} instead of
                 // the composable body.
                 .offset {
-                    // Root -> local: see containerPosition's own doc above.
-                    val posLocal = heroTitlePosition.value?.let { it - containerPosition.value }
-                    val attachedX = posLocal?.x ?: cornerXPx
-                    val attachedY = posLocal?.y ?: cornerYPx
+                    val start = flightStart.value ?: Offset(cornerXPx, cornerYPx)
                     val t = dockProgress.value
-                    val x = attachedX + (cornerXPx - attachedX) * t
-                    val y = attachedY + (cornerYPx - attachedY) * t
+                    val x = start.x + (cornerXPx - start.x) * t
+                    val y = start.y + (cornerYPx - start.y) * t
                     IntOffset(x.roundToInt(), y.roundToInt())
                 }
                 // Invisible until the hero title starts fading out, then
