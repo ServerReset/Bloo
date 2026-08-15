@@ -8419,10 +8419,10 @@ private fun ExpandedCar(v: Vehicle, state: UiState, vm: AppViewModel, flipped: B
     // Hoisted (not recreated on flip) so each column keeps its own scroll
     // position when the columns swap sides. controlsScroll in particular is
     // what the floating name below tracks -- it always belongs to whichever
-    // COLUMN currently renders `controls` (and therefore CarHeaderRow),
-    // regardless of which physical side (left/right) that currently is: the
-    // leftScroll/rightScroll pairing below always keeps this same
-    // ScrollState paired with the same content across a flip.
+    // COLUMN currently renders `controls` (and therefore CriticalContent's
+    // own HeroHeader), regardless of which physical side (left/right) that
+    // currently is: the leftScroll/rightScroll pairing below always keeps
+    // this same ScrollState paired with the same content across a flip.
     val controlsScroll = rememberScrollState()
     val pebblesScroll = rememberScrollState()
     val topInset = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
@@ -8453,6 +8453,8 @@ private fun ExpandedCar(v: Vehicle, state: UiState, vm: AppViewModel, flipped: B
     // controlsScroll.value read directly, not through the reported position
     // -- same reasoning as VehicleDetailContent's own heroYAtScrollZero doc.
     val yAtScrollZero = remember { mutableStateOf<Float?>(null) }
+    val heroTitleColor = remember { mutableStateOf(Color.Unspecified) }
+    val heroTitleFontSizeSp = remember { mutableStateOf<Float?>(null) }
     val titleFlight = remember {
         HeroTitleFlight(
             onPositioned = {
@@ -8460,26 +8462,32 @@ private fun ExpandedCar(v: Vehicle, state: UiState, vm: AppViewModel, flipped: B
                 val local = it - containerPosition.value
                 yAtScrollZero.value = local.y + controlsScroll.value
             },
-            // This title's own colour/size never change -- see CarHeaderRow's
-            // own doc -- so these just stay at their defaults, which the
-            // floating copy's own fallback (onSurface/titleLarge) matches.
-            color = mutableStateOf(Color.Unspecified),
-            fontSizeSp = mutableStateOf(null),
+            color = heroTitleColor,
+            fontSizeSp = heroTitleFontSizeSp,
             // Unused -- the avatar below reads state.imageUrls[v.vin]
             // directly (there's exactly one car here, no index to get
             // wrong), rather than through this channel.
             photoUrl = mutableStateOf(null),
         )
     }
+    // CriticalContent's own HeroHeader is the real hero photo card here --
+    // this view was NOT missing one the way the doc above used to claim;
+    // CarHeaderRow's plain-text name and HeroHeader's own (on the photo)
+    // were simply both visible at once, the exact duplicate-name bug fixed
+    // everywhere else in the app. hideName = true here, matching
+    // VehicleDetailContent's own CarHeaderRow call exactly: the floating
+    // name is sourced from HeroHeader (via the ambient LocalHeroTitleFlight
+    // below, which HeroHeader already knows how to use -- no changes needed
+    // there), not from this plain header.
     val controls: @Composable ColumnScope.() -> Unit = {
-        CarHeaderRow(v, state, onExpand = null, reserveEnd = false, titleFlight = titleFlight)
+        CarHeaderRow(v, state, onExpand = null, reserveEnd = false, hideName = true)
         CriticalContent(v, state, vm)
         HotspotSlot(v, hotspot, state, vm)
     }
     val pebbles: @Composable ColumnScope.() -> Unit = {
         PebbleList(v, state, vm, exclude = setOfNotNull("summary", "controls", hotspot))
     }
-    CompositionLocalProvider(LocalHotSeatDrag provides hotDrag) {
+    CompositionLocalProvider(LocalHotSeatDrag provides hotDrag, LocalHeroTitleFlight provides titleFlight) {
     // Was hardcoded hideIndicator = true -- the same "grid-only" flag that
     // hid the pull-to-refresh spinner in the single-car view (fixed in
     // a944a91) also hid it here, in the expanded/wide dual-column detail
@@ -8533,10 +8541,10 @@ private fun ExpandedCar(v: Vehicle, state: UiState, vm: AppViewModel, flipped: B
                 }
             }
         }
-        // The floating name, once CarHeaderRow's own title has scrolled out
-        // of view -- mirrors VehicleDetailContent's own identical pill
-        // exactly, just sourced from CarHeaderRow's title (this view's only
-        // one) instead of a hero photo card's, and tracking whichever
+        // The floating name, once CriticalContent's own HeroHeader has
+        // scrolled out of view -- mirrors VehicleDetailContent's own
+        // identical pill exactly (same hero-card source, via the same
+        // ambient LocalHeroTitleFlight above), just tracking whichever
         // column `controls` currently renders in rather than a single fixed
         // ScrollState.
         val titleLargeSp = MaterialTheme.typography.titleLarge.fontSize.value
@@ -8800,26 +8808,12 @@ private fun Refreshable(
 /**
  * Car name/model + a Driving/Parked badge, with an optional expand button.
  *
- * [hideName] (only ever true from [VehicleDetailContent]) skips the name
- * [Text] entirely -- not drawn, not reserved. The car's name is only ever
- * drawn ONCE, live, on the hero photo card right below; showing it again
- * here too was a real, visible duplicate, the same name twice on screen at
- * once.
- *
- * [titleFlight] (only ever supplied by [ExpandedCar]) is the opposite case:
- * this IS the only title-bearing element in that wide layout (no hero photo
- * card of its own to pull from instead), so it reports its own position
- * through the same [HeroTitleFlight] mechanism `SettingsHeaderRow`'s title
- * uses, and goes invisible (space still reserved) while doing so -- the
- * real, visible copy is then a floating [Text] elsewhere, drawn at this
- * title's position. An explicit parameter rather than reading
- * [LocalHeroTitleFlight] ambiently: [VehicleDetailContent] already provides
- * that CompositionLocal around ITS OWN call to this composable (for the
- * hero card's title to read, not this one), and this composable is a
- * descendant of that provider too -- an ambient read here would have this
- * title and the hero's fighting over the exact same flight object. Never
- * supplied together with `hideName = true`: those two modes belong to
- * different callers.
+ * [hideName] (true from both [VehicleDetailContent] and [ExpandedCar] now)
+ * skips the name [Text] entirely -- not drawn, not reserved. The car's name
+ * is only ever drawn ONCE, live, on the hero photo card
+ * (`CriticalContent`/`HeroHeader` in [ExpandedCar]'s case) -- showing it
+ * again here too was a real, visible duplicate, the same name twice on
+ * screen at once.
  */
 @Composable
 private fun CarHeaderRow(
@@ -8828,7 +8822,6 @@ private fun CarHeaderRow(
     onExpand: (() -> Unit)?,
     reserveEnd: Boolean,
     hideName: Boolean = false,
-    titleFlight: HeroTitleFlight? = null,
 ) {
     Row(
         Modifier
@@ -8851,13 +8844,6 @@ private fun CarHeaderRow(
                     style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onSurface,
-                    modifier = if (titleFlight != null) {
-                        Modifier
-                            .alpha(0f)
-                            .onGloballyPositioned { titleFlight.onPositioned(it.positionInRoot()) }
-                    } else {
-                        Modifier
-                    },
                 )
             }
             Text(
