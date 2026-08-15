@@ -7968,8 +7968,16 @@ internal fun BoxScope.MorphingIdentityPill(
     // past 0/1 for a frame; un-coerced that produces a negative Dp the
     // instant it does (Modifier.size/.padding both throw on that).
     val tc = t.coerceIn(0f, 1f)
-    val compactScale = IdentityPillTextStyle.fontSize.value /
-        MaterialTheme.typography.titleLarge.fontSize.value
+    // Content inside is always drawn at IdentityPillTextStyle's own (smaller)
+    // size -- expandScale is how much BIGGER than that titleLarge reads, so
+    // scaling the whole thing UP by it at t=0 is what makes it read as
+    // header-sized text. Was inverted (shrunk the pill DOWN at t=1 instead of
+    // growing it UP at t=0), which made the "pill" state end up SMALLER than
+    // its own natural size instead of the "header" state reading bigger --
+    // exactly backwards, and why the pill kept reading as too small no
+    // matter how many times IdentityPillHeight/AvatarSize were raised.
+    val expandScale = MaterialTheme.typography.titleLarge.fontSize.value /
+        IdentityPillTextStyle.fontSize.value
     val pillShape = shape
     Box(
         Modifier
@@ -7977,8 +7985,13 @@ internal fun BoxScope.MorphingIdentityPill(
             .statusBarsPadding()
             .padding(start = 8.dp + homeStartPadding, top = 8.dp, end = 8.dp, bottom = 8.dp)
             .graphicsLayer {
-                scaleX = 1f - (1f - compactScale) * tc
-                scaleY = 1f - (1f - compactScale) * tc
+                // lerp(expandScale, 1f, tc) by hand -- avoids an ambiguous-import
+                // clash between androidx.compose.ui.unit.lerp (Dp, already
+                // imported for the Row's own padding below) and
+                // androidx.compose.ui.util.lerp (Float).
+                val scale = expandScale + (1f - expandScale) * tc
+                scaleX = scale
+                scaleY = scale
                 transformOrigin = TransformOrigin(0f, 0f)
             },
     ) {
