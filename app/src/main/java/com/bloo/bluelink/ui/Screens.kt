@@ -3361,6 +3361,23 @@ internal fun GarageScreen(state: UiState, vm: AppViewModel) {
                 LaunchedEffect(totalBlocks) {
                     if (skipFirstBlocksSnap.value) { skipFirstBlocksSnap.value = false; return@LaunchedEffect }
                     if (state.screen != Screen.Garage) return@LaunchedEffect
+                    // Toggling settingsAsPage ON from the standalone route
+                    // (SettingsScreen's own toggle) changes totalBlocks AND
+                    // sets state.landOnSettingsPage in the very same
+                    // transition -- this effect exists to snap back to
+                    // currentIndex's own block when totalBlocks changes for
+                    // its OWN reasons (see the doc above), but that's
+                    // exactly wrong here: it raced the landOnSettingsPage
+                    // effect above (both fire off the same totalBlocks
+                    // change, in the same frame) and could snap to the
+                    // CURRENT CAR right after that effect had already landed
+                    // on the new Settings slot, silently undoing it --
+                    // reported as toggling the switch not actually taking
+                    // you to the embedded page. That effect's own
+                    // consumeLandOnSettingsPage() call clears this flag once
+                    // it's genuinely done, so deferring to it here is safe
+                    // even if this effect happens to run first.
+                    if (state.landOnSettingsPage) return@LaunchedEffect
                     val targetBlock = currentIndex.coerceIn(0, count - 1) / perPage
                     wrap.snapToReal(targetBlock)
                 }
@@ -7867,6 +7884,7 @@ private data class LocalNamePillState(
     val heroTitlePosition: MutableState<Offset?>,
     val heroTitleColor: MutableState<Color>,
     val heroTitleFontSizeSp: MutableState<Float?>,
+    val heroTitlePhotoUrl: MutableState<String?>,
     val containerPosition: MutableState<Offset>,
     val heroYAtScrollZero: MutableState<Float?>,
 )
@@ -8153,6 +8171,7 @@ private fun VehicleDetailContent(
             heroTitlePosition = heroTitlePosition,
             heroTitleColor = heroTitleColor,
             heroTitleFontSizeSp = heroTitleFontSizeSp,
+            heroTitlePhotoUrl = heroTitlePhotoUrl,
             containerPosition = containerPosition,
             heroYAtScrollZero = heroYAtScrollZero,
         )
@@ -8201,7 +8220,7 @@ private fun VehicleDetailContent(
         // reference below reads identically to when these were built
         // directly in this scope, before `local` bundled them for the
         // `if (hoisted == null)` branch above.
-        val (_, dockProgress, cornerXPx, cornerYPx, heroTitlePosition, heroTitleColor, heroTitleFontSizeSp, containerPosition, heroYAtScrollZero) = local
+        val (_, dockProgress, cornerXPx, cornerYPx, heroTitlePosition, heroTitleColor, heroTitleFontSizeSp, heroTitlePhotoUrl, containerPosition, heroYAtScrollZero) = local
         // This floating Text is always drawn at titleLarge -- ITS OWN fixed,
         // full-sized style, docked or not. While attached, it's scaled DOWN
         // (via graphicsLayer below, not by changing fontSize -- see that
@@ -8266,7 +8285,24 @@ private fun VehicleDetailContent(
                     .heightIn(min = lerp(0.dp, 48.dp, t))
                     .padding(horizontal = lerp(0.dp, 16.dp, t)),
                 verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(lerp(0.dp, 8.dp, t)),
             ) {
+                // Feature parity with GarageScreen's own hoisted pill (which
+                // this one otherwise mirrors exactly) -- every car's floating
+                // pill gets the same small circular avatar, not just the
+                // single-car-per-page pager's shared one. Same
+                // HeroTitleFlight.photoUrl channel as that one, so this is
+                // the literal same photo the hero card itself is showing.
+                Box(Modifier.size(lerp(0.dp, 32.dp, t))) {
+                    if (t > 0.01f) {
+                        PillAvatar(
+                            photo = heroTitlePhotoUrl.value,
+                            icon = Icons.Filled.DirectionsCar,
+                            tint = MaterialTheme.colorScheme.primary,
+                            size = lerp(0.dp, 32.dp, t),
+                        )
+                    }
+                }
                 Text(
                     v.name,
                     style = MaterialTheme.typography.titleLarge,

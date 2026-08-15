@@ -2176,7 +2176,21 @@ internal fun SettingsScreen(
                         settingsScope.launch { settingsGridState.animateScrollToItem(0) }
                     },
                 verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(lerp(0.dp, 8.dp, t)),
             ) {
+                // Same themed-icon avatar GarageScreen's own hoisted pill
+                // shows for the embedded Settings slot -- feature parity
+                // between the two, not a car-only affordance.
+                Box(Modifier.size(lerp(0.dp, 32.dp, t))) {
+                    if (t > 0.01f) {
+                        PillAvatar(
+                            photo = null,
+                            icon = Icons.Filled.Settings,
+                            tint = MaterialTheme.colorScheme.tertiary,
+                            size = lerp(0.dp, 32.dp, t),
+                        )
+                    }
+                }
                 Text(
                     "Settings",
                     style = MaterialTheme.typography.titleLarge,
