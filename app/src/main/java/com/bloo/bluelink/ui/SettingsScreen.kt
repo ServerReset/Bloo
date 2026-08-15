@@ -272,6 +272,7 @@ import androidx.compose.runtime.withFrameNanos
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.focus.FocusRequester
@@ -286,6 +287,7 @@ import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.rotate
 import androidx.lifecycle.repeatOnLifecycle
 import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.drawscope.DrawScope
@@ -549,40 +551,49 @@ private fun StatusHeaderRow(icon: ImageVector, tint: Color, title: String, statu
  * [CarHeaderRow][com.bloo.bluelink.ui] exactly in visual weight (titleLarge/
  * Bold name, bodySmall/onSurfaceVariant subtitle) so Settings reads as
  * another page in the pager, not a differently-designed screen bolted onto
- * it. Shrinks/fades/lifts as a whole on [nameHidden] via
- * [headerHandoffSpring], the same spring the floating "Settings" pill
- * ([MorphingIdentityPill][com.bloo.bluelink.ui]) grows in on, so the two read
- * as one hand-off. (A prior version made the title itself invisible and let
- * the floating pill morph in from its measured position -- that read as
- * "text in the wrong place"/"snaps to the corner" in practice, so this stays
- * a normal, always-visible header instead; see MorphingIdentityPill's own
- * doc for the full reasoning.)
+ * it.
+ *
+ * [hideName] (only ever true when [SettingsScreen] is hoisting its pill to
+ * GarageScreen, i.e. `embedded` with a real `onNameHiddenChanged`) draws the
+ * title at `alpha = 0` instead of its normal visible self -- mirrors
+ * [CarHeaderRow]'s own `hideName`, for the same reason: the hoisted pill's
+ * own `headerDelta` mode genuinely morphs off this reserved position, so
+ * showing both would draw the name twice. The standalone route keeps
+ * `hideName` false: its own pill is a separate, simpler grow-in-place
+ * element (no comparable deterministic formula off a
+ * `LazyVerticalStaggeredGrid` the way a plain `ScrollState` has one), so
+ * hiding the title here would leave nothing rendering it until that pill's
+ * own threshold. Either way, the context line doesn't have a floating
+ * equivalent, so it still shrinks/fades/lifts away on its own via
+ * [nameHidden] and [headerHandoffSpring] -- the same spring the pill uses.
  */
 @Composable
-private fun SettingsHeaderRow(state: UiState, nameHidden: Boolean) {
+private fun SettingsHeaderRow(state: UiState, nameHidden: Boolean, hideName: Boolean = false) {
     val hideT by animateFloatAsState(
         targetValue = if (nameHidden) 1f else 0f,
         animationSpec = headerHandoffSpring,
         label = "settingsHeaderHide",
     )
+    val shrinkFade: Modifier = Modifier.graphicsLayer {
+        alpha = 1f - hideT
+        val scale = 1f - hideT * 0.08f
+        scaleX = scale
+        scaleY = scale
+        translationY = -hideT * 10.dp.toPx()
+        transformOrigin = TransformOrigin(0f, 0f)
+    }
     Column(
         Modifier
             .fillMaxWidth()
             .padding(horizontal = 4.dp)
-            .graphicsLayer {
-                alpha = 1f - hideT
-                val scale = 1f - hideT * 0.08f
-                scaleX = scale
-                scaleY = scale
-                translationY = -hideT * 10.dp.toPx()
-                transformOrigin = TransformOrigin(0f, 0f)
-            },
+            .then(if (hideName) Modifier else shrinkFade),
     ) {
         Text(
             "Settings",
             style = MaterialTheme.typography.titleLarge,
             fontWeight = FontWeight.Bold,
             color = MaterialTheme.colorScheme.onSurface,
+            modifier = if (hideName) Modifier.alpha(0f) else Modifier,
         )
         val carCount = state.vehicles.size
         val modeLabel = if (state.settingsMode == "advanced") "Advanced" else "Simple"
@@ -590,6 +601,7 @@ private fun SettingsHeaderRow(state: UiState, nameHidden: Boolean) {
             "$carCount car${if (carCount == 1) "" else "s"} · $modeLabel mode",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = if (hideName) shrinkFade else Modifier,
         )
     }
 }
@@ -618,6 +630,11 @@ internal fun SettingsScreen(
     // count instead of Settings being the one page in this pager with a
     // permanently-visible header nothing else has.
     onNameHiddenChanged: ((Boolean, suspend () -> Unit) -> Unit)? = null,
+    // Mirrors onNameHiddenChanged's own hoist -- GarageScreen needs a
+    // deterministic on-screen delta too, to morph its hoisted pill in from
+    // Settings' own title instead of just growing in place (see
+    // VehicleDetailContent's own onHeaderDelta for the car-page equivalent).
+    onHeaderDelta: ((() -> Offset) -> Unit)? = null,
 ) {
     val appearance = LocalAppearance.current
     val notif by vm.notifications.collectAsState()
@@ -645,6 +662,28 @@ internal fun SettingsScreen(
             onNameHiddenChanged(settingsNameHidden) { settingsGridState.animateScrollToItem(0) }
         }
     }
+    val topInset = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
+    val density = LocalDensity.current
+    // Deterministic on-screen delta for the embedded route's hoisted pill,
+    // mirroring VehicleDetailContent's own onHeaderDelta -- item 0 is the
+    // grid's own leading FullLine spacer (topInset + 56.dp), item 1 is
+    // SettingsHeaderRow itself, so "how far scrolled" is reconstructed from
+    // the grid's own index+offset the same way ScrollState.value would
+    // report it for a plain Column, and the resulting formula has the exact
+    // same shape as the car-page one.
+    val settingsHeaderDelta: () -> Offset = remember(density, topInset) {
+        {
+            val idx = settingsGridState.firstVisibleItemIndex
+            val off = settingsGridState.firstVisibleItemScrollOffset
+            val spacerHeightPx = with(density) { (topInset + 56.dp).toPx() }
+            val scrolledPx = if (idx <= 0) off.toFloat() else spacerHeightPx + off.toFloat()
+            Offset(
+                with(density) { 12.dp.toPx() },
+                with(density) { 60.dp.toPx() } - scrolledPx,
+            )
+        }
+    }
+    SideEffect { onHeaderDelta?.invoke(settingsHeaderDelta) }
 
     // System back returns to the garage, not out of the app.
     var pickTarget by remember { mutableStateOf<String?>(null) }
@@ -656,7 +695,6 @@ internal fun SettingsScreen(
         if (uri != null && pickTarget != null) cropUri = uri
     }
 
-  val topInset = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
   val bottomInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
   // Search no longer lives on this screen -- it is one app-root element now
   // (see SearchLayer), so its query, its focus and its own back handling went
@@ -706,7 +744,7 @@ internal fun SettingsScreen(
             // settingsNameHidden keys off of for the pill hand-off; this is item 1,
             // so it's the first thing that scrolls away once the pill takes over.
             item(span = StaggeredGridItemSpan.FullLine) {
-                SettingsHeaderRow(state, settingsNameHidden)
+                SettingsHeaderRow(state, settingsNameHidden, hideName = onNameHiddenChanged != null)
             }
             run {
                 val advanced = state.settingsMode == "advanced"

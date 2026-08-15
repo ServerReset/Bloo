@@ -3365,10 +3365,9 @@ internal fun GarageScreen(state: UiState, vm: AppViewModel) {
                 // Hoisted pill state for single-car-per-page (perPage == 1) mode.
                 var carNameVisible by remember { mutableStateOf(false) }
                 var scrollToTopFn by remember { mutableStateOf<(suspend () -> Unit)?>(null) }
-                // The settled page's own headerDelta provider (see VehicleDetailContent's
-                // own doc) -- null while settled on the embedded Settings slot, which has
-                // no comparable deterministic formula (LazyVerticalStaggeredGrid, not a
-                // plain ScrollState) and just grows in from its own corner instead.
+                // The settled page's own headerDelta provider -- a car page's own
+                // (see VehicleDetailContent's doc) or Settings' own (see SettingsScreen's
+                // doc) formula, whichever is currently settled.
                 var headerDelta by remember { mutableStateOf<(() -> Offset)?>(null) }
                 val pillScope = rememberCoroutineScope()
                 Box(Modifier.fillMaxSize()) {
@@ -3479,11 +3478,14 @@ internal fun GarageScreen(state: UiState, vm: AppViewModel) {
                                     if (page == pager.settledPage) {
                                         carNameVisible = hidden
                                         scrollToTopFn = scrollFn
-                                        // No deterministic position formula for this slot
-                                        // (see headerDelta's own doc above) -- falls back
-                                        // to growing in from its own corner instead.
-                                        headerDelta = null
                                     }
+                                } else null,
+                                // Same settled-page gate as onNameHiddenChanged above --
+                                // Settings' own deterministic formula (see its own doc),
+                                // so the hoisted pill morphs off Settings' title exactly
+                                // the same way it does off a car's own header.
+                                onHeaderDelta = if (perPage == 1) { delta ->
+                                    if (page == pager.settledPage) headerDelta = delta
                                 } else null,
                             )
                         } else {
@@ -3583,13 +3585,13 @@ internal fun GarageScreen(state: UiState, vm: AppViewModel) {
                             LoadingIndicator()
                         }
                     }
-                    // Hoisted identity pill — while settled on a car page, this IS that
-                    // car's own header name, sliding/scaling continuously between the
-                    // header's real position and this pill's own corner (see
-                    // MorphingIdentityPill's `headerDelta` mode); while settled on the
-                    // embedded Settings slot, headerDelta is null (see its own doc above)
-                    // and it just grows in from that corner instead. "Hoisted" now covers
-                    // both a car page AND the embedded Settings slot (see both
+                    // Hoisted identity pill — whether settled on a car page or the
+                    // embedded Settings slot, this IS that page's own header name,
+                    // sliding/scaling continuously between the header's real position
+                    // and this pill's own corner (see MorphingIdentityPill's
+                    // `headerDelta` mode, and each page's own deterministic formula --
+                    // VehicleDetailContent's / SettingsScreen's own doc). "Hoisted" now
+                    // covers both a car page AND the embedded Settings slot (see both
                     // onNameHiddenChanged call sites above): one element, one page count,
                     // rather than a car-only pill plus Settings carrying its own separate,
                     // permanently-visible copy.
@@ -3615,12 +3617,13 @@ internal fun GarageScreen(state: UiState, vm: AppViewModel) {
                             animateContentSize = true,
                             headerDelta = headerDelta,
                         ) { t ->
-                            // headerDelta is null while settled on the embedded Settings
-                            // slot (see its own doc) -- morphing tracks that same signal
-                            // so the name text uses titleLarge (scaled to read like
-                            // labelLarge by MorphingIdentityPill's own outer graphicsLayer)
-                            // while genuinely morphing off a car header, and plain fixed
-                            // labelLarge while just growing in place for Settings.
+                            // headerDelta is non-null whenever a settled page (car OR the
+                            // embedded Settings slot) has its own deterministic formula --
+                            // both do now. morphing tracks that so the name text uses
+                            // titleLarge (scaled to read like the pill's own IdentityPillTextStyle
+                            // by MorphingIdentityPill's own outer graphicsLayer) while genuinely
+                            // morphing, and IdentityPillTextStyle directly otherwise (multi-car
+                            // grid mode, perPage > 1, where this pill has nothing to morph off).
                             val morphing = headerDelta != null
                             // Its own crossfade, not tied to the pill's own grow-in -- a
                             // slide reads right for text (it visibly moves aside), but
@@ -3634,7 +3637,7 @@ internal fun GarageScreen(state: UiState, vm: AppViewModel) {
                             // all. Sized/faded by t (see MorphingIdentityContent's own doc)
                             // so the avatar itself grows in with the rest of the pill
                             // instead of reserving its layout space before the pill exists.
-                            Box(Modifier.size(28.dp * t).graphicsLayer { alpha = t }) {
+                            Box(Modifier.size(IdentityPillAvatarSize * t).graphicsLayer { alpha = t }) {
                                 if (t > 0.01f) {
                                     AnimatedContent(
                                         targetState = settledBlock,
@@ -3642,13 +3645,13 @@ internal fun GarageScreen(state: UiState, vm: AppViewModel) {
                                         label = "carNamePillPhoto",
                                     ) { block ->
                                         if (settingsAsPage && block == pageCount) {
-                                            PillAvatar(photo = null, icon = Icons.Filled.Settings, tint = MaterialTheme.colorScheme.tertiary, size = 28.dp * t)
+                                            PillAvatar(photo = null, icon = Icons.Filled.Settings, tint = MaterialTheme.colorScheme.tertiary, size = IdentityPillAvatarSize * t)
                                         } else {
                                             PillAvatar(
                                                 photo = vehicles.getOrNull(block)?.let { state.imageUrls[it.vin] },
                                                 icon = Icons.Filled.DirectionsCar,
                                                 tint = MaterialTheme.colorScheme.primary,
-                                                size = 28.dp * t,
+                                                size = IdentityPillAvatarSize * t,
                                             )
                                         }
                                     }
@@ -3667,7 +3670,7 @@ internal fun GarageScreen(state: UiState, vm: AppViewModel) {
                             ) { block ->
                                 Text(
                                     if (settingsAsPage && block == pageCount) "Settings" else vehicles.getOrNull(block)?.name ?: "",
-                                    style = if (morphing) MaterialTheme.typography.titleLarge else MaterialTheme.typography.labelLarge,
+                                    style = if (morphing) MaterialTheme.typography.titleLarge else IdentityPillTextStyle,
                                     fontWeight = FontWeight.SemiBold,
                                     maxLines = 1,
                                 )
@@ -8056,7 +8059,7 @@ internal fun BoxScope.MorphingIdentityPill(
                     ),
             ) {
                 Row(
-                    Modifier.heightIn(min = 48.dp).padding(start = 6.dp, end = 14.dp, top = 9.dp, bottom = 9.dp),
+                    Modifier.height(IdentityPillHeight).padding(start = 6.dp, end = 14.dp),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
@@ -8076,7 +8079,7 @@ internal fun BoxScope.MorphingIdentityPill(
     // instant it does (Modifier.size/.padding both throw on that), which
     // crashed on every hand-off back to inline text in an earlier version.
     val tc = t.coerceIn(0f, 1f)
-    val compactScale = MaterialTheme.typography.labelLarge.fontSize.value /
+    val compactScale = IdentityPillTextStyle.fontSize.value /
         MaterialTheme.typography.titleLarge.fontSize.value
     val pillShape = shape
     Box(
@@ -8121,7 +8124,7 @@ internal fun BoxScope.MorphingIdentityPill(
         ) {
             Row(
                 Modifier
-                    .heightIn(min = lerp(0.dp, 48.dp, tc))
+                    .heightIn(min = lerp(0.dp, IdentityPillHeight, tc))
                     .then(
                         if (animateContentSize) {
                             Modifier.animateContentSize(spring(dampingRatio = 0.5f, stiffness = Spring.StiffnessMediumLow))
@@ -8132,8 +8135,6 @@ internal fun BoxScope.MorphingIdentityPill(
                     .padding(
                         start = lerp(0.dp, 6.dp, tc),
                         end = lerp(0.dp, 14.dp, tc),
-                        top = lerp(0.dp, 9.dp, tc),
-                        bottom = lerp(0.dp, 9.dp, tc),
                     ),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
@@ -8168,13 +8169,13 @@ internal fun RowScope.MorphingIdentityContent(
     morphing: Boolean = false,
 ) {
     val tc = t.coerceIn(0f, 1f)
-    Box(Modifier.size(28.dp * tc).graphicsLayer { alpha = tc }) {
-        if (tc > 0.01f) PillAvatar(photo, icon, tint, size = 28.dp * tc)
+    Box(Modifier.size(IdentityPillAvatarSize * tc).graphicsLayer { alpha = tc }) {
+        if (tc > 0.01f) PillAvatar(photo, icon, tint, size = IdentityPillAvatarSize * tc)
     }
     Spacer(Modifier.width(8.dp * tc))
     Text(
         name,
-        style = if (morphing) MaterialTheme.typography.titleLarge else MaterialTheme.typography.labelLarge,
+        style = if (morphing) MaterialTheme.typography.titleLarge else IdentityPillTextStyle,
         fontWeight = FontWeight.SemiBold,
         maxLines = 1,
     )
@@ -8208,12 +8209,12 @@ private fun CarNamePill(name: String, photo: String?, onClick: () -> Unit) {
         modifier = Modifier.ambientRing(pillShape).dropShadow(pillShape).frostedRim(pillShape),
     ) {
         Row(
-            Modifier.height(48.dp).padding(start = 6.dp, end = 14.dp),
+            Modifier.height(IdentityPillHeight).padding(start = 6.dp, end = 14.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            PillAvatar(photo, Icons.Filled.DirectionsCar, MaterialTheme.colorScheme.primary)
-            Text(name, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold)
+            PillAvatar(photo, Icons.Filled.DirectionsCar, MaterialTheme.colorScheme.primary, size = IdentityPillAvatarSize)
+            Text(name, style = IdentityPillTextStyle, fontWeight = FontWeight.SemiBold)
         }
     }
 }
@@ -8422,6 +8423,25 @@ private fun Refreshable(
  */
 internal val headerHandoffSpring: FiniteAnimationSpec<Float> =
     spring(dampingRatio = 0.85f, stiffness = Spring.StiffnessLow)
+
+/**
+ * The one height/text-size/avatar-size every floating identity pill in the
+ * app shares -- the car pill, its hoisted (GarageScreen) and morphed
+ * (headerDelta) forms, Settings' own standalone pill, and ExpandedCar's
+ * separate `CarNamePill` all read them from here instead of each picking
+ * their own. [IdentityPillHeight] matches [FloatingIcon]'s own 48dp circle --
+ * the pill sits right beside that button in more than one layout, and a
+ * visibly shorter pill next to a 48dp button read as an afterthought rather
+ * than chrome of the same weight. [IdentityPillTextStyle] was `labelLarge`
+ * (a caption size, chosen for a compact chip) -- raised to `titleSmall` to
+ * actually fill that taller pill instead of leaving it looking empty around
+ * a small caption. [IdentityPillAvatarSize] follows the same proportion bump
+ * (28dp -> 32dp).
+ */
+internal val IdentityPillHeight = 48.dp
+internal val IdentityPillAvatarSize = 32.dp
+internal val IdentityPillTextStyle: TextStyle
+    @Composable get() = MaterialTheme.typography.titleSmall
 
 /**
  * Car name/model + a Driving/Parked badge, with an optional expand button.
