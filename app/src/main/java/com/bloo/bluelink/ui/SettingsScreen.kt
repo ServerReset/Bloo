@@ -271,6 +271,7 @@ import androidx.compose.runtime.withFrameNanos
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.focus.FocusRequester
@@ -548,10 +549,12 @@ private fun StatusHeaderRow(icon: ImageVector, tint: Color, title: String, statu
  * [CarHeaderRow][com.bloo.bluelink.ui] exactly in visual weight (titleLarge/
  * Bold name, bodySmall/onSurfaceVariant subtitle) so Settings reads as
  * another page in the pager, not a differently-designed screen bolted onto
- * it. Plain, always-visible content -- no animation of its own; see
- * [CarHeaderRow][com.bloo.bluelink.ui]'s own doc for why (short version:
- * several fancier versions of this all cost more per-frame than they were
- * worth and kept producing real, live-tested visual bugs).
+ * it. The title is always drawn at `alpha = 0` -- mirrors
+ * [CarHeaderRow][com.bloo.bluelink.ui]'s own `hideName`: it exists purely to
+ * reserve the exact, font-metric-accurate layout space that
+ * [MorphingIdentityPill][com.bloo.bluelink.ui]'s own "header text" look
+ * occupies at rest, since that pill (both the standalone and hoisted routes
+ * now) is what actually draws "Settings" in that spot.
  */
 @Composable
 private fun SettingsHeaderRow(state: UiState) {
@@ -561,6 +564,7 @@ private fun SettingsHeaderRow(state: UiState) {
             style = MaterialTheme.typography.titleLarge,
             fontWeight = FontWeight.Bold,
             color = MaterialTheme.colorScheme.onSurface,
+            modifier = Modifier.alpha(0f),
         )
         val carCount = state.vehicles.size
         val modeLabel = if (state.settingsMode == "advanced") "Advanced" else "Simple"
@@ -2115,8 +2119,8 @@ internal fun SettingsScreen(
                 // top-left corner instead of beside it, the way it always used
                 // to sit in the same Row.
                 homeStartPadding = if (!embedded) 60.dp else 0.dp,
-            ) {
-                MorphingIdentityContent("Settings", null, Icons.Filled.Settings, MaterialTheme.colorScheme.tertiary, null)
+            ) { t ->
+                MorphingIdentityContent("Settings", null, Icons.Filled.Settings, MaterialTheme.colorScheme.tertiary, null, t)
             }
         }
         // First-run coach mark pointing at the back arrow.
