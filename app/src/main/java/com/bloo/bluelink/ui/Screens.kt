@@ -8503,13 +8503,20 @@ private fun ExpandedCar(v: Vehicle, state: UiState, vm: AppViewModel, flipped: B
                 // identical field.
                 .onGloballyPositioned { coords -> containerPosition.value = coords.positionInRoot() },
         ) {
-        // Animate the swap when the columns are flipped.
+        // Animate the swap when the columns are flipped. Same spring the
+        // expand/collapse transition (GarageScreen) and the collapsed
+        // pager's own settle both use -- this was the one transition left
+        // running on AnimatedContent's plain default spec instead of the
+        // app's own spring language, and read noticeably flatter/more
+        // mechanical next to those two right beside it.
         AnimatedContent(
             targetState = flipped,
             transitionSpec = {
                 val dir = if (targetState) 1 else -1
-                (slideInHorizontally { w -> dir * w / 4 } + fadeIn()) togetherWith
-                    (slideOutHorizontally { w -> -dir * w / 4 } + fadeOut())
+                val floatSpec = spring<Float>(dampingRatio = SoftDamping, stiffness = Spring.StiffnessMediumLow)
+                val offsetSpec = spring<IntOffset>(dampingRatio = SoftDamping, stiffness = Spring.StiffnessMediumLow)
+                (slideInHorizontally(offsetSpec) { w -> dir * w / 4 } + fadeIn(floatSpec)) togetherWith
+                    (slideOutHorizontally(offsetSpec) { w -> -dir * w / 4 } + fadeOut(floatSpec))
             },
             label = "flipColumns",
         ) { isFlipped ->
