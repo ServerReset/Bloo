@@ -664,21 +664,28 @@ internal fun SettingsScreen(
     }
     val topInset = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
     val density = LocalDensity.current
-    // Deterministic on-screen delta for the embedded route's hoisted pill,
-    // mirroring VehicleDetailContent's own onHeaderDelta -- item 0 is the
-    // grid's own leading FullLine spacer (topInset + 56.dp), item 1 is
-    // SettingsHeaderRow itself, so "how far scrolled" is reconstructed from
-    // the grid's own index+offset the same way ScrollState.value would
-    // report it for a plain Column, and the resulting formula has the exact
-    // same shape as the car-page one.
-    val settingsHeaderDelta: () -> Offset = remember(density, topInset) {
+    // Same amount MorphingIdentityPill's own homeStartPadding shifts the
+    // pill's home slot right by, standalone only -- the standalone route's
+    // pill sits in that same corner as the back arrow (see its own call
+    // site below), so its X delta needs to account for that shift too.
+    val homeStartPadding = if (!embedded) 60.dp else 0.dp
+    // Deterministic on-screen delta, mirroring VehicleDetailContent's own
+    // headerDelta -- item 0 is the grid's own leading FullLine spacer
+    // (topInset + 56.dp), item 1 is SettingsHeaderRow itself, so "how far
+    // scrolled" is reconstructed from the grid's own index+offset the same
+    // way ScrollState.value would report it for a plain Column, and the
+    // resulting formula has the exact same shape as the car-page one. Used
+    // both for the embedded route's hoisted pill (via onHeaderDelta below)
+    // AND the standalone route's own local pill (see its call site below) --
+    // same logic, same code, not two independently-maintained copies of it.
+    val settingsHeaderDelta: () -> Offset = remember(density, topInset, homeStartPadding) {
         {
             val idx = settingsGridState.firstVisibleItemIndex
             val off = settingsGridState.firstVisibleItemScrollOffset
             val spacerHeightPx = with(density) { (topInset + 56.dp).toPx() }
             val scrolledPx = if (idx <= 0) off.toFloat() else spacerHeightPx + off.toFloat()
             Offset(
-                with(density) { 12.dp.toPx() },
+                with(density) { 12.dp.toPx() - homeStartPadding.toPx() },
                 with(density) { 60.dp.toPx() } - scrolledPx,
             )
         }
@@ -744,7 +751,10 @@ internal fun SettingsScreen(
             // settingsNameHidden keys off of for the pill hand-off; this is item 1,
             // so it's the first thing that scrolls away once the pill takes over.
             item(span = StaggeredGridItemSpan.FullLine) {
-                SettingsHeaderRow(state, settingsNameHidden, hideName = onNameHiddenChanged != null)
+                // hideName always true now: both the hoisted (embedded) and local
+                // (standalone) pills below use the same headerDelta morph, so the
+                // real title always lives in one of those, never here.
+                SettingsHeaderRow(state, settingsNameHidden, hideName = true)
             }
             run {
                 val advanced = state.settingsMode == "advanced"
@@ -2168,28 +2178,26 @@ internal fun SettingsScreen(
         // embedded mode's identity pill is GarageScreen's own floating car-name pill
         // instead (see onNameHiddenChanged above), the whole point being one shared
         // element rather than this one PLUS a second, scroll-triggered one
-        // duplicating it. And even here it's no longer permanently visible --
-        // SettingsHeaderRow above is now the standalone route's own inline header, so
-        // this pill uses the exact same scroll-triggered hand-off (settingsNameHidden)
-        // the embedded route's hoisted pill does, on the same headerHandoffSpring,
-        // instead of sitting on screen the whole time next to a header saying the
-        // same thing twice. Same shape, chrome and PillAvatar "picture" slot as the
-        // floating car-name pill (Screens.kt) -- a gear glyph in the same tonal
-        // circle a car's own photo sits in gives Settings the identical "picture +
-        // name" shape, so the pill itself doesn't change type crossing between the
-        // two, only what it says.
+        // duplicating it. This is now the exact same headerDelta morph the embedded
+        // route's hoisted pill uses (see settingsHeaderDelta above) -- same logic,
+        // same code, rather than the standalone route keeping its own simpler
+        // grow-in-place copy while everything else got the real morph.
         if (onNameHiddenChanged == null) {
             MorphingIdentityPill(
                 nameHidden = settingsNameHidden,
                 onClick = { settingsScope.launch { settingsGridState.animateScrollToItem(0) } },
-                // Only when standalone (embedded never draws a back arrow, so
-                // there's nothing there to collide with): without this, the pill
-                // grows in directly on top of the back arrow at that same
-                // top-left corner instead of beside it, the way it always used
-                // to sit in the same Row.
-                homeStartPadding = if (!embedded) 60.dp else 0.dp,
-            ) {
-                MorphingIdentityContent("Settings", null, Icons.Filled.Settings, MaterialTheme.colorScheme.tertiary, null)
+                // Only actually shifts anything when standalone (embedded never
+                // draws a back arrow, so there's nothing there to collide with) --
+                // without this, the pill's home slot lands directly on top of the
+                // back arrow at that same top-left corner instead of beside it,
+                // the way it always used to sit in the same Row.
+                homeStartPadding = homeStartPadding,
+                headerDelta = settingsHeaderDelta,
+            ) { t ->
+                MorphingIdentityContent(
+                    "Settings", null, Icons.Filled.Settings, MaterialTheme.colorScheme.tertiary, null,
+                    t = t, morphing = true,
+                )
             }
         }
         // First-run coach mark pointing at the back arrow.

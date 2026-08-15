@@ -7760,18 +7760,17 @@ private fun VehicleDetailContent(
     // fixed home slot -- computed, not measured. This Column's only scroll
     // axis is vertical, so the header's X never moves (16.dp content padding
     // minus the pill's own 8.dp), and its Y is exactly the header's
-    // unscrolled position (topInset leading spacer + a 4.dp gap before
-    // CarHeaderRow, minus the pill's own topInset + 8.dp -- a small NEGATIVE
-    // delta, since the header now sits slightly above the pill's own home Y)
-    // shifted up by whatever's currently been scrolled. A closed-form
-    // function of scroll.value avoids the async onGloballyPositioned
-    // staleness a measured version of this hit in practice (see
-    // MorphingIdentityPill). MUST stay in sync with the leading Spacers below.
+    // unscrolled position (topInset leading spacer, no further gap -- see the
+    // Column below, minus the pill's own topInset + 8.dp) shifted up by
+    // whatever's currently been scrolled. A closed-form function of
+    // scroll.value avoids the async onGloballyPositioned staleness a
+    // measured version of this hit in practice (see MorphingIdentityPill).
+    // MUST stay in sync with the leading Spacer below.
     val headerDelta: () -> Offset = remember(density, topInset) {
         {
             Offset(
                 with(density) { 8.dp.toPx() },
-                with(density) { -4.dp.toPx() } - scroll.value.toFloat(),
+                with(density) { -8.dp.toPx() } - scroll.value.toFloat(),
             )
         }
     }
@@ -7788,14 +7787,12 @@ private fun VehicleDetailContent(
             // instead of one uniform value applied everywhere.
         ) {
             // Inset spacers (not padding) so content scrolls *behind* the bars.
-            // Was topInset + 8.dp + a 12.dp arrangement gap (20dp total) -- kept
-            // reading as sitting well below the status bar with the header
-            // pill's own home slot right above it for comparison, even after
-            // trimming the +8.dp once already. Cut further, and split out of
-            // the shared arrangement so this one gap can be smaller than the
-            // rest of the column's own rhythm.
+            // Was topInset + 8.dp + a 12.dp arrangement gap (20dp total), then
+            // topInset + 4.dp -- both still read as sitting well below the
+            // status bar next to the pill's own home slot for comparison. No
+            // gap left at all now: the header sits right at topInset, same as
+            // the pill's own home Y minus 8.dp.
             Spacer(Modifier.height(topInset))
-            Spacer(Modifier.height(4.dp))
             CarHeaderRow(v, state, onExpand, reserveHeaderEnd, nameHidden, hideName = true)
             Spacer(Modifier.height(12.dp))
             // summary (image+gauge) and controls are reorderable pebbles too. The full
@@ -8438,19 +8435,14 @@ internal val headerHandoffSpring: FiniteAnimationSpec<Float> =
  * app shares -- the car pill, its hoisted (GarageScreen) and morphed
  * (headerDelta) forms, Settings' own standalone pill, and ExpandedCar's
  * separate `CarNamePill` all read them from here instead of each picking
- * their own. [IdentityPillHeight] matches [FloatingIcon]'s own 48dp circle --
- * the pill sits right beside that button in more than one layout, and a
- * visibly shorter pill next to a 48dp button read as an afterthought rather
- * than chrome of the same weight. [IdentityPillTextStyle] was `labelLarge`
- * (a caption size, chosen for a compact chip) -- raised to `titleSmall` to
- * actually fill that taller pill instead of leaving it looking empty around
- * a small caption. [IdentityPillAvatarSize] follows the same proportion bump
- * (28dp -> 32dp).
+ * their own. Was 48dp/32dp/titleSmall (matching [FloatingIcon]'s own 48dp
+ * circle) -- still read as too small next to it in practice, so raised
+ * again to 56dp/40dp/titleMedium.
  */
-internal val IdentityPillHeight = 48.dp
-internal val IdentityPillAvatarSize = 32.dp
+internal val IdentityPillHeight = 56.dp
+internal val IdentityPillAvatarSize = 40.dp
 internal val IdentityPillTextStyle: TextStyle
-    @Composable get() = MaterialTheme.typography.titleSmall
+    @Composable get() = MaterialTheme.typography.titleMedium
 
 /**
  * Car name/model + a Driving/Parked badge, with an optional expand button.
