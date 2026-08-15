@@ -7632,14 +7632,19 @@ private val LocalHeroTitleFlight = compositionLocalOf<HeroTitleFlight?> { null }
  * from being the hero's own title, because as far as anyone can see, it is.
  *
  * [dockProgress] is the one thing that ever animates: 0 means "drawn exactly
- * at the hero title's live position/colour" and 1 means "docked in the
- * fixed corner, in the app's normal text colour". The position and colour
- * actually drawn are a straight lerp between those two by [dockProgress] --
- * the "attached" end of that lerp is the hero title's CURRENT live values,
- * recomputed every layout pass, so this Text tracks it exactly for as long
- * as it's genuinely still part of the card; once [dockProgress] reaches 1
- * that live term cancels out of the lerp entirely, so it's genuinely static
- * once docked despite still reading a live value underneath.
+ * at the hero title's live position/colour/size" and 1 means "docked in the
+ * fixed corner, full titleLarge size, the app's normal text colour, wrapped
+ * in a pill". Position, colour, and size are each a straight lerp between
+ * their own attached/docked values by [dockProgress] -- the "attached" end
+ * of every one of those lerps is the hero title's CURRENT live value,
+ * recomputed every layout/draw pass, so this Text tracks the real card
+ * exactly for as long as it's genuinely still part of it; once
+ * [dockProgress] reaches 1 those live terms cancel out of their lerps
+ * entirely, so it's genuinely static once docked despite still reading live
+ * values underneath. The pill's own chrome (fill/ring/shadow/rim, same as
+ * [FloatingIcon]'s) grows in alongside it, from nothing at 0 to
+ * [FloatingIcon]'s own 48dp height at 1 -- there's no pill at all while
+ * attached, only the bare label sitting on the card.
  */
 @Composable
 private fun VehicleDetailContent(
@@ -7657,10 +7662,14 @@ private fun VehicleDetailContent(
     val density = LocalDensity.current
     val haptics = LocalHaptics.current
     val topInsetPx = with(density) { topInset.toPx() }
-    // The fixed corner slot -- a little clear of the status bar, same left
-    // inset the content column's own horizontal padding uses.
-    val cornerYPx = with(density) { (topInset + 8.dp).toPx() }
-    val cornerXPx = with(density) { 16.dp.toPx() }
+    // The fixed corner slot -- this is the PILL's own top-left, not the
+    // text's: 12dp clear of the status bar on both axes, matching
+    // FloatingIcon's own default outerPadding EXACTLY (its Surface is a
+    // 48dp circle at that same offset) -- see the chrome Box below for why
+    // this specifically has to be the pill's origin rather than wherever
+    // the text glyphs happen to sit once padded.
+    val cornerYPx = with(density) { (topInset + 12.dp).toPx() }
+    val cornerXPx = with(density) { 12.dp.toPx() }
     val onSurface = MaterialTheme.colorScheme.onSurface
     // The hero title's own real, measured position/colour IN WINDOW-ROOT
     // coordinates, kept live by HeroTitleFlight below -- null/Unspecified
@@ -7694,10 +7703,17 @@ private fun VehicleDetailContent(
         // visibly overshoots and settles rather than gliding to a stop,
         // which is what makes this read as the text getting yanked into (or
         // dropped back out of) its slot instead of just sliding there.
+        // Medium, not MediumLow: the softer spring took long enough to
+        // settle that the overshoot read as loose/wobbly rather than a
+        // single confident bounce landing on its target.
         dockProgress.animateTo(
             if (nameHidden) 1f else 0f,
-            spring(dampingRatio = 0.55f, stiffness = Spring.StiffnessMediumLow),
+            spring(dampingRatio = 0.62f, stiffness = Spring.StiffnessMedium),
         )
+        // A light tap right as it lands/leaves, same as every other floating
+        // chrome's own tap feedback -- this is the one moment the pill
+        // actually arrives or departs, so it's the moment worth marking.
+        haptics?.click()
     }
     val heroFlight = remember {
         HeroTitleFlight(
@@ -7743,6 +7759,7 @@ private fun VehicleDetailContent(
         // uses for its title. titleLargeSp is the one-time reference this
         // scale is computed against.
         val titleLargeSp = MaterialTheme.typography.titleLarge.fontSize.value
+        val pillShape = RoundedCornerShape(50)
         Box(
             Modifier
                 .align(Alignment.TopStart)
@@ -7752,6 +7769,15 @@ private fun VehicleDetailContent(
                 // composition, the same reason the pull-to-refresh indicator
                 // above reads its own live values inside offset{} instead of
                 // the composable body.
+                //
+                // Targets THIS BOX'S OWN top-left, not wherever the text
+                // glyphs end up once the pill's own padding pushes them in --
+                // at t=0 (attached) that's the same thing, since the pill
+                // below hasn't grown any padding/height yet, but at t=1
+                // (docked) this specifically has to line up with
+                // FloatingIcon's own Surface origin (cornerXPx/cornerYPx --
+                // see their own doc), which is a statement about the PILL,
+                // not the label inside it.
                 .offset {
                     val attached = heroTitlePosition.value?.let { it - containerPosition.value }
                         ?: Offset(cornerXPx, cornerYPx)
@@ -7759,41 +7785,69 @@ private fun VehicleDetailContent(
                     val x = attached.x + (cornerXPx - attached.x) * t
                     val y = attached.y + (cornerYPx - attached.y) * t
                     IntOffset(x.roundToInt(), y.roundToInt())
-                }
-                // Draw-phase read only (heroTitleFontSizeSp.value,
-                // dockProgress.value), same reasoning as offset{} above.
-                // transformOrigin pins the top-left corner -- the same
-                // anchor offset{} positions -- so scaling never drifts the
-                // text off that point.
-                .graphicsLayer {
-                    val attachedScale = (heroTitleFontSizeSp.value ?: titleLargeSp) / titleLargeSp
-                    val t = dockProgress.value.coerceIn(0f, 1f)
-                    val scale = attachedScale + (1f - attachedScale) * t
-                    scaleX = scale
-                    scaleY = scale
-                    transformOrigin = TransformOrigin(0f, 0f)
                 },
         ) {
-            Text(
-                v.name,
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.Bold,
-                // Starts at the hero title's own live colour (white, over its
-                // photo) and lerps to the app's normal text colour as it
-                // docks -- same reasoning as the position lerp above: this
-                // IS the hero's title, so it tracks its colour exactly for
-                // as long as it's attached, and only diverges as it leaves.
-                color = lerp(
-                    heroTitleColor.value.let { if (it == Color.Unspecified) onSurface else it },
-                    onSurface,
-                    dockProgress.value.coerceIn(0f, 1f),
-                ),
-                maxLines = 1,
-                modifier = Modifier.clickable {
-                    haptics?.click()
-                    scope.launch { scroll.animateScrollTo(0) }
-                },
-            )
+            val t = dockProgress.value.coerceIn(0f, 1f)
+            // The pill itself -- same glass treatment (fill/ring/shadow/rim)
+            // and exact 48dp height FloatingIcon uses, so the docked name
+            // reads as one more piece of the app's own floating chrome
+            // rather than a different kind of thing. Grown in by t, not
+            // just faded: at t=0 there IS no pill, only the bare text
+            // sitting on the hero card, so a hard-toggled backdrop would pop
+            // in abruptly right as the flight starts rather than forming
+            // alongside it.
+            if (t > 0.02f) {
+                Box(
+                    Modifier
+                        .matchParentSize()
+                        .graphicsLayer { alpha = t }
+                        .background(MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = glassContainerAlpha()), pillShape)
+                        .ambientRing(pillShape)
+                        .dropShadow(pillShape)
+                        .frostedRim(pillShape),
+                )
+            }
+            Row(
+                Modifier
+                    .heightIn(min = lerp(0.dp, 48.dp, t))
+                    .padding(horizontal = lerp(0.dp, 16.dp, t)),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    v.name,
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                    // Starts at the hero title's own live colour (white, over its
+                    // photo) and lerps to the app's normal text colour as it
+                    // docks -- same reasoning as the position lerp above: this
+                    // IS the hero's title, so it tracks its colour exactly for
+                    // as long as it's attached, and only diverges as it leaves.
+                    color = lerp(
+                        heroTitleColor.value.let { if (it == Color.Unspecified) onSurface else it },
+                        onSurface,
+                        t,
+                    ),
+                    maxLines = 1,
+                    modifier = Modifier
+                        // Draw-phase read only (heroTitleFontSizeSp.value,
+                        // dockProgress.value), same reasoning as offset{}
+                        // above. transformOrigin pins the LEFT-CENTRE, matching
+                        // the Row's own CenterVertically -- scaling about any
+                        // other point would drift the glyphs against the
+                        // Row's own vertical centring as the pill grows.
+                        .graphicsLayer {
+                            val attachedScale = (heroTitleFontSizeSp.value ?: titleLargeSp) / titleLargeSp
+                            val scale = attachedScale + (1f - attachedScale) * dockProgress.value.coerceIn(0f, 1f)
+                            scaleX = scale
+                            scaleY = scale
+                            transformOrigin = TransformOrigin(0f, 0.5f)
+                        }
+                        .clickable {
+                            haptics?.click()
+                            scope.launch { scroll.animateScrollTo(0) }
+                        },
+                )
+            }
         }
     }
 }
