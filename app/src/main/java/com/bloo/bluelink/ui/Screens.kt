@@ -5432,13 +5432,19 @@ private fun HeroHeader(
                 }
             }
 
-        // Reports this title's own real, measured position/alpha to a
+        // Reports this title's own real, measured position/colour/alpha to a
         // VehicleDetailContent ancestor's floating name, if one is providing
         // it (null everywhere else -- ExpandedCar's own pebble list excludes
         // "summary" entirely, so this only ever applies here). See
         // HeroTitleFlight's own doc for why it's the title's FINAL bounds
         // (after PebbleShell's own scale) and not a guess.
         val heroTitleFlight = LocalHeroTitleFlight.current
+        // Follows the morph rather than switching: the photo fades in over the same
+        // t, so the name has to travel from the surface's own colour to the light one
+        // the scrim is built for. Snapping at a threshold would flash a white name
+        // onto a still-white card for the frames before the photo arrives.
+        val heroTitleColorNow = lerp(MaterialTheme.colorScheme.onSurface, HeroOnPhoto, heroT)
+        heroTitleFlight?.color?.value = heroTitleColorNow
         PebbleShell(
             expanded = photoExpanded,
             onToggle = { vm.togglePebble(v, com.bloo.bluelink.data.HERO_PHOTO_SECTION) },
@@ -5446,11 +5452,7 @@ private fun HeroHeader(
             title = v.name,
             vm = vm,
             dragHandle = dragHandle,
-            // Follows the morph rather than switching: the photo fades in over the same
-            // t, so the name has to travel from the surface's own colour to the light one
-            // the scrim is built for. Snapping at a threshold would flash a white name
-            // onto a still-white card for the frames before the photo arrives.
-            titleColor = lerp(MaterialTheme.colorScheme.onSurface, HeroOnPhoto, heroT),
+            titleColor = heroTitleColorNow,
             titleModifier = if (heroTitleFlight != null) {
                 Modifier.onGloballyPositioned { heroTitleFlight.onPositioned(it.positionInRoot()) }
             } else {
@@ -7576,16 +7578,27 @@ internal fun BackdropHost(content: @Composable BoxScope.() -> Unit) {
  * [PebbleShell]) reports back to [VehicleDetailContent] so the floating name
  * can fly FROM the hero card's real, measured title -- not a guessed
  * position -- and fade the hero's own copy out as the floating one takes
- * over. `onPositioned` is called every layout pass (including while the
- * hero is scrolled out of the viewport; `verticalScroll` keeps off-screen
- * children measured, just visually clipped), so it's always the hero
- * title's live, current on-screen bounds, however it's currently scaled by
- * its own [PebbleShell.growTitleOnExpand] animation. `alpha` is read the
- * other direction -- [HeroHeader] fades its own title out by exactly the
- * amount the floating copy has faded in, so the two never both read as
- * fully opaque at once.
+ * over. `onPositioned` and `color` are read every layout pass (including
+ * while the hero is scrolled out of the viewport; `verticalScroll` keeps
+ * off-screen children measured, just visually clipped), so they're always
+ * the hero title's live, current on-screen bounds and colour -- `color` in
+ * particular is what lets the floating copy actually START looking like
+ * the SAME text (the hero's title is drawn white, over its photo; the
+ * floating one needs to begin at that same white before it settles into
+ * the app's normal text colour away from the photo, or it reads as a
+ * different, unrelated piece of text rather than one continuous element
+ * leaving the card). `alpha` is read the other direction -- [HeroHeader]
+ * fades its own title out by exactly the amount the floating copy has
+ * faded in, so the two never both read as fully opaque at once.
  */
-private class HeroTitleFlight(val onPositioned: (Offset) -> Unit, val alpha: State<Float>)
+private class HeroTitleFlight(
+    val onPositioned: (Offset) -> Unit,
+    val alpha: State<Float>,
+    // MutableState, not a callback like onPositioned -- HeroHeader writes
+    // this every recomposition of its own title colour (a plain lerp, cheap
+    // to just re-set rather than wrap in a setter function).
+    val color: MutableState<Color>,
+)
 
 /** Null (the default) everywhere except inside [VehicleDetailContent]. */
 private val LocalHeroTitleFlight = compositionLocalOf<HeroTitleFlight?> { null }
@@ -7660,16 +7673,22 @@ private fun VehicleDetailContent(
     val nameHidden by remember {
         derivedStateOf { (heroTitlePosition.value?.y ?: Float.MAX_VALUE) < topInsetPx }
     }
+    // The hero title's own live colour (it's drawn white over its photo, so
+    // this is the app's normal onSurface only when the car has no photo --
+    // see HeroTitleFlight's own doc for why this matters).
+    val heroTitleColor = remember { mutableStateOf(Color.Unspecified) }
     // Where the flight begins -- captured ONCE, the instant the hero title
     // leaves the viewport, not tracked live for the rest of the trip. The
-    // floating text commits to that one start point and flies to the corner
-    // from it; further scrolling doesn't retarget it mid-flight, and once
-    // docked it's genuinely static, not still nudging with the scroll.
+    // floating text commits to that one start point/colour and flies to the
+    // corner from it; further scrolling doesn't retarget it mid-flight, and
+    // once docked it's genuinely static, not still nudging with the scroll.
     val flightStart = remember { mutableStateOf<Offset?>(null) }
+    val flightStartColor = remember { mutableStateOf(Color.Unspecified) }
     val dockProgress = remember { Animatable(0f) }
     LaunchedEffect(nameHidden) {
         if (nameHidden) {
             flightStart.value = heroTitlePosition.value?.let { it - containerPosition.value }
+            flightStartColor.value = heroTitleColor.value
         }
         // A real spring, not a tween -- dampingRatio well under 1 so it
         // visibly overshoots and settles rather than gliding to a stop,
@@ -7684,7 +7703,11 @@ private fun VehicleDetailContent(
     // fades in -- see HeroTitleFlight's own doc.
     val heroTitleAlpha = remember { derivedStateOf { 1f - dockProgress.value.coerceIn(0f, 1f) } }
     val heroFlight = remember(heroTitleAlpha) {
-        HeroTitleFlight(onPositioned = { heroTitlePosition.value = it }, alpha = heroTitleAlpha)
+        HeroTitleFlight(
+            onPositioned = { heroTitlePosition.value = it },
+            alpha = heroTitleAlpha,
+            color = heroTitleColor,
+        )
     }
     Refreshable(v, state, vm, hideIndicator = hideIndicator) {
         CompositionLocalProvider(LocalHeroTitleFlight provides heroFlight) {
@@ -7706,7 +7729,7 @@ private fun VehicleDetailContent(
                 // topInset alone, no extra breathing room, so the name sits right at
                 // the status bar's own edge instead of noticeably below it.
                 Spacer(Modifier.height(topInset))
-                CarHeaderRow(v, state, onExpand, reserveHeaderEnd)
+                CarHeaderRow(v, state, onExpand, reserveHeaderEnd, hideName = true)
                 // summary (image+gauge) and controls are reorderable pebbles too. The full
                 // pebble column always renders while swiping; smoothness comes from
                 // PebbleList's own one-frame lazy-fill (filled/EAGER_PEBBLES) + the pager's
@@ -7736,11 +7759,18 @@ private fun VehicleDetailContent(
                 // Coerced: dockProgress's own spring can overshoot past 0/1.
                 .graphicsLayer { alpha = dockProgress.value.coerceIn(0f, 1f) },
         ) {
+            val onSurface = MaterialTheme.colorScheme.onSurface
+            // Starts at the hero title's own captured colour (white, over its
+            // photo) and lerps to the app's normal text colour as it docks --
+            // otherwise the floating copy would pop straight to a completely
+            // different colour the instant it appears, undercutting the
+            // "this IS the same text" illusion the whole flight is for.
+            val startColor = flightStartColor.value.let { if (it == Color.Unspecified) onSurface else it }
             Text(
                 v.name,
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSurface,
+                color = lerp(startColor, onSurface, dockProgress.value.coerceIn(0f, 1f)),
                 maxLines = 1,
                 modifier = Modifier.clickable {
                     haptics?.click()
@@ -8023,9 +8053,18 @@ private fun Refreshable(
     }
 }
 
-/** Car name/model + a Driving/Parked badge, with an optional expand button. */
+/**
+ * Car name/model + a Driving/Parked badge, with an optional expand button.
+ *
+ * [hideName] (only ever true from [VehicleDetailContent]) skips the name
+ * [Text] entirely -- not drawn, not reserved. The car's name is only ever
+ * drawn ONCE, live, on the hero photo card right below; showing it again
+ * here too was a real, visible duplicate, the same name twice on screen at
+ * once. [ExpandedCar]'s own header keeps [hideName] false: its wide layout
+ * has no hero card of its own in the same column to duplicate against.
+ */
 @Composable
-private fun CarHeaderRow(v: Vehicle, state: UiState, onExpand: (() -> Unit)?, reserveEnd: Boolean) {
+private fun CarHeaderRow(v: Vehicle, state: UiState, onExpand: (() -> Unit)?, reserveEnd: Boolean, hideName: Boolean = false) {
     Row(
         Modifier
             .fillMaxWidth()
@@ -8041,12 +8080,14 @@ private fun CarHeaderRow(v: Vehicle, state: UiState, onExpand: (() -> Unit)?, re
         verticalAlignment = Alignment.Top,
     ) {
         Column(Modifier.weight(1f)) {
-            Text(
-                v.name,
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSurface,
-            )
+            if (!hideName) {
+                Text(
+                    v.name,
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+            }
             Text(
                 "${v.model} · ${state.powertrainLabel(v)}",
                 style = MaterialTheme.typography.bodySmall,
