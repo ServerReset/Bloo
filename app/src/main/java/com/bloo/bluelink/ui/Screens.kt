@@ -7723,12 +7723,15 @@ private fun VehicleDetailContent(
         // visibly overshoots and settles rather than gliding to a stop,
         // which is what makes this read as the text getting yanked into (or
         // dropped back out of) its slot instead of just sliding there.
-        // Medium, not MediumLow: the softer spring took long enough to
-        // settle that the overshoot read as loose/wobbly rather than a
-        // single confident bounce landing on its target.
+        // StiffnessMedium (from a prior pass meant to fix a WOBBLY, loose
+        // feel) overcorrected into reading as stiff/abrupt instead --
+        // MediumLow gives the spring more TIME to actually show its own
+        // overshoot rather than snapping through it, and 0.5 (from 0.62)
+        // makes that overshoot more pronounced, so the landing itself reads
+        // as a genuine bounce again rather than a quick, stiff correction.
         dockProgress.animateTo(
             if (nameHidden) 1f else 0f,
-            spring(dampingRatio = 0.62f, stiffness = Spring.StiffnessMedium),
+            spring(dampingRatio = 0.5f, stiffness = Spring.StiffnessMediumLow),
         )
         // A light tap right as it lands/leaves, same as every other floating
         // chrome's own tap feedback -- this is the one moment the pill
