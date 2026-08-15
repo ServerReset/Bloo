@@ -2180,16 +2180,23 @@ internal fun SettingsScreen(
             ) {
                 // Same themed-icon avatar GarageScreen's own hoisted pill
                 // shows for the embedded Settings slot -- feature parity
-                // between the two, not a car-only affordance.
-                Box(Modifier.size(lerp(0.dp, 32.dp, t))) {
-                    if (t > 0.01f) {
-                        PillAvatar(
-                            photo = null,
-                            icon = Icons.Filled.Settings,
-                            tint = MaterialTheme.colorScheme.tertiary,
-                            size = lerp(0.dp, 32.dp, t),
-                        )
-                    }
+                // between the two, not a car-only affordance. Fades in past
+                // halfway rather than a hard early gate, matching the other
+                // pills' own avatar timing (see VehicleDetailContent's
+                // identical avatar for why that matters there -- it doesn't
+                // here, Settings' own title never scales, but the same
+                // timing keeps every pill's avatar reading consistently).
+                Box(
+                    Modifier
+                        .size(lerp(0.dp, 32.dp, t))
+                        .graphicsLayer { alpha = ((t - 0.5f) / 0.5f).coerceIn(0f, 1f) },
+                ) {
+                    if (t > 0f) PillAvatar(
+                        photo = null,
+                        icon = Icons.Filled.Settings,
+                        tint = MaterialTheme.colorScheme.tertiary,
+                        size = lerp(0.dp, 32.dp, t),
+                    )
                 }
                 Text(
                     "Settings",

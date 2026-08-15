@@ -3665,33 +3665,55 @@ internal fun GarageScreen(state: UiState, vm: AppViewModel) {
                             // swipe. A plain fade keeps the avatar reading as "the
                             // picture just changed" instead of "part of it flew
                             // off".
-                            Box(Modifier.size(lerp(0.dp, 32.dp, t))) {
-                                if (t > 0.01f) {
-                                    AnimatedContent(
-                                        targetState = settledBlock,
-                                        transitionSpec = { fadeIn(tween(200)) togetherWith fadeOut(tween(120)) },
-                                        label = "hoistedPillAvatar",
-                                    ) { block ->
-                                        if (settingsAsPage && block == pageCount) {
-                                            PillAvatar(photo = null, icon = Icons.Filled.Settings, tint = MaterialTheme.colorScheme.tertiary, size = lerp(0.dp, 32.dp, t))
-                                        } else {
-                                            // hoistedPhotoUrl, not an independent
-                                            // vehicles[block]-to-imageUrls lookup --
-                                            // see HeroTitleFlight.photoUrl's own
-                                            // doc. This is the literal SAME URL
-                                            // the settled page's own hero card is
-                                            // showing right now, reported through
-                                            // the same channel as its position/
-                                            // colour, rather than a second lookup
-                                            // that can resolve to nothing while the
-                                            // real photo is right there on screen.
-                                            PillAvatar(
-                                                photo = hoistedPhotoUrl.value,
-                                                icon = Icons.Filled.DirectionsCar,
-                                                tint = MaterialTheme.colorScheme.primary,
-                                                size = lerp(0.dp, 32.dp, t),
-                                            )
-                                        }
+                            // Sized from t=0 (so the Row never jumps once it
+                            // does appear) but only actually DRAWN once t is
+                            // past halfway, via alpha rather than a hard
+                            // t>0.01 gate. The name's own text is scaled
+                            // toward its natural size about its TOP-LEFT
+                            // (see that graphicsLayer's own doc for why),
+                            // which visibly shifts the glyphs toward the top
+                            // of their box for as long as the scale is
+                            // meaningfully under 1 -- exactly the early part
+                            // of this same transition. The avatar has no
+                            // such distortion (plain layout, no scale trick),
+                            // so showing it immediately at t>0.01 made it
+                            // read as sitting properly centred while the
+                            // name visibly wasn't, right beside it. Waiting
+                            // until the name's own scale has mostly resolved
+                            // avoids ever showing that mismatch at all.
+                            Box(
+                                Modifier
+                                    .size(lerp(0.dp, 32.dp, t))
+                                    .graphicsLayer { alpha = ((t - 0.5f) / 0.5f).coerceIn(0f, 1f) },
+                            ) {
+                                // t > 0f, not the alpha threshold above -- purely
+                                // to avoid ever composing this at a literal 0×0
+                                // size; it's already invisible below that alpha
+                                // threshold regardless of when it starts composing.
+                                if (t > 0f) AnimatedContent(
+                                    targetState = settledBlock,
+                                    transitionSpec = { fadeIn(tween(200)) togetherWith fadeOut(tween(120)) },
+                                    label = "hoistedPillAvatar",
+                                ) { block ->
+                                    if (settingsAsPage && block == pageCount) {
+                                        PillAvatar(photo = null, icon = Icons.Filled.Settings, tint = MaterialTheme.colorScheme.tertiary, size = lerp(0.dp, 32.dp, t))
+                                    } else {
+                                        // hoistedPhotoUrl, not an independent
+                                        // vehicles[block]-to-imageUrls lookup --
+                                        // see HeroTitleFlight.photoUrl's own
+                                        // doc. This is the literal SAME URL
+                                        // the settled page's own hero card is
+                                        // showing right now, reported through
+                                        // the same channel as its position/
+                                        // colour, rather than a second lookup
+                                        // that can resolve to nothing while the
+                                        // real photo is right there on screen.
+                                        PillAvatar(
+                                            photo = hoistedPhotoUrl.value,
+                                            icon = Icons.Filled.DirectionsCar,
+                                            tint = MaterialTheme.colorScheme.primary,
+                                            size = lerp(0.dp, 32.dp, t),
+                                        )
                                     }
                                 }
                             }
@@ -8293,15 +8315,29 @@ private fun VehicleDetailContent(
                 // single-car-per-page pager's shared one. Same
                 // HeroTitleFlight.photoUrl channel as that one, so this is
                 // the literal same photo the hero card itself is showing.
-                Box(Modifier.size(lerp(0.dp, 32.dp, t))) {
-                    if (t > 0.01f) {
-                        PillAvatar(
-                            photo = heroTitlePhotoUrl.value,
-                            icon = Icons.Filled.DirectionsCar,
-                            tint = MaterialTheme.colorScheme.primary,
-                            size = lerp(0.dp, 32.dp, t),
-                        )
-                    }
+                //
+                // Sized from t=0 but only actually DRAWN past halfway (alpha,
+                // not a t>0.01 gate) -- the name's own scale (below) is
+                // anchored top-left, which visibly shifts its glyphs toward
+                // the top of their box for as long as that scale is
+                // meaningfully under 1. The avatar has no such distortion, so
+                // showing it immediately made it read as sitting properly
+                // centred while the name visibly wasn't, right beside it.
+                Box(
+                    Modifier
+                        .size(lerp(0.dp, 32.dp, t))
+                        .graphicsLayer { alpha = ((t - 0.5f) / 0.5f).coerceIn(0f, 1f) },
+                ) {
+                    // t > 0f, not gated on the alpha threshold above -- purely
+                    // to avoid ever composing PillAvatar at a literal 0×0 size;
+                    // it's already invisible below that alpha threshold
+                    // regardless of when it starts composing.
+                    if (t > 0f) PillAvatar(
+                        photo = heroTitlePhotoUrl.value,
+                        icon = Icons.Filled.DirectionsCar,
+                        tint = MaterialTheme.colorScheme.primary,
+                        size = lerp(0.dp, 32.dp, t),
+                    )
                 }
                 Text(
                     v.name,
@@ -8381,13 +8417,62 @@ private fun ExpandedCar(v: Vehicle, state: UiState, vm: AppViewModel, flipped: B
         }
     val hotDrag = remember { HotSeatDrag() }
     // Hoisted (not recreated on flip) so each column keeps its own scroll
-    // position when the columns swap sides.
+    // position when the columns swap sides. controlsScroll in particular is
+    // what the floating name below tracks -- it always belongs to whichever
+    // COLUMN currently renders `controls` (and therefore CarHeaderRow),
+    // regardless of which physical side (left/right) that currently is: the
+    // leftScroll/rightScroll pairing below always keeps this same
+    // ScrollState paired with the same content across a flip.
     val controlsScroll = rememberScrollState()
     val pebblesScroll = rememberScrollState()
     val topInset = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
     val bottomInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+    val density = LocalDensity.current
+    val haptics = LocalHaptics.current
+    val scope = rememberCoroutineScope()
+    val topInsetPx = with(density) { topInset.toPx() }
+    val cornerYPx = with(density) { (topInset + 12.dp).toPx() }
+    // GarageScreen's own back arrow (top-left, its default 12dp/48dp) is
+    // ALWAYS present whenever ExpandedCar is on screen -- it's the one thing
+    // that gets you out of this view. Clear it, same reasoning as the
+    // standalone Settings route's own 60dp offset from its own back arrow.
+    val cornerXPx = with(density) { 60.dp.toPx() }
+    val titlePosition = remember { mutableStateOf<Offset?>(null) }
+    val containerPosition = remember { mutableStateOf(Offset.Zero) }
+    val nameHidden by remember {
+        derivedStateOf { (titlePosition.value?.y ?: Float.MAX_VALUE) < topInsetPx }
+    }
+    val dockProgress = remember { Animatable(0f) }
+    LaunchedEffect(nameHidden) {
+        dockProgress.animateTo(
+            if (nameHidden) 1f else 0f,
+            spring(dampingRatio = 0.5f, stiffness = Spring.StiffnessMediumLow),
+        )
+        haptics?.click()
+    }
+    // controlsScroll.value read directly, not through the reported position
+    // -- same reasoning as VehicleDetailContent's own heroYAtScrollZero doc.
+    val yAtScrollZero = remember { mutableStateOf<Float?>(null) }
+    val titleFlight = remember {
+        HeroTitleFlight(
+            onPositioned = {
+                titlePosition.value = it
+                val local = it - containerPosition.value
+                yAtScrollZero.value = local.y + controlsScroll.value
+            },
+            // This title's own colour/size never change -- see CarHeaderRow's
+            // own doc -- so these just stay at their defaults, which the
+            // floating copy's own fallback (onSurface/titleLarge) matches.
+            color = mutableStateOf(Color.Unspecified),
+            fontSizeSp = mutableStateOf(null),
+            // Unused -- the avatar below reads state.imageUrls[v.vin]
+            // directly (there's exactly one car here, no index to get
+            // wrong), rather than through this channel.
+            photoUrl = mutableStateOf(null),
+        )
+    }
     val controls: @Composable ColumnScope.() -> Unit = {
-        CarHeaderRow(v, state, onExpand = null, reserveEnd = false)
+        CarHeaderRow(v, state, onExpand = null, reserveEnd = false, titleFlight = titleFlight)
         CriticalContent(v, state, vm)
         HotspotSlot(v, hotspot, state, vm)
     }
@@ -8402,7 +8487,14 @@ private fun ExpandedCar(v: Vehicle, state: UiState, vm: AppViewModel, flipped: B
     // the multi-car grid the flag was meant for, so the real M3 Expressive
     // indicator should show here too.
     Refreshable(v, state, vm) {
-        Box(Modifier.fillMaxSize()) {
+        Box(
+            Modifier
+                .fillMaxSize()
+                // Reports THIS Box's own root position -- see
+                // containerPosition's own doc on VehicleDetailContent's
+                // identical field.
+                .onGloballyPositioned { coords -> containerPosition.value = coords.positionInRoot() },
+        ) {
         // Animate the swap when the columns are flipped.
         AnimatedContent(
             targetState = flipped,
@@ -8439,6 +8531,82 @@ private fun ExpandedCar(v: Vehicle, state: UiState, vm: AppViewModel, flipped: B
                         verticalArrangement = Arrangement.spacedBy(12.dp),
                     ) { lead(); rightCol(); trail() }
                 }
+            }
+        }
+        // The floating name, once CarHeaderRow's own title has scrolled out
+        // of view -- mirrors VehicleDetailContent's own identical pill
+        // exactly, just sourced from CarHeaderRow's title (this view's only
+        // one) instead of a hero photo card's, and tracking whichever
+        // column `controls` currently renders in rather than a single fixed
+        // ScrollState.
+        val titleLargeSp = MaterialTheme.typography.titleLarge.fontSize.value
+        val onSurface = MaterialTheme.colorScheme.onSurface
+        val pillShape = RoundedCornerShape(50)
+        Box(
+            Modifier
+                .align(Alignment.TopStart)
+                .offset {
+                    val attachedX = titlePosition.value?.let { it.x - containerPosition.value.x } ?: cornerXPx
+                    val attachedY = yAtScrollZero.value?.let { it - controlsScroll.value } ?: cornerYPx
+                    val t = dockProgress.value
+                    val x = attachedX + (cornerXPx - attachedX) * t
+                    val y = attachedY + (cornerYPx - attachedY) * t
+                    IntOffset(x.roundToInt(), y.roundToInt())
+                },
+        ) {
+            val t = dockProgress.value.coerceIn(0f, 1f)
+            if (t > 0.02f) {
+                Box(
+                    Modifier
+                        .matchParentSize()
+                        .graphicsLayer { alpha = t }
+                        .background(MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = glassContainerAlpha()), pillShape)
+                        .ambientRing(pillShape)
+                        .dropShadow(pillShape)
+                        .frostedRim(pillShape),
+                )
+            }
+            Row(
+                Modifier
+                    .heightIn(min = lerp(0.dp, 48.dp, t))
+                    .padding(horizontal = lerp(0.dp, 16.dp, t))
+                    .clickable {
+                        haptics?.click()
+                        scope.launch { controlsScroll.animateScrollTo(0) }
+                    },
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(lerp(0.dp, 8.dp, t)),
+            ) {
+                // Same delayed reveal as every other pill's own avatar --
+                // see VehicleDetailContent's identical Box for why.
+                Box(
+                    Modifier
+                        .size(lerp(0.dp, 32.dp, t))
+                        .graphicsLayer { alpha = ((t - 0.5f) / 0.5f).coerceIn(0f, 1f) },
+                ) {
+                    if (t > 0f) PillAvatar(
+                        photo = state.imageUrls[v.vin],
+                        icon = Icons.Filled.DirectionsCar,
+                        tint = MaterialTheme.colorScheme.primary,
+                        size = lerp(0.dp, 32.dp, t),
+                    )
+                }
+                Text(
+                    v.name,
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = onSurface,
+                    maxLines = 1,
+                    // Top-left, not centre -- see VehicleDetailContent's
+                    // identical graphicsLayer for the full reasoning.
+                    modifier = Modifier.graphicsLayer {
+                        val attachedScale = (titleFlight.fontSizeSp.value ?: titleLargeSp) / titleLargeSp
+                        val scale = attachedScale + (1f - attachedScale) * dockProgress.value.coerceIn(0f, 1f)
+                        scaleX = scale
+                        scaleY = scale
+                        transformOrigin = TransformOrigin(0f, 0f)
+                    },
+                )
             }
         }
         }
@@ -8636,11 +8804,32 @@ private fun Refreshable(
  * [Text] entirely -- not drawn, not reserved. The car's name is only ever
  * drawn ONCE, live, on the hero photo card right below; showing it again
  * here too was a real, visible duplicate, the same name twice on screen at
- * once. [ExpandedCar]'s own header keeps [hideName] false: its wide layout
- * has no hero card of its own in the same column to duplicate against.
+ * once.
+ *
+ * [titleFlight] (only ever supplied by [ExpandedCar]) is the opposite case:
+ * this IS the only title-bearing element in that wide layout (no hero photo
+ * card of its own to pull from instead), so it reports its own position
+ * through the same [HeroTitleFlight] mechanism `SettingsHeaderRow`'s title
+ * uses, and goes invisible (space still reserved) while doing so -- the
+ * real, visible copy is then a floating [Text] elsewhere, drawn at this
+ * title's position. An explicit parameter rather than reading
+ * [LocalHeroTitleFlight] ambiently: [VehicleDetailContent] already provides
+ * that CompositionLocal around ITS OWN call to this composable (for the
+ * hero card's title to read, not this one), and this composable is a
+ * descendant of that provider too -- an ambient read here would have this
+ * title and the hero's fighting over the exact same flight object. Never
+ * supplied together with `hideName = true`: those two modes belong to
+ * different callers.
  */
 @Composable
-private fun CarHeaderRow(v: Vehicle, state: UiState, onExpand: (() -> Unit)?, reserveEnd: Boolean, hideName: Boolean = false) {
+private fun CarHeaderRow(
+    v: Vehicle,
+    state: UiState,
+    onExpand: (() -> Unit)?,
+    reserveEnd: Boolean,
+    hideName: Boolean = false,
+    titleFlight: HeroTitleFlight? = null,
+) {
     Row(
         Modifier
             .fillMaxWidth()
@@ -8662,6 +8851,13 @@ private fun CarHeaderRow(v: Vehicle, state: UiState, onExpand: (() -> Unit)?, re
                     style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onSurface,
+                    modifier = if (titleFlight != null) {
+                        Modifier
+                            .alpha(0f)
+                            .onGloballyPositioned { titleFlight.onPositioned(it.positionInRoot()) }
+                    } else {
+                        Modifier
+                    },
                 )
             }
             Text(
