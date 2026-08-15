@@ -306,6 +306,7 @@ import androidx.compose.ui.layout.boundsInParent
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.zIndex
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
@@ -5430,6 +5431,13 @@ private fun HeroHeader(
                 }
             }
 
+        // Reports this title's own real, measured position/alpha to a
+        // VehicleDetailContent ancestor's floating name, if one is providing
+        // it (null everywhere else -- ExpandedCar's own pebble list excludes
+        // "summary" entirely, so this only ever applies here). See
+        // HeroTitleFlight's own doc for why it's the title's FINAL bounds
+        // (after PebbleShell's own scale) and not a guess.
+        val heroTitleFlight = LocalHeroTitleFlight.current
         PebbleShell(
             expanded = photoExpanded,
             onToggle = { vm.togglePebble(v, com.bloo.bluelink.data.HERO_PHOTO_SECTION) },
@@ -5442,6 +5450,12 @@ private fun HeroHeader(
             // the scrim is built for. Snapping at a threshold would flash a white name
             // onto a still-white card for the frames before the photo arrives.
             titleColor = lerp(MaterialTheme.colorScheme.onSurface, HeroOnPhoto, heroT),
+            titleModifier = if (heroTitleFlight != null) {
+                Modifier.onGloballyPositioned { heroTitleFlight.onPositioned(it.positionInRoot()) }
+            } else {
+                Modifier
+            },
+            titleAlpha = heroTitleFlight?.alpha?.value ?: 1f,
             // The ONLY pebble that grows its title. Here the title is the car's NAME and the
             // card becomes a photo of that car, so the name scaling up reads as the card taking
             // over. On "Location" or "Diagnostics" it is a heading resizing for no reason.
@@ -7557,28 +7571,45 @@ internal fun BackdropHost(content: @Composable BoxScope.() -> Unit) {
 // --- Full detail ----------------------------------------------------------
 
 /**
+ * What [HeroHeader]'s own title (the car's name, drawn ON the photo card via
+ * [PebbleShell]) reports back to [VehicleDetailContent] so the floating name
+ * can fly FROM the hero card's real, measured title -- not a guessed
+ * position -- and fade the hero's own copy out as the floating one takes
+ * over. `onPositioned` is called every layout pass (including while the
+ * hero is scrolled out of the viewport; `verticalScroll` keeps off-screen
+ * children measured, just visually clipped), so it's always the hero
+ * title's live, current on-screen bounds, however it's currently scaled by
+ * its own [PebbleShell.growTitleOnExpand] animation. `alpha` is read the
+ * other direction -- [HeroHeader] fades its own title out by exactly the
+ * amount the floating copy has faded in, so the two never both read as
+ * fully opaque at once.
+ */
+private class HeroTitleFlight(val onPositioned: (Offset) -> Unit, val alpha: State<Float>)
+
+/** Null (the default) everywhere except inside [VehicleDetailContent]. */
+private val LocalHeroTitleFlight = compositionLocalOf<HeroTitleFlight?> { null }
+
+/**
  * Single-column car view (phones, and each column of the grid). Everything
  * scrolls together in one [Column] inside [Refreshable] (header row, then
  * the reorderable [PebbleList]).
  *
- * The car's name is drawn exactly ONCE on screen, ever: not by
- * [CarHeaderRow] (its own copy stays reserved-but-invisible, `hideName`),
- * but by the floating [Text] below, which tracks the header's own real
- * on-screen position 1:1 while it's still in view -- so it looks and moves
- * exactly like ordinary scrolling text -- then, once it's scrolled far
- * enough, peels off and springs (with a real bounce, not a cut) into a
- * fixed slot at the top-left of the screen and stays there. Scrolling back
- * reverses the same spring, landing it back on the header's live position
- * again rather than snapping.
+ * The car's name genuinely leaves the hero photo card and flies to a fixed
+ * corner, not a copy fading in beside a copy fading out: [HeroTitleFlight]
+ * reports the hero card's own title's real on-screen position every layout
+ * pass, and the floating [Text] here is drawn AT that exact position --
+ * indistinguishable from the hero's own title -- for as long as it's still
+ * in view. Once it's scrolled far enough off screen, it peels off and
+ * springs (with a real bounce, not a cut) into the fixed top-left slot and
+ * stays there; scrolling back reverses the same spring and lands it back on
+ * the hero title's live position rather than snapping to a fixed point.
  *
  * [dockProgress] is the one thing that ever animates: 0 means "glued to the
- * header's live scroll position" and 1 means "docked in the fixed corner".
- * The Y actually drawn is a straight lerp between those two positions by
- * [dockProgress] -- both endpoints are recomputed from the CURRENT scroll
- * offset on every layout pass, so even if the user keeps scrolling mid-
- * flight, the "attached" end of that lerp keeps sliding with them instead
- * of chasing a stale target, and dockProgress settling at exactly 0 or 1
- * always lands on a live, correct position, never a stale snapshot.
+ * hero title's live measured position" and 1 means "docked in the fixed
+ * corner". The position actually drawn is a straight lerp between those two
+ * points by [dockProgress] -- the "attached" end of that lerp is
+ * recomputed from the CURRENT measured position on every layout pass, so
+ * even scrolling further mid-flight never leaves it chasing a stale target.
  */
 @Composable
 private fun VehicleDetailContent(
@@ -7595,15 +7626,39 @@ private fun VehicleDetailContent(
     val scope = rememberCoroutineScope()
     val density = LocalDensity.current
     val haptics = LocalHaptics.current
-    // Same threshold CarHeaderRow's name has always scrolled past by: once the
-    // name (plus a little slack) has gone by, it's time to dock.
-    val thresholdPx = with(density) { (topInset + 16.dp).toPx() }
-    val nameHidden by remember { derivedStateOf { scroll.value > thresholdPx } }
-    // The fixed corner slot's own Y -- a little clear of the status bar, same
-    // left inset the header's own text already sits at (16dp, the content
-    // column's own horizontal padding), so the only travel is vertical.
+    val topInsetPx = with(density) { topInset.toPx() }
+    // The fixed corner slot -- a little clear of the status bar, same left
+    // inset the content column's own horizontal padding uses.
     val cornerYPx = with(density) { (topInset + 8.dp).toPx() }
-    val xPx = with(density) { 16.dp.toPx() }
+    val cornerXPx = with(density) { 16.dp.toPx() }
+    // The hero title's own real, measured position IN WINDOW-ROOT
+    // coordinates, kept live by HeroTitleFlight.onPositioned below -- null
+    // until the hero has laid out at least once. A plain mutableStateOf, not
+    // something read anywhere in composition: every write here is only ever
+    // consumed inside the offset{} lambda further down (layout phase), so
+    // updating it every scroll frame re-lays-out just that one floating Box,
+    // not this whole composable.
+    val heroTitlePosition = remember { mutableStateOf<Offset?>(null) }
+    // This composable's OWN root position -- needed to convert
+    // heroTitlePosition (root coordinates) into a LOCAL offset for the
+    // floating Box below. Modifier.offset{} moves an element relative to
+    // wherever its parent already placed it, not to an absolute screen
+    // position -- on a phone this container fills the screen so the two
+    // coincide, but the exact same VehicleDetailContent also runs as one
+    // column of a side-by-side grid (GarageScreen's multi-car-per-page
+    // mode), where this container's own root position is offset by however
+    // many columns come before it. Without subtracting it back out, the
+    // floating name would fly toward the FAR corner of the whole grid
+    // instead of this car's own column.
+    val containerPosition = remember { mutableStateOf(Offset.Zero) }
+    // Hidden once the hero title's own top edge has scrolled above the
+    // status bar -- i.e. once it's genuinely left the viewport, not a fixed
+    // scroll-distance guess. Root-space on both sides (topInsetPx is a
+    // screen measurement), so this one check needs no container-relative
+    // conversion.
+    val nameHidden by remember {
+        derivedStateOf { (heroTitlePosition.value?.y ?: Float.MAX_VALUE) < topInsetPx }
+    }
     val dockProgress = remember { Animatable(0f) }
     LaunchedEffect(nameHidden) {
         // A real spring, not a tween -- dampingRatio well under 1 so it
@@ -7615,39 +7670,64 @@ private fun VehicleDetailContent(
             spring(dampingRatio = 0.55f, stiffness = Spring.StiffnessMediumLow),
         )
     }
+    // The hero's OWN title fades out by exactly as much as the floating copy
+    // fades in -- see HeroTitleFlight's own doc.
+    val heroTitleAlpha = remember { derivedStateOf { 1f - dockProgress.value.coerceIn(0f, 1f) } }
+    val heroFlight = remember(heroTitleAlpha) {
+        HeroTitleFlight(onPositioned = { heroTitlePosition.value = it }, alpha = heroTitleAlpha)
+    }
     Refreshable(v, state, vm, hideIndicator = hideIndicator) {
-        Column(
-            Modifier
-                .fillMaxSize()
-                .verticalScroll(scroll)
-                .padding(horizontal = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            // Inset spacer (not padding) so content scrolls *behind* the bars --
-            // topInset alone, no extra breathing room, so the name sits right at
-            // the status bar's own edge instead of noticeably below it.
-            Spacer(Modifier.height(topInset))
-            CarHeaderRow(v, state, onExpand, reserveHeaderEnd, hideName = true)
-            // summary (image+gauge) and controls are reorderable pebbles too. The full
-            // pebble column always renders while swiping; smoothness comes from
-            // PebbleList's own one-frame lazy-fill (filled/EAGER_PEBBLES) + the pager's
-            // beyondViewportPageCount=1 pre-compose, not from an in-transit skeleton.
-            PebbleList(v, state, vm)
-            Spacer(Modifier.height(bottomInset + 16.dp))
+        CompositionLocalProvider(LocalHeroTitleFlight provides heroFlight) {
+            Column(
+                Modifier
+                    .fillMaxSize()
+                    // Reports THIS container's own root position -- see
+                    // containerPosition's own doc above. Before verticalScroll/
+                    // padding: neither affects the Column's own placement
+                    // within its parent, only its children's, so this reports
+                    // the same position regardless of where it sits in the
+                    // chain.
+                    .onGloballyPositioned { containerPosition.value = it.positionInRoot() }
+                    .verticalScroll(scroll)
+                    .padding(horizontal = 16.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                // Inset spacer (not padding) so content scrolls *behind* the bars --
+                // topInset alone, no extra breathing room, so the name sits right at
+                // the status bar's own edge instead of noticeably below it.
+                Spacer(Modifier.height(topInset))
+                CarHeaderRow(v, state, onExpand, reserveHeaderEnd)
+                // summary (image+gauge) and controls are reorderable pebbles too. The full
+                // pebble column always renders while swiping; smoothness comes from
+                // PebbleList's own one-frame lazy-fill (filled/EAGER_PEBBLES) + the pager's
+                // beyondViewportPageCount=1 pre-compose, not from an in-transit skeleton.
+                PebbleList(v, state, vm)
+                Spacer(Modifier.height(bottomInset + 16.dp))
+            }
         }
         Box(
             Modifier
                 .align(Alignment.TopStart)
-                // Layout-phase reads only (scroll.value, dockProgress.value) --
-                // this Box alone re-lays-out on a scroll or animation frame, not
-                // VehicleDetailContent's whole composition, the same reason the
-                // pull-to-refresh indicator above reads its own live values
-                // inside offset{} instead of the composable body.
+                // Layout-phase reads only (heroTitlePosition.value,
+                // dockProgress.value) -- this Box alone re-lays-out on a
+                // scroll or animation frame, not VehicleDetailContent's whole
+                // composition, the same reason the pull-to-refresh indicator
+                // above reads its own live values inside offset{} instead of
+                // the composable body.
                 .offset {
-                    val attachedYPx = topInset.toPx() - scroll.value
-                    val y = attachedYPx + (cornerYPx - attachedYPx) * dockProgress.value
-                    IntOffset(xPx.roundToInt(), y.roundToInt())
-                },
+                    // Root -> local: see containerPosition's own doc above.
+                    val posLocal = heroTitlePosition.value?.let { it - containerPosition.value }
+                    val attachedX = posLocal?.x ?: cornerXPx
+                    val attachedY = posLocal?.y ?: cornerYPx
+                    val t = dockProgress.value
+                    val x = attachedX + (cornerXPx - attachedX) * t
+                    val y = attachedY + (cornerYPx - attachedY) * t
+                    IntOffset(x.roundToInt(), y.roundToInt())
+                }
+                // Invisible until the hero title starts fading out, then
+                // fades in by the same amount -- see HeroTitleFlight's doc.
+                // Coerced: dockProgress's own spring can overshoot past 0/1.
+                .graphicsLayer { alpha = dockProgress.value.coerceIn(0f, 1f) },
         ) {
             Text(
                 v.name,
@@ -7936,17 +8016,9 @@ private fun Refreshable(
     }
 }
 
-/**
- * Car name/model + a Driving/Parked badge, with an optional expand button.
- *
- * [hideName] (only ever true from [VehicleDetailContent], which draws the
- * real, visible name itself via its own floating [Text]) draws the name at
- * `alpha = 0` -- it exists purely to reserve the exact, font-metric-accurate
- * layout space (correct across accessibility font scales) that floating
- * text starts out sitting in.
- */
+/** Car name/model + a Driving/Parked badge, with an optional expand button. */
 @Composable
-private fun CarHeaderRow(v: Vehicle, state: UiState, onExpand: (() -> Unit)?, reserveEnd: Boolean, hideName: Boolean = false) {
+private fun CarHeaderRow(v: Vehicle, state: UiState, onExpand: (() -> Unit)?, reserveEnd: Boolean) {
     Row(
         Modifier
             .fillMaxWidth()
@@ -7967,7 +8039,6 @@ private fun CarHeaderRow(v: Vehicle, state: UiState, onExpand: (() -> Unit)?, re
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.onSurface,
-                modifier = if (hideName) Modifier.alpha(0f) else Modifier,
             )
             Text(
                 "${v.model} · ${state.powertrainLabel(v)}",
@@ -9392,6 +9463,22 @@ internal fun PebbleShell(
      * telling the text to be light. Reported from a real device.
      */
     titleColor: Color = Color.Unspecified,
+    /**
+     * Extra modifier appended to the title [Text] itself, AFTER its own scale
+     * transform -- so a caller reading its position (e.g. via
+     * `onGloballyPositioned`) gets the real, final on-screen bounds, not the
+     * pre-scale layout size. Only the hero ever supplies one (see
+     * [LocalHeroTitleFlight]); every other pebble takes the default no-op.
+     */
+    titleModifier: Modifier = Modifier,
+    /**
+     * Independent alpha on just the title text, separate from the pebble's
+     * own. [Color.Unspecified]'s alpha channel already covers per-pebble
+     * tinting; this is for a caller that wants to fade the title OUT while
+     * something else (the hero's floating name, mid-flight) fades in to
+     * replace it, without touching [titleColor] itself.
+     */
+    titleAlpha: Float = 1f,
     // onTitleWidth was deleted here. It reported the title's measured width so the hero could
     // offset its collapsed readout past the car name. That whole approach is gone: the numbers are
     // now trailing content ON this Row (see HeroCollapsedNumbers), so the Row positions them and
@@ -9669,8 +9756,13 @@ internal fun PebbleShell(
                                     .graphicsLayer {
                                         scaleX = titleScale
                                         scaleY = titleScale
+                                        alpha = titleAlpha
                                         transformOrigin = TransformOrigin(0f, 0.5f)
-                                    },
+                                    }
+                                    // Appended LAST -- after the .layout{} above, so a
+                                    // caller reading this via onGloballyPositioned gets
+                                    // the real, final (already-scaled) on-screen bounds.
+                                    .then(titleModifier),
                                 style = titleStyle,
                                 color = titleColor,
                                 fontWeight = FontWeight.Bold,
