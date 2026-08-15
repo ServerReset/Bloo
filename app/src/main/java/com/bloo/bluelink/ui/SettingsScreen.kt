@@ -42,6 +42,7 @@ import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.AnimationVector1D
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.VectorConverter
@@ -271,6 +272,7 @@ import androidx.compose.runtime.withFrameNanos
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.focus.FocusRequester
@@ -285,6 +287,7 @@ import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.rotate
 import androidx.lifecycle.repeatOnLifecycle
 import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.drawscope.DrawScope
@@ -297,6 +300,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.boundsInParent
 import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.zIndex
 import androidx.compose.ui.graphics.Color
@@ -332,6 +336,7 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.round
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.lerp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
@@ -544,20 +549,56 @@ private fun StatusHeaderRow(icon: ImageVector, tint: Color, title: String, statu
 }
 
 /**
+ * `SettingsScreen`'s own (non-hoisted) floating pill's tracking state,
+ * bundled so it can be built inside an `if (hoisted == null)` branch as one
+ * value -- see `VehicleDetailContent`'s identical `LocalNamePillState` for
+ * the full reasoning. Simpler than that one: no colour/font-size tracking
+ * (Settings' own title never changes either -- see `SettingsHeaderRow`'s own
+ * doc), and no scroll-value calibration (Settings has no single scalar
+ * `ScrollState` to read the way a car page's `verticalScroll` does).
+ */
+private data class LocalSettingsPillState(
+    val flight: HeroTitleFlight,
+    val dockProgress: Animatable<Float, AnimationVector1D>,
+    val cornerXPx: Float,
+    val cornerYPx: Float,
+    val titlePosition: MutableState<Offset?>,
+    val containerPosition: MutableState<Offset>,
+)
+
+/**
  * Settings' own in-content header: title + a short context line, matching
  * [CarHeaderRow][com.bloo.bluelink.ui] exactly in visual weight (titleLarge/
  * Bold name, bodySmall/onSurfaceVariant subtitle) so Settings reads as
  * another page in the pager, not a differently-designed screen bolted onto
  * it.
+ *
+ * Reports its own real, measured position via [LocalHeroTitleFlight] (the
+ * same mechanism [HeroHeader]'s car-page title uses) whenever a flight
+ * controller is present, and goes invisible while it does -- mirroring
+ * [CarHeaderRow]'s own `hideName`, since the real, visible copy is then a
+ * floating [Text] elsewhere that's drawn AT this title's position, not this
+ * one. Unlike the hero card, Settings' own title never changes colour or
+ * size (no photo to sit over, no [PebbleShell]-style grow-on-expand), so no
+ * `color`/`fontSizeSp` need reporting -- the floating copy's own fallback
+ * (the app's normal text colour, full titleLarge) already matches exactly.
  */
 @Composable
 private fun SettingsHeaderRow(state: UiState) {
+    val titleFlight = LocalHeroTitleFlight.current
     Column(Modifier.fillMaxWidth().padding(horizontal = 4.dp)) {
         Text(
             "Settings",
             style = MaterialTheme.typography.titleLarge,
             fontWeight = FontWeight.Bold,
             color = MaterialTheme.colorScheme.onSurface,
+            modifier = if (titleFlight != null) {
+                Modifier
+                    .alpha(0f)
+                    .onGloballyPositioned { titleFlight.onPositioned(it.positionInRoot()) }
+            } else {
+                Modifier
+            },
         )
         val carCount = state.vehicles.size
         val modeLabel = if (state.settingsMode == "advanced") "Advanced" else "Simple"
@@ -583,6 +624,11 @@ private fun SettingsHeaderRow(state: UiState) {
 internal fun SettingsScreen(
     vm: AppViewModel,
     embedded: Boolean = false,
+    // Non-null ONLY for GarageScreen's single-car-per-page pager's embedded
+    // Settings slot, when it's the currently SETTLED page -- mirrors
+    // VehicleDetailContent's own `hoisted` param exactly. See
+    // HoistedIdentityFlight's own doc.
+    hoisted: HoistedIdentityFlight? = null,
 ) {
     val appearance = LocalAppearance.current
     val notif by vm.notifications.collectAsState()
@@ -599,6 +645,8 @@ internal fun SettingsScreen(
     // separate layouts to keep in sync.
     val settingsGridState = rememberLazyStaggeredGridState()
     val settingsScope = rememberCoroutineScope()
+    val density = LocalDensity.current
+    val haptics = LocalHaptics.current
     // System back returns to the garage, not out of the app.
     var pickTarget by remember { mutableStateOf<String?>(null) }
     var cropUri by remember { mutableStateOf<Uri?>(null) }
@@ -622,6 +670,59 @@ internal fun SettingsScreen(
   // behaviour underneath (GarageScreen's own handling, or the app backgrounding)
   // is what should run instead.
   if (!embedded) BackHandler { vm.closeSettings() }
+  if (hoisted != null) {
+      // Register this page as the one actually driving the hoisted pill.
+      // Idempotent -- see VehicleDetailContent's own identical guard for
+      // why re-running it every recomposition is harmless. activeScroll
+      // stays null: Settings has no per-page scroll SCALAR the way a car
+      // page's ScrollState does (LazyStaggeredGridState instead), so
+      // leaving it null makes the hoisted pill's own Y calc fall back to
+      // its own measured position directly rather than trying to read a
+      // live scroll delta the way car pages do.
+      hoisted.activeScroll.value = null
+      hoisted.scrollToTop.value = { settingsGridState.animateScrollToItem(0) }
+  }
+  // Only actually built when this page is rendering its OWN pill -- see
+  // VehicleDetailContent's identical `local` for the full reasoning.
+  val local = if (hoisted == null) {
+      val topInsetPx = with(density) { topInset.toPx() }
+      val cornerYPx = with(density) { (topInset + 12.dp).toPx() }
+      // Standalone route's own back arrow already claims this same
+      // top-left corner (its own 12dp outer padding + 48dp) -- clear it.
+      // Embedded has no back arrow (see its own doc above), so it sits at
+      // the same 16dp the grid's own content uses, matching
+      // VehicleDetailContent's pill exactly.
+      val cornerXPx = with(density) { (if (embedded) 16.dp else 60.dp).toPx() }
+      val titlePosition = remember { mutableStateOf<Offset?>(null) }
+      val containerPosition = remember { mutableStateOf(Offset.Zero) }
+      // Root-space on both sides, same reasoning as VehicleDetailContent's
+      // own nameHidden.
+      val nameHidden by remember {
+          derivedStateOf { (titlePosition.value?.y ?: Float.MAX_VALUE) < topInsetPx }
+      }
+      val dockProgress = remember { Animatable(0f) }
+      LaunchedEffect(nameHidden) {
+          dockProgress.animateTo(
+              if (nameHidden) 1f else 0f,
+              spring(dampingRatio = 0.5f, stiffness = Spring.StiffnessMediumLow),
+          )
+          haptics?.click()
+      }
+      val flight = remember {
+          HeroTitleFlight(
+              onPositioned = { titlePosition.value = it },
+              // Settings' own title never changes colour/size -- see
+              // SettingsHeaderRow's own doc -- so these just stay at their
+              // defaults (Unspecified/null), which the floating copy's own
+              // fallback (onSurface/titleLarge) already matches exactly.
+              color = mutableStateOf(Color.Unspecified),
+              fontSizeSp = mutableStateOf(null),
+          )
+      }
+      LocalSettingsPillState(flight, dockProgress, cornerXPx, cornerYPx, titlePosition, containerPosition)
+  } else {
+      null
+  }
   BackdropHost {
         // A real multi-column grid on wide screens (tablets, landscape, foldables
         // unfolded) instead of one narrow centred column with empty space on
@@ -634,7 +735,17 @@ internal fun SettingsScreen(
         // neighbouring cards are almost never the same height, and a fixed-row
         // grid would force every card in a row to the tallest one's height --
         // exactly the "wrong tool" a masonry layout exists to avoid.
-        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
+        Box(
+            Modifier
+                .fillMaxSize()
+                // Reports THIS Box's own root position -- see
+                // LocalSettingsPillState.containerPosition's own doc on
+                // VehicleDetailContent's identical field. No-op when
+                // hoisted (local == null) -- the caller tracks its own.
+                .onGloballyPositioned { coords -> local?.let { it.containerPosition.value = coords.positionInRoot() } },
+            contentAlignment = Alignment.TopCenter,
+        ) {
+        CompositionLocalProvider(LocalHeroTitleFlight provides (hoisted?.flight ?: local?.flight)) {
         LazyVerticalStaggeredGrid(
             columns = StaggeredGridCells.Adaptive(minSize = 380.dp),
             state = settingsGridState,
@@ -2006,6 +2117,7 @@ internal fun SettingsScreen(
           }
           }
         }
+        } // CompositionLocalProvider(LocalHeroTitleFlight)
         } // Box (wide-screen centering)
         // Same blurred scrim GarageScreen uses behind the system clock/battery
         // icons -- this content scrolls behind the status bar too (see the
@@ -2018,6 +2130,60 @@ internal fun SettingsScreen(
         // the same scrim twice for exactly this one page, reading as a subtly
         // darker/hazier status-bar band than every car page beside it.
         if (!isCompactCoverScreen() && !embedded) StatusBarScrim()
+        // The floating "Settings" pill, once its own header has scrolled out
+        // of view -- mirrors VehicleDetailContent's own identical pill
+        // exactly, just sourced from SettingsHeaderRow's title instead of a
+        // hero photo card's. Hoisted mode renders NO pill of its own here at
+        // all -- GarageScreen renders ONE shared pill covering every page,
+        // including this one, once it settles.
+        if (local != null) {
+        val (_, dockProgress, cornerXPx, cornerYPx, titlePosition, containerPosition) = local
+        val onSurface = MaterialTheme.colorScheme.onSurface
+        val pillShape = RoundedCornerShape(50)
+        Box(
+            Modifier
+                .align(Alignment.TopStart)
+                .offset {
+                    val attachedX = titlePosition.value?.let { it.x - containerPosition.value.x } ?: cornerXPx
+                    val attachedY = titlePosition.value?.let { it.y - containerPosition.value.y } ?: cornerYPx
+                    val t = dockProgress.value
+                    val x = attachedX + (cornerXPx - attachedX) * t
+                    val y = attachedY + (cornerYPx - attachedY) * t
+                    IntOffset(x.roundToInt(), y.roundToInt())
+                },
+        ) {
+            val t = dockProgress.value.coerceIn(0f, 1f)
+            if (t > 0.02f) {
+                Box(
+                    Modifier
+                        .matchParentSize()
+                        .graphicsLayer { alpha = t }
+                        .background(MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = glassContainerAlpha()), pillShape)
+                        .ambientRing(pillShape)
+                        .dropShadow(pillShape)
+                        .frostedRim(pillShape),
+                )
+            }
+            Row(
+                Modifier
+                    .heightIn(min = lerp(0.dp, 48.dp, t))
+                    .padding(horizontal = lerp(0.dp, 16.dp, t))
+                    .clickable {
+                        haptics?.click()
+                        settingsScope.launch { settingsGridState.animateScrollToItem(0) }
+                    },
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    "Settings",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = onSurface,
+                    maxLines = 1,
+                )
+            }
+        }
+        }
         // Floating back-arrow + "Settings" label + simple/advanced button.
         Row(
             Modifier.fillMaxWidth().align(Alignment.TopStart).statusBarsPadding()
