@@ -7760,17 +7760,18 @@ private fun VehicleDetailContent(
     // fixed home slot -- computed, not measured. This Column's only scroll
     // axis is vertical, so the header's X never moves (16.dp content padding
     // minus the pill's own 8.dp), and its Y is exactly the header's
-    // unscrolled position (topInset leading spacer + 12.dp spacedBy gap
-    // before CarHeaderRow, minus the pill's own topInset + 8.dp) shifted up
-    // by whatever's currently been scrolled. A closed-form function of
-    // scroll.value avoids the async onGloballyPositioned staleness a
-    // measured version of this hit in practice (see MorphingIdentityPill).
-    // MUST stay in sync with the leading Spacer's own height below.
+    // unscrolled position (topInset leading spacer + a 4.dp gap before
+    // CarHeaderRow, minus the pill's own topInset + 8.dp -- a small NEGATIVE
+    // delta, since the header now sits slightly above the pill's own home Y)
+    // shifted up by whatever's currently been scrolled. A closed-form
+    // function of scroll.value avoids the async onGloballyPositioned
+    // staleness a measured version of this hit in practice (see
+    // MorphingIdentityPill). MUST stay in sync with the leading Spacers below.
     val headerDelta: () -> Offset = remember(density, topInset) {
         {
             Offset(
                 with(density) { 8.dp.toPx() },
-                with(density) { 4.dp.toPx() } - scroll.value.toFloat(),
+                with(density) { -4.dp.toPx() } - scroll.value.toFloat(),
             )
         }
     }
@@ -7781,20 +7782,28 @@ private fun VehicleDetailContent(
                 .fillMaxSize()
                 .verticalScroll(scroll)
                 .padding(horizontal = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+            // No shared spacedBy here on purpose -- the gap before CarHeaderRow
+            // needs to be tighter than every OTHER gap in this column (see its
+            // own Spacer below), so each gap is now its own explicit Spacer
+            // instead of one uniform value applied everywhere.
         ) {
             // Inset spacers (not padding) so content scrolls *behind* the bars.
-            // Was topInset + 8.dp -- read as sitting noticeably below the status
-            // bar with the header pill's own home slot right above it for
-            // comparison; tightened to bring the name up closer to it.
+            // Was topInset + 8.dp + a 12.dp arrangement gap (20dp total) -- kept
+            // reading as sitting well below the status bar with the header
+            // pill's own home slot right above it for comparison, even after
+            // trimming the +8.dp once already. Cut further, and split out of
+            // the shared arrangement so this one gap can be smaller than the
+            // rest of the column's own rhythm.
             Spacer(Modifier.height(topInset))
+            Spacer(Modifier.height(4.dp))
             CarHeaderRow(v, state, onExpand, reserveHeaderEnd, nameHidden, hideName = true)
+            Spacer(Modifier.height(12.dp))
             // summary (image+gauge) and controls are reorderable pebbles too. The full
             // pebble column always renders while swiping; smoothness comes from
             // PebbleList's own one-frame lazy-fill (filled/EAGER_PEBBLES) + the pager's
             // beyondViewportPageCount=1 pre-compose, not from an in-transit skeleton.
             PebbleList(v, state, vm)
-            Spacer(Modifier.height(bottomInset + 16.dp))
+            Spacer(Modifier.height(12.dp + bottomInset + 16.dp))
         }
         // Only show the inline pill when no parent is managing it.
         if (onNameHiddenChanged == null) {
