@@ -7693,6 +7693,22 @@ private fun VehicleDetailContent(
     // floating name would fly toward the FAR corner of the whole grid
     // instead of this car's own column.
     val containerPosition = remember { mutableStateOf(Offset.Zero) }
+    // heroTitlePosition is only as fresh as the LAST time HeroHeader's title
+    // actually laid out and reported it -- during a fast scroll fling that
+    // can trail the ACTUAL, current scroll offset by a frame or so, which is
+    // exactly what reads as this text lagging behind everything else on
+    // screen (everything else scrolls 1:1 with scroll.value every frame;
+    // this was only updating whenever the report happened to catch up).
+    // heroYAtScrollZero recalibrates every time a fresh report DOES arrive
+    // (`local.y + scroll.value` -- the title's Y with the CURRENT scroll
+    // amount added back, i.e. where it'd be if scroll were 0), but the
+    // offset{} below then recomputes the LIVE Y every single frame from
+    // scroll.value directly, the exact same state every other scrolling
+    // pixel on this screen already reads -- so even on a frame where the
+    // report is a beat stale, this still moves in perfect lockstep with the
+    // actual scroll gesture. X does not have this problem (it does not
+    // change while vertically scrolling) so it stays a plain reported value.
+    val heroYAtScrollZero = remember { mutableStateOf<Float?>(null) }
     // Hidden once the hero title's own top edge has scrolled above the
     // status bar -- i.e. once it's genuinely left the viewport, not a fixed
     // scroll-distance guess. Root-space on both sides (topInsetPx is a
@@ -7721,7 +7737,10 @@ private fun VehicleDetailContent(
     }
     val heroFlight = remember {
         HeroTitleFlight(
-            onPositioned = { heroTitlePosition.value = it },
+            onPositioned = {
+                heroTitlePosition.value = it
+                heroYAtScrollZero.value = (it - containerPosition.value).y + scroll.value
+            },
             color = heroTitleColor,
             fontSizeSp = heroTitleFontSizeSp,
         )
@@ -7783,11 +7802,13 @@ private fun VehicleDetailContent(
                 // see their own doc), which is a statement about the PILL,
                 // not the label inside it.
                 .offset {
-                    val attached = heroTitlePosition.value?.let { it - containerPosition.value }
-                        ?: Offset(cornerXPx, cornerYPx)
+                    val attachedX = heroTitlePosition.value?.let { it.x - containerPosition.value.x } ?: cornerXPx
+                    // scroll.value read DIRECTLY, not via the reported
+                    // position -- see heroYAtScrollZero's own doc for why.
+                    val attachedY = heroYAtScrollZero.value?.let { it - scroll.value } ?: cornerYPx
                     val t = dockProgress.value
-                    val x = attached.x + (cornerXPx - attached.x) * t
-                    val y = attached.y + (cornerYPx - attached.y) * t
+                    val x = attachedX + (cornerXPx - attachedX) * t
+                    val y = attachedY + (cornerYPx - attachedY) * t
                     IntOffset(x.roundToInt(), y.roundToInt())
                 },
         ) {
