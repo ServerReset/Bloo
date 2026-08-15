@@ -5465,6 +5465,11 @@ private fun HeroHeader(
             // copies in and out of sync with each other. See
             // HeroTitleFlight's own doc.
             titleAlpha = if (heroTitleFlight != null) 0f else 1f,
+            onTitleScale = if (heroTitleFlight != null) {
+                { sp -> heroTitleFlight.fontSizeSp.value = sp }
+            } else {
+                null
+            },
             // The ONLY pebble that grows its title. Here the title is the car's NAME and the
             // card becomes a photo of that car, so the name scaling up reads as the card taking
             // over. On "Location" or "Diagnostics" it is a heading resizing for no reason.
@@ -7591,14 +7596,24 @@ internal fun BackdropHost(content: @Composable BoxScope.() -> Unit) {
  * ALREADY sitting exactly on top of it (see [onPositioned]) the entire time
  * it's on screen.
  *
- * `onPositioned` and `color` are read every layout pass (including while
- * the hero is scrolled out of the viewport; `verticalScroll` keeps
- * off-screen children measured, just visually clipped), so the floating
- * copy can track the hero title's live position and colour continuously
- * for as long as it's genuinely attached to it -- not a value captured
- * once and then left to drift out of sync with further scrolling.
+ * `onPositioned`, `color`, and `fontSizeSp` are read every layout pass
+ * (including while the hero is scrolled out of the viewport;
+ * `verticalScroll` keeps off-screen children measured, just visually
+ * clipped), so the floating copy can track the hero title's live position,
+ * colour, AND size continuously for as long as it's genuinely attached to
+ * it -- not values captured once and left to drift out of sync with
+ * further scrolling. `fontSizeSp` in particular is what keeps the floating
+ * copy the same SIZE as the space the (invisible) real title still
+ * reserves in its own [PebbleShell] row -- without it the floating Text
+ * drew at its own fixed, larger style regardless of the hero's actual
+ * current size, so it visibly overflowed into whatever sits beside it
+ * (the collapsed charge/range readout) instead of sitting in its slot.
  */
-private class HeroTitleFlight(val onPositioned: (Offset) -> Unit, val color: MutableState<Color>)
+private class HeroTitleFlight(
+    val onPositioned: (Offset) -> Unit,
+    val color: MutableState<Color>,
+    val fontSizeSp: MutableState<Float?>,
+)
 
 /** Null (the default) everywhere except inside [VehicleDetailContent]. */
 private val LocalHeroTitleFlight = compositionLocalOf<HeroTitleFlight?> { null }
@@ -7652,6 +7667,7 @@ private fun VehicleDetailContent(
     // until the hero has laid out at least once.
     val heroTitlePosition = remember { mutableStateOf<Offset?>(null) }
     val heroTitleColor = remember { mutableStateOf(Color.Unspecified) }
+    val heroTitleFontSizeSp = remember { mutableStateOf<Float?>(null) }
     // This composable's OWN root position -- needed to convert
     // heroTitlePosition (root coordinates) into a LOCAL offset for the
     // floating Text below. Modifier.offset{} moves an element relative to
@@ -7684,7 +7700,11 @@ private fun VehicleDetailContent(
         )
     }
     val heroFlight = remember {
-        HeroTitleFlight(onPositioned = { heroTitlePosition.value = it }, color = heroTitleColor)
+        HeroTitleFlight(
+            onPositioned = { heroTitlePosition.value = it },
+            color = heroTitleColor,
+            fontSizeSp = heroTitleFontSizeSp,
+        )
     }
     Refreshable(v, state, vm, hideIndicator = hideIndicator) {
         CompositionLocalProvider(LocalHeroTitleFlight provides heroFlight) {
@@ -7715,6 +7735,14 @@ private fun VehicleDetailContent(
                 Spacer(Modifier.height(bottomInset + 16.dp))
             }
         }
+        // This floating Text is always drawn at titleLarge -- ITS OWN fixed,
+        // full-sized style, docked or not. While attached, it's scaled DOWN
+        // (via graphicsLayer below, not by changing fontSize -- see that
+        // modifier's own comment) to match the hero's CURRENT effective
+        // size, exactly the technique PebbleShell's own growTitleOnExpand
+        // uses for its title. titleLargeSp is the one-time reference this
+        // scale is computed against.
+        val titleLargeSp = MaterialTheme.typography.titleLarge.fontSize.value
         Box(
             Modifier
                 .align(Alignment.TopStart)
@@ -7731,6 +7759,19 @@ private fun VehicleDetailContent(
                     val x = attached.x + (cornerXPx - attached.x) * t
                     val y = attached.y + (cornerYPx - attached.y) * t
                     IntOffset(x.roundToInt(), y.roundToInt())
+                }
+                // Draw-phase read only (heroTitleFontSizeSp.value,
+                // dockProgress.value), same reasoning as offset{} above.
+                // transformOrigin pins the top-left corner -- the same
+                // anchor offset{} positions -- so scaling never drifts the
+                // text off that point.
+                .graphicsLayer {
+                    val attachedScale = (heroTitleFontSizeSp.value ?: titleLargeSp) / titleLargeSp
+                    val t = dockProgress.value.coerceIn(0f, 1f)
+                    val scale = attachedScale + (1f - attachedScale) * t
+                    scaleX = scale
+                    scaleY = scale
+                    transformOrigin = TransformOrigin(0f, 0f)
                 },
         ) {
             Text(
@@ -9503,6 +9544,18 @@ internal fun PebbleShell(
      * replace it, without touching [titleColor] itself.
      */
     titleAlpha: Float = 1f,
+    /**
+     * Reports this title's own CURRENT effective font size (its base style's
+     * size times whatever [growTitleOnExpand]/collapse scale is currently
+     * applied), in sp, every recomposition. Only the hero's own floating
+     * name (see [LocalHeroTitleFlight]) reads this -- it draws a completely
+     * separate [Text] at its OWN fixed style, and without this had no way
+     * to know this title's real current size to visually match, so it
+     * rendered at a flatly different, larger size than the space actually
+     * reserved for it -- overlapping [titleTrailing] instead of sitting
+     * inside its own slot.
+     */
+    onTitleScale: ((Float) -> Unit)? = null,
     // onTitleWidth was deleted here. It reported the title's measured width so the hero could
     // offset its collapsed readout past the car name. That whole approach is gone: the numbers are
     // now trailing content ON this Row (see HeroCollapsedNumbers), so the Row positions them and
@@ -9752,6 +9805,7 @@ internal fun PebbleShell(
                             } else {
                                 collapsedTitleScale + (1f - collapsedTitleScale) * headerT
                             }
+                            onTitleScale?.invoke(titleStyle.fontSize.value * titleScale)
                             Row(verticalAlignment = Alignment.CenterVertically) {
                             Text(
                                 title,
