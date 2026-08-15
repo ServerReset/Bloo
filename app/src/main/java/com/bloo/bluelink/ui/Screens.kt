@@ -8408,6 +8408,15 @@ private fun VehicleDetailContent(
  * [HotSeatDrag] (provided via [LocalHotSeatDrag]) is the cross-column drag
  * state that lets a pebble be dragged from the scrolling list directly onto
  * that slot to pin it.
+ *
+ * A floating name (built inline near the bottom, alongside the flip-columns
+ * transition) tracks CriticalContent's own HeroHeader -- the real hero photo
+ * card, shared with [VehicleDetailContent] -- the same way every other
+ * surface's floating identity pill tracks its own hero card, and docks in
+ * the top-left corner once it scrolls out of view. `controlsScroll`, not a
+ * fixed side, is what it tracks: whichever column currently renders
+ * `controls` (and therefore HeroHeader) is the one that matters, regardless
+ * of which physical side that is after a flip.
  */
 @Composable
 private fun ExpandedCar(v: Vehicle, state: UiState, vm: AppViewModel, flipped: Boolean) {
