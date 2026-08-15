@@ -3379,6 +3379,7 @@ internal fun GarageScreen(state: UiState, vm: AppViewModel) {
                 val hoistedPosition = remember { mutableStateOf<Offset?>(null) }
                 val hoistedColor = remember { mutableStateOf(Color.Unspecified) }
                 val hoistedFontSizeSp = remember { mutableStateOf<Float?>(null) }
+                val hoistedPhotoUrl = remember { mutableStateOf<String?>(null) }
                 val hoistedContainerPosition = remember { mutableStateOf(Offset.Zero) }
                 val hoistedActiveScroll = remember { mutableStateOf<ScrollState?>(null) }
                 val hoistedScrollToTop = remember { mutableStateOf<(suspend () -> Unit)?>(null) }
@@ -3413,6 +3414,7 @@ internal fun GarageScreen(state: UiState, vm: AppViewModel) {
                             },
                             color = hoistedColor,
                             fontSizeSp = hoistedFontSizeSp,
+                            photoUrl = hoistedPhotoUrl,
                         ),
                         activeScroll = hoistedActiveScroll,
                         scrollToTop = hoistedScrollToTop,
@@ -3656,8 +3658,18 @@ internal fun GarageScreen(state: UiState, vm: AppViewModel) {
                                         if (settingsAsPage && block == pageCount) {
                                             PillAvatar(photo = null, icon = Icons.Filled.Settings, tint = MaterialTheme.colorScheme.tertiary, size = lerp(0.dp, 32.dp, t))
                                         } else {
+                                            // hoistedPhotoUrl, not an independent
+                                            // vehicles[block]-to-imageUrls lookup --
+                                            // see HeroTitleFlight.photoUrl's own
+                                            // doc. This is the literal SAME URL
+                                            // the settled page's own hero card is
+                                            // showing right now, reported through
+                                            // the same channel as its position/
+                                            // colour, rather than a second lookup
+                                            // that can resolve to nothing while the
+                                            // real photo is right there on screen.
                                             PillAvatar(
-                                                photo = vehicles.getOrNull(block)?.let { state.imageUrls[it.vin] },
+                                                photo = hoistedPhotoUrl.value,
                                                 icon = Icons.Filled.DirectionsCar,
                                                 tint = MaterialTheme.colorScheme.primary,
                                                 size = lerp(0.dp, 32.dp, t),
@@ -3689,12 +3701,20 @@ internal fun GarageScreen(state: UiState, vm: AppViewModel) {
                                         t,
                                     ),
                                     maxLines = 1,
+                                    // Top-left, not centre -- see
+                                    // VehicleDetailContent's identical
+                                    // graphicsLayer for the full reasoning
+                                    // (a taller box scaled about its own
+                                    // centre visibly sinks below where it
+                                    // was positioned; anchoring the top
+                                    // instead keeps it exactly where
+                                    // attachedY placed it).
                                     modifier = Modifier.graphicsLayer {
                                         val attachedScale = (hoistedFontSizeSp.value ?: titleLargeSp) / titleLargeSp
                                         val scale = attachedScale + (1f - attachedScale) * hoistedDockProgress.value.coerceIn(0f, 1f)
                                         scaleX = scale
                                         scaleY = scale
-                                        transformOrigin = TransformOrigin(0f, 0.5f)
+                                        transformOrigin = TransformOrigin(0f, 0f)
                                     },
                                 )
                             }
@@ -5624,6 +5644,10 @@ private fun HeroHeader(
         // onto a still-white card for the frames before the photo arrives.
         val heroTitleColorNow = lerp(MaterialTheme.colorScheme.onSurface, HeroOnPhoto, heroT)
         heroTitleFlight?.color?.value = heroTitleColorNow
+        // Same imageUrl this hero card's own HeroPhotoBackdrop draws -- see
+        // HeroTitleFlight.photoUrl's own doc for why a caller's avatar
+        // reads this instead of doing its own lookup.
+        heroTitleFlight?.photoUrl?.value = imageUrl
         PebbleShell(
             expanded = photoExpanded,
             onToggle = { vm.togglePebble(v, com.bloo.bluelink.data.HERO_PHOTO_SECTION) },
@@ -7788,11 +7812,19 @@ internal fun BackdropHost(content: @Composable BoxScope.() -> Unit) {
  * drew at its own fixed, larger style regardless of the hero's actual
  * current size, so it visibly overflowed into whatever sits beside it
  * (the collapsed charge/range readout) instead of sitting in its slot.
+ *
+ * `photoUrl` is the SAME `imageUrl` [HeroHeader] already hands its own
+ * [HeroPhotoBackdrop] -- reported here too so a caller's own avatar (e.g.
+ * GarageScreen's hoisted pill) draws the literal same photo the hero card
+ * itself is showing, rather than doing its own independent
+ * car-index-to-photo-URL lookup that can silently desync from whichever
+ * page is actually settled and end up resolving to nothing.
  */
 internal class HeroTitleFlight(
     val onPositioned: (Offset) -> Unit,
     val color: MutableState<Color>,
     val fontSizeSp: MutableState<Float?>,
+    val photoUrl: MutableState<String?>,
 )
 
 /** Null (the default) everywhere except inside [VehicleDetailContent]. */
@@ -8042,6 +8074,9 @@ private fun VehicleDetailContent(
         val heroTitlePosition = remember { mutableStateOf<Offset?>(null) }
         val heroTitleColor = remember { mutableStateOf(Color.Unspecified) }
         val heroTitleFontSizeSp = remember { mutableStateOf<Float?>(null) }
+        // Unused here -- this pill has no avatar, only GarageScreen's
+        // hoisted one does (see HeroTitleFlight.photoUrl's own doc).
+        val heroTitlePhotoUrl = remember { mutableStateOf<String?>(null) }
         // This composable's OWN root position -- needed to convert
         // heroTitlePosition (root coordinates) into a LOCAL offset for the
         // floating Text below. Modifier.offset{} moves an element relative to
@@ -8107,6 +8142,7 @@ private fun VehicleDetailContent(
                 },
                 color = heroTitleColor,
                 fontSizeSp = heroTitleFontSizeSp,
+                photoUrl = heroTitlePhotoUrl,
             )
         }
         LocalNamePillState(
@@ -8249,16 +8285,30 @@ private fun VehicleDetailContent(
                     modifier = Modifier
                         // Draw-phase read only (heroTitleFontSizeSp.value,
                         // dockProgress.value), same reasoning as offset{}
-                        // above. transformOrigin pins the LEFT-CENTRE, matching
-                        // the Row's own CenterVertically -- scaling about any
-                        // other point would drift the glyphs against the
-                        // Row's own vertical centring as the pill grows.
+                        // above. transformOrigin pins the TOP-LEFT, not the
+                        // centre -- attachedY (in offset{} above) is the real
+                        // hero title's own TOP edge, reported by
+                        // LayoutCoordinates.positionInRoot(). Our own Text is
+                        // measured at its NATURAL titleLarge size, which is
+                        // TALLER than the smaller real title it's mimicking
+                        // while attached, so scaling around the CENTRE of
+                        // that taller box shifted the visible glyphs
+                        // downward from where they were positioned to sit --
+                        // provably: a box of height H scaled by s about its
+                        // own centre has its top move by H/2*(1-s), which is
+                        // exactly the "sits too low while still on the
+                        // card" that was reported. Anchoring at (0,0)
+                        // instead keeps the top edge exactly where it was
+                        // placed regardless of scale, matching how the
+                        // position itself is anchored in the first place.
+                        // Harmless once docked (scale is 1 there, so the
+                        // origin no longer matters).
                         .graphicsLayer {
                             val attachedScale = (heroTitleFontSizeSp.value ?: titleLargeSp) / titleLargeSp
                             val scale = attachedScale + (1f - attachedScale) * dockProgress.value.coerceIn(0f, 1f)
                             scaleX = scale
                             scaleY = scale
-                            transformOrigin = TransformOrigin(0f, 0.5f)
+                            transformOrigin = TransformOrigin(0f, 0f)
                         }
                         .clickable {
                             haptics?.click()

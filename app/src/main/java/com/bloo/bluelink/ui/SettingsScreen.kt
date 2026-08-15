@@ -717,6 +717,9 @@ internal fun SettingsScreen(
               // fallback (onSurface/titleLarge) already matches exactly.
               color = mutableStateOf(Color.Unspecified),
               fontSizeSp = mutableStateOf(null),
+              // Unused here -- Settings has no avatar. See
+              // HeroTitleFlight.photoUrl's own doc.
+              photoUrl = mutableStateOf(null),
           )
       }
       LocalSettingsPillState(flight, dockProgress, cornerXPx, cornerYPx, titlePosition, containerPosition)
