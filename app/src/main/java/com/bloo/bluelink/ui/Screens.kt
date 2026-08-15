@@ -7757,16 +7757,17 @@ private fun VehicleDetailContent(
     // fixed home slot -- computed, not measured. This Column's only scroll
     // axis is vertical, so the header's X never moves (16.dp content padding
     // minus the pill's own 8.dp), and its Y is exactly the header's
-    // unscrolled position (topInset + 8.dp leading spacer + 12.dp spacedBy
-    // gap before CarHeaderRow, minus the pill's own topInset + 8.dp) shifted
-    // up by whatever's currently been scrolled. A closed-form function of
+    // unscrolled position (topInset leading spacer + 12.dp spacedBy gap
+    // before CarHeaderRow, minus the pill's own topInset + 8.dp) shifted up
+    // by whatever's currently been scrolled. A closed-form function of
     // scroll.value avoids the async onGloballyPositioned staleness a
     // measured version of this hit in practice (see MorphingIdentityPill).
+    // MUST stay in sync with the leading Spacer's own height below.
     val headerDelta: () -> Offset = remember(density, topInset) {
         {
             Offset(
                 with(density) { 8.dp.toPx() },
-                with(density) { 12.dp.toPx() } - scroll.value.toFloat(),
+                with(density) { 4.dp.toPx() } - scroll.value.toFloat(),
             )
         }
     }
@@ -7780,7 +7781,10 @@ private fun VehicleDetailContent(
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             // Inset spacers (not padding) so content scrolls *behind* the bars.
-            Spacer(Modifier.height(topInset + 8.dp))
+            // Was topInset + 8.dp -- read as sitting noticeably below the status
+            // bar with the header pill's own home slot right above it for
+            // comparison; tightened to bring the name up closer to it.
+            Spacer(Modifier.height(topInset))
             CarHeaderRow(v, state, onExpand, reserveHeaderEnd, nameHidden, hideName = true)
             // summary (image+gauge) and controls are reorderable pebbles too. The full
             // pebble column always renders while swiping; smoothness comes from
@@ -8075,12 +8079,8 @@ internal fun BoxScope.MorphingIdentityPill(
     val compactScale = MaterialTheme.typography.labelLarge.fontSize.value /
         MaterialTheme.typography.titleLarge.fontSize.value
     val pillShape = shape
-    Surface(
-        onClick = { haptics?.click(); onClick() },
-        shape = pillShape,
-        color = MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = glassContainerAlpha() * tc),
-        contentColor = MaterialTheme.colorScheme.onSurface,
-        modifier = Modifier
+    Box(
+        Modifier
             .align(Alignment.TopStart)
             .statusBarsPadding()
             .padding(start = 8.dp + homeStartPadding, top = 8.dp, end = 8.dp, bottom = 8.dp)
@@ -8092,31 +8092,53 @@ internal fun BoxScope.MorphingIdentityPill(
                 scaleX = 1f - (1f - compactScale) * tc
                 scaleY = 1f - (1f - compactScale) * tc
                 transformOrigin = TransformOrigin(0f, 0f)
-            }
-            // Chrome only once the glass pill is genuinely forming -- at t=0
-            // this sits on bare header text, and a ring/shadow drawn at zero
-            // opacity underneath it is still a wasted draw call every frame.
-            .then(if (tc > 0.02f) Modifier.ambientRing(pillShape).dropShadow(pillShape).frostedRim(pillShape) else Modifier),
+            },
     ) {
-        Row(
-            Modifier
-                .heightIn(min = lerp(0.dp, 48.dp, tc))
-                .then(
-                    if (animateContentSize) {
-                        Modifier.animateContentSize(spring(dampingRatio = 0.5f, stiffness = Spring.StiffnessMediumLow))
-                    } else {
-                        Modifier
-                    },
-                )
-                .padding(
-                    start = lerp(0.dp, 6.dp, tc),
-                    end = lerp(0.dp, 14.dp, tc),
-                    top = lerp(0.dp, 9.dp, tc),
-                    bottom = lerp(0.dp, 9.dp, tc),
-                ),
-            verticalAlignment = Alignment.CenterVertically,
+        // Chrome (fill/ring/shadow/rim) on its OWN fading layer, separate from the
+        // Surface below -- ambientRing/dropShadow/frostedRim have no alpha
+        // parameter of their own, so the previous `then(if (tc > 0.02f) ... else
+        // Modifier)` hard-toggled the whole chrome stack in and out at that
+        // threshold: a visible pop/snap right at the tail of the hand-off, since
+        // nothing there faded. Its own graphicsLayer{alpha=tc} fades this layer
+        // smoothly instead, while the Surface's text stays at full opacity the
+        // whole time -- it's the actual visible name at t=0, so IT must never fade.
+        if (tc > 0.02f) {
+            Box(
+                Modifier
+                    .matchParentSize()
+                    .graphicsLayer { alpha = tc }
+                    .background(MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = glassContainerAlpha()), pillShape)
+                    .ambientRing(pillShape)
+                    .dropShadow(pillShape)
+                    .frostedRim(pillShape),
+            )
+        }
+        Surface(
+            onClick = { haptics?.click(); onClick() },
+            shape = pillShape,
+            color = Color.Transparent,
+            contentColor = MaterialTheme.colorScheme.onSurface,
         ) {
-            content(tc)
+            Row(
+                Modifier
+                    .heightIn(min = lerp(0.dp, 48.dp, tc))
+                    .then(
+                        if (animateContentSize) {
+                            Modifier.animateContentSize(spring(dampingRatio = 0.5f, stiffness = Spring.StiffnessMediumLow))
+                        } else {
+                            Modifier
+                        },
+                    )
+                    .padding(
+                        start = lerp(0.dp, 6.dp, tc),
+                        end = lerp(0.dp, 14.dp, tc),
+                        top = lerp(0.dp, 9.dp, tc),
+                        bottom = lerp(0.dp, 9.dp, tc),
+                    ),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                content(tc)
+            }
         }
     }
 }
