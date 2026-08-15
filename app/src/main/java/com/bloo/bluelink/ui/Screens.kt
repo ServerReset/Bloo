@@ -3365,6 +3365,11 @@ internal fun GarageScreen(state: UiState, vm: AppViewModel) {
                 // Hoisted pill state for single-car-per-page (perPage == 1) mode.
                 var carNameVisible by remember { mutableStateOf(false) }
                 var scrollToTopFn by remember { mutableStateOf<(suspend () -> Unit)?>(null) }
+                // The settled page's own headerDelta provider (see VehicleDetailContent's
+                // own doc) -- null while settled on the embedded Settings slot, which has
+                // no comparable deterministic formula (LazyVerticalStaggeredGrid, not a
+                // plain ScrollState) and just grows in from its own corner instead.
+                var headerDelta by remember { mutableStateOf<(() -> Offset)?>(null) }
                 val pillScope = rememberCoroutineScope()
                 Box(Modifier.fillMaxSize()) {
                     HorizontalPager(
@@ -3474,6 +3479,10 @@ internal fun GarageScreen(state: UiState, vm: AppViewModel) {
                                     if (page == pager.settledPage) {
                                         carNameVisible = hidden
                                         scrollToTopFn = scrollFn
+                                        // No deterministic position formula for this slot
+                                        // (see headerDelta's own doc above) -- falls back
+                                        // to growing in from its own corner instead.
+                                        headerDelta = null
                                     }
                                 } else null,
                             )
@@ -3521,6 +3530,10 @@ internal fun GarageScreen(state: UiState, vm: AppViewModel) {
                                                     carNameVisible = hidden
                                                     scrollToTopFn = scrollFn
                                                 }
+                                            } else null,
+                                            // Same settled-page gate as onNameHiddenChanged above.
+                                            onHeaderDelta = if (perPage == 1) { delta ->
+                                                if (page == pager.settledPage) headerDelta = delta
                                             } else null,
                                             // Only hide the per-car pull indicator in the
                                             // multi-car grid (perPage > 1) -- a prior fix
@@ -3570,13 +3583,15 @@ internal fun GarageScreen(state: UiState, vm: AppViewModel) {
                             LoadingIndicator()
                         }
                     }
-                    // Hoisted identity pill — grows in from its own corner (see
-                    // MorphingIdentityPill/headerHandoffSpring) on the same spring
-                    // whichever car/Settings header underneath it shrinks away with,
-                    // so the two read as one hand-off. "Hoisted" now covers both a car
-                    // page AND the embedded Settings slot (see both onNameHiddenChanged
-                    // call sites above): one element, one page count, rather than a
-                    // car-only pill plus Settings carrying its own separate,
+                    // Hoisted identity pill — while settled on a car page, this IS that
+                    // car's own header name, sliding/scaling continuously between the
+                    // header's real position and this pill's own corner (see
+                    // MorphingIdentityPill's `headerDelta` mode); while settled on the
+                    // embedded Settings slot, headerDelta is null (see its own doc above)
+                    // and it just grows in from that corner instead. "Hoisted" now covers
+                    // both a car page AND the embedded Settings slot (see both
+                    // onNameHiddenChanged call sites above): one element, one page count,
+                    // rather than a car-only pill plus Settings carrying its own separate,
                     // permanently-visible copy.
                     if (perPage == 1) {
                         // Settled, not current: matches every other "which page is
@@ -3598,7 +3613,15 @@ internal fun GarageScreen(state: UiState, vm: AppViewModel) {
                             onClick = { pillScope.launch { scrollToTopFn?.invoke() } },
                             shape = RoundedCornerShape(24.dp),
                             animateContentSize = true,
-                        ) {
+                            headerDelta = headerDelta,
+                        ) { t ->
+                            // headerDelta is null while settled on the embedded Settings
+                            // slot (see its own doc) -- morphing tracks that same signal
+                            // so the name text uses titleLarge (scaled to read like
+                            // labelLarge by MorphingIdentityPill's own outer graphicsLayer)
+                            // while genuinely morphing off a car header, and plain fixed
+                            // labelLarge while just growing in place for Settings.
+                            val morphing = headerDelta != null
                             // Its own crossfade, not tied to the pill's own grow-in -- a
                             // slide reads right for text (it visibly moves aside), but
                             // sliding a circular photo the same way drags it half out of
@@ -3608,22 +3631,30 @@ internal fun GarageScreen(state: UiState, vm: AppViewModel) {
                             // currentIndex deliberately never changes while parked on the
                             // Settings slot (see the settle effect's own guard), so it
                             // alone could never drive this pill INTO showing Settings at
-                            // all.
-                            AnimatedContent(
-                                targetState = settledBlock,
-                                transitionSpec = { fadeIn(tween(200)) togetherWith fadeOut(tween(120)) },
-                                label = "carNamePillPhoto",
-                            ) { block ->
-                                if (settingsAsPage && block == pageCount) {
-                                    PillAvatar(photo = null, icon = Icons.Filled.Settings, tint = MaterialTheme.colorScheme.tertiary)
-                                } else {
-                                    PillAvatar(
-                                        photo = vehicles.getOrNull(block)?.let { state.imageUrls[it.vin] },
-                                        icon = Icons.Filled.DirectionsCar,
-                                        tint = MaterialTheme.colorScheme.primary,
-                                    )
+                            // all. Sized/faded by t (see MorphingIdentityContent's own doc)
+                            // so the avatar itself grows in with the rest of the pill
+                            // instead of reserving its layout space before the pill exists.
+                            Box(Modifier.size(28.dp * t).graphicsLayer { alpha = t }) {
+                                if (t > 0.01f) {
+                                    AnimatedContent(
+                                        targetState = settledBlock,
+                                        transitionSpec = { fadeIn(tween(200)) togetherWith fadeOut(tween(120)) },
+                                        label = "carNamePillPhoto",
+                                    ) { block ->
+                                        if (settingsAsPage && block == pageCount) {
+                                            PillAvatar(photo = null, icon = Icons.Filled.Settings, tint = MaterialTheme.colorScheme.tertiary, size = 28.dp * t)
+                                        } else {
+                                            PillAvatar(
+                                                photo = vehicles.getOrNull(block)?.let { state.imageUrls[it.vin] },
+                                                icon = Icons.Filled.DirectionsCar,
+                                                tint = MaterialTheme.colorScheme.primary,
+                                                size = 28.dp * t,
+                                            )
+                                        }
+                                    }
                                 }
                             }
+                            Spacer(Modifier.width(8.dp * t))
                             AnimatedContent(
                                 targetState = settledBlock,
                                 transitionSpec = {
@@ -3636,7 +3667,7 @@ internal fun GarageScreen(state: UiState, vm: AppViewModel) {
                             ) { block ->
                                 Text(
                                     if (settingsAsPage && block == pageCount) "Settings" else vehicles.getOrNull(block)?.name ?: "",
-                                    style = MaterialTheme.typography.labelLarge,
+                                    style = if (morphing) MaterialTheme.typography.titleLarge else MaterialTheme.typography.labelLarge,
                                     fontWeight = FontWeight.SemiBold,
                                     maxLines = 1,
                                 )
@@ -3645,16 +3676,19 @@ internal fun GarageScreen(state: UiState, vm: AppViewModel) {
                             // more page in the same sequence, so it counts too (see
                             // PagerDotsFor above, which already does the same swap).
                             if (totalBlocks > 1) {
-                                AnimatedContent(
-                                    targetState = settledBlock,
-                                    transitionSpec = { fadeIn(tween(200)) togetherWith fadeOut(tween(120)) },
-                                    label = "carNamePillCount",
-                                ) { block ->
-                                    Text(
-                                        "${block + 1} / $totalBlocks",
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    )
+                                Spacer(Modifier.width(8.dp * t))
+                                Box(Modifier.graphicsLayer { alpha = ((t - 0.5f) / 0.5f).coerceIn(0f, 1f) }) {
+                                    AnimatedContent(
+                                        targetState = settledBlock,
+                                        transitionSpec = { fadeIn(tween(200)) togetherWith fadeOut(tween(120)) },
+                                        label = "carNamePillCount",
+                                    ) { block ->
+                                        Text(
+                                            "${block + 1} / $totalBlocks",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        )
+                                    }
                                 }
                             }
                         }
@@ -7683,11 +7717,13 @@ internal fun BackdropHost(content: @Composable BoxScope.() -> Unit) {
  * scrolls together in one [Column] inside [Refreshable] (header row, then
  * the reorderable [PebbleList]). `nameHidden` is a [derivedStateOf] over the
  * scroll position -- once the user has scrolled the car name (roughly its
- * own height) out of view, a floating name pill fades in as a substitute, so
- * scrolling never leaves the screen not knowing which car it's looking at.
- * When [onNameHiddenChanged] is supplied (single-car-per-page mode in
- * [GarageScreen]), that pill is hoisted to the parent instead of rendered
- * inline here, so it can float independent of this column's own layout.
+ * own height) out of view, the floating name pill takes over as a
+ * substitute, so scrolling never leaves the screen not knowing which car
+ * it's looking at. When [onNameHiddenChanged] is supplied (single-car-per-
+ * page mode in [GarageScreen]), that pill is hoisted to the parent instead
+ * of rendered inline here, so it can float independent of this column's own
+ * layout -- [onHeaderDelta] is hoisted the exact same way, for the same
+ * reason (see [MorphingIdentityPill]'s own doc).
  */
 @Composable
 private fun VehicleDetailContent(
@@ -7698,6 +7734,7 @@ private fun VehicleDetailContent(
     reserveHeaderEnd: Boolean = false,
     onNameHiddenChanged: ((Boolean, suspend () -> Unit) -> Unit)? = null,
     hideIndicator: Boolean = false,
+    onHeaderDelta: ((() -> Offset) -> Unit)? = null,
 ) {
     val topInset = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
     val bottomInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
@@ -7716,6 +7753,24 @@ private fun VehicleDetailContent(
             onNameHiddenChanged(nameHidden) { scroll.animateScrollTo(0) }
         }
     }
+    // The name's own real on-screen position, relative to the floating pill's
+    // fixed home slot -- computed, not measured. This Column's only scroll
+    // axis is vertical, so the header's X never moves (16.dp content padding
+    // minus the pill's own 8.dp), and its Y is exactly the header's
+    // unscrolled position (topInset + 8.dp leading spacer + 12.dp spacedBy
+    // gap before CarHeaderRow, minus the pill's own topInset + 8.dp) shifted
+    // up by whatever's currently been scrolled. A closed-form function of
+    // scroll.value avoids the async onGloballyPositioned staleness a
+    // measured version of this hit in practice (see MorphingIdentityPill).
+    val headerDelta: () -> Offset = remember(density, topInset) {
+        {
+            Offset(
+                with(density) { 8.dp.toPx() },
+                with(density) { 12.dp.toPx() } - scroll.value.toFloat(),
+            )
+        }
+    }
+    SideEffect { onHeaderDelta?.invoke(headerDelta) }
     Refreshable(v, state, vm, hideIndicator = hideIndicator) {
         Column(
             Modifier
@@ -7726,7 +7781,7 @@ private fun VehicleDetailContent(
         ) {
             // Inset spacers (not padding) so content scrolls *behind* the bars.
             Spacer(Modifier.height(topInset + 8.dp))
-            CarHeaderRow(v, state, onExpand, reserveHeaderEnd, nameHidden)
+            CarHeaderRow(v, state, onExpand, reserveHeaderEnd, nameHidden, hideName = true)
             // summary (image+gauge) and controls are reorderable pebbles too. The full
             // pebble column always renders while swiping; smoothness comes from
             // PebbleList's own one-frame lazy-fill (filled/EAGER_PEBBLES) + the pager's
@@ -7739,8 +7794,12 @@ private fun VehicleDetailContent(
             MorphingIdentityPill(
                 nameHidden = nameHidden,
                 onClick = { scope.launch { scroll.animateScrollTo(0) } },
-            ) {
-                MorphingIdentityContent(v.name, state.imageUrls[v.vin], Icons.Filled.DirectionsCar, MaterialTheme.colorScheme.primary, null)
+                headerDelta = headerDelta,
+            ) { t ->
+                MorphingIdentityContent(
+                    v.name, state.imageUrls[v.vin], Icons.Filled.DirectionsCar, MaterialTheme.colorScheme.primary, null,
+                    t = t, morphing = true,
+                )
             }
         }
     }
@@ -7902,27 +7961,34 @@ internal fun PillAvatar(photo: String?, icon: ImageVector, tint: Color, size: Dp
 }
 
 /**
- * A floating identity pill that grows in from its own top-left corner as
- * [nameHidden] goes true, on [headerHandoffSpring] -- the same spring the
+ * A floating identity pill that either grows in from its own top-left corner
+ * as [nameHidden] goes true (the default), or -- when [headerDelta] is
+ * supplied -- IS the caller's own header name, sliding/scaling continuously
+ * between the header's real on-screen position and this pill's fixed home
+ * slot. Either way it's on [headerHandoffSpring], the same spring the
  * caller's own header shrinks away with (see [CarHeaderRow]/
- * `SettingsHeaderRow`), so the two read as one hand-off even though they're
- * two independently-animated elements rather than a single shared one.
+ * `SettingsHeaderRow`), so the two read as one hand-off.
  *
- * A prior version tried to make this and the header literally the SAME
- * element, sliding a single Surface between the header's measured on-screen
- * position (via `onGloballyPositioned`) and this pill's own fixed slot.
- * Twice, in practice, that read as "text in the wrong place" or "snaps to
- * the corner" instead of a clean hand-off -- cross-composable position
- * tracking through a scrolling container is exactly the kind of thing
- * that's hard to get right without live visual iteration, and it kept
- * producing visible glitches this simpler, well-understood
- * `AnimatedVisibility` + `scaleIn` growth doesn't have any of the same
- * failure modes for.
+ * Two prior versions of the [headerDelta] mode tried to MEASURE the header's
+ * position live via `onGloballyPositioned` and subtract it from a similarly
+ * measured home-slot anchor. Both times, in practice, that read as "text in
+ * the wrong place" or "snaps to the corner" instead of a clean hand-off --
+ * async position callbacks through a scrolling container turned out to have
+ * exactly the kind of timing/staleness bugs that are hard to catch without
+ * live visual iteration. [headerDelta] is now a plain DETERMINISTIC formula
+ * instead (see [VehicleDetailContent]'s own comment on how it computes one):
+ * a pure function of the same `scroll.value` [nameHidden] itself reads,
+ * evaluated lazily inside this pill's own `.offset{}` block so it tracks the
+ * header's true position every frame with no measurement, no async lag, and
+ * no possibility of going stale.
  *
- * [content] draws the avatar/name/(optional count) that goes inside; a
- * caller whose pill also swaps WHICH car/Settings it names as the user
- * swipes (GarageScreen's hoisted pill) keeps its own `AnimatedContent`
- * cross-fade for that identity swap inside [content].
+ * [content] draws the avatar/name/(optional count) that goes inside, given
+ * the current morph progress `t` (always `1f` outside [headerDelta] mode,
+ * where nothing needs to grow independently -- this whole pill already does
+ * via [AnimatedVisibility]'s own `scaleIn`); a caller whose pill also swaps
+ * WHICH car/Settings it names as the user swipes (GarageScreen's hoisted
+ * pill) keeps its own `AnimatedContent` cross-fade for that identity swap
+ * inside [content].
  *
  * `internal`, not `private` -- SettingsScreen's own standalone identity pill
  * uses this too, for the same reason its header shares [headerHandoffSpring].
@@ -7942,55 +8008,133 @@ internal fun BoxScope.MorphingIdentityPill(
     // statusBarsPadding+8dp -- for a caller whose own top-left corner is
     // ALREADY claimed by something else floating there (the standalone
     // Settings route's own back arrow, at that identical corner). Without
-    // this, the pill grows in directly on top of that arrow instead of
-    // beside it, the way it always used to sit in the same Row.
+    // this, the pill lands directly on top of that arrow instead of beside
+    // it, the way it always used to sit in the same Row.
     homeStartPadding: Dp = 0.dp,
-    content: @Composable RowScope.() -> Unit,
+    // See this function's own doc. A LAMBDA, not a plain Offset -- reading
+    // scroll.value to compute it happens lazily inside the `.offset{}` block
+    // below (a layout-phase read), not in this composable's own body, so
+    // scrolling the header never recomposes this pill.
+    headerDelta: (() -> Offset)? = null,
+    content: @Composable RowScope.(t: Float) -> Unit,
 ) {
     val haptics = LocalHaptics.current
-    AnimatedVisibility(
-        visible = nameHidden,
-        enter = fadeIn(headerHandoffSpring) + scaleIn(
-            headerHandoffSpring, initialScale = 0.6f, transformOrigin = TransformOrigin(0f, 0f),
-        ),
-        exit = fadeOut(tween(140)) + scaleOut(
-            tween(140), targetScale = 0.7f, transformOrigin = TransformOrigin(0f, 0f),
-        ),
+    if (headerDelta == null) {
+        AnimatedVisibility(
+            visible = nameHidden,
+            enter = fadeIn(headerHandoffSpring) + scaleIn(
+                headerHandoffSpring, initialScale = 0.6f, transformOrigin = TransformOrigin(0f, 0f),
+            ),
+            exit = fadeOut(tween(140)) + scaleOut(
+                tween(140), targetScale = 0.7f, transformOrigin = TransformOrigin(0f, 0f),
+            ),
+            modifier = Modifier
+                .align(Alignment.TopStart)
+                .statusBarsPadding()
+                .padding(start = 8.dp + homeStartPadding, top = 8.dp, end = 8.dp, bottom = 8.dp),
+        ) {
+            val pillShape = shape
+            Surface(
+                onClick = { haptics?.click(); onClick() },
+                shape = pillShape,
+                color = MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = glassContainerAlpha()),
+                contentColor = MaterialTheme.colorScheme.onSurface,
+                modifier = Modifier
+                    .ambientRing(pillShape)
+                    .dropShadow(pillShape)
+                    .frostedRim(pillShape)
+                    .then(
+                        if (animateContentSize) {
+                            Modifier.animateContentSize(spring(dampingRatio = 0.5f, stiffness = Spring.StiffnessMediumLow))
+                        } else {
+                            Modifier
+                        },
+                    ),
+            ) {
+                Row(
+                    Modifier.heightIn(min = 48.dp).padding(start = 6.dp, end = 14.dp, top = 9.dp, bottom = 9.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    content(1f)
+                }
+            }
+        }
+        return
+    }
+    val t by animateFloatAsState(
+        targetValue = if (nameHidden) 1f else 0f,
+        animationSpec = headerHandoffSpring,
+        label = "identityMorph",
+    )
+    // headerHandoffSpring is deliberately underdamped-ish and can overshoot
+    // past 0/1 for a frame; un-coerced that produces a negative Dp the
+    // instant it does (Modifier.size/.padding both throw on that), which
+    // crashed on every hand-off back to inline text in an earlier version.
+    val tc = t.coerceIn(0f, 1f)
+    val compactScale = MaterialTheme.typography.labelLarge.fontSize.value /
+        MaterialTheme.typography.titleLarge.fontSize.value
+    val pillShape = shape
+    Surface(
+        onClick = { haptics?.click(); onClick() },
+        shape = pillShape,
+        color = MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = glassContainerAlpha() * tc),
+        contentColor = MaterialTheme.colorScheme.onSurface,
         modifier = Modifier
             .align(Alignment.TopStart)
             .statusBarsPadding()
-            .padding(start = 8.dp + homeStartPadding, top = 8.dp, end = 8.dp, bottom = 8.dp),
+            .padding(start = 8.dp + homeStartPadding, top = 8.dp, end = 8.dp, bottom = 8.dp)
+            .offset {
+                val d = headerDelta()
+                IntOffset((d.x * (1f - tc)).roundToInt(), (d.y * (1f - tc)).roundToInt())
+            }
+            .graphicsLayer {
+                scaleX = 1f - (1f - compactScale) * tc
+                scaleY = 1f - (1f - compactScale) * tc
+                transformOrigin = TransformOrigin(0f, 0f)
+            }
+            // Chrome only once the glass pill is genuinely forming -- at t=0
+            // this sits on bare header text, and a ring/shadow drawn at zero
+            // opacity underneath it is still a wasted draw call every frame.
+            .then(if (tc > 0.02f) Modifier.ambientRing(pillShape).dropShadow(pillShape).frostedRim(pillShape) else Modifier),
     ) {
-        val pillShape = shape
-        Surface(
-            onClick = { haptics?.click(); onClick() },
-            shape = pillShape,
-            color = MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = glassContainerAlpha()),
-            contentColor = MaterialTheme.colorScheme.onSurface,
-            modifier = Modifier
-                .ambientRing(pillShape)
-                .dropShadow(pillShape)
-                .frostedRim(pillShape)
+        Row(
+            Modifier
+                .heightIn(min = lerp(0.dp, 48.dp, tc))
                 .then(
                     if (animateContentSize) {
                         Modifier.animateContentSize(spring(dampingRatio = 0.5f, stiffness = Spring.StiffnessMediumLow))
                     } else {
                         Modifier
                     },
+                )
+                .padding(
+                    start = lerp(0.dp, 6.dp, tc),
+                    end = lerp(0.dp, 14.dp, tc),
+                    top = lerp(0.dp, 9.dp, tc),
+                    bottom = lerp(0.dp, 9.dp, tc),
                 ),
+            verticalAlignment = Alignment.CenterVertically,
         ) {
-            Row(
-                Modifier.heightIn(min = 48.dp).padding(start = 6.dp, end = 14.dp, top = 9.dp, bottom = 9.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                content()
-            }
+            content(tc)
         }
     }
 }
 
-/** The avatar/name/(optional page count) that goes inside [MorphingIdentityPill]. */
+/**
+ * The avatar/name/(optional page count) that goes inside [MorphingIdentityPill].
+ * `t` is always `1f` and [morphing] always `false` outside
+ * [MorphingIdentityPill]'s `headerDelta` mode (see its own doc) -- there, the
+ * avatar's own size and the gap after it are lerped from 0, not just faded,
+ * so an invisible avatar at `t=0` doesn't still reserve its 28dp of Row space
+ * and shove the name text rightward before the pill has actually started
+ * forming; `name`'s own size comes from [morphing]'s outer scale (titleLarge,
+ * scaled down by [MorphingIdentityPill]'s own `graphicsLayer` to read like
+ * labelLarge at `t=1`), not from switching text styles mid-animation, so it's
+ * the same element throughout rather than a swap partway through. Outside
+ * `headerDelta` mode there's no such outer scale, so [morphing] = false
+ * renders the name at its own normal, fixed labelLarge size instead.
+ */
 @Composable
 internal fun RowScope.MorphingIdentityContent(
     name: String,
@@ -7998,11 +8142,25 @@ internal fun RowScope.MorphingIdentityContent(
     icon: ImageVector,
     tint: Color,
     pageLabel: String?,
+    t: Float = 1f,
+    morphing: Boolean = false,
 ) {
-    PillAvatar(photo, icon, tint)
-    Text(name, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold, maxLines = 1)
+    val tc = t.coerceIn(0f, 1f)
+    Box(Modifier.size(28.dp * tc).graphicsLayer { alpha = tc }) {
+        if (tc > 0.01f) PillAvatar(photo, icon, tint, size = 28.dp * tc)
+    }
+    Spacer(Modifier.width(8.dp * tc))
+    Text(
+        name,
+        style = if (morphing) MaterialTheme.typography.titleLarge else MaterialTheme.typography.labelLarge,
+        fontWeight = FontWeight.SemiBold,
+        maxLines = 1,
+    )
     if (pageLabel != null) {
-        Text(pageLabel, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Spacer(Modifier.width(8.dp * tc))
+        Box(Modifier.graphicsLayer { alpha = ((tc - 0.5f) / 0.5f).coerceIn(0f, 1f) }) {
+            Text(pageLabel, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
     }
 }
 
@@ -8246,27 +8404,30 @@ internal val headerHandoffSpring: FiniteAnimationSpec<Float> =
 /**
  * Car name/model + a Driving/Parked badge, with an optional expand button.
  *
- * [nameHidden] drives the same hand-off the floating name pill makes: as the
- * header scrolls out of view (the caller's own scroll-position signal, the
- * same one that reveals the pill), this whole block shrinks/fades/lifts
- * itself on [headerHandoffSpring] -- the same spring [PebbleShell]'s own
- * hero-title grow uses -- so the header reads as handing off to the pill
- * rather than the two animating completely independently of each other.
- *
- * Previously tried making the pill a literal shared element that measured
- * this header's on-screen position (via `onGloballyPositioned`) and slid a
- * single Surface between the two spots. Twice, in practice, that read as
- * "text sitting in the wrong place" or "snaps to the corner" rather than a
- * clean hand-off -- cross-composable position tracking through a scrolling
- * container turned out to be exactly the kind of thing that's hard to get
- * right without live visual iteration. This header stays a normal, always-
- * visible piece of content instead; the floating pill (see
- * [MorphingIdentityPill]) is a separate element that grows in from this same
- * top-left corner on its own, independent spring -- less literal, but far
- * more predictable.
+ * [hideName] (only ever true from [VehicleDetailContent], which has its own
+ * [MorphingIdentityPill] in `headerDelta` mode to hand off to) draws the name
+ * [Text] at `alpha = 0` instead of its normal visible self -- it then exists
+ * only to reserve the exact, font-metric-accurate layout space (correct
+ * across accessibility font scales) that the pill's own real name text
+ * morphs INTO as [nameHidden] flips true, one continuous element making the
+ * whole trip rather than this header fading out while an unrelated pill
+ * fades in beside it. [ExpandedCar]'s own header keeps [hideName] false: its
+ * pill (`CarNamePill`) is a separate, independently-animated element with no
+ * shared-element trick, so hiding the real name here would leave nothing
+ * rendering it at all until that pill's own fade-in threshold. Either way,
+ * the model/last-updated lines don't have a floating equivalent, so they
+ * still shrink/fade/lift away on their own via [nameHidden] and
+ * [headerHandoffSpring] -- the same spring the pill uses.
  */
 @Composable
-private fun CarHeaderRow(v: Vehicle, state: UiState, onExpand: (() -> Unit)?, reserveEnd: Boolean, nameHidden: Boolean = false) {
+private fun CarHeaderRow(
+    v: Vehicle,
+    state: UiState,
+    onExpand: (() -> Unit)?,
+    reserveEnd: Boolean,
+    nameHidden: Boolean = false,
+    hideName: Boolean = false,
+) {
     val hideT by animateFloatAsState(
         targetValue = if (nameHidden) 1f else 0f,
         animationSpec = headerHandoffSpring,
@@ -8275,15 +8436,7 @@ private fun CarHeaderRow(v: Vehicle, state: UiState, onExpand: (() -> Unit)?, re
     Row(
         Modifier
             .fillMaxWidth()
-            .then(if (reserveEnd) Modifier.padding(end = 52.dp) else Modifier)
-            .graphicsLayer {
-                alpha = 1f - hideT
-                val scale = 1f - hideT * 0.08f
-                scaleX = scale
-                scaleY = scale
-                translationY = -hideT * 10.dp.toPx()
-                transformOrigin = TransformOrigin(0f, 0f)
-            },
+            .then(if (reserveEnd) Modifier.padding(end = 52.dp) else Modifier),
         // Top, not CenterVertically -- the text column is three lines (name,
         // model, last-updated) of very different weight, and centering the
         // button against all three of them put its visual centre down around
@@ -8294,19 +8447,35 @@ private fun CarHeaderRow(v: Vehicle, state: UiState, onExpand: (() -> Unit)?, re
         // pairing in this app already uses.
         verticalAlignment = Alignment.Top,
     ) {
-        Column(Modifier.weight(1f)) {
+        val shrinkFade: Modifier = Modifier.graphicsLayer {
+            alpha = 1f - hideT
+            val scale = 1f - hideT * 0.08f
+            scaleX = scale
+            scaleY = scale
+            translationY = -hideT * 10.dp.toPx()
+            transformOrigin = TransformOrigin(0f, 0f)
+        }
+        // When hideName: only the subtitle (model/last-updated) shrinks/fades here --
+        // the name itself is invisible, reserving space for MorphingIdentityPill's own
+        // morph. Otherwise (ExpandedCar): nothing else animates it away, so the WHOLE
+        // column -- name included -- shrinks/fades together, matching its own
+        // independently fading pill (CarNamePill) appearing at the same time.
+        Column(Modifier.weight(1f).then(if (hideName) Modifier else shrinkFade)) {
             Text(
                 v.name,
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.onSurface,
+                modifier = if (hideName) Modifier.alpha(0f) else Modifier,
             )
-            Text(
-                "${v.model} · ${state.powertrainLabel(v)}",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            LastUpdatedLabel(v, state, Modifier.padding(top = 2.dp))
+            Column(if (hideName) shrinkFade else Modifier) {
+                Text(
+                    "${v.model} · ${state.powertrainLabel(v)}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                LastUpdatedLabel(v, state, Modifier.padding(top = 2.dp))
+            }
         }
         if (onExpand != null) {
             // A proper floating chip (was a hard-to-see bare icon).
