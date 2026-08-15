@@ -7561,14 +7561,24 @@ internal fun BackdropHost(content: @Composable BoxScope.() -> Unit) {
  * scrolls together in one [Column] inside [Refreshable] (header row, then
  * the reorderable [PebbleList]).
  *
- * Once [CarHeaderRow]'s own name has scrolled out of view, an identical copy
- * of it fades in fixed at the top-left of the screen -- not a pill, not a
- * scaled/morphing element, just the same text sitting in the exact spot the
- * real one occupied (`statusBarsPadding()` + the column's own 16dp start
- * padding, no extra offset). Because it's a plain static copy of text that
- * never moves or resizes, there's no per-frame position tracking and nothing
- * to keep in sync with a live scroll offset -- only the one boolean
- * (`nameHidden`) it fades on.
+ * The car's name is drawn exactly ONCE on screen, ever: not by
+ * [CarHeaderRow] (its own copy stays reserved-but-invisible, `hideName`),
+ * but by the floating [Text] below, which tracks the header's own real
+ * on-screen position 1:1 while it's still in view -- so it looks and moves
+ * exactly like ordinary scrolling text -- then, once it's scrolled far
+ * enough, peels off and springs (with a real bounce, not a cut) into a
+ * fixed slot at the top-left of the screen and stays there. Scrolling back
+ * reverses the same spring, landing it back on the header's live position
+ * again rather than snapping.
+ *
+ * [dockProgress] is the one thing that ever animates: 0 means "glued to the
+ * header's live scroll position" and 1 means "docked in the fixed corner".
+ * The Y actually drawn is a straight lerp between those two positions by
+ * [dockProgress] -- both endpoints are recomputed from the CURRENT scroll
+ * offset on every layout pass, so even if the user keeps scrolling mid-
+ * flight, the "attached" end of that lerp keeps sliding with them instead
+ * of chasing a stale target, and dockProgress settling at exactly 0 or 1
+ * always lands on a live, correct position, never a stale snapshot.
  */
 @Composable
 private fun VehicleDetailContent(
@@ -7586,9 +7596,24 @@ private fun VehicleDetailContent(
     val density = LocalDensity.current
     val haptics = LocalHaptics.current
     // Same threshold CarHeaderRow's name has always scrolled past by: once the
-    // name (plus a little slack) has gone by, the floating copy takes over.
-    val nameHidden by remember {
-        derivedStateOf { scroll.value > with(density) { (topInset + 16.dp).toPx() } }
+    // name (plus a little slack) has gone by, it's time to dock.
+    val thresholdPx = with(density) { (topInset + 16.dp).toPx() }
+    val nameHidden by remember { derivedStateOf { scroll.value > thresholdPx } }
+    // The fixed corner slot's own Y -- a little clear of the status bar, same
+    // left inset the header's own text already sits at (16dp, the content
+    // column's own horizontal padding), so the only travel is vertical.
+    val cornerYPx = with(density) { (topInset + 8.dp).toPx() }
+    val xPx = with(density) { 16.dp.toPx() }
+    val dockProgress = remember { Animatable(0f) }
+    LaunchedEffect(nameHidden) {
+        // A real spring, not a tween -- dampingRatio well under 1 so it
+        // visibly overshoots and settles rather than gliding to a stop,
+        // which is what makes this read as the text getting yanked into (or
+        // dropped back out of) its slot instead of just sliding there.
+        dockProgress.animateTo(
+            if (nameHidden) 1f else 0f,
+            spring(dampingRatio = 0.55f, stiffness = Spring.StiffnessMediumLow),
+        )
     }
     Refreshable(v, state, vm, hideIndicator = hideIndicator) {
         Column(
@@ -7602,7 +7627,7 @@ private fun VehicleDetailContent(
             // topInset alone, no extra breathing room, so the name sits right at
             // the status bar's own edge instead of noticeably below it.
             Spacer(Modifier.height(topInset))
-            CarHeaderRow(v, state, onExpand, reserveHeaderEnd)
+            CarHeaderRow(v, state, onExpand, reserveHeaderEnd, hideName = true)
             // summary (image+gauge) and controls are reorderable pebbles too. The full
             // pebble column always renders while swiping; smoothness comes from
             // PebbleList's own one-frame lazy-fill (filled/EAGER_PEBBLES) + the pager's
@@ -7610,11 +7635,19 @@ private fun VehicleDetailContent(
             PebbleList(v, state, vm)
             Spacer(Modifier.height(bottomInset + 16.dp))
         }
-        androidx.compose.animation.AnimatedVisibility(
-            visible = nameHidden,
-            enter = fadeIn(tween(200)),
-            exit = fadeOut(tween(150)),
-            modifier = Modifier.align(Alignment.TopStart).statusBarsPadding().padding(start = 16.dp),
+        Box(
+            Modifier
+                .align(Alignment.TopStart)
+                // Layout-phase reads only (scroll.value, dockProgress.value) --
+                // this Box alone re-lays-out on a scroll or animation frame, not
+                // VehicleDetailContent's whole composition, the same reason the
+                // pull-to-refresh indicator above reads its own live values
+                // inside offset{} instead of the composable body.
+                .offset {
+                    val attachedYPx = topInset.toPx() - scroll.value
+                    val y = attachedYPx + (cornerYPx - attachedYPx) * dockProgress.value
+                    IntOffset(xPx.roundToInt(), y.roundToInt())
+                },
         ) {
             Text(
                 v.name,
@@ -7903,9 +7936,17 @@ private fun Refreshable(
     }
 }
 
-/** Car name/model + a Driving/Parked badge, with an optional expand button. */
+/**
+ * Car name/model + a Driving/Parked badge, with an optional expand button.
+ *
+ * [hideName] (only ever true from [VehicleDetailContent], which draws the
+ * real, visible name itself via its own floating [Text]) draws the name at
+ * `alpha = 0` -- it exists purely to reserve the exact, font-metric-accurate
+ * layout space (correct across accessibility font scales) that floating
+ * text starts out sitting in.
+ */
 @Composable
-private fun CarHeaderRow(v: Vehicle, state: UiState, onExpand: (() -> Unit)?, reserveEnd: Boolean) {
+private fun CarHeaderRow(v: Vehicle, state: UiState, onExpand: (() -> Unit)?, reserveEnd: Boolean, hideName: Boolean = false) {
     Row(
         Modifier
             .fillMaxWidth()
@@ -7926,6 +7967,7 @@ private fun CarHeaderRow(v: Vehicle, state: UiState, onExpand: (() -> Unit)?, re
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.onSurface,
+                modifier = if (hideName) Modifier.alpha(0f) else Modifier,
             )
             Text(
                 "${v.model} · ${state.powertrainLabel(v)}",
