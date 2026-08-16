@@ -249,6 +249,28 @@ internal val PebbleBounceDamping = 0.68f
 internal val PebbleCloseDamping = Spring.DampingRatioNoBouncy
 internal val PebbleBounceStiffness = Spring.StiffnessLow
 
+/**
+ * The floating identity pill's own dock/undock spring -- shared by every one
+ * of its four implementations (GarageScreen's hoisted pill, VehicleDetail-
+ * Content's and SettingsScreen's own local pills, ExpandedCar's pill), all of
+ * which used to each carry the identical `spring(dampingRatio = 0.5f,
+ * stiffness = Spring.StiffnessMediumLow)` inline. That read as a quick,
+ * fairly business-like snap into place -- fine for a pebble opening, wrong
+ * for a name arriving in a corner, which asked to feel "very floaty and
+ * bouncy, with some time to settle" instead. Not [PebbleBounceDamping]/
+ * [PebbleBounceStiffness]: those are deliberately the app's CALM bounce
+ * (tuned down from something too visible); this wants MORE visible bounce
+ * and a longer settle than that pair gives, so it gets its own numbers
+ * rather than borrowing theirs. Lower damping (0.5 -> 0.32) means the swing
+ * overshoots further past the target before it starts pulling back; lower
+ * stiffness (StiffnessMediumLow -> StiffnessVeryLow) means it takes
+ * noticeably longer to get there and longer still to fully settle -- the
+ * two together are what makes it read as floating into place rather than
+ * arriving.
+ */
+internal val PillDockDamping = 0.32f
+internal val PillDockStiffness = Spring.StiffnessVeryLow
+
 @Composable
 internal fun collapseEnter(expandFrom: Alignment.Vertical = Alignment.Top): EnterTransition =
     fadeIn(MaterialTheme.motionScheme.defaultEffectsSpec<Float>()) +

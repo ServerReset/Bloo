@@ -703,9 +703,11 @@ internal fun SettingsScreen(
       }
       val dockProgress = remember { Animatable(0f) }
       LaunchedEffect(nameHidden) {
+          // PillDockDamping/PillDockStiffness -- shared by every pill
+          // implementation, see that pair's own doc.
           dockProgress.animateTo(
               if (nameHidden) 1f else 0f,
-              spring(dampingRatio = 0.5f, stiffness = Spring.StiffnessMediumLow),
+              spring(dampingRatio = PillDockDamping, stiffness = PillDockStiffness),
           )
           haptics?.click()
       }
@@ -2190,6 +2192,11 @@ internal fun SettingsScreen(
                 Box(
                     Modifier
                         .size(lerp(0.dp, 32.dp, t))
+                        // Same -4dp nudge as every other pill's own avatar
+                        // Box (VehicleDetailContent, the hoisted pill,
+                        // ExpandedCar) -- kept in sync so they all read as
+                        // one component.
+                        .offset(x = (-4).dp)
                         .graphicsLayer { alpha = ((t - 0.5f) / 0.5f).coerceIn(0f, 1f) },
                 ) {
                     if (t > 0f) PillAvatar(

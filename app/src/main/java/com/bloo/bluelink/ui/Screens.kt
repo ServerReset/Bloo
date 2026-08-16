@@ -3414,9 +3414,11 @@ internal fun GarageScreen(state: UiState, vm: AppViewModel) {
                     // this effect would still fire once on first composition
                     // and animate/click for a pill that's never shown.
                     if (perPage != 1) return@LaunchedEffect
+                    // PillDockDamping/PillDockStiffness -- shared by every
+                    // pill implementation, see that pair's own doc.
                     hoistedDockProgress.animateTo(
                         if (hoistedNameHidden) 1f else 0f,
-                        spring(dampingRatio = 0.5f, stiffness = Spring.StiffnessMediumLow),
+                        spring(dampingRatio = PillDockDamping, stiffness = PillDockStiffness),
                     )
                     haptics?.click()
                 }
@@ -3681,9 +3683,20 @@ internal fun GarageScreen(state: UiState, vm: AppViewModel) {
                             // name visibly wasn't, right beside it. Waiting
                             // until the name's own scale has mostly resolved
                             // avoids ever showing that mismatch at all.
+                            //
+                            // Nudged left of where its own box would centre
+                            // it: reported as sitting oddly once docked, and
+                            // the box's own leading/spacedBy padding (shared
+                            // with the text after it) put its optical centre
+                            // a few dp right of where it read as belonging
+                            // next to a titleLarge line. A plain offset, not
+                            // a repadded box -- the box's LAYOUT size stays
+                            // exactly what spacedBy above is measuring
+                            // against; only where it DRAWS shifts.
                             Box(
                                 Modifier
                                     .size(lerp(0.dp, 32.dp, t))
+                                    .offset(x = (-4).dp)
                                     .graphicsLayer { alpha = ((t - 0.5f) / 0.5f).coerceIn(0f, 1f) },
                             ) {
                                 // t > 0f, not the alpha threshold above -- purely
@@ -4780,13 +4793,26 @@ private fun CompactGarage(state: UiState, vm: AppViewModel, appearance: Settings
             // its own bubble into exactly that reservation (see there) --
             // one tap target, not a second one duplicated here.
             val searchInBand = appearance.showSearch && !state.locked
+            // Same glass chip every other floating chrome in the app wears
+            // (the identity pill, FloatingIcon) -- bare text here used to sit
+            // directly on whatever the tile underneath happened to be
+            // showing, so legibility rode entirely on luck (readable over a
+            // dark gauge, gone over a bright photo). A pill-shaped backdrop,
+            // sized to the band's own height, gives it the same guaranteed
+            // contrast every other piece of floating chrome already has, and
+            // reads as one more piece of that chrome rather than loose text.
+            val bandShape = RoundedCornerShape((band.heightDp / 2f).dp)
             Row(
                 Modifier
                     .align(Alignment.TopStart)
                     .offset(x = band.xDp.dp, y = band.yDp.dp)
                     .width(band.widthDp.dp)
                     .height(band.heightDp.dp)
-                    .padding(horizontal = 6.dp),
+                    .background(MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = glassContainerAlpha()), bandShape)
+                    .ambientRing(bandShape)
+                    .dropShadow(bandShape)
+                    .frostedRim(bandShape)
+                    .padding(horizontal = 8.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 // Grouped flush against whichever end is next to the camera,
                 // not spread across the whole band -- a short name spread
@@ -8199,19 +8225,15 @@ private fun VehicleDetailContent(
         }
         val dockProgress = remember { Animatable(0f) }
         LaunchedEffect(nameHidden) {
-            // A real spring, not a tween -- dampingRatio well under 1 so it
-            // visibly overshoots and settles rather than gliding to a stop,
-            // which is what makes this read as the text getting yanked into (or
-            // dropped back out of) its slot instead of just sliding there.
-            // StiffnessMedium (from a prior pass meant to fix a WOBBLY, loose
-            // feel) overcorrected into reading as stiff/abrupt instead --
-            // MediumLow gives the spring more TIME to actually show its own
-            // overshoot rather than snapping through it, and 0.5 (from 0.62)
-            // makes that overshoot more pronounced, so the landing itself reads
-            // as a genuine bounce again rather than a quick, stiff correction.
+            // PillDockDamping/PillDockStiffness -- see that pair's own doc for
+            // the full tuning history. A real spring, not a tween, and a
+            // visibly bouncier/slower one than a pebble opening gets: this is
+            // the one moment the pill actually arrives or departs, so it's
+            // allowed to feel like it's floating into its slot rather than
+            // sliding there.
             dockProgress.animateTo(
                 if (nameHidden) 1f else 0f,
-                spring(dampingRatio = 0.5f, stiffness = Spring.StiffnessMediumLow),
+                spring(dampingRatio = PillDockDamping, stiffness = PillDockStiffness),
             )
             // A light tap right as it lands/leaves, same as every other floating
             // chrome's own tap feedback -- this is the one moment the pill
@@ -8370,6 +8392,10 @@ private fun VehicleDetailContent(
                 Box(
                     Modifier
                         .size(lerp(0.dp, 32.dp, t))
+                        // See the hoisted pill's identical avatar Box for why
+                        // -- same nudge, same reasoning, kept in sync across
+                        // every pill so they all read as one component.
+                        .offset(x = (-4).dp)
                         .graphicsLayer { alpha = ((t - 0.5f) / 0.5f).coerceIn(0f, 1f) },
                 ) {
                     // t > 0f, not gated on the alpha threshold above -- purely
@@ -8497,9 +8523,11 @@ private fun ExpandedCar(v: Vehicle, state: UiState, vm: AppViewModel, flipped: B
     }
     val dockProgress = remember { Animatable(0f) }
     LaunchedEffect(nameHidden) {
+        // PillDockDamping/PillDockStiffness -- shared by every pill
+        // implementation, see that pair's own doc.
         dockProgress.animateTo(
             if (nameHidden) 1f else 0f,
-            spring(dampingRatio = 0.5f, stiffness = Spring.StiffnessMediumLow),
+            spring(dampingRatio = PillDockDamping, stiffness = PillDockStiffness),
         )
         haptics?.click()
     }
@@ -8646,10 +8674,12 @@ private fun ExpandedCar(v: Vehicle, state: UiState, vm: AppViewModel, flipped: B
                 horizontalArrangement = Arrangement.spacedBy(lerp(0.dp, 8.dp, t)),
             ) {
                 // Same delayed reveal as every other pill's own avatar --
-                // see VehicleDetailContent's identical Box for why.
+                // see VehicleDetailContent's identical Box for why. Same -4dp
+                // nudge too -- see that Box's own comment.
                 Box(
                     Modifier
                         .size(lerp(0.dp, 32.dp, t))
+                        .offset(x = (-4).dp)
                         .graphicsLayer { alpha = ((t - 0.5f) / 0.5f).coerceIn(0f, 1f) },
                 ) {
                     if (t > 0f) PillAvatar(
