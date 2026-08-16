@@ -3410,21 +3410,40 @@ internal fun GarageScreen(state: UiState, vm: AppViewModel) {
                 // which get a brand new Animatable and a null position every
                 // time they're freshly composed, this state is REUSED across
                 // every page -- only whichever page is currently settled gets
-                // to write into it. That means switching pages left
-                // hoistedPosition holding the PREVIOUS page's stale value for
-                // one frame: hoistedNameHidden would answer for the newly
-                // settled page using the wrong page's position, animate
-                // dockProgress toward a target that was never actually where
-                // the new page's header lives, then correct again a frame
-                // later once the real report arrived -- the flicker reported
-                // switching between a floating and a static page. Nulling the
-                // position (and its scroll calibration) on every settle
-                // forces the "no report yet" guard below to reapply on every
-                // page switch, not just the very first mount.
+                // to write into it. Switching pages used to NULL hoistedPosition
+                // outright (to stop hoistedNameHidden answering for the newly
+                // settled page with the wrong page's stale position, which drove
+                // dockProgress toward a target that was never actually right).
+                // That fixed the wrong-target animation, but broke something
+                // else: the render below falls back to the DOCKED CORNER
+                // whenever hoistedPosition is null, so for every frame between
+                // the null and the new page's first real report, the pill
+                // visually JUMPED to the corner -- looking attached one frame,
+                // sitting in the corner the next, then jumping again once the
+                // real report arrived. That is what "the name goes away for a
+                // quick second" turned out to be: not invisible, but yanked
+                // somewhere else and back so fast it read as a vanish.
+                //
+                // hoistedPosition is no longer nulled at all -- it always holds
+                // the last real report, stale or not, so the render below never
+                // has a reason to fall back to the corner while switching pages.
+                // hoistedFreshForSettle is the SEPARATE signal for "is that
+                // value actually for the CURRENTLY settled page" -- reset on
+                // every settle, set true the moment a report arrives (which,
+                // since onPositioned only ever fires from whichever page is
+                // currently `hoisted`, is guaranteed to be a report for the
+                // NEW page). The reactive effect below waits on this flag
+                // before trusting hoistedNameHidden, exactly like the null
+                // check used to -- but nothing about the continuous position
+                // used for RENDERING depends on it, so the pill keeps drawing
+                // smoothly at the old (still visually reasonable, since both
+                // pages are onscreen at similar places) position for the one
+                // frame it takes the new report to arrive, instead of jumping
+                // away and back.
+                var hoistedFreshForSettle by remember { mutableStateOf(false) }
                 LaunchedEffect(perPage, pager.settledPage) {
                     if (perPage != 1) return@LaunchedEffect
-                    hoistedPosition.value = null
-                    hoistedYAtScrollZero.value = null
+                    hoistedFreshForSettle = false
                 }
                 // True once this pill has EVER settled for real, for the
                 // whole lifetime of this composable -- NOT reset on every
@@ -3437,15 +3456,11 @@ internal fun GarageScreen(state: UiState, vm: AppViewModel) {
                 // already was for the PREVIOUS page) and a real, correct
                 // target (the new page's own just-arrived report), so it
                 // animates normally between them. Resetting this flag on
-                // every page switch was the previous bug: it forced every
+                // every page switch was a previous bug: it forced every
                 // single page switch to snap instead of animate, even when
-                // there was nothing wrong to correct for -- "swipe to a page
-                // that isn't floating and it doesn't animate" was this, not
-                // the flicker the snap was originally added to fix (that fix
-                // is still here: it's the null-position wait below, not this
-                // flag).
+                // there was nothing wrong to correct for.
                 var hasEverSettled by remember { mutableStateOf(false) }
-                LaunchedEffect(hoistedNameHidden, perPage, hoistedPosition.value != null) {
+                LaunchedEffect(hoistedNameHidden, perPage, hoistedFreshForSettle) {
                     // perPage > 1 (the multi-car grid): nothing below ever
                     // passes `hoisted` to a page in that mode (see both call
                     // sites' own guards), so hoistedPosition never updates
@@ -3455,8 +3470,8 @@ internal fun GarageScreen(state: UiState, vm: AppViewModel) {
                     if (perPage != 1) return@LaunchedEffect
                     // No real report for the NOW-settled page yet -- wait
                     // rather than animate toward the previous page's stale
-                    // position (see the reset LaunchedEffect above).
-                    if (hoistedPosition.value == null) return@LaunchedEffect
+                    // position (see hoistedFreshForSettle's own doc above).
+                    if (!hoistedFreshForSettle) return@LaunchedEffect
                     val hoistedTarget = if (hoistedNameHidden) 1f else 0f
                     if (!hasEverSettled) {
                         hoistedDockProgress.snapTo(hoistedTarget)
@@ -3479,6 +3494,7 @@ internal fun GarageScreen(state: UiState, vm: AppViewModel) {
                                 val localPos = it - hoistedContainerPosition.value
                                 val sv = hoistedActiveScroll.value?.value ?: 0
                                 hoistedYAtScrollZero.value = localPos.y + sv
+                                hoistedFreshForSettle = true
                             },
                             color = hoistedColor,
                             fontSizeSp = hoistedFontSizeSp,
