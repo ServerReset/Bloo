@@ -3693,76 +3693,6 @@ internal fun GarageScreen(state: UiState, vm: AppViewModel) {
                             },
                             onClick = { pillScope.launch { hoistedScrollToTop.value?.invoke() } },
                         ) { t ->
-                            // Its own crossfade, not tied to the pill's own dock
-                            // progress -- a slide reads right for text (it visibly
-                            // moves aside), but sliding a circular photo the same
-                            // way drags it half out of its own clip on every
-                            // swipe. A plain fade keeps the avatar reading as "the
-                            // picture just changed" instead of "part of it flew
-                            // off".
-                            // Sized from t=0 (so the Row never jumps once it
-                            // does appear) but only actually DRAWN once t is
-                            // past halfway, via alpha rather than a hard
-                            // t>0.01 gate. The name's own text is scaled
-                            // toward its natural size about its TOP-LEFT
-                            // (see that graphicsLayer's own doc for why),
-                            // which visibly shifts the glyphs toward the top
-                            // of their box for as long as the scale is
-                            // meaningfully under 1 -- exactly the early part
-                            // of this same transition. The avatar has no
-                            // such distortion (plain layout, no scale trick),
-                            // so showing it immediately at t>0.01 made it
-                            // read as sitting properly centred while the
-                            // name visibly wasn't, right beside it. Waiting
-                            // until the name's own scale has mostly resolved
-                            // avoids ever showing that mismatch at all.
-                            //
-                            // Nudged left of where its own box would centre
-                            // it: reported as sitting oddly once docked, and
-                            // the box's own leading/spacedBy padding (shared
-                            // with the text after it) put its optical centre
-                            // a few dp right of where it read as belonging
-                            // next to a titleLarge line. A plain offset, not
-                            // a repadded box -- the box's LAYOUT size stays
-                            // exactly what spacedBy above is measuring
-                            // against; only where it DRAWS shifts.
-                            Box(
-                                Modifier
-                                    .size(lerp(0.dp, 32.dp, t))
-                                    .offset(x = (-4).dp)
-                                    .graphicsLayer { alpha = ((t - 0.5f) / 0.5f).coerceIn(0f, 1f) },
-                            ) {
-                                // t > 0f, not the alpha threshold above -- purely
-                                // to avoid ever composing this at a literal 0×0
-                                // size; it's already invisible below that alpha
-                                // threshold regardless of when it starts composing.
-                                if (t > 0f) AnimatedContent(
-                                    targetState = settledBlock,
-                                    transitionSpec = { fadeIn(tween(200)) togetherWith fadeOut(tween(120)) },
-                                    label = "hoistedPillAvatar",
-                                ) { block ->
-                                    if (settingsAsPage && block == pageCount) {
-                                        PillAvatar(photo = null, icon = Icons.Filled.Settings, tint = MaterialTheme.colorScheme.tertiary, size = lerp(0.dp, 32.dp, t))
-                                    } else {
-                                        // hoistedPhotoUrl, not an independent
-                                        // vehicles[block]-to-imageUrls lookup --
-                                        // see HeroTitleFlight.photoUrl's own
-                                        // doc. This is the literal SAME URL
-                                        // the settled page's own hero card is
-                                        // showing right now, reported through
-                                        // the same channel as its position/
-                                        // colour, rather than a second lookup
-                                        // that can resolve to nothing while the
-                                        // real photo is right there on screen.
-                                        PillAvatar(
-                                            photo = hoistedPhotoUrl.value,
-                                            icon = Icons.Filled.DirectionsCar,
-                                            tint = MaterialTheme.colorScheme.primary,
-                                            size = lerp(0.dp, 32.dp, t),
-                                        )
-                                    }
-                                }
-                            }
                             AnimatedContent(
                                 targetState = settledBlock,
                                 transitionSpec = {
@@ -8015,45 +7945,23 @@ private data class LocalNamePillState(
 )
 
 /**
- * Small circular avatar for the hoisted identity pill (GarageScreen's
- * single-car-per-page pager) -- a car's own photo, or a themed icon in a
- * tonal circle when there isn't one (a car with no photo set, or a non-car
- * "page" like Settings' own slot). Unlike the name text itself, there's
- * nothing on the hero card this is "pulled from" -- the hero's own header
- * icon is a plain, non-circular, non-photo [Icon] -- so this fades in on
- * its own alongside the rest of the pill's chrome, rather than tracking a
- * real element's live position/size the way the name does.
- */
-@Composable
-internal fun PillAvatar(photo: String?, icon: ImageVector, tint: Color, size: Dp) {
-    Box(Modifier.size(size).clip(CircleShape), contentAlignment = Alignment.Center) {
-        if (!photo.isNullOrBlank()) {
-            AsyncImage(
-                model = rememberPhotoModel(photo),
-                contentDescription = null,
-                contentScale = ContentScale.Crop,
-                modifier = Modifier.fillMaxSize(),
-            )
-        } else {
-            Box(Modifier.fillMaxSize().background(tint.copy(alpha = 0.22f)), contentAlignment = Alignment.Center) {
-                Icon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(size * 0.58f))
-            }
-        }
-    }
-}
-
-/**
  * The floating identity pill's own shared chrome shell -- position
  * ([attachedX]/[attachedY] while live, lerping to [cornerXPx]/[cornerYPx]
  * once docked, by [dockProgress]), the pill's own glass background/ring/
  * shadow/rim growing in alongside it, and [content] drawn inside a Row that
- * grows its own height/padding by that same [dockProgress]. Shared by
- * [VehicleDetailContent]'s own (non-hoisted) pill and GarageScreen's hoisted
- * one -- they differ only in what feeds [attachedX]/[attachedY] (a single
- * car's own hero title vs. whichever page is currently settled) and what
- * [content] draws (a bare name vs. an avatar+name+page-count that also
- * cross-fades between cars), not in how the pill itself moves, grows, or is
- * styled.
+ * grows its own height/padding by that same [dockProgress]. Used by
+ * GarageScreen's hoisted pill -- VehicleDetailContent's, SettingsScreen's,
+ * and ExpandedCar's own (non-hoisted) pills each keep their own inline copy
+ * of this exact shell instead of sharing this one, deliberately, to avoid
+ * risk to their already-working, CI-verified code.
+ *
+ * Every one of those pills draws just a name (GarageScreen's hoisted pill
+ * also cross-fades a "current / total" page count alongside it) -- no
+ * avatar any more. It used to show one (a car's own photo, or a themed icon
+ * when there wasn't one), but unlike the name text there was nothing on the
+ * hero card it was actually "pulled from," so it read as decoration rather
+ * than information; removed everywhere, name and count are what identify
+ * the pill now.
  *
  * [attachedX]/[attachedY] are plain lambdas, not [Offset], so whichever
  * live values they read (e.g. `scroll.value`, see
@@ -8123,6 +8031,14 @@ private fun BoxScope.FloatingIdentityPill(
         Row(
             Modifier
                 .heightIn(min = lerp(0.dp, 48.dp, t))
+                // Clipped to the SAME shape as the glass fill behind it,
+                // before .clickable -- without this, clickable's own ripple
+                // indication paints out to this Row's plain rectangular
+                // bounds, flashing square corners past the rounded
+                // background on every tap even though the fill itself was
+                // always correctly round. This is what "edges still not
+                // round" turned out to be: not the shape, the ripple.
+                .clip(pillShape)
                 .padding(horizontal = lerp(0.dp, 16.dp, t))
                 .clickable { haptics?.click(); onClick() },
             verticalAlignment = Alignment.CenterVertically,
@@ -8422,44 +8338,20 @@ private fun VehicleDetailContent(
             Row(
                 Modifier
                     .heightIn(min = lerp(0.dp, 48.dp, t))
+                    // Clipped to the SAME shape as the glass fill behind it,
+                    // before .clickable moves here from the Text below --
+                    // that used to leave the whole Row un-clickable and un-
+                    // clipped, so tapping the name showed a plain rectangular
+                    // ripple sized to the TEXT's own glyph bounds, sharp
+                    // corners and all, regardless of the rounded pill drawn
+                    // behind it. This is what "edges still not round" turned
+                    // out to be: not the fill's shape, the ripple.
+                    .clip(pillShape)
+                    .clickable { haptics?.click(); scope.launch { scroll.animateScrollTo(0) } }
                     .padding(horizontal = lerp(0.dp, 16.dp, t)),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(lerp(0.dp, 8.dp, t)),
             ) {
-                // Feature parity with GarageScreen's own hoisted pill (which
-                // this one otherwise mirrors exactly) -- every car's floating
-                // pill gets the same small circular avatar, not just the
-                // single-car-per-page pager's shared one. Same
-                // HeroTitleFlight.photoUrl channel as that one, so this is
-                // the literal same photo the hero card itself is showing.
-                //
-                // Sized from t=0 but only actually DRAWN past halfway (alpha,
-                // not a t>0.01 gate) -- the name's own scale (below) is
-                // anchored top-left, which visibly shifts its glyphs toward
-                // the top of their box for as long as that scale is
-                // meaningfully under 1. The avatar has no such distortion, so
-                // showing it immediately made it read as sitting properly
-                // centred while the name visibly wasn't, right beside it.
-                Box(
-                    Modifier
-                        .size(lerp(0.dp, 32.dp, t))
-                        // See the hoisted pill's identical avatar Box for why
-                        // -- same nudge, same reasoning, kept in sync across
-                        // every pill so they all read as one component.
-                        .offset(x = (-4).dp)
-                        .graphicsLayer { alpha = ((t - 0.5f) / 0.5f).coerceIn(0f, 1f) },
-                ) {
-                    // t > 0f, not gated on the alpha threshold above -- purely
-                    // to avoid ever composing PillAvatar at a literal 0×0 size;
-                    // it's already invisible below that alpha threshold
-                    // regardless of when it starts composing.
-                    if (t > 0f) PillAvatar(
-                        photo = heroTitlePhotoUrl.value,
-                        icon = Icons.Filled.DirectionsCar,
-                        tint = MaterialTheme.colorScheme.primary,
-                        size = lerp(0.dp, 32.dp, t),
-                    )
-                }
                 Text(
                     v.name,
                     style = MaterialTheme.typography.titleLarge,
@@ -8502,10 +8394,6 @@ private fun VehicleDetailContent(
                             scaleX = scale
                             scaleY = scale
                             transformOrigin = TransformOrigin(0f, 0f)
-                        }
-                        .clickable {
-                            haptics?.click()
-                            scope.launch { scroll.animateScrollTo(0) }
                         },
                 )
             }
@@ -8723,30 +8611,18 @@ private fun ExpandedCar(v: Vehicle, state: UiState, vm: AppViewModel, flipped: B
             Row(
                 Modifier
                     .heightIn(min = lerp(0.dp, 48.dp, t))
-                    .padding(horizontal = lerp(0.dp, 16.dp, t))
+                    // Clip before clickable -- see the hoisted pill's
+                    // identical fix for why (the ripple, not the fill, was
+                    // what read as "not round").
+                    .clip(pillShape)
                     .clickable {
                         haptics?.click()
                         scope.launch { controlsScroll.animateScrollTo(0) }
-                    },
+                    }
+                    .padding(horizontal = lerp(0.dp, 16.dp, t)),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(lerp(0.dp, 8.dp, t)),
             ) {
-                // Same delayed reveal as every other pill's own avatar --
-                // see VehicleDetailContent's identical Box for why. Same -4dp
-                // nudge too -- see that Box's own comment.
-                Box(
-                    Modifier
-                        .size(lerp(0.dp, 32.dp, t))
-                        .offset(x = (-4).dp)
-                        .graphicsLayer { alpha = ((t - 0.5f) / 0.5f).coerceIn(0f, 1f) },
-                ) {
-                    if (t > 0f) PillAvatar(
-                        photo = state.imageUrls[v.vin],
-                        icon = Icons.Filled.DirectionsCar,
-                        tint = MaterialTheme.colorScheme.primary,
-                        size = lerp(0.dp, 32.dp, t),
-                    )
-                }
                 Text(
                     v.name,
                     style = MaterialTheme.typography.titleLarge,

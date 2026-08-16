@@ -2182,39 +2182,18 @@ internal fun SettingsScreen(
             Row(
                 Modifier
                     .heightIn(min = lerp(0.dp, 48.dp, t))
-                    .padding(horizontal = lerp(0.dp, 16.dp, t))
+                    // Clip before clickable -- see the hoisted pill's
+                    // identical fix for why (the ripple, not the fill, was
+                    // what read as "not round").
+                    .clip(pillShape)
                     .clickable {
                         haptics?.click()
                         settingsScope.launch { settingsGridState.animateScrollToItem(0) }
-                    },
+                    }
+                    .padding(horizontal = lerp(0.dp, 16.dp, t)),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(lerp(0.dp, 8.dp, t)),
             ) {
-                // Same themed-icon avatar GarageScreen's own hoisted pill
-                // shows for the embedded Settings slot -- feature parity
-                // between the two, not a car-only affordance. Fades in past
-                // halfway rather than a hard early gate, matching the other
-                // pills' own avatar timing (see VehicleDetailContent's
-                // identical avatar for why that matters there -- it doesn't
-                // here, Settings' own title never scales, but the same
-                // timing keeps every pill's avatar reading consistently).
-                Box(
-                    Modifier
-                        .size(lerp(0.dp, 32.dp, t))
-                        // Same -4dp nudge as every other pill's own avatar
-                        // Box (VehicleDetailContent, the hoisted pill,
-                        // ExpandedCar) -- kept in sync so they all read as
-                        // one component.
-                        .offset(x = (-4).dp)
-                        .graphicsLayer { alpha = ((t - 0.5f) / 0.5f).coerceIn(0f, 1f) },
-                ) {
-                    if (t > 0f) PillAvatar(
-                        photo = null,
-                        icon = Icons.Filled.Settings,
-                        tint = MaterialTheme.colorScheme.tertiary,
-                        size = lerp(0.dp, 32.dp, t),
-                    )
-                }
                 Text(
                     "Settings",
                     style = MaterialTheme.typography.titleLarge,
