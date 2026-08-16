@@ -273,6 +273,7 @@ import androidx.compose.runtime.withFrameNanos
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.focus.FocusRequester
@@ -594,11 +595,7 @@ private fun SettingsHeaderRow(state: UiState) {
             color = MaterialTheme.colorScheme.onSurface,
             modifier = if (titleFlight != null) {
                 Modifier
-                    // Crossfades with the floating copy by dockProgress, not
-                    // a flat 0f -- see HeroTitleFlight's own doc (Screens.kt)
-                    // for why. graphicsLayer, not a plain alpha() constant,
-                    // so this reads dockProgress live, draw-phase only.
-                    .graphicsLayer { alpha = 1f - titleFlight.dockProgress().coerceIn(0f, 1f) }
+                    .alpha(0f)
                     .onGloballyPositioned { titleFlight.onPositioned(it.positionInRoot()) }
             } else {
                 Modifier
@@ -735,7 +732,6 @@ internal fun SettingsScreen(
               // Unused here -- Settings has no avatar. See
               // HeroTitleFlight.photoUrl's own doc.
               photoUrl = mutableStateOf(null),
-              dockProgress = { dockProgress.value },
           )
       }
       LocalSettingsPillState(flight, dockProgress, cornerXPx, cornerYPx, titlePosition, containerPosition)
@@ -2214,10 +2210,6 @@ internal fun SettingsScreen(
                     // Ellipsis, not the Text default (Clip) -- matches every
                     // other pill's own name Text, for consistency.
                     overflow = TextOverflow.Ellipsis,
-                    // Complement of the real "Settings" title's own alpha
-                    // (1 - dockProgress) -- see HeroTitleFlight's own doc
-                    // (Screens.kt) for why this crossfade matters.
-                    modifier = Modifier.graphicsLayer { alpha = dockProgress.value.coerceIn(0f, 1f) },
                 )
             }
         }
