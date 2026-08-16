@@ -2571,6 +2571,88 @@ private val ToggleSettings = listOf(
     ),
 )
 
+/**
+ * The per-vehicle counterpart of [ToggleSpec]: a plain on/off setting that
+ * exists once PER CAR -- a seat's heat/cool flag, the heated-steering-wheel
+ * flag, whether a dashboard section shows for that car -- rather than once
+ * for the whole app. [CarSettingsCard] (the real "Cars" settings card) is
+ * the source of truth for all of these; this list is what makes them
+ * searchable without a hand-written [SearchEntry] closure per car per
+ * toggle, the same duplication [ToggleSettings] already removed on the
+ * app-wide side.
+ */
+private class VehicleToggleSpec(
+    val title: (Vehicle) -> String,
+    val keywords: (Vehicle) -> String,
+    val label: String,
+    val visible: (Vehicle, UiState) -> Boolean = { _, _ -> true },
+    val checked: (Vehicle, UiState) -> Boolean,
+    val onToggle: (AppViewModel, Vehicle, Boolean) -> Unit,
+)
+
+/** Every plain per-car toggle: the four seat positions' heat and cool flags,
+ *  the heated steering wheel flag, and which of [com.bloo.bluelink.data.HIDEABLE_SECTIONS]
+ *  shows on that car's dashboard -- generated once per position/section here
+ *  instead of needing its own [SearchEntry] written out by hand. Reuses
+ *  [SeatPositions] (Screens.kt), the same list [CarSettingsCard] itself
+ *  builds its seat rows from, so the two can't drift out of sync with
+ *  each other on label or key. */
+private val VehicleToggleSettings: List<VehicleToggleSpec> = buildList {
+    SeatPositions.forEach { pos ->
+        add(
+            VehicleToggleSpec(
+                title = { v -> "${pos.label} seat heat · ${v.name}" },
+                keywords = { v -> "seat heat warm climate ${v.name}" },
+                label = "${pos.label} seat heat",
+                checked = { v, s -> pos.heat(s.seatConfigs[v.vin] ?: SeatConfig()) },
+                onToggle = { vm, v, value -> vm.setSeatFlag(v, pos.heatKey, value) },
+            ),
+        )
+        add(
+            VehicleToggleSpec(
+                title = { v -> "${pos.label} seat cool · ${v.name}" },
+                keywords = { v -> "seat cool ventilated climate ${v.name}" },
+                label = "${pos.label} seat cool",
+                checked = { v, s -> pos.cool(s.seatConfigs[v.vin] ?: SeatConfig()) },
+                onToggle = { vm, v, value -> vm.setSeatFlag(v, pos.coolKey, value) },
+            ),
+        )
+    }
+    add(
+        VehicleToggleSpec(
+            title = { v -> "Heated steering wheel · ${v.name}" },
+            keywords = { v -> "steering wheel heat climate ${v.name}" },
+            label = "Heated steering wheel",
+            checked = { v, s -> (s.seatConfigs[v.vin] ?: SeatConfig()).steeringWheel },
+            onToggle = { vm, v, value -> vm.setSeatFlag(v, "sw", value) },
+        ),
+    )
+    // Same labels CarSettingsCard's own "Sections shown" group uses -- kept
+    // as a second copy rather than hoisted shared, since hoisting a map two
+    // functions apart from either of its uses would cost more to find than
+    // the eight-line literal costs to duplicate.
+    val sectionLabels = mapOf(
+        "charge" to "Charge / fuel", "climate" to "Climate", "location" to "Location",
+        "weather" to "Weather", "trips" to "Trips", "info" to "Car info",
+        "diagnostics" to "Diagnostics", "ai" to "AI summary",
+    )
+    com.bloo.bluelink.data.HIDEABLE_SECTIONS.forEach { sec ->
+        val sectionLabel = sectionLabels[sec] ?: sec
+        add(
+            VehicleToggleSpec(
+                title = { v -> "Show $sectionLabel · ${v.name}" },
+                keywords = { v -> "section hide show dashboard card $sectionLabel ${v.name}" },
+                label = "Show $sectionLabel",
+                // The AI toggle only matters when AI is enabled for this device --
+                // same gate CarSettingsCard's own "Sections shown" group uses.
+                visible = { _, s -> sec != "ai" || s.aiEnabled },
+                checked = { v, s -> !s.isPebbleHidden(v.vin, sec) },
+                onToggle = { vm, v, value -> vm.setSectionHidden(v, sec, !value) },
+            ),
+        )
+    }
+}
+
 /** True if any WORD in [hay] starts with [prefix] -- "lim" hits "charge limit"
  *  but not "unlimited". Scanning for the boundary beats splitting the string,
  *  which would allocate a list per entry per keystroke. */
@@ -3796,6 +3878,15 @@ private fun SettingsSearchResults(
         add("Service interval · ${v.name}", "service interval maintenance mileage due ${v.name}") {
             MilesField(state.serviceIntervalMiles[v.vin], "Interval (mi)", Modifier.fillMaxWidth()) {
                 vm.setServiceIntervalMiles(v.vin, it)
+            }
+        }
+        // The dynamic half of the per-car index: every seat heat/cool flag,
+        // the steering wheel, and every hideable dashboard section for THIS
+        // car, from VehicleToggleSettings -- no per-car, per-toggle code.
+        VehicleToggleSettings.forEach { spec ->
+            if (!spec.visible(v, state)) return@forEach
+            add(spec.title(v), spec.keywords(v)) {
+                ToggleRow(spec.label, spec.checked(v, state)) { spec.onToggle(vm, v, it) }
             }
         }
     }
