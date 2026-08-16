@@ -3406,45 +3406,19 @@ internal fun GarageScreen(state: UiState, vm: AppViewModel) {
                 }
                 val hoistedDockProgress = remember { Animatable(0f) }
                 val pillScope = rememberCoroutineScope()
-                // Unlike the local pills (VehicleDetailContent, SettingsScreen),
-                // which get a brand new Animatable and a null position every
-                // time they're freshly composed, this state is REUSED across
-                // every page -- only whichever page is currently settled gets
-                // to write into it. Switching pages used to NULL hoistedPosition
-                // outright (to stop hoistedNameHidden answering for the newly
-                // settled page with the wrong page's stale position, which drove
-                // dockProgress toward a target that was never actually right).
-                // That fixed the wrong-target animation, but broke something
-                // else: the render below falls back to the DOCKED CORNER
-                // whenever hoistedPosition is null, so for every frame between
-                // the null and the new page's first real report, the pill
-                // visually JUMPED to the corner -- looking attached one frame,
-                // sitting in the corner the next, then jumping again once the
-                // real report arrived. That is what "the name goes away for a
-                // quick second" turned out to be: not invisible, but yanked
-                // somewhere else and back so fast it read as a vanish.
-                //
-                // hoistedPosition is no longer nulled at all -- it always holds
-                // the last real report, stale or not, so the render below never
-                // has a reason to fall back to the corner while switching pages.
-                // hoistedFreshForSettle is the SEPARATE signal for "is that
-                // value actually for the CURRENTLY settled page" -- reset on
-                // every settle, set true the moment a report arrives (which,
-                // since onPositioned only ever fires from whichever page is
-                // currently `hoisted`, is guaranteed to be a report for the
-                // NEW page). The reactive effect below waits on this flag
-                // before trusting hoistedNameHidden, exactly like the null
-                // check used to -- but nothing about the continuous position
-                // used for RENDERING depends on it, so the pill keeps drawing
-                // smoothly at the old (still visually reasonable, since both
-                // pages are onscreen at similar places) position for the one
-                // frame it takes the new report to arrive, instead of jumping
-                // away and back.
+                // hoistedPosition is reused across every page (only whichever
+                // page is currently settled writes into it), so it can hold a
+                // stale, previous-page value right after a switch. Render
+                // uses it as-is regardless -- both pages sit at similar
+                // places on screen, so a stale frame is a non-event. These
+                // two flags exist purely to keep the DOCK DECISION from
+                // acting on that stale value: reset on every settle,
+                // hoistedFreshForSettle flips true once a real report for
+                // the NEW page arrives, hoistedSnappedForSettle then makes
+                // that first post-switch decision a snap rather than an
+                // animation (every later change on the SAME settled page --
+                // ordinary scrolling -- still animates normally).
                 var hoistedFreshForSettle by remember { mutableStateOf(false) }
-                // Reset on every settle, alongside hoistedFreshForSettle --
-                // see that flag's own doc. This one gates snap-vs-animate:
-                // false means "this settle hasn't snapped to its own correct
-                // state yet".
                 var hoistedSnappedForSettle by remember { mutableStateOf(false) }
                 LaunchedEffect(perPage, pager.settledPage) {
                     if (perPage != 1) return@LaunchedEffect
@@ -3452,39 +3426,9 @@ internal fun GarageScreen(state: UiState, vm: AppViewModel) {
                     hoistedSnappedForSettle = false
                 }
                 LaunchedEffect(hoistedNameHidden, perPage, hoistedFreshForSettle) {
-                    // perPage > 1 (the multi-car grid): nothing below ever
-                    // passes `hoisted` to a page in that mode (see both call
-                    // sites' own guards), so hoistedPosition never updates
-                    // and hoistedNameHidden never genuinely changes -- but
-                    // this effect would still fire once on first composition
-                    // and animate/click for a pill that's never shown.
                     if (perPage != 1) return@LaunchedEffect
-                    // No real report for the NOW-settled page yet -- wait
-                    // rather than animate toward the previous page's stale
-                    // position (see hoistedFreshForSettle's own doc above).
                     if (!hoistedFreshForSettle) return@LaunchedEffect
                     val hoistedTarget = if (hoistedNameHidden) 1f else 0f
-                    // No transition between pages at all now -- every page
-                    // switch snaps straight to whatever's correct for the
-                    // newly settled page, not just the very first one ever.
-                    // Animating this used to seem like the more polished
-                    // choice (a page switch from a floating car to an
-                    // already-docked one gets a "real" transition instead of
-                    // an instant cut), but it was also the one thing keeping
-                    // this whole class of bug alive: every animated page-
-                    // switch transition is a WINDOW during which the pill's
-                    // position/size/shadow have to track a report that may
-                    // still be catching up, is drawn mid-flight over
-                    // whatever the new page's own hero card looks like, and
-                    // can overshoot past dockProgress 0 or 1 on the bounce --
-                    // three different surfaces, each independently capable
-                    // of producing the "goes away for a second" reported
-                    // here more than once. Only a SCROLL-driven change on
-                    // the page that's ALREADY settled (hoistedSnappedForSettle
-                    // already true, so this fires again without a page
-                    // switch in between) still animates -- that transition
-                    // was never the one reported as broken, and it's the
-                    // pill's actual, expected dock/undock behaviour.
                     if (!hoistedSnappedForSettle) {
                         hoistedDockProgress.snapTo(hoistedTarget)
                         hoistedSnappedForSettle = true
@@ -3660,6 +3604,10 @@ internal fun GarageScreen(state: UiState, vm: AppViewModel) {
                                             // no reason once nothing was actually competing
                                             // with it.
                                             reserveHeaderEnd = canExpand && i == end - 1 && !appearance.settingsAsPage,
+                                            // Same condition PagerDotsFor itself uses to
+                                            // decide whether it's showing at all -- see
+                                            // reserveTopForDots's own doc.
+                                            reserveTopForDots = totalBlocks > 1,
                                             // Only hide the per-car pull indicator in the
                                             // multi-car grid (perPage > 1) -- a prior fix
                                             // meant for the grid only ended up applying here
@@ -3740,10 +3688,17 @@ internal fun GarageScreen(state: UiState, vm: AppViewModel) {
                             AnimatedContent(
                                 targetState = settledBlock,
                                 transitionSpec = {
+                                    // Exit used to fade out in 120ms while enter
+                                    // took 200ms -- the outgoing name was fully
+                                    // gone a good 80ms before the incoming one
+                                    // finished fading in, a real window with no
+                                    // name on screen at all. Same duration both
+                                    // ways now, so together they never dip below
+                                    // full combined opacity.
                                     val dir = if (targetState > initialState) 1 else -1
                                     (slideInHorizontally(tween(200)) { it * dir / 3 } +
                                         fadeIn(tween(200))) togetherWith
-                                        fadeOut(tween(120))
+                                        fadeOut(tween(200))
                                 },
                                 label = "hoistedPillName",
                             ) { block ->
@@ -3792,7 +3747,9 @@ internal fun GarageScreen(state: UiState, vm: AppViewModel) {
                                 Box(Modifier.graphicsLayer { alpha = ((t - 0.5f) / 0.5f).coerceIn(0f, 1f) }) {
                                     AnimatedContent(
                                         targetState = settledBlock,
-                                        transitionSpec = { fadeIn(tween(200)) togetherWith fadeOut(tween(120)) },
+                                        // Matched durations -- see hoistedPillName's
+                                        // identical fix just above for why.
+                                        transitionSpec = { fadeIn(tween(200)) togetherWith fadeOut(tween(200)) },
                                         label = "hoistedPillCount",
                                     ) { block ->
                                         Text(
@@ -5449,6 +5406,16 @@ internal fun FloatingIcon(
  * Reading it one level down confines the invalidation to the dots. Keep the read
  * in here — hoisting it back to the call site silently restores the stall.
  */
+/** How much extra top clearance a car needs to reserve when [PagerDots] is
+ *  showing (see [VehicleDetailContent]'s own `reserveTopForDots`) -- the
+ *  dots' own `top = 10.dp` position plus roughly their own control height
+ *  (7dp dots + 6dp vertical padding each side, plus the glass rim/shadow's
+ *  own visual bulk), rounded up with a little breathing room rather than
+ *  measured exactly. Generous on purpose: a few dp of unclaimed space above
+ *  the chips is invisible; a few dp of real overlap is a toggle switch
+ *  sitting behind the "Updated x ago" text. */
+private val PagerDotClearance = 40.dp
+
 @Composable
 private fun PagerDotsFor(
     pager: PagerState,
@@ -8177,6 +8144,16 @@ private fun VehicleDetailContent(
     onExpand: (() -> Unit)? = null,
     reserveHeaderEnd: Boolean = false,
     hideIndicator: Boolean = false,
+    // True whenever GarageScreen's own PagerDotsFor is showing (totalBlocks
+    // > 1 there) -- that indicator floats fixed at TopCenter, independent of
+    // this car's own scroll position, so it can sit directly over this
+    // car's fact-chip row the instant the car is scrolled to its own top.
+    // Reported from a real device: with exactly two cars the dots -- one
+    // small circle, one elongated into a bar -- read as a toggle switch
+    // sitting half behind the chips. Same idea as reserveHeaderEnd already
+    // dodging the Settings gear; this reserves the analogous clearance at
+    // the top instead of the end.
+    reserveTopForDots: Boolean = false,
     // Non-null ONLY for GarageScreen's single-car-per-page pager's currently
     // SETTLED page -- see HoistedIdentityFlight's own doc. When provided,
     // this page's own scroll/scroll-to-top are reported into the CALLER's
@@ -8266,20 +8243,11 @@ private fun VehicleDetailContent(
             derivedStateOf { (heroTitlePosition.value?.y ?: Float.MAX_VALUE) < topInsetPx }
         }
         val dockProgress = remember { Animatable(0f) }
-        // True once a real position report has ever arrived for THIS
-        // composition of the pill. Before that, heroTitlePosition is null and
-        // nameHidden's own MAX_VALUE fallback always reads "not hidden" --
-        // not necessarily true. This local pill is freshly (re)composed every
-        // time GarageScreen un-hoists a page (the settled page moves
-        // elsewhere), and that page may already be scrolled well past its own
-        // header -- so animating toward the placeholder's "not hidden" default
-        // used to fly the pill in from the hero position across the whole
-        // screen the instant the FIRST real report corrected it a frame
-        // later, even though nothing the user did should have moved it at
-        // all. Keyed on the null-ness too, not just nameHidden's own value,
-        // so a report that confirms the placeholder's guess (nameHidden was
-        // already false) still gets its one chance to snap instead of skating
-        // past silently on an unchanged key.
+        // Freshly (re)composed every time GarageScreen un-hoists a page, so
+        // heroTitlePosition starts null -- its MAX_VALUE fallback reads "not
+        // hidden" even when the page is really scrolled well past its own
+        // header. hasReport makes the first real report a snap, not a fly-in
+        // from that wrong guess; every change after that animates normally.
         var hasReport by remember { mutableStateOf(false) }
         LaunchedEffect(nameHidden, heroTitlePosition.value != null) {
             if (heroTitlePosition.value == null) return@LaunchedEffect
@@ -8359,8 +8327,10 @@ private fun VehicleDetailContent(
             ) {
                 // Inset spacer (not padding) so content scrolls *behind* the bars --
                 // topInset alone, no extra breathing room, so the name sits right at
-                // the status bar's own edge instead of noticeably below it.
-                Spacer(Modifier.height(topInset))
+                // the status bar's own edge instead of noticeably below it. Plus
+                // PagerDotClearance when the dots are showing -- see
+                // reserveTopForDots's own doc.
+                Spacer(Modifier.height(topInset + if (reserveTopForDots) PagerDotClearance else 0.dp))
                 CarHeaderRow(v, state, onExpand, reserveHeaderEnd, hideName = true)
                 // summary (image+gauge) and controls are reorderable pebbles too. The full
                 // pebble column always renders while swiping; smoothness comes from
