@@ -7513,24 +7513,48 @@ internal fun rememberRelativeTime(millis: Long?): String? {
     return label
 }
 
-/** Small "Updated x ago" caption shown prominently under the car name. */
+/**
+ * Small pill-shaped fact badge -- [CarHeaderRow]'s own model/powertrain and
+ * "updated x ago" facts, which used to be two stacked plain caption lines
+ * with no container of their own, reading as an afterthought next to the
+ * rest of the app's chip/pill chrome. A muted [surfaceContainerHigh] fill,
+ * not the floating pills' glass treatment -- this sits on the app's own
+ * ordinary surface, not over an unpredictable photo, so it doesn't need
+ * that treatment's guaranteed contrast, just enough of a container to read
+ * as a distinct fact rather than body text bleeding into the row beside it.
+ */
+@Composable
+private fun MetaChip(text: String, modifier: Modifier = Modifier, icon: ImageVector? = null) {
+    Surface(
+        shape = RoundedCornerShape(50),
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = modifier,
+    ) {
+        Row(
+            Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            if (icon != null) {
+                Icon(icon, contentDescription = null, modifier = Modifier.size(12.dp))
+                Spacer(Modifier.width(4.dp))
+            }
+            Text(
+                text,
+                style = MaterialTheme.typography.labelMedium,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+    }
+}
+
+/** "Updated x ago" fact, as a [MetaChip]. Null (renders nothing) until a
+ *  first fetch has actually landed for [v]. */
 @Composable
 private fun LastUpdatedLabel(v: Vehicle, state: UiState, modifier: Modifier = Modifier) {
     val rel = rememberRelativeTime(state.fetchedAt(v)) ?: return
-    Row(modifier, verticalAlignment = Alignment.CenterVertically) {
-        Icon(
-            Icons.Filled.Refresh,
-            contentDescription = null,
-            modifier = Modifier.size(12.dp),
-            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        Spacer(Modifier.width(4.dp))
-        Text(
-            "Updated $rel",
-            style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-    }
+    MetaChip("Updated $rel", modifier, icon = Icons.Filled.Refresh)
 }
 
 // --- Drag-and-drop reordering --------------------------------------------
@@ -8889,7 +8913,13 @@ private fun Refreshable(
 }
 
 /**
- * Car name/model + a Driving/Parked badge, with an optional expand button.
+ * Car name + a row of small fact chips (model/powertrain, "updated x ago"),
+ * with an optional expand button. The two facts used to be stacked plain
+ * caption lines under the name; as [MetaChip]s in a [FlowRow] instead, they
+ * read as distinct pieces of status (matching the app's own chip/pill
+ * language elsewhere) rather than a second and third line of body text, and
+ * wrap onto their own line instead of clipping if a long model name and the
+ * expand button don't both fit the available width.
  *
  * [hideName] (true from both [VehicleDetailContent] and [ExpandedCar] now)
  * skips the name [Text] entirely -- not drawn, not reserved. The car's name
@@ -8910,14 +8940,14 @@ private fun CarHeaderRow(
         Modifier
             .fillMaxWidth()
             .then(if (reserveEnd) Modifier.padding(end = 52.dp) else Modifier),
-        // Top, not CenterVertically -- the text column is three lines (name,
-        // model, last-updated) of very different weight, and centering the
-        // button against all three of them put its visual centre down around
-        // the model/updated lines instead of level with the name, the one
-        // line it actually reads as paired with. Top-aligns the button's own
-        // top edge with the name's, the same "icon keys off the title, not
-        // the whole block" alignment every other icon-beside-a-text-column
-        // pairing in this app already uses.
+        // Top, not CenterVertically -- the text column is two rows (name,
+        // fact chips) of very different weight, and centering the button
+        // against both put its visual centre down around the chips instead
+        // of level with the name, the one row it actually reads as paired
+        // with. Top-aligns the button's own top edge with the name's, the
+        // same "icon keys off the title, not the whole block" alignment
+        // every other icon-beside-a-text-column pairing in this app
+        // already uses.
         verticalAlignment = Alignment.Top,
     ) {
         Column(Modifier.weight(1f)) {
@@ -8929,12 +8959,14 @@ private fun CarHeaderRow(
                     color = MaterialTheme.colorScheme.onSurface,
                 )
             }
-            Text(
-                "${v.model} · ${state.powertrainLabel(v)}",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            LastUpdatedLabel(v, state, Modifier.padding(top = 2.dp))
+            FlowRow(
+                modifier = Modifier.padding(top = if (hideName) 0.dp else 6.dp),
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                verticalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                MetaChip("${v.model} · ${state.powertrainLabel(v)}")
+                LastUpdatedLabel(v, state)
+            }
         }
         if (onExpand != null) {
             // A proper floating chip (was a hard-to-see bare icon).
