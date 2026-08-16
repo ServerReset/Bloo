@@ -8110,14 +8110,12 @@ private fun BoxScope.FloatingIdentityPill(
                         Modifier
                     },
                 )
-                // Clipped to the SAME shape the glass fill above uses,
-                // before .clickable -- without this, clickable's own ripple
-                // indication paints out to this Row's plain rectangular
-                // bounds, flashing square corners past the rounded
-                // background on every tap even though the fill itself was
-                // always correctly round. This is what "edges still not
-                // round" turned out to be: not the shape, the ripple.
-                .clip(pillShape)
+                // Clipped to a shape that lerps its OWN corner radius by t
+                // (PillDockedCorner's own doc explains why this can't just
+                // share pillShape) -- before .clickable, so clickable's own
+                // ripple indication respects the pill's rounding instead of
+                // painting out to this Row's plain rectangular bounds.
+                .clip(RoundedCornerShape(lerp(0.dp, PillDockedCorner, t)))
                 .padding(horizontal = lerp(0.dp, 16.dp, t))
                 .clickable { haptics?.click(); onClick() },
             verticalAlignment = Alignment.CenterVertically,
@@ -8424,15 +8422,15 @@ private fun VehicleDetailContent(
                             Modifier
                         },
                     )
-                    // Clipped to the SAME shape as the glass fill above,
-                    // before .clickable moves here from the Text below --
-                    // that used to leave the whole Row un-clickable and un-
-                    // clipped, so tapping the name showed a plain rectangular
-                    // ripple sized to the TEXT's own glyph bounds, sharp
-                    // corners and all, regardless of the rounded pill drawn
-                    // behind it. This is what "edges still not round" turned
-                    // out to be: not the fill's shape, the ripple.
-                    .clip(pillShape)
+                    // Clipped to a shape that lerps its OWN corner radius by
+                    // t, not pillShape directly -- see PillDockedCorner's own
+                    // doc for why. Before .clickable moves here from the Text
+                    // below -- that used to leave the whole Row un-clickable
+                    // and un-clipped, so tapping the name showed a plain
+                    // rectangular ripple sized to the TEXT's own glyph
+                    // bounds, sharp corners and all, regardless of the
+                    // rounded pill drawn behind it.
+                    .clip(RoundedCornerShape(lerp(0.dp, PillDockedCorner, t)))
                     .clickable { haptics?.click(); scope.launch { scroll.animateScrollTo(0) } }
                     .padding(horizontal = lerp(0.dp, 16.dp, t)),
                 verticalAlignment = Alignment.CenterVertically,
@@ -8707,10 +8705,11 @@ private fun ExpandedCar(v: Vehicle, state: UiState, vm: AppViewModel, flipped: B
                             Modifier
                         },
                     )
-                    // Clip before clickable -- see the hoisted pill's
-                    // identical fix for why (the ripple, not the fill, was
-                    // what read as "not round").
-                    .clip(pillShape)
+                    // Clip (lerped corner, not pillShape directly -- see
+                    // PillDockedCorner's own doc) before clickable -- see the
+                    // hoisted pill's identical fix for why (the ripple, not
+                    // the fill, was what read as "not round").
+                    .clip(RoundedCornerShape(lerp(0.dp, PillDockedCorner, t)))
                     .clickable {
                         haptics?.click()
                         scope.launch { controlsScroll.animateScrollTo(0) }

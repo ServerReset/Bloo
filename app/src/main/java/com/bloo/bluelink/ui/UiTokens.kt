@@ -306,6 +306,33 @@ internal fun pillDockSpring(from: Float, to: Float): SpringSpec<Float> {
     return spring(dampingRatio = damping, stiffness = PillDockStiffness)
 }
 
+/**
+ * Half of the pill's fully-docked 48dp height -- the corner radius its own
+ * percent(50) background shape naturally reaches once dockProgress hits 1.
+ *
+ * Every pill implementation ALSO clips its content Row to a shape (originally
+ * so tapping it shows a ripple that respects the pill's rounding, not a
+ * rectangle -- see pillDockSpring's own call sites). That clip used to share
+ * the exact same percent(50) shape the background uses, which is wrong for
+ * the CLIP specifically: percent(50) is computed from the Row's own current
+ * LAYOUT size, and the Row's layout size (padding aside) is the name Text's
+ * NATURAL, unscaled titleLarge bounds -- unaffected by the graphicsLayer
+ * scale that draws it smaller while attached. At low dockProgress the Row
+ * therefore has real height (and a real corner radius from it) well before
+ * there's any real padding to keep the small, top-left-scaled glyphs clear
+ * of that curve, so the rounded corner sliced directly into the first
+ * character or two -- reported as "part of the text gets cut off" and,
+ * since the effect got WORSE as dockProgress approached 0 from above rather
+ * than better, also read as the name partially vanishing on its way back to
+ * attached. Lerping the CLIP's own corner from 0dp (a plain rectangle -- can
+ * never cut content that's already inside it) up to this constant by the
+ * same dockProgress the padding grows by keeps the two in lockstep, so
+ * there's never a point where curvature outruns the padding meant to clear
+ * it. The background keeps its own percent(50) shape unchanged -- it only
+ * ever draws past dockProgress 0.02, well clear of this low-t window.
+ */
+internal val PillDockedCorner = 24.dp
+
 @Composable
 internal fun collapseEnter(expandFrom: Alignment.Vertical = Alignment.Top): EnterTransition =
     fadeIn(MaterialTheme.motionScheme.defaultEffectsSpec<Float>()) +

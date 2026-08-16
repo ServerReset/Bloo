@@ -2189,10 +2189,12 @@ internal fun SettingsScreen(
                             Modifier
                         },
                     )
-                    // Clip before clickable -- see the hoisted pill's
-                    // identical fix for why (the ripple, not the fill, was
-                    // what read as "not round").
-                    .clip(pillShape)
+                    // Clip (lerped corner, not pillShape directly -- see
+                    // PillDockedCorner's own doc, Screens.kt) before
+                    // clickable -- see the hoisted pill's identical fix for
+                    // why (the ripple, not the fill, was what read as "not
+                    // round").
+                    .clip(RoundedCornerShape(lerp(0.dp, PillDockedCorner, t)))
                     .clickable {
                         haptics?.click()
                         settingsScope.launch { settingsGridState.animateScrollToItem(0) }
