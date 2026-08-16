@@ -3396,7 +3396,6 @@ internal fun GarageScreen(state: UiState, vm: AppViewModel) {
                 val hoistedPosition = remember { mutableStateOf<Offset?>(null) }
                 val hoistedColor = remember { mutableStateOf(Color.Unspecified) }
                 val hoistedFontSizeSp = remember { mutableStateOf<Float?>(null) }
-                val hoistedPhotoUrl = remember { mutableStateOf<String?>(null) }
                 val hoistedContainerPosition = remember { mutableStateOf(Offset.Zero) }
                 val hoistedActiveScroll = remember { mutableStateOf<ScrollState?>(null) }
                 val hoistedScrollToTop = remember { mutableStateOf<(suspend () -> Unit)?>(null) }
@@ -3454,7 +3453,6 @@ internal fun GarageScreen(state: UiState, vm: AppViewModel) {
                             },
                             color = hoistedColor,
                             fontSizeSp = hoistedFontSizeSp,
-                            photoUrl = hoistedPhotoUrl,
                         ),
                         activeScroll = hoistedActiveScroll,
                         scrollToTop = hoistedScrollToTop,
@@ -5735,10 +5733,6 @@ private fun HeroHeader(
         // onto a still-white card for the frames before the photo arrives.
         val heroTitleColorNow = lerp(MaterialTheme.colorScheme.onSurface, HeroOnPhoto, heroT)
         heroTitleFlight?.color?.value = heroTitleColorNow
-        // Same imageUrl this hero card's own HeroPhotoBackdrop draws -- see
-        // HeroTitleFlight.photoUrl's own doc for why a caller's avatar
-        // reads this instead of doing its own lookup.
-        heroTitleFlight?.photoUrl?.value = imageUrl
         PebbleShell(
             expanded = photoExpanded,
             onToggle = { vm.togglePebble(v, com.bloo.bluelink.data.HERO_PHOTO_SECTION) },
@@ -7927,19 +7921,11 @@ internal fun BackdropHost(content: @Composable BoxScope.() -> Unit) {
  * drew at its own fixed, larger style regardless of the hero's actual
  * current size, so it visibly overflowed into whatever sits beside it
  * (the collapsed charge/range readout) instead of sitting in its slot.
- *
- * `photoUrl` is the SAME `imageUrl` [HeroHeader] already hands its own
- * [HeroPhotoBackdrop] -- reported here too so a caller's own avatar (e.g.
- * GarageScreen's hoisted pill) draws the literal same photo the hero card
- * itself is showing, rather than doing its own independent
- * car-index-to-photo-URL lookup that can silently desync from whichever
- * page is actually settled and end up resolving to nothing.
  */
 internal class HeroTitleFlight(
     val onPositioned: (Offset) -> Unit,
     val color: MutableState<Color>,
     val fontSizeSp: MutableState<Float?>,
-    val photoUrl: MutableState<String?>,
 )
 
 /** Null (the default) everywhere except inside [VehicleDetailContent]. */
@@ -7982,7 +7968,6 @@ private data class LocalNamePillState(
     val heroTitlePosition: MutableState<Offset?>,
     val heroTitleColor: MutableState<Color>,
     val heroTitleFontSizeSp: MutableState<Float?>,
-    val heroTitlePhotoUrl: MutableState<String?>,
     val containerPosition: MutableState<Offset>,
     val heroYAtScrollZero: MutableState<Float?>,
     /** This car's own column width in px -- see the pill's own `.widthIn`
@@ -8048,7 +8033,12 @@ private fun BoxScope.FloatingIdentityPill(
             .offset {
                 val ax = attachedX()
                 val ay = attachedY()
-                val t = dockProgress.value
+                // Coerced -- same reason the content's own t below is: the
+                // dock spring bounces past its target, and letting POSITION
+                // follow that raw overshoot while SIZE/alpha stay clamped
+                // to [0,1] put the two visibly out of step with each other
+                // for the length of the bounce.
+                val t = dockProgress.value.coerceIn(0f, 1f)
                 val x = ax + (cornerXPx - ax) * t
                 val y = ay + (cornerYPx - ay) * t
                 IntOffset(x.roundToInt(), y.roundToInt())
@@ -8202,9 +8192,6 @@ private fun VehicleDetailContent(
         val heroTitlePosition = remember { mutableStateOf<Offset?>(null) }
         val heroTitleColor = remember { mutableStateOf(Color.Unspecified) }
         val heroTitleFontSizeSp = remember { mutableStateOf<Float?>(null) }
-        // Unused here -- this pill has no avatar, only GarageScreen's
-        // hoisted one does (see HeroTitleFlight.photoUrl's own doc).
-        val heroTitlePhotoUrl = remember { mutableStateOf<String?>(null) }
         // This composable's OWN root position -- needed to convert
         // heroTitlePosition (root coordinates) into a LOCAL offset for the
         // floating Text below. Modifier.offset{} moves an element relative to
@@ -8276,7 +8263,6 @@ private fun VehicleDetailContent(
                 },
                 color = heroTitleColor,
                 fontSizeSp = heroTitleFontSizeSp,
-                photoUrl = heroTitlePhotoUrl,
             )
         }
         LocalNamePillState(
@@ -8287,7 +8273,6 @@ private fun VehicleDetailContent(
             heroTitlePosition = heroTitlePosition,
             heroTitleColor = heroTitleColor,
             heroTitleFontSizeSp = heroTitleFontSizeSp,
-            heroTitlePhotoUrl = heroTitlePhotoUrl,
             containerPosition = containerPosition,
             heroYAtScrollZero = heroYAtScrollZero,
             containerWidthPx = containerWidthPx,
@@ -8349,7 +8334,7 @@ private fun VehicleDetailContent(
         // reference below reads identically to when these were built
         // directly in this scope, before `local` bundled them for the
         // `if (hoisted == null)` branch above.
-        val (_, dockProgress, cornerXPx, cornerYPx, heroTitlePosition, heroTitleColor, heroTitleFontSizeSp, heroTitlePhotoUrl, containerPosition, heroYAtScrollZero, containerWidthPx) = local
+        val (_, dockProgress, cornerXPx, cornerYPx, heroTitlePosition, heroTitleColor, heroTitleFontSizeSp, containerPosition, heroYAtScrollZero, containerWidthPx) = local
         // This floating Text is always drawn at titleLarge -- ITS OWN fixed,
         // full-sized style, docked or not. While attached, it's scaled DOWN
         // (via graphicsLayer below, not by changing fontSize -- see that
@@ -8383,7 +8368,10 @@ private fun VehicleDetailContent(
                     // scroll.value read DIRECTLY, not via the reported
                     // position -- see heroYAtScrollZero's own doc for why.
                     val attachedY = heroYAtScrollZero.value?.let { it - scroll.value } ?: cornerYPx
-                    val t = dockProgress.value
+                    // Coerced -- see the hoisted pill's identical offset{}
+                    // for why (keeps position in step with size/alpha
+                    // through the spring's own bounce past its target).
+                    val t = dockProgress.value.coerceIn(0f, 1f)
                     val x = attachedX + (cornerXPx - attachedX) * t
                     val y = attachedY + (cornerYPx - attachedY) * t
                     IntOffset(x.roundToInt(), y.roundToInt())
@@ -8591,10 +8579,6 @@ private fun ExpandedCar(v: Vehicle, state: UiState, vm: AppViewModel, flipped: B
             },
             color = heroTitleColor,
             fontSizeSp = heroTitleFontSizeSp,
-            // Unused -- the avatar below reads state.imageUrls[v.vin]
-            // directly (there's exactly one car here, no index to get
-            // wrong), rather than through this channel.
-            photoUrl = mutableStateOf(null),
         )
     }
     // CriticalContent's own HeroHeader is the real hero photo card here --
@@ -8690,7 +8674,8 @@ private fun ExpandedCar(v: Vehicle, state: UiState, vm: AppViewModel, flipped: B
                 .offset {
                     val attachedX = titlePosition.value?.let { it.x - containerPosition.value.x } ?: cornerXPx
                     val attachedY = yAtScrollZero.value?.let { it - controlsScroll.value } ?: cornerYPx
-                    val t = dockProgress.value
+                    // Coerced -- see the hoisted pill's identical offset{}.
+                    val t = dockProgress.value.coerceIn(0f, 1f)
                     val x = attachedX + (cornerXPx - attachedX) * t
                     val y = attachedY + (cornerYPx - attachedY) * t
                     IntOffset(x.roundToInt(), y.roundToInt())

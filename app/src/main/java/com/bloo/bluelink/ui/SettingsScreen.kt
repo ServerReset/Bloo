@@ -729,9 +729,6 @@ internal fun SettingsScreen(
               // fallback (onSurface/titleLarge) already matches exactly.
               color = mutableStateOf(Color.Unspecified),
               fontSizeSp = mutableStateOf(null),
-              // Unused here -- Settings has no avatar. See
-              // HeroTitleFlight.photoUrl's own doc.
-              photoUrl = mutableStateOf(null),
           )
       }
       LocalSettingsPillState(flight, dockProgress, cornerXPx, cornerYPx, titlePosition, containerPosition)
@@ -2161,7 +2158,9 @@ internal fun SettingsScreen(
                 .offset {
                     val attachedX = titlePosition.value?.let { it.x - containerPosition.value.x } ?: cornerXPx
                     val attachedY = titlePosition.value?.let { it.y - containerPosition.value.y } ?: cornerYPx
-                    val t = dockProgress.value
+                    // Coerced -- see the hoisted pill's identical offset{}
+                    // (Screens.kt) for why.
+                    val t = dockProgress.value.coerceIn(0f, 1f)
                     val x = attachedX + (cornerXPx - attachedX) * t
                     val y = attachedY + (cornerYPx - attachedY) * t
                     IntOffset(x.roundToInt(), y.roundToInt())
