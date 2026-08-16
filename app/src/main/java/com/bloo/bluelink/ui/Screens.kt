@@ -3483,6 +3483,7 @@ internal fun GarageScreen(state: UiState, vm: AppViewModel) {
                             color = hoistedColor,
                             fontSizeSp = hoistedFontSizeSp,
                             photoUrl = hoistedPhotoUrl,
+                            dockProgress = { hoistedDockProgress.value },
                         ),
                         activeScroll = hoistedActiveScroll,
                         scrollToTop = hoistedScrollToTop,
@@ -3753,6 +3754,18 @@ internal fun GarageScreen(state: UiState, vm: AppViewModel) {
                                         val scale = attachedScale + (1f - attachedScale) * hoistedDockProgress.value.coerceIn(0f, 1f)
                                         scaleX = scale
                                         scaleY = scale
+                                        // Complement of the real hero title's
+                                        // own alpha (1 - dockProgress) -- see
+                                        // HeroTitleFlight's own doc for why
+                                        // this crossfade, not a flat 1f,
+                                        // matters: at dockProgress == 0 this
+                                        // copy fades OUT as the real title
+                                        // fades back IN, so there's a genuine
+                                        // handoff instead of two permanently-
+                                        // exclusive copies with no shared
+                                        // moment either could be trusted to
+                                        // be the one actually showing.
+                                        alpha = hoistedDockProgress.value.coerceIn(0f, 1f)
                                         transformOrigin = TransformOrigin(0f, 0f)
                                     },
                                 )
@@ -5757,14 +5770,16 @@ private fun HeroHeader(
             } else {
                 Modifier
             },
-            // Permanently invisible, not crossfaded -- there is exactly ONE
-            // visible copy of this title whenever a flight controller is
-            // present (VehicleDetailContent's own floating Text, drawn AT
-            // this title's live position/colour via HeroTitleFlight above),
-            // so this one never draws glyphs at all rather than fading two
-            // copies in and out of sync with each other. See
-            // HeroTitleFlight's own doc.
-            titleAlpha = if (heroTitleFlight != null) 0f else 1f,
+            // Crossfades with the floating copy by dockProgress, not
+            // permanently 0 -- see HeroTitleFlight's own doc for why. A
+            // lambda so this reads dockProgress live, draw-phase only,
+            // instead of forcing a full recomposition on every frame of the
+            // dock spring.
+            titleAlpha = if (heroTitleFlight != null) {
+                { 1f - heroTitleFlight.dockProgress().coerceIn(0f, 1f) }
+            } else {
+                { 1f }
+            },
             onTitleScale = if (heroTitleFlight != null) {
                 { sp -> heroTitleFlight.fontSizeSp.value = sp }
             } else {
@@ -7888,13 +7903,30 @@ internal fun BackdropHost(content: @Composable BoxScope.() -> Unit) {
  * What a header title -- [HeroHeader]'s own (the car's name, drawn ON the
  * photo card via [PebbleShell]), or `SettingsHeaderRow`'s own -- reports
  * back to whichever composable is floating a copy of it, so THAT copy can
- * BE the real title -- the only copy that ever draws glyphs -- rather than
- * a second, independent [Text] with its own alpha faded to fake standing in
- * for the first one. Whenever a flight controller is provided at all, the
- * real title goes permanently invisible (see each call site's own
- * `titleAlpha`/`alpha`) -- not crossfaded with anything, just never drawn,
- * because the floating copy is ALREADY sitting exactly on top of it (see
- * [onPositioned]) the entire time it's on screen.
+ * BE the real title while it's genuinely in flight, crossfading BACK to the
+ * real title once it's done -- rather than a second, independent [Text]
+ * permanently faded to fake standing in for the first one for as long as a
+ * flight controller merely exists.
+ *
+ * That permanent-hide design (real title alpha always 0 the instant a
+ * flight controller is present, full stop) used to be the whole story, and
+ * it was a single point of failure: the floating copy was the ONLY thing
+ * that ever drew this title's glyphs, at ANY dockProgress, so any gap in
+ * ITS OWN rendering -- for instance the frame its own chrome crosses the
+ * `t > 0.02f` threshold -- had no fallback and read as the name vanishing.
+ * It also meant "fully attached" (dockProgress == 0, the floating copy
+ * sitting pixel-for-pixel on top of the real one) never actually handed
+ * anything back -- there was no "fixed text" state to return to, which is
+ * what the reported "briefly disappears transitioning back... it should
+ * switch to the name and then move it back into the hero name" was asking
+ * for literally. [dockProgress] is what makes the handoff possible: the
+ * real title's own alpha is `1 - dockProgress` and the floating copy's is
+ * `dockProgress` (see each call site), so the two are always exact
+ * complements of the SAME continuous, already-smoothly-animated spring
+ * value -- there is no discrete instant where neither (or both, visibly)
+ * is showing, and at dockProgress == 0 the real, ordinary title is what's
+ * actually on screen again, not a floating stand-in that merely looks
+ * identical to it.
  *
  * `onPositioned`, `color`, and `fontSizeSp` are read every layout pass
  * (including while the hero is scrolled out of the viewport;
@@ -7921,6 +7953,11 @@ internal class HeroTitleFlight(
     val color: MutableState<Color>,
     val fontSizeSp: MutableState<Float?>,
     val photoUrl: MutableState<String?>,
+    /** 0 = fully attached (the real title should own visibility again), 1 =
+     *  fully docked. A plain lambda, not a captured Float, so it always
+     *  reads the CURRENT value of whichever Animatable backs it -- see
+     *  each construction site. */
+    val dockProgress: () -> Float,
 )
 
 /** Null (the default) everywhere except inside [VehicleDetailContent]. */
@@ -8093,13 +8130,13 @@ private fun BoxScope.FloatingIdentityPill(
  * scrolls together in one [Column] inside [Refreshable] (header row, then
  * the reorderable [PebbleList]).
  *
- * The car's name is drawn by exactly ONE [Text], ever: this one. The hero
- * card's own title never draws glyphs at all while this is active (see the
- * `titleAlpha = 0f` at [HeroHeader]'s [PebbleShell] call) -- there is no
- * second copy to fade in or out, so nothing needs hiding or crossfading.
+ * The car's name is visibly drawn by at most ONE of two [Text]s at a time:
+ * this one, or the hero card's own real title -- see [HeroTitleFlight]'s own
+ * doc for the crossfade between them (by [dockProgress], not a hard switch).
  * [HeroTitleFlight] reports the hero title's real, live position and colour
- * every layout pass, and THIS Text is simply drawn there -- indistinguishable
- * from being the hero's own title, because as far as anyone can see, it is.
+ * every layout pass, and THIS Text is drawn there while it's the one
+ * showing -- indistinguishable from being the hero's own title, because as
+ * far as anyone can see, while attached, it is.
  *
  * [dockProgress] is the one thing that ever animates: 0 means "drawn exactly
  * at the hero title's live position/colour/size" and 1 means "docked in the
@@ -8255,6 +8292,7 @@ private fun VehicleDetailContent(
                 color = heroTitleColor,
                 fontSizeSp = heroTitleFontSizeSp,
                 photoUrl = heroTitlePhotoUrl,
+                dockProgress = { dockProgress.value },
             )
         }
         LocalNamePillState(
@@ -8442,6 +8480,10 @@ private fun VehicleDetailContent(
                             val scale = attachedScale + (1f - attachedScale) * dockProgress.value.coerceIn(0f, 1f)
                             scaleX = scale
                             scaleY = scale
+                            // Complement of the real hero title's own alpha
+                            // (1 - dockProgress) -- see HeroTitleFlight's own
+                            // doc for why this crossfade matters.
+                            alpha = dockProgress.value.coerceIn(0f, 1f)
                             transformOrigin = TransformOrigin(0f, 0f)
                         },
                 )
@@ -8540,10 +8582,11 @@ private fun ExpandedCar(v: Vehicle, state: UiState, vm: AppViewModel, flipped: B
             },
             color = heroTitleColor,
             fontSizeSp = heroTitleFontSizeSp,
-            // Unused -- the avatar below reads state.imageUrls[v.vin]
-            // directly (there's exactly one car here, no index to get
-            // wrong), rather than through this channel.
+            // Unused -- this pill has no avatar to feed (see the shared
+            // FloatingIdentityPill doc for why none of the pills do any
+            // more).
             photoUrl = mutableStateOf(null),
+            dockProgress = { dockProgress.value },
         )
     }
     // CriticalContent's own HeroHeader is the real hero photo card here --
@@ -8695,6 +8738,10 @@ private fun ExpandedCar(v: Vehicle, state: UiState, vm: AppViewModel, flipped: B
                         val scale = attachedScale + (1f - attachedScale) * dockProgress.value.coerceIn(0f, 1f)
                         scaleX = scale
                         scaleY = scale
+                        // Complement of the real hero title's own alpha
+                        // (1 - dockProgress) -- see HeroTitleFlight's own
+                        // doc for why this crossfade matters.
+                        alpha = dockProgress.value.coerceIn(0f, 1f)
                         transformOrigin = TransformOrigin(0f, 0f)
                     },
                 )
@@ -10366,8 +10413,16 @@ internal fun PebbleShell(
      * tinting; this is for a caller that wants to fade the title OUT while
      * something else (the hero's floating name, mid-flight) fades in to
      * replace it, without touching [titleColor] itself.
+     *
+     * A lambda, not a plain [Float] -- read inside this title's own
+     * `graphicsLayer` below (draw-phase only), so a caller backing it with a
+     * continuously-animating value (the hero's own dockProgress, via
+     * [HeroTitleFlight]) gets a live crossfade every frame without forcing
+     * this whole pebble to recompose on every one of those frames the way
+     * passing the raw, ever-changing Float itself as a composable parameter
+     * would.
      */
-    titleAlpha: Float = 1f,
+    titleAlpha: () -> Float = { 1f },
     /**
      * Reports this title's own CURRENT effective font size (its base style's
      * size times whatever [growTitleOnExpand]/collapse scale is currently
@@ -10682,7 +10737,7 @@ internal fun PebbleShell(
                                     .graphicsLayer {
                                         scaleX = titleScale
                                         scaleY = titleScale
-                                        alpha = titleAlpha
+                                        alpha = titleAlpha()
                                         transformOrigin = TransformOrigin(0f, 0.5f)
                                     }
                                     // Appended LAST -- after the .layout{} above, so a
