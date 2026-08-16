@@ -3441,25 +3441,16 @@ internal fun GarageScreen(state: UiState, vm: AppViewModel) {
                 // frame it takes the new report to arrive, instead of jumping
                 // away and back.
                 var hoistedFreshForSettle by remember { mutableStateOf(false) }
+                // Reset on every settle, alongside hoistedFreshForSettle --
+                // see that flag's own doc. This one gates snap-vs-animate:
+                // false means "this settle hasn't snapped to its own correct
+                // state yet".
+                var hoistedSnappedForSettle by remember { mutableStateOf(false) }
                 LaunchedEffect(perPage, pager.settledPage) {
                     if (perPage != 1) return@LaunchedEffect
                     hoistedFreshForSettle = false
+                    hoistedSnappedForSettle = false
                 }
-                // True once this pill has EVER settled for real, for the
-                // whole lifetime of this composable -- NOT reset on every
-                // page switch. Only the very first-ever settle (right after
-                // the app opens on this pager) has no meaningful "from" state
-                // to animate away from, so only that one snaps; every
-                // subsequent transition -- including a page switch straight
-                // from a floating car to an already-scrolled-away one -- has
-                // a real, correct starting point (wherever dockProgress
-                // already was for the PREVIOUS page) and a real, correct
-                // target (the new page's own just-arrived report), so it
-                // animates normally between them. Resetting this flag on
-                // every page switch was a previous bug: it forced every
-                // single page switch to snap instead of animate, even when
-                // there was nothing wrong to correct for.
-                var hasEverSettled by remember { mutableStateOf(false) }
                 LaunchedEffect(hoistedNameHidden, perPage, hoistedFreshForSettle) {
                     // perPage > 1 (the multi-car grid): nothing below ever
                     // passes `hoisted` to a page in that mode (see both call
@@ -3473,9 +3464,30 @@ internal fun GarageScreen(state: UiState, vm: AppViewModel) {
                     // position (see hoistedFreshForSettle's own doc above).
                     if (!hoistedFreshForSettle) return@LaunchedEffect
                     val hoistedTarget = if (hoistedNameHidden) 1f else 0f
-                    if (!hasEverSettled) {
+                    // No transition between pages at all now -- every page
+                    // switch snaps straight to whatever's correct for the
+                    // newly settled page, not just the very first one ever.
+                    // Animating this used to seem like the more polished
+                    // choice (a page switch from a floating car to an
+                    // already-docked one gets a "real" transition instead of
+                    // an instant cut), but it was also the one thing keeping
+                    // this whole class of bug alive: every animated page-
+                    // switch transition is a WINDOW during which the pill's
+                    // position/size/shadow have to track a report that may
+                    // still be catching up, is drawn mid-flight over
+                    // whatever the new page's own hero card looks like, and
+                    // can overshoot past dockProgress 0 or 1 on the bounce --
+                    // three different surfaces, each independently capable
+                    // of producing the "goes away for a second" reported
+                    // here more than once. Only a SCROLL-driven change on
+                    // the page that's ALREADY settled (hoistedSnappedForSettle
+                    // already true, so this fires again without a page
+                    // switch in between) still animates -- that transition
+                    // was never the one reported as broken, and it's the
+                    // pill's actual, expected dock/undock behaviour.
+                    if (!hoistedSnappedForSettle) {
                         hoistedDockProgress.snapTo(hoistedTarget)
-                        hasEverSettled = true
+                        hoistedSnappedForSettle = true
                         return@LaunchedEffect
                     }
                     // pillDockSpring -- shared by every pill implementation,
