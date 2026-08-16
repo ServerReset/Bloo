@@ -7832,7 +7832,7 @@ private class LocalNamePillState(
     val flight: HeroTitleFlight,
     /** True once the hero title's top edge has scrolled above the status
      *  bar -- the one bit [TitleDockBadge] runs on. */
-    val nameHidden: State<Boolean>,
+    val nameHidden: androidx.compose.runtime.State<Boolean>,
 )
 
 /**

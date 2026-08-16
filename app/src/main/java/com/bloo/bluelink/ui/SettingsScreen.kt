@@ -554,7 +554,7 @@ private class LocalSettingsPillState(
     val flight: HeroTitleFlight,
     /** True once the header title's top edge has scrolled above the status
      *  bar -- the one bit the badge runs on. */
-    val nameHidden: State<Boolean>,
+    val nameHidden: androidx.compose.runtime.State<Boolean>,
 )
 
 /**
@@ -689,16 +689,7 @@ internal fun SettingsScreen(
         // neighbouring cards are almost never the same height, and a fixed-row
         // grid would force every card in a row to the tallest one's height --
         // exactly the "wrong tool" a masonry layout exists to avoid.
-        Box(
-            Modifier
-                .fillMaxSize()
-                // Reports THIS Box's own root position -- see
-                // LocalSettingsPillState.containerPosition's own doc on
-                // VehicleDetailContent's identical field. No-op when
-                // hoisted (local == null) -- the caller tracks its own.
-                .onGloballyPositioned { coords -> local?.let { it.containerPosition.value = coords.positionInRoot() } },
-            contentAlignment = Alignment.TopCenter,
-        ) {
+        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
         CompositionLocalProvider(LocalHeroTitleFlight provides (hoisted?.flight ?: local?.flight)) {
         LazyVerticalStaggeredGrid(
             columns = StaggeredGridCells.Adaptive(minSize = 380.dp),
