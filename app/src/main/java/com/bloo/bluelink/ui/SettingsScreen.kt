@@ -2482,6 +2482,95 @@ private fun aiCommandLabel(cmd: String): String = when (cmd) {
 
 private class SearchEntry(val title: String, val haystack: String, val content: @Composable () -> Unit)
 
+/**
+ * Declarative description of one plain on/off setting, so a new simple toggle
+ * needs exactly one entry here to become searchable -- not a hand-written
+ * [SearchEntry] closure duplicating the same `ToggleRow(label, checked) { onToggle }`
+ * shape every other toggle already uses. This is the "dynamic index" for the
+ * subset of settings that fit it: anything that is genuinely just a checked
+ * state and a setter reads its search row from this single list instead of a
+ * bespoke `add(...)` call. Settings whose search behaviour has to be more than
+ * a toggle -- a segmented picker, a confirm-gated biometric prompt, a slider,
+ * anything per-vehicle -- still declare themselves explicitly below; forcing
+ * those through this shape would be the same regression the biometric entry's
+ * own comment warns about (a search shortcut skipping a step the real row
+ * enforces).
+ */
+private class ToggleSpec(
+    val title: String,
+    val keywords: String,
+    /** Shown on the row itself; defaults to [title] since most toggles read
+     *  identically in both places. Only a few (e.g. "Dynamic color (Material
+     *  You)") spell the row out more fully than the search title. */
+    val label: String = title,
+    val visible: (UiState) -> Boolean = { true },
+    val checked: (SettingsStore.Appearance, SettingsStore.NotificationPrefs, UiState) -> Boolean,
+    val onToggle: (AppViewModel, Boolean) -> Unit,
+)
+
+/** Every plain app-wide toggle, in the order it should appear when searched.
+ *  Add a new one here -- not a new `add(...)` call in [SettingsSearchResults]
+ *  -- and it is searchable with no other change. */
+private val ToggleSettings = listOf(
+    ToggleSpec(
+        title = "Haptic feedback", keywords = "vibration vibrate buzz sound",
+        checked = { a, _, _ -> a.hapticsEnabled }, onToggle = { vm, v -> vm.setHapticsEnabled(v) },
+    ),
+    ToggleSpec(
+        title = "Open links in app", keywords = "browser tab links",
+        checked = { a, _, _ -> a.linksInApp }, onToggle = { vm, v -> vm.setLinksInApp(v) },
+    ),
+    ToggleSpec(
+        title = "Live charging updates", keywords = "notification charging live progress ongoing bar ev limit",
+        checked = { _, n, _ -> n.charging }, onToggle = { vm, v -> vm.setNotifyCharging(v) },
+    ),
+    ToggleSpec(
+        title = "Service due alerts", keywords = "notification reminder service",
+        checked = { _, n, _ -> n.service }, onToggle = { vm, v -> vm.setNotifyService(v) },
+    ),
+    ToggleSpec(
+        title = "Door-left-open alerts", keywords = "notification door open",
+        checked = { _, n, _ -> n.doorOpen }, onToggle = { vm, v -> vm.setNotifyDoor(v) },
+    ),
+    ToggleSpec(
+        title = "Car-running alerts", keywords = "notification engine climate running left on",
+        checked = { _, n, _ -> n.running }, onToggle = { vm, v -> vm.setNotifyRunning(v) },
+    ),
+    ToggleSpec(
+        title = "Left-unlocked alerts", keywords = "notification unlocked lock left open",
+        checked = { _, n, _ -> n.unlocked }, onToggle = { vm, v -> vm.setNotifyUnlocked(v) },
+    ),
+    ToggleSpec(
+        title = "Aurora background", keywords = "gradient animated theme background glow",
+        checked = { a, _, _ -> a.auroraBackground }, onToggle = { vm, v -> vm.setAuroraBackground(v) },
+    ),
+    ToggleSpec(
+        title = "Dynamic color", label = "Dynamic color (Material You)", keywords = "material you wallpaper theme color",
+        checked = { a, _, _ -> a.dynamicColor }, onToggle = { vm, v -> vm.setDynamicColor(v) },
+    ),
+    ToggleSpec(
+        title = "Pebble outline", keywords = "border rim card theme appearance",
+        checked = { a, _, _ -> a.pebbleOutline }, onToggle = { vm, v -> vm.setPebbleOutline(v) },
+    ),
+    // Same top-level gate the AI card itself uses -- these two only mean
+    // anything on a device Gemini Nano actually supports, same reason the
+    // card is hidden entirely rather than shown disabled.
+    ToggleSpec(
+        title = "On-device AI", label = "On-device AI (Gemini Nano)", keywords = "gemini nano ai summary assistant privacy on-device",
+        visible = { it.aiSupported }, checked = { _, _, s -> s.aiEnabled }, onToggle = { vm, v -> vm.setAiEnabled(v) },
+    ),
+    ToggleSpec(
+        title = "Summarize automatically", keywords = "ai auto summary refresh",
+        visible = { it.aiSupported }, checked = { _, _, s -> s.aiAuto }, onToggle = { vm, v -> vm.setAiAuto(v) },
+    ),
+    // Same gate as the row itself (Backup & sync): only meaningful with
+    // Shizuku actually installed and running.
+    ToggleSpec(
+        title = "Install updates seamlessly", label = "Install updates seamlessly (Shizuku)", keywords = "shizuku silent install update",
+        visible = { it.shizukuAvailable }, checked = { a, _, _ -> a.seamlessInstallShizuku }, onToggle = { vm, v -> vm.setSeamlessInstallShizuku(v) },
+    ),
+)
+
 /** True if any WORD in [hay] starts with [prefix] -- "lim" hits "charge limit"
  *  but not "unlimited". Scanning for the boundary beats splitting the string,
  *  which would allocate a list per entry per keystroke. */
@@ -3504,8 +3593,14 @@ private fun SettingsSearchResults(
     }
 
     // --- App-wide settings ---
-    add("Haptic feedback", "vibration vibrate buzz sound") {
-        ToggleRow("Haptic feedback", appearance.hapticsEnabled) { vm.setHapticsEnabled(it) }
+    // The dynamic half of the index: every plain toggle in ToggleSettings
+    // renders itself here with no per-toggle code -- see that list's own doc
+    // comment for what does and doesn't fit this shape.
+    ToggleSettings.forEach { spec ->
+        if (!spec.visible(state)) return@forEach
+        add(spec.title, spec.keywords) {
+            ToggleRow(spec.label, spec.checked(appearance, notif, state)) { spec.onToggle(vm, it) }
+        }
     }
     // Two of Security's own controls, missing from here entirely -- "fingerprint"
     // and "lock" are exactly the words someone would type for this. Reproduces
@@ -3578,24 +3673,6 @@ private fun SettingsSearchResults(
         // Deferred-commit, same as the main Appearance card's slider — see there.
         VibrancySlider(appearance, vm)
     }
-    add("Open links in app", "browser tab links") {
-        ToggleRow("Open links in app", appearance.linksInApp) { vm.setLinksInApp(it) }
-    }
-    add("Live charging updates", "notification charging live progress ongoing bar ev limit") {
-        ToggleRow("Live charging updates", notif.charging) { vm.setNotifyCharging(it) }
-    }
-    add("Service due alerts", "notification reminder service") {
-        ToggleRow("Service due alerts", notif.service) { vm.setNotifyService(it) }
-    }
-    add("Door-left-open alerts", "notification door open") {
-        ToggleRow("Door-left-open alerts", notif.doorOpen) { vm.setNotifyDoor(it) }
-    }
-    add("Car-running alerts", "notification engine climate running left on") {
-        ToggleRow("Car-running alerts", notif.running) { vm.setNotifyRunning(it) }
-    }
-    add("Left-unlocked alerts", "notification unlocked lock left open") {
-        ToggleRow("Left-unlocked alerts", notif.unlocked) { vm.setNotifyUnlocked(it) }
-    }
     add("Search on the car screen", "search bubble car screen cover home garage ask command") {
         ToggleRow("Search on the car screen", appearance.showSearch) { vm.setShowSearch(it) }
     }
@@ -3658,35 +3735,6 @@ private fun SettingsSearchResults(
             selectedKey = appearance.themeMode.name,
             onSelect = { vm.setThemeMode(ThemeMode.valueOf(it)) },
         )
-    }
-    add("Aurora background", "gradient animated theme background glow") {
-        ToggleRow("Aurora background", appearance.auroraBackground) { vm.setAuroraBackground(it) }
-    }
-    add("Dynamic color", "material you wallpaper theme color") {
-        ToggleRow("Dynamic color (Material You)", appearance.dynamicColor) { vm.setDynamicColor(it) }
-    }
-    add("Pebble outline", "border rim card theme appearance") {
-        ToggleRow("Pebble outline", appearance.pebbleOutline) { vm.setPebbleOutline(it) }
-    }
-    // Same top-level gate the AI card itself uses -- these two only mean
-    // anything on a device Gemini Nano actually supports, same reason the
-    // card is hidden entirely rather than shown disabled.
-    if (state.aiSupported) {
-        add("On-device AI", "gemini nano ai summary assistant privacy on-device") {
-            ToggleRow("On-device AI (Gemini Nano)", state.aiEnabled) { vm.setAiEnabled(it) }
-        }
-        add("Summarize automatically", "ai auto summary refresh") {
-            ToggleRow("Summarize automatically", state.aiAuto) { vm.setAiAuto(it) }
-        }
-    }
-    // Same gate as the row itself (Backup & sync): only meaningful with
-    // Shizuku actually installed and running.
-    if (state.shizukuAvailable) {
-        add("Install updates seamlessly", "shizuku silent install update") {
-            ToggleRow("Install updates seamlessly (Shizuku)", appearance.seamlessInstallShizuku) {
-                vm.setSeamlessInstallShizuku(it)
-            }
-        }
     }
     // --- Per-car ---
     state.vehicles.forEach { v ->
