@@ -702,9 +702,21 @@ internal fun SettingsScreen(
           derivedStateOf { (titlePosition.value?.y ?: Float.MAX_VALUE) < topInsetPx }
       }
       val dockProgress = remember { Animatable(0f) }
-      LaunchedEffect(nameHidden) {
-          // pillDockSpring -- shared by every pill implementation, see its own doc.
+      // See VehicleDetailContent's identical guard for why -- the first-ever
+      // settle, once a real position report arrives, snaps instead of
+      // animating, so this pill never flies in from nowhere on first mount
+      // (e.g. GarageScreen un-hoisting Settings' own embedded slot while it
+      // was already scrolled down).
+      var hasReport by remember { mutableStateOf(false) }
+      LaunchedEffect(nameHidden, titlePosition.value != null) {
+          if (titlePosition.value == null) return@LaunchedEffect
           val target = if (nameHidden) 1f else 0f
+          if (!hasReport) {
+              dockProgress.snapTo(target)
+              hasReport = true
+              return@LaunchedEffect
+          }
+          // pillDockSpring -- shared by every pill implementation, see its own doc.
           dockProgress.animateTo(target, pillDockSpring(dockProgress.value, target))
           haptics?.click()
       }

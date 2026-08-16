@@ -255,34 +255,36 @@ internal val PebbleBounceStiffness = Spring.StiffnessLow
  * of its four implementations (GarageScreen's hoisted pill, VehicleDetail-
  * Content's and SettingsScreen's own local pills, ExpandedCar's pill).
  *
- * Went through two tunings before this one. First shipped as the same
+ * Three tunings before this one. First shipped as the same
  * `spring(dampingRatio = 0.5f, stiffness = StiffnessMediumLow)` every pebble
  * bounce uses, which read as a quick, business-like snap -- fine for a
  * pebble, wrong for a name arriving in a corner. Slowed and loosened next
  * (0.32 / StiffnessVeryLow) chasing "floaty and bouncy" -- but StiffnessVeryLow
- * makes the whole approach drift, not just the settle, which read as sluggish
- * rather than lively: asked for "most of its movement pretty quick, then
- * slowly bounce back and forth 2 or 3 times till it settles" instead, which is
- * a HIGH stiffness (fast approach) paired with a LOW damping ratio (several
- * visible oscillations on the way there) -- two different knobs than "slow
- * and loose" reaches for. [PillDockStiffness] is fixed and fast; the damping
- * ratio is what [pillDockSpring] computes per-call instead of a constant.
+ * drags out the APPROACH too, which read as sluggish rather than lively.
+ * StiffnessMedium plus a wide, low damping range (0.62-0.2) fixed the drift
+ * but overcorrected into "too fast, aggressive, and springy" -- asked for
+ * "normal speed... bounce a bit and then settle" instead, a smaller ask than
+ * either extreme: not slow and floaty, not fast and wild, just an ordinary
+ * transition with one clear, modest overshoot on top. [PillDockStiffness] is
+ * fixed and moderate now (down from Medium); the damping ratio is still what
+ * [pillDockSpring] computes per-call, over a narrower, gentler range.
  *
  * Not [PebbleBounceDamping]/[PebbleBounceStiffness]: those are deliberately
- * the app's CALM bounce (tuned down from something too visible). This one is
- * asked to be the opposite of calm.
+ * the app's CALM bounce (tuned down from something too visible). This one
+ * still gets its own numbers so the two can keep moving independently, but
+ * they're closer together now than the last two tunings had them.
  */
-internal val PillDockStiffness = Spring.StiffnessMedium
+internal val PillDockStiffness = Spring.StiffnessMediumLow
 
 /** Floor of [pillDockSpring]'s damping range: a small correction (the
  *  animation reversing before it finished, or re-triggering from a position
- *  already close to its target) settles promptly with barely a wobble. */
-internal val PillDockGentleDamping = 0.62f
+ *  already close to its target) settles promptly with essentially no wobble. */
+internal val PillDockGentleDamping = 0.8f
 
 /** Ceiling of [pillDockSpring]'s damping range: a full attach<->dock swing
- *  (the ordinary case -- 0 all the way to 1, or back) gets several genuine,
- *  visible oscillations before it settles. */
-internal val PillDockBounceDamping = 0.2f
+ *  (the ordinary case -- 0 all the way to 1, or back) gets one clear, modest
+ *  overshoot before it settles -- "bounce a bit," not several oscillations. */
+internal val PillDockBounceDamping = 0.45f
 
 /**
  * The pill's dock spring, made dynamic: "harder" (a longer) trip is bouncier,

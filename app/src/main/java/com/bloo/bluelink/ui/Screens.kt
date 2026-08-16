@@ -3406,7 +3406,30 @@ internal fun GarageScreen(state: UiState, vm: AppViewModel) {
                 }
                 val hoistedDockProgress = remember { Animatable(0f) }
                 val pillScope = rememberCoroutineScope()
-                LaunchedEffect(hoistedNameHidden, perPage) {
+                // Unlike the local pills (VehicleDetailContent, SettingsScreen),
+                // which get a brand new Animatable and a null position every
+                // time they're freshly composed, this state is REUSED across
+                // every page -- only whichever page is currently settled gets
+                // to write into it. That means switching pages left
+                // hoistedPosition holding the PREVIOUS page's stale value for
+                // one frame: hoistedNameHidden would answer for the newly
+                // settled page using the wrong page's position, animate
+                // dockProgress toward a target that was never actually where
+                // the new page's header lives, then correct again a frame
+                // later once the real report arrived -- the flicker reported
+                // switching between a floating and a static page. Nulling the
+                // position (and its scroll calibration) on every settle
+                // forces the "no report yet" guard below to reapply on every
+                // page switch, not just the very first mount.
+                LaunchedEffect(perPage, pager.settledPage) {
+                    if (perPage != 1) return@LaunchedEffect
+                    hoistedPosition.value = null
+                    hoistedYAtScrollZero.value = null
+                }
+                // True once a real position report has arrived for whichever
+                // page is CURRENTLY settled -- see the LaunchedEffect above.
+                var hasReport by remember { mutableStateOf(false) }
+                LaunchedEffect(hoistedNameHidden, perPage, hoistedPosition.value != null) {
                     // perPage > 1 (the multi-car grid): nothing below ever
                     // passes `hoisted` to a page in that mode (see both call
                     // sites' own guards), so hoistedPosition never updates
@@ -3414,9 +3437,18 @@ internal fun GarageScreen(state: UiState, vm: AppViewModel) {
                     // this effect would still fire once on first composition
                     // and animate/click for a pill that's never shown.
                     if (perPage != 1) return@LaunchedEffect
+                    if (hoistedPosition.value == null) {
+                        hasReport = false
+                        return@LaunchedEffect
+                    }
+                    val hoistedTarget = if (hoistedNameHidden) 1f else 0f
+                    if (!hasReport) {
+                        hoistedDockProgress.snapTo(hoistedTarget)
+                        hasReport = true
+                        return@LaunchedEffect
+                    }
                     // pillDockSpring -- shared by every pill implementation,
                     // see its own doc.
-                    val hoistedTarget = if (hoistedNameHidden) 1f else 0f
                     hoistedDockProgress.animateTo(
                         hoistedTarget,
                         pillDockSpring(hoistedDockProgress.value, hoistedTarget),
@@ -8225,18 +8257,39 @@ private fun VehicleDetailContent(
             derivedStateOf { (heroTitlePosition.value?.y ?: Float.MAX_VALUE) < topInsetPx }
         }
         val dockProgress = remember { Animatable(0f) }
-        LaunchedEffect(nameHidden) {
-            // pillDockSpring -- see its own doc for the full tuning history. A
-            // real spring, not a tween, and a visibly bouncier one than a
-            // pebble opening gets: this is the one moment the pill actually
-            // arrives or departs, so it's allowed a quick approach followed by
-            // a couple of genuine settling bounces rather than sliding there.
+        // True once a real position report has ever arrived for THIS
+        // composition of the pill. Before that, heroTitlePosition is null and
+        // nameHidden's own MAX_VALUE fallback always reads "not hidden" --
+        // not necessarily true. This local pill is freshly (re)composed every
+        // time GarageScreen un-hoists a page (the settled page moves
+        // elsewhere), and that page may already be scrolled well past its own
+        // header -- so animating toward the placeholder's "not hidden" default
+        // used to fly the pill in from the hero position across the whole
+        // screen the instant the FIRST real report corrected it a frame
+        // later, even though nothing the user did should have moved it at
+        // all. Keyed on the null-ness too, not just nameHidden's own value,
+        // so a report that confirms the placeholder's guess (nameHidden was
+        // already false) still gets its one chance to snap instead of skating
+        // past silently on an unchanged key.
+        var hasReport by remember { mutableStateOf(false) }
+        LaunchedEffect(nameHidden, heroTitlePosition.value != null) {
+            if (heroTitlePosition.value == null) return@LaunchedEffect
             val target = if (nameHidden) 1f else 0f
-            dockProgress.animateTo(target, pillDockSpring(dockProgress.value, target))
-            // A light tap right as it lands/leaves, same as every other floating
-            // chrome's own tap feedback -- this is the one moment the pill
-            // actually arrives or departs, so it's the moment worth marking.
-            haptics?.click()
+            if (!hasReport) {
+                dockProgress.snapTo(target)
+                hasReport = true
+            } else {
+                // pillDockSpring -- see its own doc for the full tuning
+                // history. A real spring, not a tween: this is the one
+                // moment the pill actually arrives or departs, so it's
+                // allowed a bit of settle on top of an otherwise ordinary
+                // transition.
+                dockProgress.animateTo(target, pillDockSpring(dockProgress.value, target))
+                // A light tap right as it lands/leaves, same as every other
+                // floating chrome's own tap feedback -- only for a REAL
+                // arrival/departure, not the silent initial snap above.
+                haptics?.click()
+            }
         }
         val heroFlight = remember {
             HeroTitleFlight(
@@ -8520,11 +8573,21 @@ private fun ExpandedCar(v: Vehicle, state: UiState, vm: AppViewModel, flipped: B
         derivedStateOf { (titlePosition.value?.y ?: Float.MAX_VALUE) < topInsetPx }
     }
     val dockProgress = remember { Animatable(0f) }
-    LaunchedEffect(nameHidden) {
-        // pillDockSpring -- shared by every pill implementation, see its own doc.
+    // See VehicleDetailContent's identical guard for why -- the first-ever
+    // settle, once a real position report arrives, snaps instead of
+    // animating, so this pill never flies in from nowhere on first mount.
+    var hasReport by remember { mutableStateOf(false) }
+    LaunchedEffect(nameHidden, titlePosition.value != null) {
+        if (titlePosition.value == null) return@LaunchedEffect
         val target = if (nameHidden) 1f else 0f
-        dockProgress.animateTo(target, pillDockSpring(dockProgress.value, target))
-        haptics?.click()
+        if (!hasReport) {
+            dockProgress.snapTo(target)
+            hasReport = true
+        } else {
+            // pillDockSpring -- shared by every pill implementation, see its own doc.
+            dockProgress.animateTo(target, pillDockSpring(dockProgress.value, target))
+            haptics?.click()
+        }
     }
     // controlsScroll.value read directly, not through the reported position
     // -- same reasoning as VehicleDetailContent's own heroYAtScrollZero doc.
