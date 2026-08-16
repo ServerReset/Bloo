@@ -2496,7 +2496,7 @@ private class SearchEntry(val title: String, val haystack: String, val content: 
  * own comment warns about (a search shortcut skipping a step the real row
  * enforces).
  */
-private class ToggleSpec(
+internal class ToggleSpec(
     val title: String,
     val keywords: String,
     /** Shown on the row itself; defaults to [title] since most toggles read
@@ -2511,7 +2511,7 @@ private class ToggleSpec(
 /** Every plain app-wide toggle, in the order it should appear when searched.
  *  Add a new one here -- not a new `add(...)` call in [SettingsSearchResults]
  *  -- and it is searchable with no other change. */
-private val ToggleSettings = listOf(
+internal val ToggleSettings = listOf(
     ToggleSpec(
         title = "Haptic feedback", keywords = "vibration vibrate buzz sound",
         checked = { a, _, _ -> a.hapticsEnabled }, onToggle = { vm, v -> vm.setHapticsEnabled(v) },
@@ -2581,7 +2581,7 @@ private val ToggleSettings = listOf(
  * toggle, the same duplication [ToggleSettings] already removed on the
  * app-wide side.
  */
-private class VehicleToggleSpec(
+internal class VehicleToggleSpec(
     val title: (Vehicle) -> String,
     val keywords: (Vehicle) -> String,
     val label: String,
@@ -2597,7 +2597,7 @@ private class VehicleToggleSpec(
  *  [SeatPositions] (Screens.kt), the same list [CarSettingsCard] itself
  *  builds its seat rows from, so the two can't drift out of sync with
  *  each other on label or key. */
-private val VehicleToggleSettings: List<VehicleToggleSpec> = buildList {
+internal val VehicleToggleSettings: List<VehicleToggleSpec> = buildList {
     SeatPositions.forEach { pos ->
         add(
             VehicleToggleSpec(
@@ -2747,7 +2747,7 @@ private fun searchScore(tokens: List<String>, e: SearchEntry, fuzzy: Boolean): I
  *  map directly onto [com.bloo.bluelink.data.TileCommandRunner]'s own command
  *  vocabulary, so search runs commands through the exact same path the Quick
  *  Settings tiles use. */
-private class ParsedVehicleCommand(val cmd: String, val climateTarget: String = "default", val label: String)
+internal class ParsedVehicleCommand(val cmd: String, val climateTarget: String = "default", val label: String)
 
 /** Recognises a small, deliberately-conservative set of command phrasings --
  *  lock/unlock, start/stop/smart climate, start/stop charging -- rather than
@@ -2777,7 +2777,7 @@ private class ParsedVehicleCommand(val cmd: String, val climateTarget: String = 
  * it ("64 degrees", "64F"). Getting this wrong would start climate at 5 degrees
  * because the car is called an Ioniq 5.
  */
-private fun parseClimateTemperature(q: String, metric: Boolean): Int? {
+internal fun parseClimateTemperature(q: String, metric: Boolean): Int? {
     if (RxColdest.containsMatchIn(q)) {
         return CLIMATE_TEMP_RANGE_F.first
     }
@@ -2800,7 +2800,7 @@ private fun parseClimateTemperature(q: String, metric: Boolean): Int? {
     return f.coerceIn(CLIMATE_TEMP_RANGE_F.first, CLIMATE_TEMP_RANGE_F.last)
 }
 
-private fun parseVehicleCommand(query: String, metric: Boolean = false): ParsedVehicleCommand? {
+internal fun parseVehicleCommand(query: String, metric: Boolean = false): ParsedVehicleCommand? {
     val q = query.lowercase()
     // Only meaningful for a climate START, and only when the phrasing is not
     // already asking for smart climate (which computes its own target from the
