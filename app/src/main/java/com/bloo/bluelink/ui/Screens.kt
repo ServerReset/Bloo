@@ -10449,8 +10449,26 @@ internal fun PebbleShell(
     // exactly is what keeps the corners and the height reading as one card in both directions,
     // even though open bounces and close (deliberately, now) doesn't -- see collapseExit's own
     // doc for why closing settled on a calm spring instead.
+    //
+    // PebbleCornerCollapsed (38dp = ControlHeight/2) is only a FALLBACK, for the one frame
+    // before the header row below has ever reported its own real height. It used to be the
+    // only number in play, which made "fully rounded" a coincidence: true stadium ends need
+    // corner = height/2 of the ACTUAL row, and the row only ever measures exactly
+    // ControlHeight when nothing pushes it taller (headerContent's extra line, a wrapped
+    // title, a bigger in-row action button) -- any of those left visibly flatter corners
+    // than the pill-shaped buttons riding inside the same row, which is what was reported.
+    // headerRowHeightPx (below) is that row's real measured height every time it changes;
+    // corner now targets ITS half, so the card is a true capsule at whatever height this
+    // pebble's own content actually needs, not just the one height it was tuned against.
+    var headerRowHeightPx by remember { mutableIntStateOf(0) }
+    val density = LocalDensity.current
+    val collapsedCorner = if (headerRowHeightPx > 0) {
+        with(density) { (headerRowHeightPx / 2f).toDp() }
+    } else {
+        PebbleCornerCollapsed
+    }
     val corner by animateDpAsState(
-        targetValue = if (expanded) PebbleCornerExpanded else PebbleCornerCollapsed,
+        targetValue = if (expanded) PebbleCornerExpanded else collapsedCorner,
         animationSpec = if (expanded) {
             spring(dampingRatio = PebbleBounceDamping, stiffness = PebbleBounceStiffness)
         } else {
@@ -10551,6 +10569,12 @@ internal fun PebbleShell(
                     Row(
                         Modifier
                             .fillMaxWidth()
+                            // Feeds collapsedCorner above: this row's height IS the
+                            // whole card's collapsed height (the body is hidden then),
+                            // and it's stable across the expand/collapse animation
+                            // itself (only the body grows/shrinks below it), so this
+                            // never fires mid-bounce with a transient wrong value.
+                            .onSizeChanged { headerRowHeightPx = it.height }
                             .then(
                                 if (forceExpanded) Modifier
                                 else Modifier.clickable {
