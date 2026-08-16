@@ -3426,9 +3426,25 @@ internal fun GarageScreen(state: UiState, vm: AppViewModel) {
                     hoistedPosition.value = null
                     hoistedYAtScrollZero.value = null
                 }
-                // True once a real position report has arrived for whichever
-                // page is CURRENTLY settled -- see the LaunchedEffect above.
-                var hasReport by remember { mutableStateOf(false) }
+                // True once this pill has EVER settled for real, for the
+                // whole lifetime of this composable -- NOT reset on every
+                // page switch. Only the very first-ever settle (right after
+                // the app opens on this pager) has no meaningful "from" state
+                // to animate away from, so only that one snaps; every
+                // subsequent transition -- including a page switch straight
+                // from a floating car to an already-scrolled-away one -- has
+                // a real, correct starting point (wherever dockProgress
+                // already was for the PREVIOUS page) and a real, correct
+                // target (the new page's own just-arrived report), so it
+                // animates normally between them. Resetting this flag on
+                // every page switch was the previous bug: it forced every
+                // single page switch to snap instead of animate, even when
+                // there was nothing wrong to correct for -- "swipe to a page
+                // that isn't floating and it doesn't animate" was this, not
+                // the flicker the snap was originally added to fix (that fix
+                // is still here: it's the null-position wait below, not this
+                // flag).
+                var hasEverSettled by remember { mutableStateOf(false) }
                 LaunchedEffect(hoistedNameHidden, perPage, hoistedPosition.value != null) {
                     // perPage > 1 (the multi-car grid): nothing below ever
                     // passes `hoisted` to a page in that mode (see both call
@@ -3437,14 +3453,14 @@ internal fun GarageScreen(state: UiState, vm: AppViewModel) {
                     // this effect would still fire once on first composition
                     // and animate/click for a pill that's never shown.
                     if (perPage != 1) return@LaunchedEffect
-                    if (hoistedPosition.value == null) {
-                        hasReport = false
-                        return@LaunchedEffect
-                    }
+                    // No real report for the NOW-settled page yet -- wait
+                    // rather than animate toward the previous page's stale
+                    // position (see the reset LaunchedEffect above).
+                    if (hoistedPosition.value == null) return@LaunchedEffect
                     val hoistedTarget = if (hoistedNameHidden) 1f else 0f
-                    if (!hasReport) {
+                    if (!hasEverSettled) {
                         hoistedDockProgress.snapTo(hoistedTarget)
-                        hasReport = true
+                        hasEverSettled = true
                         return@LaunchedEffect
                     }
                     // pillDockSpring -- shared by every pill implementation,
@@ -3716,6 +3732,14 @@ internal fun GarageScreen(state: UiState, vm: AppViewModel) {
                                         t,
                                     ),
                                     maxLines = 1,
+                                    // Ellipsis, not the Text default (Clip):
+                                    // without this a name that doesn't fit
+                                    // the space available at the moment it's
+                                    // measured is chopped off mid-glyph with
+                                    // no visual indication anything's missing
+                                    // -- reported directly against a
+                                    // screenshot showing exactly that.
+                                    overflow = TextOverflow.Ellipsis,
                                     // Top-left, not centre -- see
                                     // VehicleDetailContent's identical
                                     // graphicsLayer for the full reasoning
@@ -8009,29 +8033,44 @@ private fun BoxScope.FloatingIdentityPill(
             },
     ) {
         val t = dockProgress.value.coerceIn(0f, 1f)
-        // The pill itself -- same glass treatment (fill/ring/shadow/rim)
-        // and exact 48dp height FloatingIcon uses, so a docked identity
-        // pill reads as one more piece of the app's own floating chrome
-        // rather than a different kind of thing. Grown in by t, not just
-        // faded: at t=0 there IS no pill, only the bare content sitting on
-        // its real card/header, so a hard-toggled backdrop would pop in
-        // abruptly right as the flight starts rather than forming
-        // alongside it.
-        if (t > 0.02f) {
-            Box(
-                Modifier
-                    .matchParentSize()
-                    .graphicsLayer { alpha = t }
-                    .background(MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = glassContainerAlpha()), pillShape)
-                    .ambientRing(pillShape)
-                    .dropShadow(pillShape)
-                    .frostedRim(pillShape),
-            )
-        }
         Row(
             Modifier
                 .heightIn(min = lerp(0.dp, 48.dp, t))
-                // Clipped to the SAME shape as the glass fill behind it,
+                // The pill's own glass treatment (fill/ring/shadow/rim),
+                // same as FloatingIcon's, so a docked identity pill reads as
+                // one more piece of the app's own floating chrome. Applied
+                // to THIS Row directly now, not a separate matchParentSize
+                // sibling Box -- that used to measure the fill/shadow/border
+                // against the Row's size from a SEPARATE node's own layout,
+                // which is exactly what read as "the shadow is buggy,
+                // especially while animating": two nodes resizing together
+                // in theory, but with no guarantee the shadow's node redraws
+                // on the exact same frame the Row's own size actually
+                // changed on, through a fast resize. On the same node as the
+                // content it wraps, there is no second size to fall out of
+                // sync with -- one measure, one shape, drawn together every
+                // frame. Grown in by t, not just faded: at t=0 there IS no
+                // pill, only the bare content sitting on its real card/
+                // header, so a hard-toggled backdrop would pop in abruptly
+                // right as the flight starts rather than forming alongside
+                // it. Deliberately BEFORE .clip below -- dropShadow's own
+                // blur bleeds outside the shape's own bounds by design (that
+                // bleed IS the visible shadow); clipping first would cut
+                // that bleed off at the pill's exact edge and read as no
+                // shadow at all.
+                .then(
+                    if (t > 0.02f) {
+                        Modifier
+                            .graphicsLayer { alpha = t }
+                            .background(MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = glassContainerAlpha()), pillShape)
+                            .ambientRing(pillShape)
+                            .dropShadow(pillShape)
+                            .frostedRim(pillShape)
+                    } else {
+                        Modifier
+                    },
+                )
+                // Clipped to the SAME shape the glass fill above uses,
                 // before .clickable -- without this, clickable's own ripple
                 // indication paints out to this Row's plain rectangular
                 // bounds, flashing square corners past the rounded
@@ -8316,29 +8355,36 @@ private fun VehicleDetailContent(
                 },
         ) {
             val t = dockProgress.value.coerceIn(0f, 1f)
-            // The pill itself -- same glass treatment (fill/ring/shadow/rim)
-            // and exact 48dp height FloatingIcon uses, so the docked name
-            // reads as one more piece of the app's own floating chrome
-            // rather than a different kind of thing. Grown in by t, not
-            // just faded: at t=0 there IS no pill, only the bare text
-            // sitting on the hero card, so a hard-toggled backdrop would pop
-            // in abruptly right as the flight starts rather than forming
-            // alongside it.
-            if (t > 0.02f) {
-                Box(
-                    Modifier
-                        .matchParentSize()
-                        .graphicsLayer { alpha = t }
-                        .background(MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = glassContainerAlpha()), pillShape)
-                        .ambientRing(pillShape)
-                        .dropShadow(pillShape)
-                        .frostedRim(pillShape),
-                )
-            }
             Row(
                 Modifier
                     .heightIn(min = lerp(0.dp, 48.dp, t))
-                    // Clipped to the SAME shape as the glass fill behind it,
+                    // The pill's own glass treatment (fill/ring/shadow/rim)
+                    // and exact 48dp height FloatingIcon uses, so the docked
+                    // name reads as one more piece of the app's own floating
+                    // chrome. Applied to THIS Row directly, not a separate
+                    // matchParentSize sibling Box -- see the hoisted pill's
+                    // identical fix for why that used to read as "the shadow
+                    // is buggy, especially while animating". Grown in by t,
+                    // not just faded: at t=0 there IS no pill, only the bare
+                    // text sitting on the hero card, so a hard-toggled
+                    // backdrop would pop in abruptly right as the flight
+                    // starts rather than forming alongside it. Deliberately
+                    // BEFORE .clip below -- dropShadow's own blur bleeds
+                    // outside the shape's bounds by design; clipping first
+                    // would cut that bleed off at the pill's exact edge.
+                    .then(
+                        if (t > 0.02f) {
+                            Modifier
+                                .graphicsLayer { alpha = t }
+                                .background(MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = glassContainerAlpha()), pillShape)
+                                .ambientRing(pillShape)
+                                .dropShadow(pillShape)
+                                .frostedRim(pillShape)
+                        } else {
+                            Modifier
+                        },
+                    )
+                    // Clipped to the SAME shape as the glass fill above,
                     // before .clickable moves here from the Text below --
                     // that used to leave the whole Row un-clickable and un-
                     // clipped, so tapping the name showed a plain rectangular
@@ -8367,6 +8413,9 @@ private fun VehicleDetailContent(
                         t,
                     ),
                     maxLines = 1,
+                    // Ellipsis, not the Text default (Clip) -- see the
+                    // hoisted pill's identical fix for why.
+                    overflow = TextOverflow.Ellipsis,
                     modifier = Modifier
                         // Draw-phase read only (heroTitleFontSizeSp.value,
                         // dockProgress.value), same reasoning as offset{}
@@ -8597,20 +8646,27 @@ private fun ExpandedCar(v: Vehicle, state: UiState, vm: AppViewModel, flipped: B
                 },
         ) {
             val t = dockProgress.value.coerceIn(0f, 1f)
-            if (t > 0.02f) {
-                Box(
-                    Modifier
-                        .matchParentSize()
-                        .graphicsLayer { alpha = t }
-                        .background(MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = glassContainerAlpha()), pillShape)
-                        .ambientRing(pillShape)
-                        .dropShadow(pillShape)
-                        .frostedRim(pillShape),
-                )
-            }
             Row(
                 Modifier
                     .heightIn(min = lerp(0.dp, 48.dp, t))
+                    // Glass chrome applied directly to this Row -- not a
+                    // separate matchParentSize sibling Box -- see the
+                    // hoisted pill's identical fix for why (that's what read
+                    // as "the shadow is buggy, especially while animating").
+                    // Before .clip below -- dropShadow's own blur bleeds
+                    // outside the shape's bounds by design.
+                    .then(
+                        if (t > 0.02f) {
+                            Modifier
+                                .graphicsLayer { alpha = t }
+                                .background(MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = glassContainerAlpha()), pillShape)
+                                .ambientRing(pillShape)
+                                .dropShadow(pillShape)
+                                .frostedRim(pillShape)
+                        } else {
+                            Modifier
+                        },
+                    )
                     // Clip before clickable -- see the hoisted pill's
                     // identical fix for why (the ripple, not the fill, was
                     // what read as "not round").
@@ -8629,6 +8685,9 @@ private fun ExpandedCar(v: Vehicle, state: UiState, vm: AppViewModel, flipped: B
                     fontWeight = FontWeight.Bold,
                     color = onSurface,
                     maxLines = 1,
+                    // Ellipsis, not the Text default (Clip) -- see the
+                    // hoisted pill's identical fix for why.
+                    overflow = TextOverflow.Ellipsis,
                     // Top-left, not centre -- see VehicleDetailContent's
                     // identical graphicsLayer for the full reasoning.
                     modifier = Modifier.graphicsLayer {

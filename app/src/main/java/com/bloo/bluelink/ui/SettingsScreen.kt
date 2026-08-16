@@ -2168,20 +2168,27 @@ internal fun SettingsScreen(
                 },
         ) {
             val t = dockProgress.value.coerceIn(0f, 1f)
-            if (t > 0.02f) {
-                Box(
-                    Modifier
-                        .matchParentSize()
-                        .graphicsLayer { alpha = t }
-                        .background(MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = glassContainerAlpha()), pillShape)
-                        .ambientRing(pillShape)
-                        .dropShadow(pillShape)
-                        .frostedRim(pillShape),
-                )
-            }
             Row(
                 Modifier
                     .heightIn(min = lerp(0.dp, 48.dp, t))
+                    // Glass chrome applied directly to this Row -- not a
+                    // separate matchParentSize sibling Box -- see the
+                    // hoisted pill's identical fix (Screens.kt) for why
+                    // (that's what read as "the shadow is buggy, especially
+                    // while animating"). Before .clip below -- dropShadow's
+                    // own blur bleeds outside the shape's bounds by design.
+                    .then(
+                        if (t > 0.02f) {
+                            Modifier
+                                .graphicsLayer { alpha = t }
+                                .background(MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = glassContainerAlpha()), pillShape)
+                                .ambientRing(pillShape)
+                                .dropShadow(pillShape)
+                                .frostedRim(pillShape)
+                        } else {
+                            Modifier
+                        },
+                    )
                     // Clip before clickable -- see the hoisted pill's
                     // identical fix for why (the ripple, not the fill, was
                     // what read as "not round").
@@ -2200,6 +2207,9 @@ internal fun SettingsScreen(
                     fontWeight = FontWeight.Bold,
                     color = onSurface,
                     maxLines = 1,
+                    // Ellipsis, not the Text default (Clip) -- matches every
+                    // other pill's own name Text, for consistency.
+                    overflow = TextOverflow.Ellipsis,
                 )
             }
         }
