@@ -2849,6 +2849,16 @@ private fun parseVehicleCommand(query: String, metric: Boolean = false): ParsedV
             } else {
                 ParsedVehicleCommand("climate_on", "default", "Starting climate for")
             }
+        // Bare "heat <car> to 80" / "cool <car> to 65" / "warm <car> to 70" --
+        // no start/turn-on prefix, no "up" -- the pattern above requires one
+        // of those, so a query that's just the verb plus a target temperature
+        // fell through to "not a command" entirely. Requiring temp != null is
+        // what keeps this safe: it's the same guard that stops "Ioniq 5" from
+        // being read as a temperature (see parseClimateTemperature's own doc),
+        // so a bare "heat" with no number attached still isn't a command here
+        // either -- it needs a real "to/at N" or "N degrees" alongside it.
+        temp != null && RxHeatCoolVerb.containsMatchIn(q) ->
+            ParsedVehicleCommand("climate_on", TileCommandRunner.TEMP_PREFIX + temp, "Starting climate at $tempLabel for")
         // Charge LIMIT before charge start/stop: "set the charge limit to 80"
         // contains "charg", and the limit is the more specific request.
         RxChargeLimit
@@ -3643,6 +3653,10 @@ private val RxFlashLights = Regex("(flash|blink) (the )?(lights|headlights)|ligh
 private val RxHorn = Regex("\\bhonk\\b|sound (the )?horn|\\bhorn\\b|beep (the )?(car|horn)|find (my|the) car")
 private val RxChargeStop = Regex("(stop|turn off|cancel|halt|end) (the )?charg|unplug")
 private val RxChargeStart = Regex("(start|begin|turn on|resume) (the )?charg|charge (it|the car|my car)( now)?|top (it )?up")
+// Bare verb, no "start"/"turn on"/"up" needed -- paired with `temp != null` at
+// its one call site, which is what stops it from firing on every unrelated
+// sentence that happens to contain "heat" or "cool".
+private val RxHeatCoolVerb = Regex("\\b(heat|cool|warm)\\b")
 private val RxSearchTokens = Regex("[^a-z0-9%]+")
 
 
