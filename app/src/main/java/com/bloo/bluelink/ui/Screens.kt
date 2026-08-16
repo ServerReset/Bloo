@@ -4425,7 +4425,21 @@ private fun cutoutClearanceDp(): EdgeDp {
  * beside it is too small to hold anything worth putting there. Null is the
  * normal answer on a phone; this is a cover-screen affordance.
  */
-private data class CoverBand(val xDp: Float, val yDp: Float, val widthDp: Float, val heightDp: Float)
+/** @property nearCameraAtEnd true when this band's END edge (right, in LTR) is
+ *  the one touching the camera island -- the island sits at the OTHER end of
+ *  the row from this band's own start, so grouping content flush against the
+ *  band's end is what actually reads as "next to the camera". False means the
+ *  island touches the band's START edge instead, so content should group
+ *  there. Threaded through explicitly rather than re-derived by every caller,
+ *  since it depends on which of the two free segments (left/right of the
+ *  island) [coverCutoutBand] picked. */
+internal data class CoverBand(
+    val xDp: Float,
+    val yDp: Float,
+    val widthDp: Float,
+    val heightDp: Float,
+    val nearCameraAtEnd: Boolean,
+)
 
 /** Below these a band is a sliver: too short for a legible line of text, or
  *  too narrow for a name plus a tap target. */
@@ -4433,7 +4447,7 @@ private const val COVER_BAND_MIN_W = 84f
 private const val COVER_BAND_MIN_H = 26f
 
 @Composable
-private fun coverCutoutBand(): CoverBand? {
+internal fun coverCutoutBand(): CoverBand? {
     val view = LocalView.current
     val density = LocalDensity.current
     if (Build.VERSION.SDK_INT < Build.VERSION_CODES.P) return null
@@ -4461,6 +4475,10 @@ private fun coverCutoutBand(): CoverBand? {
                 yDp = r.top.toFloat().toDp().value,
                 widthDp = widthPx.toDp().value,
                 heightDp = (r.bottom - r.top).toFloat().toDp().value,
+                // useLeft picked the segment left of the island, so the
+                // island -- and therefore "near camera" -- is at this band's
+                // END (right); otherwise the island sits at its START.
+                nearCameraAtEnd = useLeft,
             )
         }
         if (band.widthDp < COVER_BAND_MIN_W || band.heightDp < COVER_BAND_MIN_H) continue
@@ -4469,6 +4487,12 @@ private fun coverCutoutBand(): CoverBand? {
     }
     return best
 }
+
+/** Fixed footprint of the search dock this band reserves next to the camera
+ *  island (see [CompactGarage]'s band Row and [SearchLayer]'s band-docked
+ *  bubble) -- shared between the two files so the space one reserves is
+ *  exactly the space the other draws into. */
+internal val CoverBandSearchDock = 30.dp
 
 /**
  * The adaptive cover-screen scaffold. Measures the REAL available space with
@@ -4748,6 +4772,14 @@ private fun CompactGarage(state: UiState, vm: AppViewModel, appearance: Settings
             }
         }
         if (band != null) {
+            // Search is available here whenever it's available on the cover
+            // at all -- same gate BlooApp itself uses to decide whether to
+            // show SearchLayer for the garage. When it holds, this band
+            // reserves CoverBandSearchDock's worth of space at the end
+            // nearest the camera; SearchLayer reads the same band and docks
+            // its own bubble into exactly that reservation (see there) --
+            // one tap target, not a second one duplicated here.
+            val searchInBand = appearance.showSearch && !state.locked
             Row(
                 Modifier
                     .align(Alignment.TopStart)
@@ -4756,25 +4788,37 @@ private fun CompactGarage(state: UiState, vm: AppViewModel, appearance: Settings
                     .height(band.heightDp.dp)
                     .padding(horizontal = 6.dp),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                // Grouped flush against whichever end is next to the camera,
+                // not spread across the whole band -- a short name spread
+                // full-width by weight(1f) used to leave a dead gap between
+                // the text and the island it should read as belonging next
+                // to. weight(1f, fill = false) still bounds FittedText enough
+                // to shrink-fit inside a narrow band, it just no longer
+                // forces the box to fill space the text isn't using.
+                horizontalArrangement = Arrangement.spacedBy(
+                    4.dp,
+                    if (band.nearCameraAtEnd) Alignment.End else Alignment.Start,
+                ),
             ) {
-                // The car's name, which every other cover page has to spend a
-                // whole title band on. Here it costs nothing.
-                //
-                // Name only: search on the cover is the draggable bubble (see
-                // SearchLayer), and a second, fixed copy of it here would be
-                // the thing the bubble exists to avoid -- a search button
-                // parked somewhere the user can't move it off whatever it is
-                // covering.
-                vehicles.getOrNull(currentIndex.coerceIn(0, count - 1))?.let { current ->
+                val current = vehicles.getOrNull(currentIndex.coerceIn(0, count - 1))
+                // Order follows which end is near the camera, so the dock
+                // reservation always lands flush against it regardless of
+                // which side of the island this band happens to be on.
+                if (!band.nearCameraAtEnd && searchInBand) {
+                    Spacer(Modifier.width(CoverBandSearchDock))
+                }
+                if (current != null) {
                     com.bloo.uicommon.FittedText(
                         text = current.name,
                         style = MaterialTheme.typography.labelLarge.copy(
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.onSurface,
                         ),
-                        modifier = Modifier.weight(1f),
+                        modifier = Modifier.weight(1f, fill = false),
                     )
+                }
+                if (band.nearCameraAtEnd && searchInBand) {
+                    Spacer(Modifier.width(CoverBandSearchDock))
                 }
             }
         }

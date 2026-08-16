@@ -466,8 +466,18 @@ fun BlooTheme(
         vibrancy = vibrancy,
     )
 
+    // Deliberately NOT density.fontScale * uiScale any more. That multiplied the
+    // device's own accessibility font-scale setting through, so a phone set to a
+    // large system font blew straight past every fixed-size floating overlay this
+    // app draws over its own content (the identity pill, Settings' header row) --
+    // those aren't real text flow that reflows around a bigger font, they're
+    // absolutely-positioned copies tracking a specific pixel spot, and they only
+    // stayed aligned at the font size they were tuned against. 100% is this app's
+    // own baseline regardless of what the device is set to; uiScale (the app's own
+    // "make everything bigger" preference, set inside Bloo itself, independent of
+    // the OS setting) is the only thing still allowed to scale text from here.
     val density = LocalDensity.current
-    val scaledDensity = Density(density.density, density.fontScale * uiScale)
+    val scaledDensity = Density(density.density, uiScale)
 
     val reduceMotion = remember {
         Settings.Global.getFloat(context.contentResolver, Settings.Global.ANIMATOR_DURATION_SCALE, 1f) == 0f

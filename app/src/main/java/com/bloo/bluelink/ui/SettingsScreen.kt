@@ -95,6 +95,7 @@ import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.displayCutout
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.ime
+import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.union
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.layout.statusBars
@@ -3090,7 +3091,16 @@ internal fun SearchLayer(
         // remains above the bar, minus a margin so it never looks wedged.
         val keyboardUp = WindowInsets.ime.asPaddingValues().calculateBottomPadding() > 80.dp
         val edge = if (compact) 8.dp else 16.dp
-        val bubble = if (compact) 40.dp else 52.dp
+        // On the cover, a camera band beside the island (see coverCutoutBand)
+        // is real, unoccluded space with nothing else fixed in it once the
+        // name has taken its share -- a better home for search than a corner
+        // it would otherwise float over. Docked there it's a fixed CoverBand-
+        // SearchDock circle, matching the reservation CompactGarage's own
+        // band Row leaves for it; undocked (no band, or not compact) it's the
+        // free-floating, draggable circle this always was. "Fixed when the
+        // space is there, floating when it isn't."
+        val band = if (compact) coverCutoutBand() else null
+        val bubble = if (band != null) CoverBandSearchDock else if (compact) 40.dp else 52.dp
         val barW = minOf(maxWidth - edge * 2, 640.dp)
         val barH = 52.dp
         val freeAbovePill = (maxHeight - bottomInset - barH - edge * 2 - 24.dp).coerceAtLeast(96.dp)
@@ -3111,6 +3121,25 @@ internal fun SearchLayer(
         val maxY = (maxHeight - bubble - edge - bottomInset).coerceAtLeast(edge)
         val restX = maxX
         val restY = maxY
+        // This Box sits inside BlooApp's own `.padding(padding)` (the
+        // Scaffold's safeDrawing content padding), while coverCutoutBand()
+        // reports coordinates in the WINDOW's own space -- the same gap
+        // CompactGarage's band Row doesn't have to close because it draws
+        // full-bleed, ignoring that padding entirely (see its own comment).
+        // Subtracting the same inset back out here is what puts this bubble
+        // in the same coordinate space as that Row, so the two agree on
+        // where the band actually is.
+        val safeDrawing = WindowInsets.safeDrawing.asPaddingValues()
+        val insetLeftDp = safeDrawing.calculateLeftPadding(LocalLayoutDirection.current).value
+        val insetTopDp = safeDrawing.calculateTopPadding().value
+        // Flush against whichever end of the band the camera touches --
+        // exactly the edge CompactGarage's own Arrangement groups its
+        // dockSpacer reservation against -- and vertically centred in it.
+        val dockedX = band?.let {
+            (if (it.nearCameraAtEnd) it.xDp + it.widthDp - 6f - CoverBandSearchDock.value
+            else it.xDp + 6f) - insetLeftDp
+        }
+        val dockedY = band?.let { (it.yDp + (it.heightDp - CoverBandSearchDock.value) / 2f) - insetTopDp }
         // Restore the user's last-parked spot from durable storage, once -- if this
         // composition doesn't already have one in memory. rememberSaveable's dragX/
         // dragY survive a LIVE session (rotation, a mode switch while the process
@@ -3141,8 +3170,20 @@ internal fun SearchLayer(
         // flip mode's memory, and normal mode has no memory of its own by
         // design (there's nowhere on that screen to remember: one fixed spot
         // is the whole point).
-        val bubbleX = if (compact && !dragX.isNaN()) dragX.dp.coerceIn(minX, maxX) else restX
-        val bubbleY = if (compact && !dragY.isNaN()) dragY.dp.coerceIn(minY, maxY) else restY
+        // Docked beats dragged beats resting: a band, when there's one to dock
+        // into, always wins over wherever the bubble was last left -- fixed
+        // when the space is there, floating (and rememberable) only when it
+        // isn't.
+        val bubbleX = when {
+            dockedX != null -> dockedX.dp
+            compact && !dragX.isNaN() -> dragX.dp.coerceIn(minX, maxX)
+            else -> restX
+        }
+        val bubbleY = when {
+            dockedY != null -> dockedY.dp
+            compact && !dragY.isNaN() -> dragY.dp.coerceIn(minY, maxY)
+            else -> restY
+        }
 
         val targetW = when (form) {
             SearchForm.BAR -> barW
@@ -3290,7 +3331,10 @@ internal fun SearchLayer(
             // Dragging only exists for the bubble. A bar spans the screen --
             // there is nowhere to move it to -- and while it is a text field
             // a drag would fight the keyboard and the panel above it.
-            onDrag = if (form == SearchForm.BUBBLE && compact) {
+            // Docked into a camera band, there is nowhere to drag it TO --
+            // the whole point of the fixed spot is that it's the one place
+            // guaranteed not to cover something else.
+            onDrag = if (form == SearchForm.BUBBLE && compact && band == null) {
                 { dx, dy ->
                     dragX = ((if (dragX.isNaN()) bubbleX else dragX.dp) + dx).coerceIn(minX, maxX).value
                     dragY = ((if (dragY.isNaN()) bubbleY else dragY.dp) + dy).coerceIn(minY, maxY).value
