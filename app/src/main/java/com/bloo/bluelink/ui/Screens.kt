@@ -43,7 +43,6 @@ import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.AnimationVector1D
 import androidx.compose.animation.core.FiniteAnimationSpec
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.Spring
@@ -3381,95 +3380,34 @@ internal fun GarageScreen(state: UiState, vm: AppViewModel) {
                     val targetBlock = currentIndex.coerceIn(0, count - 1) / perPage
                     wrap.snapToReal(targetBlock)
                 }
-                // Hoisted identity flight for the single-car-per-page pager
-                // (perPage == 1) -- one shared floating pill, driven by
-                // whichever page is currently SETTLED (car or the embedded
-                // Settings slot), rather than each page keeping its own
-                // independent copy. See HoistedIdentityFlight's own doc, and
-                // VehicleDetailContent's identical (per-page) fields for why
-                // each of these exists.
+                // Hoisted identity badge state for the single-car-per-page
+                // pager (perPage == 1) -- one shared TitleDockBadge, driven
+                // by whichever page is currently SETTLED (car or the
+                // embedded Settings slot), rather than each page keeping its
+                // own. See HoistedIdentityFlight's own doc. The position is
+                // deliberately NOT reset on page switches: a stale value
+                // holds the badge steady for the single frame it takes the
+                // newly settled page's own report to arrive (guaranteed
+                // next layout pass -- onPositioned only ever fires from the
+                // page currently holding the hoisted flight), and if the new
+                // page's answer differs the badge just fades -- its only
+                // move -- rather than flashing through a wrong state.
                 val density = LocalDensity.current
                 val hoistedTopInset = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
                 val hoistedTopInsetPx = with(density) { hoistedTopInset.toPx() }
-                val hoistedCornerYPx = with(density) { (hoistedTopInset + 12.dp).toPx() }
-                val hoistedCornerXPx = with(density) { 16.dp.toPx() }
                 val hoistedPosition = remember { mutableStateOf<Offset?>(null) }
-                val hoistedColor = remember { mutableStateOf(Color.Unspecified) }
-                val hoistedFontSizeSp = remember { mutableStateOf<Float?>(null) }
-                val hoistedContainerPosition = remember { mutableStateOf(Offset.Zero) }
-                val hoistedActiveScroll = remember { mutableStateOf<ScrollState?>(null) }
                 val hoistedScrollToTop = remember { mutableStateOf<(suspend () -> Unit)?>(null) }
-                val hoistedYAtScrollZero = remember { mutableStateOf<Float?>(null) }
                 val hoistedNameHidden by remember {
                     derivedStateOf { (hoistedPosition.value?.y ?: Float.MAX_VALUE) < hoistedTopInsetPx }
                 }
-                val hoistedDockProgress = remember { Animatable(0f) }
                 val pillScope = rememberCoroutineScope()
-                // hoistedPosition is reused across every page (only whichever
-                // page is currently settled writes into it), so it can hold a
-                // stale, previous-page value right after a switch. Render
-                // uses it as-is regardless -- both pages sit at similar
-                // places on screen, so a stale frame is a non-event. These
-                // two flags exist purely to keep the DOCK DECISION from
-                // acting on that stale value: reset on every settle,
-                // hoistedFreshForSettle flips true once a real report for
-                // the NEW page arrives, hoistedSnappedForSettle then makes
-                // that first post-switch decision a snap rather than an
-                // animation (every later change on the SAME settled page --
-                // ordinary scrolling -- still animates normally).
-                var hoistedFreshForSettle by remember { mutableStateOf(false) }
-                var hoistedSnappedForSettle by remember { mutableStateOf(false) }
-                LaunchedEffect(perPage, pager.settledPage) {
-                    if (perPage != 1) return@LaunchedEffect
-                    hoistedFreshForSettle = false
-                    hoistedSnappedForSettle = false
-                }
-                LaunchedEffect(hoistedNameHidden, perPage, hoistedFreshForSettle) {
-                    if (perPage != 1) return@LaunchedEffect
-                    if (!hoistedFreshForSettle) return@LaunchedEffect
-                    val hoistedTarget = if (hoistedNameHidden) 1f else 0f
-                    if (!hoistedSnappedForSettle) {
-                        hoistedDockProgress.snapTo(hoistedTarget)
-                        hoistedSnappedForSettle = true
-                        return@LaunchedEffect
-                    }
-                    // pillDockSpring -- shared by every pill implementation,
-                    // see its own doc.
-                    hoistedDockProgress.animateTo(
-                        hoistedTarget,
-                        pillDockSpring(hoistedDockProgress.value, hoistedTarget),
-                    )
-                    haptics?.click()
-                }
                 val hoistedFlight = remember {
                     HoistedIdentityFlight(
-                        flight = HeroTitleFlight(
-                            onPositioned = {
-                                hoistedPosition.value = it
-                                val localPos = it - hoistedContainerPosition.value
-                                val sv = hoistedActiveScroll.value?.value ?: 0
-                                hoistedYAtScrollZero.value = localPos.y + sv
-                                hoistedFreshForSettle = true
-                            },
-                            color = hoistedColor,
-                            fontSizeSp = hoistedFontSizeSp,
-                        ),
-                        activeScroll = hoistedActiveScroll,
+                        flight = HeroTitleFlight(onPositioned = { hoistedPosition.value = it }),
                         scrollToTop = hoistedScrollToTop,
                     )
                 }
-                Box(
-                    Modifier
-                        .fillMaxSize()
-                        // Reports THIS Box's own root position -- see
-                        // hoistedContainerPosition's own doc above (and
-                        // VehicleDetailContent's identical field). Every
-                        // in-composition car/Settings page fills this exact
-                        // same Box (one page visible at a time in the
-                        // pager), so this one measurement covers all of
-                        // them.
-                        .onGloballyPositioned { coords -> hoistedContainerPosition.value = coords.positionInRoot() },
-                ) {
+                Box(Modifier.fillMaxSize()) {
                     HorizontalPager(
                         state = pager,
                         modifier = Modifier.fillMaxSize(),
@@ -3660,39 +3598,32 @@ internal fun GarageScreen(state: UiState, vm: AppViewModel) {
                             LoadingIndicator()
                         }
                     }
-                    // Hoisted identity pill -- one shared floating pill for
+                    // Hoisted identity badge -- one shared TitleDockBadge for
                     // single-car-per-page mode, following whichever page is
                     // currently SETTLED (car or the embedded Settings slot).
                     // See hoistedFlight's own doc above.
                     if (perPage == 1) {
                         // Settled, not current: matches every other "which page is
                         // this" read in this pager (the settle effect above), so
-                        // the pill's own identity only updates mid-swipe once a
+                        // the badge's own identity only updates mid-swipe once a
                         // page actually wins, not on every frame of the drag.
                         val settledBlock = realBlock(pager.settledPage)
-                        val titleLargeSp = MaterialTheme.typography.titleLarge.fontSize.value
-                        val onSurface = MaterialTheme.colorScheme.onSurface
-                        FloatingIdentityPill(
-                            dockProgress = hoistedDockProgress,
-                            cornerXPx = hoistedCornerXPx,
-                            cornerYPx = hoistedCornerYPx,
-                            attachedX = { hoistedPosition.value?.let { it.x - hoistedContainerPosition.value.x } ?: hoistedCornerXPx },
-                            attachedY = {
-                                val sv = hoistedActiveScroll.value?.value ?: 0
-                                hoistedYAtScrollZero.value?.let { it - sv } ?: hoistedCornerYPx
-                            },
+                        TitleDockBadge(
+                            visible = hoistedNameHidden,
+                            cornerX = 16.dp,
+                            cornerY = hoistedTopInset + 12.dp,
+                            // Clears the top-right gear/expand chrome, same
+                            // as VehicleDetailContent's own badge.
+                            reserveEnd = 72.dp,
                             onClick = { pillScope.launch { hoistedScrollToTop.value?.invoke() } },
-                        ) { t ->
+                        ) {
                             AnimatedContent(
                                 targetState = settledBlock,
                                 transitionSpec = {
-                                    // Exit used to fade out in 120ms while enter
-                                    // took 200ms -- the outgoing name was fully
-                                    // gone a good 80ms before the incoming one
-                                    // finished fading in, a real window with no
-                                    // name on screen at all. Same duration both
-                                    // ways now, so together they never dip below
-                                    // full combined opacity.
+                                    // Matched enter/exit durations, so combined
+                                    // opacity never dips below full mid-swap --
+                                    // an 80ms mismatch here was one past source
+                                    // of "the name disappears for a moment".
                                     val dir = if (targetState > initialState) 1 else -1
                                     (slideInHorizontally(tween(200)) { it * dir / 3 } +
                                         fadeIn(tween(200))) togetherWith
@@ -3704,58 +3635,25 @@ internal fun GarageScreen(state: UiState, vm: AppViewModel) {
                                     if (settingsAsPage && block == pageCount) "Settings" else vehicles.getOrNull(block)?.name ?: "",
                                     style = MaterialTheme.typography.titleLarge,
                                     fontWeight = FontWeight.Bold,
-                                    // Same live position/colour/size tracking
-                                    // VehicleDetailContent's own local pill uses --
-                                    // see its own doc for the full reasoning.
-                                    color = lerp(
-                                        hoistedColor.value.let { if (it == Color.Unspecified) onSurface else it },
-                                        onSurface,
-                                        t,
-                                    ),
+                                    color = MaterialTheme.colorScheme.onSurface,
                                     maxLines = 1,
-                                    // Ellipsis, not the Text default (Clip):
-                                    // without this a name that doesn't fit
-                                    // the space available at the moment it's
-                                    // measured is chopped off mid-glyph with
-                                    // no visual indication anything's missing
-                                    // -- reported directly against a
-                                    // screenshot showing exactly that.
                                     overflow = TextOverflow.Ellipsis,
-                                    // Top-left, not centre -- see
-                                    // VehicleDetailContent's identical
-                                    // graphicsLayer for the full reasoning
-                                    // (a taller box scaled about its own
-                                    // centre visibly sinks below where it
-                                    // was positioned; anchoring the top
-                                    // instead keeps it exactly where
-                                    // attachedY placed it).
-                                    modifier = Modifier.graphicsLayer {
-                                        val attachedScale = (hoistedFontSizeSp.value ?: titleLargeSp) / titleLargeSp
-                                        val scale = attachedScale + (1f - attachedScale) * hoistedDockProgress.value.coerceIn(0f, 1f)
-                                        scaleX = scale
-                                        scaleY = scale
-                                        transformOrigin = TransformOrigin(0f, 0f)
-                                    },
                                 )
                             }
                             // totalBlocks, not vehicles.size -- the Settings slot is one
                             // more page in the same sequence, so it counts too (see
                             // PagerDotsFor above, which already does the same swap).
                             if (totalBlocks > 1) {
-                                Box(Modifier.graphicsLayer { alpha = ((t - 0.5f) / 0.5f).coerceIn(0f, 1f) }) {
-                                    AnimatedContent(
-                                        targetState = settledBlock,
-                                        // Matched durations -- see hoistedPillName's
-                                        // identical fix just above for why.
-                                        transitionSpec = { fadeIn(tween(200)) togetherWith fadeOut(tween(200)) },
-                                        label = "hoistedPillCount",
-                                    ) { block ->
-                                        Text(
-                                            "${block + 1} / $totalBlocks",
-                                            style = MaterialTheme.typography.labelSmall,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        )
-                                    }
+                                AnimatedContent(
+                                    targetState = settledBlock,
+                                    transitionSpec = { fadeIn(tween(200)) togetherWith fadeOut(tween(200)) },
+                                    label = "hoistedPillCount",
+                                ) { block ->
+                                    Text(
+                                        "${block + 1} / $totalBlocks",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
                                 }
                             }
                         }
@@ -5720,19 +5618,19 @@ private fun HeroHeader(
                 }
             }
 
-        // Reports this title's own real, measured position/colour to a
-        // VehicleDetailContent ancestor's floating name, if one is providing
-        // it (null everywhere else -- ExpandedCar's own pebble list excludes
-        // "summary" entirely, so this only ever applies here). See
-        // HeroTitleFlight's own doc for why it's the title's FINAL bounds
-        // (after PebbleShell's own scale) and not a guess.
+        // Reports this title's own real, measured position to a
+        // VehicleDetailContent ancestor's floating dock badge, if one is
+        // providing it (null everywhere else -- ExpandedCar's own pebble
+        // list excludes "summary" entirely, so this only ever applies
+        // here). The title itself stays fully visible at all times now --
+        // see HeroTitleFlight's own doc for why there's no clone to keep in
+        // sync with any more, just this one position report.
         val heroTitleFlight = LocalHeroTitleFlight.current
         // Follows the morph rather than switching: the photo fades in over the same
         // t, so the name has to travel from the surface's own colour to the light one
         // the scrim is built for. Snapping at a threshold would flash a white name
         // onto a still-white card for the frames before the photo arrives.
         val heroTitleColorNow = lerp(MaterialTheme.colorScheme.onSurface, HeroOnPhoto, heroT)
-        heroTitleFlight?.color?.value = heroTitleColorNow
         PebbleShell(
             expanded = photoExpanded,
             onToggle = { vm.togglePebble(v, com.bloo.bluelink.data.HERO_PHOTO_SECTION) },
@@ -5745,19 +5643,6 @@ private fun HeroHeader(
                 Modifier.onGloballyPositioned { heroTitleFlight.onPositioned(it.positionInRoot()) }
             } else {
                 Modifier
-            },
-            // Permanently invisible, not crossfaded -- there is exactly ONE
-            // visible copy of this title whenever a flight controller is
-            // present (VehicleDetailContent's own floating Text, drawn AT
-            // this title's live position/colour via HeroTitleFlight above),
-            // so this one never draws glyphs at all rather than fading two
-            // copies in and out of sync with each other. See
-            // HeroTitleFlight's own doc.
-            titleAlpha = if (heroTitleFlight != null) 0f else 1f,
-            onTitleScale = if (heroTitleFlight != null) {
-                { sp -> heroTitleFlight.fontSizeSp.value = sp }
-            } else {
-                null
             },
             // The ONLY pebble that grows its title. Here the title is the car's NAME and the
             // card becomes a photo of that car, so the name scaling up reads as the card taking
@@ -7899,33 +7784,23 @@ internal fun BackdropHost(content: @Composable BoxScope.() -> Unit) {
 
 /**
  * What a header title -- [HeroHeader]'s own (the car's name, drawn ON the
- * photo card via [PebbleShell]), or `SettingsHeaderRow`'s own -- reports
- * back to whichever composable is floating a copy of it, so THAT copy can
- * BE the real title -- the only copy that ever draws glyphs -- rather than
- * a second, independent [Text] with its own alpha faded to fake standing in
- * for the first one. Whenever a flight controller is provided at all, the
- * real title goes permanently invisible (see each call site's own
- * `titleAlpha`/`alpha`) -- not crossfaded with anything, just never drawn,
- * because the floating copy is ALREADY sitting exactly on top of it (see
- * [onPositioned]) the entire time it's on screen.
+ * photo card via [PebbleShell]), or `SettingsHeaderRow`'s own -- reports to
+ * whichever surface hosts a [TitleDockBadge] for it: just its live measured
+ * position, nothing else. The one derived fact anyone needs is "has the
+ * title's top edge scrolled above the status bar" -- the badge shows then,
+ * and hides again once the real title is back.
  *
- * `onPositioned`, `color`, and `fontSizeSp` are read every layout pass
- * (including while the hero is scrolled out of the viewport;
- * `verticalScroll` keeps off-screen children measured, just visually
- * clipped), so the floating copy can track the hero title's live position,
- * colour, AND size continuously for as long as it's genuinely attached to
- * it -- not values captured once and left to drift out of sync with
- * further scrolling. `fontSizeSp` in particular is what keeps the floating
- * copy the same SIZE as the space the (invisible) real title still
- * reserves in its own [PebbleShell] row -- without it the floating Text
- * drew at its own fixed, larger style regardless of the hero's actual
- * current size, so it visibly overflowed into whatever sits beside it
- * (the collapsed charge/range readout) instead of sitting in its slot.
+ * This used to be a much bigger contract (colour, font size, photo URL, and
+ * a floating CLONE of the title that hid the real one and flew between its
+ * live position and a corner). That clone was a standing source of one-frame
+ * flashes: any gap between hiding the real title and the copy's own
+ * rendering -- a stale position report, a clip outrunning its padding, a
+ * crossfade with mismatched durations -- read as the name vanishing, and
+ * each fix surfaced the next. The badge never hides the real title at all,
+ * so there is no gap for any of that to happen in.
  */
 internal class HeroTitleFlight(
     val onPositioned: (Offset) -> Unit,
-    val color: MutableState<Color>,
-    val fontSizeSp: MutableState<Float?>,
 )
 
 /** Null (the default) everywhere except inside [VehicleDetailContent]. */
@@ -7933,167 +7808,98 @@ internal val LocalHeroTitleFlight = compositionLocalOf<HeroTitleFlight?> { null 
 
 /**
  * What GarageScreen's own single-car-per-page pager needs from whichever
- * page is currently SETTLED, to render ONE shared floating identity pill
- * (name + avatar + page count) instead of each page keeping its own
- * independent copy. Passed into [VehicleDetailContent]/`SettingsScreen`'s
- * own `hoisted` param ONLY for the settled page (see the call site's own
- * guard) -- every other in-composition page (the pre-composed neighbour)
- * gets null and renders nothing of its own here, since the one shared pill
- * already covers whichever page just settled.
+ * page is currently SETTLED, to render ONE shared [TitleDockBadge] (name +
+ * page count) instead of each page keeping its own independent copy. Passed
+ * into [VehicleDetailContent]/`SettingsScreen`'s own `hoisted` param ONLY
+ * for the settled page (see the call site's own guard) -- every other
+ * in-composition page (the pre-composed neighbour) gets null and renders
+ * nothing of its own here, since the one shared badge already covers
+ * whichever page just settled.
  */
 internal class HoistedIdentityFlight(
     val flight: HeroTitleFlight,
-    // The settled page's own ScrollState -- read live (`.value`) by the
-    // hoisted pill's own position calc, same reasoning as
-    // VehicleDetailContent's own (non-hoisted) heroYAtScrollZero doc gives
-    // for why this has to be a live read, not a reported snapshot.
-    val activeScroll: MutableState<ScrollState?>,
     // Runs the settled page's own "scroll back to top" -- invoked when the
-    // hoisted pill itself is tapped.
+    // hoisted badge itself is tapped.
     val scrollToTop: MutableState<(suspend () -> Unit)?>,
 )
 
 /**
- * [VehicleDetailContent]'s own (non-hoisted) floating pill's tracking state,
- * bundled so it can be built inside an `if (hoisted == null)` branch as one
- * value -- see that composable's own `local` var. Every field here is the
- * exact same state that block always built inline; only the packaging is
- * new.
+ * [VehicleDetailContent]'s own (non-hoisted) badge state, bundled so it can
+ * be built inside an `if (hoisted == null)` branch as one value -- see that
+ * composable's own `local` var.
  */
-private data class LocalNamePillState(
+private class LocalNamePillState(
     val flight: HeroTitleFlight,
-    val dockProgress: Animatable<Float, AnimationVector1D>,
-    val cornerXPx: Float,
-    val cornerYPx: Float,
-    val heroTitlePosition: MutableState<Offset?>,
-    val heroTitleColor: MutableState<Color>,
-    val heroTitleFontSizeSp: MutableState<Float?>,
-    val containerPosition: MutableState<Offset>,
-    val heroYAtScrollZero: MutableState<Float?>,
-    /** This car's own column width in px -- see the pill's own `.widthIn`
-     *  for why. Zero (the default) is a harmless "not measured yet". */
-    val containerWidthPx: MutableState<Float>,
+    /** True once the hero title's top edge has scrolled above the status
+     *  bar -- the one bit [TitleDockBadge] runs on. */
+    val nameHidden: State<Boolean>,
 )
 
 /**
- * The floating identity pill's own shared chrome shell -- position
- * ([attachedX]/[attachedY] while live, lerping to [cornerXPx]/[cornerYPx]
- * once docked, by [dockProgress]), the pill's own glass background/ring/
- * shadow/rim growing in alongside it, and [content] drawn inside a Row that
- * grows its own height/padding by that same [dockProgress]. Used by
- * GarageScreen's hoisted pill -- VehicleDetailContent's, SettingsScreen's,
- * and ExpandedCar's own (non-hoisted) pills each keep their own inline copy
- * of this exact shell instead of sharing this one, deliberately, to avoid
- * risk to their already-working, CI-verified code.
+ * The floating name badge: a fixed-position glass pill in the top corner
+ * that fades/scales in once the surface's real title has scrolled out of
+ * view, and back out once it returns. Deliberately NOT a flown copy of the
+ * real title -- see [HeroTitleFlight]'s own doc for the history. The badge
+ * and the real title are two independent things that are (by the very
+ * condition driving [visible]) never meaningfully on screen at once, so
+ * neither ever hides, clips, rescales, or repositions the other: no shared
+ * frame for a flash to happen in, and a fraction of the old system's
+ * per-frame work (no offset{} re-layout on every scroll frame, no live
+ * colour/size mirroring -- one boolean flip drives everything).
  *
- * Every one of those pills draws just a name (GarageScreen's hoisted pill
- * also cross-fades a "current / total" page count alongside it) -- no
- * avatar any more. It used to show one (a car's own photo, or a themed icon
- * when there wasn't one), but unlike the name text there was nothing on the
- * hero card it was actually "pulled from," so it read as decoration rather
- * than information; removed everywhere, name and count are what identify
- * the pill now.
- *
- * [attachedX]/[attachedY] are plain lambdas, not [Offset], so whichever
- * live values they read (e.g. `scroll.value`, see
- * [VehicleDetailContent]'s own heroYAtScrollZero doc) are read at the
- * exact moment `.offset{}` itself runs -- Compose's snapshot system
- * tracks reads by where they DYNAMICALLY execute, not where a lambda was
- * lexically defined, so this stays layout-phase-only through the extra
- * indirection.
+ * Fixed 48dp-min height and the same glass fill/ring/shadow/rim as
+ * [FloatingIcon], so it reads as one more piece of the app's floating
+ * chrome. [reserveEnd] keeps its maximum width clear of whatever chrome
+ * occupies the surface's top-RIGHT corner (gear/flip/expand buttons) --
+ * combined with the Text's own ellipsis this is what bounds a long name
+ * instead of letting it run under the buttons or off the edge.
  */
 @Composable
-private fun BoxScope.FloatingIdentityPill(
-    dockProgress: Animatable<Float, AnimationVector1D>,
-    cornerXPx: Float,
-    cornerYPx: Float,
-    attachedX: () -> Float,
-    attachedY: () -> Float,
+internal fun BoxScope.TitleDockBadge(
+    visible: Boolean,
+    cornerX: Dp,
+    cornerY: Dp,
+    reserveEnd: Dp,
     onClick: () -> Unit,
-    content: @Composable RowScope.(t: Float) -> Unit,
+    content: @Composable RowScope.() -> Unit,
 ) {
     val haptics = LocalHaptics.current
-    val pillShape = RoundedCornerShape(50)
-    Box(
-        Modifier
+    val shape = RoundedCornerShape(50)
+    AnimatedVisibility(
+        visible = visible,
+        // A gentle pop: fade plus a slight scale-up from 92%, on the same
+        // MediumLow-stiffness springs the rest of the floating chrome uses.
+        // Exit mirrors it, slightly stiffer so leaving reads quicker than
+        // arriving -- the standard asymmetry everywhere else in the app.
+        enter = fadeIn(spring(stiffness = Spring.StiffnessMediumLow)) +
+            scaleIn(initialScale = 0.92f, animationSpec = spring(dampingRatio = 0.6f, stiffness = Spring.StiffnessMediumLow)),
+        exit = fadeOut(spring(stiffness = Spring.StiffnessMedium)) +
+            scaleOut(targetScale = 0.92f, animationSpec = spring(stiffness = Spring.StiffnessMedium)),
+        modifier = Modifier
             .align(Alignment.TopStart)
-            // Layout-phase reads only -- this Box alone re-lays-out on a
-            // scroll or animation frame, not its caller's whole
-            // composition, the same reason the pull-to-refresh indicator
-            // in Refreshable reads its own live values inside offset{}
-            // instead of the composable body.
-            //
-            // Targets THIS BOX'S OWN top-left, not wherever the content
-            // ends up once the pill's own padding pushes it in -- at t=0
-            // (attached) that's the same thing, since the pill hasn't
-            // grown any padding/height yet, but at t=1 (docked) this
-            // specifically has to line up with FloatingIcon's own Surface
-            // origin (cornerXPx/cornerYPx), which is a statement about the
-            // PILL, not the label inside it.
-            .offset {
-                val ax = attachedX()
-                val ay = attachedY()
-                // Coerced -- same reason the content's own t below is: the
-                // dock spring bounces past its target, and letting POSITION
-                // follow that raw overshoot while SIZE/alpha stay clamped
-                // to [0,1] put the two visibly out of step with each other
-                // for the length of the bounce.
-                val t = dockProgress.value.coerceIn(0f, 1f)
-                val x = ax + (cornerXPx - ax) * t
-                val y = ay + (cornerYPx - ay) * t
-                IntOffset(x.roundToInt(), y.roundToInt())
-            },
+            // The padding IS the width bound: this AnimatedVisibility node
+            // fills at most the host Box minus these insets, so the content
+            // Row (and its Text's ellipsis) is constrained by construction,
+            // in every host -- full-screen page, grid column, dual-column
+            // expanded view -- with no measured-width plumbing needed.
+            .padding(start = cornerX, top = cornerY, end = reserveEnd),
     ) {
-        val t = dockProgress.value.coerceIn(0f, 1f)
         Row(
             Modifier
-                .heightIn(min = lerp(0.dp, 48.dp, t))
-                // The pill's own glass treatment (fill/ring/shadow/rim),
-                // same as FloatingIcon's, so a docked identity pill reads as
-                // one more piece of the app's own floating chrome. Applied
-                // to THIS Row directly now, not a separate matchParentSize
-                // sibling Box -- that used to measure the fill/shadow/border
-                // against the Row's size from a SEPARATE node's own layout,
-                // which is exactly what read as "the shadow is buggy,
-                // especially while animating": two nodes resizing together
-                // in theory, but with no guarantee the shadow's node redraws
-                // on the exact same frame the Row's own size actually
-                // changed on, through a fast resize. On the same node as the
-                // content it wraps, there is no second size to fall out of
-                // sync with -- one measure, one shape, drawn together every
-                // frame. Grown in by t, not just faded: at t=0 there IS no
-                // pill, only the bare content sitting on its real card/
-                // header, so a hard-toggled backdrop would pop in abruptly
-                // right as the flight starts rather than forming alongside
-                // it. Deliberately BEFORE .clip below -- dropShadow's own
-                // blur bleeds outside the shape's own bounds by design (that
-                // bleed IS the visible shadow); clipping first would cut
-                // that bleed off at the pill's exact edge and read as no
-                // shadow at all.
-                .then(
-                    if (t > 0.02f) {
-                        Modifier
-                            .graphicsLayer { alpha = t }
-                            .background(MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = glassContainerAlpha()), pillShape)
-                            .ambientRing(pillShape)
-                            .dropShadow(pillShape)
-                            .frostedRim(pillShape)
-                    } else {
-                        Modifier
-                    },
-                )
-                // Clipped to a shape that lerps its OWN corner radius by t
-                // (PillDockedCorner's own doc explains why this can't just
-                // share pillShape) -- before .clickable, so clickable's own
-                // ripple indication respects the pill's rounding instead of
-                // painting out to this Row's plain rectangular bounds.
-                .clip(RoundedCornerShape(lerp(0.dp, PillDockedCorner, t)))
-                .padding(horizontal = lerp(0.dp, 16.dp, t))
-                .clickable { haptics?.click(); onClick() },
+                .heightIn(min = 48.dp)
+                .background(MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = glassContainerAlpha()), shape)
+                .ambientRing(shape)
+                .dropShadow(shape)
+                // Chrome before clip -- dropShadow's blur bleeds outside the
+                // shape by design; clip only bounds the ripple below.
+                .frostedRim(shape)
+                .clip(shape)
+                .clickable { haptics?.click(); onClick() }
+                .padding(horizontal = 16.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(lerp(0.dp, 8.dp, t)),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            content(t)
+            content()
         }
     }
 }
@@ -8103,28 +7909,12 @@ private fun BoxScope.FloatingIdentityPill(
  * scrolls together in one [Column] inside [Refreshable] (header row, then
  * the reorderable [PebbleList]).
  *
- * The car's name is drawn by exactly ONE [Text], ever: this one. The hero
- * card's own title never draws glyphs at all while this is active (see the
- * `titleAlpha = 0f` at [HeroHeader]'s [PebbleShell] call) -- there is no
- * second copy to fade in or out, so nothing needs hiding or crossfading.
- * [HeroTitleFlight] reports the hero title's real, live position and colour
- * every layout pass, and THIS Text is simply drawn there -- indistinguishable
- * from being the hero's own title, because as far as anyone can see, it is.
- *
- * [dockProgress] is the one thing that ever animates: 0 means "drawn exactly
- * at the hero title's live position/colour/size" and 1 means "docked in the
- * fixed corner, full titleLarge size, the app's normal text colour, wrapped
- * in a pill". Position, colour, and size are each a straight lerp between
- * their own attached/docked values by [dockProgress] -- the "attached" end
- * of every one of those lerps is the hero title's CURRENT live value,
- * recomputed every layout/draw pass, so this Text tracks the real card
- * exactly for as long as it's genuinely still part of it; once
- * [dockProgress] reaches 1 those live terms cancel out of their lerps
- * entirely, so it's genuinely static once docked despite still reading live
- * values underneath. The pill's own chrome (fill/ring/shadow/rim, same as
- * [FloatingIcon]'s) grows in alongside it, from nothing at 0 to
- * [FloatingIcon]'s own 48dp height at 1 -- there's no pill at all while
- * attached, only the bare label sitting on the card.
+ * The car's name is drawn ONCE, on the hero card, always fully visible --
+ * see [TitleDockBadge]'s own doc for why there's no cloned copy chasing it
+ * any more. [HeroTitleFlight] reports only that title's live Y position, and
+ * [nameHidden] (in [LocalNamePillState]) is the one bit derived from it:
+ * has the title's top scrolled above the status bar. [TitleDockBadge] just
+ * fades in and out at a fixed corner by that bit.
  */
 @Composable
 private fun VehicleDetailContent(
@@ -8146,10 +7936,10 @@ private fun VehicleDetailContent(
     reserveTopForDots: Boolean = false,
     // Non-null ONLY for GarageScreen's single-car-per-page pager's currently
     // SETTLED page -- see HoistedIdentityFlight's own doc. When provided,
-    // this page's own scroll/scroll-to-top are reported into the CALLER's
-    // shared flight, and this composable renders NO floating pill of its
-    // own at all -- the caller renders ONE shared pill instead, covering
-    // every page including this one.
+    // this page's own scroll-to-top is reported into the CALLER's shared
+    // flight, and this composable renders NO badge of its own at all -- the
+    // caller renders ONE shared badge instead, covering every page
+    // including this one.
     hoisted: HoistedIdentityFlight? = null,
 ) {
     val topInset = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
@@ -8157,126 +7947,36 @@ private fun VehicleDetailContent(
     val scroll = rememberScrollState()
     val scope = rememberCoroutineScope()
     val density = LocalDensity.current
-    val haptics = LocalHaptics.current
     if (hoisted != null) {
-        // Register this page as the one actually driving the hoisted pill.
+        // Register this page as the one actually driving the hoisted badge.
         // Idempotent, so re-running it every recomposition while hoisted is
         // harmless -- the caller only ever passes non-null here for the
         // currently SETTLED page, so there's no risk of two pages fighting
         // over the same hoisted state.
-        hoisted.activeScroll.value = scroll
         hoisted.scrollToTop.value = { scroll.animateScrollTo(0) }
     }
-    // Only actually built when this page is rendering its OWN pill --
+    // Only actually built when this page is rendering its OWN badge --
     // hoisted mode reports into the CALLER's shared flight/state instead
     // (see HoistedIdentityFlight's own doc), so none of this needs to
-    // exist there at all: no local spring animating for nothing, no local
-    // haptic firing alongside the caller's own.
+    // exist there at all.
     val local = if (hoisted == null) {
         val topInsetPx = with(density) { topInset.toPx() }
-        // The fixed corner slot -- this is the PILL's own top-left, not the
-        // text's (see the chrome Box below for why that distinction matters).
-        // Y matches FloatingIcon's own default outerPadding (12dp clear of the
-        // status bar) -- both are floating chrome anchored near the top of the
-        // screen, so that vertical rhythm is real. X does NOT: FloatingIcon
-        // sits in the opposite (top-RIGHT) corner, so matching its value here
-        // shares no actual edge with anything -- it only succeeded in
-        // misaligning this pill from the pebble cards scrolling underneath it,
-        // which all share the content column's own 16dp horizontal padding.
-        // 16dp lines this pill's own left edge up with theirs instead.
-        val cornerYPx = with(density) { (topInset + 12.dp).toPx() }
-        val cornerXPx = with(density) { 16.dp.toPx() }
-        // The hero title's own real, measured position/colour IN WINDOW-ROOT
-        // coordinates, kept live by HeroTitleFlight below -- null/Unspecified
-        // until the hero has laid out at least once.
+        // The hero title's own real, measured Y IN WINDOW-ROOT coordinates,
+        // kept live by HeroTitleFlight below -- null until the hero has laid
+        // out at least once. Root-space on both sides (topInsetPx is a
+        // screen measurement too), so this needs no container-relative
+        // conversion -- and no X at all, since the badge never needs to
+        // know where the real title sits horizontally any more.
         val heroTitlePosition = remember { mutableStateOf<Offset?>(null) }
-        val heroTitleColor = remember { mutableStateOf(Color.Unspecified) }
-        val heroTitleFontSizeSp = remember { mutableStateOf<Float?>(null) }
-        // This composable's OWN root position -- needed to convert
-        // heroTitlePosition (root coordinates) into a LOCAL offset for the
-        // floating Text below. Modifier.offset{} moves an element relative to
-        // wherever its parent already placed it, not to an absolute screen
-        // position -- on a phone this container fills the screen so the two
-        // coincide, but the exact same VehicleDetailContent also runs as one
-        // column of a side-by-side grid (GarageScreen's multi-car-per-page
-        // mode), where this container's own root position is offset by however
-        // many columns come before it. Without subtracting it back out, the
-        // floating name would fly toward the FAR corner of the whole grid
-        // instead of this car's own column.
-        val containerPosition = remember { mutableStateOf(Offset.Zero) }
-        val containerWidthPx = remember { mutableStateOf(0f) }
-        // heroTitlePosition is only as fresh as the LAST time HeroHeader's title
-        // actually laid out and reported it -- during a fast scroll fling that
-        // can trail the ACTUAL, current scroll offset by a frame or so, which is
-        // exactly what reads as this text lagging behind everything else on
-        // screen (everything else scrolls 1:1 with scroll.value every frame;
-        // this was only updating whenever the report happened to catch up).
-        // heroYAtScrollZero recalibrates every time a fresh report DOES arrive
-        // (`local.y + scroll.value` -- the title's Y with the CURRENT scroll
-        // amount added back, i.e. where it'd be if scroll were 0), but the
-        // offset{} below then recomputes the LIVE Y every single frame from
-        // scroll.value directly, the exact same state every other scrolling
-        // pixel on this screen already reads -- so even on a frame where the
-        // report is a beat stale, this still moves in perfect lockstep with the
-        // actual scroll gesture. X does not have this problem (it does not
-        // change while vertically scrolling) so it stays a plain reported value.
-        val heroYAtScrollZero = remember { mutableStateOf<Float?>(null) }
-        // Hidden once the hero title's own top edge has scrolled above the
-        // status bar -- i.e. once it's genuinely left the viewport, not a fixed
-        // scroll-distance guess. Root-space on both sides (topInsetPx is a
-        // screen measurement), so this one check needs no container-relative
-        // conversion.
-        val nameHidden by remember {
+        // derivedStateOf is the load-bearing part: onPositioned writes a new
+        // Offset on every layout pass while scrolling, but nothing
+        // recomposes unless this BOOLEAN actually flips -- which is the
+        // whole per-frame cost of the badge system while scrolling.
+        val nameHidden = remember {
             derivedStateOf { (heroTitlePosition.value?.y ?: Float.MAX_VALUE) < topInsetPx }
         }
-        val dockProgress = remember { Animatable(0f) }
-        // Freshly (re)composed every time GarageScreen un-hoists a page, so
-        // heroTitlePosition starts null -- its MAX_VALUE fallback reads "not
-        // hidden" even when the page is really scrolled well past its own
-        // header. hasReport makes the first real report a snap, not a fly-in
-        // from that wrong guess; every change after that animates normally.
-        var hasReport by remember { mutableStateOf(false) }
-        LaunchedEffect(nameHidden, heroTitlePosition.value != null) {
-            if (heroTitlePosition.value == null) return@LaunchedEffect
-            val target = if (nameHidden) 1f else 0f
-            if (!hasReport) {
-                dockProgress.snapTo(target)
-                hasReport = true
-            } else {
-                // pillDockSpring -- see its own doc for the full tuning
-                // history. A real spring, not a tween: this is the one
-                // moment the pill actually arrives or departs, so it's
-                // allowed a bit of settle on top of an otherwise ordinary
-                // transition.
-                dockProgress.animateTo(target, pillDockSpring(dockProgress.value, target))
-                // A light tap right as it lands/leaves, same as every other
-                // floating chrome's own tap feedback -- only for a REAL
-                // arrival/departure, not the silent initial snap above.
-                haptics?.click()
-            }
-        }
-        val heroFlight = remember {
-            HeroTitleFlight(
-                onPositioned = {
-                    heroTitlePosition.value = it
-                    heroYAtScrollZero.value = (it - containerPosition.value).y + scroll.value
-                },
-                color = heroTitleColor,
-                fontSizeSp = heroTitleFontSizeSp,
-            )
-        }
-        LocalNamePillState(
-            flight = heroFlight,
-            dockProgress = dockProgress,
-            cornerXPx = cornerXPx,
-            cornerYPx = cornerYPx,
-            heroTitlePosition = heroTitlePosition,
-            heroTitleColor = heroTitleColor,
-            heroTitleFontSizeSp = heroTitleFontSizeSp,
-            containerPosition = containerPosition,
-            heroYAtScrollZero = heroYAtScrollZero,
-            containerWidthPx = containerWidthPx,
-        )
+        val heroFlight = remember { HeroTitleFlight(onPositioned = { heroTitlePosition.value = it }) }
+        LocalNamePillState(flight = heroFlight, nameHidden = nameHidden)
     } else {
         null
     }
@@ -8288,24 +7988,6 @@ private fun VehicleDetailContent(
             Column(
                 Modifier
                     .fillMaxSize()
-                    // Reports THIS container's own root position -- see
-                    // LocalNamePillState.containerPosition's own doc above.
-                    // Before verticalScroll/padding: neither affects the
-                    // Column's own placement within its parent, only its
-                    // children's, so this reports the same position
-                    // regardless of where it sits in the chain. No-op when
-                    // hoisted (local == null) -- the caller tracks its own.
-                    // Also reports this car's own COLUMN width -- see
-                    // LocalNamePillState.containerWidthPx's own doc. Same
-                    // pre-padding measurement as the position above, so it's
-                    // this car's full available width, not the 16dp-inset
-                    // content width.
-                    .onGloballyPositioned { coords ->
-                        local?.let {
-                            it.containerPosition.value = coords.positionInRoot()
-                            it.containerWidthPx.value = coords.size.width.toFloat()
-                        }
-                    }
                     .verticalScroll(scroll)
                     .padding(horizontal = 16.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
@@ -8325,167 +8007,30 @@ private fun VehicleDetailContent(
                 Spacer(Modifier.height(bottomInset + 16.dp))
             }
         }
-        // Hoisted mode renders NO pill of its own here at all -- the caller
-        // (GarageScreen) renders ONE shared pill covering every page,
+        // Hoisted mode renders NO badge of its own here at all -- the caller
+        // (GarageScreen) renders ONE shared badge covering every page,
         // including this one, once it settles. See HoistedIdentityFlight's
         // own doc.
         if (local != null) {
-        // Destructured back to plain names -- zero-cost, and every
-        // reference below reads identically to when these were built
-        // directly in this scope, before `local` bundled them for the
-        // `if (hoisted == null)` branch above.
-        val (_, dockProgress, cornerXPx, cornerYPx, heroTitlePosition, heroTitleColor, heroTitleFontSizeSp, containerPosition, heroYAtScrollZero, containerWidthPx) = local
-        // This floating Text is always drawn at titleLarge -- ITS OWN fixed,
-        // full-sized style, docked or not. While attached, it's scaled DOWN
-        // (via graphicsLayer below, not by changing fontSize -- see that
-        // modifier's own comment) to match the hero's CURRENT effective
-        // size, exactly the technique PebbleShell's own growTitleOnExpand
-        // uses for its title. titleLargeSp is the one-time reference this
-        // scale is computed against.
-        val titleLargeSp = MaterialTheme.typography.titleLarge.fontSize.value
-        val onSurface = MaterialTheme.colorScheme.onSurface
-        val pillShape = RoundedCornerShape(50)
-        Box(
-            Modifier
-                .align(Alignment.TopStart)
-                // Layout-phase reads only (heroTitlePosition.value,
-                // dockProgress.value) -- this Box alone re-lays-out on a
-                // scroll or animation frame, not VehicleDetailContent's whole
-                // composition, the same reason the pull-to-refresh indicator
-                // above reads its own live values inside offset{} instead of
-                // the composable body.
-                //
-                // Targets THIS BOX'S OWN top-left, not wherever the text
-                // glyphs end up once the pill's own padding pushes them in --
-                // at t=0 (attached) that's the same thing, since the pill
-                // below hasn't grown any padding/height yet, but at t=1
-                // (docked) this specifically has to line up with
-                // FloatingIcon's own Surface origin (cornerXPx/cornerYPx --
-                // see their own doc), which is a statement about the PILL,
-                // not the label inside it.
-                .offset {
-                    val attachedX = heroTitlePosition.value?.let { it.x - containerPosition.value.x } ?: cornerXPx
-                    // scroll.value read DIRECTLY, not via the reported
-                    // position -- see heroYAtScrollZero's own doc for why.
-                    val attachedY = heroYAtScrollZero.value?.let { it - scroll.value } ?: cornerYPx
-                    // Coerced -- see the hoisted pill's identical offset{}
-                    // for why (keeps position in step with size/alpha
-                    // through the spring's own bounce past its target).
-                    val t = dockProgress.value.coerceIn(0f, 1f)
-                    val x = attachedX + (cornerXPx - attachedX) * t
-                    val y = attachedY + (cornerYPx - attachedY) * t
-                    IntOffset(x.roundToInt(), y.roundToInt())
-                },
-        ) {
-            val t = dockProgress.value.coerceIn(0f, 1f)
-            Row(
-                Modifier
-                    .heightIn(min = lerp(0.dp, 48.dp, t))
-                    // Bounded to this car's own column width (minus a margin
-                    // roughly matching the hero card's own horizontal
-                    // padding on both sides) -- without this, a long name had
-                    // nothing stopping it from measuring at its full natural
-                    // width and drawing straight past the edge of a narrow
-                    // column with no ellipsis ever triggering, since nothing
-                    // upstream was actually constraining it that tightly.
-                    // Harmless on a full-width phone (there the column is the
-                    // whole screen, so this rarely binds); on GarageScreen's
-                    // side-by-side grid, where each car's own column is a
-                    // good deal narrower, this is what makes the Text
-                    // below's own overflow = Ellipsis actually trigger,
-                    // instead of measuring at its full natural width and
-                    // running straight past the edge of a narrow column with
-                    // nothing upstream ever tight enough to stop it.
-                    .widthIn(max = with(density) { (containerWidthPx.value - 32f).coerceAtLeast(0f).toDp() })
-                    // The pill's own glass treatment (fill/ring/shadow/rim)
-                    // and exact 48dp height FloatingIcon uses, so the docked
-                    // name reads as one more piece of the app's own floating
-                    // chrome. Applied to THIS Row directly, not a separate
-                    // matchParentSize sibling Box -- see the hoisted pill's
-                    // identical fix for why that used to read as "the shadow
-                    // is buggy, especially while animating". Grown in by t,
-                    // not just faded: at t=0 there IS no pill, only the bare
-                    // text sitting on the hero card, so a hard-toggled
-                    // backdrop would pop in abruptly right as the flight
-                    // starts rather than forming alongside it. Deliberately
-                    // BEFORE .clip below -- dropShadow's own blur bleeds
-                    // outside the shape's bounds by design; clipping first
-                    // would cut that bleed off at the pill's exact edge.
-                    .then(
-                        if (t > 0.02f) {
-                            Modifier
-                                .graphicsLayer { alpha = t }
-                                .background(MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = glassContainerAlpha()), pillShape)
-                                .ambientRing(pillShape)
-                                .dropShadow(pillShape)
-                                .frostedRim(pillShape)
-                        } else {
-                            Modifier
-                        },
-                    )
-                    // Clipped to a shape that lerps its OWN corner radius by
-                    // t, not pillShape directly -- see PillDockedCorner's own
-                    // doc for why. Before .clickable moves here from the Text
-                    // below -- that used to leave the whole Row un-clickable
-                    // and un-clipped, so tapping the name showed a plain
-                    // rectangular ripple sized to the TEXT's own glyph
-                    // bounds, sharp corners and all, regardless of the
-                    // rounded pill drawn behind it.
-                    .clip(RoundedCornerShape(lerp(0.dp, PillDockedCorner, t)))
-                    .clickable { haptics?.click(); scope.launch { scroll.animateScrollTo(0) } }
-                    .padding(horizontal = lerp(0.dp, 16.dp, t)),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(lerp(0.dp, 8.dp, t)),
+            TitleDockBadge(
+                visible = local.nameHidden.value,
+                cornerX = 16.dp,
+                cornerY = topInset + 12.dp,
+                // Clears the top-right FloatingIcon slot (the expand button
+                // in grid columns, the gear on the standalone route) -- 12dp
+                // outer padding + 48dp icon + a little air.
+                reserveEnd = 72.dp,
+                onClick = { scope.launch { scroll.animateScrollTo(0) } },
             ) {
                 Text(
                     v.name,
                     style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.Bold,
-                    // Starts at the hero title's own live colour (white, over its
-                    // photo) and lerps to the app's normal text colour as it
-                    // docks -- same reasoning as the position lerp above: this
-                    // IS the hero's title, so it tracks its colour exactly for
-                    // as long as it's attached, and only diverges as it leaves.
-                    color = lerp(
-                        heroTitleColor.value.let { if (it == Color.Unspecified) onSurface else it },
-                        onSurface,
-                        t,
-                    ),
+                    color = MaterialTheme.colorScheme.onSurface,
                     maxLines = 1,
-                    // Ellipsis, not the Text default (Clip) -- see the
-                    // hoisted pill's identical fix for why.
                     overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier
-                        // Draw-phase read only (heroTitleFontSizeSp.value,
-                        // dockProgress.value), same reasoning as offset{}
-                        // above. transformOrigin pins the TOP-LEFT, not the
-                        // centre -- attachedY (in offset{} above) is the real
-                        // hero title's own TOP edge, reported by
-                        // LayoutCoordinates.positionInRoot(). Our own Text is
-                        // measured at its NATURAL titleLarge size, which is
-                        // TALLER than the smaller real title it's mimicking
-                        // while attached, so scaling around the CENTRE of
-                        // that taller box shifted the visible glyphs
-                        // downward from where they were positioned to sit --
-                        // provably: a box of height H scaled by s about its
-                        // own centre has its top move by H/2*(1-s), which is
-                        // exactly the "sits too low while still on the
-                        // card" that was reported. Anchoring at (0,0)
-                        // instead keeps the top edge exactly where it was
-                        // placed regardless of scale, matching how the
-                        // position itself is anchored in the first place.
-                        // Harmless once docked (scale is 1 there, so the
-                        // origin no longer matters).
-                        .graphicsLayer {
-                            val attachedScale = (heroTitleFontSizeSp.value ?: titleLargeSp) / titleLargeSp
-                            val scale = attachedScale + (1f - attachedScale) * dockProgress.value.coerceIn(0f, 1f)
-                            scaleX = scale
-                            scaleY = scale
-                            transformOrigin = TransformOrigin(0f, 0f)
-                        },
                 )
             }
-        }
         }
     }
 }
@@ -8506,14 +8051,13 @@ private fun VehicleDetailContent(
  * state that lets a pebble be dragged from the scrolling list directly onto
  * that slot to pin it.
  *
- * A floating name (built inline near the bottom, alongside the flip-columns
- * transition) tracks CriticalContent's own HeroHeader -- the real hero photo
- * card, shared with [VehicleDetailContent] -- the same way every other
- * surface's floating identity pill tracks its own hero card, and docks in
- * the top-left corner once it scrolls out of view. `controlsScroll`, not a
- * fixed side, is what it tracks: whichever column currently renders
- * `controls` (and therefore HeroHeader) is the one that matters, regardless
- * of which physical side that is after a flip.
+ * A [TitleDockBadge] (built inline near the bottom, alongside the
+ * flip-columns transition) fades in once CriticalContent's own HeroHeader --
+ * the real hero photo card, shared with [VehicleDetailContent] -- has
+ * scrolled out of view, same as every other surface. Tapping it scrolls
+ * `controlsScroll` back to top: whichever column currently renders
+ * `controls` (and therefore HeroHeader), regardless of which physical side
+ * that is after a flip.
  */
 @Composable
 private fun ExpandedCar(v: Vehicle, state: UiState, vm: AppViewModel, flipped: Boolean) {
@@ -8523,63 +8067,26 @@ private fun ExpandedCar(v: Vehicle, state: UiState, vm: AppViewModel, flipped: B
         }
     val hotDrag = remember { HotSeatDrag() }
     // Hoisted (not recreated on flip) so each column keeps its own scroll
-    // position when the columns swap sides. controlsScroll in particular is
-    // what the floating name below tracks -- it always belongs to whichever
-    // COLUMN currently renders `controls` (and therefore CriticalContent's
-    // own HeroHeader), regardless of which physical side (left/right) that
-    // currently is: the leftScroll/rightScroll pairing below always keeps
-    // this same ScrollState paired with the same content across a flip.
+    // position when the columns swap sides. controlsScroll always belongs
+    // to whichever COLUMN currently renders `controls` (and therefore
+    // CriticalContent's own HeroHeader), regardless of which physical side
+    // (left/right) that currently is: the leftScroll/rightScroll pairing
+    // below always keeps this same ScrollState paired with the same content
+    // across a flip -- which is what makes it the right thing for the
+    // badge's own tap-to-scroll-to-top.
     val controlsScroll = rememberScrollState()
     val pebblesScroll = rememberScrollState()
     val topInset = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
     val bottomInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
     val density = LocalDensity.current
-    val haptics = LocalHaptics.current
     val scope = rememberCoroutineScope()
     val topInsetPx = with(density) { topInset.toPx() }
-    val cornerYPx = with(density) { (topInset + 12.dp).toPx() }
-    // GarageScreen's own back arrow (top-left, its default 12dp/48dp) is
-    // ALWAYS present whenever ExpandedCar is on screen -- it's the one thing
-    // that gets you out of this view. Clear it, same reasoning as the
-    // standalone Settings route's own 60dp offset from its own back arrow.
-    val cornerXPx = with(density) { 60.dp.toPx() }
     val titlePosition = remember { mutableStateOf<Offset?>(null) }
-    val containerPosition = remember { mutableStateOf(Offset.Zero) }
     val nameHidden by remember {
         derivedStateOf { (titlePosition.value?.y ?: Float.MAX_VALUE) < topInsetPx }
     }
-    val dockProgress = remember { Animatable(0f) }
-    // See VehicleDetailContent's identical guard for why -- the first-ever
-    // settle, once a real position report arrives, snaps instead of
-    // animating, so this pill never flies in from nowhere on first mount.
-    var hasReport by remember { mutableStateOf(false) }
-    LaunchedEffect(nameHidden, titlePosition.value != null) {
-        if (titlePosition.value == null) return@LaunchedEffect
-        val target = if (nameHidden) 1f else 0f
-        if (!hasReport) {
-            dockProgress.snapTo(target)
-            hasReport = true
-        } else {
-            // pillDockSpring -- shared by every pill implementation, see its own doc.
-            dockProgress.animateTo(target, pillDockSpring(dockProgress.value, target))
-            haptics?.click()
-        }
-    }
-    // controlsScroll.value read directly, not through the reported position
-    // -- same reasoning as VehicleDetailContent's own heroYAtScrollZero doc.
-    val yAtScrollZero = remember { mutableStateOf<Float?>(null) }
-    val heroTitleColor = remember { mutableStateOf(Color.Unspecified) }
-    val heroTitleFontSizeSp = remember { mutableStateOf<Float?>(null) }
     val titleFlight = remember {
-        HeroTitleFlight(
-            onPositioned = {
-                titlePosition.value = it
-                val local = it - containerPosition.value
-                yAtScrollZero.value = local.y + controlsScroll.value
-            },
-            color = heroTitleColor,
-            fontSizeSp = heroTitleFontSizeSp,
-        )
+        HeroTitleFlight(onPositioned = { titlePosition.value = it })
     }
     // CriticalContent's own HeroHeader is the real hero photo card here --
     // this view was NOT missing one the way the doc above used to claim;
@@ -8606,14 +8113,7 @@ private fun ExpandedCar(v: Vehicle, state: UiState, vm: AppViewModel, flipped: B
     // the multi-car grid the flag was meant for, so the real M3 Expressive
     // indicator should show here too.
     Refreshable(v, state, vm) {
-        Box(
-            Modifier
-                .fillMaxSize()
-                // Reports THIS Box's own root position -- see
-                // containerPosition's own doc on VehicleDetailContent's
-                // identical field.
-                .onGloballyPositioned { coords -> containerPosition.value = coords.positionInRoot() },
-        ) {
+        Box(Modifier.fillMaxSize()) {
         // Animate the swap when the columns are flipped. Same spring the
         // expand/collapse transition (GarageScreen) and the collapsed
         // pager's own settle both use -- this was the one transition left
@@ -8659,83 +8159,27 @@ private fun ExpandedCar(v: Vehicle, state: UiState, vm: AppViewModel, flipped: B
                 }
             }
         }
-        // The floating name, once CriticalContent's own HeroHeader has
-        // scrolled out of view -- mirrors VehicleDetailContent's own
-        // identical pill exactly (same hero-card source, via the same
-        // ambient LocalHeroTitleFlight above), just tracking whichever
-        // column `controls` currently renders in rather than a single fixed
-        // ScrollState.
-        val titleLargeSp = MaterialTheme.typography.titleLarge.fontSize.value
-        val onSurface = MaterialTheme.colorScheme.onSurface
-        val pillShape = RoundedCornerShape(50)
-        Box(
-            Modifier
-                .align(Alignment.TopStart)
-                .offset {
-                    val attachedX = titlePosition.value?.let { it.x - containerPosition.value.x } ?: cornerXPx
-                    val attachedY = yAtScrollZero.value?.let { it - controlsScroll.value } ?: cornerYPx
-                    // Coerced -- see the hoisted pill's identical offset{}.
-                    val t = dockProgress.value.coerceIn(0f, 1f)
-                    val x = attachedX + (cornerXPx - attachedX) * t
-                    val y = attachedY + (cornerYPx - attachedY) * t
-                    IntOffset(x.roundToInt(), y.roundToInt())
-                },
+        // The floating name badge, once CriticalContent's own HeroHeader has
+        // scrolled out of view (same hero-card source as VehicleDetailContent,
+        // via the same ambient LocalHeroTitleFlight above).
+        TitleDockBadge(
+            visible = nameHidden,
+            // Clears GarageScreen's own back arrow (top-left, 12dp/48dp) --
+            // it's always present whenever ExpandedCar is on screen.
+            cornerX = 60.dp,
+            cornerY = topInset + 12.dp,
+            // Clears the flip-columns + gear buttons in the top-right.
+            reserveEnd = 120.dp,
+            onClick = { scope.launch { controlsScroll.animateScrollTo(0) } },
         ) {
-            val t = dockProgress.value.coerceIn(0f, 1f)
-            Row(
-                Modifier
-                    .heightIn(min = lerp(0.dp, 48.dp, t))
-                    // Glass chrome applied directly to this Row -- not a
-                    // separate matchParentSize sibling Box -- see the
-                    // hoisted pill's identical fix for why (that's what read
-                    // as "the shadow is buggy, especially while animating").
-                    // Before .clip below -- dropShadow's own blur bleeds
-                    // outside the shape's bounds by design.
-                    .then(
-                        if (t > 0.02f) {
-                            Modifier
-                                .graphicsLayer { alpha = t }
-                                .background(MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = glassContainerAlpha()), pillShape)
-                                .ambientRing(pillShape)
-                                .dropShadow(pillShape)
-                                .frostedRim(pillShape)
-                        } else {
-                            Modifier
-                        },
-                    )
-                    // Clip (lerped corner, not pillShape directly -- see
-                    // PillDockedCorner's own doc) before clickable -- see the
-                    // hoisted pill's identical fix for why (the ripple, not
-                    // the fill, was what read as "not round").
-                    .clip(RoundedCornerShape(lerp(0.dp, PillDockedCorner, t)))
-                    .clickable {
-                        haptics?.click()
-                        scope.launch { controlsScroll.animateScrollTo(0) }
-                    }
-                    .padding(horizontal = lerp(0.dp, 16.dp, t)),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(lerp(0.dp, 8.dp, t)),
-            ) {
-                Text(
-                    v.name,
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Bold,
-                    color = onSurface,
-                    maxLines = 1,
-                    // Ellipsis, not the Text default (Clip) -- see the
-                    // hoisted pill's identical fix for why.
-                    overflow = TextOverflow.Ellipsis,
-                    // Top-left, not centre -- see VehicleDetailContent's
-                    // identical graphicsLayer for the full reasoning.
-                    modifier = Modifier.graphicsLayer {
-                        val attachedScale = (titleFlight.fontSizeSp.value ?: titleLargeSp) / titleLargeSp
-                        val scale = attachedScale + (1f - attachedScale) * dockProgress.value.coerceIn(0f, 1f)
-                        scaleX = scale
-                        scaleY = scale
-                        transformOrigin = TransformOrigin(0f, 0f)
-                    },
-                )
-            }
+            Text(
+                v.name,
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
         }
         }
     }
@@ -10404,26 +9848,6 @@ internal fun PebbleShell(
      * [LocalHeroTitleFlight]); every other pebble takes the default no-op.
      */
     titleModifier: Modifier = Modifier,
-    /**
-     * Independent alpha on just the title text, separate from the pebble's
-     * own. [Color.Unspecified]'s alpha channel already covers per-pebble
-     * tinting; this is for a caller that wants to fade the title OUT while
-     * something else (the hero's floating name, mid-flight) fades in to
-     * replace it, without touching [titleColor] itself.
-     */
-    titleAlpha: Float = 1f,
-    /**
-     * Reports this title's own CURRENT effective font size (its base style's
-     * size times whatever [growTitleOnExpand]/collapse scale is currently
-     * applied), in sp, every recomposition. Only the hero's own floating
-     * name (see [LocalHeroTitleFlight]) reads this -- it draws a completely
-     * separate [Text] at its OWN fixed style, and without this had no way
-     * to know this title's real current size to visually match, so it
-     * rendered at a flatly different, larger size than the space actually
-     * reserved for it -- overlapping [titleTrailing] instead of sitting
-     * inside its own slot.
-     */
-    onTitleScale: ((Float) -> Unit)? = null,
     // onTitleWidth was deleted here. It reported the title's measured width so the hero could
     // offset its collapsed readout past the car name. That whole approach is gone: the numbers are
     // now trailing content ON this Row (see HeroCollapsedNumbers), so the Row positions them and
@@ -10697,7 +10121,6 @@ internal fun PebbleShell(
                             } else {
                                 collapsedTitleScale + (1f - collapsedTitleScale) * headerT
                             }
-                            onTitleScale?.invoke(titleStyle.fontSize.value * titleScale)
                             Row(verticalAlignment = Alignment.CenterVertically) {
                             Text(
                                 title,
@@ -10726,7 +10149,6 @@ internal fun PebbleShell(
                                     .graphicsLayer {
                                         scaleX = titleScale
                                         scaleY = titleScale
-                                        alpha = titleAlpha
                                         transformOrigin = TransformOrigin(0f, 0.5f)
                                     }
                                     // Appended LAST -- after the .layout{} above, so a

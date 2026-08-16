@@ -9,7 +9,6 @@ import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.SpringSpec
 import androidx.compose.animation.core.Transition
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.spring
@@ -250,88 +249,10 @@ internal val PebbleBounceDamping = 0.68f
 internal val PebbleCloseDamping = Spring.DampingRatioNoBouncy
 internal val PebbleBounceStiffness = Spring.StiffnessLow
 
-/**
- * The floating identity pill's own dock/undock spring -- shared by every one
- * of its four implementations (GarageScreen's hoisted pill, VehicleDetail-
- * Content's and SettingsScreen's own local pills, ExpandedCar's pill).
- *
- * Four tunings before this one. First shipped as the same
- * `spring(dampingRatio = 0.5f, stiffness = StiffnessMediumLow)` every pebble
- * bounce uses, which read as a quick, business-like snap -- fine for a
- * pebble, wrong for a name arriving in a corner. Slowed and loosened next
- * (0.32 / StiffnessVeryLow) chasing "floaty and bouncy" -- but StiffnessVeryLow
- * drags out the APPROACH too, which read as sluggish rather than lively.
- * StiffnessMedium plus a wide, low damping range (0.62-0.2) fixed the drift
- * but overcorrected into "too fast, aggressive, and springy". Pulled back to
- * StiffnessMediumLow with a narrower 0.8-0.45 range next, landing the speed
- * and the single modest overshoot, but asked for "more time to settle" after
- * that -- the SHAPE of the motion (quick approach, one clear bounce) was
- * right, it just needed to linger over that last bit longer rather than
- * resolving right away. [PillDockStiffness] is lower again (StiffnessLow,
- * down from MediumLow) for that -- unlike the earlier StiffnessVeryLow
- * mistake, this is a smaller step down and the damping range stays the same
- * narrow 0.8-0.45 it already had, so the approach doesn't drift and the
- * bounce doesn't widen -- only the tail gets more time to actually resolve.
- *
- * Not [PebbleBounceDamping]/[PebbleBounceStiffness]: those are deliberately
- * the app's CALM bounce (tuned down from something too visible). This one
- * still gets its own numbers so the two can keep moving independently.
- */
-internal val PillDockStiffness = Spring.StiffnessLow
-
-/** Floor of [pillDockSpring]'s damping range: a small correction (the
- *  animation reversing before it finished, or re-triggering from a position
- *  already close to its target) settles promptly with essentially no wobble. */
-internal val PillDockGentleDamping = 0.8f
-
-/** Ceiling of [pillDockSpring]'s damping range: a full attach<->dock swing
- *  (the ordinary case -- 0 all the way to 1, or back) gets one clear, modest
- *  overshoot before it settles -- "bounce a bit," not several oscillations. */
-internal val PillDockBounceDamping = 0.45f
-
-/**
- * The pill's dock spring, made dynamic: "harder" (a longer) trip is bouncier,
- * a short one settles calmly. [from]/[to] are dockProgress's own 0..1 space
- * (its value right before this call, and the target being animated to), so
- * `abs(to - from)` is exactly how much of the full attach<->dock swing this
- * particular animation actually has to cover -- 1.0 for the ordinary case, a
- * fraction of that when interrupted mid-flight and reversed. Lerped linearly
- * between [PillDockGentleDamping] and [PillDockBounceDamping] by that
- * fraction, stiffness held constant at [PillDockStiffness] so the initial
- * approach always reads as quick regardless of how bouncy the tail ends up.
- */
-internal fun pillDockSpring(from: Float, to: Float): SpringSpec<Float> {
-    val travel = (to - from).let { if (it < 0f) -it else it }.coerceIn(0f, 1f)
-    val damping = PillDockGentleDamping + (PillDockBounceDamping - PillDockGentleDamping) * travel
-    return spring(dampingRatio = damping, stiffness = PillDockStiffness)
-}
-
-/**
- * Half of the pill's fully-docked 48dp height -- the corner radius its own
- * percent(50) background shape naturally reaches once dockProgress hits 1.
- *
- * Every pill implementation ALSO clips its content Row to a shape (originally
- * so tapping it shows a ripple that respects the pill's rounding, not a
- * rectangle -- see pillDockSpring's own call sites). That clip used to share
- * the exact same percent(50) shape the background uses, which is wrong for
- * the CLIP specifically: percent(50) is computed from the Row's own current
- * LAYOUT size, and the Row's layout size (padding aside) is the name Text's
- * NATURAL, unscaled titleLarge bounds -- unaffected by the graphicsLayer
- * scale that draws it smaller while attached. At low dockProgress the Row
- * therefore has real height (and a real corner radius from it) well before
- * there's any real padding to keep the small, top-left-scaled glyphs clear
- * of that curve, so the rounded corner sliced directly into the first
- * character or two -- reported as "part of the text gets cut off" and,
- * since the effect got WORSE as dockProgress approached 0 from above rather
- * than better, also read as the name partially vanishing on its way back to
- * attached. Lerping the CLIP's own corner from 0dp (a plain rectangle -- can
- * never cut content that's already inside it) up to this constant by the
- * same dockProgress the padding grows by keeps the two in lockstep, so
- * there's never a point where curvature outruns the padding meant to clear
- * it. The background keeps its own percent(50) shape unchanged -- it only
- * ever draws past dockProgress 0.02, well clear of this low-t window.
- */
-internal val PillDockedCorner = 24.dp
+// The PillDock* spring tokens and pillDockSpring() that used to live here
+// are gone with the flown-title system they served -- the floating name is
+// a fixed-corner TitleDockBadge now (see Screens.kt), which animates with
+// plain AnimatedVisibility springs and needs no bespoke tuning of its own.
 
 @Composable
 internal fun collapseEnter(expandFrom: Alignment.Vertical = Alignment.Top): EnterTransition =

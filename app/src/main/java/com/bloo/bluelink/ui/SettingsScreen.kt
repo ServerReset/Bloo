@@ -42,7 +42,6 @@ import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.AnimationVector1D
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.VectorConverter
@@ -325,7 +324,6 @@ import androidx.compose.material3.LocalTextStyle
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.lerp
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -333,11 +331,8 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.composed
 import androidx.compose.ui.layout.onPlaced
 import androidx.compose.ui.layout.positionInParent
-import androidx.compose.ui.unit.IntOffset
-import androidx.compose.ui.unit.round
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.lerp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
@@ -550,21 +545,16 @@ private fun StatusHeaderRow(icon: ImageVector, tint: Color, title: String, statu
 }
 
 /**
- * `SettingsScreen`'s own (non-hoisted) floating pill's tracking state,
- * bundled so it can be built inside an `if (hoisted == null)` branch as one
- * value -- see `VehicleDetailContent`'s identical `LocalNamePillState` for
- * the full reasoning. Simpler than that one: no colour/font-size tracking
- * (Settings' own title never changes either -- see `SettingsHeaderRow`'s own
- * doc), and no scroll-value calibration (Settings has no single scalar
- * `ScrollState` to read the way a car page's `verticalScroll` does).
+ * `SettingsScreen`'s own (non-hoisted) badge state, bundled so it can be
+ * built inside an `if (hoisted == null)` branch as one value -- see
+ * `VehicleDetailContent`'s identical `LocalNamePillState` for the full
+ * reasoning.
  */
-private data class LocalSettingsPillState(
+private class LocalSettingsPillState(
     val flight: HeroTitleFlight,
-    val dockProgress: Animatable<Float, AnimationVector1D>,
-    val cornerXPx: Float,
-    val cornerYPx: Float,
-    val titlePosition: MutableState<Offset?>,
-    val containerPosition: MutableState<Offset>,
+    /** True once the header title's top edge has scrolled above the status
+     *  bar -- the one bit the badge runs on. */
+    val nameHidden: State<Boolean>,
 )
 
 /**
@@ -576,13 +566,10 @@ private data class LocalSettingsPillState(
  *
  * Reports its own real, measured position via [LocalHeroTitleFlight] (the
  * same mechanism [HeroHeader]'s car-page title uses) whenever a flight
- * controller is present, and goes invisible while it does -- mirroring
- * [CarHeaderRow]'s own `hideName`, since the real, visible copy is then a
- * floating [Text] elsewhere that's drawn AT this title's position, not this
- * one. Unlike the hero card, Settings' own title never changes colour or
- * size (no photo to sit over, no [PebbleShell]-style grow-on-expand), so no
- * `color`/`fontSizeSp` need reporting -- the floating copy's own fallback
- * (the app's normal text colour, full titleLarge) already matches exactly.
+ * controller is present, and stays FULLY VISIBLE while it does -- the
+ * position feeds only the "has this scrolled off-screen" bit that shows
+ * and hides the corner badge (see `TitleDockBadge`, Screens.kt); there is
+ * no floating copy standing in for this title any more.
  */
 @Composable
 private fun SettingsHeaderRow(state: UiState) {
@@ -594,9 +581,7 @@ private fun SettingsHeaderRow(state: UiState) {
             fontWeight = FontWeight.Bold,
             color = MaterialTheme.colorScheme.onSurface,
             modifier = if (titleFlight != null) {
-                Modifier
-                    .alpha(0f)
-                    .onGloballyPositioned { titleFlight.onPositioned(it.positionInRoot()) }
+                Modifier.onGloballyPositioned { titleFlight.onPositioned(it.positionInRoot()) }
             } else {
                 Modifier
             },
@@ -672,66 +657,23 @@ internal fun SettingsScreen(
   // is what should run instead.
   if (!embedded) BackHandler { vm.closeSettings() }
   if (hoisted != null) {
-      // Register this page as the one actually driving the hoisted pill.
+      // Register this page as the one actually driving the hoisted badge.
       // Idempotent -- see VehicleDetailContent's own identical guard for
-      // why re-running it every recomposition is harmless. activeScroll
-      // stays null: Settings has no per-page scroll SCALAR the way a car
-      // page's ScrollState does (LazyStaggeredGridState instead), so
-      // leaving it null makes the hoisted pill's own Y calc fall back to
-      // its own measured position directly rather than trying to read a
-      // live scroll delta the way car pages do.
-      hoisted.activeScroll.value = null
+      // why re-running it every recomposition is harmless.
       hoisted.scrollToTop.value = { settingsGridState.animateScrollToItem(0) }
   }
-  // Only actually built when this page is rendering its OWN pill -- see
+  // Only actually built when this page is rendering its OWN badge -- see
   // VehicleDetailContent's identical `local` for the full reasoning.
   val local = if (hoisted == null) {
       val topInsetPx = with(density) { topInset.toPx() }
-      val cornerYPx = with(density) { (topInset + 12.dp).toPx() }
-      // Standalone route's own back arrow already claims this same
-      // top-left corner (its own 12dp outer padding + 48dp) -- clear it.
-      // Embedded has no back arrow (see its own doc above), so it sits at
-      // the same 16dp the grid's own content uses, matching
-      // VehicleDetailContent's pill exactly.
-      val cornerXPx = with(density) { (if (embedded) 16.dp else 60.dp).toPx() }
       val titlePosition = remember { mutableStateOf<Offset?>(null) }
-      val containerPosition = remember { mutableStateOf(Offset.Zero) }
       // Root-space on both sides, same reasoning as VehicleDetailContent's
       // own nameHidden.
-      val nameHidden by remember {
+      val nameHidden = remember {
           derivedStateOf { (titlePosition.value?.y ?: Float.MAX_VALUE) < topInsetPx }
       }
-      val dockProgress = remember { Animatable(0f) }
-      // See VehicleDetailContent's identical guard for why -- the first-ever
-      // settle, once a real position report arrives, snaps instead of
-      // animating, so this pill never flies in from nowhere on first mount
-      // (e.g. GarageScreen un-hoisting Settings' own embedded slot while it
-      // was already scrolled down).
-      var hasReport by remember { mutableStateOf(false) }
-      LaunchedEffect(nameHidden, titlePosition.value != null) {
-          if (titlePosition.value == null) return@LaunchedEffect
-          val target = if (nameHidden) 1f else 0f
-          if (!hasReport) {
-              dockProgress.snapTo(target)
-              hasReport = true
-              return@LaunchedEffect
-          }
-          // pillDockSpring -- shared by every pill implementation, see its own doc.
-          dockProgress.animateTo(target, pillDockSpring(dockProgress.value, target))
-          haptics?.click()
-      }
-      val flight = remember {
-          HeroTitleFlight(
-              onPositioned = { titlePosition.value = it },
-              // Settings' own title never changes colour/size -- see
-              // SettingsHeaderRow's own doc -- so these just stay at their
-              // defaults (Unspecified/null), which the floating copy's own
-              // fallback (onSurface/titleLarge) already matches exactly.
-              color = mutableStateOf(Color.Unspecified),
-              fontSizeSp = mutableStateOf(null),
-          )
-      }
-      LocalSettingsPillState(flight, dockProgress, cornerXPx, cornerYPx, titlePosition, containerPosition)
+      val flight = remember { HeroTitleFlight(onPositioned = { titlePosition.value = it }) }
+      LocalSettingsPillState(flight, nameHidden)
   } else {
       null
   }
@@ -2142,78 +2084,35 @@ internal fun SettingsScreen(
         // the same scrim twice for exactly this one page, reading as a subtly
         // darker/hazier status-bar band than every car page beside it.
         if (!isCompactCoverScreen() && !embedded) StatusBarScrim()
-        // The floating "Settings" pill, once its own header has scrolled out
-        // of view -- mirrors VehicleDetailContent's own identical pill
-        // exactly, just sourced from SettingsHeaderRow's title instead of a
-        // hero photo card's. Hoisted mode renders NO pill of its own here at
-        // all -- GarageScreen renders ONE shared pill covering every page,
+        // The floating "Settings" badge, once its own header has scrolled
+        // out of view -- same TitleDockBadge every car page uses, sourced
+        // from SettingsHeaderRow's title instead of a hero photo card's.
+        // Hoisted mode renders NO badge of its own here at all --
+        // GarageScreen renders ONE shared badge covering every page,
         // including this one, once it settles.
         if (local != null) {
-        val (_, dockProgress, cornerXPx, cornerYPx, titlePosition, containerPosition) = local
-        val onSurface = MaterialTheme.colorScheme.onSurface
-        val pillShape = RoundedCornerShape(50)
-        Box(
-            Modifier
-                .align(Alignment.TopStart)
-                .offset {
-                    val attachedX = titlePosition.value?.let { it.x - containerPosition.value.x } ?: cornerXPx
-                    val attachedY = titlePosition.value?.let { it.y - containerPosition.value.y } ?: cornerYPx
-                    // Coerced -- see the hoisted pill's identical offset{}
-                    // (Screens.kt) for why.
-                    val t = dockProgress.value.coerceIn(0f, 1f)
-                    val x = attachedX + (cornerXPx - attachedX) * t
-                    val y = attachedY + (cornerYPx - attachedY) * t
-                    IntOffset(x.roundToInt(), y.roundToInt())
-                },
-        ) {
-            val t = dockProgress.value.coerceIn(0f, 1f)
-            Row(
-                Modifier
-                    .heightIn(min = lerp(0.dp, 48.dp, t))
-                    // Glass chrome applied directly to this Row -- not a
-                    // separate matchParentSize sibling Box -- see the
-                    // hoisted pill's identical fix (Screens.kt) for why
-                    // (that's what read as "the shadow is buggy, especially
-                    // while animating"). Before .clip below -- dropShadow's
-                    // own blur bleeds outside the shape's bounds by design.
-                    .then(
-                        if (t > 0.02f) {
-                            Modifier
-                                .graphicsLayer { alpha = t }
-                                .background(MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = glassContainerAlpha()), pillShape)
-                                .ambientRing(pillShape)
-                                .dropShadow(pillShape)
-                                .frostedRim(pillShape)
-                        } else {
-                            Modifier
-                        },
-                    )
-                    // Clip (lerped corner, not pillShape directly -- see
-                    // PillDockedCorner's own doc, Screens.kt) before
-                    // clickable -- see the hoisted pill's identical fix for
-                    // why (the ripple, not the fill, was what read as "not
-                    // round").
-                    .clip(RoundedCornerShape(lerp(0.dp, PillDockedCorner, t)))
-                    .clickable {
-                        haptics?.click()
-                        settingsScope.launch { settingsGridState.animateScrollToItem(0) }
-                    }
-                    .padding(horizontal = lerp(0.dp, 16.dp, t)),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(lerp(0.dp, 8.dp, t)),
+            TitleDockBadge(
+                visible = local.nameHidden.value,
+                // Standalone route's own back arrow already claims the
+                // top-left corner (12dp outer padding + 48dp) -- clear it.
+                // Embedded has no back arrow, so it sits at the same 16dp
+                // the grid's own content uses, matching the car pages.
+                cornerX = if (embedded) 16.dp else 60.dp,
+                cornerY = topInset + 12.dp,
+                // Clears the Simple/Advanced segmented toggle in the
+                // top-right (172dp wide, plus its own breathing room).
+                reserveEnd = 192.dp,
+                onClick = { settingsScope.launch { settingsGridState.animateScrollToItem(0) } },
             ) {
                 Text(
                     "Settings",
                     style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.Bold,
-                    color = onSurface,
+                    color = MaterialTheme.colorScheme.onSurface,
                     maxLines = 1,
-                    // Ellipsis, not the Text default (Clip) -- matches every
-                    // other pill's own name Text, for consistency.
                     overflow = TextOverflow.Ellipsis,
                 )
             }
-        }
         }
         // Floating back-arrow + "Settings" label + simple/advanced button.
         Row(
@@ -3155,9 +3054,8 @@ internal fun SearchLayer(
         // can't fix on its own. Stored and restored as FRACTIONS of the drag range
         // (see SettingsStore's own doc), not raw dp, so this stays correct even if
         // minX/maxX/minY/maxY come out slightly different than when it was saved.
-        // Plain arithmetic lerp rather than androidx.compose.ui.unit.lerp: this file
-        // already imports a same-named lerp for TextStyle, and importing both would
-        // collide.
+        // Plain arithmetic rather than androidx.compose.ui.unit.lerp -- two
+        // multiplies don't need an import.
         LaunchedEffect(Unit) {
             if (dragX.isNaN()) {
                 vm.searchBubblePosition()?.let { (xFrac, yFrac) ->
