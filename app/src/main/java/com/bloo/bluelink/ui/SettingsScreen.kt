@@ -703,12 +703,9 @@ internal fun SettingsScreen(
       }
       val dockProgress = remember { Animatable(0f) }
       LaunchedEffect(nameHidden) {
-          // PillDockDamping/PillDockStiffness -- shared by every pill
-          // implementation, see that pair's own doc.
-          dockProgress.animateTo(
-              if (nameHidden) 1f else 0f,
-              spring(dampingRatio = PillDockDamping, stiffness = PillDockStiffness),
-          )
+          // pillDockSpring -- shared by every pill implementation, see its own doc.
+          val target = if (nameHidden) 1f else 0f
+          dockProgress.animateTo(target, pillDockSpring(dockProgress.value, target))
           haptics?.click()
       }
       val flight = remember {

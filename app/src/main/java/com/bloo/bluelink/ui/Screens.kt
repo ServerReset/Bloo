@@ -3414,11 +3414,12 @@ internal fun GarageScreen(state: UiState, vm: AppViewModel) {
                     // this effect would still fire once on first composition
                     // and animate/click for a pill that's never shown.
                     if (perPage != 1) return@LaunchedEffect
-                    // PillDockDamping/PillDockStiffness -- shared by every
-                    // pill implementation, see that pair's own doc.
+                    // pillDockSpring -- shared by every pill implementation,
+                    // see its own doc.
+                    val hoistedTarget = if (hoistedNameHidden) 1f else 0f
                     hoistedDockProgress.animateTo(
-                        if (hoistedNameHidden) 1f else 0f,
-                        spring(dampingRatio = PillDockDamping, stiffness = PillDockStiffness),
+                        hoistedTarget,
+                        pillDockSpring(hoistedDockProgress.value, hoistedTarget),
                     )
                     haptics?.click()
                 }
@@ -8225,16 +8226,13 @@ private fun VehicleDetailContent(
         }
         val dockProgress = remember { Animatable(0f) }
         LaunchedEffect(nameHidden) {
-            // PillDockDamping/PillDockStiffness -- see that pair's own doc for
-            // the full tuning history. A real spring, not a tween, and a
-            // visibly bouncier/slower one than a pebble opening gets: this is
-            // the one moment the pill actually arrives or departs, so it's
-            // allowed to feel like it's floating into its slot rather than
-            // sliding there.
-            dockProgress.animateTo(
-                if (nameHidden) 1f else 0f,
-                spring(dampingRatio = PillDockDamping, stiffness = PillDockStiffness),
-            )
+            // pillDockSpring -- see its own doc for the full tuning history. A
+            // real spring, not a tween, and a visibly bouncier one than a
+            // pebble opening gets: this is the one moment the pill actually
+            // arrives or departs, so it's allowed a quick approach followed by
+            // a couple of genuine settling bounces rather than sliding there.
+            val target = if (nameHidden) 1f else 0f
+            dockProgress.animateTo(target, pillDockSpring(dockProgress.value, target))
             // A light tap right as it lands/leaves, same as every other floating
             // chrome's own tap feedback -- this is the one moment the pill
             // actually arrives or departs, so it's the moment worth marking.
@@ -8523,12 +8521,9 @@ private fun ExpandedCar(v: Vehicle, state: UiState, vm: AppViewModel, flipped: B
     }
     val dockProgress = remember { Animatable(0f) }
     LaunchedEffect(nameHidden) {
-        // PillDockDamping/PillDockStiffness -- shared by every pill
-        // implementation, see that pair's own doc.
-        dockProgress.animateTo(
-            if (nameHidden) 1f else 0f,
-            spring(dampingRatio = PillDockDamping, stiffness = PillDockStiffness),
-        )
+        // pillDockSpring -- shared by every pill implementation, see its own doc.
+        val target = if (nameHidden) 1f else 0f
+        dockProgress.animateTo(target, pillDockSpring(dockProgress.value, target))
         haptics?.click()
     }
     // controlsScroll.value read directly, not through the reported position

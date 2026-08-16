@@ -9,6 +9,7 @@ import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.SpringSpec
 import androidx.compose.animation.core.Transition
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.spring
@@ -252,24 +253,53 @@ internal val PebbleBounceStiffness = Spring.StiffnessLow
 /**
  * The floating identity pill's own dock/undock spring -- shared by every one
  * of its four implementations (GarageScreen's hoisted pill, VehicleDetail-
- * Content's and SettingsScreen's own local pills, ExpandedCar's pill), all of
- * which used to each carry the identical `spring(dampingRatio = 0.5f,
- * stiffness = Spring.StiffnessMediumLow)` inline. That read as a quick,
- * fairly business-like snap into place -- fine for a pebble opening, wrong
- * for a name arriving in a corner, which asked to feel "very floaty and
- * bouncy, with some time to settle" instead. Not [PebbleBounceDamping]/
- * [PebbleBounceStiffness]: those are deliberately the app's CALM bounce
- * (tuned down from something too visible); this wants MORE visible bounce
- * and a longer settle than that pair gives, so it gets its own numbers
- * rather than borrowing theirs. Lower damping (0.5 -> 0.32) means the swing
- * overshoots further past the target before it starts pulling back; lower
- * stiffness (StiffnessMediumLow -> StiffnessVeryLow) means it takes
- * noticeably longer to get there and longer still to fully settle -- the
- * two together are what makes it read as floating into place rather than
- * arriving.
+ * Content's and SettingsScreen's own local pills, ExpandedCar's pill).
+ *
+ * Went through two tunings before this one. First shipped as the same
+ * `spring(dampingRatio = 0.5f, stiffness = StiffnessMediumLow)` every pebble
+ * bounce uses, which read as a quick, business-like snap -- fine for a
+ * pebble, wrong for a name arriving in a corner. Slowed and loosened next
+ * (0.32 / StiffnessVeryLow) chasing "floaty and bouncy" -- but StiffnessVeryLow
+ * makes the whole approach drift, not just the settle, which read as sluggish
+ * rather than lively: asked for "most of its movement pretty quick, then
+ * slowly bounce back and forth 2 or 3 times till it settles" instead, which is
+ * a HIGH stiffness (fast approach) paired with a LOW damping ratio (several
+ * visible oscillations on the way there) -- two different knobs than "slow
+ * and loose" reaches for. [PillDockStiffness] is fixed and fast; the damping
+ * ratio is what [pillDockSpring] computes per-call instead of a constant.
+ *
+ * Not [PebbleBounceDamping]/[PebbleBounceStiffness]: those are deliberately
+ * the app's CALM bounce (tuned down from something too visible). This one is
+ * asked to be the opposite of calm.
  */
-internal val PillDockDamping = 0.32f
-internal val PillDockStiffness = Spring.StiffnessVeryLow
+internal val PillDockStiffness = Spring.StiffnessMedium
+
+/** Floor of [pillDockSpring]'s damping range: a small correction (the
+ *  animation reversing before it finished, or re-triggering from a position
+ *  already close to its target) settles promptly with barely a wobble. */
+internal val PillDockGentleDamping = 0.62f
+
+/** Ceiling of [pillDockSpring]'s damping range: a full attach<->dock swing
+ *  (the ordinary case -- 0 all the way to 1, or back) gets several genuine,
+ *  visible oscillations before it settles. */
+internal val PillDockBounceDamping = 0.2f
+
+/**
+ * The pill's dock spring, made dynamic: "harder" (a longer) trip is bouncier,
+ * a short one settles calmly. [from]/[to] are dockProgress's own 0..1 space
+ * (its value right before this call, and the target being animated to), so
+ * `abs(to - from)` is exactly how much of the full attach<->dock swing this
+ * particular animation actually has to cover -- 1.0 for the ordinary case, a
+ * fraction of that when interrupted mid-flight and reversed. Lerped linearly
+ * between [PillDockGentleDamping] and [PillDockBounceDamping] by that
+ * fraction, stiffness held constant at [PillDockStiffness] so the initial
+ * approach always reads as quick regardless of how bouncy the tail ends up.
+ */
+internal fun pillDockSpring(from: Float, to: Float): SpringSpec<Float> {
+    val travel = (to - from).let { if (it < 0f) -it else it }.coerceIn(0f, 1f)
+    val damping = PillDockGentleDamping + (PillDockBounceDamping - PillDockGentleDamping) * travel
+    return spring(dampingRatio = damping, stiffness = PillDockStiffness)
+}
 
 @Composable
 internal fun collapseEnter(expandFrom: Alignment.Vertical = Alignment.Top): EnterTransition =
