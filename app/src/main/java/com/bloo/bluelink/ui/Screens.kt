@@ -8006,6 +8006,9 @@ private data class LocalNamePillState(
     val heroTitlePhotoUrl: MutableState<String?>,
     val containerPosition: MutableState<Offset>,
     val heroYAtScrollZero: MutableState<Float?>,
+    /** This car's own column width in px -- see the pill's own `.widthIn`
+     *  for why. Zero (the default) is a harmless "not measured yet". */
+    val containerWidthPx: MutableState<Float>,
 )
 
 /**
@@ -8225,6 +8228,7 @@ private fun VehicleDetailContent(
         // floating name would fly toward the FAR corner of the whole grid
         // instead of this car's own column.
         val containerPosition = remember { mutableStateOf(Offset.Zero) }
+        val containerWidthPx = remember { mutableStateOf(0f) }
         // heroTitlePosition is only as fresh as the LAST time HeroHeader's title
         // actually laid out and reported it -- during a fast scroll fling that
         // can trail the ACTUAL, current scroll offset by a frame or so, which is
@@ -8306,6 +8310,7 @@ private fun VehicleDetailContent(
             heroTitlePhotoUrl = heroTitlePhotoUrl,
             containerPosition = containerPosition,
             heroYAtScrollZero = heroYAtScrollZero,
+            containerWidthPx = containerWidthPx,
         )
     } else {
         null
@@ -8325,7 +8330,17 @@ private fun VehicleDetailContent(
                     // children's, so this reports the same position
                     // regardless of where it sits in the chain. No-op when
                     // hoisted (local == null) -- the caller tracks its own.
-                    .onGloballyPositioned { coords -> local?.let { it.containerPosition.value = coords.positionInRoot() } }
+                    // Also reports this car's own COLUMN width -- see
+                    // LocalNamePillState.containerWidthPx's own doc. Same
+                    // pre-padding measurement as the position above, so it's
+                    // this car's full available width, not the 16dp-inset
+                    // content width.
+                    .onGloballyPositioned { coords ->
+                        local?.let {
+                            it.containerPosition.value = coords.positionInRoot()
+                            it.containerWidthPx.value = coords.size.width.toFloat()
+                        }
+                    }
                     .verticalScroll(scroll)
                     .padding(horizontal = 16.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
@@ -8352,7 +8367,7 @@ private fun VehicleDetailContent(
         // reference below reads identically to when these were built
         // directly in this scope, before `local` bundled them for the
         // `if (hoisted == null)` branch above.
-        val (_, dockProgress, cornerXPx, cornerYPx, heroTitlePosition, heroTitleColor, heroTitleFontSizeSp, heroTitlePhotoUrl, containerPosition, heroYAtScrollZero) = local
+        val (_, dockProgress, cornerXPx, cornerYPx, heroTitlePosition, heroTitleColor, heroTitleFontSizeSp, heroTitlePhotoUrl, containerPosition, heroYAtScrollZero, containerWidthPx) = local
         // This floating Text is always drawn at titleLarge -- ITS OWN fixed,
         // full-sized style, docked or not. While attached, it's scaled DOWN
         // (via graphicsLayer below, not by changing fontSize -- see that
@@ -8396,6 +8411,22 @@ private fun VehicleDetailContent(
             Row(
                 Modifier
                     .heightIn(min = lerp(0.dp, 48.dp, t))
+                    // Bounded to this car's own column width (minus a margin
+                    // roughly matching the hero card's own horizontal
+                    // padding on both sides) -- without this, a long name had
+                    // nothing stopping it from measuring at its full natural
+                    // width and drawing straight past the edge of a narrow
+                    // column with no ellipsis ever triggering, since nothing
+                    // upstream was actually constraining it that tightly.
+                    // Harmless on a full-width phone (there the column is the
+                    // whole screen, so this rarely binds); on GarageScreen's
+                    // side-by-side grid, where each car's own column is a
+                    // good deal narrower, this is what makes the Text
+                    // below's own overflow = Ellipsis actually trigger,
+                    // instead of measuring at its full natural width and
+                    // running straight past the edge of a narrow column with
+                    // nothing upstream ever tight enough to stop it.
+                    .widthIn(max = with(density) { (containerWidthPx.value - 32f).coerceAtLeast(0f).toDp() })
                     // The pill's own glass treatment (fill/ring/shadow/rim)
                     // and exact 48dp height FloatingIcon uses, so the docked
                     // name reads as one more piece of the app's own floating
@@ -8928,20 +8959,27 @@ private fun Refreshable(
 }
 
 /**
- * Car name + a row of small fact chips (model/powertrain, "updated x ago"),
- * with an optional expand button. The two facts used to be stacked plain
- * caption lines under the name; as [MetaChip]s in a [FlowRow] instead, they
- * read as distinct pieces of status (matching the app's own chip/pill
- * language elsewhere) rather than a second and third line of body text, and
- * wrap onto their own line instead of clipping if a long model name and the
- * expand button don't both fit the available width.
+ * A row of small fact chips (model/powertrain, "updated x ago"), with an
+ * optional expand button -- [hideName] is true from every real caller now
+ * ([VehicleDetailContent] and [ExpandedCar] both pass it, the car's name is
+ * only ever drawn ONCE, live, on the hero photo card, so a second copy here
+ * would be the same name twice on screen at once), which makes this row's
+ * ENTIRE content the chips, not a name plus a caption underneath it.
  *
- * [hideName] (true from both [VehicleDetailContent] and [ExpandedCar] now)
- * skips the name [Text] entirely -- not drawn, not reserved. The car's name
- * is only ever drawn ONCE, live, on the hero photo card
- * (`CriticalContent`/`HeroHeader` in [ExpandedCar]'s case) -- showing it
- * again here too was a real, visible duplicate, the same name twice on
- * screen at once.
+ * CenterVertically, not Top: with no name line above them any more, the
+ * chips are the row's only content, sitting noticeably shorter than
+ * [FloatingIcon]'s fixed 48dp -- top-aligning them against it left the icon
+ * looming taller beside a strip of chips hugging the top edge, reading as
+ * mismatched pieces rather than one row. Centering both against each other
+ * is what makes it read as one consistent band, the same alignment this
+ * exact icon-beside-content pairing uses everywhere else it isn't paired
+ * with a taller title line of its own.
+ *
+ * [hideName] itself (and the name [Text] it would draw) stays as an escape
+ * hatch rather than being deleted outright -- nothing currently calls it
+ * false, but the option to draw a title-sized line above the chips again
+ * (with its own top-aligned pairing) is cheap to keep and expensive to
+ * reconstruct if a future caller needs it.
  */
 @Composable
 private fun CarHeaderRow(
@@ -8955,15 +8993,7 @@ private fun CarHeaderRow(
         Modifier
             .fillMaxWidth()
             .then(if (reserveEnd) Modifier.padding(end = 52.dp) else Modifier),
-        // Top, not CenterVertically -- the text column is two rows (name,
-        // fact chips) of very different weight, and centering the button
-        // against both put its visual centre down around the chips instead
-        // of level with the name, the one row it actually reads as paired
-        // with. Top-aligns the button's own top edge with the name's, the
-        // same "icon keys off the title, not the whole block" alignment
-        // every other icon-beside-a-text-column pairing in this app
-        // already uses.
-        verticalAlignment = Alignment.Top,
+        verticalAlignment = if (hideName) Alignment.CenterVertically else Alignment.Top,
     ) {
         Column(Modifier.weight(1f)) {
             if (!hideName) {
