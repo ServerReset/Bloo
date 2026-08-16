@@ -11,7 +11,6 @@ import com.bloo.bluelink.data.BlueLinkException
 import com.bloo.bluelink.data.BlueLinkRepository
 import com.bloo.bluelink.data.Brand
 import com.bloo.bluelink.data.CarAlerts
-import com.bloo.bluelink.data.formatPlaceName
 import com.bloo.bluelink.data.ClimatePreset
 import com.bloo.bluelink.data.ClimateRequest
 import com.bloo.bluelink.data.DEFAULT_CLIMATE_DURATION_MIN
@@ -55,7 +54,6 @@ import com.bloo.bluelink.data.VehicleStatus
 import com.bloo.bluelink.data.displayChargeLimit
 import com.bloo.bluelink.data.Weather
 import com.bloo.bluelink.data.WeatherApi
-import androidx.glance.appwidget.updateAll
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
