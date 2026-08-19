@@ -3441,7 +3441,7 @@ internal fun GarageScreen(state: UiState, vm: AppViewModel) {
                 val pillScope = rememberCoroutineScope()
                 val hoistedFlight = remember {
                     HoistedIdentityFlight(
-                        flight = HeroTitleFlight(hoistedTopInsetPx),
+                        flight = HeroTitleFlight(hoistedTopInsetPx, with(density) { TitleDockHysteresis.toPx() }),
                         scrollToTop = hoistedScrollToTop,
                     )
                 }
@@ -3661,7 +3661,7 @@ internal fun GarageScreen(state: UiState, vm: AppViewModel) {
                             // slot uses whatever colour that car's OWN HeroHeader
                             // most recently reported (hoistedFlight.flight.color),
                             // same as the non-hoisted call sites.
-                            textColor = if (onSettingsSlot) MaterialTheme.colorScheme.onSurface else hoistedFlight.flight.color,
+                            textColor = if (onSettingsSlot || hoistedFlight.flight.color == Color.Unspecified) MaterialTheme.colorScheme.onSurface else hoistedFlight.flight.color,
                             onClick = { pillScope.launch { hoistedScrollToTop.value?.invoke() } },
                             // A plain, un-animated Text of whatever's CURRENTLY settled --
                             // see TitleFlightOverlay's own doc on measureContent for why this
@@ -5729,6 +5729,11 @@ private fun HeroHeader(
                 Modifier
                     .onGloballyPositioned { heroTitleFlight.onPositioned(it.positionInRoot()) }
                     .alpha(0f)
+                    // Position anchor only -- see TitleFlightOverlay's matching
+                    // measuring-copy comment for why this can't stay in the
+                    // accessibility tree: it would announce the car's name a
+                    // second time, on top of the one real flying Text.
+                    .clearAndSetSemantics {}
             } else {
                 Modifier
             },
@@ -7870,24 +7875,42 @@ internal fun BackdropHost(content: @Composable BoxScope.() -> Unit) {
 
 // --- Full detail ----------------------------------------------------------
 
+/** How far past [HeroTitleFlight]'s dock line the inline title has to
+ *  scroll back before `docked` releases again -- see that class's own
+ *  `docked` doc for why a bare threshold isn't enough. Shared by every
+ *  construction site so the debounce feels the same everywhere. */
+internal val TitleDockHysteresis = 8.dp
+
+/** [HeroTitleFlight.color] before [HeroHeader] has reported a real one yet
+ *  (this composable's own first frame) is [Color.Unspecified] -- resolving
+ *  that straight through as [TitleFlightOverlay]'s `textColor` would let it
+ *  fall through to whatever LocalContentColor happened to already be, an
+ *  arbitrary colour rather than a deliberate one. One frame's difference at
+ *  most (color is set the same composition pass HeroHeader itself runs),
+ *  but a real value beats an accidental one either way. */
+@Composable
+private fun Color.takeOrElseOnSurface(): Color =
+    if (this == Color.Unspecified) MaterialTheme.colorScheme.onSurface else this
+
 /**
  * What a header title -- [HeroHeader]'s own (the car's name, drawn ON the
  * photo card via [PebbleShell]), or `SettingsHeaderRow`'s own -- reports to
- * whichever surface hosts a [TitleFlightOverlay] for it: just its live measured
- * position, nothing else. The one derived fact anyone needs is "has the
- * title's top edge scrolled above the status bar" -- the badge shows then,
- * and hides again once the real title is back.
+ * whichever surface hosts a [TitleFlightOverlay] for it: its live measured
+ * position and colour. [docked] is the one derived fact most callers
+ * actually need -- has the title's top edge scrolled above the status bar,
+ * with hysteresis (see that property's own doc).
  *
- * This used to be a much bigger contract (colour, font size, photo URL, and
- * a floating CLONE of the title that hid the real one and flew between its
- * live position and a corner). That clone was a standing source of one-frame
- * flashes: any gap between hiding the real title and the copy's own
- * rendering -- a stale position report, a clip outrunning its padding, a
- * crossfade with mismatched durations -- read as the name vanishing, and
- * each fix surfaced the next. The badge never hides the real title at all,
- * so there is no gap for any of that to happen in.
+ * This used to be a much bigger contract still (font size, photo URL, and a
+ * floating CLONE of the title that hid the real one and flew between its
+ * live position and a corner). That clone was a standing source of
+ * one-frame flashes: any gap between hiding the real title and the copy's
+ * own rendering -- a stale position report, a clip outrunning its padding,
+ * a crossfade with mismatched durations -- read as the name vanishing, and
+ * each fix surfaced the next. [TitleFlightOverlay] never hides the real
+ * title at all -- it's the ONLY thing that ever paints the name, so there
+ * is no second copy for any of that to happen between.
  */
-internal class HeroTitleFlight(private val topInsetPx: Float) {
+internal class HeroTitleFlight(private val topInsetPx: Float, private val hysteresisPx: Float) {
     private var inlineX by mutableFloatStateOf(0f)
     private var inlineY by mutableFloatStateOf(Float.MAX_VALUE)
 
@@ -7902,9 +7925,23 @@ internal class HeroTitleFlight(private val topInsetPx: Float) {
      *  cause recomposition. */
     val inlinePos: androidx.compose.runtime.State<Offset> = derivedStateOf { Offset(inlineX, inlineY) }
 
-    /** Has the inline title's top edge crossed the status bar. The one
-     *  recomposition-triggering read [TitleFlightOverlay] does. */
-    val docked: androidx.compose.runtime.State<Boolean> = derivedStateOf { inlineY < topInsetPx }
+    /** Has the inline title's top edge crossed the status bar -- with
+     *  hysteresis, not one bare threshold. A single cutoff meant a scroll
+     *  position that happened to settle (a fling's last pixel, a hand
+     *  resting mid-drag) exactly at the line could flip `docked` back and
+     *  forth on sub-pixel jitter, restarting TitleFlightOverlay's spring
+     *  every time -- the flying Text visibly stuttering in place instead of
+     *  either committing to dock or staying put. [hysteresisPx] separates
+     *  the entering and leaving lines so a real crossing still reacts
+     *  immediately, but resting near the boundary can't retrigger it. The
+     *  one recomposition-triggering read [TitleFlightOverlay] does. */
+    val docked: androidx.compose.runtime.State<Boolean> = derivedStateOf {
+        val wasDocked = dockedNow
+        val nowDocked = if (wasDocked) inlineY < topInsetPx + hysteresisPx else inlineY < topInsetPx
+        dockedNow = nowDocked
+        nowDocked
+    }
+    private var dockedNow = false
 
     /** What colour the inline title would be drawing itself in right now,
      *  reported the same way position is -- [HeroHeader]'s title morphs
@@ -8066,7 +8103,13 @@ internal fun BoxScope.TitleFlightOverlay(
                 Modifier
                     .alpha(0f)
                     .widthIn(max = maxWidth)
-                    .onGloballyPositioned { dockedAnchor.value = it.positionInRoot() },
+                    .onGloballyPositioned { dockedAnchor.value = it.positionInRoot() }
+                    // Position-measuring only -- alpha alone doesn't remove a node
+                    // from the accessibility tree, so without this a screen reader
+                    // announced the name here AND on the real flying Text below
+                    // (and, before this same fix on the inline slot, a third time
+                    // there too): one name, one announcement.
+                    .clearAndSetSemantics {},
             ) { measure() }
             extraContent?.invoke(this)
         }
@@ -8149,7 +8192,7 @@ private fun VehicleDetailContent(
     // exist there at all.
     val local = if (hoisted == null) {
         val topInsetPx = with(density) { topInset.toPx() }
-        val heroFlight = remember { HeroTitleFlight(topInsetPx) }
+        val heroFlight = remember { HeroTitleFlight(topInsetPx, with(density) { TitleDockHysteresis.toPx() }) }
         LocalNamePillState(flight = heroFlight)
     } else {
         null
@@ -8196,7 +8239,10 @@ private fun VehicleDetailContent(
                 // outer padding + 48dp icon + a little air.
                 reserveEnd = 72.dp,
                 maxWidth = screenWidth - 16.dp - 72.dp - 32.dp,
-                textColor = local.flight.color,
+                // Falls back to onSurface before HeroHeader has reported a real
+                // colour yet (this composable's own first frame) -- Unspecified would
+                // otherwise resolve through LocalContentColor's own default instead.
+                textColor = local.flight.color.takeOrElseOnSurface(),
                 onClick = { scope.launch { scroll.animateScrollTo(0) } },
             ) {
                 Text(
@@ -8257,7 +8303,7 @@ private fun ExpandedCar(v: Vehicle, state: UiState, vm: AppViewModel, flipped: B
     val density = LocalDensity.current
     val scope = rememberCoroutineScope()
     val topInsetPx = with(density) { topInset.toPx() }
-    val titleFlight = remember { HeroTitleFlight(topInsetPx) }
+    val titleFlight = remember { HeroTitleFlight(topInsetPx, with(density) { TitleDockHysteresis.toPx() }) }
     // CriticalContent's own HeroHeader is the real hero photo card here --
     // this view was NOT missing one the way the doc above used to claim;
     // CarHeaderRow's plain-text name and HeroHeader's own (on the photo)
@@ -8342,7 +8388,8 @@ private fun ExpandedCar(v: Vehicle, state: UiState, vm: AppViewModel, flipped: B
             // Clears the flip-columns + gear buttons in the top-right.
             reserveEnd = 120.dp,
             maxWidth = screenWidth - 60.dp - 120.dp - 32.dp,
-            textColor = titleFlight.color,
+            // Same Unspecified-before-first-report fallback as VehicleDetailContent's own call site.
+            textColor = titleFlight.color.takeOrElseOnSurface(),
             onClick = { scope.launch { controlsScroll.animateScrollTo(0) } },
         ) {
             Text(

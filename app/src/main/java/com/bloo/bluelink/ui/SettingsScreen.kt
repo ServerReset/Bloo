@@ -183,6 +183,7 @@ import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
@@ -402,6 +403,10 @@ private fun SettingsHeaderRow(state: UiState) {
                 Modifier
                     .onGloballyPositioned { titleFlight.onPositioned(it.positionInRoot()) }
                     .alpha(0f)
+                    // Position anchor only -- see TitleFlightOverlay's matching
+                    // measuring-copy comment (Screens.kt) for why this can't stay
+                    // in the accessibility tree.
+                    .clearAndSetSemantics {}
             } else {
                 Modifier
             },
@@ -486,7 +491,7 @@ internal fun SettingsScreen(
   // VehicleDetailContent's identical `local` for the full reasoning.
   val local = if (hoisted == null) {
       val topInsetPx = with(density) { topInset.toPx() }
-      val flight = remember { HeroTitleFlight(topInsetPx) }
+      val flight = remember { HeroTitleFlight(topInsetPx, with(density) { TitleDockHysteresis.toPx() }) }
       LocalSettingsPillState(flight)
   } else {
       null
