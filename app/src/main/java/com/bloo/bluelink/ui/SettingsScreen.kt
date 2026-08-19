@@ -176,6 +176,7 @@ import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
@@ -372,12 +373,6 @@ private fun StatusHeaderRow(icon: ImageVector, tint: Color, title: String, statu
  */
 private class LocalSettingsPillState(
     val flight: HeroTitleFlight,
-    /** True once the header title's top edge has scrolled above the status
-     *  bar -- the one bit the badge runs on. */
-    val nameHidden: androidx.compose.runtime.State<Boolean>,
-    /** The header title's own live root-Y -- see [LocalNamePillState.position]
-     *  (Screens.kt) for what this feeds. */
-    val position: androidx.compose.runtime.State<Offset?>,
 )
 
 /**
@@ -389,10 +384,10 @@ private class LocalSettingsPillState(
  *
  * Reports its own real, measured position via [LocalHeroTitleFlight] (the
  * same mechanism [HeroHeader]'s car-page title uses) whenever a flight
- * controller is present, and stays FULLY VISIBLE while it does -- the
- * position feeds only the "has this scrolled off-screen" bit that shows
- * and hides the corner badge (see `TitleDockBadge`, Screens.kt); there is
- * no floating copy standing in for this title any more.
+ * controller is present, and stays permanently INVISIBLE while it does --
+ * see `TitleFlightOverlay`'s own doc (Screens.kt) for why: this slot's only
+ * job is to report where the real, single, visible Text should sit when
+ * undocked.
  */
 @Composable
 private fun SettingsHeaderRow(state: UiState) {
@@ -404,7 +399,9 @@ private fun SettingsHeaderRow(state: UiState) {
             fontWeight = FontWeight.Bold,
             color = MaterialTheme.colorScheme.onSurface,
             modifier = if (titleFlight != null) {
-                Modifier.onGloballyPositioned { titleFlight.onPositioned(it.positionInRoot()) }
+                Modifier
+                    .onGloballyPositioned { titleFlight.onPositioned(it.positionInRoot()) }
+                    .alpha(0f)
             } else {
                 Modifier
             },
@@ -489,14 +486,8 @@ internal fun SettingsScreen(
   // VehicleDetailContent's identical `local` for the full reasoning.
   val local = if (hoisted == null) {
       val topInsetPx = with(density) { topInset.toPx() }
-      val titlePosition = remember { mutableStateOf<Offset?>(null) }
-      // Root-space on both sides, same reasoning as VehicleDetailContent's
-      // own nameHidden.
-      val nameHidden = remember {
-          derivedStateOf { (titlePosition.value?.y ?: Float.MAX_VALUE) < topInsetPx }
-      }
-      val flight = remember { HeroTitleFlight(onPositioned = { titlePosition.value = it }) }
-      LocalSettingsPillState(flight, nameHidden, titlePosition)
+      val flight = remember { HeroTitleFlight(topInsetPx) }
+      LocalSettingsPillState(flight)
   } else {
       null
   }
@@ -1899,31 +1890,34 @@ internal fun SettingsScreen(
         // darker/hazier status-bar band than every car page beside it.
         if (!isCompactCoverScreen() && !embedded) StatusBarScrim()
         // The floating "Settings" badge, once its own header has scrolled
-        // out of view -- same TitleDockBadge every car page uses, sourced
+        // out of view -- same TitleFlightOverlay every car page uses, sourced
         // from SettingsHeaderRow's title instead of a hero photo card's.
         // Hoisted mode renders NO badge of its own here at all --
         // GarageScreen renders ONE shared badge covering every page,
         // including this one, once it settles.
         if (local != null) {
-            TitleDockBadge(
-                visible = local.nameHidden.value,
+            val cornerX = if (embedded) 16.dp else 60.dp
+            val reserveEnd = 192.dp
+            val screenWidth = LocalConfiguration.current.screenWidthDp.dp
+            TitleFlightOverlay(
+                flight = local.flight,
                 // Standalone route's own back arrow already claims the
                 // top-left corner (12dp outer padding + 48dp) -- clear it.
                 // Embedded has no back arrow, so it sits at the same 16dp
                 // the grid's own content uses, matching the car pages.
-                cornerX = if (embedded) 16.dp else 60.dp,
+                cornerX = cornerX,
                 cornerY = topInset + 12.dp,
                 // Clears the Simple/Advanced segmented toggle in the
                 // top-right (172dp wide, plus its own breathing room).
-                reserveEnd = 192.dp,
-                titleYPx = local.position.value?.y,
+                reserveEnd = reserveEnd,
+                maxWidth = screenWidth - cornerX - reserveEnd - 32.dp,
+                textColor = MaterialTheme.colorScheme.onSurface,
                 onClick = { settingsScope.launch { settingsGridState.animateScrollToItem(0) } },
             ) {
                 Text(
                     "Settings",
                     style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
