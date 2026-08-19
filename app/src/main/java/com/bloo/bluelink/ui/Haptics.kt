@@ -174,14 +174,6 @@ class Haptics(context: Context) {
         }
     }
 
-    /** Success chime — rise then crisp click. */
-    fun success() {
-        if (composes) composed {
-            add(VibrationEffect.Composition.PRIMITIVE_QUICK_RISE, 0.6f, 0)
-            add(VibrationEffect.Composition.PRIMITIVE_CLICK, 0.8f, 10)
-        } else waveform(longArrayOf(0, 16, 24, 16), intArrayOf(0, 120, 0, 200))
-    }
-
     /** Celebration: a boom that scatters into crackling pops, then trails off. */
     fun fireworks() {
         if (composes) {

@@ -146,7 +146,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableFloatStateOf
@@ -165,7 +164,6 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
@@ -2839,11 +2837,7 @@ internal fun parseVehicleCommand(query: String, metric: Boolean = false): Parsed
         }
         RxClimateOff
             .containsMatchIn(q) -> ParsedVehicleCommand("climate_off", label = "Stopping climate for")
-        Regex(
-            "(start|turn on|run|fire up|kick on) (the )?(climate|ac|a/c|heat(er)?|aircon|air con)" +
-                "|pre.?(heat|cool|condition)|warm (it|the car|my car) up|cool (it|the car|my car) down" +
-                "|(warm|cool) up (the|my) car",
-        ).containsMatchIn(q) ->
+        RxClimateStart.containsMatchIn(q) ->
             if (temp != null) {
                 ParsedVehicleCommand(
                     "climate_on",
@@ -3651,6 +3645,15 @@ private val RxLock = Regex("\\block\\b|secure (the |my )?car|lock (it|up)\\b")
 private val RxSmartClimate = Regex("smart climate|smart (ac|a/c|heat|clim)")
 private val RxNegation = Regex("stop|turn off|cancel")
 private val RxClimateOff = Regex("(stop|turn off|cancel|kill|end) (the )?(climate|ac|a/c|heat(er)?|aircon|air con|cooling|warming)")
+// Was constructed fresh inline at its one call site, unlike every other
+// pattern in this block -- missed when the rest were hoisted (see the
+// doc above this block for why that hoist mattered: once per submitted
+// query, not once per frame, but still worth not re-parsing).
+private val RxClimateStart = Regex(
+    "(start|turn on|run|fire up|kick on) (the )?(climate|ac|a/c|heat(er)?|aircon|air con)" +
+        "|pre.?(heat|cool|condition)|warm (it|the car|my car) up|cool (it|the car|my car) down" +
+        "|(warm|cool) up (the|my) car",
+)
 private val RxChargeLimit = Regex("(charge|charging) (limit|target)|limit .*(charge|charging)|charge to \\d{2,3}")
 private val RxPercent = Regex("\\b(\\d{2,3})\\s*%?")
 private val RxFlashLights = Regex("(flash|blink) (the )?(lights|headlights)|lights? (on|flash)")

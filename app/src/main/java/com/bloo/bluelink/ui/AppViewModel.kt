@@ -1522,7 +1522,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             _state.map { it.refreshing }.distinctUntilChanged().collect { wasRefreshing ->
                 // Route through the single sync path so an imported remote is
                 // actually folded into UiState (refreshLocalCarConfig), not just
-                // lastSyncMs/syncError -- same handling as setSyncUri / retryDriveSync.
+                // lastSyncMs/syncError -- same handling as setSyncUri / syncNow.
                 if (!wasRefreshing) runDriveSyncNow()
             }
         }
@@ -3649,12 +3649,6 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             val err = _state.value.syncError
             if (err == null) reportInfo("Synced with Drive") else reportError("Sync failed: $err")
         }
-    }
-
-    /** Kept for the existing "Sync now" retry affordance shown next to a sync
-     *  error; delegates to the same path as [syncNow] without the snackbar. */
-    fun retryDriveSync() {
-        viewModelScope.launch { runDriveSyncNow() }
     }
 
     /** Designate [id] as the primary device (source of truth + tiebreaker). Persists
