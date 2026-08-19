@@ -2312,7 +2312,18 @@ class SettingsStore(private val context: Context) {
             val plan = SyncMerge.mergePlan(json, guarded) ?: return@edit
             plan.stringPuts.forEach { (name, value) -> mut[stringPreferencesKey(name)] = value }
             plan.boolPuts.forEach { (name, value) -> mut[booleanPreferencesKey(name)] = value }
-            photoPaths.forEach { (vin, path) -> mut[stringPreferencesKey("img_$vin")] = path }
+            // photoPaths was decided from the PRE-PASS protect+ownPhotoKeys snapshot,
+            // taken before this edit block opened -- the same gap `liveDirty` above
+            // exists to close for prefs. setImageUrl (the crop screen's write path)
+            // goes through editTracked and holds no mutex, so it can land between
+            // that snapshot and here; without this filter its fresh img_$vin would
+            // be silently overwritten by the older remote photo, AND -- since that
+            // overwrite bypasses editTracked -- the key wouldn't even be marked
+            // dirty afterward, so the next sync push wouldn't re-upload the correct
+            // local photo either. Same guard the prefs above already get.
+            photoPaths.forEach { (vin, path) ->
+                if ("img_$vin" !in guarded) mut[stringPreferencesKey("img_$vin")] = path
+            }
             // Propagate deletions from the remote file, but never remove a key we're
             // protecting (locally changed since our last sync, or live-dirty within
             // this transaction) or a device-local key -- mergePlan already dropped

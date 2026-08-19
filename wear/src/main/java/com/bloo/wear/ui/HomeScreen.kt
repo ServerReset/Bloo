@@ -1323,7 +1323,17 @@ private fun ClimateCard(vm: WearViewModel, ui: WearUi, car: CarView) = SectionCa
     // 2°F steps, not 1° - the round screen only has room for so many dots before
     // they crowd into an unreadable smear; halving the count (11 vs 21) fixes that.
     val fahrenheit = useFahrenheit(ui)
-    SliderRow("Temp", degLabel(d.tempF.toString(), fahrenheit), d.tempF, CLIMATE_TEMP_RANGE_F.first, CLIMATE_TEMP_RANGE_F.last, 2, accent = tempColor(d.tempF)) { vm.setClimateTemp(car.vin, it) }
+    // Local draft during the drag -- setClimateTemp writes into the shared
+    // climate draft AND pushes it to the phone over the Data Layer (see
+    // WearViewModel.updateDraft/publishClimateDrafts), so it commits once on
+    // release (onSettle), not on every tick -- the same fix already made once
+    // for the watch text-size slider (SettingsScreen.kt), applied here.
+    var tempDraft by remember(d.tempF) { mutableIntStateOf(d.tempF) }
+    SliderRow(
+        "Temp", degLabel(tempDraft.toString(), fahrenheit), tempDraft,
+        CLIMATE_TEMP_RANGE_F.first, CLIMATE_TEMP_RANGE_F.last, 2, accent = tempColor(tempDraft),
+        onSettle = { vm.setClimateTemp(car.vin, tempDraft) },
+    ) { tempDraft = it }
     // One tap for the ends of the range, which is where people actually want
     // to be: "as cold as it goes" is a common intent and, on a watch, eleven
     // slider steps of dragging to reach it. The phone understands the same two
@@ -1353,7 +1363,12 @@ private fun ClimateCard(vm: WearViewModel, ui: WearUi, car: CarView) = SectionCa
             modifier = Modifier.weight(1f),
         )
     }
-    SliderRow("Run", "${d.duration} min", d.duration, CLIMATE_DURATION_RANGE.first, CLIMATE_DURATION_RANGE.last, 1) { vm.setClimateDuration(car.vin, it) }
+    var durationDraft by remember(d.duration) { mutableIntStateOf(d.duration) }
+    SliderRow(
+        "Run", "$durationDraft min", durationDraft,
+        CLIMATE_DURATION_RANGE.first, CLIMATE_DURATION_RANGE.last, 1,
+        onSettle = { vm.setClimateDuration(car.vin, durationDraft) },
+    ) { durationDraft = it }
     Spacer(Modifier.height(4.dp))
     MorphButton(
         label = if (d.defrost) "Defrost on" else "Defrost",
@@ -1488,21 +1503,39 @@ private fun ComfortCard(vm: WearViewModel, ui: WearUi, car: CarView) = SectionCa
         Text("Front", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         Spacer(Modifier.height(2.dp))
     }
+    // Same local-draft-until-release pattern as the Temp/Run sliders above --
+    // each seat setter is the same draft-write-plus-phone-push shape.
     if (seats.driverHeat) {
-        SliderRow("Driver seat", seatStepLabels[d.seatDriver], d.seatDriver, 0, 3, 1, accent = WearColors.heat) { vm.setSeatDriver(car.vin, it) }
+        var driverDraft by remember(d.seatDriver) { mutableIntStateOf(d.seatDriver) }
+        SliderRow(
+            "Driver seat", seatStepLabels[driverDraft], driverDraft, 0, 3, 1, accent = WearColors.heat,
+            onSettle = { vm.setSeatDriver(car.vin, driverDraft) },
+        ) { driverDraft = it }
     }
     if (seats.passHeat) {
-        SliderRow("Passenger", seatStepLabels[d.seatPassenger], d.seatPassenger, 0, 3, 1, accent = WearColors.heat) { vm.setSeatPassenger(car.vin, it) }
+        var passDraft by remember(d.seatPassenger) { mutableIntStateOf(d.seatPassenger) }
+        SliderRow(
+            "Passenger", seatStepLabels[passDraft], passDraft, 0, 3, 1, accent = WearColors.heat,
+            onSettle = { vm.setSeatPassenger(car.vin, passDraft) },
+        ) { passDraft = it }
     }
     if (showRearRow) {
         Spacer(Modifier.height(6.dp))
         Text("Rear", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         Spacer(Modifier.height(2.dp))
         if (seats.rearLeftHeat) {
-            SliderRow("Rear left", seatStepLabels[d.seatRearLeft], d.seatRearLeft, 0, 3, 1, accent = WearColors.heat) { vm.setSeatRearLeft(car.vin, it) }
+            var rearLeftDraft by remember(d.seatRearLeft) { mutableIntStateOf(d.seatRearLeft) }
+            SliderRow(
+                "Rear left", seatStepLabels[rearLeftDraft], rearLeftDraft, 0, 3, 1, accent = WearColors.heat,
+                onSettle = { vm.setSeatRearLeft(car.vin, rearLeftDraft) },
+            ) { rearLeftDraft = it }
         }
         if (seats.rearRightHeat) {
-            SliderRow("Rear right", seatStepLabels[d.seatRearRight], d.seatRearRight, 0, 3, 1, accent = WearColors.heat) { vm.setSeatRearRight(car.vin, it) }
+            var rearRightDraft by remember(d.seatRearRight) { mutableIntStateOf(d.seatRearRight) }
+            SliderRow(
+                "Rear right", seatStepLabels[rearRightDraft], rearRightDraft, 0, 3, 1, accent = WearColors.heat,
+                onSettle = { vm.setSeatRearRight(car.vin, rearRightDraft) },
+            ) { rearRightDraft = it }
         }
     }
 }
