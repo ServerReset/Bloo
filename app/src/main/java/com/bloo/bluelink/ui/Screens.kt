@@ -3663,6 +3663,9 @@ internal fun GarageScreen(state: UiState, vm: AppViewModel) {
                             // most recently reported (hoistedFlight.flight.color),
                             // same as the non-hoisted call sites.
                             textColor = if (onSettingsSlot || hoistedFlight.flight.color == Color.Unspecified) MaterialTheme.colorScheme.onSurface else hoistedFlight.flight.color,
+                            // See TitleFlightOverlay's own resetKey doc: a page
+                            // switch snaps instead of springing.
+                            resetKey = settledBlock,
                             onClick = { pillScope.launch { hoistedScrollToTop.value?.invoke() } },
                             // A plain, un-animated Text of whatever's CURRENTLY settled --
                             // see TitleFlightOverlay's own doc on measureContent for why this
@@ -8030,6 +8033,17 @@ internal fun BoxScope.TitleFlightOverlay(
     /** Extra content shown ONLY once docked, alongside the flying text
      *  inside the pill (the hoisted badge's page-count label). */
     extraContent: (@Composable RowScope.() -> Unit)? = null,
+    /** Identifies WHICH thing is currently flying -- null everywhere except
+     *  the hoisted (single-car-per-page pager) badge, which passes the
+     *  settled page index. A page switch is a discontinuous jump (a
+     *  different car's title, at a different position, possibly a different
+     *  dock state) not a continuous scroll crossing, so when this changes
+     *  [progress] snaps straight to the new page's resting state instead of
+     *  springing through it -- springing would visibly animate the pill
+     *  through a transition the user didn't cause by scrolling at all,
+     *  which is what made it look like it was "still animating" on every
+     *  swipe. */
+    resetKey: Any? = null,
     /** What the invisible docked-position ANCHOR renders -- must stay a
      *  plain, non-animated composable (defaults to [content] for every
      *  surface but the hoisted one). [content] itself is composed TWICE
@@ -8061,21 +8075,52 @@ internal fun BoxScope.TitleFlightOverlay(
     // each other; see this function's own doc for why a spring (not a
     // scroll-tied fraction) is deliberate here.
     val progress = remember { Animatable(0f) }
-    LaunchedEffect(docked) {
-        progress.animateTo(
-            if (docked) 1f else 0f,
-            // MediumBouncy arriving -- overshoot-and-settle, like the text is
-            // being caught by the corner. Undamped leaving, the same
-            // arriving-is-slower-than-leaving asymmetry every other spring
-            // pair in this file already uses.
-            spring(
-                dampingRatio = if (docked) Spring.DampingRatioMediumBouncy else Spring.DampingRatioNoBouncy,
-                stiffness = Spring.StiffnessMediumLow,
-            ),
-        )
+    // Set true only while a spring is actually running -- see `active` below,
+    // which uses it to skip composing the expensive glass chrome (shadow,
+    // ring, frosted rim) for the vast majority of the time nothing is
+    // docked or mid-transition. That chrome used to be composed
+    // unconditionally on every surface hosting a badge, all the time --
+    // cheap for any ONE of them, but real cost stacked up across a grid of
+    // simultaneously-visible cards, which is what was reading as the whole
+    // app dragging.
+    var transitioning by remember { mutableStateOf(false) }
+    val lastResetKey = remember { mutableStateOf(resetKey) }
+    LaunchedEffect(docked, resetKey) {
+        val target = if (docked) 1f else 0f
+        if (resetKey != lastResetKey.value) {
+            // A different thing is flying now (the hoisted badge settled on a
+            // new page) -- jump straight to its resting state, no spring.
+            lastResetKey.value = resetKey
+            transitioning = false
+            progress.snapTo(target)
+        } else {
+            transitioning = true
+            progress.animateTo(
+                target,
+                // MediumBouncy arriving -- overshoot-and-settle, like the text is
+                // being caught by the corner. Undamped leaving, the same
+                // arriving-is-slower-than-leaving asymmetry every other spring
+                // pair in this file already uses.
+                spring(
+                    dampingRatio = if (docked) Spring.DampingRatioMediumBouncy else Spring.DampingRatioNoBouncy,
+                    stiffness = Spring.StiffnessMediumLow,
+                ),
+            )
+            transitioning = false
+        }
     }
     val dockedAnchor = remember { mutableStateOf<Offset?>(null) }
     val dockedSize = remember { mutableStateOf<IntSize?>(null) }
+    // The one recomposition-triggering read gating the expensive chrome
+    // below: composed only while docked, or while a spring is actively
+    // carrying it there or back. `dockedAnchor` also has to be known already
+    // -- composing the chrome before its own first measurement arrived was
+    // the OTHER bug this round: an empty, near-square Row (nothing sizing
+    // it yet) got its full pill-shaped clip computed against that wrong,
+    // tiny size, then visibly re-clipped into the real pill shape the
+    // instant the measurement landed -- reading as the shadow snapping from
+    // square to pill partway through, not just fading in late.
+    val active = (docked || transitioning) && dockedAnchor.value != null
     val measure = measureContent ?: content
     // A SEPARATE, permanently static (never transformed) measuring copy --
     // exists purely to answer "where does the pill rest, and how big is it"
@@ -8127,6 +8172,15 @@ internal fun BoxScope.TitleFlightOverlay(
     // continuous arrival; a full-size shadow that only fades its opacity
     // reads as popping in the instant alpha clears whatever the eye's
     // threshold for "there" is, even though the fade itself was smooth.
+    //
+    // Gated on `active`: skip composing this whole subtree -- the
+    // background/ambientRing/dropShadow/frostedRim/clip chain, all real
+    // draw work -- entirely while there's nothing docked and nothing
+    // transitioning, rather than composing it always and just animating
+    // its alpha to 0. One badge paying that cost while idle is nothing; a
+    // grid of several simultaneously-visible cards each paying it, all the
+    // time, is what was dragging the rest of the app down.
+    if (active) {
     val density = LocalDensity.current
     Box(
         Modifier
@@ -8181,6 +8235,7 @@ internal fun BoxScope.TitleFlightOverlay(
             Box(Modifier.size(dockedSize.value?.let { with(density) { DpSize(it.width.toDp(), it.height.toDp()) } } ?: DpSize.Zero))
             extraContent?.invoke(this)
         }
+    }
     }
     // The one visible Text. Positioned by lerping between the inline slot's
     // live position and the docked slot's measured position -- at progress
