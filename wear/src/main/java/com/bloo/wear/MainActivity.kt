@@ -128,6 +128,10 @@ class MainActivity : ComponentActivity() {
         super.onStop()
         // Stamp the moment we leave the foreground; consumed by maybeRelock().
         backgroundedAt = System.currentTimeMillis()
+        // Pauses the periodic update-recheck loop's actual network requests --
+        // see WearViewModel.foregrounded's own doc -- so it stops polling once
+        // the watch app itself isn't on-screen, not only once the process dies.
+        viewModel.onBackgrounded()
     }
 
     override fun onStart() {

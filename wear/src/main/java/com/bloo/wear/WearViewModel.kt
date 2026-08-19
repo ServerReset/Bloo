@@ -417,6 +417,15 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
     private val _ui = MutableStateFlow(WearUi())
     val ui = _ui.asStateFlow()
 
+    /** True whenever [com.bloo.wear.MainActivity] is on-screen -- gates the
+     *  periodic update-recheck loop in [init] so it only makes a network
+     *  request while the watch app is actually foregrounded, not for as long
+     *  as the process happens to survive in the background. Set from
+     *  MainActivity.onResume ([onAppResumed]) / onStop ([onBackgrounded]);
+     *  starts true since this ViewModel's own init only ever runs while the
+     *  app is being opened. */
+    private val foregrounded = MutableStateFlow(true)
+
     /** Lazily create (and cache) the standalone [VehicleRepository] for
      *  [brand], used by the watch's own direct/standalone command path. One
      *  repository instance is reused per brand for the life of the ViewModel
@@ -643,9 +652,20 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
         // the shorter recheck floor (runUpdateCheck no-ops until the interval
         // elapses / stops once an update is found), so a long-lived session picks
         // up a fresh build within ~15 min. onAppResumed() covers the foreground case.
+        //
+        // viewModelScope lives until the Activity finishes (onCleared), not just
+        // while it's on-screen -- MainActivity.onStop() doesn't touch it -- so
+        // this loop used to keep firing a real network request every 15 minutes
+        // for as long as the watch process survived in the background, not just
+        // while the user was actually looking at Bloo. foregrounded gates the
+        // ACTUAL request rather than restructuring the loop's own lifetime: delay()
+        // still ticks in the background (a timer, not real work), but
+        // foregrounded.first { it } suspends right before the network call until
+        // onAppResumed() (MainActivity.onResume) says the app is on-screen again.
         viewModelScope.launch {
             while (true) {
                 kotlinx.coroutines.delay(UPDATE_RECHECK_INTERVAL_MS)
+                foregrounded.first { it }
                 // Stop looping once an update is found — runUpdateCheck returns true then,
                 // and it early-returns thereafter anyway, so keep the coroutine from
                 // spinning a no-op every interval for the rest of the session.
@@ -660,7 +680,13 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
      *  instead of only on a cold relaunch. Uses the short recheck floor (debounced)
      *  and no-ops if an update was already found this session. */
     fun onAppResumed() {
+        foregrounded.value = true
         viewModelScope.launch { runUpdateCheck(force = false, minInterval = UPDATE_RECHECK_INTERVAL_MS) }
+    }
+
+    /** Called from [com.bloo.wear.MainActivity.onStop] -- see [foregrounded]. */
+    fun onBackgrounded() {
+        foregrounded.value = false
     }
 
     private fun bootstrap() {
