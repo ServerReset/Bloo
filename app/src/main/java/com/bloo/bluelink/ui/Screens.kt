@@ -341,6 +341,8 @@ import com.bloo.bluelink.data.GeoLocation
 import com.bloo.bluelink.data.Powertrain
 import com.bloo.bluelink.data.SeatConfig
 import com.bloo.bluelink.data.SeatLevel
+import com.bloo.bluelink.data.VehiclePlatform
+import com.bloo.bluelink.data.platformOverridable
 import com.bloo.bluelink.data.SettingsStore
 import com.bloo.bluelink.data.degValue
 import com.bloo.bluelink.data.MapTiles
@@ -679,7 +681,7 @@ fun BlooApp(vm: AppViewModel) {
 
 // --- Onboarding wizard (first run + new-car detection) --------------------
 
-private enum class WizardStepKind { POWERTRAIN, SEATS, STEERING }
+private enum class WizardStepKind { POWERTRAIN, PLATFORM, SEATS, STEERING }
 
 private data class WizardPage(
     val kind: WizardStepKind,
@@ -688,14 +690,17 @@ private data class WizardPage(
 
 /**
  * Flattens the per-vehicle setup wizard into one linear list of pages: for
- * each vehicle, a POWERTRAIN page, then a SEATS page, then a STEERING page,
- * in that order. The resulting list drives a single [HorizontalPager] in
- * [CarSetupWizardScreen], so a multi-car setup becomes one continuous swipe
- * sequence instead of nested per-car flows.
+ * each vehicle, a POWERTRAIN page, a PLATFORM page (only for a vehicle where
+ * [com.bloo.bluelink.data.platformOverridable] is true -- see that
+ * property's own doc; there's nothing to confirm for the rest), then SEATS,
+ * then STEERING, in that order. The resulting list drives a single
+ * [HorizontalPager] in [CarSetupWizardScreen], so a multi-car setup becomes
+ * one continuous swipe sequence instead of nested per-car flows.
  */
 private fun buildSetupPages(vehicles: List<com.bloo.bluelink.data.Vehicle>): List<WizardPage> = buildList {
     vehicles.forEach { v ->
         add(WizardPage(WizardStepKind.POWERTRAIN, v.vin))
+        if (v.platformOverridable) add(WizardPage(WizardStepKind.PLATFORM, v.vin))
         add(WizardPage(WizardStepKind.SEATS, v.vin))
         add(WizardPage(WizardStepKind.STEERING, v.vin))
     }
@@ -1242,6 +1247,15 @@ private fun OnboardingCarPage(
         PowertrainPicker(current = currentPt) { pt -> vm.setPowertrain(vehicle, pt) }
     }
 
+    // Only Hyundai/Genesis US vehicles have a real head-unit generation to
+    // confirm -- see platformOverridable's own doc.
+    if (vehicle.platformOverridable) {
+        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Text("Head-unit generation", style = MaterialTheme.typography.labelMedium, color = scheme.primary, fontWeight = FontWeight.SemiBold)
+            PlatformPicker(current = state.platformOf(vehicle)) { pt -> vm.setPlatform(vehicle, pt) }
+        }
+    }
+
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Text("Seats", style = MaterialTheme.typography.labelMedium, color = scheme.primary, fontWeight = FontWeight.SemiBold)
         Column(
@@ -1410,6 +1424,7 @@ private fun CarFeatureWizard(
                     ) {
                         when (pg.kind) {
                             WizardStepKind.POWERTRAIN -> WizardPowertrainPage(veh, state, vm)
+                            WizardStepKind.PLATFORM -> WizardPlatformPage(veh, state, vm)
                             WizardStepKind.SEATS -> WizardSeatsPage(veh, sc, vm)
                             WizardStepKind.STEERING -> WizardSteeringPage(veh, sc, vm)
                         }
@@ -1522,6 +1537,61 @@ private fun WizardPowertrainPage(
                     horizontalArrangement = Arrangement.spacedBy(14.dp),
                 ) {
                     Text(icon, style = MaterialTheme.typography.headlineSmall)
+                    Column(Modifier.weight(1f)) {
+                        Text(label, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                        Text(desc, style = MaterialTheme.typography.bodySmall, color = if (selected) scheme.onPrimaryContainer.copy(alpha = 0.7f) else scheme.onSurfaceVariant)
+                    }
+                    if (selected) Icon(Icons.Filled.CheckCircle, null, tint = scheme.primary, modifier = Modifier.size(24.dp))
+                }
+            }
+        }
+    }
+}
+
+/**
+ * One wizard page: which head-unit generation this Hyundai/Genesis US car
+ * has, Gen5W or ccNC -- only ever reached for a vehicle where
+ * [platformOverridable] is true (see [buildSetupPages]), same two-option
+ * shape as [WizardPowertrainPage] otherwise: a selectable [Surface] row per
+ * option, driven straight off `state.platformOf(vehicle)`, no local
+ * "pending" selection.
+ */
+@Composable
+private fun WizardPlatformPage(
+    vehicle: com.bloo.bluelink.data.Vehicle?,
+    state: UiState,
+    vm: AppViewModel,
+) {
+    val scheme = MaterialTheme.colorScheme
+    if (vehicle == null) return
+    WizardPageHeader(
+        "Head-unit generation",
+        "Which generation is the ${vehicle.name}?",
+        "Bloo can't always tell these apart from the API alone. Confirm it here " +
+            "so features like Trips only show up when they're actually available.",
+    )
+    val current = state.platformOf(vehicle)
+    val haptics = LocalHaptics.current
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        VehiclePlatform.entries.forEach { pt ->
+            val selected = current == pt
+            val (label, desc) = when (pt) {
+                VehiclePlatform.GEN5W -> "Gen5W" to "Older head unit -- no Trips, no connected-car store"
+                VehiclePlatform.CCNC -> "ccNC" to "Newer head unit -- Trips and the connected-car store, where the backend supports them"
+            }
+            Surface(
+                onClick = { haptics?.click(); vm.setPlatform(vehicle, pt) },
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(16.dp),
+                color = if (selected) scheme.primaryContainer else scheme.surfaceContainerHigh,
+                contentColor = if (selected) scheme.onPrimaryContainer else scheme.onSurface,
+                border = if (selected) null else BorderStroke(1.dp, scheme.outlineVariant),
+            ) {
+                Row(
+                    Modifier.padding(16.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(14.dp),
+                ) {
                     Column(Modifier.weight(1f)) {
                         Text(label, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
                         Text(desc, style = MaterialTheme.typography.bodySmall, color = if (selected) scheme.onPrimaryContainer.copy(alpha = 0.7f) else scheme.onSurfaceVariant)
@@ -4724,7 +4794,7 @@ private fun CompactCar(
     onTileChange: (String) -> Unit = {},
 ) {
     val status = state.statusFor(v)
-    val isGen5W = remember(v.brand, v.generation) { v.isGen5W }
+    val isGen5W = remember(v.brand, v.generation, state.platforms[v.vin]) { state.isGen5WEffective(v) }
     // Cover-screen tiles follow the same order the user arranged the pebbles in
     // (state.sectionsFor). "summary" maps to the always-present "main" tile;
     // "controls" has no cover tile so it falls away. If summary was somehow
@@ -8303,7 +8373,7 @@ private fun HotspotSlot(v: Vehicle, hotspot: String?, state: UiState, vm: AppVie
         // the per-pass set allocation.
         val options = remember(
             state.sectionOrders[v.vin], state.hiddenPebbles, state.aiEnabled, state.hasBattery(v),
-            v.isGen5W, state.updateAvailable, state.updateTileDismissed,
+            v.isGen5W, state.platforms[v.vin], state.updateAvailable, state.updateTileDismissed,
         ) {
             state.sectionsFor(v).filter {
                 it != "summary" && it != "controls" && state.isSectionAvailable(v, it)
@@ -8560,7 +8630,7 @@ private fun PebbleList(v: Vehicle, state: UiState, vm: AppViewModel, exclude: Se
     // would survive until some unrelated key changed. Every input the predicate reads has to be
     // a key, which is the contract this line already follows for the other six.
     val sections = remember(
-        allSections, exclude, state.hiddenPebbles, state.aiEnabled, hasBattery, v.isGen5W,
+        allSections, exclude, state.hiddenPebbles, state.aiEnabled, hasBattery, v.isGen5W, state.platforms[v.vin],
         state.updateAvailable, state.updateTileDismissed,
     ) {
         allSections.filter {
@@ -10551,8 +10621,10 @@ private fun TripsPebble(v: Vehicle, state: UiState, vm: AppViewModel, dragHandle
     // The evTripDetails feed isn't served by Gen5W (generation 2) head units -
     // they report nothing, EV or not - so the pebble is hidden for them rather
     // than sitting permanently empty. Kia US doesn't report a generation, so it's
-    // excluded from the check and keeps the pebble.
-    val isGen5W = v.isGen5W
+    // excluded from the check and keeps the pebble. Reads the user's own
+    // confirmed generation (Settings/onboarding) over the raw API guess when
+    // one's been set -- see UiState.isGen5WEffective.
+    val isGen5W = state.isGen5WEffective(v)
     if (isGen5W) return
     // Same reasoning one step further out: a Gen5W head unit reports nothing,
     // and neither does a backend with no trips endpoint. Kia US, Canada and
@@ -10787,7 +10859,7 @@ private fun InfoPebble(v: Vehicle, status: VehicleStatus?, state: UiState, vm: A
             }
 
             SectionLabel("${v.brand.label} owners")
-            OwnerLinks(v, context, inApp)
+            OwnerLinks(v, state, context, inApp)
         }
     }
 }
@@ -10805,7 +10877,7 @@ private fun InfoPebble(v: Vehicle, status: VehicleStatus?, state: UiState, vm: A
  */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun OwnerLinks(v: Vehicle, context: Context, inApp: Boolean) {
+private fun OwnerLinks(v: Vehicle, state: UiState, context: Context, inApp: Boolean) {
     val links = v.brand.links
 
     @Composable
@@ -10828,8 +10900,9 @@ private fun OwnerLinks(v: Vehicle, context: Context, inApp: Boolean) {
             }
             LinkButton("Owners site", Icons.Filled.Person) { openUrl(context, links.ownersUrl, inApp) }
             // Features-on-Demand store (themes, lighting patterns…): ccNC-era
-            // head units only - older Gen5W cars have nothing to buy.
-            if (v.supportsConnectedStore) {
+            // head units only - older Gen5W cars have nothing to buy. Honours
+            // the user's own confirmed generation over the raw API guess.
+            if (state.supportsConnectedStoreEffective(v)) {
                 LinkButton("Car store", Icons.Filled.Storefront) { openUrl(context, links.storeUrl, inApp) }
             }
         }
@@ -10841,8 +10914,9 @@ private fun OwnerLinks(v: Vehicle, context: Context, inApp: Boolean) {
         }
         // Digital Key: Gen5W head units use DK1 (BLE/NFC dedicated app).
         // Gen3+ and all Kia models use DK2 (UWB via wallet).
-        // Kia has no gen field so isGen5W is always false for them.
-        val isGen5W = v.isGen5W
+        // Kia has no gen field so isGen5W is always false for them. Honours
+        // the user's own confirmed generation over the raw API guess.
+        val isGen5W = state.isGen5WEffective(v)
         group("Digital Car Key") {
             if (isGen5W) {
                 when (v.brand) {
@@ -11479,7 +11553,7 @@ private fun ClimatePebble(
             ToggleRow("Steering wheel heat", steeringHeat) { steeringHeat = it }
         }
 
-        val isGen5W = v.isGen5W
+        val isGen5W = state.isGen5WEffective(v)
         if (seats.any && !(isGen5W && v.isEv)) {
             SectionLabel("Seats")
             if (seats.driverHeat || seats.driverCool) {

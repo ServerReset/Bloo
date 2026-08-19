@@ -41,7 +41,9 @@ import com.bloo.bluelink.data.DEFAULT_SECTIONS
 import com.bloo.bluelink.data.EvTrip
 import com.bloo.bluelink.data.GeoLocation
 import com.bloo.bluelink.data.Powertrain
+import com.bloo.bluelink.data.VehiclePlatform
 import com.bloo.bluelink.data.isGen5W
+import com.bloo.bluelink.data.platformOverridable
 import com.bloo.bluelink.data.brand
 import com.bloo.bluelink.data.SeatConfig
 import com.bloo.bluelink.data.SessionStore
@@ -157,6 +159,8 @@ data class UiState(
     val climateSync: Map<String, com.bloo.bluelink.data.ClimateSync> = emptyMap(),
     val seatConfigs: Map<String, SeatConfig> = emptyMap(),
     val powertrains: Map<String, Powertrain> = emptyMap(),
+    /** User-confirmed head-unit generation, by VIN -- see [platformOf]. */
+    val platforms: Map<String, VehiclePlatform> = emptyMap(),
     val sectionOrders: Map<String, List<String>> = emptyMap(),
     val imageUrls: Map<String, String> = emptyMap(),
     val placeNames: Map<String, String> = emptyMap(),
@@ -330,6 +334,29 @@ data class UiState(
     /** Burns fuel (everything except a pure EV). */
     fun hasFuel(v: Vehicle): Boolean = powertrainOf(v) != Powertrain.EV
 
+    /** Effective head-unit generation: user override, else inferred from the
+     *  API the same way [com.bloo.bluelink.data.isGen5W] always has. For a
+     *  vehicle where [com.bloo.bluelink.data.platformOverridable] is false
+     *  (Kia US, Canada, Europe) there is nothing to override -- any stored
+     *  [platforms] entry for it is simply never written (the picker that
+     *  writes one is gated the same way), so this always falls through to
+     *  the API inference for those. */
+    fun platformOf(v: Vehicle): VehiclePlatform =
+        platforms[v.vin] ?: if (v.isGen5W) VehiclePlatform.GEN5W else VehiclePlatform.CCNC
+
+    /** [com.bloo.bluelink.data.isGen5W], but honouring a user override --
+     *  every UI gate that used to read the raw property directly (Trips
+     *  availability, the connected-store link, Digital Car Key's DK1/DK2
+     *  branch, the Gen5W EV seat-climate hide) reads this instead, so all of
+     *  them move together when the user corrects their car's generation. */
+    fun isGen5WEffective(v: Vehicle): Boolean = platformOf(v) == VehiclePlatform.GEN5W
+
+    /** [com.bloo.bluelink.data.supportsConnectedStore], honouring the same
+     *  override [isGen5WEffective] does -- mirrors that property's own
+     *  Kia-is-always-eligible special case. */
+    fun supportsConnectedStoreEffective(v: Vehicle): Boolean =
+        v.brand == com.bloo.bluelink.data.Brand.KIA || (v.platformOverridable && platformOf(v) == VehiclePlatform.CCNC)
+
     /**
      * Whether [section] has anything to show for [v] -- the one predicate every list of
      * pebbles/sections filters through, so they can't disagree about what exists.
@@ -365,7 +392,7 @@ data class UiState(
             // rail still showing a dot for it. TripsPebble's own `!v.brand.supportsTrips
             // -> return` guard only stops it from drawing anything, not from being
             // offered a slot in the first place.
-            "trips" -> hasBattery(v) && !v.isGen5W && v.brand.supportsTrips
+            "trips" -> hasBattery(v) && !isGen5WEffective(v) && v.brand.supportsTrips
             // `!updateTileDismissed` too: UpdateAvailableTile renders nothing once dismissed,
             // so the section stayed "available" and left a zero-height slot with a spacedBy gap
             // on either side of it -- the same phantom-slot shape the "trips" line above
@@ -1372,6 +1399,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     ): PerCarConfig {
         val seatConfigs = vehicles.associate { it.vin to settingsStore.seatConfig(it.vin, prefs) }
         val powertrains = vehicles.mapNotNull { v -> settingsStore.powertrain(v.vin, prefs)?.let { v.vin to it } }.toMap()
+        val platforms = vehicles.mapNotNull { v -> settingsStore.platform(v.vin, prefs)?.let { v.vin to it } }.toMap()
         val sectionOrders = vehicles.associate { it.vin to settingsStore.sectionOrder(it.vin, prefs) }
         val images = vehicles.mapNotNull { v -> settingsStore.imageUrl(v.vin, prefs)?.let { v.vin to it } }.toMap()
         val plates = vehicles.associate { it.vin to settingsStore.licensePlate(it.vin, prefs) }.filterValues { it.isNotBlank() }
@@ -1395,6 +1423,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 it.copy(
                     seatConfigs = seatConfigs,
                     powertrains = powertrains,
+                    platforms = platforms,
                     sectionOrders = sectionOrders,
                     imageUrls = images,
                     licensePlates = plates,
@@ -1416,7 +1445,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         )
     }
 
-    /** Result of [perCarConfig]: a UiState transform folding in the 17 config fields, plus the
+    /** Result of [perCarConfig]: a UiState transform folding in the 18 config fields, plus the
      *  shortcut set the caller needs separately for [com.bloo.bluelink.Shortcuts.refresh]. */
     private class PerCarConfig(val apply: (UiState) -> UiState, val shortcutSet: Set<String>?)
 
@@ -2045,6 +2074,22 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     private fun snapshotOf(v: Vehicle, status: VehicleStatus?): VehicleSnapshot {
         // Use the effective powertrain (a PHEV reads battery %, not fuel %).
         val hasBattery = _state.value.hasBattery(v)
+        // Same idea for generation: write the EFFECTIVE (override-applied) number,
+        // not the raw API one, so the watch/widget/tile runners -- which only ever
+        // see this snapshot, never the live in-memory Vehicle -- agree with the
+        // user's own correction via the exact same isGen5W numeric check they
+        // already run on whatever Vehicle they rebuild from it. A no-op for a
+        // vehicle where platformOverridable is false (Kia US, Canada, Europe):
+        // isGen5W ignores the generation number outright for those, so which
+        // string ends up here can't change anything either way.
+        val effectiveGeneration = if (v.platformOverridable) {
+            when (_state.value.platformOf(v)) {
+                VehiclePlatform.GEN5W -> "2"
+                VehiclePlatform.CCNC -> "3"
+            }
+        } else {
+            v.generation
+        }
         val percent = status?.percentFor(hasBattery)
         val range = status?.rangeMiFor(hasBattery)
         // A fix that did NOT ride along on the status. `locate()` prefers the GPS carried
@@ -2067,7 +2112,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             isEv = v.isEv,
             hasBattery = hasBattery,
             regId = v.regId,
-            generation = v.generation,
+            generation = effectiveGeneration,
             brandIndicator = v.brandIndicator,
             percent = percent,
             rangeMi = range,
@@ -2263,6 +2308,16 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         // from the synced snapshot, so a correction here needs to reach it right
         // away rather than waiting on the next status refresh.
         viewModelScope.launch { settingsStore.setPowertrain(v.vin, value); persistSnapshots() }
+    }
+
+    fun setPlatform(v: Vehicle, value: VehiclePlatform) {
+        _state.update { it.copy(platforms = it.platforms + (v.vin to value)) }
+        // Same reason setPowertrain republishes: persistSnapshots writes the
+        // EFFECTIVE (override-applied) generation number into the synced
+        // VehicleSnapshot -- see snapshotOf -- which is what lets the watch's
+        // own isGen5W check (computed on its own rebuilt Vehicle) agree with
+        // this choice with no watch-side code of its own.
+        viewModelScope.launch { settingsStore.setPlatform(v.vin, value); persistSnapshots() }
     }
 
     // --- App self-update (GitHub Actions builds; Bloo isn't on the Play Store) ---

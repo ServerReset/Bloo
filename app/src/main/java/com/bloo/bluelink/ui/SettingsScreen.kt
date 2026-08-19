@@ -195,6 +195,7 @@ import com.bloo.bluelink.data.LiveCharge
 import com.bloo.bluelink.data.CLIMATE_TEMP_RANGE_F
 import com.bloo.bluelink.data.LockTiming
 import com.bloo.bluelink.data.Powertrain
+import com.bloo.bluelink.data.platformOverridable
 import com.bloo.bluelink.data.SeatConfig
 import com.bloo.bluelink.data.SettingsStore
 import com.bloo.bluelink.data.degValue
@@ -2168,6 +2169,24 @@ private fun CarSettingsCard(
             PowertrainPicker(current = state.powertrainOf(v)) { pt -> vm.setPowertrain(v, pt) }
         }
 
+        // Only Hyundai/Genesis US vehicles have a real head-unit generation to
+        // confirm -- see Vehicle.platformOverridable's own doc. Every other
+        // brand/region always resolves the same way regardless, so showing
+        // this picker there would be a control with no actual effect.
+        if (v.platformOverridable) {
+            SettingsGroup("Head-unit generation") {
+                Text(
+                    "Bloo can't always tell Gen5W and ccNC head units apart from the " +
+                        "API alone. Confirm which one this car has so features like " +
+                        "Trips only show up when they're actually available.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(Modifier.height(4.dp))
+                PlatformPicker(current = state.platformOf(v)) { pt -> vm.setPlatform(v, pt) }
+            }
+        }
+
         SettingsGroup("Climate features") {
             Text(
                 "The remote climate command controls four seat positions. Enable " +
@@ -3886,6 +3905,13 @@ private fun SettingsSearchResults(
         add("Powertrain · ${v.name}", "powertrain ev gas hybrid phev ${v.name}") {
             PowertrainPicker(current = state.powertrainOf(v)) { pt -> vm.setPowertrain(v, pt) }
         }
+        // Same gate CarSettingsCard's own group uses -- nothing to confirm for
+        // a vehicle where this picker would have no effect either way.
+        if (v.platformOverridable) {
+            add("Head-unit generation · ${v.name}", "gen5w ccnc platform generation trips ${v.name}") {
+                PlatformPicker(current = state.platformOf(v)) { pt -> vm.setPlatform(v, pt) }
+            }
+        }
         add("Last service · ${v.name}", "service maintenance mileage ${v.name}") {
             MilesField(state.lastServiceMiles[v.vin], "Last service (mi)", Modifier.fillMaxWidth()) {
                 vm.setLastServiceMiles(v.vin, it)
@@ -4253,6 +4279,24 @@ internal fun PowertrainPicker(current: com.bloo.bluelink.data.Powertrain, onSele
         ),
         selectedKey = current.name,
         onSelect = { key -> onSelect(com.bloo.bluelink.data.Powertrain.valueOf(key)) },
+    )
+}
+
+/** A car's confirmed head-unit generation (Gen5W / ccNC) -- the same shape
+ *  [PowertrainPicker] is, a fixed choice between equal alternatives on one
+ *  [MorphSegmented]. Only ever shown for a vehicle where
+ *  [com.bloo.bluelink.data.platformOverridable] is true -- see that
+ *  property's own doc for why every other vehicle has nothing here to
+ *  confirm. */
+@Composable
+internal fun PlatformPicker(current: com.bloo.bluelink.data.VehiclePlatform, onSelect: (com.bloo.bluelink.data.VehiclePlatform) -> Unit) {
+    MorphSegmented(
+        options = listOf(
+            SegmentOption(com.bloo.bluelink.data.VehiclePlatform.GEN5W.name, "Gen5W", null),
+            SegmentOption(com.bloo.bluelink.data.VehiclePlatform.CCNC.name, "ccNC", null),
+        ),
+        selectedKey = current.name,
+        onSelect = { key -> onSelect(com.bloo.bluelink.data.VehiclePlatform.valueOf(key)) },
     )
 }
 

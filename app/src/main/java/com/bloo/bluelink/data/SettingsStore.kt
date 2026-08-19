@@ -83,6 +83,18 @@ data class SeatConfig(
 /** User-confirmed powertrain (the US API only exposes EV vs gas). */
 enum class Powertrain { GAS, HYBRID, PHEV, EV }
 
+/**
+ * User-confirmed head-unit generation for a Hyundai/Genesis US vehicle --
+ * the same GEN5W/ccNC split [com.bloo.bluelink.data.isGen5W] already infers
+ * from the API's own `generation` field, made overridable the same way
+ * [Powertrain] is: only Hyundai/Genesis US cars ever report a real
+ * generation number (Kia US, every Canada brand, and Europe all resolve
+ * [com.bloo.bluelink.data.isGen5W] to a fixed answer regardless of this
+ * choice -- see that property's own doc), so this only has anything to
+ * confirm for that same population.
+ */
+enum class VehiclePlatform { GEN5W, CCNC }
+
 /** When the biometric app-lock re-engages after the app leaves the foreground. */
 enum class LockTiming(val label: String) {
     OFF("Off"),
@@ -1712,6 +1724,23 @@ class SettingsStore(private val context: Context) {
 
     suspend fun setPowertrain(vin: String, value: Powertrain) {
         editTracked { it[stringPreferencesKey("ptrain_$vin")] = value.name }
+    }
+
+    // --- Per-car head-unit generation override ----------------------------
+    //
+    // Same shape as the powertrain override right above -- null means "not
+    // confirmed by the user yet", callers fall back to the API-derived guess
+    // ([com.bloo.bluelink.data.isGen5W]) when this is null. See VehiclePlatform's
+    // own doc for which vehicles this has anything real to confirm.
+
+    suspend fun platform(vin: String): VehiclePlatform? = platform(vin, context.settingsDataStore.data.first())
+
+    fun platform(vin: String, p: Preferences): VehiclePlatform? =
+        p[stringPreferencesKey("platform_$vin")]
+            ?.let { runCatching { VehiclePlatform.valueOf(it) }.getOrNull() }
+
+    suspend fun setPlatform(vin: String, value: VehiclePlatform) {
+        editTracked { it[stringPreferencesKey("platform_$vin")] = value.name }
     }
 
     // Remaining global appearance setters (theme/font/dynamic-color/palette):

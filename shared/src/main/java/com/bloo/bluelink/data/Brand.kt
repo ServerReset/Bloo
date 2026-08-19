@@ -398,6 +398,18 @@ val Vehicle.isGen5W: Boolean
     get() = brand != Brand.KIA && !brand.isCanada && !brand.isEurope && (generation.trim().toIntOrNull() ?: 3) < 3
 
 /**
+ * True for exactly the population where [isGen5W] varies at all: a
+ * Hyundai/Genesis US car, the only brand/region combination whose API
+ * reports a real head-unit generation number. Kia US never exposes one,
+ * and Canada/Europe are excluded from [isGen5W]/[supportsConnectedStore]
+ * outright -- so a user-facing "which generation is this" choice only has
+ * anything to confirm, and only actually changes anything, for a vehicle
+ * where this is true.
+ */
+val Vehicle.platformOverridable: Boolean
+    get() = brand != Brand.KIA && !brand.isCanada && !brand.isEurope
+
+/**
  * Horn & Lights / Flash Lights (rcs/rhl/light, rcs/rhl/hnl) exist on the
  * Hyundai/Genesis US telematics API this app already uses for lock/unlock;
  * Kia's US API (Kia Connect) has no equivalent endpoint, and no equivalent was
