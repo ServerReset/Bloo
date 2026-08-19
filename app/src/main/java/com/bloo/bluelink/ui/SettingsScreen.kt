@@ -374,6 +374,9 @@ private class LocalSettingsPillState(
     /** True once the header title's top edge has scrolled above the status
      *  bar -- the one bit the badge runs on. */
     val nameHidden: androidx.compose.runtime.State<Boolean>,
+    /** The header title's own live root-Y -- see [LocalNamePillState.position]
+     *  (Screens.kt) for what this feeds. */
+    val position: androidx.compose.runtime.State<Offset?>,
 )
 
 /**
@@ -492,7 +495,7 @@ internal fun SettingsScreen(
           derivedStateOf { (titlePosition.value?.y ?: Float.MAX_VALUE) < topInsetPx }
       }
       val flight = remember { HeroTitleFlight(onPositioned = { titlePosition.value = it }) }
-      LocalSettingsPillState(flight, nameHidden)
+      LocalSettingsPillState(flight, nameHidden, titlePosition)
   } else {
       null
   }
@@ -1912,6 +1915,7 @@ internal fun SettingsScreen(
                 // Clears the Simple/Advanced segmented toggle in the
                 // top-right (172dp wide, plus its own breathing room).
                 reserveEnd = 192.dp,
+                titleYPx = local.position.value?.y,
                 onClick = { settingsScope.launch { settingsGridState.animateScrollToItem(0) } },
             ) {
                 Text(
