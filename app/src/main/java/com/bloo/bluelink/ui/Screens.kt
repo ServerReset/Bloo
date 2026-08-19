@@ -4898,7 +4898,22 @@ private fun CompactCar(
                     // The home tile is the cover's own combined layout, not
                     // the phone's photo-first HeroHeader -- see CoverMainTile.
                     if (tiles[i] == "main") {
-                        CoverMainTile(v, state, vm)
+                        // Narrowed the same way every SinglePebble branch already is:
+                        // CoverMainTile and CoverActionBar (called from inside its
+                        // `actions` lambda) together only ever read this fixed set of
+                        // UiState fields, but both took the whole UiState directly, so
+                        // any unrelated emission (a location update on another car, a
+                        // log line) recomposed this tile the whole time the cover
+                        // screen was showing. remember(keys) { state } is the same
+                        // "same reference back, skip if the keys didn't move" trick
+                        // used at every other pebble call site.
+                        val mainState = remember(
+                            state.statusFor(v), state.imageUrls[v.vin], state.hasBattery(v),
+                            state.hasFuel(v), state.drivingLabel(v), state.loading,
+                            state.isPending(v.vin, "doors"), state.isPending(v.vin, "climate"),
+                            state.isPending(v.vin, "charge"), state.isPending(v.vin, "hornLights"),
+                        ) { state }
+                        CoverMainTile(v, mainState, vm)
                     } else {
                         SinglePebble(tiles[i], v, state, vm, Modifier)
                     }

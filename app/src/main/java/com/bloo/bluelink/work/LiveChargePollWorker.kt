@@ -9,6 +9,7 @@ import androidx.work.NetworkType
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
+import com.bloo.bluelink.data.Brand
 import com.bloo.bluelink.data.BlueLinkGate
 import com.bloo.bluelink.data.CredentialStore
 import com.bloo.bluelink.data.LiveCharge
@@ -61,11 +62,22 @@ class LiveChargePollWorker(context: Context, params: WorkerParameters) : Corouti
         // frozen at 43% for the whole session, beside a notification counting up.
         // Collected and written in one merge below.
         val fetched = mutableMapOf<String, VehicleStatus>()
+        // Vehicle IDENTITY comes from the on-disk snapshot, not repo.vehicles()
+        // -- this tick only needs to re-poll STATUS for cars it already knows
+        // about, and repo.vehicles() is a real network round trip that used to
+        // run every 5 minutes for the entire length of a charge just to
+        // re-fetch the same fleet list this worker already has cached, doubling
+        // the outbound calls this chain makes. Same snap.toVehicle() rebuild
+        // TileCommandRunner/WearCommandRunner already use for the identical
+        // reason. A car added/removed mid-charge is picked up on the next
+        // foreground refresh (AppViewModel's own saveVehiclesKeepingStatus),
+        // same as it always was for anything this worker missed.
+        val snapshotsByBrand = SnapshotStore(applicationContext).current().vehicles
+            .groupBy { Brand.fromIndicator(it.toVehicle().brandIndicator) }
         for (brand in store.loggedInBrands()) {
             val repo = runCatching { repositoryFor(brand, store, CredentialStore(applicationContext)) }
                 .getOrNull() ?: continue
-            val vehicles = runCatching { BlueLinkGate.statusMutex.withLock { repo.vehicles() } }
-                .getOrElse { emptyList() }
+            val vehicles = snapshotsByBrand[brand]?.map { it.toVehicle() } ?: emptyList()
             for (v in vehicles) {
                 val status = runCatching {
                     BlueLinkGate.statusMutex.withLock { repo.status(v, refresh = false) }

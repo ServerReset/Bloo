@@ -790,7 +790,18 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             // repoFor(it) lazily creates+caches one VehicleRepository per brand
             // in the `repos` map (see repoFor above) so later calls just reuse it.
             brands.forEach { repoFor(it) }
-            _state.update { it.copy(accounts = credentialStore.loadAll()) }
+            // Off the main thread: loadAll() touches CredentialStore's lazy
+            // `prefs`, which on first access does real work (MasterKey
+            // generation/lookup + EncryptedSharedPreferences setup) --
+            // exactly the "relatively expensive" cost that property's own
+            // doc comment warns about. This whole launch block otherwise
+            // runs on Main.immediate (viewModelScope's default dispatcher,
+            // which coroutine resumption doesn't change), and this is the
+            // one call in the cold-start auto-login path -- the app's
+            // everyday launch, for any returning user -- that actually did
+            // blocking work on it.
+            val accounts = withContext(Dispatchers.IO) { credentialStore.loadAll() }
+            _state.update { it.copy(accounts = accounts) }
             val locked = settingsStore.appearance.first().biometricLock && canUseBiometrics()
             // Load the garage either way so it's ready (and visible, blurred)
             // behind the lock overlay; the overlay just gates interaction.
