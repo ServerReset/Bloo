@@ -313,6 +313,7 @@ import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.composed
 import androidx.compose.ui.layout.onPlaced
 import androidx.compose.ui.layout.positionInParent
@@ -8053,11 +8054,12 @@ internal fun BoxScope.TitleFlightOverlay(
     val docked by flight.docked
     val haptics = LocalHaptics.current
     val shape = RoundedCornerShape(50)
-    // 0 = resting inline, 1 = resting docked -- the ONE number driving both
-    // the flying Text's position (lerp between the two measured anchors)
-    // and the pill chrome's own alpha, so neither can visibly outrun the
-    // other; see this function's own doc for why a spring (not a scroll-tied
-    // fraction) is deliberate here.
+    // 0 = resting inline, 1 = resting docked -- the ONE number driving the
+    // flying Text's position (lerp between the two measured anchors), the
+    // pill chrome's own alpha, AND (see pillContainer below) the pill
+    // chrome's own size and position, so none of them can visibly outrun
+    // each other; see this function's own doc for why a spring (not a
+    // scroll-tied fraction) is deliberate here.
     val progress = remember { Animatable(0f) }
     LaunchedEffect(docked) {
         progress.animateTo(
@@ -8073,15 +8075,87 @@ internal fun BoxScope.TitleFlightOverlay(
         )
     }
     val dockedAnchor = remember { mutableStateOf<Offset?>(null) }
+    val dockedSize = remember { mutableStateOf<IntSize?>(null) }
     val measure = measureContent ?: content
-    // The pill chrome + its own invisible measuring copy of the text --
-    // composed unconditionally (cheap: one Row, one clipped background,
-    // sized to whatever's docked) so dockedAnchor is always fresh the
-    // instant a crossing starts, not one frame late.
+    // A SEPARATE, permanently static (never transformed) measuring copy --
+    // exists purely to answer "where does the pill rest, and how big is it"
+    // with a real layout pass instead of guessed pixel math, the same reason
+    // the original single-Box design measured a docked anchor at all. It has
+    // to be a distinct node from the animated pill below: LayoutCoordinates
+    // report position/size AFTER ancestor graphicsLayer transforms are
+    // applied, so if this measurer lived inside the animated pill (which
+    // this round makes scale and slide, not just fade), its own reported
+    // numbers would be mid-animation snapshots instead of the true resting
+    // values dockedAnchor/dockedSize are supposed to be.
     Box(
         Modifier
             .align(Alignment.TopStart)
-            .graphicsLayer { alpha = progress.value.coerceIn(0f, 1f) }
+            .alpha(0f)
+            .padding(start = cornerX, top = cornerY, end = reserveEnd),
+    ) {
+        Row(
+            Modifier.heightIn(min = 48.dp).padding(horizontal = 16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Box(
+                Modifier
+                    .widthIn(max = maxWidth)
+                    .onGloballyPositioned {
+                        dockedAnchor.value = it.positionInRoot()
+                        dockedSize.value = it.size
+                    }
+                    // Position-measuring only -- alpha alone doesn't remove a node
+                    // from the accessibility tree, so without this a screen reader
+                    // announced the name here AND on the real flying Text below
+                    // (and, before this same fix on the inline slot, a third time
+                    // there too): one name, one announcement.
+                    .clearAndSetSemantics {},
+            ) { measure() }
+            extraContent?.invoke(this)
+        }
+    }
+    // The pill's actual glass chrome -- shape, shadow, ring, background --
+    // now follows the flying text instead of sitting fully-formed at the
+    // corner and just fading in around it: it grows from a small pill near
+    // the inline anchor up to full size at the docked position, in lockstep
+    // with `progress`, via a `graphicsLayer` transform (translation + scale)
+    // rather than a real layout-size animation, specifically so it can't
+    // feed back into dockedAnchor/dockedSize above (see that Box's own doc).
+    // This is also what fixes the shadow reading like it "snaps in": a
+    // shadow around a shape that's ALSO growing into place reads as one
+    // continuous arrival; a full-size shadow that only fades its opacity
+    // reads as popping in the instant alpha clears whatever the eye's
+    // threshold for "there" is, even though the fade itself was smooth.
+    val density = LocalDensity.current
+    Box(
+        Modifier
+            .align(Alignment.TopStart)
+            .graphicsLayer {
+                val p = progress.value
+                val clamped = p.coerceIn(0f, 1f)
+                alpha = clamped
+                // 0.55 start, not 0f -- a shape growing from nothing looks like
+                // it's materializing out of a point; starting partway there
+                // reads as "arriving", not "being born".
+                val scale = 0.55f + 0.45f * clamped
+                scaleX = scale
+                scaleY = scale
+                // Grown from the LEADING edge (where the text itself sits), not
+                // the centre -- a centre-anchored scale would visibly shift the
+                // text's own left edge sideways as the pill grows, fighting the
+                // text's own independently-lerped position.
+                transformOrigin = TransformOrigin(0f, 0.5f)
+                val inline = flight.inlinePos.value
+                val target = dockedAnchor.value ?: inline
+                // Same start-at-inline, land-at-target lerp the flying text uses,
+                // expressed as a delta from this Box's own natural (padding-only)
+                // resting position -- unclamped `p`, not `clamped`, so the
+                // container can overshoot right along with the bouncy spring
+                // instead of the shape looking stiffer than the text it holds.
+                translationX = (inline.x - target.x) * (1f - p)
+                translationY = (inline.y - target.y) * (1f - p)
+            }
             .padding(start = cornerX, top = cornerY, end = reserveEnd),
     ) {
         Row(
@@ -8099,26 +8173,22 @@ internal fun BoxScope.TitleFlightOverlay(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            Box(
-                Modifier
-                    .alpha(0f)
-                    .widthIn(max = maxWidth)
-                    .onGloballyPositioned { dockedAnchor.value = it.positionInRoot() }
-                    // Position-measuring only -- alpha alone doesn't remove a node
-                    // from the accessibility tree, so without this a screen reader
-                    // announced the name here AND on the real flying Text below
-                    // (and, before this same fix on the inline slot, a third time
-                    // there too): one name, one announcement.
-                    .clearAndSetSemantics {},
-            ) { measure() }
+            // An invisible spacer, not a second copy of the text -- sized to
+            // match dockedSize (measured above) so the pill's own width is
+            // correct for the name it holds without rendering that name a
+            // second time here (the one visible copy is the flying Text below,
+            // drawn on top of this same region once docked).
+            Box(Modifier.size(dockedSize.value?.let { with(density) { DpSize(it.width.toDp(), it.height.toDp()) } } ?: DpSize.Zero))
             extraContent?.invoke(this)
         }
     }
     // The one visible Text. Positioned by lerping between the inline slot's
     // live position and the docked slot's measured position -- at progress
     // 0 this sits exactly on the (invisible) inline title, at progress 1
-    // exactly on the (invisible) docked measuring copy above, and every
-    // value between while the spring is in flight.
+    // exactly on the docked measuring copy's position, and every value
+    // between while the spring is in flight -- same lerp the pill chrome
+    // above uses for its own translation, so the text always stays exactly
+    // where the pill's growing shape says it should be.
     Box(
         Modifier
             .align(Alignment.TopStart)
