@@ -35,17 +35,52 @@ class Ai(context: Context) {
         const val MIN_ARTICLE_CHARS = 400
     }
 
-    // Created on first use (and only once, thanks to `by lazy`) so constructing
-    // an Ai instance is cheap and the actual ML Kit client — and whatever
-    // resources it holds — is only spun up if summarization is ever invoked.
-    private val summarizer: Summarizer by lazy {
-        Summarization.getClient(
-            SummarizerOptions.builder(app)
-                .setInputType(SummarizerOptions.InputType.ARTICLE)
-                .setOutputType(SummarizerOptions.OutputType.THREE_BULLETS)
-                .setLanguage(SummarizerOptions.Language.ENGLISH)
-                .build(),
-        )
+    // NOT `by lazy` any more -- a `by lazy` value, once created, is held
+    // (and the underlying AICore session it opens stays live) for as long as
+    // this Ai instance exists, with no way to hand it back. On the phone
+    // path this instance lives on AppViewModel for the app's entire process
+    // lifetime, so that meant Gemini Nano's own memory reservation was held
+    // for the whole session after the very first isSupported()/summarize()
+    // call -- exactly the "background apps get killed for RAM" complaint
+    // this was rewritten for. Instead the client is built on demand and
+    // [releaseSummarizer] hands it back the moment each call is done; see
+    // [withSummarizer] for where that happens.
+    private var summarizerRef: Summarizer? = null
+
+    private fun summarizer(): Summarizer = summarizerRef ?: Summarization.getClient(
+        SummarizerOptions.builder(app)
+            .setInputType(SummarizerOptions.InputType.ARTICLE)
+            .setOutputType(SummarizerOptions.OutputType.THREE_BULLETS)
+            .setLanguage(SummarizerOptions.Language.ENGLISH)
+            .build(),
+    ).also { summarizerRef = it }
+
+    /** Closes the current client (if one is open) and forgets it, so the
+     *  on-device model session AICore is holding on this app's behalf is
+     *  actually released instead of just becoming unreachable garbage --
+     *  `close()` is the real signal AICore waits for, a `Summarizer` left to
+     *  the GC eventually gets collected but keeps its session reserved until
+     *  then. Safe to call when nothing was ever opened (a `close()` on a
+     *  handle nothing built) -- it's a no-op. */
+    private fun releaseSummarizer() {
+        summarizerRef?.let { runCatching { it.close() } }
+        summarizerRef = null
+    }
+
+    /** Builds (or reuses an already-open) client for [block], then always
+     *  releases it afterward -- success, failure, or cancellation -- so
+     *  every public entry point below leaves no session open behind it
+     *  regardless of how it ends. Reopening per call costs a cheap client
+     *  handle construction, not a model reload (the model itself is cached
+     *  on-device by AICore across app runs); the memory this actually saves
+     *  is the *session* AICore keeps live for an open client, not the
+     *  downloaded model weights. */
+    private suspend fun <T> withSummarizer(block: suspend (Summarizer) -> T): T {
+        try {
+            return block(summarizer())
+        } finally {
+            releaseSummarizer()
+        }
     }
 
     /**
@@ -58,7 +93,7 @@ class Ai(context: Context) {
      * all) is swallowed and reported as unsupported rather than propagated.
      */
     suspend fun isSupported(): Boolean = runCatching {
-        summarizer.checkFeatureStatus().await() != FeatureStatus.UNAVAILABLE
+        withSummarizer { it.checkFeatureStatus().await() != FeatureStatus.UNAVAILABLE }
     }.getOrDefault(false)
 
     /**
@@ -75,11 +110,11 @@ class Ai(context: Context) {
      * real download/inference error can be shown to the user instead of a
      * silently empty summary.
      */
-    suspend fun summarize(text: String): String {
-        ensureFeatureReady()
+    suspend fun summarize(text: String): String = withSummarizer { summarizer ->
+        ensureFeatureReady(summarizer)
         val request = SummarizationRequest.builder(padToMinimum(text)).build()
         val result = summarizer.runInference(request).await()
-        return result.summary
+        result.summary
     }
 
     /**
@@ -112,7 +147,7 @@ class Ai(context: Context) {
      * already AVAILABLE (or, in principle, UNAVAILABLE), this returns immediately
      * without ever starting a download.
      */
-    private suspend fun ensureFeatureReady() {
+    private suspend fun ensureFeatureReady(summarizer: Summarizer) {
         val status = summarizer.checkFeatureStatus().await()
         if (status == FeatureStatus.DOWNLOADABLE || status == FeatureStatus.DOWNLOADING) {
             suspendCancellableCoroutine { cont ->

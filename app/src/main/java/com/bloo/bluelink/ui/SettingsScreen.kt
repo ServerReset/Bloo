@@ -371,12 +371,6 @@ private fun StatusHeaderRow(icon: ImageVector, tint: Color, title: String, statu
  */
 private class LocalSettingsPillState(
     val flight: HeroTitleFlight,
-    /** True once the header title's top edge has scrolled above the status
-     *  bar -- the one bit the badge runs on. */
-    val nameHidden: androidx.compose.runtime.State<Boolean>,
-    /** The header title's own live root-Y -- see [LocalNamePillState.position]
-     *  (Screens.kt) for what this feeds. */
-    val position: androidx.compose.runtime.State<Offset?>,
 )
 
 /**
@@ -403,7 +397,11 @@ private fun SettingsHeaderRow(state: UiState) {
             fontWeight = FontWeight.Bold,
             color = MaterialTheme.colorScheme.onSurface,
             modifier = if (titleFlight != null) {
-                Modifier.onGloballyPositioned { titleFlight.onPositioned(it.positionInRoot()) }
+                Modifier
+                    .onGloballyPositioned { titleFlight.onPositioned(it.positionInRoot()) }
+                    // See HeroTitleFlight.progress's own doc (Screens.kt) --
+                    // fades out at exactly the rate TitleDockBadge fades in.
+                    .graphicsLayer { alpha = 1f - titleFlight.progress.value }
             } else {
                 Modifier
             },
@@ -488,14 +486,11 @@ internal fun SettingsScreen(
   // VehicleDetailContent's identical `local` for the full reasoning.
   val local = if (hoisted == null) {
       val topInsetPx = with(density) { topInset.toPx() }
-      val titlePosition = remember { mutableStateOf<Offset?>(null) }
+      val zonePx = with(density) { TitleDockZone.toPx() }
       // Root-space on both sides, same reasoning as VehicleDetailContent's
-      // own nameHidden.
-      val nameHidden = remember {
-          derivedStateOf { (titlePosition.value?.y ?: Float.MAX_VALUE) < topInsetPx }
-      }
-      val flight = remember { HeroTitleFlight(onPositioned = { titlePosition.value = it }) }
-      LocalSettingsPillState(flight, nameHidden, titlePosition)
+      // own HeroTitleFlight construction.
+      val flight = remember { HeroTitleFlight(topInsetPx = topInsetPx, zonePx = zonePx) }
+      LocalSettingsPillState(flight)
   } else {
       null
   }
@@ -1183,9 +1178,15 @@ internal fun SettingsScreen(
                         HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
                         Spacer(Modifier.height(4.dp))
                         val logScroll = rememberScrollState()
+                        // Memoized on `logs` itself: this join re-ran on every
+                        // recomposition while the panel was expanded (any unrelated
+                        // state change nearby, not just a new log line), rebuilding
+                        // the whole joined string from scratch each time for no
+                        // reason -- remember(logs) makes it track only actual changes.
+                        val logText = remember(logs) { logs.joinToString("\n").ifBlank { "No activity yet." } }
                         SelectionContainer {
                             Text(
-                                text = logs.joinToString("\n").ifBlank { "No activity yet." },
+                                text = logText,
                                 style = MaterialTheme.typography.bodySmall,
                                 fontFamily = FontFamily.Monospace,
                                 modifier = Modifier
@@ -1905,7 +1906,7 @@ internal fun SettingsScreen(
         // including this one, once it settles.
         if (local != null) {
             TitleDockBadge(
-                visible = local.nameHidden.value,
+                flight = local.flight,
                 // Standalone route's own back arrow already claims the
                 // top-left corner (12dp outer padding + 48dp) -- clear it.
                 // Embedded has no back arrow, so it sits at the same 16dp
@@ -1915,7 +1916,6 @@ internal fun SettingsScreen(
                 // Clears the Simple/Advanced segmented toggle in the
                 // top-right (172dp wide, plus its own breathing room).
                 reserveEnd = 192.dp,
-                titleYPx = local.position.value?.y,
                 onClick = { settingsScope.launch { settingsGridState.animateScrollToItem(0) } },
             ) {
                 Text(
