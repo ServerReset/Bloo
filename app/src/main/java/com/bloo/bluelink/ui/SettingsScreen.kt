@@ -146,6 +146,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableFloatStateOf
@@ -164,6 +165,7 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
@@ -370,6 +372,12 @@ private fun StatusHeaderRow(icon: ImageVector, tint: Color, title: String, statu
  */
 private class LocalSettingsPillState(
     val flight: HeroTitleFlight,
+    /** True once the header title's top edge has scrolled above the status
+     *  bar -- the one bit the badge runs on. */
+    val nameHidden: androidx.compose.runtime.State<Boolean>,
+    /** The header title's own live root-Y -- see [LocalNamePillState.position]
+     *  (Screens.kt) for what this feeds. */
+    val position: androidx.compose.runtime.State<Offset?>,
 )
 
 /**
@@ -396,11 +404,7 @@ private fun SettingsHeaderRow(state: UiState) {
             fontWeight = FontWeight.Bold,
             color = MaterialTheme.colorScheme.onSurface,
             modifier = if (titleFlight != null) {
-                Modifier
-                    .onGloballyPositioned { titleFlight.onPositioned(it.positionInRoot()) }
-                    // See HeroTitleFlight.progress's own doc (Screens.kt) --
-                    // fades out at exactly the rate TitleDockBadge fades in.
-                    .graphicsLayer { alpha = 1f - titleFlight.progress.value }
+                Modifier.onGloballyPositioned { titleFlight.onPositioned(it.positionInRoot()) }
             } else {
                 Modifier
             },
@@ -485,11 +489,14 @@ internal fun SettingsScreen(
   // VehicleDetailContent's identical `local` for the full reasoning.
   val local = if (hoisted == null) {
       val topInsetPx = with(density) { topInset.toPx() }
-      val zonePx = with(density) { TitleDockZone.toPx() }
+      val titlePosition = remember { mutableStateOf<Offset?>(null) }
       // Root-space on both sides, same reasoning as VehicleDetailContent's
-      // own HeroTitleFlight construction.
-      val flight = remember { HeroTitleFlight(topInsetPx = topInsetPx, zonePx = zonePx) }
-      LocalSettingsPillState(flight)
+      // own nameHidden.
+      val nameHidden = remember {
+          derivedStateOf { (titlePosition.value?.y ?: Float.MAX_VALUE) < topInsetPx }
+      }
+      val flight = remember { HeroTitleFlight(onPositioned = { titlePosition.value = it }) }
+      LocalSettingsPillState(flight, nameHidden, titlePosition)
   } else {
       null
   }
@@ -1177,15 +1184,9 @@ internal fun SettingsScreen(
                         HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
                         Spacer(Modifier.height(4.dp))
                         val logScroll = rememberScrollState()
-                        // Memoized on `logs` itself: this join re-ran on every
-                        // recomposition while the panel was expanded (any unrelated
-                        // state change nearby, not just a new log line), rebuilding
-                        // the whole joined string from scratch each time for no
-                        // reason -- remember(logs) makes it track only actual changes.
-                        val logText = remember(logs) { logs.joinToString("\n").ifBlank { "No activity yet." } }
                         SelectionContainer {
                             Text(
-                                text = logText,
+                                text = logs.joinToString("\n").ifBlank { "No activity yet." },
                                 style = MaterialTheme.typography.bodySmall,
                                 fontFamily = FontFamily.Monospace,
                                 modifier = Modifier
@@ -1905,7 +1906,7 @@ internal fun SettingsScreen(
         // including this one, once it settles.
         if (local != null) {
             TitleDockBadge(
-                flight = local.flight,
+                visible = local.nameHidden.value,
                 // Standalone route's own back arrow already claims the
                 // top-left corner (12dp outer padding + 48dp) -- clear it.
                 // Embedded has no back arrow, so it sits at the same 16dp
@@ -1915,6 +1916,7 @@ internal fun SettingsScreen(
                 // Clears the Simple/Advanced segmented toggle in the
                 // top-right (172dp wide, plus its own breathing room).
                 reserveEnd = 192.dp,
+                titleYPx = local.position.value?.y,
                 onClick = { settingsScope.launch { settingsGridState.animateScrollToItem(0) } },
             ) {
                 Text(

@@ -3437,12 +3437,15 @@ internal fun GarageScreen(state: UiState, vm: AppViewModel) {
                 val density = LocalDensity.current
                 val hoistedTopInset = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
                 val hoistedTopInsetPx = with(density) { hoistedTopInset.toPx() }
-                val hoistedZonePx = with(density) { TitleDockZone.toPx() }
+                val hoistedPosition = remember { mutableStateOf<Offset?>(null) }
                 val hoistedScrollToTop = remember { mutableStateOf<(suspend () -> Unit)?>(null) }
+                val hoistedNameHidden by remember {
+                    derivedStateOf { (hoistedPosition.value?.y ?: Float.MAX_VALUE) < hoistedTopInsetPx }
+                }
                 val pillScope = rememberCoroutineScope()
                 val hoistedFlight = remember {
                     HoistedIdentityFlight(
-                        flight = HeroTitleFlight(topInsetPx = hoistedTopInsetPx, zonePx = hoistedZonePx),
+                        flight = HeroTitleFlight(onPositioned = { hoistedPosition.value = it }),
                         scrollToTop = hoistedScrollToTop,
                     )
                 }
@@ -3648,12 +3651,13 @@ internal fun GarageScreen(state: UiState, vm: AppViewModel) {
                         // page actually wins, not on every frame of the drag.
                         val settledBlock = realBlock(pager.settledPage)
                         TitleDockBadge(
-                            flight = hoistedFlight.flight,
+                            visible = hoistedNameHidden,
                             cornerX = 16.dp,
                             cornerY = hoistedTopInset + 12.dp,
                             // Clears the top-right gear/expand chrome, same
                             // as VehicleDetailContent's own badge.
                             reserveEnd = 72.dp,
+                            titleYPx = hoistedPosition.value?.y,
                             onClick = { pillScope.launch { hoistedScrollToTop.value?.invoke() } },
                         ) {
                             AnimatedContent(
@@ -5694,12 +5698,7 @@ private fun HeroHeader(
             dragHandle = dragHandle,
             titleColor = heroTitleColorNow,
             titleModifier = if (heroTitleFlight != null) {
-                Modifier
-                    .onGloballyPositioned { heroTitleFlight.onPositioned(it.positionInRoot()) }
-                    // The other half of the handoff -- see HeroTitleFlight.progress's
-                    // own doc. Fades out at exactly the rate TitleDockBadge fades in,
-                    // because both read this same number.
-                    .graphicsLayer { alpha = 1f - heroTitleFlight.progress.value }
+                Modifier.onGloballyPositioned { heroTitleFlight.onPositioned(it.positionInRoot()) }
             } else {
                 Modifier
             },
@@ -7844,74 +7843,23 @@ internal fun BackdropHost(content: @Composable BoxScope.() -> Unit) {
 /**
  * What a header title -- [HeroHeader]'s own (the car's name, drawn ON the
  * photo card via [PebbleShell]), or `SettingsHeaderRow`'s own -- reports to
- * whichever surface hosts a [TitleDockBadge] for it, and the ONE piece of
- * scroll-coupled math both ends of that handoff read: [progress], a plain
- * function of the title's own live Y with no state of its own to drift out
- * of step. The inline title fades itself out (`1 - progress`) at exactly
- * the rate [TitleDockBadge] fades/slides itself in (`progress`), because
- * both are the same number read at draw/layout time -- not two animations
- * racing each other, which is what the next two paragraphs are about.
+ * whichever surface hosts a [TitleDockBadge] for it: just its live measured
+ * position, nothing else. The one derived fact anyone needs is "has the
+ * title's top edge scrolled above the status bar" -- the badge shows then,
+ * and hides again once the real title is back.
  *
  * This used to be a much bigger contract (colour, font size, photo URL, and
  * a floating CLONE of the title that hid the real one and flew between its
- * live position and a corner, driven by its OWN spring). That clone was a
- * standing source of one-frame flashes: any gap between hiding the real
- * title and the copy's own rendering -- a stale position report, a clip
- * outrunning its padding, a crossfade with mismatched durations -- read as
- * the name vanishing, and each fix surfaced the next.
- *
- * The very next version after that (see git history) fixed the flashing by
- * never hiding the real title at all: the corner badge became a fully
- * independent fixed-position pill that just faded in on its own spring once
- * the real title scrolled past a threshold. Stable, but no longer a single
- * moving thing -- the badge popped in beside a title that was simply gone,
- * two unrelated elements handing off rather than one continuous shape. This
- * version is the middle ground: still no live-position CLONE (nothing here
- * hides or duplicates styling), but [progress] ties the real title's own
- * fade to the badge's fade/slide with no threshold and no spring at all --
- * scrolling directly drives both, the same way scrolling directly drives
- * everything else on screen, so there's nothing to visibly outrun.
+ * live position and a corner). That clone was a standing source of one-frame
+ * flashes: any gap between hiding the real title and the copy's own
+ * rendering -- a stale position report, a clip outrunning its padding, a
+ * crossfade with mismatched durations -- read as the name vanishing, and
+ * each fix surfaced the next. The badge never hides the real title at all,
+ * so there is no gap for any of that to happen in.
  */
 internal class HeroTitleFlight(
-    private val topInsetPx: Float,
-    /** Width, in px, of the crossfade+slide zone -- the last bit of scroll
-     *  before the title's top would cross the status bar. */
-    private val zonePx: Float,
-) {
-    private var lastY by mutableFloatStateOf(Float.MAX_VALUE)
-
-    fun onPositioned(offset: Offset) {
-        lastY = offset.y
-    }
-
-    /** The title's own live root-Y, for [TitleDockBadge]'s short slide-in --
-     *  see its own doc. Same underlying value [progress] reads; exposed
-     *  separately because the badge needs the raw number, not the 0..1
-     *  fraction. */
-    val positionY: androidx.compose.runtime.State<Float> = derivedStateOf { lastY }
-
-    /** 0 once the title is fully inline (or hasn't scrolled at all), 1 once
-     *  it's fully docked at the corner -- and every value between while it
-     *  crosses the zone. A pure function of [lastY], read only from deferred
-     *  draw/layout lambdas (`graphicsLayer {}`, `Modifier.offset {}`) at both
-     *  ends of the handoff, never from composition -- so watching it doesn't
-     *  itself cause recomposition. */
-    val progress: androidx.compose.runtime.State<Float> = derivedStateOf {
-        ((topInsetPx + zonePx - lastY) / zonePx).coerceIn(0f, 1f)
-    }
-
-    /** The one boolean anything here recomposes on: is the handoff zone
-     *  active at all right now. Flips twice per crossing -- entering and
-     *  leaving -- same recomposition cost the all-or-nothing boolean design
-     *  this replaced already had; [TitleDockBadge] uses it to skip composing
-     *  itself entirely while fully undocked. */
-    val active: androidx.compose.runtime.State<Boolean> = derivedStateOf { progress.value > 0f }
-}
-
-/** Width of the scroll-coupled crossfade+slide zone every [HeroTitleFlight]
- *  shares. Short on purpose -- this is a handoff, not a scroll animation the
- *  user is meant to watch play out. */
-internal val TitleDockZone = 40.dp
+    val onPositioned: (Offset) -> Unit,
+)
 
 /** Null (the default) everywhere except inside [VehicleDetailContent]. */
 internal val LocalHeroTitleFlight = compositionLocalOf<HeroTitleFlight?> { null }
@@ -7936,24 +7884,32 @@ internal class HoistedIdentityFlight(
 /**
  * [VehicleDetailContent]'s own (non-hoisted) badge state, bundled so it can
  * be built inside an `if (hoisted == null)` branch as one value -- see that
- * composable's own `local` var. Just the [HeroTitleFlight] itself now --
- * [HeroTitleFlight.active]/`.progress` replaced the separate nameHidden/
- * position fields this used to carry.
+ * composable's own `local` var.
  */
 private class LocalNamePillState(
     val flight: HeroTitleFlight,
+    /** True once the hero title's top edge has scrolled above the status
+     *  bar -- the one bit [TitleDockBadge] runs on. */
+    val nameHidden: androidx.compose.runtime.State<Boolean>,
+    /** The hero title's own live root-Y, so [TitleDockBadge] can animate its
+     *  entrance FROM there -- the "splits off the pebble" flight. Same value
+     *  [nameHidden] is derived from; exposed separately because the badge
+     *  needs the raw number, not just the boolean. */
+    val position: androidx.compose.runtime.State<Offset?>,
 )
 
 /**
  * The floating name badge: a fixed-position glass pill in the top corner
- * that fades/scales/slides in as the surface's real title crosses
- * [HeroTitleFlight]'s handoff zone, and back out in reverse -- one
- * continuous, scroll-coupled motion shared with the real title's own fade
- * (see [HeroTitleFlight.progress]'s own doc for the three generations this
- * design has been through and why). NOT a flown COPY of the real title:
- * nothing here duplicates its styling, and the real title stays exactly
- * what [HeroHeader] already draws the whole time, just fading itself by the
- * same number this fades itself in by.
+ * that fades/scales/flies in once the surface's real title has scrolled out
+ * of view, and back out once it returns. NOT a flown COPY of the real title
+ * -- see [HeroTitleFlight]'s own doc for the history of why that failed --
+ * but it does still fly, one short hop, FROM roughly where the real title
+ * last was TO the corner, via [titleYPx]: captured once per visibility
+ * flip (not continuously mirrored every scroll frame, which is what made
+ * the old system fight itself), so it's a single spring per crossing, not
+ * a live position feed. The real title itself never hides, clips, rescales,
+ * or repositions for this -- it stays exactly what [HeroHeader] already
+ * draws, at full opacity, the whole time.
  *
  * Fixed 48dp-min height and the same glass fill/ring/shadow/rim as
  * [FloatingIcon], so it reads as one more piece of the app's floating
@@ -7964,50 +7920,68 @@ private class LocalNamePillState(
  */
 @Composable
 internal fun BoxScope.TitleDockBadge(
-    flight: HeroTitleFlight,
+    visible: Boolean,
     cornerX: Dp,
     cornerY: Dp,
     reserveEnd: Dp,
+    /** The real title's live root-Y in pixels, or null before it's laid out
+     *  once. Read only at the instant [visible] flips (see the
+     *  [LaunchedEffect] below) -- [nameHidden] crosses true/false at
+     *  essentially this same threshold, so the flight is always a short,
+     *  "splits off the pebble" hop rather than a cross-screen throw. */
+    titleYPx: Float?,
     onClick: () -> Unit,
     content: @Composable RowScope.() -> Unit,
 ) {
-    // The one recomposition-triggering read in this whole function -- see
-    // HeroTitleFlight.active's own doc. Composing nothing at all while fully
-    // undocked is the entire performance point of the boolean gate.
-    val active by flight.active
-    if (!active) return
     val haptics = LocalHaptics.current
     val shape = RoundedCornerShape(50)
     val density = LocalDensity.current
     val cornerYPx = with(density) { cornerY.toPx() }
-    Box(
-        Modifier
+    // The one-shot flight offset: captured fresh at each visibility
+    // crossing (LaunchedEffect keyed on `visible`, nothing else), then
+    // sprung toward zero (appearing) or back out toward the captured start
+    // (disappearing). This is deliberately NOT a continuous position mirror
+    // -- it reads titleYPx exactly once per crossing and then owns its own
+    // animation, so nothing here can desync mid-scroll the way the old
+    // flown-title system's per-frame mirror eventually did.
+    val flightPx = remember { Animatable(0f) }
+    LaunchedEffect(visible) {
+        val start = (titleYPx ?: cornerYPx) - cornerYPx
+        if (visible) {
+            flightPx.snapTo(start)
+            // MediumBouncy, not the old LowBouncy (0.75) -- the whole point of
+            // bringing this flight back was for it to visibly overshoot and
+            // settle, like the text is actually being caught by the corner,
+            // not just eased into place. Exit stays undamped-quick (no bounce
+            // on the way OUT), the same arriving-vs-leaving asymmetry every
+            // other spring pair in this file already uses.
+            flightPx.animateTo(0f, spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMediumLow))
+        } else {
+            flightPx.animateTo(start, spring(stiffness = Spring.StiffnessMedium))
+        }
+    }
+    AnimatedVisibility(
+        visible = visible,
+        // A bouncy pop: fade plus a scale-up from 90% that overshoots past
+        // 100% before settling, on the same MediumBouncy the flight above
+        // uses -- both read as one physical object arriving, not two
+        // independently-timed animations. Exit mirrors the flight's own
+        // asymmetry: quicker, no bounce, so leaving reads faster than arriving.
+        enter = fadeIn(spring(stiffness = Spring.StiffnessMediumLow)) +
+            scaleIn(initialScale = 0.9f, animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMediumLow)),
+        exit = fadeOut(spring(stiffness = Spring.StiffnessMedium)) +
+            scaleOut(targetScale = 0.92f, animationSpec = spring(stiffness = Spring.StiffnessMedium)),
+        modifier = Modifier
             .align(Alignment.TopStart)
-            // Fade + a slight scale-up from 92%, driven directly by
-            // progress -- no spring, no threshold: this IS the scroll, at
-            // draw time, read via a deferred lambda so none of it causes
-            // recomposition on its own.
-            .graphicsLayer {
-                val p = flight.progress.value
-                alpha = p
-                // Plain arithmetic, not lerp(): 0.92 + 0.08*p needs no import
-                // beyond what this file already has.
-                scaleX = 0.92f + 0.08f * p
-                scaleY = scaleX
-            }
-            // The short slide from wherever the real title currently is
-            // down/up to the corner -- also a pure function of progress, so
-            // it lands exactly at 0 the instant progress reaches 1 and never
-            // overshoots past that even while the user keeps scrolling.
-            .offset {
-                val p = flight.progress.value
-                IntOffset(0, ((flight.positionY.value - cornerYPx) * (1f - p)).roundToInt())
-            }
-            // The padding IS the width bound: this node fills at most the
-            // host Box minus these insets, so the content Row (and its
-            // Text's ellipsis) is constrained by construction, in every
-            // host -- full-screen page, grid column, dual-column expanded
-            // view -- with no measured-width plumbing needed.
+            // The short vertical hop described above -- offset{} reads the
+            // Animatable directly so it never triggers recomposition, only
+            // relayout, same as every other scroll-driven offset in this file.
+            .offset { IntOffset(0, flightPx.value.roundToInt()) }
+            // The padding IS the width bound: this AnimatedVisibility node
+            // fills at most the host Box minus these insets, so the content
+            // Row (and its Text's ellipsis) is constrained by construction,
+            // in every host -- full-screen page, grid column, dual-column
+            // expanded view -- with no measured-width plumbing needed.
             .padding(start = cornerX, top = cornerY, end = reserveEnd),
     ) {
         Row(
@@ -8035,11 +8009,12 @@ internal fun BoxScope.TitleDockBadge(
  * scrolls together in one [Column] inside [Refreshable] (header row, then
  * the reorderable [PebbleList]).
  *
- * The car's name is drawn ONCE, on the hero card -- see [TitleDockBadge]'s
- * own doc for why there's no cloned copy chasing it any more. [HeroTitleFlight]
- * tracks that title's live Y position and derives [HeroTitleFlight.progress]
- * from it, the one continuous number both the hero title's own fade and
- * [TitleDockBadge]'s fade/scale/slide read.
+ * The car's name is drawn ONCE, on the hero card, always fully visible --
+ * see [TitleDockBadge]'s own doc for why there's no cloned copy chasing it
+ * any more. [HeroTitleFlight] reports only that title's live Y position, and
+ * [nameHidden] (in [LocalNamePillState]) is the one bit derived from it:
+ * has the title's top scrolled above the status bar. [TitleDockBadge] just
+ * fades in and out at a fixed corner by that bit.
  */
 @Composable
 private fun VehicleDetailContent(
@@ -8086,15 +8061,22 @@ private fun VehicleDetailContent(
     // exist there at all.
     val local = if (hoisted == null) {
         val topInsetPx = with(density) { topInset.toPx() }
-        val zonePx = with(density) { TitleDockZone.toPx() }
-        // The hero title's own real, measured Y IN WINDOW-ROOT coordinates
-        // (root-space on both sides -- topInsetPx is a screen measurement
-        // too -- so no container-relative conversion, and no X at all,
-        // since the badge never needs to know where the real title sits
-        // horizontally) lives inside HeroTitleFlight itself now; see its own
-        // doc for what it derives from that one number.
-        val heroFlight = remember { HeroTitleFlight(topInsetPx = topInsetPx, zonePx = zonePx) }
-        LocalNamePillState(flight = heroFlight)
+        // The hero title's own real, measured Y IN WINDOW-ROOT coordinates,
+        // kept live by HeroTitleFlight below -- null until the hero has laid
+        // out at least once. Root-space on both sides (topInsetPx is a
+        // screen measurement too), so this needs no container-relative
+        // conversion -- and no X at all, since the badge never needs to
+        // know where the real title sits horizontally any more.
+        val heroTitlePosition = remember { mutableStateOf<Offset?>(null) }
+        // derivedStateOf is the load-bearing part: onPositioned writes a new
+        // Offset on every layout pass while scrolling, but nothing
+        // recomposes unless this BOOLEAN actually flips -- which is the
+        // whole per-frame cost of the badge system while scrolling.
+        val nameHidden = remember {
+            derivedStateOf { (heroTitlePosition.value?.y ?: Float.MAX_VALUE) < topInsetPx }
+        }
+        val heroFlight = remember { HeroTitleFlight(onPositioned = { heroTitlePosition.value = it }) }
+        LocalNamePillState(flight = heroFlight, nameHidden = nameHidden, position = heroTitlePosition)
     } else {
         null
     }
@@ -8131,13 +8113,14 @@ private fun VehicleDetailContent(
         // own doc.
         if (local != null) {
             TitleDockBadge(
-                flight = local.flight,
+                visible = local.nameHidden.value,
                 cornerX = 16.dp,
                 cornerY = topInset + 12.dp,
                 // Clears the top-right FloatingIcon slot (the expand button
                 // in grid columns, the gear on the standalone route) -- 12dp
                 // outer padding + 48dp icon + a little air.
                 reserveEnd = 72.dp,
+                titleYPx = local.position.value?.y,
                 onClick = { scope.launch { scroll.animateScrollTo(0) } },
             ) {
                 Text(
@@ -8199,8 +8182,13 @@ private fun ExpandedCar(v: Vehicle, state: UiState, vm: AppViewModel, flipped: B
     val density = LocalDensity.current
     val scope = rememberCoroutineScope()
     val topInsetPx = with(density) { topInset.toPx() }
-    val zonePx = with(density) { TitleDockZone.toPx() }
-    val titleFlight = remember { HeroTitleFlight(topInsetPx = topInsetPx, zonePx = zonePx) }
+    val titlePosition = remember { mutableStateOf<Offset?>(null) }
+    val nameHidden by remember {
+        derivedStateOf { (titlePosition.value?.y ?: Float.MAX_VALUE) < topInsetPx }
+    }
+    val titleFlight = remember {
+        HeroTitleFlight(onPositioned = { titlePosition.value = it })
+    }
     // CriticalContent's own HeroHeader is the real hero photo card here --
     // this view was NOT missing one the way the doc above used to claim;
     // CarHeaderRow's plain-text name and HeroHeader's own (on the photo)
@@ -8276,13 +8264,14 @@ private fun ExpandedCar(v: Vehicle, state: UiState, vm: AppViewModel, flipped: B
         // scrolled out of view (same hero-card source as VehicleDetailContent,
         // via the same ambient LocalHeroTitleFlight above).
         TitleDockBadge(
-            flight = titleFlight,
+            visible = nameHidden,
             // Clears GarageScreen's own back arrow (top-left, 12dp/48dp) --
             // it's always present whenever ExpandedCar is on screen.
             cornerX = 60.dp,
             cornerY = topInset + 12.dp,
             // Clears the flip-columns + gear buttons in the top-right.
             reserveEnd = 120.dp,
+            titleYPx = titlePosition.value?.y,
             onClick = { scope.launch { controlsScroll.animateScrollTo(0) } },
         ) {
             Text(
