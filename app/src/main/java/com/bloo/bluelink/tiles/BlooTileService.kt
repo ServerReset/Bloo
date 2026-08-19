@@ -13,6 +13,7 @@ import android.widget.Toast
 import com.bloo.bluelink.MainActivity
 import com.bloo.bluelink.R
 import com.bloo.bluelink.Shortcuts
+import com.bloo.bluelink.data.AppLog
 import com.bloo.bluelink.data.SettingsStore
 import com.bloo.bluelink.data.SnapshotStore
 import com.bloo.bluelink.data.TileCommandRunner
@@ -81,16 +82,17 @@ abstract class BlooTileService : TileService() {
         // cancel if the shade closed again while that first render() was
         // still suspended on a cold DataStore read. render() resuming after
         // that point touches qsTile outside the window the class's own docs
-        // say is safe, and tile.updateTile() throwing on a now-invalid binder
-        // would crash the process with no CoroutineExceptionHandler here to
-        // catch it. Folding the immediate paint into watchJob itself means
+        // say is safe. Folding the immediate paint into watchJob itself means
         // there is exactly one job touching qsTile, and cancelling it always
         // cancels ALL of it, whichever suspend point it's parked at.
+        // (render() itself is now the one place a shade-close race landing
+        // mid-render is caught -- see its own doc -- so this call and the
+        // loop's below no longer need their own runCatching to stay safe.)
         watchJob = scope.launch {
             render()
             SnapshotStore(applicationContext).payload
                 .drop(1) // the render() above already painted the current value
-                .collect { runCatching { render() } }
+                .collect { render() }
         }
     }
 
@@ -117,36 +119,52 @@ abstract class BlooTileService : TileService() {
      * Reads this tile's assigned car+command from settings and the latest cached vehicle
      * snapshot, then paints [qsTile]'s state/icon/label/subtitle to match and pushes it with
      * [Tile.updateTile]. If no car/command has been assigned yet, shows a generic inactive
-     * "unassigned" tile instead. Every settings/store read is wrapped in `runCatching` so a
-     * transient failure (e.g. store not yet initialized) degrades to a sane fallback rather
-     * than leaving the tile in a broken half-drawn state or crashing the host process.
+     * "unassigned" tile instead. Every settings/store read is individually wrapped in
+     * `runCatching` so a transient failure (e.g. store not yet initialized) degrades to a sane
+     * fallback rather than leaving the tile in a broken half-drawn state; the whole qsTile
+     * touch-and-[Tile.updateTile] sequence is ALSO wrapped, one level up, so a shade-close race
+     * (qsTile going invalid while this was suspended on a cold read) can't crash the host
+     * process with no CoroutineExceptionHandler to catch it either -- every caller gets that
+     * for free rather than needing its own runCatching around calling this.
      */
     private suspend fun render() {
-        val tile = qsTile ?: return
-        val ctx = applicationContext
-        val cfg = runCatching { SettingsStore(ctx).tileConfig(index) }.getOrNull()
-        if (cfg == null) {
-            tile.state = Tile.STATE_INACTIVE
-            tile.label = runCatching { SettingsStore(ctx).tileLabel(index) }.getOrNull() ?: "Bloo tile ${index + 1}"
-            tile.icon = Icon.createWithResource(ctx, R.drawable.ic_shortcut_car)
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) tile.subtitle = "Unassigned"
+        // The whole qsTile touch-and-push is one runCatching, not just the store
+        // reads above it -- the caller in onStartListening used to call this
+        // unprotected for the very first paint (only the LOOP's later calls were
+        // wrapped), so a shade-close race landing between the `qsTile ?: return`
+        // above and `tile.updateTile()` below -- qsTile going invalid while this
+        // was suspended on a cold DataStore read -- could still throw with no
+        // CoroutineExceptionHandler to catch it, on first paint specifically.
+        // Guarding here instead of at each call site means every caller gets
+        // this for free rather than needing to remember it.
+        val protected = runCatching {
+            val tile = qsTile ?: return@runCatching
+            val ctx = applicationContext
+            val cfg = runCatching { SettingsStore(ctx).tileConfig(index) }.getOrNull()
+            if (cfg == null) {
+                tile.state = Tile.STATE_INACTIVE
+                tile.label = runCatching { SettingsStore(ctx).tileLabel(index) }.getOrNull() ?: "Bloo tile ${index + 1}"
+                tile.icon = Icon.createWithResource(ctx, R.drawable.ic_shortcut_car)
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) tile.subtitle = "Unassigned"
+                tile.updateTile()
+                return@runCatching
+            }
+            val (vin, cmd) = cfg
+            val snap = runCatching {
+                SnapshotStore(ctx).current().vehicles.firstOrNull { it.vin == vin }
+            }.getOrNull()
+            val custom = runCatching { SettingsStore(ctx).tileLabel(index) }.getOrNull()
+
+            tile.state = if (isActiveState(cmd, snap)) Tile.STATE_ACTIVE else Tile.STATE_INACTIVE
+            tile.icon = Icon.createWithResource(ctx, iconFor(cmd, snap))
+            tile.label = custom ?: defaultLabel(cmd, snap)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) tile.subtitle = snap?.name ?: "Car"
             tile.updateTile()
-            return
+
+            // Optional: kick a throttled live refresh so the shown state is current.
+            maybeLiveRefresh(ctx, vin)
         }
-        val (vin, cmd) = cfg
-        val snap = runCatching {
-            SnapshotStore(ctx).current().vehicles.firstOrNull { it.vin == vin }
-        }.getOrNull()
-        val custom = runCatching { SettingsStore(ctx).tileLabel(index) }.getOrNull()
-
-        tile.state = if (isActiveState(cmd, snap)) Tile.STATE_ACTIVE else Tile.STATE_INACTIVE
-        tile.icon = Icon.createWithResource(ctx, iconFor(cmd, snap))
-        tile.label = custom ?: defaultLabel(cmd, snap)
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) tile.subtitle = snap?.name ?: "Car"
-        tile.updateTile()
-
-        // Optional: kick a throttled live refresh so the shown state is current.
-        maybeLiveRefresh(ctx, vin)
+        protected.exceptionOrNull()?.let { AppLog.log("⚠ Tile ${index + 1} render failed: ${it.message}") }
     }
 
     /** If live refresh is on and this car hasn't refreshed recently, queue one. */

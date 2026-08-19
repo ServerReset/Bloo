@@ -9132,11 +9132,16 @@ internal fun CustomPaletteSwatch(
             // minimum touch target guideline and had no button semantics --
             // TalkBack announced it with no "double tap to activate" cue and
             // it was genuinely hard to hit with a finger. IconButton gives
-            // both a real (if still compact, given the tight swatch grid)
-            // touch target and the Button role for free.
+            // both a real touch target and the Button role for free.
             // Manual haptics?.click() dropped: MorphIconButton fires it. This was
             // the one bare IconButton in the file that remembered to.
-            MorphIconButton(onClick = onEdit, modifier = Modifier.size(28.dp)) {
+            //
+            // 32dp, not the full 48dp guideline: this sits in a caption row
+            // (Text + this button) inside a 58dp-wide swatch column, itself one
+            // of several in a tight grid -- 48dp here would overflow that
+            // column or push its touch target into the neighbouring swatch's.
+            // 32dp is a real improvement over the old 28dp that still fits.
+            MorphIconButton(onClick = onEdit, modifier = Modifier.size(32.dp)) {
                 Icon(
                     Icons.Filled.Settings,
                     contentDescription = "Edit palette",
