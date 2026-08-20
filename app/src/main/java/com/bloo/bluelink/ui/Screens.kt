@@ -480,19 +480,15 @@ fun BlooApp(vm: AppViewModel) {
     // status/navigation bars; screen content draws on top of it.
     val scheme = MaterialTheme.colorScheme
     // Biometric lock overlay: blur the whole app behind it and fade the blur
-    // away once unlocked.
-    val lockBlur by animateDpAsState(
-        targetValue = if (state.locked) 22.dp else 0.dp,
-        animationSpec = tween(durationMillis = 450),
-        label = "lockBlur",
-    )
-    val lockAlpha by animateFloatAsState(
-        targetValue = if (state.locked) 1f else 0f,
-        animationSpec = tween(durationMillis = 450),
-        label = "lockAlpha",
-    )
+    // away once unlocked. Both animated values used to be read directly here
+    // in BlooApp's own body (`by animateDpAsState`/`animateFloatAsState`),
+    // which subscribed BlooApp's entire recompose scope -- the Scaffold, the
+    // whole NavHost of every screen, the SearchLayer -- to every one of the
+    // ~27 frames of each 450ms lock/unlock transition. Hoisted into their own
+    // small composables below so only those tiny scopes recompose per frame;
+    // everything else just gets redrawn under the blurred/faded layer.
     Box(Modifier.fillMaxSize()) {
-    Box(Modifier.fillMaxSize().blur(lockBlur)) {
+    LockBlurLayer(locked = state.locked) {
     Box(
         Modifier
             .fillMaxSize()
@@ -670,14 +666,40 @@ fun BlooApp(vm: AppViewModel) {
     }
     }
         // Biometric lock overlay, drawn over the blurred app; fades out on unlock.
-        if (lockAlpha > 0.01f) {
-            Box(Modifier.fillMaxSize().alpha(lockAlpha)) {
-                LockOverlay(vm)
-            }
-        }
+        LockAlphaOverlay(locked = state.locked, vm = vm)
     }
     }
 
+}
+
+// Owns the lock-blur animation in its own small recompose scope so animating
+// it doesn't invalidate all of BlooApp (see BlooApp's call site comment).
+@Composable
+private fun LockBlurLayer(locked: Boolean, content: @Composable () -> Unit) {
+    val lockBlur by animateDpAsState(
+        targetValue = if (locked) 22.dp else 0.dp,
+        animationSpec = tween(durationMillis = 450),
+        label = "lockBlur",
+    )
+    Box(Modifier.fillMaxSize().blur(lockBlur)) {
+        content()
+    }
+}
+
+// Owns the lock-overlay fade animation in its own small recompose scope, for
+// the same reason as [LockBlurLayer].
+@Composable
+private fun LockAlphaOverlay(locked: Boolean, vm: AppViewModel) {
+    val lockAlpha by animateFloatAsState(
+        targetValue = if (locked) 1f else 0f,
+        animationSpec = tween(durationMillis = 450),
+        label = "lockAlpha",
+    )
+    if (lockAlpha > 0.01f) {
+        Box(Modifier.fillMaxSize().alpha(lockAlpha)) {
+            LockOverlay(vm)
+        }
+    }
 }
 
 // --- Onboarding wizard (first run + new-car detection) --------------------

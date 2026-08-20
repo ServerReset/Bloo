@@ -11,7 +11,9 @@ import androidx.work.NetworkType
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
-import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import java.util.concurrent.TimeUnit
 
 /**
@@ -29,13 +31,21 @@ class CarWidgetReceiver : GlanceAppWidgetReceiver() {
 
     override fun onDeleted(context: Context, appWidgetIds: IntArray) {
         super.onDeleted(context, appWidgetIds)
-        // Best-effort synchronous clear (onDeleted has no coroutine scope). The
-        // config store's edit is a fast local DataStore write.
-        runCatching {
-            runBlocking {
-                val store = WidgetConfigStore(context)
+        // Best-effort clear. Used to run inside runBlocking on whatever thread
+        // dispatched onDeleted (the main thread, in the common case), blocking
+        // it on the DataStore's disk write for every removed id -- a home
+        // screen wipe with several car widgets meant several sequential
+        // blocking writes back to back. goAsync() extends the receiver's
+        // lifetime past this call returning, so the actual suspend work can
+        // run on a background dispatcher instead of blocking the caller.
+        val appContext = context.applicationContext
+        val pending = goAsync()
+        CoroutineScope(Dispatchers.IO).launch {
+            runCatching {
+                val store = WidgetConfigStore(appContext)
                 appWidgetIds.forEach { store.clear(it) }
             }
+            pending.finish()
         }
     }
 
