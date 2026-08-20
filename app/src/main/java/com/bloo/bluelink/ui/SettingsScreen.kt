@@ -3812,15 +3812,30 @@ private fun SettingsSearchResults(
     // harmless no-op navigation if already on the garage, and the pager's own
     // authoritative landing effect (Screens.kt) snaps onto the new Settings
     // slot regardless of whether this composition is fresh or already
-    // mounted. Turning OFF stays a plain preference change -- if this result
-    // was reached while actually parked on the embedded page, the pager's own
-    // existing drift-correction already lands back on a car gracefully once
-    // the slot disappears; there's nothing to fix on the way out that isn't
-    // already handled.
+    // mounted.
+    //
+    // Turning OFF used to be treated as a plain preference change, on the
+    // theory that the pager's own drift-correction (LaunchedEffect(totalBlocks)
+    // in GarageScreen) would "land back on a car gracefully once the slot
+    // disappears" -- that's exactly the bug: reached from a search result
+    // while genuinely parked on the embedded slot, nothing ever calls
+    // openSettings(), so that drift-correction effect finds state.screen
+    // still == Screen.Garage and snaps the pager to whatever car currentIndex
+    // resolves to instead of navigating anywhere -- the "turning this off
+    // takes you back to the first car, not the real Settings screen" bug.
+    // The main Settings card's own copy of this toggle (see ToggleRow above
+    // in this same file) already gets this right by checking `embedded`; this
+    // one has no such parameter, so it checks state.onSettingsPageSlot
+    // instead -- true exactly when the pager is currently settled on the
+    // embedded slot, the same signal GarageScreen itself uses.
     add("Settings as a swipeable page", "gear button pager swipe car screen navigation") {
         ToggleRow("Settings as a swipeable page", appearance.settingsAsPage) { turningOn ->
             vm.setSettingsAsPage(turningOn)
-            if (turningOn) vm.closeSettings(landOnSettingsPage = true)
+            if (turningOn) {
+                vm.closeSettings(landOnSettingsPage = true)
+            } else if (state.onSettingsPageSlot) {
+                vm.openSettings()
+            }
         }
     }
     add("Units", "unit system metric imperial temperature distance speed miles km") {
