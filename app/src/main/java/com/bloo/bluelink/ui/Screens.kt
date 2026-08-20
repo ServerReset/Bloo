@@ -3487,16 +3487,31 @@ internal fun GarageScreen(state: UiState, vm: AppViewModel) {
                         scrollToTop = hoistedScrollToTop,
                     )
                 }
-                // Each block's own dock state, the last time it was actually
+                // Each page's own dock state, the last time it was actually
                 // live and ready -- NOT scoped to any one AnimatedContent slot
-                // (those come and go per `block`), so a block visited earlier
+                // (those come and go per `block`), so a page visited earlier
                 // still has a remembered answer the next time it's compared
                 // against. Lets the page-switch transition below tell "both
                 // sides are the same kind of badge (hero-card or floating
                 // pill)" from "the two sides actually differ" BEFORE the
                 // incoming page's own layout has reported anything -- see
                 // that transitionSpec's own doc.
-                val lastKnownDocked = remember { mutableStateMapOf<Int, Boolean>() }
+                //
+                // Keyed by stable identity (a VIN, or "settings"), NOT by raw
+                // block index -- an index's real-world meaning isn't stable:
+                // deleting a car shifts every later one down a slot, resizing
+                // a foldable/tablet window changes perPage and so pageCount,
+                // and reordering cars (drag-to-reorder, reachable from the
+                // embedded Settings page without ever leaving this same
+                // composition) reassigns which car sits at which index
+                // directly. A raw-Int-keyed map would silently compare one
+                // car's remembered dock state against a DIFFERENT car now
+                // sitting at that same index after any of those, picking the
+                // wrong transition (or wrongly skipping it) for reasons
+                // having nothing to do with the two pages actually involved.
+                val lastKnownDocked = remember { mutableStateMapOf<Any, Boolean>() }
+                fun dockedKey(block: Int): Any =
+                    if (settingsAsPage && block == pageCount) "settings" else vehicles.getOrNull(block)?.vin ?: block
                 Box(Modifier.fillMaxSize()) {
                     HorizontalPager(
                         state = pager,
@@ -3727,8 +3742,8 @@ internal fun GarageScreen(state: UiState, vm: AppViewModel) {
                         AnimatedContent(
                             targetState = settledBlock,
                             transitionSpec = {
-                                val fromDocked = lastKnownDocked[initialState]
-                                val toDocked = lastKnownDocked[targetState]
+                                val fromDocked = lastKnownDocked[dockedKey(initialState)]
+                                val toDocked = lastKnownDocked[dockedKey(targetState)]
                                 if (fromDocked != null && fromDocked == toDocked) {
                                     // Same kind of badge on both sides -- no
                                     // transition at all; the incoming text is
@@ -3819,11 +3834,14 @@ internal fun GarageScreen(state: UiState, vm: AppViewModel) {
                                         )
                                         // Recorded every frame this block is live and
                                         // ready, same as `frozen` above -- so the NEXT
-                                        // time this block is either side of a switch,
-                                        // the transitionSpec already knows whether it's
-                                        // a hero-card or a docked pill without having to
-                                        // wait on a fresh layout report.
-                                        lastKnownDocked[block] = hoistedFlight.flight.docked.value
+                                        // time this car/Settings is either side of a
+                                        // switch, the transitionSpec already knows
+                                        // whether it's a hero-card or a docked pill
+                                        // without having to wait on a fresh layout
+                                        // report. Keyed by dockedKey(block) (stable
+                                        // identity), not the raw index -- see
+                                        // lastKnownDocked's own doc for why.
+                                        lastKnownDocked[dockedKey(block)] = hoistedFlight.flight.docked.value
                                     }
                                 }
                             }
