@@ -2638,7 +2638,13 @@ internal fun LockOverlay(vm: AppViewModel) {
             .background(Color.Black.copy(alpha = 0.45f))
             .clickable(interactionSource = noRipple, indication = null) {},
     ) {
-        // Floating back arrow -> login.
+        // Floating back arrow -> login. A hand-rolled Surface, not
+        // FloatingIcon itself -- this sits over the dark lock scrim above,
+        // not a photo/card background, so it deliberately uses plain white
+        // instead of FloatingIcon's glass-container fill. Size/padding still
+        // match every other header button (HeaderButtonSize/HeaderCornerGap)
+        // -- this used to be its own one-off 46dp, 2dp smaller than every
+        // other floating button in the app for no reason.
         Surface(
             onClick = { haptics?.click(); vm.lockToLogin() },
             shape = CircleShape,
@@ -2647,8 +2653,8 @@ internal fun LockOverlay(vm: AppViewModel) {
             modifier = Modifier
                 .align(Alignment.TopStart)
                 .statusBarsPadding()
-                .padding(12.dp)
-                .size(46.dp),
+                .padding(HeaderCornerGap)
+                .size(HeaderButtonSize),
         ) {
             Box(contentAlignment = Alignment.Center) {
                 Icon(Icons.Filled.ArrowBack, contentDescription = "Back to login")
@@ -3246,7 +3252,7 @@ internal fun GarageScreen(state: UiState, vm: AppViewModel) {
                             pager = exPager,
                             real = { exWrap.real(it) },
                             count = count,
-                            modifier = Modifier.align(Alignment.TopCenter).statusBarsPadding().padding(top = 10.dp)
+                            modifier = Modifier.align(Alignment.TopCenter).statusBarsPadding().padding(top = HeaderCornerGap)
                                 .graphicsLayer { alpha = dotsAlphaState.value },
                             onRefresh = { vm.refreshStatus(vehicles[exWrap.settledReal]) },
                         )
@@ -3636,7 +3642,7 @@ internal fun GarageScreen(state: UiState, vm: AppViewModel) {
                             pager = pager,
                             real = { realBlock(it) },
                             count = totalBlocks,
-                            modifier = Modifier.align(Alignment.TopCenter).statusBarsPadding().padding(top = 10.dp)
+                            modifier = Modifier.align(Alignment.TopCenter).statusBarsPadding().padding(top = HeaderCornerGap)
                                 .graphicsLayer { alpha = dotsAlphaState.value },
                             onRefresh = { vm.refreshStatus(vehicles[currentIndex]) },
                         )
@@ -3656,7 +3662,7 @@ internal fun GarageScreen(state: UiState, vm: AppViewModel) {
                             visible = state.refreshing,
                             enter = fadeIn(tween(150)),
                             exit = fadeOut(tween(200)),
-                            modifier = Modifier.align(Alignment.TopCenter).statusBarsPadding().padding(top = 10.dp),
+                            modifier = Modifier.align(Alignment.TopCenter).statusBarsPadding().padding(top = HeaderCornerGap),
                         ) {
                             LoadingIndicator()
                         }
@@ -3773,7 +3779,7 @@ internal fun GarageScreen(state: UiState, vm: AppViewModel) {
                             TitleFlightOverlay(
                                 flight = effectiveFlight,
                                 cornerX = 16.dp,
-                                cornerY = hoistedTopInset + 12.dp,
+                                cornerY = hoistedTopInset + HeaderCornerGap,
                                 // Clears the top-right gear/expand chrome, same
                                 // as VehicleDetailContent's own badge.
                                 reserveEnd = 72.dp,
@@ -4779,7 +4785,7 @@ private fun CompactGarage(state: UiState, vm: AppViewModel, appearance: Settings
             modifier = Modifier
                 .align(Alignment.TopCenter)
                 .statusBarsPadding()
-                .padding(top = 10.dp, start = 12.dp, end = 12.dp)
+                .padding(top = HeaderCornerGap, start = HeaderCornerGap, end = HeaderCornerGap)
                 .graphicsLayer { alpha = dotsAlphaState.value },
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
@@ -5415,18 +5421,37 @@ internal fun StatusBarScrim() {
     )
 }
 
+/** The one shared "gap below the status bar" every free-floating header
+ *  element -- [FloatingIcon]'s own default [FloatingIcon.outerPadding], every
+ *  [TitleFlightOverlay] call site's `cornerY`, the page-dot overlays -- lines
+ *  up against, so they all sit on the same row instead of each surface
+ *  reproducing its own close-but-not-quite value (this used to be `12.dp` in
+ *  some places and `10.dp` in others, an inconsistency invisible on any one
+ *  screen alone but obvious the moment two headers are compared side by
+ *  side). */
+internal val HeaderCornerGap = 12.dp
+
+/** The one shared size every free-floating header BUTTON -- [FloatingIcon]'s
+ *  circle, and anything meant to sit in the same row as one -- is drawn at,
+ *  so two buttons on the same header always share a vertical centre. Used to
+ *  be re-typed as a bare `48.dp` at each call site (and, in one place,
+ *  [LockOverlay]'s own hand-rolled back button, mistyped as `46.dp` -- a
+ *  silent 2dp size/alignment drift from every other header button in the
+ *  app). */
+internal val HeaderButtonSize = 48.dp
+
 /** A small translucent circular icon button used as a floating overlay control.
- *  [outerPadding] is the breathing room around the 48dp circle - the default
- *  (12dp, a 72dp footprint) suits free-floating overlay corners; tight rows
- *  (the cover screen's title row, at 2dp) keep that footprint down to 52dp on
- *  a ~260dp-tall screen. */
+ *  [outerPadding] is the breathing room around the [HeaderButtonSize] circle -
+ *  the default ([HeaderCornerGap], a 72dp footprint) suits free-floating
+ *  overlay corners; tight rows (the cover screen's title row, at 2dp) keep
+ *  that footprint down to 52dp on a ~260dp-tall screen. */
 @Composable
 internal fun FloatingIcon(
     icon: ImageVector,
     description: String,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
-    outerPadding: Dp = 12.dp,
+    outerPadding: Dp = HeaderCornerGap,
 ) {
     val haptics = LocalHaptics.current
     val interaction = remember { MutableInteractionSource() }
@@ -5447,7 +5472,7 @@ internal fun FloatingIcon(
         interactionSource = interaction,
         modifier = modifier
             .padding(outerPadding)
-            .size(48.dp)
+            .size(HeaderButtonSize)
             .graphicsLayer(scaleX = scale, scaleY = scale)
             .ambientRing(CircleShape)
             .dropShadow(CircleShape)
@@ -8550,7 +8575,7 @@ private fun VehicleDetailContent(
             TitleFlightOverlay(
                 flight = local.flight,
                 cornerX = 16.dp,
-                cornerY = topInset + 12.dp,
+                cornerY = topInset + HeaderCornerGap,
                 // Clears the top-right FloatingIcon slot (the expand button
                 // in grid columns, the gear on the standalone route) -- 12dp
                 // outer padding + 48dp icon + a little air.
@@ -8672,8 +8697,12 @@ private fun ExpandedCar(v: Vehicle, state: UiState, vm: AppViewModel, flipped: B
             val leftScroll = if (isFlipped) pebblesScroll else controlsScroll
             val rightScroll = if (isFlipped) controlsScroll else pebblesScroll
             // Inset spacers (not padding) so content scrolls *behind* the bars;
-            // the leading spacer also clears the floating overlay buttons.
-            val lead: @Composable ColumnScope.() -> Unit = { Spacer(Modifier.height(topInset + 52.dp)) }
+            // the leading spacer also clears the floating overlay buttons --
+            // HeaderCornerGap + HeaderButtonSize (their real combined
+            // footprint, 60dp), not the bare 52.dp this used to hardcode,
+            // which let content peek up 8dp under the buttons' own bottom
+            // edge.
+            val lead: @Composable ColumnScope.() -> Unit = { Spacer(Modifier.height(topInset + HeaderCornerGap + HeaderButtonSize)) }
             val trail: @Composable ColumnScope.() -> Unit = { Spacer(Modifier.height(bottomInset + 16.dp)) }
             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 Row(
@@ -8704,7 +8733,7 @@ private fun ExpandedCar(v: Vehicle, state: UiState, vm: AppViewModel, flipped: B
             // Clears GarageScreen's own back arrow (top-left, 12dp/48dp) --
             // it's always present whenever ExpandedCar is on screen.
             cornerX = 60.dp,
-            cornerY = topInset + 12.dp,
+            cornerY = topInset + HeaderCornerGap,
             // Clears the flip-columns + gear buttons in the top-right.
             reserveEnd = 120.dp,
             maxWidth = screenWidth - 60.dp - 120.dp - 32.dp,

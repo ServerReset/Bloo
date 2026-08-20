@@ -1911,7 +1911,7 @@ internal fun SettingsScreen(
                 // Embedded has no back arrow, so it sits at the same 16dp
                 // the grid's own content uses, matching the car pages.
                 cornerX = cornerX,
-                cornerY = topInset + 12.dp,
+                cornerY = topInset + HeaderCornerGap,
                 // Clears the Simple/Advanced segmented toggle in the
                 // top-right (172dp wide, plus its own breathing room).
                 reserveEnd = reserveEnd,
@@ -1940,7 +1940,7 @@ internal fun SettingsScreen(
                 // cutout) with nothing reserving room for it. Reproduces the
                 // same 12dp by hand only when there's no FloatingIcon here to
                 // provide it for free.
-                .then(if (embedded) Modifier.padding(start = 12.dp) else Modifier),
+                .then(if (embedded) Modifier.padding(start = HeaderCornerGap) else Modifier),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             // No back arrow when embedded -- there's no separate screen it would be
@@ -1977,7 +1977,11 @@ internal fun SettingsScreen(
                     selectedKey = state.settingsMode,
                     onSelect = { vm.setSettingsMode(it) },
                     containerColor = MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = glassContainerAlpha()),
-                    trackHeight = 44.dp,
+                    // HeaderButtonSize (48dp), not its own one-off 44dp -- the
+                    // comment above already says this is meant to match the
+                    // "Settings" pill/FloatingIcon's own height in the same
+                    // row; it just hadn't actually been set to the same value.
+                    trackHeight = HeaderButtonSize,
                 )
             }
             Spacer(Modifier.width(8.dp))
