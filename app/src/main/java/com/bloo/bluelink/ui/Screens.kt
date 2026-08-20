@@ -3658,11 +3658,12 @@ internal fun GarageScreen(state: UiState, vm: AppViewModel) {
                             reserveEnd = 72.dp,
                             maxWidth = screenWidth - 16.dp - 72.dp - 32.dp,
                             // The Settings slot has no hero photo to morph its own
-                            // colour against, so it's always plain onSurface; a car
-                            // slot uses whatever colour that car's OWN HeroHeader
-                            // most recently reported (hoistedFlight.flight.color),
-                            // same as the non-hoisted call sites.
-                            textColor = if (onSettingsSlot || hoistedFlight.flight.color == Color.Unspecified) MaterialTheme.colorScheme.onSurface else hoistedFlight.flight.color,
+                            // colour against, so it's forced to plain onSurface;
+                            // every car slot instead reads hoistedFlight.flight's
+                            // own live colour, resolved INSIDE TitleFlightOverlay
+                            // (see textColorOverride's own doc for why reading it
+                            // there instead of here as a call-site argument matters).
+                            textColorOverride = if (onSettingsSlot) MaterialTheme.colorScheme.onSurface else null,
                             // See TitleFlightOverlay's own resetKey doc: a page
                             // switch snaps instead of springing.
                             resetKey = settledBlock,
@@ -8028,7 +8029,12 @@ internal fun BoxScope.TitleFlightOverlay(
     cornerY: Dp,
     reserveEnd: Dp,
     maxWidth: Dp,
-    textColor: Color,
+    /** Forces a fixed colour (Settings/hoisted-on-Settings-slot have no
+     *  photo to morph against, so there's nothing to read from [flight]).
+     *  Null -- every other surface -- reads [flight]'s own live colour
+     *  instead, resolved INSIDE this function rather than by the caller;
+     *  see the read site below for why that's load-bearing, not stylistic. */
+    textColorOverride: Color? = null,
     onClick: () -> Unit,
     /** Extra content shown ONLY once docked, alongside the flying text
      *  inside the pill (the hoisted badge's page-count label). */
@@ -8268,7 +8274,18 @@ internal fun BoxScope.TitleFlightOverlay(
                 )
             },
     ) {
-        CompositionLocalProvider(LocalContentColor provides textColor) { content() }
+        // Read HERE, inside TitleFlightOverlay's own (small) recompose scope
+        // -- not by the caller, as a call-site argument expression, which is
+        // what this looked like before. flight.color is a plain mutableStateOf
+        // written every frame of HeroHeader's photo-expand spring (see that
+        // property's own doc); reading it as an argument to THIS call ties
+        // the ENTIRE calling composable (VehicleDetailContent, ExpandedCar,
+        // GarageScreen's whole hoisted-badge scope) to recompose on every one
+        // of those frames, not just the small text-colour consumer that
+        // actually needs the value. Resolving it in this function's own body
+        // instead means only this function reruns.
+        val resolvedColor = textColorOverride ?: flight.color.takeOrElseOnSurface()
+        CompositionLocalProvider(LocalContentColor provides resolvedColor) { content() }
     }
 }
 
@@ -8377,7 +8394,10 @@ private fun VehicleDetailContent(
                 // Falls back to onSurface before HeroHeader has reported a real
                 // colour yet (this composable's own first frame) -- Unspecified would
                 // otherwise resolve through LocalContentColor's own default instead.
-                textColor = local.flight.color.takeOrElseOnSurface(),
+                // textColorOverride omitted: `flight` here IS local.flight, so
+                // TitleFlightOverlay reads its live colour itself -- see that
+                // parameter's own doc for why resolving it there instead of
+                // here is load-bearing, not stylistic.
                 onClick = { scope.launch { scroll.animateScrollTo(0) } },
             ) {
                 Text(
@@ -8524,7 +8544,9 @@ private fun ExpandedCar(v: Vehicle, state: UiState, vm: AppViewModel, flipped: B
             reserveEnd = 120.dp,
             maxWidth = screenWidth - 60.dp - 120.dp - 32.dp,
             // Same Unspecified-before-first-report fallback as VehicleDetailContent's own call site.
-            textColor = titleFlight.color.takeOrElseOnSurface(),
+            // textColorOverride omitted -- same reasoning as VehicleDetailContent's
+            // own call site: flight IS titleFlight, so TitleFlightOverlay reads
+            // its live colour itself.
             onClick = { scope.launch { controlsScroll.animateScrollTo(0) } },
         ) {
             Text(

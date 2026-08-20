@@ -1916,7 +1916,8 @@ internal fun SettingsScreen(
                 // top-right (172dp wide, plus its own breathing room).
                 reserveEnd = reserveEnd,
                 maxWidth = screenWidth - cornerX - reserveEnd - 32.dp,
-                textColor = MaterialTheme.colorScheme.onSurface,
+                // Fixed -- Settings has no hero photo to morph a colour against.
+                textColorOverride = MaterialTheme.colorScheme.onSurface,
                 onClick = { settingsScope.launch { settingsGridState.animateScrollToItem(0) } },
             ) {
                 Text(
