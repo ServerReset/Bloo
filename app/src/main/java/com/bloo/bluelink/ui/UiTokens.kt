@@ -254,6 +254,17 @@ internal val PebbleBounceStiffness = Spring.StiffnessLow
 // a fixed-corner TitleDockBadge now (see Screens.kt), which animates with
 // plain AnimatedVisibility springs and needs no bespoke tuning of its own.
 
+// Shared by OnboardingScreen and the per-vehicle setup wizard (Screens.kt) --
+// both are the same linear step-wizard pattern (progress bar -> AnimatedContent
+// slide+fade -> Back/Next footer), and the footer's own AnimatedVisibility
+// specs were already identical between the two. These two durations had
+// drifted apart (350/300, 240/220) despite there being no reason for the two
+// screens to feel like a different pace for what is the same "step advance"
+// motion -- pulled out here so both share one number instead of two
+// independently-tuned ones.
+internal const val WizardProgressDurationMs = 300
+internal const val WizardStepFadeInDurationMs = 220
+
 @Composable
 internal fun collapseEnter(expandFrom: Alignment.Vertical = Alignment.Top): EnterTransition =
     fadeIn(MaterialTheme.motionScheme.defaultEffectsSpec<Float>()) +

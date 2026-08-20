@@ -850,7 +850,7 @@ private fun OnboardingScreen(vm: AppViewModel) {
 
             // --- Progress: an animated bar plus a small step counter ---
             val progress = if (steps.size > 1) pageIndex.toFloat() / lastIndex.toFloat() else 1f
-            val animatedProgress by animateFloatAsState(progress, tween(350), label = "onboardProgress")
+            val animatedProgress by animateFloatAsState(progress, tween(WizardProgressDurationMs), label = "onboardProgress")
             Row(
                 Modifier.fillMaxWidth().padding(horizontal = 24.dp),
                 verticalAlignment = Alignment.CenterVertically,
@@ -883,7 +883,7 @@ private fun OnboardingScreen(vm: AppViewModel) {
                 targetState = pageIndex,
                 transitionSpec = {
                     val dir = if (targetState > initialState) 1 else -1
-                    (slideInHorizontally { it * dir } + fadeIn(tween(240))) togetherWith
+                    (slideInHorizontally { it * dir } + fadeIn(tween(WizardStepFadeInDurationMs))) togetherWith
                         (slideOutHorizontally { -it * dir } + fadeOut(tween(180)))
                 },
                 modifier = Modifier.weight(1f),
@@ -1409,7 +1409,7 @@ private fun CarFeatureWizard(
 
             // Progress bar across the top.
             val progress = if (pages.size > 1) pageIndex.toFloat() / (pages.lastIndex.toFloat()) else 1f
-            val animatedProgress by animateFloatAsState(progress, tween(300), label = "wizProgress")
+            val animatedProgress by animateFloatAsState(progress, tween(WizardProgressDurationMs), label = "wizProgress")
             Box(
                 Modifier
                     .fillMaxWidth()
@@ -1433,7 +1433,7 @@ private fun CarFeatureWizard(
                 targetState = pageIndex,
                 transitionSpec = {
                     val dir = if (targetState > initialState) 1 else -1
-                    (slideInHorizontally { it * dir } + fadeIn(tween(220))) togetherWith
+                    (slideInHorizontally { it * dir } + fadeIn(tween(WizardStepFadeInDurationMs))) togetherWith
                         (slideOutHorizontally { -it * dir } + fadeOut(tween(180)))
                 },
                 modifier = Modifier.weight(1f),
@@ -2036,7 +2036,10 @@ private fun LoginScreen(
                         onSelect = { key -> brand = Brand.valueOf(key) },
                     )
 
-                    // Email field — label and placeholder animate with brand.
+                    // Email field — label and placeholder animate with brand. Same
+                    // fadeIn/fadeOut durations (220/160) as the sign-in button's own
+                    // label and the privacy note below -- all three are driven by the
+                    // same brand-selection change, so they should settle together.
                     AnimatedContent(
                         targetState = emailLabel,
                         transitionSpec = {
@@ -2107,7 +2110,11 @@ private fun LoginScreen(
                         } else {
                             AnimatedContent(
                                 targetState = brand.label,
-                                transitionSpec = { fadeIn(tween(200)) togetherWith fadeOut(tween(150)) },
+                                // Same duration as the email label's own crossfade just
+                                // above -- both are driven by the same brand-selection
+                                // change, so they should settle together instead of at
+                                // three slightly different paces.
+                                transitionSpec = { fadeIn(tween(220)) togetherWith fadeOut(tween(160)) },
                                 label = "signInLabel",
                             ) { label ->
                                 Text("Sign in to $label", fontWeight = FontWeight.SemiBold)
@@ -2146,7 +2153,9 @@ private fun LoginScreen(
 
                     AnimatedContent(
                         targetState = brand.label,
-                        transitionSpec = { fadeIn(tween(250)) togetherWith fadeOut(tween(180)) },
+                        // Same duration as this form's other two brand-driven crossfades
+                        // (the email label and the sign-in button label) -- see there.
+                        transitionSpec = { fadeIn(tween(220)) togetherWith fadeOut(tween(160)) },
                         label = "privacyNote",
                     ) { label ->
                         Text(
@@ -3780,10 +3789,17 @@ internal fun GarageScreen(state: UiState, vm: AppViewModel) {
                                 flight = effectiveFlight,
                                 cornerX = 16.dp,
                                 cornerY = hoistedTopInset + HeaderCornerGap,
-                                // Clears the top-right gear/expand chrome, same
-                                // as VehicleDetailContent's own badge.
-                                reserveEnd = 72.dp,
-                                maxWidth = screenWidth - 16.dp - 72.dp - 32.dp,
+                                // Car slots clear the top-right gear/expand chrome, same
+                                // as VehicleDetailContent's own badge (72dp). The embedded
+                                // Settings slot instead needs to clear the always-visible
+                                // 172dp Simple/Advanced toggle in the corner (192dp, same
+                                // value SettingsScreen's own standalone route already
+                                // reserves for it -- see SettingsHeaderRow) -- without
+                                // this, a docked "Settings" pill could grow wide enough to
+                                // run under that toggle, something only the standalone
+                                // route was guarding against.
+                                reserveEnd = if (onSettingsSlot) 192.dp else 72.dp,
+                                maxWidth = screenWidth - 16.dp - (if (onSettingsSlot) 192.dp else 72.dp) - 32.dp,
                                 // The Settings slot has no hero photo to morph its own
                                 // colour against, so it's forced to plain onSurface;
                                 // every car slot instead reads its own flight's live
@@ -8074,6 +8090,17 @@ internal class HeroTitleFlight(private val topInsetPx: Float, private val hyster
     fun onPositioned(offset: Offset) {
         inlineX = offset.x
         inlineY = offset.y
+        // Hysteresis computed HERE, not inside `docked`'s derivedStateOf
+        // below -- onPositioned is the one real event source for inlineY
+        // changes, called exactly once per genuine position report.
+        // derivedStateOf's calculation lambda, by contrast, is documented to
+        // be re-runnable more than once per real change (speculative
+        // recomposition, a discarded/rolled-back snapshot) without that
+        // being visible to callers -- fine for a pure read, but `dockedNow`
+        // used to be mutated INSIDE that lambda as a side effect, so a
+        // discarded/speculative run could still permanently advance the
+        // hysteresis baseline a real, committed run never asked for.
+        dockedNow = if (dockedNow) inlineY < topInsetPx + hysteresisPx else inlineY < topInsetPx
         reportGen++
     }
 
@@ -8093,13 +8120,14 @@ internal class HeroTitleFlight(private val topInsetPx: Float, private val hyster
      *  the entering and leaving lines so a real crossing still reacts
      *  immediately, but resting near the boundary can't retrigger it. The
      *  one recomposition-triggering read [TitleFlightOverlay] does. */
-    override val docked: androidx.compose.runtime.State<Boolean> = derivedStateOf {
-        val wasDocked = dockedNow
-        val nowDocked = if (wasDocked) inlineY < topInsetPx + hysteresisPx else inlineY < topInsetPx
-        dockedNow = nowDocked
-        nowDocked
-    }
-    private var dockedNow = false
+    // Plain snapshot state, not derivedStateOf -- dockedNow is now written
+    // exactly once per real onPositioned event above, so there is no
+    // separate pure "calculation" left to derive; this IS the value.
+    private val dockedNowState = mutableStateOf(false)
+    private var dockedNow: Boolean
+        get() = dockedNowState.value
+        set(value) { dockedNowState.value = value }
+    override val docked: androidx.compose.runtime.State<Boolean> = dockedNowState
 
     /** What colour the inline title would be drawing itself in right now,
      *  reported the same way position is -- [HeroHeader]'s title morphs
@@ -8293,7 +8321,16 @@ internal fun BoxScope.TitleFlightOverlay(
     // to correct itself, which is exactly the kind of visible after-the-
     // fact correction this whole guard exists to avoid.
     var mounted by remember(flight) { mutableStateOf(false) }
-    LaunchedEffect(docked) {
+    // Keyed on `flight` too, not just `docked` -- a `flight` swap resets
+    // `mounted` via the `remember(flight)` above, but if the swap happens to
+    // land on a `docked` value equal to what it already was (e.g. neither
+    // the outgoing snapshot nor the incoming live flight is past the dock
+    // line), a `LaunchedEffect(docked)` alone would never restart to consume
+    // that reset: `mounted` would stay stuck false until some LATER, genuine
+    // `docked` change silently snapped instead of springing that transition.
+    // Including `flight` here guarantees the reset is always consumed
+    // immediately, on the swap itself.
+    LaunchedEffect(docked, flight) {
         if (!mounted) {
             mounted = true
             progress.snapTo(if (docked) 1f else 0f)
