@@ -379,6 +379,7 @@ import com.bloo.bluelink.data.isPluggedOrCharging
 import com.bloo.uicommon.rememberConfirmArm
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlin.math.sin
@@ -3707,23 +3708,45 @@ internal fun GarageScreen(state: UiState, vm: AppViewModel) {
                             // to describe the NEW page instead of just finishing
                             // its own exit undisturbed (see FrozenTitleFlight's
                             // own doc). `frozen` records this slot's own last-seen
-                            // values every frame while it IS live, so the instant
-                            // it stops being current there's already a correct,
-                            // motionless snapshot sitting there for it to switch
-                            // to.
+                            // values every frame while it IS live AND ready, so
+                            // the instant it stops being current there's already
+                            // a correct, motionless snapshot sitting there for it
+                            // to switch to.
                             val isLive = block == settledBlock
                             val frozen = remember(block) { mutableStateOf<FrozenTitleFlight?>(null) }
+                            // `hoistedFlight.flight` is a SINGLE shared instance
+                            // whose position/dock/colour is deliberately NOT
+                            // reset on a page switch (see this whole block's
+                            // outer doc above): for the one frame between
+                            // `settledBlock` flipping and this page's OWN
+                            // HeroHeader actually laying out and reporting
+                            // through onPositioned, it still holds the PREVIOUS
+                            // page's values. Freezing (or handing straight to
+                            // TitleFlightOverlay) whatever's there DURING that
+                            // window would bake the wrong page's geometry/dock
+                            // state into this slot -- `ready` only flips true
+                            // once `reportGeneration` has actually advanced
+                            // since this slot went live, i.e. once a report
+                            // belonging to THIS page has genuinely landed.
+                            var ready by remember(block) { mutableStateOf(false) }
                             if (isLive) {
-                                SideEffect {
-                                    frozen.value = FrozenTitleFlight(
-                                        hoistedFlight.flight.inlinePos.value,
-                                        hoistedFlight.flight.docked.value,
-                                        hoistedFlight.flight.color,
-                                    )
+                                LaunchedEffect(block) {
+                                    val startGen = hoistedFlight.flight.reportGeneration
+                                    snapshotFlow { hoistedFlight.flight.reportGeneration }.first { it != startGen }
+                                    ready = true
+                                }
+                                if (ready) {
+                                    SideEffect {
+                                        frozen.value = FrozenTitleFlight(
+                                            hoistedFlight.flight.inlinePos.value,
+                                            hoistedFlight.flight.docked.value,
+                                            hoistedFlight.flight.color,
+                                        )
+                                    }
                                 }
                             }
                             val effectiveFlight: TitleFlightSource =
-                                if (isLive) hoistedFlight.flight else (frozen.value ?: hoistedFlight.flight)
+                                if (isLive && ready) hoistedFlight.flight else (frozen.value ?: hoistedFlight.flight)
                             val onSettingsSlot = settingsAsPage && block == pageCount
                             val title = if (onSettingsSlot) "Settings" else vehicles.getOrNull(block)?.name ?: ""
                             TitleFlightOverlay(
@@ -7991,9 +8014,21 @@ internal class HeroTitleFlight(private val topInsetPx: Float, private val hyster
     private var inlineX by mutableFloatStateOf(0f)
     private var inlineY by mutableFloatStateOf(Float.MAX_VALUE)
 
+    /** Bumped on every real [onPositioned] report -- lets a reader detect
+     *  "has the CURRENTLY-hoisted page actually reported its own position
+     *  yet", as opposed to just reading whatever this shared instance last
+     *  held (which, for the single frame right after a page switch, is
+     *  still the PREVIOUS page's value -- see the hoisted call site's own
+     *  doc on why that one-frame staleness, harmless for the badge's own
+     *  steady hold, is NOT safe to treat as this page's real value when
+     *  freezing a snapshot for the page being left). */
+    private var reportGen by mutableIntStateOf(0)
+    val reportGeneration: Int get() = reportGen
+
     fun onPositioned(offset: Offset) {
         inlineX = offset.x
         inlineY = offset.y
+        reportGen++
     }
 
     /** The real inline title's live root position -- always laid out, but
@@ -8192,17 +8227,26 @@ internal fun BoxScope.TitleFlightOverlay(
     // line. See TitleFlightOverlay's own call site in GarageScreen for the
     // actual page-switch transition.
     //
-    // `mounted` makes this instance's very FIRST composition snap straight
-    // to whatever `docked` already is instead of springing to it -- load-
-    // bearing for the hoisted call site's AnimatedContent: each key gets a
-    // freshly `remember`ed `progress` starting at 0, and without this guard
-    // a brand new page's badge would spring from the inline anchor to the
-    // dock corner (or the reverse) INSIDE AnimatedContent's own slide/fade
-    // entrance, two independent motions stacked on the same arrival. Any
-    // LATER `docked` change on an already-mounted instance (a genuine
-    // scroll crossing on the page currently being viewed) still springs
-    // exactly as before.
-    var mounted by remember { mutableStateOf(false) }
+    // `mounted` makes the FIRST composition of a given [flight] snap
+    // straight to whatever `docked` already is instead of springing to it
+    // -- load-bearing for the hoisted call site's AnimatedContent: each key
+    // gets a freshly `remember`ed `progress` starting at 0, and without this
+    // guard a brand new page's badge would spring from the inline anchor to
+    // the dock corner (or the reverse) INSIDE AnimatedContent's own
+    // slide/fade entrance, two independent motions stacked on the same
+    // arrival. Any LATER `docked` change while [flight] stays the SAME
+    // object (a genuine scroll crossing on the page currently being viewed)
+    // still springs exactly as before.
+    //
+    // Keyed on `flight` itself, not just "first ever" -- the hoisted call
+    // site can hand this function a DIFFERENT [flight] object over this
+    // same AnimatedContent slot's lifetime (a frozen snapshot at first,
+    // swapped for the real live one once it's confirmed ready -- see that
+    // call site's own doc). Without re-keying here, that swap would read as
+    // a second `docked` change on an "already mounted" instance and spring
+    // to correct itself, which is exactly the kind of visible after-the-
+    // fact correction this whole guard exists to avoid.
+    var mounted by remember(flight) { mutableStateOf(false) }
     LaunchedEffect(docked) {
         if (!mounted) {
             mounted = true
