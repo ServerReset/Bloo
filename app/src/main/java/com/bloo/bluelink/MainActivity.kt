@@ -11,12 +11,15 @@ import androidx.activity.viewModels
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.fragment.app.FragmentActivity
+import androidx.lifecycle.lifecycleScope
 import com.bloo.bluelink.ui.AppViewModel
 import com.bloo.bluelink.ui.BlooApp
 import com.bloo.bluelink.ui.BlooTheme
 import com.bloo.bluelink.work.AlertWorker
 import com.bloo.bluelink.work.DriveSyncWorker
 import com.bloo.bluelink.work.UpdateCheckWorker
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import org.lsposed.hiddenapibypass.HiddenApiBypass
 import rikka.shizuku.Shizuku
 
@@ -71,14 +74,22 @@ class MainActivity : FragmentActivity() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             window.isNavigationBarContrastEnforced = false
         }
-        AlertWorker.schedule(applicationContext)
-        // Drive settings sync used to only run while the app was foregrounded and
-        // a refresh settled — a no-op periodic worker when sync isn't configured.
-        DriveSyncWorker.schedule(applicationContext)
-        // Bloo isn't on the Play Store, so it checks its own GitHub Actions builds
-        // for updates; this is that check running even when the app is closed,
-        // presenting a newer build via notification instead of the in-app tile.
-        UpdateCheckWorker.schedule(applicationContext)
+        // Each schedule() call does a synchronous Room round-trip inside WorkManager's
+        // enqueueUniquePeriodicWork (regardless of ExistingPeriodicWorkPolicy.KEEP), so
+        // running these on the main thread ahead of setContent() delays the first
+        // Compose frame on every cold start. Dispatched off-thread instead; the
+        // schedules are idempotent/unique-work-keyed so ordering relative to the UI
+        // doesn't matter.
+        lifecycleScope.launch(Dispatchers.Default) {
+            AlertWorker.schedule(applicationContext)
+            // Drive settings sync used to only run while the app was foregrounded and
+            // a refresh settled — a no-op periodic worker when sync isn't configured.
+            DriveSyncWorker.schedule(applicationContext)
+            // Bloo isn't on the Play Store, so it checks its own GitHub Actions builds
+            // for updates; this is that check running even when the app is closed,
+            // presenting a newer build via notification instead of the in-app tile.
+            UpdateCheckWorker.schedule(applicationContext)
+        }
         // Shizuku (optional silent-install path): lift the runtime non-SDK block once
         // so the reflected PackageInstaller/IntentSender constructors are callable, and
         // listen for the permission-grant result. Both are guarded — no-ops (and no

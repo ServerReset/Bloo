@@ -491,7 +491,7 @@ internal fun SettingsScreen(
   // VehicleDetailContent's identical `local` for the full reasoning.
   val local = if (hoisted == null) {
       val topInsetPx = with(density) { topInset.toPx() }
-      val flight = remember { HeroTitleFlight(topInsetPx, with(density) { TitleDockHysteresis.toPx() }) }
+      val flight = remember(topInsetPx) { HeroTitleFlight(topInsetPx, with(density) { TitleDockHysteresis.toPx() }) }
       LocalSettingsPillState(flight)
   } else {
       null

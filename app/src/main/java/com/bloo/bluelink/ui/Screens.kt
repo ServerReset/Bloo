@@ -3440,7 +3440,7 @@ internal fun GarageScreen(state: UiState, vm: AppViewModel) {
                 val hoistedTopInsetPx = with(density) { hoistedTopInset.toPx() }
                 val hoistedScrollToTop = remember { mutableStateOf<(suspend () -> Unit)?>(null) }
                 val pillScope = rememberCoroutineScope()
-                val hoistedFlight = remember {
+                val hoistedFlight = remember(hoistedTopInsetPx) {
                     HoistedIdentityFlight(
                         flight = HeroTitleFlight(hoistedTopInsetPx, with(density) { TitleDockHysteresis.toPx() }),
                         scrollToTop = hoistedScrollToTop,
@@ -8344,7 +8344,7 @@ private fun VehicleDetailContent(
     // exist there at all.
     val local = if (hoisted == null) {
         val topInsetPx = with(density) { topInset.toPx() }
-        val heroFlight = remember { HeroTitleFlight(topInsetPx, with(density) { TitleDockHysteresis.toPx() }) }
+        val heroFlight = remember(topInsetPx) { HeroTitleFlight(topInsetPx, with(density) { TitleDockHysteresis.toPx() }) }
         LocalNamePillState(flight = heroFlight)
     } else {
         null
@@ -8458,7 +8458,7 @@ private fun ExpandedCar(v: Vehicle, state: UiState, vm: AppViewModel, flipped: B
     val density = LocalDensity.current
     val scope = rememberCoroutineScope()
     val topInsetPx = with(density) { topInset.toPx() }
-    val titleFlight = remember { HeroTitleFlight(topInsetPx, with(density) { TitleDockHysteresis.toPx() }) }
+    val titleFlight = remember(topInsetPx) { HeroTitleFlight(topInsetPx, with(density) { TitleDockHysteresis.toPx() }) }
     // CriticalContent's own HeroHeader is the real hero photo card here --
     // this view was NOT missing one the way the doc above used to claim;
     // CarHeaderRow's plain-text name and HeroHeader's own (on the photo)
