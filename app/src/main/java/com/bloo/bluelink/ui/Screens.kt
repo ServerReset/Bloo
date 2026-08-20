@@ -3673,6 +3673,20 @@ internal fun GarageScreen(state: UiState, vm: AppViewModel) {
                         val settledBlock = realBlock(pager.settledPage)
                         val onSettingsSlot = settingsAsPage && settledBlock == pageCount
                         val screenWidth = LocalConfiguration.current.screenWidthDp.dp
+                        // What the two AnimatedContents below actually show --
+                        // deliberately NOT settledBlock itself. settledBlock
+                        // changes the instant a swipe settles, same frame as
+                        // resetKey below, but the pill doesn't finish hopping
+                        // off screen (and TitleFlightOverlay's own hop-off
+                        // fade/translate only ramps up over that window, it
+                        // isn't instantaneous) until onConcealed fires --
+                        // updating straight off settledBlock showed the NEW
+                        // car's name/count at full alpha, at the OLD page's
+                        // position, for that whole hop-off window. Held one
+                        // step behind, updated only once concealed, so the
+                        // swap genuinely happens off screen instead of just
+                        // usually finishing fast enough not to be caught.
+                        var displayedBlock by remember { mutableStateOf(settledBlock) }
                         TitleFlightOverlay(
                             flight = hoistedFlight.flight,
                             cornerX = 16.dp,
@@ -3691,6 +3705,7 @@ internal fun GarageScreen(state: UiState, vm: AppViewModel) {
                             // See TitleFlightOverlay's own resetKey doc: a page
                             // switch snaps instead of springing.
                             resetKey = settledBlock,
+                            onConcealed = { displayedBlock = settledBlock },
                             onClick = { pillScope.launch { hoistedScrollToTop.value?.invoke() } },
                             // A plain, un-animated Text of whatever's CURRENTLY settled --
                             // see TitleFlightOverlay's own doc on measureContent for why this
@@ -3710,7 +3725,7 @@ internal fun GarageScreen(state: UiState, vm: AppViewModel) {
                                 // PagerDotsFor above, which already does the same swap).
                                 if (totalBlocks > 1) {
                                     AnimatedContent(
-                                        targetState = settledBlock,
+                                        targetState = displayedBlock,
                                         // Instant, not its own crossfade -- see the
                                         // name AnimatedContent just below for why:
                                         // TitleFlightOverlay's own hop is now the
@@ -3740,7 +3755,7 @@ internal fun GarageScreen(state: UiState, vm: AppViewModel) {
                             // while off screen) and is the only motion a page switch
                             // shows, so this just snaps straight to the new name.
                             AnimatedContent(
-                                targetState = settledBlock,
+                                targetState = displayedBlock,
                                 transitionSpec = { EnterTransition.None togetherWith ExitTransition.None },
                                 label = "hoistedPillName",
                             ) { block ->
@@ -8080,6 +8095,17 @@ internal fun BoxScope.TitleFlightOverlay(
      *  which is what made it look like it was "still animating" on every
      *  swipe. */
     resetKey: Any? = null,
+    /** Invoked exactly once a [resetKey] change has fully hopped the flying
+     *  text/pill off screen -- i.e. right when it's safe for the caller to
+     *  swap whatever content it shows without that swap ever being visible.
+     *  Null everywhere but the hoisted badge, which uses it to defer its own
+     *  name/page-count `AnimatedContent`s' `targetState` update to this exact
+     *  moment instead of updating them the instant [resetKey] itself
+     *  changes -- doing that showed the NEW page's content at full alpha,
+     *  at the OLD page's position, for the whole hop-off window, since the
+     *  hop's own fade/translate only ramps up over that same window instead
+     *  of being instantaneous. */
+    onConcealed: (() -> Unit)? = null,
     /** What the invisible docked-position ANCHOR renders -- must stay a
      *  plain, non-animated composable (defaults to [content] for every
      *  surface but the hoisted one). [content] itself is composed TWICE
@@ -8175,6 +8201,9 @@ internal fun BoxScope.TitleFlightOverlay(
             // place, which is exactly as correct to hide behind a hop as a
             // state change is.
             hop.animateTo(1f, tween(120, easing = FastOutLinearInEasing))
+            // Fully hidden now -- safe for the caller to swap whatever
+            // content it shows (see this parameter's own doc).
+            onConcealed?.invoke()
             val newDocked = flight.docked.value
             progress.snapTo(if (newDocked) 1f else 0f)
             hop.animateTo(
