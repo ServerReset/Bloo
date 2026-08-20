@@ -786,8 +786,9 @@ class SettingsStore(private val context: Context) {
 
     // --- First-run onboarding -------------------------------------------
 
-    suspend fun onboardingSeen(): Boolean =
-        context.settingsDataStore.data.first()[booleanPreferencesKey("onboarding_seen")] ?: false
+    suspend fun onboardingSeen(): Boolean = onboardingSeen(context.settingsDataStore.data.first())
+
+    fun onboardingSeen(p: Preferences): Boolean = p[booleanPreferencesKey("onboarding_seen")] ?: false
 
     suspend fun setOnboardingSeen() {
         editTracked { it[booleanPreferencesKey("onboarding_seen")] = true }
@@ -915,8 +916,10 @@ class SettingsStore(private val context: Context) {
     // --- App-icon shortcut selection -------------------------------------
 
     /** Enabled shortcut ids ("cmd_vin"); null = never customised (show all). */
-    suspend fun enabledShortcuts(): Set<String>? {
-        val raw = context.settingsDataStore.data.first()[stringPreferencesKey("enabled_shortcuts")] ?: return null
+    suspend fun enabledShortcuts(): Set<String>? = enabledShortcuts(context.settingsDataStore.data.first())
+
+    fun enabledShortcuts(p: Preferences): Set<String>? {
+        val raw = p[stringPreferencesKey("enabled_shortcuts")] ?: return null
         return raw.split(",").filter { it.isNotBlank() }.toSet()
     }
 
@@ -933,8 +936,10 @@ class SettingsStore(private val context: Context) {
      *  either is missing (e.g. the car was removed and its keys cleared but the
      *  command key survived some other way) the tile is treated as fully
      *  unassigned rather than half-configured. */
-    suspend fun tileConfig(index: Int): Pair<String, String>? {
-        val p = context.settingsDataStore.data.first()
+    suspend fun tileConfig(index: Int): Pair<String, String>? =
+        tileConfig(index, context.settingsDataStore.data.first())
+
+    fun tileConfig(index: Int, p: Preferences): Pair<String, String>? {
         val vin = p[stringPreferencesKey("tile_${index}_vin")]?.takeIf { it.isNotBlank() } ?: return null
         val cmd = p[stringPreferencesKey("tile_${index}_cmd")]?.takeIf { it.isNotBlank() } ?: return null
         return vin to cmd

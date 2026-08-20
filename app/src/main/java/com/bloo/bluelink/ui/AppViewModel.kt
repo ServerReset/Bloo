@@ -1406,18 +1406,18 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         val lastSvc = vehicles.mapNotNull { v -> settingsStore.lastServiceMiles(v.vin, prefs)?.let { v.vin to it } }.toMap()
         val svcInterval = vehicles.mapNotNull { v -> settingsStore.serviceIntervalMiles(v.vin, prefs)?.let { v.vin to it } }.toMap()
         val climatePresets = vehicles.associate { it.vin to settingsStore.climatePresets(it.vin, prefs) }
-        val firstRun = !settingsStore.onboardingSeen()
+        val firstRun = !settingsStore.onboardingSeen(prefs)
         // On first open all pebbles start expanded regardless of any stored state.
         val collapsed = if (firstRun) emptySet()
         else vehicles.flatMap { v -> settingsStore.collapsedSections(v.vin, prefs).map { "${v.vin}:$it" } }.toSet()
         val hidden = vehicles.flatMap { v -> settingsStore.hiddenSections(v.vin, prefs).map { "${v.vin}:$it" } }.toSet()
         val hotspots = vehicles.mapNotNull { v -> settingsStore.hotspot(v.vin, prefs)?.let { v.vin to it } }.toMap()
-        val tileConfigs = (0 until com.bloo.bluelink.data.TILE_COUNT).map { settingsStore.tileConfig(it) }
+        val tileConfigs = (0 until com.bloo.bluelink.data.TILE_COUNT).map { settingsStore.tileConfig(it, prefs) }
         val tileLabels = (0 until com.bloo.bluelink.data.TILE_COUNT).map { settingsStore.tileLabel(it, prefs) }
         val tileClimateTargets = (0 until com.bloo.bluelink.data.TILE_COUNT).map { settingsStore.tileClimateTarget(it, prefs) }
         val tileBackground = settingsStore.tileBackground(prefs)
         val tileLiveRefresh = settingsStore.tileLiveRefresh(prefs)
-        val shortcutSet = settingsStore.enabledShortcuts()
+        val shortcutSet = settingsStore.enabledShortcuts(prefs)
         return PerCarConfig(
             apply = {
                 it.copy(
