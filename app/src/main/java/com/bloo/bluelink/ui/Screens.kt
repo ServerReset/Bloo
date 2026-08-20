@@ -3729,6 +3729,27 @@ internal fun GarageScreen(state: UiState, vm: AppViewModel) {
                             // since this slot went live, i.e. once a report
                             // belonging to THIS page has genuinely landed.
                             var ready by remember(block) { mutableStateOf(false) }
+                            // A ONE-TIME, non-reactive snapshot of whatever the
+                            // shared flight looked like the instant this slot
+                            // went live -- i.e. the stale, previous-page value
+                            // `ready` exists to guard against. Captured once
+                            // (remember, no dependency on the flight's own live
+                            // fields) specifically so it can't itself drift
+                            // while !ready: reading `hoistedFlight.flight`
+                            // directly during that window (what an earlier
+                            // version of this fix actually did, despite the
+                            // comment above already describing why that's
+                            // wrong) fell straight through `frozen.value ?:
+                            // hoistedFlight.flight` to the live, still-stale
+                            // object, since `frozen` itself is never written
+                            // before `ready`.
+                            val preReadySnapshot = remember(block) {
+                                FrozenTitleFlight(
+                                    hoistedFlight.flight.inlinePos.value,
+                                    hoistedFlight.flight.docked.value,
+                                    hoistedFlight.flight.color,
+                                )
+                            }
                             if (isLive) {
                                 LaunchedEffect(block) {
                                     val startGen = hoistedFlight.flight.reportGeneration
@@ -3746,7 +3767,7 @@ internal fun GarageScreen(state: UiState, vm: AppViewModel) {
                                 }
                             }
                             val effectiveFlight: TitleFlightSource =
-                                if (isLive && ready) hoistedFlight.flight else (frozen.value ?: hoistedFlight.flight)
+                                if (isLive && ready) hoistedFlight.flight else (frozen.value ?: preReadySnapshot)
                             val onSettingsSlot = settingsAsPage && block == pageCount
                             val title = if (onSettingsSlot) "Settings" else vehicles.getOrNull(block)?.name ?: ""
                             TitleFlightOverlay(
