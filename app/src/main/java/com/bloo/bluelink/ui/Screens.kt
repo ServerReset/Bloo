@@ -24,6 +24,8 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.expandHorizontally
@@ -3709,7 +3711,11 @@ internal fun GarageScreen(state: UiState, vm: AppViewModel) {
                                 if (totalBlocks > 1) {
                                     AnimatedContent(
                                         targetState = settledBlock,
-                                        transitionSpec = { fadeIn(tween(200)) togetherWith fadeOut(tween(200)) },
+                                        // Instant, not its own crossfade -- see the
+                                        // name AnimatedContent just below for why:
+                                        // TitleFlightOverlay's own hop is now the
+                                        // only motion a page switch shows.
+                                        transitionSpec = { EnterTransition.None togetherWith ExitTransition.None },
                                         label = "hoistedPillCount",
                                     ) { block ->
                                         Text(
@@ -3721,24 +3727,21 @@ internal fun GarageScreen(state: UiState, vm: AppViewModel) {
                                 }
                             },
                         ) {
-                            // The one place this whole file still crossfades text --
-                            // deliberately: this is a DIFFERENT car's name replacing
-                            // the last one on a page swipe, not the same name moving
-                            // between two positions, so there is no single element to
-                            // preserve across it. TitleFlightOverlay's own position/
-                            // bounce logic wraps this unchanged either way.
+                            // Used to crossfade+slide its own text here (a DIFFERENT
+                            // car's name replacing the last one, not the same name
+                            // moving between two positions, so there was no single
+                            // element to preserve across it) -- but that ran at the
+                            // same time as TitleFlightOverlay's own hop-off/on for
+                            // the very same page switch, and two independent
+                            // motions (this one horizontal, the hop vertical) fighting
+                            // for the same few hundred milliseconds is exactly what
+                            // read as "weird name changes" and jank on top of the
+                            // hop. The hop now hides this swap entirely (it happens
+                            // while off screen) and is the only motion a page switch
+                            // shows, so this just snaps straight to the new name.
                             AnimatedContent(
                                 targetState = settledBlock,
-                                transitionSpec = {
-                                    // Matched enter/exit durations, so combined
-                                    // opacity never dips below full mid-swap --
-                                    // an 80ms mismatch here was one past source
-                                    // of "the name disappears for a moment".
-                                    val dir = if (targetState > initialState) 1 else -1
-                                    (slideInHorizontally(tween(200)) { it * dir / 3 } +
-                                        fadeIn(tween(200))) togetherWith
-                                        fadeOut(tween(200))
-                                },
+                                transitionSpec = { EnterTransition.None togetherWith ExitTransition.None },
                                 label = "hoistedPillName",
                             ) { block ->
                                 Text(
@@ -8125,49 +8128,82 @@ internal fun BoxScope.TitleFlightOverlay(
     // simultaneously-visible cards, which is what was reading as the whole
     // app dragging.
     var transitioning by remember { mutableStateOf(false) }
+    // True only while the page-switch hop below owns `progress`/`hop` --
+    // guards the scroll-spring effect further down from fighting it for
+    // the same two Animatables (see that effect's own doc for the race
+    // this prevents).
+    var pageSwitchActive by remember { mutableStateOf(false) }
     val lastResetKey = remember { mutableStateOf(resetKey) }
-    LaunchedEffect(docked, resetKey) {
-        val target = if (docked) 1f else 0f
-        if (resetKey != lastResetKey.value) {
-            // A different thing is flying now (the hoisted badge settled on a
-            // new page). NOT the bouncy scroll-crossing spring below -- that
-            // read as the pill visibly going on its own journey for a swipe
-            // the user didn't cause by scrolling at all -- but NOT an instant
-            // snapTo either, which reads as a hard, ungraceful cut.
-            lastResetKey.value = resetKey
-            transitioning = true
-            val cameFromDocked = progress.value > 0.5f
-            if (cameFromDocked != docked) {
-                // The two pages disagree on dock state -- the old page's
-                // inline/docked anchors belong to a different hero card
-                // entirely, so lerping `progress` across them (the old
-                // behaviour) visibly dragged the text/pill across unrelated
-                // layout, reading as jank. Instead: hop fully off screen
-                // first (fast, same speed either direction -- there's
-                // nothing to see yet either way), THEN snap straight onto
-                // the new page's own resting anchors while still hidden,
-                // THEN hop back on screen -- smoothly if arriving as the
-                // floating pill (a bigger, more deliberate piece of chrome
-                // worth a graceful arrival), quickly if arriving as plain
-                // pebble text (just a reveal, not an arrival).
-                hop.animateTo(1f, tween(120, easing = FastOutLinearInEasing))
-                progress.snapTo(target)
-                hop.animateTo(
-                    0f,
-                    if (docked) tween(260, easing = FastOutSlowInEasing)
-                    else tween(120, easing = LinearOutSlowInEasing),
-                )
-            } else {
-                // Same dock state on both pages (e.g. both docked, only the
-                // name changed) -- the anchors already coincide, so a quick
-                // crossfade+settle is enough; no need to leave the screen.
-                progress.animateTo(target, tween(180))
-            }
+    // Page-switch hop -- keyed ONLY on resetKey, deliberately NOT also on
+    // `docked` (the combined key this used to be). `docked` is derived from
+    // `inlineY`, which only updates once the NEWLY settled page's own hero
+    // title reports through onPositioned -- a real layout pass that lands
+    // at least one recomposition AFTER resetKey itself changes (resetKey
+    // flips the instant the pager settles; hoisted/LocalHeroTitleFlight
+    // switches to the new page in that same recomposition, but its
+    // onGloballyPositioned callback can only fire once THAT page has
+    // actually laid out). Keying this effect on `docked` too meant that
+    // late arrival cancelled-and-restarted this coroutine mid-hop (any key
+    // changing does that), stranding `hop` at whatever partial value it
+    // had reached with nothing left to animate it back -- and worse, since
+    // by the time `docked` finally changed `resetKey` already equalled
+    // `lastResetKey.value`, that restart fell into the scroll-spring
+    // branch below instead, springing `progress` across the NEW page's
+    // anchors in full view -- the exact sliding-across-mismatched-layout
+    // jank this hop exists to prevent, just relocated one effect over.
+    // Reading `flight.docked.value` fresh (not a captured parameter) once
+    // the hop-out has actually finished sidesteps the lag instead of
+    // racing it.
+    LaunchedEffect(resetKey) {
+        if (resetKey == lastResetKey.value) return@LaunchedEffect
+        lastResetKey.value = resetKey
+        pageSwitchActive = true
+        transitioning = true
+        try {
+            // Hop fully off screen first (fast, same speed regardless of
+            // which way this ends up going -- there's nothing on screen
+            // worth seeing either way), THEN snap `progress` straight onto
+            // the new page's own resting anchors while still hidden, THEN
+            // hop back on screen -- smoothly if arriving as the floating
+            // pill (a bigger, more deliberate piece of chrome worth a
+            // graceful arrival), quickly if arriving as plain pebble text
+            // (just a reveal, not an arrival). Unconditional, not just for
+            // a dock-state mismatch: with `docked` unreliable to read at
+            // the moment resetKey changes (see above), there's no cheap
+            // way to tell mismatch from match up front, and a same-state
+            // switch still hops a different car's own inline anchor into
+            // place, which is exactly as correct to hide behind a hop as a
+            // state change is.
+            hop.animateTo(1f, tween(120, easing = FastOutLinearInEasing))
+            val newDocked = flight.docked.value
+            progress.snapTo(if (newDocked) 1f else 0f)
+            hop.animateTo(
+                0f,
+                if (newDocked) tween(260, easing = FastOutSlowInEasing)
+                else tween(120, easing = LinearOutSlowInEasing),
+            )
+        } finally {
+            // Runs on normal completion AND on cancellation (a second
+            // swipe landing before this one finished hopping back in) --
+            // without it, an interrupted hop could strand these true
+            // forever, permanently blocking the scroll-spring effect below.
             transitioning = false
-        } else {
-            transitioning = true
+            pageSwitchActive = false
+        }
+    }
+    // Scroll-driven spring -- the hero title's own inline position crossing
+    // the dock line as the user scrolls THIS settled page, independent of
+    // any page switch. Guarded on `pageSwitchActive` so a `docked` flip
+    // that's really just the tail of the effect above (the new page's own
+    // onPositioned finally landing) can't also fire this branch and fight
+    // it for `progress`; once the hop finishes, later genuine scroll
+    // crossings reach here exactly as before.
+    LaunchedEffect(docked) {
+        if (pageSwitchActive) return@LaunchedEffect
+        transitioning = true
+        try {
             progress.animateTo(
-                target,
+                if (docked) 1f else 0f,
                 // MediumBouncy arriving -- overshoot-and-settle, like the text is
                 // being caught by the corner. Undamped leaving, the same
                 // arriving-is-slower-than-leaving asymmetry every other spring
@@ -8177,6 +8213,10 @@ internal fun BoxScope.TitleFlightOverlay(
                     stiffness = Spring.StiffnessMediumLow,
                 ),
             )
+        } finally {
+            // Runs on normal completion AND on cancellation (e.g. a page
+            // switch's hop preempting this Animatable mid-spring) -- see
+            // the effect above's matching `finally` for why that matters.
             transitioning = false
         }
     }
