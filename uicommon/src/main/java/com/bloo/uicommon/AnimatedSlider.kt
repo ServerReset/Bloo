@@ -21,11 +21,13 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.blur
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.BlurEffect
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.TileMode
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.positionChanged
 import androidx.compose.ui.layout.onSizeChanged
@@ -188,7 +190,21 @@ fun AnimatedSlider(
         Modifier
             .fillMaxWidth()
             .height(thumbH)
-            .then(if (settleBlur > 0.5f) Modifier.blur(settleBlur.dp, 0.dp) else Modifier)
+            // A deferred graphicsLayer read, not the previous body-level
+            // `.then(if (settleBlur > 0.5f) Modifier.blur(...) else Modifier)` --
+            // that read settleBlur (an animateFloatAsState value ticking every
+            // frame of the post-release settle bounce) directly in the
+            // composable body, recomposing this whole Box every one of those
+            // frames instead of just redrawing it -- the exact anti-pattern
+            // this file's own Canvas draw below (which reads anim.value inside
+            // its DrawScope) exists specifically to avoid.
+            .graphicsLayer {
+                renderEffect = if (settleBlur > 0.5f) {
+                    BlurEffect(settleBlur, settleBlur, TileMode.Clamp)
+                } else {
+                    null
+                }
+            }
             // Captures the control's actual laid-out pixel width once it's known,
             // feeding widthPx (used by rawForX above to convert touch x-coordinates
             // into slider values).

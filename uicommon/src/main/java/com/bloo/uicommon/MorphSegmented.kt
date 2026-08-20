@@ -35,10 +35,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.animation.core.Animatable
-import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.BlurEffect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.graphics.TileMode
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
@@ -283,8 +284,23 @@ fun MorphSegmented(
                 Modifier
                     .width(segWidth)
                     .fillMaxHeight()
-                    .graphicsLayer { translationX = indicatorXPx.value; alpha = indicatorAlpha }
-                    .then(if (motionBlurX > 0.5f) Modifier.blur(motionBlurX.dp, 0.dp) else Modifier)
+                    // motionBlurX folded into this SAME deferred lambda, not a
+                    // separate body-level `.then(if (motionBlurX > 0.5f) ...)` --
+                    // that read motionBlurX (an animateFloatAsState value that
+                    // changes every frame of a drag and its settle-back) directly
+                    // in the composable body, recomposing this whole Box on every
+                    // one of those frames instead of just redrawing it, unlike
+                    // translationX/alpha right above which were already correctly
+                    // deferred.
+                    .graphicsLayer {
+                        translationX = indicatorXPx.value
+                        alpha = indicatorAlpha
+                        renderEffect = if (motionBlurX > 0.5f) {
+                            BlurEffect(motionBlurX, motionBlurX, TileMode.Clamp)
+                        } else {
+                            null
+                        }
+                    }
                     .background(indicatorColor, RoundedCornerShape(14.dp)),
             )
             // The row of segment labels/icons, layered on top of the indicator Box
