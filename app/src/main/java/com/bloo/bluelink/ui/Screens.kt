@@ -23,6 +23,8 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -3485,6 +3487,16 @@ internal fun GarageScreen(state: UiState, vm: AppViewModel) {
                         scrollToTop = hoistedScrollToTop,
                     )
                 }
+                // Each block's own dock state, the last time it was actually
+                // live and ready -- NOT scoped to any one AnimatedContent slot
+                // (those come and go per `block`), so a block visited earlier
+                // still has a remembered answer the next time it's compared
+                // against. Lets the page-switch transition below tell "both
+                // sides are the same kind of badge (hero-card or floating
+                // pill)" from "the two sides actually differ" BEFORE the
+                // incoming page's own layout has reported anything -- see
+                // that transitionSpec's own doc.
+                val lastKnownDocked = remember { mutableStateMapOf<Int, Boolean>() }
                 Box(Modifier.fillMaxSize()) {
                     HorizontalPager(
                         state = pager,
@@ -3696,21 +3708,48 @@ internal fun GarageScreen(state: UiState, vm: AppViewModel) {
                         // for the full history). AnimatedContent keeps the
                         // OUTGOING page's content composed and rendering,
                         // unchanged, for exactly as long as its exit transition
-                        // needs, and starts the INCOMING page's content fresh --
-                        // this is precisely the "hop off, then reveal" shape asked
-                        // for, just built on Compose's own tested machinery
-                        // instead of reimplementing it.
+                        // needs, and starts the INCOMING page's content fresh.
+                        //
+                        // BUT that motion only belongs on a real change: two
+                        // cars that are BOTH plain hero-card text (undocked) or
+                        // BOTH a docked pill look identical either side of the
+                        // switch, so playing the same slide/fade for them just
+                        // reads as pointless motion for a name that's already
+                        // moving with the pager's own drag underneath it. Only
+                        // animate when the two sides are actually different
+                        // KINDS of badge -- and when they are, don't slide both
+                        // halves at once: the outgoing side leaves first (a
+                        // plain, ordinary exit), and the incoming side's own
+                        // entrance is delayed to start only once that exit has
+                        // actually finished, so a docked pill genuinely "pops up
+                        // from the edge" onto an already-cleared spot instead of
+                        // arriving on top of the thing it's replacing.
                         AnimatedContent(
                             targetState = settledBlock,
                             transitionSpec = {
-                                val slidePx = with(density) { TitleSwitchSlideDistance.roundToPx() }
-                                (slideInVertically(tween(240, easing = FastOutSlowInEasing)) { -slidePx } +
-                                    fadeIn(tween(200)))
-                                    .togetherWith(
-                                        slideOutVertically(tween(140, easing = FastOutLinearInEasing)) { -slidePx } +
-                                            fadeOut(tween(120)),
-                                    )
-                                    .using(SizeTransform(clip = false))
+                                val fromDocked = lastKnownDocked[initialState]
+                                val toDocked = lastKnownDocked[targetState]
+                                if (fromDocked != null && fromDocked == toDocked) {
+                                    // Same kind of badge on both sides -- no
+                                    // transition at all; the incoming text is
+                                    // already at its correct resting spot the
+                                    // instant it's composed (TitleFlightOverlay's
+                                    // own `mounted` guard snaps, never springs,
+                                    // on a brand new `flight` instance).
+                                    EnterTransition.None togetherWith ExitTransition.None
+                                } else {
+                                    val slidePx = with(density) { TitleSwitchSlideDistance.roundToPx() }
+                                    val exitMs = 140
+                                    (slideInVertically(
+                                        tween(180, delayMillis = exitMs, easing = FastOutSlowInEasing),
+                                    ) { -slidePx } +
+                                        fadeIn(tween(160, delayMillis = exitMs)))
+                                        .togetherWith(
+                                            slideOutVertically(tween(exitMs, easing = FastOutLinearInEasing)) { -slidePx } +
+                                                fadeOut(tween(120)),
+                                        )
+                                        .using(SizeTransform(clip = false))
+                                }
                             },
                             label = "hoistedTitleFlight",
                         ) { block ->
@@ -3778,6 +3817,13 @@ internal fun GarageScreen(state: UiState, vm: AppViewModel) {
                                             hoistedFlight.flight.docked.value,
                                             hoistedFlight.flight.color,
                                         )
+                                        // Recorded every frame this block is live and
+                                        // ready, same as `frozen` above -- so the NEXT
+                                        // time this block is either side of a switch,
+                                        // the transitionSpec already knows whether it's
+                                        // a hero-card or a docked pill without having to
+                                        // wait on a fresh layout report.
+                                        lastKnownDocked[block] = hoistedFlight.flight.docked.value
                                     }
                                 }
                             }
@@ -3785,6 +3831,20 @@ internal fun GarageScreen(state: UiState, vm: AppViewModel) {
                                 if (isLive && ready) hoistedFlight.flight else (frozen.value ?: preReadySnapshot)
                             val onSettingsSlot = settingsAsPage && block == pageCount
                             val title = if (onSettingsSlot) "Settings" else vehicles.getOrNull(block)?.name ?: ""
+                            // Invisible until `ready`, not just correctly positioned --
+                            // `effectiveFlight` falls back to a snapshot of the PREVIOUS
+                            // page's geometry for isLive && !ready (see that val's own
+                            // doc), so painting this slot before `ready` would show the
+                            // new page's name at the old page's position/dock-state for
+                            // a frame or more: the "text lags behind" symptom. This is
+                            // load-bearing for the same-dock-state case above in
+                            // particular, which plays no AnimatedContent fade of its own
+                            // to incidentally mask it.
+                            Box(
+                                Modifier
+                                    .fillMaxSize()
+                                    .graphicsLayer { alpha = if (isLive && !ready) 0f else 1f },
+                            ) {
                             TitleFlightOverlay(
                                 flight = effectiveFlight,
                                 cornerX = 16.dp,
@@ -3843,6 +3903,7 @@ internal fun GarageScreen(state: UiState, vm: AppViewModel) {
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis,
                                 )
+                            }
                             }
                         }
                     }
