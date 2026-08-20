@@ -8089,10 +8089,20 @@ internal fun BoxScope.TitleFlightOverlay(
         val target = if (docked) 1f else 0f
         if (resetKey != lastResetKey.value) {
             // A different thing is flying now (the hoisted badge settled on a
-            // new page) -- jump straight to its resting state, no spring.
+            // new page). NOT the bouncy scroll-crossing spring below -- that
+            // read as the pill visibly going on its own journey for a swipe
+            // the user didn't cause by scrolling at all -- but NOT an instant
+            // snapTo either, which reads as a hard, ungraceful cut exactly
+            // when the two pages disagree (one page docked, the next one
+            // freshly at the top): the pill would just vanish or appear with
+            // no transition bridging the two at all. A quick, undamped
+            // crossfade+settle threads that needle: fast enough to feel like
+            // "handled immediately", not "animating", but still a real
+            // transition instead of a jump cut.
             lastResetKey.value = resetKey
+            transitioning = true
+            progress.animateTo(target, tween(180))
             transitioning = false
-            progress.snapTo(target)
         } else {
             transitioning = true
             progress.animateTo(
