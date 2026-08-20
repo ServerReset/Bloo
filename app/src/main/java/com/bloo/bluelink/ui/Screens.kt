@@ -7908,6 +7908,11 @@ internal fun BackdropHost(content: @Composable BoxScope.() -> Unit) {
  *  construction site so the debounce feels the same everywhere. */
 internal val TitleDockHysteresis = 8.dp
 
+/** How far [TitleFlightOverlay]'s "hop" transition carries the flying
+ *  text/pill off the top of the screen when a page swipe changes dock
+ *  state -- see that function's `hop` doc for why this exists at all. */
+private val TitleHopDistance = 96.dp
+
 /** [HeroTitleFlight.color] before [HeroHeader] has reported a real one yet
  *  (this composable's own first frame) is [Color.Unspecified] -- resolving
  *  that straight through as [TitleFlightOverlay]'s `textColor` would let it
@@ -8096,6 +8101,7 @@ internal fun BoxScope.TitleFlightOverlay(
     val docked by flight.docked
     val haptics = LocalHaptics.current
     val shape = RoundedCornerShape(50)
+    val density = LocalDensity.current
     // 0 = resting inline, 1 = resting docked -- the ONE number driving the
     // flying Text's position (lerp between the two measured anchors), the
     // pill chrome's own alpha, AND (see pillContainer below) the pill
@@ -8103,6 +8109,13 @@ internal fun BoxScope.TitleFlightOverlay(
     // each other; see this function's own doc for why a spring (not a
     // scroll-tied fraction) is deliberate here.
     val progress = remember { Animatable(0f) }
+    // 0 = on screen (normal), 1 = hopped fully off screen -- ONLY driven
+    // during a resetKey mismatch that also changes dock state (see below).
+    // Applied as an extra upward translation + fade on top of `progress`'s
+    // own lerp, so the flying text/pill physically leaves the screen before
+    // it ever gets repositioned onto the new page's (unrelated) anchors,
+    // instead of visibly sliding across them.
+    val hop = remember { Animatable(0f) }
     // Set true only while a spring is actually running -- see `active` below,
     // which uses it to skip composing the expensive glass chrome (shadow,
     // ring, frosted rim) for the vast majority of the time nothing is
@@ -8120,16 +8133,36 @@ internal fun BoxScope.TitleFlightOverlay(
             // new page). NOT the bouncy scroll-crossing spring below -- that
             // read as the pill visibly going on its own journey for a swipe
             // the user didn't cause by scrolling at all -- but NOT an instant
-            // snapTo either, which reads as a hard, ungraceful cut exactly
-            // when the two pages disagree (one page docked, the next one
-            // freshly at the top): the pill would just vanish or appear with
-            // no transition bridging the two at all. A quick, undamped
-            // crossfade+settle threads that needle: fast enough to feel like
-            // "handled immediately", not "animating", but still a real
-            // transition instead of a jump cut.
+            // snapTo either, which reads as a hard, ungraceful cut.
             lastResetKey.value = resetKey
             transitioning = true
-            progress.animateTo(target, tween(180))
+            val cameFromDocked = progress.value > 0.5f
+            if (cameFromDocked != docked) {
+                // The two pages disagree on dock state -- the old page's
+                // inline/docked anchors belong to a different hero card
+                // entirely, so lerping `progress` across them (the old
+                // behaviour) visibly dragged the text/pill across unrelated
+                // layout, reading as jank. Instead: hop fully off screen
+                // first (fast, same speed either direction -- there's
+                // nothing to see yet either way), THEN snap straight onto
+                // the new page's own resting anchors while still hidden,
+                // THEN hop back on screen -- smoothly if arriving as the
+                // floating pill (a bigger, more deliberate piece of chrome
+                // worth a graceful arrival), quickly if arriving as plain
+                // pebble text (just a reveal, not an arrival).
+                hop.animateTo(1f, tween(120, easing = FastOutLinearInEasing))
+                progress.snapTo(target)
+                hop.animateTo(
+                    0f,
+                    if (docked) tween(260, easing = FastOutSlowInEasing)
+                    else tween(120, easing = LinearOutSlowInEasing),
+                )
+            } else {
+                // Same dock state on both pages (e.g. both docked, only the
+                // name changed) -- the anchors already coincide, so a quick
+                // crossfade+settle is enough; no need to leave the screen.
+                progress.animateTo(target, tween(180))
+            }
             transitioning = false
         } else {
             transitioning = true
@@ -8219,14 +8252,14 @@ internal fun BoxScope.TitleFlightOverlay(
     // grid of several simultaneously-visible cards each paying it, all the
     // time, is what was dragging the rest of the app down.
     if (active) {
-    val density = LocalDensity.current
     Box(
         Modifier
             .align(Alignment.TopStart)
             .graphicsLayer {
                 val p = progress.value
                 val clamped = p.coerceIn(0f, 1f)
-                alpha = clamped
+                val h = hop.value
+                alpha = clamped * (1f - h)
                 // 0.55 start, not 0f -- a shape growing from nothing looks like
                 // it's materializing out of a point; starting partway there
                 // reads as "arriving", not "being born".
@@ -8246,7 +8279,10 @@ internal fun BoxScope.TitleFlightOverlay(
                 // container can overshoot right along with the bouncy spring
                 // instead of the shape looking stiffer than the text it holds.
                 translationX = (inline.x - target.x) * (1f - p)
-                translationY = (inline.y - target.y) * (1f - p)
+                // `hop` rides on top of the same translationY, carrying the
+                // whole shape further up off screen (and back) -- see `hop`'s
+                // own doc on why this exists separately from `p`'s lerp.
+                translationY = (inline.y - target.y) * (1f - p) - with(density) { TitleHopDistance.toPx() } * h
             }
             .padding(start = cornerX, top = cornerY, end = reserveEnd),
     ) {
@@ -8294,6 +8330,14 @@ internal fun BoxScope.TitleFlightOverlay(
                     (inline.x + (target.x - inline.x) * p).roundToInt(),
                     (inline.y + (target.y - inline.y) * p).roundToInt(),
                 )
+            }
+            // Same `hop` ride as the chrome above -- carries the text itself
+            // off the top of the screen (and back) during a resetKey
+            // mismatch that also changes dock state, so it's never visible
+            // mid-slide across a different page's unrelated anchors.
+            .graphicsLayer {
+                translationY = -with(density) { TitleHopDistance.toPx() } * hop.value
+                alpha = 1f - hop.value
             },
     ) {
         // Read HERE, inside TitleFlightOverlay's own (small) recompose scope
