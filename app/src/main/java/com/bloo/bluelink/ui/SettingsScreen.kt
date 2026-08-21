@@ -520,7 +520,12 @@ internal fun SettingsScreen(
   // see that composable's own doc for the full reasoning.
   val liveFlight = hoisted?.flight ?: local.flight
   val liveDocked by liveFlight.docked
-  LaunchedEffect(liveDocked) { onDockedChanged?.invoke(liveDocked) }
+  // Undocking is reported immediately off the raw flag; docking is instead
+  // reported by the local badge's own TitleFlightOverlay call below, via
+  // `onSettledChanged`, once its spring has actually arrived -- mirrors
+  // VehicleDetailContent's identical split; see that parameter's own doc
+  // (Screens.kt) for the hand-off-timing bug this avoids.
+  LaunchedEffect(liveDocked) { if (!liveDocked) onDockedChanged?.invoke(false) }
   if (hoisted != null) {
       // Register this page as the one actually driving the hoisted badge.
       // Idempotent -- see VehicleDetailContent's own identical guard for
@@ -1920,6 +1925,9 @@ internal fun SettingsScreen(
                 // Fixed -- Settings has no hero photo to morph a colour against.
                 textColorOverride = MaterialTheme.colorScheme.onSurface,
                 onClick = { settingsScope.launch { settingsGridState.animateScrollToItem(0) } },
+                // See onDockedChanged's own doc just above -- mirrors
+                // VehicleDetailContent's identical wiring.
+                onSettledChanged = { settled -> if (settled) onDockedChanged?.invoke(true) },
             ) {
                 Text(
                     "Settings",

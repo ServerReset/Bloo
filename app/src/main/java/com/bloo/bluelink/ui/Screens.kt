@@ -8580,6 +8580,21 @@ internal fun BoxScope.TitleFlightOverlay(
      *  are not, and paid for (and were destabilized by) a correction they
      *  never needed when this used to run for all of them. */
     containerRelative: Boolean = false,
+    /** Reports whether this overlay is currently docked AND at rest (not
+     *  mid-spring) -- i.e. the ONLY moment it's actually safe for a caller
+     *  to swap this badge out for a different instance without a visible
+     *  jump. VehicleDetailContent uses this (not the raw, unsettled
+     *  `flight.docked`) to decide when to hand its per-page badge off to
+     *  GarageScreen's shared hoisted one: reporting the instant `docked`
+     *  flips true used to fire the hand-off mid-spring, before this
+     *  overlay's own animation had actually arrived at the corner -- the
+     *  incoming hoisted instance then cold-starts with `progress.snapTo()`
+     *  (see `mounted` above) at whatever position `docked` says, which is
+     *  NOT yet where this (still-arriving) instance was actually drawing,
+     *  reading as the transition snapping partway through instead of
+     *  gliding all the way in. Delaying the hand-off until the spring
+     *  itself reports "arrived" removes that gap entirely. */
+    onSettledChanged: ((Boolean) -> Unit)? = null,
     /** The flying text itself. A plain `Text(name, ...)` for every surface
      *  but the hoisted one, which wraps its own `AnimatedContent` for the
      *  page-switch crossfade -- that crossfade is a SEPARATE, orthogonal
@@ -8653,6 +8668,12 @@ internal fun BoxScope.TitleFlightOverlay(
             transitioning = false
         }
     }
+    // See `onSettledChanged`'s own doc -- "settled" means genuinely at
+    // rest in the docked position, not just `docked` itself (which flips
+    // the INSTANT the raw scroll threshold crosses, well before this
+    // overlay's own spring above has actually arrived there).
+    val settled = docked && !transitioning
+    LaunchedEffect(settled) { onSettledChanged?.invoke(settled) }
     // Captures this overlay's own hosting container's root-window position,
     // so the root-absolute anchors below (HeroHeader's inline title report
     // at line ~6007, and this composable's own docked-anchor measurer just
@@ -8891,7 +8912,20 @@ internal fun BoxScope.TitleFlightOverlay(
             // doc). Chained AFTER the graphicsLayer above so the reported
             // bounds include that scale/offset -- callers need where the
             // name is actually PAINTED, not its untransformed layout slot.
-            .onGloballyPositioned { onNameBoundsChanged?.invoke(it.boundsInRoot()) },
+            //
+            // Gated on `active` (docked or mid-transition, same condition
+            // the chrome Box above uses): a name can only ever climb high
+            // enough to actually reach the dots' row right around that
+            // window, and skipping the report the rest of the time avoids
+            // real per-frame cost (a coordinate-space walk, a Rect
+            // allocation, a snapshot write) landing on every idle relayout.
+            // That cost used to run unconditionally, including on the busy
+            // frames a badge is mid-spring INTO the corner -- competing
+            // with the spring's own work on the UI thread for exactly the
+            // surface (VehicleDetailContent's own per-page badge) whose
+            // transition needs to stay smooth, which is what was reading
+            // as a stutter/snap rather than a glide.
+            .onGloballyPositioned { if (active) onNameBoundsChanged?.invoke(it.boundsInRoot()) },
     ) {
         // Read HERE, inside TitleFlightOverlay's own (small) recompose scope
         // -- not by the caller, as a call-site argument expression, which is
@@ -9014,7 +9048,14 @@ private fun VehicleDetailContent(
     // be writing its real position/colour/scale into.
     val liveFlight = hoisted?.flight ?: local.flight
     val liveDocked by liveFlight.docked
-    LaunchedEffect(liveDocked) { onDockedChanged?.invoke(liveDocked) }
+    // Undocking is reported immediately off the raw flag -- there's no
+    // hand-off-timing hazard on the way OUT (the shared hoisted badge, if
+    // any, is what's springing back to inline; this page's own local badge
+    // just needs to know to start rendering again). Docking is instead
+    // reported by the local badge's own TitleFlightOverlay call below, via
+    // `onSettledChanged`, once its spring has actually arrived -- not the
+    // instant this raw flag flips -- see that parameter's own doc for why.
+    LaunchedEffect(liveDocked) { if (!liveDocked) onDockedChanged?.invoke(false) }
     if (hoisted != null) {
         // Register this page as the one actually driving the hoisted badge.
         // Idempotent, so re-running it every recomposition while hoisted is
@@ -9076,6 +9117,10 @@ private fun VehicleDetailContent(
                 onClick = { scope.launch { scroll.animateScrollTo(0) } },
                 onNameBoundsChanged = onNameBoundsChanged,
                 containerRelative = gridColumn,
+                // See onDockedChanged's own doc just above -- docking is
+                // reported here, once this badge's own spring has actually
+                // arrived, rather than off the raw scroll-threshold flag.
+                onSettledChanged = { settled -> if (settled) onDockedChanged?.invoke(true) },
             ) {
                 Text(
                     v.name,
