@@ -5,7 +5,6 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.glance.GlanceModifier
 import androidx.glance.LocalContext
-import androidx.glance.LocalSize
 import androidx.glance.Image
 import androidx.glance.ImageProvider
 import androidx.glance.action.clickable

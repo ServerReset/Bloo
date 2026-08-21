@@ -1,7 +1,6 @@
 package com.bloo.bluelink.widget
 
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.glance.ColorFilter
@@ -9,10 +8,8 @@ import androidx.glance.GlanceModifier
 import androidx.glance.Image
 import androidx.glance.ImageProvider
 import androidx.glance.LocalContext
-import androidx.glance.LocalSize
 import androidx.glance.appwidget.cornerRadius
 import androidx.glance.background
-import androidx.glance.layout.Alignment
 import androidx.glance.layout.Box
 import androidx.glance.layout.Column
 import androidx.glance.layout.Row
@@ -20,9 +17,7 @@ import androidx.glance.layout.Spacer
 import androidx.glance.layout.height
 import androidx.glance.layout.size
 import androidx.glance.layout.width
-import androidx.glance.unit.ColorProvider
 import com.bloo.bluelink.R
-import com.bloo.bluelink.data.BlooColors
 import com.bloo.bluelink.data.VehicleSnapshot
 
 /**

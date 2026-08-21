@@ -359,7 +359,6 @@ import com.bloo.bluelink.data.WeatherCode
 import com.bloo.bluelink.data.coordString
 import com.bloo.bluelink.data.links
 import com.bloo.bluelink.data.openLabels
-import com.bloo.bluelink.data.supportsConnectedStore
 import com.bloo.bluelink.data.supportsHornLights
 import com.bloo.bluelink.data.percentFor
 import com.bloo.bluelink.data.rangeMiFor
@@ -3680,7 +3679,13 @@ internal fun GarageScreen(state: UiState, vm: AppViewModel) {
                             count = totalBlocks,
                             modifier = Modifier.align(Alignment.TopCenter).statusBarsPadding().padding(top = HeaderCornerGap)
                                 .graphicsLayer { alpha = dotsAlphaState.value },
-                            onRefresh = { vm.refreshStatus(vehicles[currentIndex]) },
+                            // Guarded like every other currentIndex read in this
+                            // function (currentVehicle above, etc.) -- currentIndex
+                            // is its own StateFlow, independent of `vehicles`, so a
+                            // resync/removal shrinking the list can leave it briefly
+                            // out of range; an unguarded vehicles[currentIndex] here
+                            // would crash the screen on a mistimed pull-to-refresh.
+                            onRefresh = { vehicles.getOrNull(currentIndex)?.let { vm.refreshStatus(it) } },
                         )
                     }
                     // Grid mode (perPage > 1, wide/large screens) hides each
