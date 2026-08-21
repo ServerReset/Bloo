@@ -5684,49 +5684,25 @@ internal fun FloatingIcon(
  *  sitting behind the "Updated x ago" text. */
 private val PagerDotClearance = 40.dp
 
-/** Decides how the centered page-dot indicator should get out of a
- *  colliding car name's way: (translationX px, alpha). Pure/non-composable
- *  so it's cheap to call every frame from inside a `graphicsLayer{}` draw
+/** Whether the centered page-dot indicator currently overlaps a colliding
+ *  car name -- a plain rect-overlap test against [name]'s live measured
+ *  bounds (not a guessed width), padded by [marginPx] so a name ellipsizing
+ *  right up against the dots' edge still counts. Pure/non-composable so
+ *  it's cheap to call every frame from inside a `graphicsLayer{}` draw
  *  block (see [PagerDots]' own call site) without touching composition.
- *
- *  Deliberately a real rect-overlap test against [name]'s live measured
- *  bounds rather than a guessed width -- [dots] is `null` until the first
- *  layout pass lands and [name] is `null` whenever this screen isn't
- *  tracking a flying name at all (or nothing has ever reported yet), both
- *  of which mean "nothing to dodge, sit put."
+ *  `null` [dots] (no layout pass yet) or [name] (nothing flying/docked on
+ *  this screen) both mean "nothing to hide against."
  */
-private fun dotsCollisionShift(
-    dots: Rect?,
-    name: Rect?,
-    screenWidthPx: Float,
-    marginPx: Float,
-): Pair<Float, Float> {
-    if (dots == null || name == null) return 0f to 1f
+private fun dotsOverlapsName(dots: Rect?, name: Rect?, marginPx: Float): Boolean {
+    if (dots == null || name == null) return false
     // Vertical gate first -- the hero-card inline name usually sits well
     // below the dots' fixed top row (only a DOCKED pill, or one mid-flight
     // toward it, climbs high enough to matter), so most frames bail out
-    // here without ever reaching the horizontal math below.
-    if (name.bottom < dots.top || name.top > dots.bottom) return 0f to 1f
+    // here without ever reaching the horizontal check below.
+    if (name.bottom < dots.top || name.top > dots.bottom) return false
     val paddedLeft = name.left - marginPx
     val paddedRight = name.right + marginPx
-    // Horizontal overlap against the dots' own NATURAL (unshifted)
-    // footprint -- see selfBoundsPx's own doc for why that's what's passed
-    // in here, not an already-shifted position.
-    if (paddedRight < dots.left || paddedLeft > dots.right) return 0f to 1f
-    val dotsWidth = dots.width
-    val roomRight = screenWidthPx - paddedRight
-    val roomLeft = paddedLeft
-    return when {
-        // Enough clear space to the right of the name: bump the dots just
-        // far enough right to clear its trailing edge.
-        roomRight >= dotsWidth -> (paddedRight - dots.left) to 1f
-        // No room to the right (a name that already reaches past screen
-        // centre) -- try clearing it to the left instead.
-        roomLeft >= dotsWidth -> (paddedLeft - dots.right) to 1f
-        // Neither side has room for the dots' own width: nothing to shift
-        // to, so fade them out rather than let them sit on top of the name.
-        else -> 0f to 0f
-    }
+    return paddedRight >= dots.left && paddedLeft <= dots.right
 }
 
 @Composable
@@ -5760,18 +5736,16 @@ private fun PagerDots(
     val haptics = LocalHaptics.current
     val expandProgress = remember { Animatable(0f) }
     var holding by remember { mutableStateOf(false) }
-    // This control's own natural (i.e. pre-collision-shift) on-screen
-    // bounds, captured once per layout pass via onGloballyPositioned below
-    // -- NOT affected by the collision graphicsLayer{} translation this
-    // function applies to itself, because onGloballyPositioned is chained
-    // BEFORE that graphicsLayer (outer node), and a child's own
-    // graphicsLayer transform never moves how an ANCESTOR node reports its
-    // own placement. That's exactly what's needed here: comparing the
-    // dots' resting position against the name's bounds, not a
-    // once-already-shifted position feeding back into itself.
+    // This control's own natural on-screen bounds, captured once per layout
+    // pass via onGloballyPositioned below -- NOT affected by the hide
+    // graphicsLayer{} this function applies to itself, because
+    // onGloballyPositioned is chained BEFORE that graphicsLayer (outer
+    // node), and a child's own graphicsLayer transform never moves how an
+    // ANCESTOR node reports its own placement. That's exactly what's
+    // needed here: comparing the dots' resting position against the
+    // name's bounds.
     val selfBoundsPx = remember { mutableStateOf<Rect?>(null) }
     val density = LocalDensity.current
-    val screenWidthPx = with(density) { LocalConfiguration.current.screenWidthDp.dp.toPx() }
     // Breathing room kept between the name's own bounds and the dots, on
     // top of whatever raw overlap check finds -- a name ellipsizing right
     // up against the dots' edge would still read as a collision even
@@ -5810,9 +5784,8 @@ private fun PagerDots(
     Box(
         modifier = modifier
             .onGloballyPositioned { selfBoundsPx.value = it.boundsInRoot() }
-            // Collision dodge: bump sideways toward whichever side of the
-            // name has more clear room, or fade out entirely if neither
-            // side does. A conservative rect-overlap test against the
+            // Hide entirely while a colliding car name overlaps this
+            // control -- a conservative rect-overlap test against the
             // name's OWN live measured/painted bounds (see
             // TitleFlightOverlay's onNameBoundsChanged), not a hardcoded
             // character-count/name-length threshold -- real device text
@@ -5822,14 +5795,7 @@ private fun PagerDots(
             // dotsAlphaState's own read just above this function's call
             // sites -- never invalidates composition.
             .graphicsLayer {
-                val (dx, a) = dotsCollisionShift(
-                    dots = selfBoundsPx.value,
-                    name = nameBoundsPx?.value,
-                    screenWidthPx = screenWidthPx,
-                    marginPx = collisionMarginPx,
-                )
-                translationX = dx
-                alpha = a
+                alpha = if (dotsOverlapsName(selfBoundsPx.value, nameBoundsPx?.value, collisionMarginPx)) 0f else 1f
             },
         contentAlignment = Alignment.Center,
     ) {
