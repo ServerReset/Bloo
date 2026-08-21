@@ -3735,6 +3735,25 @@ internal fun GarageScreen(state: UiState, vm: AppViewModel) {
                                             // that map's own doc for why this can no
                                             // longer be conditioned on being settled.
                                             onDockedChanged = if (perPage == 1) ({ d -> dockedPages[dockedPageKey(page)] = d }) else null,
+                                            // Feeds PagerDotsFor's own collision
+                                            // dodge -- was missing from this call
+                                            // site entirely, which is why the dots
+                                            // never actually dodged: this page's
+                                            // own (non-hoisted) badge is the one
+                                            // that's live and flying near the top
+                                            // for the whole undocked/pre-dock
+                                            // phase, in BOTH single-car and grid
+                                            // mode, and nothing here was reporting
+                                            // its bounds at all.
+                                            onNameBoundsChanged = { nameBoundsPxState.value = it },
+                                            // Only a grid column's container is
+                                            // genuinely offset from the
+                                            // composition root -- see
+                                            // TitleFlightOverlay's own
+                                            // `containerRelative` doc for why this
+                                            // must stay scoped to exactly that
+                                            // case.
+                                            gridColumn = perPage > 1,
                                         )
                                     }
                                 }
@@ -8586,6 +8605,15 @@ internal fun BoxScope.TitleFlightOverlay(
      *  test for collision against; nothing in here ever reads it back. See
      *  [PagerDots]' own call site for the consumer. */
     onNameBoundsChanged: ((Rect?) -> Unit)? = null,
+    /** True ONLY for a perPage>1 grid column -- see `containerOrigin`'s own
+     *  doc below for why this must default to false and stay opt-in rather
+     *  than running unconditionally for every caller. A grid column's
+     *  hosting container is genuinely offset from the composition root by
+     *  every prior column's width; the hoisted single-car badge,
+     *  VehicleDetailContent's own per-page badge, and ExpandedCar's badge
+     *  are not, and paid for (and were destabilized by) a correction they
+     *  never needed when this used to run for all of them. */
+    containerRelative: Boolean = false,
     /** The flying text itself. A plain `Text(name, ...)` for every surface
      *  but the hoisted one, which wraps its own `AnimatedContent` for the
      *  page-switch crossfade -- that crossfade is a SEPARATE, orthogonal
@@ -8666,19 +8694,34 @@ internal fun BoxScope.TitleFlightOverlay(
     // relative to THIS container before feeding Modifier.offset/graphicsLayer
     // translation. Both of those only ever interpret their argument as a
     // delta from the composable's own already-placed local position, never
-    // as an absolute screen coordinate. A perPage==1 hoisted badge's
-    // container sits at the composition root, so this is always (0,0) there
-    // and the subtraction below is a no-op; a perPage>1 grid column's
-    // container is offset from root by the cumulative width of every prior
-    // column, and without this subtraction that offset was being counted
-    // TWICE -- once already baked into the column's own natural placement,
-    // once again inside the root-absolute coordinate fed straight into
-    // offset -- which pushed every column but the first off-screen.
-    // matchParentSize (not a fixed size) so this never influences how big
-    // the overlay's own Box actually is; it exists purely to report where
-    // that Box's top-start corner landed in root coordinates.
+    // as an absolute screen coordinate.
+    //
+    // ONLY built when `containerRelative` is true -- i.e. only for a grid
+    // column, whose container really is offset from root by the cumulative
+    // width of every prior column, so without this subtraction that offset
+    // was being counted TWICE and every column past the first rendered
+    // off-screen. This used to run unconditionally for all THREE of this
+    // function's calling contexts (the hoisted single-car badge,
+    // VehicleDetailContent's own per-page badge, and ExpandedCar), on the
+    // assumption the other two always sit at composition root so the
+    // subtraction there is a harmless no-op. That assumption was never
+    // actually verified for VehicleDetailContent's own badge -- its real
+    // container is `Refreshable`'s Box, several layout levels deep inside a
+    // HorizontalPager page, not literally the composition root -- and even
+    // where it WAS a true no-op, adding a THIRD independently-remembered,
+    // independently-updated Offset (this one) that the flying Text's
+    // position now depends on meant three separate onGloballyPositioned
+    // callbacks had to land in the same recomposition for the position to
+    // be fully correct on any given frame, instead of the previous two.
+    // That's exactly the kind of one-frame skew that reads as a stutter on
+    // a spring-driven transition whose whole point is sub-pixel smoothness
+    // -- which is what broke the previously-seamless hero-card-to-pill
+    // transition on the two call sites that never needed this correction
+    // at all. Scoped back to only the one caller that actually needs it.
     val containerOrigin = remember { mutableStateOf(Offset.Zero) }
-    Box(Modifier.matchParentSize().onGloballyPositioned { containerOrigin.value = it.positionInRoot() })
+    if (containerRelative) {
+        Box(Modifier.matchParentSize().onGloballyPositioned { containerOrigin.value = it.positionInRoot() })
+    }
     val dockedAnchor = remember { mutableStateOf<Offset?>(null) }
     val dockedSize = remember { mutableStateOf<IntSize?>(null) }
     // The one recomposition-triggering read gating the expensive chrome
@@ -8956,6 +8999,18 @@ private fun VehicleDetailContent(
     // for every page outside that pager (perPage > 1 grid mode), which has
     // no single "the settled car" for a caller-level flag to mean anything.
     onDockedChanged: ((Boolean) -> Unit)? = null,
+    // Forwarded to this page's own (non-hoisted) TitleFlightOverlay call
+    // below -- see that parameter's own doc (Screens.kt). Was missing
+    // entirely from this call site until it was found to be the reason the
+    // page-dot collision dodge never triggered: the hoisted badge and
+    // ExpandedCar's badge both wired this, but the flying name most likely
+    // to actually be near the dots (this composable's own per-page badge,
+    // live for the whole undocked/pre-dock phase) never reported anything.
+    onNameBoundsChanged: ((Rect?) -> Unit)? = null,
+    // True ONLY when this is a perPage>1 grid column -- forwarded to this
+    // page's own TitleFlightOverlay call as `containerRelative`. See that
+    // parameter's own doc for why this must stay opt-in and default false.
+    gridColumn: Boolean = false,
 ) {
     val topInset = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
     val bottomInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
@@ -9053,6 +9108,8 @@ private fun VehicleDetailContent(
                 // parameter's own doc for why resolving it there instead of
                 // here is load-bearing, not stylistic.
                 onClick = { scope.launch { scroll.animateScrollTo(0) } },
+                onNameBoundsChanged = onNameBoundsChanged,
+                containerRelative = gridColumn,
             ) {
                 Text(
                     v.name,
