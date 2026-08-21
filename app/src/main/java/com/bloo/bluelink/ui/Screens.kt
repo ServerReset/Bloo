@@ -1803,6 +1803,19 @@ private fun WizardFeatureToggle(
 private class Burst(val x: Float, val y: Float, val start: Float, val life: Float, val hue: Float, val count: Int, val maxR: Float)
 
 /**
+ * Caches the edge-trace ring's rounded-rect perimeter Path + PathMeasure
+ * (and a reusable output Path) keyed on Canvas size, so the hold-to-refresh
+ * gesture animation -- which redraws every frame -- doesn't reallocate 2
+ * Path objects + a PathMeasure on every single frame. Only `measure.getSegment`
+ * needs to re-run per frame; the perimeter only changes when size does.
+ */
+private class EdgeTracePerimeterCache {
+    var size: androidx.compose.ui.geometry.Size? = null
+    val measure = androidx.compose.ui.graphics.PathMeasure()
+    val traced = androidx.compose.ui.graphics.Path()
+}
+
+/**
  * A short, lightweight particle-burst fireworks animation drawn on a Canvas.
  *
  * Seven [Burst]s are generated once (`remember`) with randomized position,
@@ -3498,6 +3511,42 @@ internal fun GarageScreen(state: UiState, vm: AppViewModel) {
                     )
                 }
                 SideEffect { hoistedFlight.flight.topInsetPx = hoistedTopInsetPx }
+                // Per-page (keyed by pager page index, which every block --
+                // car or the embedded Settings slot -- has exactly one of)
+                // live "is THIS page's own title currently docked" flag,
+                // reported up by whichever page is currently live (settled
+                // or not -- see VehicleDetailContent/SettingsScreen's own
+                // `onDockedChanged`). This used to be inferred purely from
+                // `page == pager.settledPage`, which conflated two different
+                // questions: "which page is settled" and "should the shared
+                // corner badge take over from this page's own inline title".
+                // A page can be settled for a long time while fully
+                // undocked (the ordinary hero-card state) -- hoisting it
+                // regardless meant its name was ALWAYS routed through the
+                // shared floating overlay instead of ordinary page content,
+                // even mid-drag, which is what let the badge visibly detach
+                // from the card it names. Gating `hoisted` on this map
+                // instead means only a page that has ACTUALLY scrolled its
+                // title past the status bar ever claims the shared flight;
+                // every other page (settled-but-undocked, or the
+                // pre-composed neighbour) renders its own name as plain
+                // page content that moves 1:1 with the pager's own drag.
+                // Keyed by stable identity (a VIN, or "settings"), NOT by raw
+                // page index -- an index's real-world meaning isn't stable:
+                // deleting a car shifts every later one down a slot,
+                // resizing a foldable/tablet window changes perPage and so
+                // pageCount, and reordering cars (drag-to-reorder, reachable
+                // from the embedded Settings page without ever leaving this
+                // same composition) reassigns which car sits at which index
+                // directly. An earlier, index-keyed version of this exact
+                // idea (lastKnownDocked, since removed) had precisely this
+                // bug: after a reorder, a page's dockedPages entry could
+                // describe a DIFFERENT car than the one now sitting at that
+                // index, hoisting the wrong page's badge or leaving the
+                // right one stuck un-hoisted.
+                val dockedPages = remember { mutableStateMapOf<Any, Boolean>() }
+                fun dockedPageKey(page: Int): Any =
+                    if (settingsAsPage && page == pageCount) "settings" else vehicles.getOrNull(page)?.vin ?: page
                 Box(Modifier.fillMaxSize()) {
                     HorizontalPager(
                         state = pager,
@@ -3596,13 +3645,14 @@ internal fun GarageScreen(state: UiState, vm: AppViewModel) {
                         if (settingsAsPage && block == pageCount) {
                             // The extra slot: Settings itself, embedded rather than
                             // navigated to -- see SettingsScreen's own `embedded` doc.
-                            // hoisted only for the SETTLED page -- see
-                            // hoistedFlight's own doc for why a pre-composed
-                            // neighbour must never also drive it.
+                            // hoisted only for the SETTLED page, AND only once that
+                            // page's own title has actually scrolled into the docked
+                            // (pill) state -- see dockedPages' own doc above for why
+                            // "settled" alone isn't the right gate any more.
                             SettingsScreen(
                                 vm, embedded = true,
-                                hoisted = if (perPage == 1 && page == pager.settledPage) hoistedFlight else null,
-                                hoistedPending = perPage == 1 && page != pager.settledPage,
+                                hoisted = if (perPage == 1 && page == pager.settledPage && dockedPages[dockedPageKey(page)] == true) hoistedFlight else null,
+                                onDockedChanged = if (perPage == 1) ({ d -> dockedPages[dockedPageKey(page)] = d }) else null,
                             )
                         } else {
                         Row(Modifier.fillMaxSize()) {
@@ -3643,16 +3693,20 @@ internal fun GarageScreen(state: UiState, vm: AppViewModel) {
                                             // car view's refresh feedback too.
                                             hideIndicator = perPage > 1,
                                             // hoisted only for the SETTLED page in
-                                            // single-car-per-page mode -- see
-                                            // hoistedFlight's own doc. perPage > 1
-                                            // shows several cars at once, so there is
+                                            // single-car-per-page mode, AND only once
+                                            // that page's own title has actually
+                                            // scrolled into the docked (pill) state --
+                                            // see dockedPages' own doc above. perPage >
+                                            // 1 shows several cars at once, so there is
                                             // no single "the settled car" to hoist.
-                                            hoisted = if (perPage == 1 && page == pager.settledPage) hoistedFlight else null,
-                                            // The pre-composed neighbour -- see
-                                            // hoistedPending's own doc for why this
-                                            // can't just be inferred from hoisted
-                                            // being null.
-                                            hoistedPending = perPage == 1 && page != pager.settledPage,
+                                            hoisted = if (perPage == 1 && page == pager.settledPage && dockedPages[dockedPageKey(page)] == true) hoistedFlight else null,
+                                            // Every page in the single-car-per-page
+                                            // pager (settled or the pre-composed
+                                            // neighbour alike) reports its own live
+                                            // docked state up into dockedPages -- see
+                                            // that map's own doc for why this can no
+                                            // longer be conditioned on being settled.
+                                            onDockedChanged = if (perPage == 1) ({ d -> dockedPages[dockedPageKey(page)] = d }) else null,
                                         )
                                     }
                                 }
@@ -3705,7 +3759,31 @@ internal fun GarageScreen(state: UiState, vm: AppViewModel) {
                     // single-car-per-page mode, following whichever page is
                     // currently SETTLED (car or the embedded Settings slot).
                     // See hoistedFlight's own doc above.
-                    if (perPage == 1) {
+                    // Mounted ONLY once the settled page has actually reported
+                    // itself docked (dockedPages, above) -- NOT unconditionally
+                    // for every perPage==1 frame the way this used to read. Two
+                    // reasons this can no longer stay unconditional now that
+                    // `hoisted` itself is gated the same way (see the call
+                    // sites' own doc): first, an undocked settled page renders
+                    // its OWN plain title as ordinary content now (VehicleDetail
+                    // Content/SettingsScreen's own `local` path), so an always-
+                    // mounted copy here would draw a SECOND, stale copy of
+                    // whatever name this shared flight last carried right on
+                    // top of it. Second, nothing is writing fresh reports into
+                    // hoistedFlight.flight while no page currently owns it, so
+                    // that stale copy wouldn't even be showing the RIGHT car --
+                    // exactly last fix's bug 2 (wrong name at a stale position),
+                    // just relocated here instead of at the settle boundary.
+                    // The one tradeoff: mounting/unmounting this composable
+                    // resets TitleFlightOverlay's own internal dock/undock
+                    // spring each time, instead of that spring free-running
+                    // continuously the way a truly permanent instance would --
+                    // acceptable because by the time this mounts, the page's
+                    // own `local` flight has already been reporting the exact
+                    // corner-adjacent position for a while (see
+                    // VehicleDetailContent's `onDockedChanged`/hoisted hand-off
+                    // doc), so there's no visible snap.
+                    if (perPage == 1 && dockedPages[dockedPageKey(pager.settledPage)] == true) {
                         // Settled, not current: matches every other "which page is
                         // this" read in this pager (the settle effect above), so
                         // the badge's own identity only updates mid-swipe once a
@@ -5157,33 +5235,43 @@ private fun CompactCar(
         Box(Modifier.fillMaxSize()) {
             if (edgeTraceProgress.value > 0.001f) {
                 val accent = MaterialTheme.colorScheme.primary
+                // The rounded-rect perimeter Path + PathMeasure only depend on the
+                // Canvas size/density (constant while this composable is on screen),
+                // not on edgeTraceProgress -- so they're built once per size/density
+                // and cached here instead of being reallocated on every animation
+                // frame. Only measure.getSegment(...) needs to re-run per frame, and
+                // `traced` is rewound and reused rather than reallocated each time.
+                val perimeterCache = remember { EdgeTracePerimeterCache() }
                 Canvas(Modifier.fillMaxSize()) {
                     val stroke = with(density) { 3.dp.toPx() }
                     val inset = stroke / 2f
-                    val rect = androidx.compose.ui.geometry.Rect(
-                        inset, inset, size.width - inset, size.height - inset
-                    )
-                    // Trace the actual RECTANGULAR (rounded) screen perimeter, not an
-                    // ellipse. The old code called drawArc on this full-screen rect,
-                    // which draws an arc of the ELLIPSE inscribed in it — a huge oval
-                    // bulging far past the visible edges (the "giant blue circle" in
-                    // the screenshots). Instead, build the rounded-rect perimeter as a
-                    // Path and take the first `progress` fraction of its length via
-                    // PathMeasure.getSegment, so a thin stroke grows clockwise hugging
-                    // the real edge.
-                    val corner = with(density) { 28.dp.toPx() }
-                    val perimeter = androidx.compose.ui.graphics.Path().apply {
-                        addRoundRect(
-                            androidx.compose.ui.geometry.RoundRect(
-                                rect,
-                                androidx.compose.ui.geometry.CornerRadius(corner, corner),
-                            )
+                    if (perimeterCache.size != size) {
+                        val rect = androidx.compose.ui.geometry.Rect(
+                            inset, inset, size.width - inset, size.height - inset
                         )
+                        // Trace the actual RECTANGULAR (rounded) screen perimeter, not an
+                        // ellipse. The old code called drawArc on this full-screen rect,
+                        // which draws an arc of the ELLIPSE inscribed in it — a huge oval
+                        // bulging far past the visible edges (the "giant blue circle" in
+                        // the screenshots). Instead, build the rounded-rect perimeter as a
+                        // Path and take the first `progress` fraction of its length via
+                        // PathMeasure.getSegment, so a thin stroke grows clockwise hugging
+                        // the real edge.
+                        val corner = with(density) { 28.dp.toPx() }
+                        val perimeter = androidx.compose.ui.graphics.Path().apply {
+                            addRoundRect(
+                                androidx.compose.ui.geometry.RoundRect(
+                                    rect,
+                                    androidx.compose.ui.geometry.CornerRadius(corner, corner),
+                                )
+                            )
+                        }
+                        perimeterCache.measure.setPath(perimeter, false)
+                        perimeterCache.size = size
                     }
-                    val measure = androidx.compose.ui.graphics.PathMeasure().apply {
-                        setPath(perimeter, false)
-                    }
-                    val traced = androidx.compose.ui.graphics.Path()
+                    val measure = perimeterCache.measure
+                    val traced = perimeterCache.traced
+                    traced.rewind()
                     measure.getSegment(
                         0f,
                         measure.length * edgeTraceProgress.value.coerceIn(0f, 1f),
@@ -8642,68 +8730,82 @@ private fun VehicleDetailContent(
     // the top instead of the end.
     reserveTopForDots: Boolean = false,
     // Non-null ONLY for GarageScreen's single-car-per-page pager's currently
-    // SETTLED page -- see HoistedIdentityFlight's own doc. When provided,
+    // SETTLED page, AND only once that page has reported itself DOCKED (see
+    // `onDockedChanged` below and the call site's `dockedPages` doc) -- see
+    // HoistedIdentityFlight's own doc. A settled-but-undocked page (the
+    // ordinary hero-card state, and the common case for a plain hero-to-hero
+    // swipe) now gets `hoisted == null` here just like the pre-composed
+    // neighbour does, and renders its OWN name as ordinary page content
+    // (`local`, below) instead -- see this param's git history for the two
+    // bugs that came from routing that case through the shared flight
+    // anyway: the badge visibly detaching from its card mid-drag (only the
+    // ORIGIN page owned the shared flight for the whole gesture, since
+    // `pager.settledPage` doesn't change until the drag fully settles), and
+    // a one-frame flash of the new car's name at the old car's stale
+    // position right at the settle boundary. When `hoisted` IS non-null,
     // this page's own scroll-to-top is reported into the CALLER's shared
     // flight, and this composable renders NO badge of its own at all -- the
     // caller renders ONE shared badge instead, covering every page
     // including this one.
     hoisted: HoistedIdentityFlight? = null,
-    // True whenever this page belongs to that same single-car-per-page
-    // pager but ISN'T the settled one -- i.e. the pre-composed neighbour
-    // `beyondViewportPageCount = 1` keeps alive for a smooth swipe.
-    // `hoisted == null` alone used to mean two different things here:
-    // "genuinely standalone" (perPage > 1 grid mode, where a real local
-    // badge belongs) and "hoisted mode, just not settled yet" (where NO
-    // badge should be built at all -- the caller's shared one already
-    // covers this page the instant it settles). Collapsing both into one
-    // branch meant this pre-composed neighbour built and ran a full second
-    // HeroTitleFlight/TitleFlightOverlay -- its own measuring Box,
-    // derivedStateOf, dock spring watcher -- purely so it could be thrown
-    // away the moment it actually settled, real extra work on the swipe's
-    // critical path for a badge that was never shown. This flag lets that
-    // case render its title as a plain, ordinary visible Text (no flight,
-    // no invisible anchor, no animation machinery at all) instead.
-    hoistedPending: Boolean = false,
+    // Reports this page's own live docked state (with hysteresis -- see
+    // HeroTitleFlight.docked's own doc) up to the caller on every change,
+    // regardless of whether `hoisted` is currently null or not. Called for
+    // EVERY page in the single-car-per-page pager -- settled or the
+    // pre-composed neighbour alike -- because the caller needs to know the
+    // instant a settled-but-undocked page BECOMES docked in order to start
+    // passing `hoisted` for it; there's no other signal it could use. Null
+    // for every page outside that pager (perPage > 1 grid mode), which has
+    // no single "the settled car" for a caller-level flag to mean anything.
+    onDockedChanged: ((Boolean) -> Unit)? = null,
 ) {
     val topInset = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
     val bottomInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
     val scroll = rememberScrollState()
     val scope = rememberCoroutineScope()
     val density = LocalDensity.current
+    // Built UNCONDITIONALLY now, for every page -- settled, pre-composed
+    // neighbour, or a plain standalone grid column alike. This used to be
+    // skipped entirely whenever `hoisted != null` or `hoistedPending`, on
+    // the theory that a page in either state reports into (or will report
+    // into) the caller's shared flight instead and so has no use for one of
+    // its own. That left the pre-composed neighbour with NOTHING tracking
+    // its own dock state or position until the moment it became settled --
+    // exactly the gap that let a stale, previous-page position leak through
+    // for a frame right at the settle boundary (see `hoisted`'s own doc).
+    // Building this always means every page has a live, continuously
+    // up-to-date local flight from the moment it exists, so there's always
+    // something real to read from (`onDockedChanged`, below) and always
+    // something real to hand off FROM the instant this page's own name
+    // needs to take over the shared corner badge.
+    val topInsetPx = with(density) { topInset.toPx() }
+    // remember(Unit) + SideEffect, not remember(topInsetPx) -- see the
+    // hoisted flight's identical construction in GarageScreen for why a
+    // keyed remember here silently discarded all accumulated dock/
+    // position state on every inset change instead of just picking up
+    // the new inset value.
+    val heroFlight = remember { HeroTitleFlight(topInsetPx, with(density) { TitleDockHysteresis.toPx() }) }
+    SideEffect { heroFlight.topInsetPx = topInsetPx }
+    val local = LocalNamePillState(flight = heroFlight)
+    // Whichever flight is actually LIVE for this page right now: the
+    // caller's shared one while genuinely hoisted, this page's own
+    // otherwise. Both `docked` reporting and the ambient
+    // LocalHeroTitleFlight below key off this SAME value, so there is never
+    // a moment where the two disagree about which object HeroHeader should
+    // be writing its real position/colour/scale into.
+    val liveFlight = hoisted?.flight ?: local.flight
+    val liveDocked by liveFlight.docked
+    LaunchedEffect(liveDocked) { onDockedChanged?.invoke(liveDocked) }
     if (hoisted != null) {
         // Register this page as the one actually driving the hoisted badge.
         // Idempotent, so re-running it every recomposition while hoisted is
         // harmless -- the caller only ever passes non-null here for the
-        // currently SETTLED page, so there's no risk of two pages fighting
-        // over the same hoisted state.
+        // currently SETTLED, currently DOCKED page, so there's no risk of
+        // two pages fighting over the same hoisted state.
         hoisted.scrollToTop.value = { scroll.animateScrollTo(0) }
     }
-    // Only actually built when this page is rendering its OWN badge --
-    // hoisted mode (settled OR pending -- see hoistedPending's own doc)
-    // reports into (or will report into) the CALLER's shared flight/state
-    // instead, so none of this needs to exist for either of those.
-    val local = if (hoisted == null && !hoistedPending) {
-        val topInsetPx = with(density) { topInset.toPx() }
-        // remember(Unit) + SideEffect, not remember(topInsetPx) -- see the
-        // hoisted flight's identical construction in GarageScreen for why a
-        // keyed remember here silently discarded all accumulated dock/
-        // position state on every inset change instead of just picking up
-        // the new inset value.
-        val heroFlight = remember { HeroTitleFlight(topInsetPx, with(density) { TitleDockHysteresis.toPx() }) }
-        SideEffect { heroFlight.topInsetPx = topInsetPx }
-        LocalNamePillState(flight = heroFlight)
-    } else {
-        null
-    }
     Refreshable(v, state, vm, hideIndicator = hideIndicator) {
-        // Hoisted mode reports into the CALLER's shared flight instead of
-        // this composable's own local one -- see HoistedIdentityFlight's
-        // own doc. `local` can now ALSO be null while `hoisted` is null too
-        // (the hoistedPending case) -- providing null here is correct then:
-        // HeroHeader treats a null flight as "render my own plain, visible
-        // title text, no invisible anchor, nothing reporting anywhere",
-        // exactly right for a page that isn't currently anyone's badge.
-        CompositionLocalProvider(LocalHeroTitleFlight provides (hoisted?.flight ?: local?.flight)) {
+        CompositionLocalProvider(LocalHeroTitleFlight provides liveFlight) {
             Column(
                 Modifier
                     .fillMaxSize()
@@ -8726,11 +8828,15 @@ private fun VehicleDetailContent(
                 Spacer(Modifier.height(bottomInset + 16.dp))
             }
         }
-        // Hoisted mode renders NO badge of its own here at all -- the caller
-        // (GarageScreen) renders ONE shared badge covering every page,
-        // including this one, once it settles. See HoistedIdentityFlight's
-        // own doc.
-        if (local != null) {
+        // Hoisted mode (this page is settled AND docked) renders NO badge of
+        // its own here at all -- the caller (GarageScreen) renders ONE
+        // shared badge covering every page, including this one. Every OTHER
+        // state -- perPage > 1 grid mode, this pager's pre-composed
+        // neighbour, or this same page before it's scrolled into the docked
+        // state -- renders its own name here, as ordinary page content that
+        // simply moves with the pager/scroll like everything else on the
+        // page. See `hoisted`'s own doc.
+        if (hoisted == null) {
             val screenWidth = LocalConfiguration.current.screenWidthDp.dp
             TitleFlightOverlay(
                 flight = local.flight,
@@ -9770,6 +9876,13 @@ private fun ColorPickerCanvas(
     val hueGradient = remember(Unit) {
         (0..12).map { i -> Color(android.graphics.Color.HSVToColor(floatArrayOf(i * 30f, 1f, 1f))) }
     }
+    // Both brushes only depend on colours that change far less often than the
+    // Canvas redraws while dragging (sat/value redraw on every pointer move):
+    // satValueBrush only needs to change when the hue itself changes, and
+    // hueBrush's gradient stops never change at all. Hoisting them out of the
+    // draw scope avoids allocating a new List + Brush on every drag frame.
+    val satValueBrush = remember(pureHue) { Brush.horizontalGradient(listOf(Color.White, pureHue)) }
+    val hueBrush = remember(hueGradient) { Brush.horizontalGradient(hueGradient) }
     fun hexOf(c: Color) = String.format(java.util.Locale.US, "#%06X", 0xFFFFFF and c.toArgb())
     // A plain text field is the accessible alternative to the two drag-only
     // Canvases below, which have no TalkBack path at all -- a screen-reader
@@ -9826,7 +9939,7 @@ private fun ColorPickerCanvas(
                     }
                 }
         ) {
-            drawRect(Brush.horizontalGradient(listOf(Color.White, pureHue)))
+            drawRect(satValueBrush)
             drawRect(Brush.verticalGradient(listOf(Color.Transparent, Color.Black)))
             val cx = sat * size.width
             val cy = (1f - value) * size.height
@@ -9860,7 +9973,7 @@ private fun ColorPickerCanvas(
                     }
                 }
         ) {
-            drawRect(Brush.horizontalGradient(hueGradient))
+            drawRect(hueBrush)
             val tx = (hue / 360f) * size.width
             drawCircle(Color.White, 14.dp.toPx(), Offset(tx, size.height / 2f))
             drawCircle(pureHue, 11.dp.toPx(), Offset(tx, size.height / 2f))

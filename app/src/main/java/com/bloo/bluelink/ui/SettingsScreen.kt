@@ -450,15 +450,15 @@ internal fun SettingsScreen(
     vm: AppViewModel,
     embedded: Boolean = false,
     // Non-null ONLY for GarageScreen's single-car-per-page pager's embedded
-    // Settings slot, when it's the currently SETTLED page -- mirrors
-    // VehicleDetailContent's own `hoisted` param exactly. See
+    // Settings slot, when it's the currently SETTLED page AND that page has
+    // reported itself DOCKED -- mirrors VehicleDetailContent's own `hoisted`
+    // param exactly, including why "settled" alone is no longer enough. See
     // HoistedIdentityFlight's own doc.
     hoisted: HoistedIdentityFlight? = null,
-    // Mirrors VehicleDetailContent's own `hoistedPending` exactly -- true
-    // when this IS the pager's embedded Settings slot but it isn't the
-    // settled page yet (the pre-composed neighbour). See that param's own
-    // doc for why this can't just be folded into `hoisted == null`.
-    hoistedPending: Boolean = false,
+    // Mirrors VehicleDetailContent's own `onDockedChanged` exactly -- reports
+    // this slot's own live docked state up to GarageScreen on every change,
+    // regardless of whether `hoisted` is currently null.
+    onDockedChanged: ((Boolean) -> Unit)? = null,
 ) {
     val appearance = LocalAppearance.current
     val notif by vm.notifications.collectAsState()
@@ -500,28 +500,32 @@ internal fun SettingsScreen(
   // behaviour underneath (GarageScreen's own handling, or the app backgrounding)
   // is what should run instead.
   if (!embedded) BackHandler { vm.closeSettings() }
+  // Built UNCONDITIONALLY now -- mirrors VehicleDetailContent's identical
+  // `local` exactly, including why: this slot needs a live, continuously
+  // up-to-date flight of its OWN even before (or without ever) becoming the
+  // hoisted one, both so `onDockedChanged` below has something real to read
+  // and so there's no stale-position gap at the moment it DOES take over
+  // the shared corner badge.
+  val topInsetPx = with(density) { topInset.toPx() }
+  // remember(Unit) + SideEffect, not remember(topInsetPx) -- see
+  // Screens.kt's VehicleDetailContent/GarageScreen/ExpandedCar
+  // construction sites for the full reasoning: a keyed remember here
+  // discarded all of this flight's accumulated dock/position state on
+  // every inset change (rotation, fold/unfold, multi-window resize)
+  // instead of just picking up the new inset value.
+  val flight = remember { HeroTitleFlight(topInsetPx, with(density) { TitleDockHysteresis.toPx() }) }
+  SideEffect { flight.topInsetPx = topInsetPx }
+  val local = LocalSettingsPillState(flight)
+  // Mirrors VehicleDetailContent's identical `liveFlight`/`liveDocked` --
+  // see that composable's own doc for the full reasoning.
+  val liveFlight = hoisted?.flight ?: local.flight
+  val liveDocked by liveFlight.docked
+  LaunchedEffect(liveDocked) { onDockedChanged?.invoke(liveDocked) }
   if (hoisted != null) {
       // Register this page as the one actually driving the hoisted badge.
       // Idempotent -- see VehicleDetailContent's own identical guard for
       // why re-running it every recomposition is harmless.
       hoisted.scrollToTop.value = { settingsGridState.animateScrollToItem(0) }
-  }
-  // Only actually built when this page is rendering its OWN badge -- see
-  // VehicleDetailContent's identical `local` (and `hoistedPending`) for the
-  // full reasoning.
-  val local = if (hoisted == null && !hoistedPending) {
-      val topInsetPx = with(density) { topInset.toPx() }
-      // remember(Unit) + SideEffect, not remember(topInsetPx) -- see
-      // Screens.kt's VehicleDetailContent/GarageScreen/ExpandedCar
-      // construction sites for the full reasoning: a keyed remember here
-      // discarded all of this flight's accumulated dock/position state on
-      // every inset change (rotation, fold/unfold, multi-window resize)
-      // instead of just picking up the new inset value.
-      val flight = remember { HeroTitleFlight(topInsetPx, with(density) { TitleDockHysteresis.toPx() }) }
-      SideEffect { flight.topInsetPx = topInsetPx }
-      LocalSettingsPillState(flight)
-  } else {
-      null
   }
   BackdropHost {
         // A real multi-column grid on wide screens (tablets, landscape, foldables
@@ -536,7 +540,7 @@ internal fun SettingsScreen(
         // grid would force every card in a row to the tallest one's height --
         // exactly the "wrong tool" a masonry layout exists to avoid.
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
-        CompositionLocalProvider(LocalHeroTitleFlight provides (hoisted?.flight ?: local?.flight)) {
+        CompositionLocalProvider(LocalHeroTitleFlight provides liveFlight) {
         LazyVerticalStaggeredGrid(
             columns = StaggeredGridCells.Adaptive(minSize = 380.dp),
             state = settingsGridState,
@@ -1711,20 +1715,6 @@ internal fun SettingsScreen(
             // a browser fallback source, and the optional Shizuku silent-install toggle
             // gated to just its row so the card itself never vanishes).
             SettingsCard("Updates", Icons.Filled.SystemUpdate, vm) {
-                val updateTint by androidx.compose.animation.animateColorAsState(
-                    targetValue = when {
-                        state.updateAvailable != null -> MaterialTheme.colorScheme.tertiary
-                        else -> MaterialTheme.colorScheme.onSurfaceVariant
-                    },
-                    // Sprung rather than snapped -- "up to date" turning tertiary the instant
-                    // a check lands is the one moment this card actually has news, and a cut
-                    // read as flat next to how much of the rest of the app now springs.
-                    animationSpec = spring(
-                        dampingRatio = SoftDamping,
-                        stiffness = androidx.compose.animation.core.Spring.StiffnessLow,
-                    ),
-                    label = "settingsUpdateTint",
-                )
                 // The installed build number carries the card as a hero stat, the
                 // same big-number language the garage hero uses for %/range —
                 // instead of a label/value row buried under a paragraph. The state
@@ -1758,26 +1748,7 @@ internal fun SettingsScreen(
                             )
                         }
                         Spacer(Modifier.width(12.dp))
-                        Row(
-                            Modifier
-                                .clip(CircleShape)
-                                .background(updateTint.copy(alpha = 0.15f))
-                                .padding(horizontal = 12.dp, vertical = 8.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Icon(Icons.Filled.SystemUpdate, contentDescription = null, tint = updateTint, modifier = Modifier.size(16.dp))
-                            Spacer(Modifier.width(6.dp))
-                            AnimatedContent(
-                                targetState = when {
-                                    state.updateChecking -> "Checking…"
-                                    state.updateAvailable != null -> "Build ${state.updateAvailable!!.run.runNumber} ready"
-                                    else -> "Up to date"
-                                },
-                                label = "settingsUpdateChipText",
-                            ) { text ->
-                                Text(text, style = MaterialTheme.typography.labelMedium, color = updateTint, fontWeight = FontWeight.Bold)
-                            }
-                        }
+                        UpdateStatusChip(state)
                     }
                 }
                 Spacer(Modifier.height(14.dp))
@@ -1924,10 +1895,13 @@ internal fun SettingsScreen(
         // The floating "Settings" badge, once its own header has scrolled
         // out of view -- same TitleFlightOverlay every car page uses, sourced
         // from SettingsHeaderRow's title instead of a hero photo card's.
-        // Hoisted mode renders NO badge of its own here at all --
-        // GarageScreen renders ONE shared badge covering every page,
-        // including this one, once it settles.
-        if (local != null) {
+        // Hoisted mode (this slot is settled AND docked) renders NO badge of
+        // its own here at all -- GarageScreen renders ONE shared badge
+        // covering every page, including this one. Every other state --
+        // standalone route, or this slot before it's scrolled into the
+        // docked state -- renders its own "Settings" title here instead.
+        // See `hoisted`'s own doc.
+        if (hoisted == null) {
             val cornerX = if (embedded) 16.dp else 60.dp
             val reserveEnd = 192.dp
             val screenWidth = LocalConfiguration.current.screenWidthDp.dp
@@ -4716,6 +4690,50 @@ private fun AddTilePill(label: String, onClick: () -> Unit) {
  * in practice this only ever fires for the single "Car"/"Cars" card, which had no icon
  * of its own to begin with.
  */
+/**
+ * The Updates card's tonal status chip, split out of the card body so the
+ * spring-animated tint (`updateTint`) only recomposes this small Row/Icon/Text
+ * scope on every animation frame, instead of the whole card content lambda
+ * (which also hosts the RollingNumber hero stat and outer Surface/Row layout).
+ */
+@Composable
+private fun UpdateStatusChip(state: UiState) {
+    val updateTint by androidx.compose.animation.animateColorAsState(
+        targetValue = when {
+            state.updateAvailable != null -> MaterialTheme.colorScheme.tertiary
+            else -> MaterialTheme.colorScheme.onSurfaceVariant
+        },
+        // Sprung rather than snapped -- "up to date" turning tertiary the instant
+        // a check lands is the one moment this card actually has news, and a cut
+        // read as flat next to how much of the rest of the app now springs.
+        animationSpec = spring(
+            dampingRatio = SoftDamping,
+            stiffness = androidx.compose.animation.core.Spring.StiffnessLow,
+        ),
+        label = "settingsUpdateTint",
+    )
+    Row(
+        Modifier
+            .clip(CircleShape)
+            .background(updateTint.copy(alpha = 0.15f))
+            .padding(horizontal = 12.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(Icons.Filled.SystemUpdate, contentDescription = null, tint = updateTint, modifier = Modifier.size(16.dp))
+        Spacer(Modifier.width(6.dp))
+        AnimatedContent(
+            targetState = when {
+                state.updateChecking -> "Checking…"
+                state.updateAvailable != null -> "Build ${state.updateAvailable!!.run.runNumber} ready"
+                else -> "Up to date"
+            },
+            label = "settingsUpdateChipText",
+        ) { text ->
+            Text(text, style = MaterialTheme.typography.labelMedium, color = updateTint, fontWeight = FontWeight.Bold)
+        }
+    }
+}
+
 @Composable
 internal fun SettingsCard(title: String, icon: ImageVector? = null, vm: AppViewModel, content: @Composable () -> Unit) {
     var expanded by rememberSaveable(title) { mutableStateOf(true) }
