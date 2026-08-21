@@ -23,6 +23,8 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -3753,29 +3755,43 @@ internal fun GarageScreen(state: UiState, vm: AppViewModel) {
                             transitionSpec = {
                                 val fromDocked = lastKnownDocked[dockedKey(initialState)]
                                 val toDocked = lastKnownDocked[dockedKey(targetState)]
-                                if (fromDocked != null && fromDocked == toDocked) {
-                                    // Same kind of badge on both sides -- skip the
-                                    // big slide (there's nothing to hop over), but
-                                    // still a quick plain crossfade rather than a
-                                    // dead instant cut: a hard swap with literally
-                                    // no transition read as its own kind of jank
-                                    // (the badge just snapping to new text with no
-                                    // acknowledgement of the change at all).
-                                    // clip=false matters here too, not just the slide
-                                    // branch below -- AnimatedContent's DEFAULT
-                                    // SizeTransform clips content to an animated,
-                                    // un-offset-aware bounding box between the two
-                                    // states' own measured sizes. This badge's actual
-                                    // visible content is positioned way outside that
-                                    // box (offset from ROOT coordinates via
-                                    // inlinePos/dockedAnchor, not from this Box's own
-                                    // origin), so without clip=false it sat entirely
-                                    // outside the clip rect for the whole crossfade --
-                                    // invisible for the animation's whole duration,
-                                    // then simply appearing once the transition ended
-                                    // and the clip went away. Read as "no animation at
-                                    // all, it just pops in."
-                                    fadeIn(tween(100)).togetherWith(fadeOut(tween(90))).using(SizeTransform(clip = false))
+                                if (fromDocked == false && toDocked == false) {
+                                    // Both sides plain hero-card text -- no
+                                    // floating chrome at all either side, and
+                                    // the name is already moving with the
+                                    // pager's own drag underneath it. Playing
+                                    // any transition here (even a quick
+                                    // crossfade) was its own visible jank: a
+                                    // name that's supposed to just BE the
+                                    // next car's, immediately, instead
+                                    // visibly fading through a swap. Literal
+                                    // no-op transition -- the incoming text
+                                    // is already correct and in place the
+                                    // instant it's composed.
+                                    EnterTransition.None togetherWith ExitTransition.None
+                                } else if (fromDocked == true && toDocked == true) {
+                                    // Both sides a docked pill -- a real
+                                    // pill-to-pill "morph": a short
+                                    // horizontal wipe+fade reads closer to
+                                    // the chrome staying put and the text
+                                    // sliding through it than the vertical
+                                    // hop below (which belongs to an actual
+                                    // dock-state change, not this). clip=false
+                                    // for the same reason as always: this
+                                    // badge's visible content is positioned
+                                    // from ROOT coordinates, far outside
+                                    // AnimatedContent's own local bounding
+                                    // box, so its default (clipping)
+                                    // SizeTransform would hide it for the
+                                    // whole transition.
+                                    val wipePx = with(density) { 28.dp.roundToPx() }
+                                    (slideInHorizontally(tween(160, easing = FastOutSlowInEasing)) { wipePx } +
+                                        fadeIn(tween(140)))
+                                        .togetherWith(
+                                            slideOutHorizontally(tween(120, easing = FastOutLinearInEasing)) { -wipePx } +
+                                                fadeOut(tween(100)),
+                                        )
+                                        .using(SizeTransform(clip = false))
                                 } else {
                                     val slidePx = with(density) { TitleSwitchSlideDistance.roundToPx() }
                                     val exitMs = 140
@@ -3841,6 +3857,7 @@ internal fun GarageScreen(state: UiState, vm: AppViewModel) {
                                     hoistedFlight.flight.inlinePos.value,
                                     hoistedFlight.flight.docked.value,
                                     hoistedFlight.flight.color,
+                                    hoistedFlight.flight.titleScale,
                                 )
                             }
                             if (isLive) {
@@ -3871,6 +3888,7 @@ internal fun GarageScreen(state: UiState, vm: AppViewModel) {
                                             hoistedFlight.flight.inlinePos.value,
                                             hoistedFlight.flight.docked.value,
                                             hoistedFlight.flight.color,
+                                            hoistedFlight.flight.titleScale,
                                         )
                                         // Recorded every frame this block is live and
                                         // ready, same as `frozen` above -- so the NEXT
@@ -5992,6 +6010,25 @@ private fun HeroHeader(
         // onto a still-white card for the frames before the photo arrives.
         val heroTitleColorNow = lerp(MaterialTheme.colorScheme.onSurface, HeroOnPhoto, heroT)
         if (heroTitleFlight != null) heroTitleFlight.color = heroTitleColorNow
+        // Mirrors PebbleShell's own hero title grow/shrink spring EXACTLY
+        // (same damping/stiffness, same collapsed/expanded type-step ratio)
+        // -- see that spring's own doc for why these particular numbers.
+        // PebbleShell's copy of this spring only ever drives the invisible
+        // anchor Text underneath; without a second copy here, the one Text
+        // that's actually PAINTED (TitleFlightOverlay's) never grew or
+        // shrank with the pebble at all.
+        val headerT by animateFloatAsState(
+            targetValue = if (photoExpanded) 1f else 0f,
+            animationSpec = spring(dampingRatio = 0.62f, stiffness = Spring.StiffnessVeryLow),
+            label = "heroTitleFlightScale",
+        )
+        val collapsedTitleScale = with(LocalDensity.current) {
+            MaterialTheme.typography.titleMedium.fontSize.toPx() /
+                MaterialTheme.typography.headlineSmall.fontSize.toPx()
+        }
+        if (heroTitleFlight != null) {
+            heroTitleFlight.titleScale = collapsedTitleScale + (1f - collapsedTitleScale) * headerT
+        }
         PebbleShell(
             expanded = photoExpanded,
             onToggle = { vm.togglePebble(v, com.bloo.bluelink.data.HERO_PHOTO_SECTION) },
@@ -8165,8 +8202,11 @@ internal val TitleDockHysteresis = 8.dp
 
 /** How far the hoisted badge's page-switch `AnimatedContent` slides its
  *  outgoing/incoming [TitleFlightOverlay] off the top of the screen -- see
- *  that call site's own doc for why the transition lives there now. */
-private val TitleSwitchSlideDistance = 96.dp
+ *  that call site's own doc for why the transition lives there now. Was
+ *  96.dp -- reported as reading like "a lot of text jumping" once the two
+ *  sides genuinely differ in dock state (a hero-card <-> pill switch);
+ *  56.dp is still a real, visible hop without throwing the text as far. */
+private val TitleSwitchSlideDistance = 56.dp
 
 /** [HeroTitleFlight.color] before [HeroHeader] has reported a real one yet
  *  (this composable's own first frame) is [Color.Unspecified] -- resolving
@@ -8192,6 +8232,14 @@ internal interface TitleFlightSource {
     val inlinePos: androidx.compose.runtime.State<Offset>
     val docked: androidx.compose.runtime.State<Boolean>
     val color: Color
+    /** Mirrors PebbleShell's own hero-title grow/shrink scale (1f = fully
+     *  grown/expanded size, the collapsed ratio when the hero photo pebble
+     *  is collapsed) -- so the ONE thing that actually paints the name
+     *  visibly grows/shrinks with the pebble the same way the invisible
+     *  anchor Text underneath it always has. 1f (no scaling) for every
+     *  surface without a hero photo to collapse against (Settings, a
+     *  frozen exiting snapshot, ExpandedCar). */
+    val titleScale: Float
 }
 
 /**
@@ -8278,6 +8326,11 @@ internal class HeroTitleFlight(private val topInsetPx: Float, private val hyster
      *  ExpandedCar report a constant colour here since they have no such
      *  morph. */
     override var color by mutableStateOf(Color.Unspecified)
+
+    /** See [TitleFlightSource.titleScale]'s own doc. Written every frame of
+     *  [HeroHeader]'s own grow/shrink spring, the same way [color] tracks
+     *  its colour morph. */
+    override var titleScale by mutableFloatStateOf(1f)
 }
 
 /**
@@ -8290,10 +8343,11 @@ internal class HeroTitleFlight(private val topInsetPx: Float, private val hyster
  * jump to describe the wrong page's position/colour while animating away
  * with the wrong page's own name still showing. This just holds still.
  */
-private class FrozenTitleFlight(pos: Offset, dockedVal: Boolean, colorVal: Color) : TitleFlightSource {
+private class FrozenTitleFlight(pos: Offset, dockedVal: Boolean, colorVal: Color, scaleVal: Float = 1f) : TitleFlightSource {
     override val inlinePos: androidx.compose.runtime.State<Offset> = mutableStateOf(pos)
     override val docked: androidx.compose.runtime.State<Boolean> = mutableStateOf(dockedVal)
     override val color: Color = colorVal
+    override val titleScale: Float = scaleVal
 }
 
 /** Null (the default) everywhere except inside [VehicleDetailContent]. */
@@ -8640,6 +8694,24 @@ internal fun BoxScope.TitleFlightOverlay(
                     (inline.x + (target.x - inline.x) * p).roundToInt(),
                     (inline.y + (target.y - inline.y) * p).roundToInt(),
                 )
+            }
+            // Mirrors PebbleShell's own hero title grow/shrink (see
+            // flight.titleScale's own doc) -- but only while resting inline;
+            // faded back to full size (1f) as `progress` approaches docked,
+            // since a docked pill's size is that spring's own job (the
+            // chrome Box above already scales 0.55->1 growing into dock),
+            // not the now-scrolled-away hero photo's collapse state. Left-
+            // anchored origin, same as PebbleShell's own copy, so the name
+            // grows from its own start position instead of drifting sideways.
+            .graphicsLayer {
+                // Spelled out, not lerp() -- this file doesn't have the Float
+                // overload of lerp in scope (see PebbleShell's own identical
+                // note on its copy of this same interpolation).
+                val p = progress.value.coerceIn(0f, 1f)
+                val scale = flight.titleScale + (1f - flight.titleScale) * p
+                scaleX = scale
+                scaleY = scale
+                transformOrigin = TransformOrigin(0f, 0.5f)
             },
     ) {
         // Read HERE, inside TitleFlightOverlay's own (small) recompose scope
