@@ -5931,6 +5931,25 @@ private fun HeroHeader(
         // TitleFlightOverlay's own doc for why: it's a position anchor only,
         // the actual visible Text lives entirely in that overlay now.
         val heroTitleFlight = LocalHeroTitleFlight.current
+        // The ambient flight instance itself changes the moment this page
+        // becomes the hoisted/settled one (GarageScreen switches which
+        // HeroTitleFlight it hands down) -- but onGloballyPositioned below
+        // only fires on an actual RELAYOUT of this node, not merely because
+        // the target it reports to changed. If this page's title happened
+        // not to move on screen at that exact moment (the ordinary case: it
+        // was already laid out as the pre-composed pager neighbour), nothing
+        // would ever re-trigger a report to the NEW flight, leaving its
+        // reportGeneration stuck and its caller's "ready" gate unresolved --
+        // not just for a frame, but indefinitely, until some unrelated
+        // relayout (a scroll) happened to occur. Caching the last known
+        // coordinates and re-pushing them the instant the flight identity
+        // changes closes that gap: the new flight gets a real report in the
+        // very same frame it becomes current, with no dependency on layout
+        // happening to be dirty at that moment.
+        val lastHeroCoords = remember { mutableStateOf<LayoutCoordinates?>(null) }
+        LaunchedEffect(heroTitleFlight) {
+            lastHeroCoords.value?.let { heroTitleFlight?.onPositioned(it.positionInRoot()) }
+        }
         // Follows the morph rather than switching: the photo fades in over the same
         // t, so the name has to travel from the surface's own colour to the light one
         // the scrim is built for. Snapping at a threshold would flash a white name
@@ -5951,7 +5970,10 @@ private fun HeroHeader(
                 // Text to land on; that Text is the only thing that actually
                 // PAINTS the name any more. See TitleFlightOverlay's own doc.
                 Modifier
-                    .onGloballyPositioned { heroTitleFlight.onPositioned(it.positionInRoot()) }
+                    .onGloballyPositioned {
+                        lastHeroCoords.value = it
+                        heroTitleFlight.onPositioned(it.positionInRoot())
+                    }
                     .alpha(0f)
                     // Position anchor only -- see TitleFlightOverlay's matching
                     // measuring-copy comment for why this can't stay in the
