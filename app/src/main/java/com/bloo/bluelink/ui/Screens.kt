@@ -246,6 +246,7 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.State
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -284,6 +285,7 @@ import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.boundsInParent
+import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.layout.onSizeChanged
@@ -3115,6 +3117,15 @@ internal fun GarageScreen(state: UiState, vm: AppViewModel) {
         animationSpec = tween(durationMillis = 200),
         label = "dotsFade",
     )
+    // Live bounds of whichever car name is currently flying/docked on this
+    // screen -- written from inside TitleFlightOverlay's onNameBoundsChanged
+    // (both the hoisted single-car-per-page badge below, and each
+    // ExpandedCar page's own badge), read by PagerDotsFor's own collision
+    // dodge. A plain remembered State, never read here with `by` -- see
+    // pullFractionState's identical doc just above for why a GarageScreen-
+    // scope read of something that changes every animation frame would be
+    // expensive; PagerDots reads `.value` itself, at draw time.
+    val nameBoundsPxState = remember { mutableStateOf<Rect?>(null) }
     // Slide the floating overlays (dots, settings, back/flip) down: in real time as
     // the user pulls, then settle/spring back up once the refresh completes.
     // overlayShiftTarget genuinely needs the continuous fraction (the shift is
@@ -3264,7 +3275,23 @@ internal fun GarageScreen(state: UiState, vm: AppViewModel) {
                                 themeMode = appearance.themeMode,
                                 vibrancy = appearance.vibrancy,
                             ) {
-                                ExpandedCar(pv, state, vm, flipped = appearance.columnsFlipped)
+                                ExpandedCar(
+                                    pv,
+                                    state,
+                                    vm,
+                                    flipped = appearance.columnsFlipped,
+                                    // Feeds this same PagerDotsFor's collision dodge
+                                    // below. Wired unconditionally per page rather than
+                                    // gated to "only the settled page" -- doing that
+                                    // gate here would mean reading exPager.currentPage
+                                    // in this scope, which is exactly the per-frame,
+                                    // whole-pager-invalidating read this file's own
+                                    // PagerDotsFor doc above warns against. Harmless
+                                    // either way: only one page is ever actually
+                                    // composed here (beyondViewportPageCount = 0), so
+                                    // there's no simultaneous writer to race against.
+                                    onNameBoundsChanged = { nameBoundsPxState.value = it },
+                                )
                             }
                         }
                     }
@@ -3277,6 +3304,7 @@ internal fun GarageScreen(state: UiState, vm: AppViewModel) {
                             modifier = Modifier.align(Alignment.TopCenter).statusBarsPadding().padding(top = HeaderCornerGap)
                                 .graphicsLayer { alpha = dotsAlphaState.value },
                             onRefresh = { vm.refreshStatus(vehicles[exWrap.settledReal]) },
+                            nameBoundsPx = nameBoundsPxState,
                         )
                     }
                 }
@@ -3733,6 +3761,7 @@ internal fun GarageScreen(state: UiState, vm: AppViewModel) {
                             // out of range; an unguarded vehicles[currentIndex] here
                             // would crash the screen on a mistimed pull-to-refresh.
                             onRefresh = { vehicles.getOrNull(currentIndex)?.let { vm.refreshStatus(it) } },
+                            nameBoundsPx = nameBoundsPxState,
                         )
                     }
                     // Grid mode (perPage > 1, wide/large screens) hides each
@@ -3835,6 +3864,11 @@ internal fun GarageScreen(state: UiState, vm: AppViewModel) {
                             // matters).
                             textColorOverride = if (onSettingsSlot) MaterialTheme.colorScheme.onSurface else null,
                             onClick = { pillScope.launch { hoistedScrollToTop.value?.invoke() } },
+                            // Feeds PagerDotsFor's own collision dodge just
+                            // above -- see nameBoundsPxState's declaration
+                            // near dotsAlphaState for why this is a plain
+                            // `.value =` write, not a `by` delegate.
+                            onNameBoundsChanged = { nameBoundsPxState.value = it },
                             measureContent = {
                                 Text(
                                     title,
@@ -5540,6 +5574,19 @@ internal val HeaderCornerGap = 12.dp
  *  app). */
 internal val HeaderButtonSize = 48.dp
 
+/** Extra breathing room reserved *below* a header button's own footprint
+ *  (`HeaderCornerGap + HeaderButtonSize`) before real content is allowed to
+ *  start, on top of whatever `Arrangement.spacedBy` a column already adds.
+ *  Needed because a button's true on-screen silhouette is bigger than its
+ *  logical box: [FloatingIcon] draws `ambientRing()`/`dropShadow()` glow
+ *  outside its 48dp circle, and content below it (e.g. a [Pebble] row) has
+ *  its own card shadow -- so reserving exactly the button's geometric
+ *  footprint (as ExpandedCar's dual-column header used to) leaves only the
+ *  column's incidental 12dp `spacedBy` gap as buffer, which those two halos
+ *  can visibly eat into. Mirrors the same "bare inset isn't enough, add a
+ *  named clearance" pattern [PagerDotClearance] already uses below. */
+internal val HeaderContentClearance = 12.dp
+
 /** A small translucent circular icon button used as a floating overlay control.
  *  [outerPadding] is the breathing room around the [HeaderButtonSize] circle -
  *  the default ([HeaderCornerGap], a 72dp footprint) suits free-floating
@@ -5618,6 +5665,51 @@ internal fun FloatingIcon(
  *  sitting behind the "Updated x ago" text. */
 private val PagerDotClearance = 40.dp
 
+/** Decides how the centered page-dot indicator should get out of a
+ *  colliding car name's way: (translationX px, alpha). Pure/non-composable
+ *  so it's cheap to call every frame from inside a `graphicsLayer{}` draw
+ *  block (see [PagerDots]' own call site) without touching composition.
+ *
+ *  Deliberately a real rect-overlap test against [name]'s live measured
+ *  bounds rather than a guessed width -- [dots] is `null` until the first
+ *  layout pass lands and [name] is `null` whenever this screen isn't
+ *  tracking a flying name at all (or nothing has ever reported yet), both
+ *  of which mean "nothing to dodge, sit put."
+ */
+private fun dotsCollisionShift(
+    dots: Rect?,
+    name: Rect?,
+    screenWidthPx: Float,
+    marginPx: Float,
+): Pair<Float, Float> {
+    if (dots == null || name == null) return 0f to 1f
+    // Vertical gate first -- the hero-card inline name usually sits well
+    // below the dots' fixed top row (only a DOCKED pill, or one mid-flight
+    // toward it, climbs high enough to matter), so most frames bail out
+    // here without ever reaching the horizontal math below.
+    if (name.bottom < dots.top || name.top > dots.bottom) return 0f to 1f
+    val paddedLeft = name.left - marginPx
+    val paddedRight = name.right + marginPx
+    // Horizontal overlap against the dots' own NATURAL (unshifted)
+    // footprint -- see selfBoundsPx's own doc for why that's what's passed
+    // in here, not an already-shifted position.
+    if (paddedRight < dots.left || paddedLeft > dots.right) return 0f to 1f
+    val dotsWidth = dots.width
+    val roomRight = screenWidthPx - paddedRight
+    val roomLeft = paddedLeft
+    return when {
+        // Enough clear space to the right of the name: bump the dots just
+        // far enough right to clear its trailing edge.
+        roomRight >= dotsWidth -> (paddedRight - dots.left) to 1f
+        // No room to the right (a name that already reaches past screen
+        // centre) -- try clearing it to the left instead.
+        roomLeft >= dotsWidth -> (paddedLeft - dots.right) to 1f
+        // Neither side has room for the dots' own width: nothing to shift
+        // to, so fade them out rather than let them sit on top of the name.
+        else -> 0f to 0f
+    }
+}
+
 @Composable
 private fun PagerDotsFor(
     pager: PagerState,
@@ -5625,7 +5717,18 @@ private fun PagerDotsFor(
     real: (Int) -> Int,
     modifier: Modifier = Modifier,
     onRefresh: (() -> Unit)? = null,
-) = PagerDots(current = real(pager.currentPage), count = count, modifier = modifier, onRefresh = onRefresh)
+    // Root-coordinate, POST-transform bounds of whatever car name is
+    // currently flying/docked on this same screen (see TitleFlightOverlay's
+    // own `onNameBoundsChanged`), if this call site tracks one. Handed down
+    // as the State object itself, not read here with `by` -- this
+    // composable is a direct child of the same GarageScreen scope
+    // PagerDotsFor's own doc above warns is expensive to recompose (it
+    // hosts the whole car pager), so the value is only ever read inside
+    // PagerDots' own graphicsLayer{} below, at draw time, the same
+    // established pattern pullFractionState/dotsAlphaState already use
+    // here for exactly that reason.
+    nameBoundsPx: State<Rect?>? = null,
+) = PagerDots(current = real(pager.currentPage), count = count, modifier = modifier, onRefresh = onRefresh, nameBoundsPx = nameBoundsPx)
 
 @Composable
 private fun PagerDots(
@@ -5633,10 +5736,28 @@ private fun PagerDots(
     count: Int,
     modifier: Modifier = Modifier,
     onRefresh: (() -> Unit)? = null,
+    nameBoundsPx: State<Rect?>? = null,
 ) {
     val haptics = LocalHaptics.current
     val expandProgress = remember { Animatable(0f) }
     var holding by remember { mutableStateOf(false) }
+    // This control's own natural (i.e. pre-collision-shift) on-screen
+    // bounds, captured once per layout pass via onGloballyPositioned below
+    // -- NOT affected by the collision graphicsLayer{} translation this
+    // function applies to itself, because onGloballyPositioned is chained
+    // BEFORE that graphicsLayer (outer node), and a child's own
+    // graphicsLayer transform never moves how an ANCESTOR node reports its
+    // own placement. That's exactly what's needed here: comparing the
+    // dots' resting position against the name's bounds, not a
+    // once-already-shifted position feeding back into itself.
+    val selfBoundsPx = remember { mutableStateOf<Rect?>(null) }
+    val density = LocalDensity.current
+    val screenWidthPx = with(density) { LocalConfiguration.current.screenWidthDp.dp.toPx() }
+    // Breathing room kept between the name's own bounds and the dots, on
+    // top of whatever raw overlap check finds -- a name ellipsizing right
+    // up against the dots' edge would still read as a collision even
+    // without literal pixel overlap.
+    val collisionMarginPx = with(density) { 8.dp.toPx() }
 
     if (onRefresh != null) {
         LaunchedEffect(holding) {
@@ -5667,7 +5788,32 @@ private fun PagerDots(
         }
     }
 
-    Box(modifier = modifier, contentAlignment = Alignment.Center) {
+    Box(
+        modifier = modifier
+            .onGloballyPositioned { selfBoundsPx.value = it.boundsInRoot() }
+            // Collision dodge: bump sideways toward whichever side of the
+            // name has more clear room, or fade out entirely if neither
+            // side does. A conservative rect-overlap test against the
+            // name's OWN live measured/painted bounds (see
+            // TitleFlightOverlay's onNameBoundsChanged), not a hardcoded
+            // character-count/name-length threshold -- real device text
+            // width varies with font, locale and Dynamic Type scale, so a
+            // fixed threshold would either under- or over-trigger there.
+            // Draw-phase only (graphicsLayer{}), same reasoning as
+            // dotsAlphaState's own read just above this function's call
+            // sites -- never invalidates composition.
+            .graphicsLayer {
+                val (dx, a) = dotsCollisionShift(
+                    dots = selfBoundsPx.value,
+                    name = nameBoundsPx?.value,
+                    screenWidthPx = screenWidthPx,
+                    marginPx = collisionMarginPx,
+                )
+                translationX = dx
+                alpha = a
+            },
+        contentAlignment = Alignment.Center,
+    ) {
         // Overlay ring that fills as the user holds
         if (onRefresh != null && expandProgress.value > 0.01f) {
             CircularProgressIndicator(
@@ -8432,6 +8578,14 @@ internal fun BoxScope.TitleFlightOverlay(
      *  instead, so only ONE AnimatedContent instance -- the visible one --
      *  ever exists. */
     measureContent: (@Composable () -> Unit)? = null,
+    /** Reports the REAL visible flying Text's current root-coordinate,
+     *  post-transform bounds (position AND size, after scale/translation)
+     *  on every layout pass -- null once it has nothing to report (before
+     *  either anchor exists, mirrors the alpha-gate below). Purely an
+     *  outward report for a sibling overlay (the page-dot indicator) to
+     *  test for collision against; nothing in here ever reads it back. See
+     *  [PagerDots]' own call site for the consumer. */
+    onNameBoundsChanged: ((Rect?) -> Unit)? = null,
     /** The flying text itself. A plain `Text(name, ...)` for every surface
      *  but the hoisted one, which wraps its own `AnimatedContent` for the
      *  page-switch crossfade -- that crossfade is a SEPARATE, orthogonal
@@ -8440,6 +8594,14 @@ internal fun BoxScope.TitleFlightOverlay(
      *  rather than this function needing to know about it at all. */
     content: @Composable () -> Unit,
 ) {
+    // Clear any stale bounds report the instant this overlay leaves
+    // composition (e.g. the hoisted single-car badge unmounting when its
+    // page un-docks, or an ExpandedCar page pager throws away its
+    // off-screen neighbour) -- otherwise PagerDots keeps dodging/hiding
+    // against a Rect belonging to a name overlay that no longer exists.
+    DisposableEffect(onNameBoundsChanged) {
+        onDispose { onNameBoundsChanged?.invoke(null) }
+    }
     val docked by flight.docked
     val haptics = LocalHaptics.current
     val shape = RoundedCornerShape(50)
@@ -8497,6 +8659,26 @@ internal fun BoxScope.TitleFlightOverlay(
             transitioning = false
         }
     }
+    // Captures this overlay's own hosting container's root-window position,
+    // so the root-absolute anchors below (HeroHeader's inline title report
+    // at line ~6007, and this composable's own docked-anchor measurer just
+    // below -- both via positionInRoot()) can be converted into a delta
+    // relative to THIS container before feeding Modifier.offset/graphicsLayer
+    // translation. Both of those only ever interpret their argument as a
+    // delta from the composable's own already-placed local position, never
+    // as an absolute screen coordinate. A perPage==1 hoisted badge's
+    // container sits at the composition root, so this is always (0,0) there
+    // and the subtraction below is a no-op; a perPage>1 grid column's
+    // container is offset from root by the cumulative width of every prior
+    // column, and without this subtraction that offset was being counted
+    // TWICE -- once already baked into the column's own natural placement,
+    // once again inside the root-absolute coordinate fed straight into
+    // offset -- which pushed every column but the first off-screen.
+    // matchParentSize (not a fixed size) so this never influences how big
+    // the overlay's own Box actually is; it exists purely to report where
+    // that Box's top-start corner landed in root coordinates.
+    val containerOrigin = remember { mutableStateOf(Offset.Zero) }
+    Box(Modifier.matchParentSize().onGloballyPositioned { containerOrigin.value = it.positionInRoot() })
     val dockedAnchor = remember { mutableStateOf<Offset?>(null) }
     val dockedSize = remember { mutableStateOf<IntSize?>(null) }
     // The one recomposition-triggering read gating the expensive chrome
@@ -8595,8 +8777,14 @@ internal fun BoxScope.TitleFlightOverlay(
                 // Offset.Zero` fallback exists only to satisfy the compiler
                 // now that inlinePos is nullable (see that property's own
                 // doc); it should never be the branch actually taken here.
-                val inline = flight.inlinePos.value ?: dockedAnchor.value ?: Offset.Zero
-                val target = dockedAnchor.value ?: inline
+                // Both anchors are root-absolute (positionInRoot()); subtract this
+                // overlay's own container origin (see containerOrigin's own doc
+                // above) before using them as an offset delta -- graphicsLayer
+                // translation is relative to this Box's own placed position, not
+                // an absolute screen coordinate.
+                val origin = containerOrigin.value
+                val inline = (flight.inlinePos.value ?: dockedAnchor.value ?: origin) - origin
+                val target = (dockedAnchor.value ?: (flight.inlinePos.value ?: origin)) - origin
                 // Same start-at-inline, land-at-target lerp the flying text uses,
                 // expressed as a delta from this Box's own natural (padding-only)
                 // resting position -- unclamped `p`, not `clamped`, so the
@@ -8650,8 +8838,12 @@ internal fun BoxScope.TitleFlightOverlay(
                 // fallback) is what actually hides the badge for that
                 // window, so which fallback value is used here doesn't
                 // matter visually.
-                val inline = flight.inlinePos.value ?: dockedAnchor.value ?: Offset.Zero
-                val target = dockedAnchor.value ?: inline
+                // See the graphicsLayer block above for why containerOrigin has
+                // to be subtracted here too -- Modifier.offset{} is the same
+                // kind of local delta, not an absolute screen coordinate.
+                val origin = containerOrigin.value
+                val inline = (flight.inlinePos.value ?: dockedAnchor.value ?: origin) - origin
+                val target = (dockedAnchor.value ?: (flight.inlinePos.value ?: origin)) - origin
                 val p = progress.value
                 IntOffset(
                     (inline.x + (target.x - inline.x) * p).roundToInt(),
@@ -8684,7 +8876,13 @@ internal fun BoxScope.TitleFlightOverlay(
                 // that way -- there's no path back to "neither has ever
                 // reported" for a live flight object.
                 alpha = if (flight.inlinePos.value == null && dockedAnchor.value == null) 0f else 1f
-            },
+            }
+            // Reports this Text's real, post-transform screen bounds for
+            // the page-dot collision dodge (see onNameBoundsChanged's own
+            // doc). Chained AFTER the graphicsLayer above so the reported
+            // bounds include that scale/offset -- callers need where the
+            // name is actually PAINTED, not its untransformed layout slot.
+            .onGloballyPositioned { onNameBoundsChanged?.invoke(it.boundsInRoot()) },
     ) {
         // Read HERE, inside TitleFlightOverlay's own (small) recompose scope
         // -- not by the caller, as a call-site argument expression, which is
@@ -8896,7 +9094,17 @@ private fun VehicleDetailContent(
  * that is after a flip.
  */
 @Composable
-private fun ExpandedCar(v: Vehicle, state: UiState, vm: AppViewModel, flipped: Boolean) {
+private fun ExpandedCar(
+    v: Vehicle,
+    state: UiState,
+    vm: AppViewModel,
+    flipped: Boolean,
+    // See the call site's own doc (GarageScreen's exPager block) -- feeds
+    // the sibling PagerDotsFor's collision dodge. Null (the default) for
+    // every OTHER caller of ExpandedCar, none of which pair it with a
+    // page-dot indicator that needs to know.
+    onNameBoundsChanged: ((Rect?) -> Unit)? = null,
+) {
     val hotspot = state.hotspotFor(v.vin)
         ?.takeIf {
             it in state.sectionsFor(v) && state.isSectionAvailable(v, it)
@@ -8975,8 +9183,13 @@ private fun ExpandedCar(v: Vehicle, state: UiState, vm: AppViewModel, flipped: B
             // HeaderCornerGap + HeaderButtonSize (their real combined
             // footprint, 60dp), not the bare 52.dp this used to hardcode,
             // which let content peek up 8dp under the buttons' own bottom
-            // edge.
-            val lead: @Composable ColumnScope.() -> Unit = { Spacer(Modifier.height(topInset + HeaderCornerGap + HeaderButtonSize)) }
+            // edge. HeaderContentClearance adds real buffer on top of that
+            // bare footprint -- without it, the column's own 12dp
+            // `spacedBy` was the only thing standing between the button's
+            // ambient glow/shadow halo and the first pebble/control's own
+            // card shadow, and the two could visibly touch (e.g. the AI
+            // summary pebble sitting right under the gear/flip buttons).
+            val lead: @Composable ColumnScope.() -> Unit = { Spacer(Modifier.height(topInset + HeaderCornerGap + HeaderButtonSize + HeaderContentClearance)) }
             val trail: @Composable ColumnScope.() -> Unit = { Spacer(Modifier.height(bottomInset + 16.dp)) }
             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 Row(
@@ -9016,6 +9229,7 @@ private fun ExpandedCar(v: Vehicle, state: UiState, vm: AppViewModel, flipped: B
             // own call site: flight IS titleFlight, so TitleFlightOverlay reads
             // its live colour itself.
             onClick = { scope.launch { controlsScroll.animateScrollTo(0) } },
+            onNameBoundsChanged = onNameBoundsChanged,
         ) {
             Text(
                 v.name,
