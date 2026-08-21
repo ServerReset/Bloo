@@ -23,8 +23,6 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.EnterTransition
-import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -3750,13 +3748,14 @@ internal fun GarageScreen(state: UiState, vm: AppViewModel) {
                                 val fromDocked = lastKnownDocked[dockedKey(initialState)]
                                 val toDocked = lastKnownDocked[dockedKey(targetState)]
                                 if (fromDocked != null && fromDocked == toDocked) {
-                                    // Same kind of badge on both sides -- no
-                                    // transition at all; the incoming text is
-                                    // already at its correct resting spot the
-                                    // instant it's composed (TitleFlightOverlay's
-                                    // own `mounted` guard snaps, never springs,
-                                    // on a brand new `flight` instance).
-                                    EnterTransition.None togetherWith ExitTransition.None
+                                    // Same kind of badge on both sides -- skip the
+                                    // big slide (there's nothing to hop over), but
+                                    // still a quick plain crossfade rather than a
+                                    // dead instant cut: a hard swap with literally
+                                    // no transition read as its own kind of jank
+                                    // (the badge just snapping to new text with no
+                                    // acknowledgement of the change at all).
+                                    fadeIn(tween(100)) togetherWith fadeOut(tween(90))
                                 } else {
                                     val slidePx = with(density) { TitleSwitchSlideDistance.roundToPx() }
                                     val exitMs = 140
@@ -3854,20 +3853,21 @@ internal fun GarageScreen(state: UiState, vm: AppViewModel) {
                                 if (isLive && ready) hoistedFlight.flight else (frozen.value ?: preReadySnapshot)
                             val onSettingsSlot = settingsAsPage && block == pageCount
                             val title = if (onSettingsSlot) "Settings" else vehicles.getOrNull(block)?.name ?: ""
-                            // Invisible until `ready`, not just correctly positioned --
-                            // `effectiveFlight` falls back to a snapshot of the PREVIOUS
-                            // page's geometry for isLive && !ready (see that val's own
-                            // doc), so painting this slot before `ready` would show the
-                            // new page's name at the old page's position/dock-state for
-                            // a frame or more: the "text lags behind" symptom. This is
-                            // load-bearing for the same-dock-state case above in
-                            // particular, which plays no AnimatedContent fade of its own
-                            // to incidentally mask it.
-                            Box(
-                                Modifier
-                                    .fillMaxSize()
-                                    .graphicsLayer { alpha = if (isLive && !ready) 0f else 1f },
-                            ) {
+                            // NOT gated on `ready` any more -- a prior round hid this
+                            // slot at alpha 0 for the entire isLive && !ready window to
+                            // mask the stale pre-ready geometry (see effectiveFlight's
+                            // own doc), on the theory that `ready` resolves within a
+                            // frame. In real use it did not reliably resolve that fast
+                            // (HeroHeader's onGloballyPositioned isn't guaranteed to
+                            // re-fire promptly just because LocalHeroTitleFlight's
+                            // VALUE changed, if the title's actual on-screen geometry
+                            // didn't itself move) -- so the badge could stay invisible
+                            // well past its own entrance animation, reading as "the name
+                            // just disappears", only recovering once a real scroll
+                            // forced a fresh onPositioned report. `preReadySnapshot`
+                            // already gives this window a real, if momentarily stale,
+                            // position to render at instead of nothing -- one frame of
+                            // slightly-off geometry beats an indefinitely blank name.
                             TitleFlightOverlay(
                                 flight = effectiveFlight,
                                 cornerX = 16.dp,
@@ -3926,7 +3926,6 @@ internal fun GarageScreen(state: UiState, vm: AppViewModel) {
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis,
                                 )
-                            }
                             }
                         }
                     }
