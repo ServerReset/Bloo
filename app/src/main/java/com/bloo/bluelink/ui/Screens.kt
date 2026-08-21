@@ -3486,31 +3486,6 @@ internal fun GarageScreen(state: UiState, vm: AppViewModel) {
                         scrollToTop = hoistedScrollToTop,
                     )
                 }
-                // Each page's own dock state, the last time it was actually
-                // live and ready -- NOT scoped to any one AnimatedContent slot
-                // (those come and go per `block`), so a page visited earlier
-                // still has a remembered answer the next time it's compared
-                // against. Lets the page-switch transition below tell "both
-                // sides are the same kind of badge (hero-card or floating
-                // pill)" from "the two sides actually differ" BEFORE the
-                // incoming page's own layout has reported anything -- see
-                // that transitionSpec's own doc.
-                //
-                // Keyed by stable identity (a VIN, or "settings"), NOT by raw
-                // block index -- an index's real-world meaning isn't stable:
-                // deleting a car shifts every later one down a slot, resizing
-                // a foldable/tablet window changes perPage and so pageCount,
-                // and reordering cars (drag-to-reorder, reachable from the
-                // embedded Settings page without ever leaving this same
-                // composition) reassigns which car sits at which index
-                // directly. A raw-Int-keyed map would silently compare one
-                // car's remembered dock state against a DIFFERENT car now
-                // sitting at that same index after any of those, picking the
-                // wrong transition (or wrongly skipping it) for reasons
-                // having nothing to do with the two pages actually involved.
-                val lastKnownDocked = remember { mutableStateMapOf<Any, Boolean>() }
-                fun dockedKey(block: Int): Any =
-                    if (settingsAsPage && block == pageCount) "settings" else vehicles.getOrNull(block)?.vin ?: block
                 Box(Modifier.fillMaxSize()) {
                     HorizontalPager(
                         state = pager,
@@ -3725,256 +3700,114 @@ internal fun GarageScreen(state: UiState, vm: AppViewModel) {
                         // page actually wins, not on every frame of the drag.
                         val settledBlock = realBlock(pager.settledPage)
                         val screenWidth = LocalConfiguration.current.screenWidthDp.dp
-                        // The WHOLE badge (chrome + text together) slides/fades
-                        // off the top of the screen and back on across a page
-                        // switch, via AnimatedContent -- not a hand-rolled
-                        // Animatable coordinating with a second competing effect
-                        // inside TitleFlightOverlay (three earlier rounds of that
-                        // never actually converged; see that function's own doc
-                        // for the full history). AnimatedContent keeps the
-                        // OUTGOING page's content composed and rendering,
-                        // unchanged, for exactly as long as its exit transition
-                        // needs, and starts the INCOMING page's content fresh.
-                        //
-                        // BUT that motion only belongs on a real change: two
-                        // cars that are BOTH plain hero-card text (undocked) or
-                        // BOTH a docked pill look identical either side of the
-                        // switch, so playing the same slide/fade for them just
-                        // reads as pointless motion for a name that's already
-                        // moving with the pager's own drag underneath it. Only
-                        // animate when the two sides are actually different
-                        // KINDS of badge -- and when they are, don't slide both
-                        // halves at once: the outgoing side leaves first (a
-                        // plain, ordinary exit), and the incoming side's own
-                        // entrance is delayed to start only once that exit has
-                        // actually finished, so a docked pill genuinely "pops up
-                        // from the edge" onto an already-cleared spot instead of
-                        // arriving on top of the thing it's replacing.
-                        AnimatedContent(
-                            targetState = settledBlock,
-                            transitionSpec = {
-                                val fromDocked = lastKnownDocked[dockedKey(initialState)]
-                                val toDocked = lastKnownDocked[dockedKey(targetState)]
-                                if (fromDocked == false && toDocked == false) {
-                                    // Both sides plain hero-card text -- no
-                                    // floating chrome at all either side, and
-                                    // the name is already moving with the
-                                    // pager's own drag underneath it. Playing
-                                    // any transition here (even a quick
-                                    // crossfade) was its own visible jank: a
-                                    // name that's supposed to just BE the
-                                    // next car's, immediately, instead
-                                    // visibly fading through a swap. Literal
-                                    // no-op transition -- the incoming text
-                                    // is already correct and in place the
-                                    // instant it's composed.
-                                    EnterTransition.None togetherWith ExitTransition.None
-                                } else if (fromDocked == true && toDocked == true) {
-                                    // Both sides a docked pill -- a real
-                                    // pill-to-pill "morph": a short
-                                    // horizontal wipe+fade reads closer to
-                                    // the chrome staying put and the text
-                                    // sliding through it than the vertical
-                                    // hop below (which belongs to an actual
-                                    // dock-state change, not this). clip=false
-                                    // for the same reason as always: this
-                                    // badge's visible content is positioned
-                                    // from ROOT coordinates, far outside
-                                    // AnimatedContent's own local bounding
-                                    // box, so its default (clipping)
-                                    // SizeTransform would hide it for the
-                                    // whole transition.
-                                    val wipePx = with(density) { 28.dp.roundToPx() }
-                                    (slideInHorizontally(tween(160, easing = FastOutSlowInEasing)) { wipePx } +
-                                        fadeIn(tween(140)))
-                                        .togetherWith(
-                                            slideOutHorizontally(tween(120, easing = FastOutLinearInEasing)) { -wipePx } +
-                                                fadeOut(tween(100)),
-                                        )
-                                        .using(SizeTransform(clip = false))
-                                } else {
-                                    val slidePx = with(density) { TitleSwitchSlideDistance.roundToPx() }
-                                    val exitMs = 140
-                                    (slideInVertically(
-                                        tween(180, delayMillis = exitMs, easing = FastOutSlowInEasing),
-                                    ) { -slidePx } +
-                                        fadeIn(tween(160, delayMillis = exitMs)))
-                                        .togetherWith(
-                                            slideOutVertically(tween(exitMs, easing = FastOutLinearInEasing)) { -slidePx } +
-                                                fadeOut(tween(120)),
-                                        )
-                                        .using(SizeTransform(clip = false))
-                                }
-                            },
-                            label = "hoistedTitleFlight",
-                        ) { block ->
-                            // Only the slot that's the ACTUAL current target reads
-                            // the real, live, SHARED flight -- it's the one page
-                            // actually reporting position/dock/colour through
-                            // onPositioned right now. Every other slot rendered
-                            // here is an outgoing remnant of a page already left;
-                            // reading the live flight there would show it jumping
-                            // to describe the NEW page instead of just finishing
-                            // its own exit undisturbed (see FrozenTitleFlight's
-                            // own doc). `frozen` records this slot's own last-seen
-                            // values every frame while it IS live AND ready, so
-                            // the instant it stops being current there's already
-                            // a correct, motionless snapshot sitting there for it
-                            // to switch to.
-                            val isLive = block == settledBlock
-                            val frozen = remember(block) { mutableStateOf<FrozenTitleFlight?>(null) }
-                            // `hoistedFlight.flight` is a SINGLE shared instance
-                            // whose position/dock/colour is deliberately NOT
-                            // reset on a page switch (see this whole block's
-                            // outer doc above): for the one frame between
-                            // `settledBlock` flipping and this page's OWN
-                            // HeroHeader actually laying out and reporting
-                            // through onPositioned, it still holds the PREVIOUS
-                            // page's values. Freezing (or handing straight to
-                            // TitleFlightOverlay) whatever's there DURING that
-                            // window would bake the wrong page's geometry/dock
-                            // state into this slot -- `ready` only flips true
-                            // once `reportGeneration` has actually advanced
-                            // since this slot went live, i.e. once a report
-                            // belonging to THIS page has genuinely landed.
-                            var ready by remember(block) { mutableStateOf(false) }
-                            // A ONE-TIME, non-reactive snapshot of whatever the
-                            // shared flight looked like the instant this slot
-                            // went live -- i.e. the stale, previous-page value
-                            // `ready` exists to guard against. Captured once
-                            // (remember, no dependency on the flight's own live
-                            // fields) specifically so it can't itself drift
-                            // while !ready: reading `hoistedFlight.flight`
-                            // directly during that window (what an earlier
-                            // version of this fix actually did, despite the
-                            // comment above already describing why that's
-                            // wrong) fell straight through `frozen.value ?:
-                            // hoistedFlight.flight` to the live, still-stale
-                            // object, since `frozen` itself is never written
-                            // before `ready`.
-                            val preReadySnapshot = remember(block) {
-                                FrozenTitleFlight(
-                                    hoistedFlight.flight.inlinePos.value,
-                                    hoistedFlight.flight.docked.value,
-                                    hoistedFlight.flight.color,
-                                    hoistedFlight.flight.titleScale,
-                                )
-                            }
-                            if (isLive) {
-                                // Captured HERE, during composition, not inside the
-                                // effect body below -- HeroHeader's own force-push
-                                // effect (LaunchedEffect(heroTitleFlight) in HeroHeader)
-                                // fires from the SAME recomposition that made this
-                                // slot live, and Compose doesn't guarantee this
-                                // LaunchedEffect's body runs before that one's. If
-                                // `startGen` were read inside the coroutine instead,
-                                // a HeroHeader push that happened to run FIRST would
-                                // already be baked into the "start" value this reads,
-                                // so the .first { it != startGen } below would then
-                                // wait on some LATER, unrelated relayout (a real
-                                // scroll) instead of ever seeing that legitimate first
-                                // report -- reintroducing the exact "ready never
-                                // resolves promptly" bug the push was meant to fix,
-                                // just via ordering instead of via the push missing
-                                // entirely.
-                                val startGen = remember(block) { hoistedFlight.flight.reportGeneration }
-                                LaunchedEffect(block, startGen) {
-                                    snapshotFlow { hoistedFlight.flight.reportGeneration }.first { it != startGen }
-                                    ready = true
-                                }
-                                if (ready) {
-                                    SideEffect {
-                                        frozen.value = FrozenTitleFlight(
-                                            hoistedFlight.flight.inlinePos.value,
-                                            hoistedFlight.flight.docked.value,
-                                            hoistedFlight.flight.color,
-                                            hoistedFlight.flight.titleScale,
-                                        )
-                                        // Recorded every frame this block is live and
-                                        // ready, same as `frozen` above -- so the NEXT
-                                        // time this car/Settings is either side of a
-                                        // switch, the transitionSpec already knows
-                                        // whether it's a hero-card or a docked pill
-                                        // without having to wait on a fresh layout
-                                        // report. Keyed by dockedKey(block) (stable
-                                        // identity), not the raw index -- see
-                                        // lastKnownDocked's own doc for why.
-                                        lastKnownDocked[dockedKey(block)] = hoistedFlight.flight.docked.value
-                                    }
-                                }
-                            }
-                            val effectiveFlight: TitleFlightSource =
-                                if (isLive && ready) hoistedFlight.flight else (frozen.value ?: preReadySnapshot)
-                            val onSettingsSlot = settingsAsPage && block == pageCount
-                            val title = if (onSettingsSlot) "Settings" else vehicles.getOrNull(block)?.name ?: ""
-                            // NOT gated on `ready` any more -- a prior round hid this
-                            // slot at alpha 0 for the entire isLive && !ready window to
-                            // mask the stale pre-ready geometry (see effectiveFlight's
-                            // own doc), on the theory that `ready` resolves within a
-                            // frame. In real use it did not reliably resolve that fast
-                            // (HeroHeader's onGloballyPositioned isn't guaranteed to
-                            // re-fire promptly just because LocalHeroTitleFlight's
-                            // VALUE changed, if the title's actual on-screen geometry
-                            // didn't itself move) -- so the badge could stay invisible
-                            // well past its own entrance animation, reading as "the name
-                            // just disappears", only recovering once a real scroll
-                            // forced a fresh onPositioned report. `preReadySnapshot`
-                            // already gives this window a real, if momentarily stale,
-                            // position to render at instead of nothing -- one frame of
-                            // slightly-off geometry beats an indefinitely blank name.
-                            TitleFlightOverlay(
-                                flight = effectiveFlight,
-                                cornerX = 16.dp,
-                                cornerY = hoistedTopInset + HeaderCornerGap,
-                                // Car slots clear the top-right gear/expand chrome, same
-                                // as VehicleDetailContent's own badge (72dp). The embedded
-                                // Settings slot instead needs to clear the always-visible
-                                // 172dp Simple/Advanced toggle in the corner (192dp, same
-                                // value SettingsScreen's own standalone route already
-                                // reserves for it -- see SettingsHeaderRow) -- without
-                                // this, a docked "Settings" pill could grow wide enough to
-                                // run under that toggle, something only the standalone
-                                // route was guarding against.
-                                reserveEnd = if (onSettingsSlot) 192.dp else 72.dp,
-                                maxWidth = screenWidth - 16.dp - (if (onSettingsSlot) 192.dp else 72.dp) - 32.dp,
-                                // The Settings slot has no hero photo to morph its own
-                                // colour against, so it's forced to plain onSurface;
-                                // every car slot instead reads its own flight's live
-                                // colour, resolved INSIDE TitleFlightOverlay (see
-                                // textColorOverride's own doc for why reading it
-                                // there instead of here as a call-site argument
-                                // matters).
-                                textColorOverride = if (onSettingsSlot) MaterialTheme.colorScheme.onSurface else null,
-                                // Only the live slot's tap should do anything --
-                                // an exiting remnant is already on its way out.
-                                onClick = { if (isLive) pillScope.launch { hoistedScrollToTop.value?.invoke() } },
-                                measureContent = {
-                                    Text(
-                                        title,
-                                        style = MaterialTheme.typography.titleLarge,
-                                        fontWeight = FontWeight.Bold,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis,
-                                    )
-                                },
-                                extraContent = {
-                                    // totalBlocks, not vehicles.size -- the Settings slot is
-                                    // one more page in the same sequence, so it counts too
-                                    // (see PagerDotsFor above, which already does the same
-                                    // swap). No inner AnimatedContent needed any more -- the
-                                    // OUTER one above already gives every slot its own fixed
-                                    // `block`, so this never needs to crossfade in place.
-                                    if (totalBlocks > 1) {
-                                        Text(
-                                            "${block + 1} / $totalBlocks",
-                                            style = MaterialTheme.typography.labelSmall,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        )
-                                    }
-                                },
-                            ) {
+                        val onSettingsSlot = settingsAsPage && settledBlock == pageCount
+                        val title = if (onSettingsSlot) "Settings" else vehicles.getOrNull(settledBlock)?.name ?: ""
+                        // ONE persistent TitleFlightOverlay, bound directly to the
+                        // single shared hoistedFlight.flight -- never torn down and
+                        // rebuilt per page (an AnimatedContent-per-block design used
+                        // to live here; see git history for the full saga of bugs
+                        // that came from swapping the underlying flight object on
+                        // every switch: stale-geometry windows, readiness races, a
+                        // duplicate badge on the pre-composed neighbour, and a
+                        // dock-state cache that could itself go stale). Since the
+                        // object is never swapped, TitleFlightOverlay's OWN existing
+                        // spring (mounted/LaunchedEffect(docked, flight), already
+                        // used and proven for a real SCROLL-driven dock/undock
+                        // crossing) is what carries a page switch that changes dock
+                        // state too -- no separate "hop" machinery needed, because
+                        // it is not a structurally different event to this function
+                        // any more. inlinePos/dockedAnchor are also structurally the
+                        // SAME position for every car (same corner offsets, same
+                        // hero-card layout), so hero-hero and pill-pill switches
+                        // don't visibly move at all -- only the TEXT changes, via
+                        // the inner AnimatedContent in `content` below.
+                        TitleFlightOverlay(
+                            flight = hoistedFlight.flight,
+                            cornerX = 16.dp,
+                            cornerY = hoistedTopInset + HeaderCornerGap,
+                            // Car slots clear the top-right gear/expand chrome, same
+                            // as VehicleDetailContent's own badge (72dp). The embedded
+                            // Settings slot instead needs to clear the always-visible
+                            // 172dp Simple/Advanced toggle in the corner (192dp, same
+                            // value SettingsScreen's own standalone route already
+                            // reserves for it -- see SettingsHeaderRow) -- without
+                            // this, a docked "Settings" pill could grow wide enough to
+                            // run under that toggle, something only the standalone
+                            // route was guarding against.
+                            reserveEnd = if (onSettingsSlot) 192.dp else 72.dp,
+                            maxWidth = screenWidth - 16.dp - (if (onSettingsSlot) 192.dp else 72.dp) - 32.dp,
+                            // The Settings slot has no hero photo to morph its own
+                            // colour against, so it's forced to plain onSurface;
+                            // every car slot instead reads its own flight's live
+                            // colour, resolved INSIDE TitleFlightOverlay (see
+                            // textColorOverride's own doc for why reading it
+                            // there instead of here as a call-site argument
+                            // matters).
+                            textColorOverride = if (onSettingsSlot) MaterialTheme.colorScheme.onSurface else null,
+                            onClick = { pillScope.launch { hoistedScrollToTop.value?.invoke() } },
+                            measureContent = {
                                 Text(
                                     title,
+                                    style = MaterialTheme.typography.titleLarge,
+                                    fontWeight = FontWeight.Bold,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+                            },
+                            extraContent = {
+                                // totalBlocks, not vehicles.size -- the Settings slot is
+                                // one more page in the same sequence, so it counts too
+                                // (see PagerDotsFor above, which already does the same
+                                // swap).
+                                if (totalBlocks > 1) {
+                                    Text(
+                                        "${settledBlock + 1} / $totalBlocks",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                }
+                            },
+                        ) {
+                            // A LITERAL masked wipe, not an approximation: `content`
+                            // is invoked from inside TitleFlightOverlay's own visible
+                            // Text Box, which is already positioned exactly where the
+                            // pill/hero-card sits -- so this AnimatedContent's local
+                            // bounds genuinely ARE the text's on-screen bounds, and
+                            // its default (clipping) SizeTransform genuinely clips to
+                            // them, unlike the old outer-AnimatedContent attempt whose
+                            // content was offset far outside its own measured box.
+                            //
+                            // docked read HERE, not hoisted out as a val above --
+                            // same reasoning as flight.color's own doc: keeps the
+                            // recompose scope this causes down to just this small
+                            // inner composable, not the whole hoisted-badge block.
+                            val docked by hoistedFlight.flight.docked
+                            AnimatedContent(
+                                targetState = title,
+                                transitionSpec = {
+                                    if (docked) {
+                                        // A real, local wipe: the outgoing name
+                                        // slides out one side while the incoming
+                                        // one slides in from the other, both
+                                        // clipped to their own (here, genuinely
+                                        // local) bounds -- the "morph and change
+                                        // the text with a wipe" this whole
+                                        // redesign exists for.
+                                        (slideInHorizontally(tween(220, easing = FastOutSlowInEasing)) { it } + fadeIn(tween(180)))
+                                            .togetherWith(
+                                                slideOutHorizontally(tween(220, easing = FastOutSlowInEasing)) { -it } + fadeOut(tween(180)),
+                                            )
+                                    } else {
+                                        // Plain hero-card text -- already moving
+                                        // with the pager's own drag underneath it;
+                                        // no separate transition of its own.
+                                        EnterTransition.None togetherWith ExitTransition.None
+                                    }
+                                },
+                                label = "hoistedTitleWipe",
+                            ) { t ->
+                                Text(
+                                    t,
                                     style = MaterialTheme.typography.titleLarge,
                                     fontWeight = FontWeight.Bold,
                                     maxLines = 1,
@@ -8200,14 +8033,6 @@ internal fun BackdropHost(content: @Composable BoxScope.() -> Unit) {
  *  construction site so the debounce feels the same everywhere. */
 internal val TitleDockHysteresis = 8.dp
 
-/** How far the hoisted badge's page-switch `AnimatedContent` slides its
- *  outgoing/incoming [TitleFlightOverlay] off the top of the screen -- see
- *  that call site's own doc for why the transition lives there now. Was
- *  96.dp -- reported as reading like "a lot of text jumping" once the two
- *  sides genuinely differ in dock state (a hero-card <-> pill switch);
- *  56.dp is still a real, visible hop without throwing the text as far. */
-private val TitleSwitchSlideDistance = 56.dp
-
 /** [HeroTitleFlight.color] before [HeroHeader] has reported a real one yet
  *  (this composable's own first frame) is [Color.Unspecified] -- resolving
  *  that straight through as [TitleFlightOverlay]'s `textColor` would let it
@@ -8222,11 +8047,11 @@ private fun Color.takeOrElseOnSurface(): Color =
 /**
  * The read-only shape [TitleFlightOverlay] actually needs from whatever is
  * flying: a live position, a live docked flag, and a live colour. Extracted
- * from [HeroTitleFlight] so a page-switch transition can hand the overlay a
- * FROZEN snapshot instead -- see [FrozenTitleFlight]'s own doc for why an
- * exiting page's badge can't keep reading the real, live (and by then
- * already-reassigned-to-the-new-page) [HeroTitleFlight] while it animates
- * away.
+ * from [HeroTitleFlight] as its own interface so other implementations are
+ * possible (there are none left in this file -- an earlier page-switch
+ * design used a frozen, non-reactive implementation for an exiting slot;
+ * see git history), but [TitleFlightOverlay] only ever needs to know this
+ * much, not the concrete class.
  */
 internal interface TitleFlightSource {
     val inlinePos: androidx.compose.runtime.State<Offset>
@@ -8331,23 +8156,6 @@ internal class HeroTitleFlight(private val topInsetPx: Float, private val hyster
      *  [HeroHeader]'s own grow/shrink spring, the same way [color] tracks
      *  its colour morph. */
     override var titleScale by mutableFloatStateOf(1f)
-}
-
-/**
- * A frozen, non-reactive snapshot of a [TitleFlightSource] -- captured once,
- * from a page's own [HeroTitleFlight] while it was still the live/current
- * one, and handed to the page-switch [AnimatedContent] for that page's
- * OUTGOING (exiting) slot. The real [HeroTitleFlight] is shared across every
- * page in the hoisted badge and starts reflecting the NEWLY settled page the
- * instant a swipe settles -- an exiting slot reading it live would visibly
- * jump to describe the wrong page's position/colour while animating away
- * with the wrong page's own name still showing. This just holds still.
- */
-private class FrozenTitleFlight(pos: Offset, dockedVal: Boolean, colorVal: Color, scaleVal: Float = 1f) : TitleFlightSource {
-    override val inlinePos: androidx.compose.runtime.State<Offset> = mutableStateOf(pos)
-    override val docked: androidx.compose.runtime.State<Boolean> = mutableStateOf(dockedVal)
-    override val color: Color = colorVal
-    override val titleScale: Float = scaleVal
 }
 
 /** Null (the default) everywhere except inside [VehicleDetailContent]. */
@@ -8473,58 +8281,19 @@ internal fun BoxScope.TitleFlightOverlay(
     // app dragging.
     var transitioning by remember { mutableStateOf(false) }
     // Page-switch handling (the hoisted badge's own car-to-car swipe) used
-    // to live here, as a second LaunchedEffect racing this one for the same
-    // Animatable -- keyed on a resetKey parameter this function no longer
-    // takes. Three rounds of tuning that race (a combined key that could
-    // cancel a hop mid-flight, then two split effects with a guard flag)
-    // never actually fixed the underlying problem: a SHARED flight object
-    // reporting the newly-settled page's position/colour the instant a
-    // swipe settles, while this function was still trying to animate the
-    // OLD page's Text/pill away from it. Fixing that here, in-place, always
-    // meant fighting the same shared, live, single-writer state no matter
-    // how the two transitions were sequenced.
-    //
-    // The actual fix lives one level up: the hoisted call site now wraps
-    // this whole function in its own `AnimatedContent`, handing an
-    // INDEPENDENT, frozen [FrozenTitleFlight] snapshot to the exiting page
-    // and the real, live [flight] only to the current one -- so there is no
-    // shared state left to race, and Compose's own (mature, well-tested)
-    // enter/exit transition machinery does the off-screen motion instead of
-    // a hand-rolled Animatable coordinating with two competing effects.
-    // This function goes back to knowing only about ONE thing: whichever
-    // [flight] it was given, springing to dock or undock as it crosses the
-    // line. See TitleFlightOverlay's own call site in GarageScreen for the
-    // actual page-switch transition.
-    //
-    // `mounted` makes the FIRST composition of a given [flight] snap
-    // straight to whatever `docked` already is instead of springing to it
-    // -- load-bearing for the hoisted call site's AnimatedContent: each key
-    // gets a freshly `remember`ed `progress` starting at 0, and without this
-    // guard a brand new page's badge would spring from the inline anchor to
-    // the dock corner (or the reverse) INSIDE AnimatedContent's own
-    // slide/fade entrance, two independent motions stacked on the same
-    // arrival. Any LATER `docked` change while [flight] stays the SAME
-    // object (a genuine scroll crossing on the page currently being viewed)
-    // still springs exactly as before.
-    //
-    // Keyed on `flight` itself, not just "first ever" -- the hoisted call
-    // site can hand this function a DIFFERENT [flight] object over this
-    // same AnimatedContent slot's lifetime (a frozen snapshot at first,
-    // swapped for the real live one once it's confirmed ready -- see that
-    // call site's own doc). Without re-keying here, that swap would read as
-    // a second `docked` change on an "already mounted" instance and spring
-    // to correct itself, which is exactly the kind of visible after-the-
-    // fact correction this whole guard exists to avoid.
+    // to live one level up, wrapping this whole function in its own
+    // `AnimatedContent` -- several rounds of that never actually converged
+    // (see git history for the saga). The hoisted call site now hands this
+    // function the SAME shared `flight` object continuously, never swapping
+    // it on a page switch, so a dock-state change caused by switching cars
+    // and a dock-state change caused by scrolling the current one are no
+    // longer different code paths at all -- both just flip `docked` on the
+    // one object this function already knows how to spring to. `mounted`
+    // still exists for the surfaces that DO get a fresh `flight` object
+    // occasionally (a `remember(topInsetPx)` rebuild on a rotation, say):
+    // it makes that instance's FIRST composition snap straight to whatever
+    // `docked` already is instead of visibly springing to it.
     var mounted by remember(flight) { mutableStateOf(false) }
-    // Keyed on `flight` too, not just `docked` -- a `flight` swap resets
-    // `mounted` via the `remember(flight)` above, but if the swap happens to
-    // land on a `docked` value equal to what it already was (e.g. neither
-    // the outgoing snapshot nor the incoming live flight is past the dock
-    // line), a `LaunchedEffect(docked)` alone would never restart to consume
-    // that reset: `mounted` would stay stuck false until some LATER, genuine
-    // `docked` change silently snapped instead of springing that transition.
-    // Including `flight` here guarantees the reset is always consumed
-    // immediately, on the swap itself.
     LaunchedEffect(docked, flight) {
         if (!mounted) {
             mounted = true
