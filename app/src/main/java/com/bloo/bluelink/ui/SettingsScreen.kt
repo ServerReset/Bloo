@@ -438,6 +438,11 @@ internal fun SettingsScreen(
     // VehicleDetailContent's own `hoisted` param exactly. See
     // HoistedIdentityFlight's own doc.
     hoisted: HoistedIdentityFlight? = null,
+    // Mirrors VehicleDetailContent's own `hoistedPending` exactly -- true
+    // when this IS the pager's embedded Settings slot but it isn't the
+    // settled page yet (the pre-composed neighbour). See that param's own
+    // doc for why this can't just be folded into `hoisted == null`.
+    hoistedPending: Boolean = false,
 ) {
     val appearance = LocalAppearance.current
     val notif by vm.notifications.collectAsState()
@@ -486,8 +491,9 @@ internal fun SettingsScreen(
       hoisted.scrollToTop.value = { settingsGridState.animateScrollToItem(0) }
   }
   // Only actually built when this page is rendering its OWN badge -- see
-  // VehicleDetailContent's identical `local` for the full reasoning.
-  val local = if (hoisted == null) {
+  // VehicleDetailContent's identical `local` (and `hoistedPending`) for the
+  // full reasoning.
+  val local = if (hoisted == null && !hoistedPending) {
       val topInsetPx = with(density) { topInset.toPx() }
       val flight = remember(topInsetPx) { HeroTitleFlight(topInsetPx, with(density) { TitleDockHysteresis.toPx() }) }
       LocalSettingsPillState(flight)

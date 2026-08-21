@@ -3613,6 +3613,7 @@ internal fun GarageScreen(state: UiState, vm: AppViewModel) {
                             SettingsScreen(
                                 vm, embedded = true,
                                 hoisted = if (perPage == 1 && page == pager.settledPage) hoistedFlight else null,
+                                hoistedPending = perPage == 1 && page != pager.settledPage,
                             )
                         } else {
                         Row(Modifier.fillMaxSize()) {
@@ -3658,6 +3659,11 @@ internal fun GarageScreen(state: UiState, vm: AppViewModel) {
                                             // shows several cars at once, so there is
                                             // no single "the settled car" to hoist.
                                             hoisted = if (perPage == 1 && page == pager.settledPage) hoistedFlight else null,
+                                            // The pre-composed neighbour -- see
+                                            // hoistedPending's own doc for why this
+                                            // can't just be inferred from hoisted
+                                            // being null.
+                                            hoistedPending = perPage == 1 && page != pager.settledPage,
                                         )
                                     }
                                 }
@@ -3755,7 +3761,21 @@ internal fun GarageScreen(state: UiState, vm: AppViewModel) {
                                     // no transition read as its own kind of jank
                                     // (the badge just snapping to new text with no
                                     // acknowledgement of the change at all).
-                                    fadeIn(tween(100)) togetherWith fadeOut(tween(90))
+                                    // clip=false matters here too, not just the slide
+                                    // branch below -- AnimatedContent's DEFAULT
+                                    // SizeTransform clips content to an animated,
+                                    // un-offset-aware bounding box between the two
+                                    // states' own measured sizes. This badge's actual
+                                    // visible content is positioned way outside that
+                                    // box (offset from ROOT coordinates via
+                                    // inlinePos/dockedAnchor, not from this Box's own
+                                    // origin), so without clip=false it sat entirely
+                                    // outside the clip rect for the whole crossfade --
+                                    // invisible for the animation's whole duration,
+                                    // then simply appearing once the transition ended
+                                    // and the clip went away. Read as "no animation at
+                                    // all, it just pops in."
+                                    fadeIn(tween(100)).togetherWith(fadeOut(tween(90))).using(SizeTransform(clip = false))
                                 } else {
                                     val slidePx = with(density) { TitleSwitchSlideDistance.roundToPx() }
                                     val exitMs = 140
@@ -3824,8 +3844,24 @@ internal fun GarageScreen(state: UiState, vm: AppViewModel) {
                                 )
                             }
                             if (isLive) {
-                                LaunchedEffect(block) {
-                                    val startGen = hoistedFlight.flight.reportGeneration
+                                // Captured HERE, during composition, not inside the
+                                // effect body below -- HeroHeader's own force-push
+                                // effect (LaunchedEffect(heroTitleFlight) in HeroHeader)
+                                // fires from the SAME recomposition that made this
+                                // slot live, and Compose doesn't guarantee this
+                                // LaunchedEffect's body runs before that one's. If
+                                // `startGen` were read inside the coroutine instead,
+                                // a HeroHeader push that happened to run FIRST would
+                                // already be baked into the "start" value this reads,
+                                // so the .first { it != startGen } below would then
+                                // wait on some LATER, unrelated relayout (a real
+                                // scroll) instead of ever seeing that legitimate first
+                                // report -- reintroducing the exact "ready never
+                                // resolves promptly" bug the push was meant to fix,
+                                // just via ordering instead of via the push missing
+                                // entirely.
+                                val startGen = remember(block) { hoistedFlight.flight.reportGeneration }
+                                LaunchedEffect(block, startGen) {
                                     snapshotFlow { hoistedFlight.flight.reportGeneration }.first { it != startGen }
                                     ready = true
                                 }
@@ -8656,6 +8692,22 @@ private fun VehicleDetailContent(
     // caller renders ONE shared badge instead, covering every page
     // including this one.
     hoisted: HoistedIdentityFlight? = null,
+    // True whenever this page belongs to that same single-car-per-page
+    // pager but ISN'T the settled one -- i.e. the pre-composed neighbour
+    // `beyondViewportPageCount = 1` keeps alive for a smooth swipe.
+    // `hoisted == null` alone used to mean two different things here:
+    // "genuinely standalone" (perPage > 1 grid mode, where a real local
+    // badge belongs) and "hoisted mode, just not settled yet" (where NO
+    // badge should be built at all -- the caller's shared one already
+    // covers this page the instant it settles). Collapsing both into one
+    // branch meant this pre-composed neighbour built and ran a full second
+    // HeroTitleFlight/TitleFlightOverlay -- its own measuring Box,
+    // derivedStateOf, dock spring watcher -- purely so it could be thrown
+    // away the moment it actually settled, real extra work on the swipe's
+    // critical path for a badge that was never shown. This flag lets that
+    // case render its title as a plain, ordinary visible Text (no flight,
+    // no invisible anchor, no animation machinery at all) instead.
+    hoistedPending: Boolean = false,
 ) {
     val topInset = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
     val bottomInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
@@ -8671,10 +8723,10 @@ private fun VehicleDetailContent(
         hoisted.scrollToTop.value = { scroll.animateScrollTo(0) }
     }
     // Only actually built when this page is rendering its OWN badge --
-    // hoisted mode reports into the CALLER's shared flight/state instead
-    // (see HoistedIdentityFlight's own doc), so none of this needs to
-    // exist there at all.
-    val local = if (hoisted == null) {
+    // hoisted mode (settled OR pending -- see hoistedPending's own doc)
+    // reports into (or will report into) the CALLER's shared flight/state
+    // instead, so none of this needs to exist for either of those.
+    val local = if (hoisted == null && !hoistedPending) {
         val topInsetPx = with(density) { topInset.toPx() }
         val heroFlight = remember(topInsetPx) { HeroTitleFlight(topInsetPx, with(density) { TitleDockHysteresis.toPx() }) }
         LocalNamePillState(flight = heroFlight)
@@ -8684,8 +8736,12 @@ private fun VehicleDetailContent(
     Refreshable(v, state, vm, hideIndicator = hideIndicator) {
         // Hoisted mode reports into the CALLER's shared flight instead of
         // this composable's own local one -- see HoistedIdentityFlight's
-        // own doc.
-        CompositionLocalProvider(LocalHeroTitleFlight provides (hoisted?.flight ?: local!!.flight)) {
+        // own doc. `local` can now ALSO be null while `hoisted` is null too
+        // (the hoistedPending case) -- providing null here is correct then:
+        // HeroHeader treats a null flight as "render my own plain, visible
+        // title text, no invisible anchor, nothing reporting anywhere",
+        // exactly right for a page that isn't currently anyone's badge.
+        CompositionLocalProvider(LocalHeroTitleFlight provides (hoisted?.flight ?: local?.flight)) {
             Column(
                 Modifier
                     .fillMaxSize()
