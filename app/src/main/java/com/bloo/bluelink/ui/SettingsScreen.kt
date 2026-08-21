@@ -377,11 +377,11 @@ private class LocalSettingsPillState(
 )
 
 /**
- * Settings' own in-content header: title + a short context line, matching
- * [CarHeaderRow][com.bloo.bluelink.ui] exactly in visual weight (titleLarge/
- * Bold name, bodySmall/onSurfaceVariant subtitle) so Settings reads as
- * another page in the pager, not a differently-designed screen bolted onto
- * it.
+ * Settings' own in-content header: title + a short context line, using
+ * headlineSmall/Bold for the name (bodySmall/onSurfaceVariant subtitle) --
+ * matching the base [PebbleShell] scales its own hero title from (see
+ * TitleFlightOverlay's content Text sites in Screens.kt for the same fix),
+ * not [CarHeaderRow][com.bloo.bluelink.ui]'s own titleLarge name text.
  *
  * Reports its own real, measured position via [LocalHeroTitleFlight] (the
  * same mechanism [HeroHeader]'s car-page title uses) whenever a flight

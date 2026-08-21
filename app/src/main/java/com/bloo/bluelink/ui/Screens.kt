@@ -8160,16 +8160,13 @@ internal class HeroTitleFlight(topInsetPx: Float, private val hysteresisPx: Floa
     // itself out on, rather than an invisible-by-coincidence magic number.
     private var inlineYState by mutableStateOf<Float?>(null)
 
-    /** Bumped on every real [onPositioned] report -- lets a reader detect
-     *  "has the CURRENTLY-hoisted page actually reported its own position
-     *  yet", as opposed to just reading whatever this shared instance last
-     *  held (which, for the single frame right after a page switch, is
-     *  still the PREVIOUS page's value -- see the hoisted call site's own
-     *  doc on why that one-frame staleness, harmless for the badge's own
-     *  steady hold, is NOT safe to treat as this page's real value when
-     *  freezing a snapshot for the page being left). */
+    // Bumped on every real onPositioned/onSettled report -- no external
+    // reader left (an earlier round's readiness gate that consumed this via
+    // a public reportGeneration getter was reworked away; see git history),
+    // kept as internal bookkeeping in case a future reader needs to detect
+    // "has this shared instance received a report since some earlier point"
+    // again without re-deriving it from scratch.
     private var reportGen by mutableIntStateOf(0)
-    val reportGeneration: Int get() = reportGen
 
     fun onPositioned(offset: Offset) {
         inlineX = offset.x
