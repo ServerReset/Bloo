@@ -167,6 +167,7 @@ import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.graphics.Color
@@ -391,6 +392,17 @@ private class LocalSettingsPillState(
 @Composable
 private fun SettingsHeaderRow(state: UiState) {
     val titleFlight = LocalHeroTitleFlight.current
+    // Same fix as HeroHeader's own identical block (Screens.kt) -- force a
+    // fresh report the instant the ambient flight identity changes (this
+    // slot becoming/ceasing to be the hoisted one), instead of waiting on
+    // an incidental relayout that might not come. Uses onSettled, not
+    // onPositioned, so it doesn't inherit hysteresis left over from
+    // whichever DIFFERENT page (a car) was settled on the shared flight
+    // before this one -- see HeroTitleFlight.onSettled's own doc.
+    val lastCoords = remember { mutableStateOf<LayoutCoordinates?>(null) }
+    LaunchedEffect(titleFlight) {
+        lastCoords.value?.let { titleFlight?.onSettled(it.positionInRoot()) }
+    }
     Column(Modifier.fillMaxWidth().padding(horizontal = 4.dp)) {
         Text(
             "Settings",
@@ -399,7 +411,10 @@ private fun SettingsHeaderRow(state: UiState) {
             color = MaterialTheme.colorScheme.onSurface,
             modifier = if (titleFlight != null) {
                 Modifier
-                    .onGloballyPositioned { titleFlight.onPositioned(it.positionInRoot()) }
+                    .onGloballyPositioned {
+                        lastCoords.value = it
+                        titleFlight.onPositioned(it.positionInRoot())
+                    }
                     .alpha(0f)
                     // Position anchor only -- see TitleFlightOverlay's matching
                     // measuring-copy comment (Screens.kt) for why this can't stay

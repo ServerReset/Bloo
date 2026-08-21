@@ -32,7 +32,6 @@ import androidx.compose.animation.expandHorizontally
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.shrinkHorizontally
 import androidx.compose.animation.shrinkVertically
-import androidx.compose.animation.SizeTransform
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
 import androidx.compose.animation.slideInHorizontally
@@ -5835,7 +5834,19 @@ private fun HeroHeader(
         // happening to be dirty at that moment.
         val lastHeroCoords = remember { mutableStateOf<LayoutCoordinates?>(null) }
         LaunchedEffect(heroTitleFlight) {
-            lastHeroCoords.value?.let { heroTitleFlight?.onPositioned(it.positionInRoot()) }
+            // onSettled, not onPositioned -- this is the FIRST report the
+            // (possibly newly-current) flight gets from this page becoming
+            // settled, not a continuous scroll update. The shared hoisted
+            // flight is reused across every page switch now (see its own
+            // doc), so its hysteresis baseline can be left over from
+            // whichever DIFFERENT page was settled before this one -- biasing
+            // this page's own first read through the wrong branch of that
+            // hysteresis and rendering it docked (or undocked) purely
+            // because of where the previous, unrelated page happened to
+            // leave the flag. onSettled bypasses that bias for this one
+            // report; onPositioned (below) still carries it correctly for
+            // this page's OWN later, continuous scroll updates.
+            lastHeroCoords.value?.let { heroTitleFlight?.onSettled(it.positionInRoot()) }
         }
         // Follows the morph rather than switching: the photo fades in over the same
         // t, so the name has to travel from the surface's own colour to the light one
@@ -8115,6 +8126,27 @@ internal class HeroTitleFlight(private val topInsetPx: Float, private val hyster
         // discarded/speculative run could still permanently advance the
         // hysteresis baseline a real, committed run never asked for.
         dockedNow = if (dockedNow) inlineY < topInsetPx + hysteresisPx else inlineY < topInsetPx
+        reportGen++
+    }
+
+    /** Like [onPositioned], but for the FIRST report from a page that just
+     *  became the settled one on THIS same shared instance -- bypasses the
+     *  hysteresis carried over from whichever page was settled before it.
+     *  That hysteresis exists to stop ONE title's own position from
+     *  jittering across the threshold on sub-pixel scroll noise; it says
+     *  nothing about a totally different page's title, whose own inlineY
+     *  can easily land inside the (small, [hysteresisPx]-wide) band without
+     *  ever having crossed anything itself. Routed through the biased
+     *  `if (dockedNow) ... else ...` branch in [onPositioned], that could
+     *  make a freshly-settled page render as docked (or stay undocked)
+     *  purely because of where the PREVIOUS page happened to leave the flag
+     *  -- a real, reproducible wrong-state bug once this class started
+     *  being shared continuously across page switches instead of being
+     *  rebuilt fresh per page. */
+    fun onSettled(offset: Offset) {
+        inlineX = offset.x
+        inlineY = offset.y
+        dockedNow = inlineY < topInsetPx
         reportGen++
     }
 
