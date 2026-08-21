@@ -3479,12 +3479,25 @@ internal fun GarageScreen(state: UiState, vm: AppViewModel) {
                 val hoistedTopInsetPx = with(density) { hoistedTopInset.toPx() }
                 val hoistedScrollToTop = remember { mutableStateOf<(suspend () -> Unit)?>(null) }
                 val pillScope = rememberCoroutineScope()
-                val hoistedFlight = remember(hoistedTopInsetPx) {
+                // remember(Unit), not remember(hoistedTopInsetPx): the old
+                // keyed remember threw this whole object away -- accumulated
+                // dock state, colour, titleScale, everything -- and rebuilt
+                // it from scratch every time the status-bar inset itself
+                // changed (rotation, fold/unfold, multi-window resize), even
+                // though nothing about WHICH page is hoisted or what it's
+                // doing changed at all. The freshly-built replacement then
+                // had to re-earn its position from a genuine sentinel-free
+                // "nothing reported yet" state (see HeroTitleFlight's own
+                // doc) before the badge was visible again. topInsetPx is
+                // pushed into the persistent object via a plain field write
+                // below instead -- see HeroTitleFlight.topInsetPx's own doc.
+                val hoistedFlight = remember {
                     HoistedIdentityFlight(
                         flight = HeroTitleFlight(hoistedTopInsetPx, with(density) { TitleDockHysteresis.toPx() }),
                         scrollToTop = hoistedScrollToTop,
                     )
                 }
+                SideEffect { hoistedFlight.flight.topInsetPx = hoistedTopInsetPx }
                 Box(Modifier.fillMaxSize()) {
                     HorizontalPager(
                         state = pager,
@@ -3747,7 +3760,19 @@ internal fun GarageScreen(state: UiState, vm: AppViewModel) {
                             measureContent = {
                                 Text(
                                     title,
-                                    style = MaterialTheme.typography.titleLarge,
+                                    // headlineSmall, not titleLarge -- matches the
+                                    // base PebbleShell actually scales its own
+                                    // (invisible) title anchor from (see that
+                                    // Text's own `titleStyle` comment). The flying
+                                    // Text used to be styled a whole different type
+                                    // step (titleLarge, 22sp default) than the base
+                                    // its shared titleScale ratio was computed
+                                    // against (titleMedium/headlineSmall, 16/24sp) --
+                                    // so even when titleScale genuinely varied with
+                                    // the hero photo pebble's own expand/collapse, the
+                                    // rendered size never actually reached either of
+                                    // the two type steps it was supposed to land on.
+                                    style = MaterialTheme.typography.headlineSmall,
                                     fontWeight = FontWeight.Bold,
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis,
@@ -3807,7 +3832,9 @@ internal fun GarageScreen(state: UiState, vm: AppViewModel) {
                             ) { t ->
                                 Text(
                                     t,
-                                    style = MaterialTheme.typography.titleLarge,
+                                    // headlineSmall -- see measureContent's
+                                    // identical fix just above for why.
+                                    style = MaterialTheme.typography.headlineSmall,
                                     fontWeight = FontWeight.Bold,
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis,
@@ -8065,7 +8092,12 @@ private fun Color.takeOrElseOnSurface(): Color =
  * much, not the concrete class.
  */
 internal interface TitleFlightSource {
-    val inlinePos: androidx.compose.runtime.State<Offset>
+    /** Null until the real inline title has reported a genuine position at
+     *  least once (see [HeroTitleFlight]'s own doc on why this is nullable
+     *  rather than a fabricated off-screen sentinel). [TitleFlightOverlay]
+     *  fades itself out while this is null instead of trusting a made-up
+     *  coordinate. */
+    val inlinePos: androidx.compose.runtime.State<Offset?>
     val docked: androidx.compose.runtime.State<Boolean>
     val color: Color
     /** Mirrors PebbleShell's own hero-title grow/shrink scale (1f = fully
@@ -8097,9 +8129,36 @@ internal interface TitleFlightSource {
  * is no second copy for any of that to happen between.
  */
 
-internal class HeroTitleFlight(private val topInsetPx: Float, private val hysteresisPx: Float) : TitleFlightSource {
+internal class HeroTitleFlight(topInsetPx: Float, private val hysteresisPx: Float) : TitleFlightSource {
+    // Live field, not a constructor `val` captured once -- the OLD shape
+    // forced every one of this class's 4 construction sites to
+    // `remember(topInsetPx)`, so the only way to ever notice a changed
+    // status-bar inset (rotation, fold/unfold, multi-window resize, an
+    // IME-driven inset recompute some OEM skins trigger) was to throw the
+    // whole object away and build a fresh one -- discarding every bit of
+    // accumulated state (dockedNow, color, titleScale, reportGen, the real
+    // inlineX/inlineY) right along with it, snapping the badge back to its
+    // just-constructed defaults for no reason related to the inset change
+    // itself. A plain mutable field means the call site can push a new
+    // value in with a cheap `SideEffect` (see the construction sites' own
+    // comment) and the very next onPositioned/onSettled call just picks it
+    // up -- no rebuild, no reset.
+    var topInsetPx: Float = topInsetPx
     private var inlineX by mutableFloatStateOf(0f)
-    private var inlineY by mutableFloatStateOf(Float.MAX_VALUE)
+    // Null, not a fabricated off-screen sentinel (this used to be
+    // Float.MAX_VALUE). The old sentinel relied entirely on an accident of
+    // arithmetic: TitleFlightOverlay's `.offset{}` lerp and its chrome
+    // Box's `translationY` both feed this straight into `roundToInt()`,
+    // which happens to saturate a MAX_VALUE-scaled result to Int.MAX_VALUE
+    // -- billions of px below the viewport, i.e. invisible, but only
+    // because that particular saturation behaviour holds for that
+    // particular lerp. Any future read of this value that didn't go through
+    // that exact math (a hit-test, a different interpolation, a debug
+    // overlay) would have seen a real, enormous-but-finite number instead
+    // of "no value yet". Nullable makes "nothing has ever reported a real
+    // position" an explicit state TitleFlightOverlay checks for and fades
+    // itself out on, rather than an invisible-by-coincidence magic number.
+    private var inlineYState by mutableStateOf<Float?>(null)
 
     /** Bumped on every real [onPositioned] report -- lets a reader detect
      *  "has the CURRENTLY-hoisted page actually reported its own position
@@ -8114,7 +8173,7 @@ internal class HeroTitleFlight(private val topInsetPx: Float, private val hyster
 
     fun onPositioned(offset: Offset) {
         inlineX = offset.x
-        inlineY = offset.y
+        inlineYState = offset.y
         // Hysteresis computed HERE, not inside `docked`'s derivedStateOf
         // below -- onPositioned is the one real event source for inlineY
         // changes, called exactly once per genuine position report.
@@ -8125,7 +8184,7 @@ internal class HeroTitleFlight(private val topInsetPx: Float, private val hyster
         // used to be mutated INSIDE that lambda as a side effect, so a
         // discarded/speculative run could still permanently advance the
         // hysteresis baseline a real, committed run never asked for.
-        dockedNow = if (dockedNow) inlineY < topInsetPx + hysteresisPx else inlineY < topInsetPx
+        dockedNow = if (dockedNow) offset.y < topInsetPx + hysteresisPx else offset.y < topInsetPx
         reportGen++
     }
 
@@ -8145,16 +8204,20 @@ internal class HeroTitleFlight(private val topInsetPx: Float, private val hyster
      *  rebuilt fresh per page. */
     fun onSettled(offset: Offset) {
         inlineX = offset.x
-        inlineY = offset.y
-        dockedNow = inlineY < topInsetPx
+        inlineYState = offset.y
+        dockedNow = offset.y < topInsetPx
         reportGen++
     }
 
     /** The real inline title's live root position -- always laid out, but
      *  drawn invisibly (see [TitleFlightOverlay]'s own doc for why); read
      *  only from deferred draw/layout lambdas so watching it doesn't itself
-     *  cause recomposition. */
-    override val inlinePos: androidx.compose.runtime.State<Offset> = derivedStateOf { Offset(inlineX, inlineY) }
+     *  cause recomposition. Null until the first real [onPositioned]/
+     *  [onSettled] report lands -- see [inlineYState]'s own doc for why
+     *  that's a deliberate "nothing to show yet" rather than an off-screen
+     *  sentinel. */
+    override val inlinePos: androidx.compose.runtime.State<Offset?> =
+        derivedStateOf { inlineYState?.let { Offset(inlineX, it) } }
 
     /** Has the inline title's top edge crossed the status bar -- with
      *  hysteresis, not one bare threshold. A single cutoff meant a scroll
@@ -8439,7 +8502,15 @@ internal fun BoxScope.TitleFlightOverlay(
                 // text's own left edge sideways as the pill grows, fighting the
                 // text's own independently-lerped position.
                 transformOrigin = TransformOrigin(0f, 0.5f)
-                val inline = flight.inlinePos.value
+                // `active` (which gates this whole Box) already requires
+                // `docked || transitioning`, and `docked` can only ever
+                // have become true via a real onPositioned/onSettled report
+                // -- so by the time this composes, flight.inlinePos.value
+                // is never actually null. The `?: dockedAnchor.value ?:
+                // Offset.Zero` fallback exists only to satisfy the compiler
+                // now that inlinePos is nullable (see that property's own
+                // doc); it should never be the branch actually taken here.
+                val inline = flight.inlinePos.value ?: dockedAnchor.value ?: Offset.Zero
                 val target = dockedAnchor.value ?: inline
                 // Same start-at-inline, land-at-target lerp the flying text uses,
                 // expressed as a delta from this Box's own natural (padding-only)
@@ -8488,7 +8559,13 @@ internal fun BoxScope.TitleFlightOverlay(
             .align(Alignment.TopStart)
             .widthIn(max = maxWidth)
             .offset {
-                val inline = flight.inlinePos.value
+                // Falls back to the docked anchor, then to the origin, only
+                // to give roundToInt() something finite to chew on while
+                // `inline` is null -- the alpha gate below (not this
+                // fallback) is what actually hides the badge for that
+                // window, so which fallback value is used here doesn't
+                // matter visually.
+                val inline = flight.inlinePos.value ?: dockedAnchor.value ?: Offset.Zero
                 val target = dockedAnchor.value ?: inline
                 val p = progress.value
                 IntOffset(
@@ -8513,6 +8590,15 @@ internal fun BoxScope.TitleFlightOverlay(
                 scaleX = scale
                 scaleY = scale
                 transformOrigin = TransformOrigin(0f, 0.5f)
+                // Fade to fully invisible while NEITHER anchor has a real
+                // value yet -- the one genuine construction-time/rotation-
+                // time window where this badge has nothing real to show
+                // (see HeroTitleFlight.inlineYState's own doc on why this
+                // replaces a sentinel coordinate instead of layering on top
+                // of one). Once either anchor reports, this is 1f and stays
+                // that way -- there's no path back to "neither has ever
+                // reported" for a live flight object.
+                alpha = if (flight.inlinePos.value == null && dockedAnchor.value == null) 0f else 1f
             },
     ) {
         // Read HERE, inside TitleFlightOverlay's own (small) recompose scope
@@ -8601,7 +8687,13 @@ private fun VehicleDetailContent(
     // instead, so none of this needs to exist for either of those.
     val local = if (hoisted == null && !hoistedPending) {
         val topInsetPx = with(density) { topInset.toPx() }
-        val heroFlight = remember(topInsetPx) { HeroTitleFlight(topInsetPx, with(density) { TitleDockHysteresis.toPx() }) }
+        // remember(Unit) + SideEffect, not remember(topInsetPx) -- see the
+        // hoisted flight's identical construction in GarageScreen for why a
+        // keyed remember here silently discarded all accumulated dock/
+        // position state on every inset change instead of just picking up
+        // the new inset value.
+        val heroFlight = remember { HeroTitleFlight(topInsetPx, with(density) { TitleDockHysteresis.toPx() }) }
+        SideEffect { heroFlight.topInsetPx = topInsetPx }
         LocalNamePillState(flight = heroFlight)
     } else {
         null
@@ -8663,7 +8755,10 @@ private fun VehicleDetailContent(
             ) {
                 Text(
                     v.name,
-                    style = MaterialTheme.typography.titleLarge,
+                    // headlineSmall -- matches PebbleShell's own real title
+                    // base; see the hoisted badge's identical fix for the
+                    // full reasoning.
+                    style = MaterialTheme.typography.headlineSmall,
                     fontWeight = FontWeight.Bold,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
@@ -8719,7 +8814,12 @@ private fun ExpandedCar(v: Vehicle, state: UiState, vm: AppViewModel, flipped: B
     val density = LocalDensity.current
     val scope = rememberCoroutineScope()
     val topInsetPx = with(density) { topInset.toPx() }
-    val titleFlight = remember(topInsetPx) { HeroTitleFlight(topInsetPx, with(density) { TitleDockHysteresis.toPx() }) }
+    // remember(Unit) + SideEffect, not remember(topInsetPx) -- same
+    // reasoning as VehicleDetailContent's and GarageScreen's identical
+    // construction sites: an inset change alone shouldn't discard this
+    // flight's accumulated dock/position state.
+    val titleFlight = remember { HeroTitleFlight(topInsetPx, with(density) { TitleDockHysteresis.toPx() }) }
+    SideEffect { titleFlight.topInsetPx = topInsetPx }
     // CriticalContent's own HeroHeader is the real hero photo card here --
     // this view was NOT missing one the way the doc above used to claim;
     // CarHeaderRow's plain-text name and HeroHeader's own (on the photo)
@@ -8816,7 +8916,10 @@ private fun ExpandedCar(v: Vehicle, state: UiState, vm: AppViewModel, flipped: B
         ) {
             Text(
                 v.name,
-                style = MaterialTheme.typography.titleLarge,
+                // headlineSmall -- matches PebbleShell's own real title
+                // base; see the hoisted badge's identical fix for the full
+                // reasoning.
+                style = MaterialTheme.typography.headlineSmall,
                 fontWeight = FontWeight.Bold,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,

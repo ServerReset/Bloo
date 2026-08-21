@@ -151,6 +151,7 @@ import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
@@ -406,7 +407,7 @@ private fun SettingsHeaderRow(state: UiState) {
     Column(Modifier.fillMaxWidth().padding(horizontal = 4.dp)) {
         Text(
             "Settings",
-            style = MaterialTheme.typography.titleLarge,
+            style = MaterialTheme.typography.headlineSmall,
             fontWeight = FontWeight.Bold,
             color = MaterialTheme.colorScheme.onSurface,
             modifier = if (titleFlight != null) {
@@ -510,7 +511,14 @@ internal fun SettingsScreen(
   // full reasoning.
   val local = if (hoisted == null && !hoistedPending) {
       val topInsetPx = with(density) { topInset.toPx() }
-      val flight = remember(topInsetPx) { HeroTitleFlight(topInsetPx, with(density) { TitleDockHysteresis.toPx() }) }
+      // remember(Unit) + SideEffect, not remember(topInsetPx) -- see
+      // Screens.kt's VehicleDetailContent/GarageScreen/ExpandedCar
+      // construction sites for the full reasoning: a keyed remember here
+      // discarded all of this flight's accumulated dock/position state on
+      // every inset change (rotation, fold/unfold, multi-window resize)
+      // instead of just picking up the new inset value.
+      val flight = remember { HeroTitleFlight(topInsetPx, with(density) { TitleDockHysteresis.toPx() }) }
+      SideEffect { flight.topInsetPx = topInsetPx }
       LocalSettingsPillState(flight)
   } else {
       null
@@ -1941,7 +1949,16 @@ internal fun SettingsScreen(
             ) {
                 Text(
                     "Settings",
-                    style = MaterialTheme.typography.titleLarge,
+                    // headlineSmall -- matches every other TitleFlightOverlay
+                    // content Text (see Screens.kt's identical fixes on the
+                    // hoisted/VehicleDetailContent/ExpandedCar badges) for
+                    // consistency across every surface this overlay covers.
+                    // Settings' own titleScale never actually varies (only
+                    // HeroHeader's hero-photo pebble writes titleScale), so
+                    // this alone doesn't fix a visible grow/shrink bug here
+                    // the way it does on a car page -- it's a font-weight-
+                    // consistency fix, not a scale-correctness one.
+                    style = MaterialTheme.typography.headlineSmall,
                     fontWeight = FontWeight.Bold,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
