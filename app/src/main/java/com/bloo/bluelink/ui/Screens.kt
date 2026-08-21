@@ -8645,9 +8645,28 @@ internal fun BoxScope.TitleFlightOverlay(
     // it makes that instance's FIRST composition snap straight to whatever
     // `docked` already is instead of visibly springing to it.
     var mounted by remember(flight) { mutableStateOf(false) }
+    // Latches `transitioning` true the INSTANT `docked` is observed to have
+    // actually changed (not just "whenever docked is true") -- synchronously,
+    // right here in composition, not inside the LaunchedEffect coroutine
+    // below. That coroutine only starts running once THIS composition's
+    // effects are applied, which is after this recomposition (the one that
+    // first sees the new `docked` value) has already committed -- leaving a
+    // real window where `docked` has flipped but `transitioning` is still
+    // the OLD (false) value, exactly the frame `settled` (see its own doc)
+    // is trying to tell callers NOT to treat as arrived. Left as a coroutine-
+    // only write, that gap made `settled` spuriously true for one frame the
+    // instant docking STARTED, not once it finished -- firing the hand-off
+    // before the spring had moved at all, reading as no transition playing
+    // whatsoever rather than a mid-flight snap.
+    var lastDocked by remember { mutableStateOf(docked) }
+    if (lastDocked != docked) {
+        transitioning = true
+        lastDocked = docked
+    }
     LaunchedEffect(docked, flight) {
         if (!mounted) {
             mounted = true
+            transitioning = false
             progress.snapTo(if (docked) 1f else 0f)
             return@LaunchedEffect
         }
