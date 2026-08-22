@@ -3681,6 +3681,11 @@ internal fun GarageScreen(state: UiState, vm: AppViewModel) {
                                 vm, embedded = true,
                                 hoisted = if (perPage == 1 && page == pager.settledPage && dockedPages[dockedPageKey(page)] == true) hoistedFlight else null,
                                 onDockedChanged = if (perPage == 1) ({ d -> dockedPages[dockedPageKey(page)] = d }) else null,
+                                // See VehicleDetailContent's identical `pageLabel`
+                                // doc -- matches the shared hoisted badge's own
+                                // label so the hand-off between the two instances
+                                // has no width to pop.
+                                pageLabel = if (perPage == 1 && totalBlocks > 1) "${block + 1} / $totalBlocks" else null,
                             )
                         } else {
                         Row(Modifier.fillMaxSize()) {
@@ -3754,6 +3759,16 @@ internal fun GarageScreen(state: UiState, vm: AppViewModel) {
                                             // must stay scoped to exactly that
                                             // case.
                                             gridColumn = perPage > 1,
+                                            // See VehicleDetailContent's own
+                                            // `pageLabel` doc -- matches the
+                                            // shared hoisted badge's own label so
+                                            // the hand-off between the two
+                                            // instances has no width to pop.
+                                            // Only meaningful for the pager this
+                                            // page's badge can actually hand off
+                                            // into (perPage == 1); grid columns
+                                            // never hoist at all.
+                                            pageLabel = if (perPage == 1 && totalBlocks > 1) "${block + 1} / $totalBlocks" else null,
                                         )
                                     }
                                 }
@@ -3831,12 +3846,41 @@ internal fun GarageScreen(state: UiState, vm: AppViewModel) {
                     // corner-adjacent position for a while (see
                     // VehicleDetailContent's `onDockedChanged`/hoisted hand-off
                     // doc), so there's no visible snap.
-                    if (perPage == 1 && dockedPages[dockedPageKey(pager.settledPage)] == true) {
+                    //
+                    // Wrapped in AnimatedVisibility, not a plain `if`, so
+                    // mounting/unmounting fades rather than pops -- a bare
+                    // `if` used to tear this composable down (and stand it
+                    // back up) INSTANTLY the moment the settled page's own
+                    // docked state differs from the page swiped away from
+                    // (e.g. settling on an undocked car right after a docked
+                    // one), which read as the corner pill just vanishing/
+                    // appearing with no transition at all.
+                    val hoistedVisible = perPage == 1 && dockedPages[dockedPageKey(pager.settledPage)] == true
+                    // Frozen at the last value seen while actually visible.
+                    // AnimatedVisibility keeps `content` composed for the
+                    // duration of its own exit fade, and `pager.settledPage`
+                    // has ALREADY moved on to the new (undocked) page by the
+                    // time that fade starts -- reading this straight would
+                    // visibly relabel the still-fading pill with the NEW
+                    // page's name/number instead of the one it was actually
+                    // showing when it started fading out. Written plainly
+                    // here in composition, not inside an effect/coroutine --
+                    // every reader in this SAME pass (including `content`,
+                    // invoked in this same pass) sees the just-written value
+                    // immediately, so there's no one-frame gap of the kind
+                    // that broke the `settled`/`transitioning` fix above.
+                    var frozenBlock by remember { mutableStateOf(realBlock(pager.settledPage)) }
+                    if (hoistedVisible) frozenBlock = realBlock(pager.settledPage)
+                    AnimatedVisibility(
+                        visible = hoistedVisible,
+                        enter = fadeIn(tween(160)),
+                        exit = fadeOut(tween(160)),
+                    ) {
                         // Settled, not current: matches every other "which page is
                         // this" read in this pager (the settle effect above), so
                         // the badge's own identity only updates mid-swipe once a
                         // page actually wins, not on every frame of the drag.
-                        val settledBlock = realBlock(pager.settledPage)
+                        val settledBlock = frozenBlock
                         val screenWidth = LocalConfiguration.current.screenWidthDp.dp
                         val onSettingsSlot = settingsAsPage && settledBlock == pageCount
                         val title = if (onSettingsSlot) "Settings" else vehicles.getOrNull(settledBlock)?.name ?: ""
@@ -9030,6 +9074,18 @@ private fun VehicleDetailContent(
     // page's own TitleFlightOverlay call as `containerRelative`. See that
     // parameter's own doc for why this must stay opt-in and default false.
     gridColumn: Boolean = false,
+    // "N / M" page-count label, non-null under the exact same condition the
+    // shared hoisted badge shows one (perPage == 1, more than one page) --
+    // see this page's own TitleFlightOverlay call below for why passing it
+    // here too, not just on the hoisted badge, is load-bearing rather than
+    // decorative: without it, the local badge's chrome Row measures
+    // narrower (name only) than the hoisted badge's chrome Row (name +
+    // label) it gets swapped for the instant this page finishes docking,
+    // and Modifier.size(dockedSize...) has no width animation of its own --
+    // so the pill visibly popped wider the moment the hand-off happened.
+    // Passing the identical label here means both instances measure to the
+    // same width, so there's nothing left to jump.
+    pageLabel: String? = null,
 ) {
     val topInset = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
     val bottomInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
@@ -9140,6 +9196,19 @@ private fun VehicleDetailContent(
                 // reported here, once this badge's own spring has actually
                 // arrived, rather than off the raw scroll-threshold flag.
                 onSettledChanged = { settled -> if (settled) onDockedChanged?.invoke(true) },
+                // See `pageLabel`'s own doc -- matches the shared hoisted
+                // badge's own extraContent (Screens.kt, GarageScreen) so
+                // the two instances' chrome measures to the same width and
+                // the hand-off between them has nothing left to pop.
+                extraContent = pageLabel?.let { label ->
+                    {
+                        Text(
+                            label,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                },
             ) {
                 Text(
                     v.name,

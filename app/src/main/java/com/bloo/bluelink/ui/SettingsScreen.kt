@@ -459,6 +459,10 @@ internal fun SettingsScreen(
     // this slot's own live docked state up to GarageScreen on every change,
     // regardless of whether `hoisted` is currently null.
     onDockedChanged: ((Boolean) -> Unit)? = null,
+    // Mirrors VehicleDetailContent's own `pageLabel` exactly -- see that
+    // parameter's own doc (Screens.kt) for why this local badge needs the
+    // identical "N / M" label the shared hoisted badge shows.
+    pageLabel: String? = null,
 ) {
     val appearance = LocalAppearance.current
     val notif by vm.notifications.collectAsState()
@@ -1928,6 +1932,17 @@ internal fun SettingsScreen(
                 // See onDockedChanged's own doc just above -- mirrors
                 // VehicleDetailContent's identical wiring.
                 onSettledChanged = { settled -> if (settled) onDockedChanged?.invoke(true) },
+                // See `pageLabel`'s own doc -- matches the shared hoisted
+                // badge's own extraContent so the hand-off has no width to pop.
+                extraContent = pageLabel?.let { label ->
+                    {
+                        Text(
+                            label,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                },
             ) {
                 Text(
                     "Settings",
