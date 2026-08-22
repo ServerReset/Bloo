@@ -603,14 +603,18 @@ fun BlooApp(vm: AppViewModel) {
             // handles its own insets); other screens stay inset by the Scaffold.
             when (screen) {
                 // Bootstrapping only -- see Screen.Loading's own doc
-                // (AppViewModel.kt) for why this exists at all. Deliberately
-                // just the app's own themed background (already painted
-                // behind this whole Scaffold) with nothing else: no spinner,
-                // no login form, no flash of a screen that doesn't belong.
-                // This is the FIRST thing a cold start ever renders, so it
-                // has to stay cheap and free of anything that could itself
-                // pop in a frame late.
-                Screen.Loading -> Box(Modifier.fillMaxSize().padding(padding))
+                // (AppViewModel.kt) for why this exists at all. The SAME
+                // AuroraBackground + wordmark LoginScreen opens with (so
+                // there's nothing to visually reconcile if this resolves to
+                // Login next -- same background, same brand mark, already
+                // mid-fade), but with no form, no fields, nothing interactive
+                // -- this is a "we haven't decided what screen you need yet"
+                // placeholder, not a real destination, and it has to stay
+                // cheap: AuroraBackground is already exactly what the FIRST
+                // frame of a cold start painted before this screen existed
+                // (LoginScreen used it too), so this is strictly less work
+                // than before, not more.
+                Screen.Loading -> LoadingScreen(Modifier.padding(padding))
                 Screen.Login -> Box(Modifier.padding(padding)) {
                     LoginScreen(
                         loading = state.loading,
@@ -1912,6 +1916,42 @@ private fun borderlessFieldColors(): androidx.compose.material3.TextFieldColors 
         focusedBorderColor = Color.Transparent,
         unfocusedBorderColor = Color.Transparent,
     )
+}
+
+/**
+ * The Screen.Loading bootstrapping placeholder -- see that state's own doc
+ * (AppViewModel.kt) for why it exists. Same AuroraBackground + "Bloo"
+ * wordmark [LoginScreen] opens with, so if this resolves to Login next
+ * there's nothing to visually reconcile: same backdrop, same brand mark,
+ * already faded in. No form, no fields, nothing interactive -- this is a
+ * "still deciding" placeholder, shown for however long the cold-start
+ * auto-login coroutine takes to resolve, not a real destination on its own.
+ *
+ * The wordmark fades in on its own (not present from frame one) rather than
+ * being static: a car-status app booting into a full-strength logo the
+ * INSTANT the process starts reads as an abrupt, slightly jarring "already
+ * finished loading" claim before anything has actually happened yet; easing
+ * it in over a beat reads as the app settling into itself instead.
+ */
+@Composable
+private fun LoadingScreen(modifier: Modifier = Modifier) {
+    var visible by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) { visible = true }
+    val alpha by animateFloatAsState(
+        targetValue = if (visible) 1f else 0f,
+        animationSpec = tween(500, easing = FastOutSlowInEasing),
+        label = "loadingWordmarkFade",
+    )
+    Box(modifier.fillMaxSize()) {
+        AuroraBackground(Modifier.matchParentSize())
+        Text(
+            "Bloo",
+            style = MaterialTheme.typography.displayLarge,
+            fontWeight = FontWeight.Black,
+            color = MaterialTheme.colorScheme.onSurface,
+            modifier = Modifier.align(Alignment.Center).graphicsLayer { this.alpha = alpha },
+        )
+    }
 }
 
 // A synced device not seen this long is flagged as possibly on a different Drive
