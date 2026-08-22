@@ -42,6 +42,7 @@ import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.MutableTransitionState
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.VectorConverter
 import androidx.compose.animation.core.animateDpAsState
@@ -3661,6 +3662,46 @@ internal fun GarageScreen(state: UiState, vm: AppViewModel) {
                 }
                 fun dockedPageKey(page: Int): Any =
                     if (settingsAsPage && page == pageCount) "settings" else vehicles.getOrNull(page)?.vin ?: page
+                // Whether the shared hoisted badge SHOULD be showing right
+                // now, and which page it's showing/fading for -- computed
+                // HERE (not beside the AnimatedVisibility call site that
+                // actually renders it, further below) so the per-page pager
+                // content below can also read them; see `isSettledAndDocked`
+                // and `hoistedFullyGone`'s own docs for why both matter.
+                val hoistedVisible = perPage == 1 && dockedPages[dockedPageKey(pager.settledPage)] == true
+                // Frozen at the last page seen while `hoistedVisible` was
+                // actually true. AnimatedVisibility (further below) keeps
+                // its content composed for the duration of its own exit
+                // fade, and `pager.settledPage` may have ALREADY moved on to
+                // a DIFFERENT, never-docked page by the time that fade
+                // starts (a fast swipe straight off a still-docked car) --
+                // reading `pager.settledPage` straight, at either use site,
+                // would relabel the still-fading badge with the new page's
+                // identity, or (see `isSettledAndDocked` below) incorrectly
+                // extend the new page's own hoisted grace period using the
+                // OLD page's fade state. Written plainly here in
+                // composition, not inside an effect/coroutine -- every
+                // reader in this same pass sees the just-written value
+                // immediately.
+                var frozenBlock by remember { mutableStateOf(realBlock(pager.settledPage)) }
+                if (hoistedVisible) frozenBlock = realBlock(pager.settledPage)
+                // Backs the AnimatedVisibility call site further below
+                // instead of a bare Boolean, so its own idle/target
+                // bookkeeping can answer "has the exit fade actually
+                // FINISHED", not just "has the dock flag flipped false" --
+                // see `hoistedFullyGone`'s own doc for why the two are
+                // different questions.
+                val hoistedVisibleState = remember { MutableTransitionState(false) }
+                // True only once the shared badge's own exit fade has
+                // genuinely finished playing (isIdle) settled on "gone"
+                // (!targetState) -- NOT the instant dockedPages flips false,
+                // which only means the SPRING settled, one phase before the
+                // 160ms crossfade even starts. Read synchronously here (a
+                // plain property read on a Compose-owned object, not a
+                // remembered duration or a coroutine delay), so using it
+                // below to gate the undock hand-off can't race the fade the
+                // way a `LaunchedEffect(...) { delay(160) }` guess could.
+                val hoistedFullyGone = hoistedVisibleState.isIdle && !hoistedVisibleState.targetState
                 Box(Modifier.fillMaxSize()) {
                     HorizontalPager(
                         state = pager,
@@ -3781,7 +3822,38 @@ internal fun GarageScreen(state: UiState, vm: AppViewModel) {
                         // "resolve once, don't re-derive per argument" rule this
                         // file already applies elsewhere (see TitleFlightOverlay's
                         // own textColorOverride doc).
-                        val isSettledAndDocked = perPage == 1 && page == pager.settledPage && dockedPages[dockedPageKey(page)] == true
+                        //
+                        // `|| (!hoistedFullyGone && page == frozenBlock)`, not
+                        // just the raw dockedPages flag: dockedPages flips
+                        // false the instant the shared badge's own SPRING
+                        // settles back undocked, one phase before its 160ms
+                        // crossfade (AnimatedVisibility, further above/below)
+                        // even starts. Handing `hoisted` back to null the
+                        // instant the flag flips used to switch this page's
+                        // ambient LocalHeroTitleFlight back to its own local
+                        // flight immediately -- cutting the shared flight off
+                        // from any further live position reports while it was
+                        // STILL VISIBLE, fading out for another 160ms. If the
+                        // user was still actively scrolling during that window
+                        // (a slow, deliberate scroll past the undock threshold,
+                        // as opposed to a fling that's already stopped by the
+                        // time the spring settles), the exiting badge kept
+                        // animating toward a now-frozen stale target while the
+                        // freshly-live local badge tracked real, still-moving
+                        // coordinates -- the two visibly diverging, reading as
+                        // the name flickering/partly vanishing rather than
+                        // gliding. Keeping `hoisted` (and therefore the shared
+                        // flight's own live position feed) alive for the FULL
+                        // fade, not just the spring phase, closes that gap.
+                        // Gated on `page == frozenBlock`, not just "any
+                        // currently-settled page": without it, swiping straight
+                        // from a still-docked car to a DIFFERENT, never-docked
+                        // one would incorrectly extend the NEW page's own
+                        // hoisted grace period off the OLD page's still-fading
+                        // badge -- frozenBlock is specifically which page that
+                        // badge belongs to.
+                        val isSettledAndDocked = perPage == 1 && page == pager.settledPage &&
+                            (dockedPages[dockedPageKey(page)] == true || (!hoistedFullyGone && page == frozenBlock))
                         // remember(page), not a fresh lambda literal per
                         // recomposition -- this whole per-page content block
                         // recomposes for reasons unrelated to docking (any
@@ -3977,24 +4049,18 @@ internal fun GarageScreen(state: UiState, vm: AppViewModel) {
                     // (e.g. settling on an undocked car right after a docked
                     // one), which read as the corner pill just vanishing/
                     // appearing with no transition at all.
-                    val hoistedVisible = perPage == 1 && dockedPages[dockedPageKey(pager.settledPage)] == true
-                    // Frozen at the last value seen while actually visible.
-                    // AnimatedVisibility keeps `content` composed for the
-                    // duration of its own exit fade, and `pager.settledPage`
-                    // has ALREADY moved on to the new (undocked) page by the
-                    // time that fade starts -- reading this straight would
-                    // visibly relabel the still-fading pill with the NEW
-                    // page's name/number instead of the one it was actually
-                    // showing when it started fading out. Written plainly
-                    // here in composition, not inside an effect/coroutine --
-                    // every reader in this SAME pass (including `content`,
-                    // invoked in this same pass) sees the just-written value
-                    // immediately, so there's no one-frame gap of the kind
-                    // that broke the `settled`/`transitioning` fix above.
-                    var frozenBlock by remember { mutableStateOf(realBlock(pager.settledPage)) }
-                    if (hoistedVisible) frozenBlock = realBlock(pager.settledPage)
+                    //
+                    // `hoistedVisible`/`frozenBlock` are computed once,
+                    // higher up (right after `dockedPageKey`), not here --
+                    // the per-page pager content above needs to read them
+                    // too (see `isSettledAndDocked`'s own doc). Backed by
+                    // `hoistedVisibleState`, a MutableTransitionState, not a
+                    // bare `visible: Boolean` -- see `hoistedFullyGone`'s own
+                    // doc for why knowing exactly when this fade FINISHES,
+                    // not just when it starts, matters.
+                    hoistedVisibleState.targetState = hoistedVisible
                     AnimatedVisibility(
-                        visible = hoistedVisible,
+                        visibleState = hoistedVisibleState,
                         enter = fadeIn(tween(160)),
                         exit = fadeOut(tween(160)),
                     ) {
@@ -11760,13 +11826,38 @@ private fun SplitExpandButton(
     val leftMorphed = action.active || leftPressed || expanded
     val rightMorphed = rightPressed || expanded
 
+    // Pinned to an EXACT height, not IntrinsicSize.Min (content-driven) --
+    // see the Row's own `.height(buttonHeight)` below for the full
+    // reasoning. Two things fall out of knowing this height exactly instead
+    // of only approximately:
+    //
+    // 1. A true semicircle on the outer (left/right) edges needs radius ==
+    //    height / 2 EXACTLY -- a flat 50.dp guess used to be the permanent
+    //    "fully rounded" target, close to correct for this button's usual
+    //    ~44dp height but not exact, and Android's own rounded-rect drawing
+    //    has UNDEFINED behavior (not a clean clamp) once the two radii on
+    //    one edge sum past that edge's real length -- so whenever this
+    //    button's actual height drifted even a little, the corner stopped
+    //    being a clean semicircle and started looking subtly off instead,
+    //    exactly the "close but not" a real pill shape.
+    // 2. Sizing the button to exactly fill the header row's own content
+    //    height (PebbleHeaderHeight minus that row's own 16dp top/bottom
+    //    reach -- see below) means this button's top/bottom clearance from
+    //    the card's own edge is the SAME 16dp its right clearance already
+    //    is (the header row's `padding(horizontal = 16.dp, ...)`), instead
+    //    of whatever a content-driven height happened to centre out to.
+    val buttonHeight = PebbleHeaderHeight - 32.dp
+    // Half the button's own exact height -- a true semicircle on one edge
+    // needs radius == height / 2, not more (see buttonHeight's own doc for
+    // why "more" isn't safe here).
+    val fullyRound = buttonHeight / 2
     val leftOuter by animateDpAsState(
-        if (leftMorphed) 16.dp else 50.dp,
+        if (leftMorphed) 16.dp else fullyRound,
         spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessLow),
         label = "splitOuterLeft",
     )
     val rightOuter by animateDpAsState(
-        if (rightMorphed) 16.dp else 50.dp,
+        if (rightMorphed) 16.dp else fullyRound,
         spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessLow),
         label = "splitOuterRight",
     )
@@ -11815,7 +11906,13 @@ private fun SplitExpandButton(
     }
 
     Row(
-        modifier = Modifier.height(IntrinsicSize.Min),
+        // A MINIMUM of buttonHeight, not IntrinsicSize.Min -- see that val's
+        // own doc for why matching it exactly is what makes every edge's
+        // clearance uniform. `heightIn`, not a hard `.height`, so a larger
+        // accessibility font scale (a taller label) can still grow this
+        // button past that floor instead of having its own content clipped
+        // to fit a number computed for the ordinary case.
+        modifier = Modifier.heightIn(min = buttonHeight),
         horizontalArrangement = Arrangement.spacedBy(3.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -11922,8 +12019,15 @@ internal fun MorphExpandButton(
         animationSpec = spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessLow),
         label = "morphChevron",
     )
+    // 25.dp, not 50.dp -- this button is a FIXED 50.dp square (below), so a
+    // true circle needs radius == half that, exactly. The old 50.dp target
+    // (a full size-worth of radius on a 50.dp box, 2x what's needed) relied
+    // on Android's rounded-rect drawing to clamp an oversized radius down to
+    // something sane -- which is UNDEFINED behavior, not a guaranteed clean
+    // clamp, once the corner radii sum past the side length they're on. See
+    // SplitExpandButton's own identical fix for the same reasoning.
     val corner by animateDpAsState(
-        targetValue = if (expanded) 14.dp else 50.dp,
+        targetValue = if (expanded) 14.dp else 25.dp,
         animationSpec = spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessLow),
         label = "morphExpandCorner",
     )
