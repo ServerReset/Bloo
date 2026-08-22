@@ -99,6 +99,21 @@ private const val UPDATE_REMINDER_DELAY_MS = 24L * 60 * 60 * 1000L
 private const val SHIZUKU_INSTALL_REQUEST_CODE = 4711
 
 sealed interface Screen {
+    /** The bootstrapping state, and ONLY the bootstrapping state: shown for
+     *  the brief window between process start and the cold-start auto-login
+     *  coroutine (see AppViewModel's init block) determining whether this is
+     *  a genuinely logged-out device (-> Login) or a returning signed-in one
+     *  (-> whatever loadGarage resolves once its network call returns). Used
+     *  to be UiState.screen's own default was Login itself -- meaning a
+     *  returning, already-authenticated user saw the full interactive login
+     *  form (fields, brand picker) render first on EVERY cold start, then
+     *  get slid/faded away once the real screen resolved a network round
+     *  trip later. That read as both a flash (a screen that doesn't belong
+     *  appearing then animating away) and the reported launch lag (staring
+     *  at an irrelevant form for however long the network takes). Renders as
+     *  just the app's own background -- see its own render branch
+     *  (Screens.kt) for why nothing else belongs here. */
+    data object Loading : Screen
     data object Login : Screen
     /** No vehicles enrolled (or still loading the first time). */
     data object Empty : Screen
@@ -138,7 +153,10 @@ sealed interface Screen {
  */
 @androidx.compose.runtime.Immutable
 data class UiState(
-    val screen: Screen = Screen.Login,
+    // Screen.Loading, NOT Screen.Login -- see Screen.Loading's own doc for
+    // why defaulting straight to Login was a real, every-launch bug for any
+    // returning signed-in user.
+    val screen: Screen = Screen.Loading,
     /** Biometric app-lock overlay: the real app renders (blurred) behind it. */
     val locked: Boolean = false,
     val loading: Boolean = false,
@@ -813,27 +831,48 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         // interactive login() below.
         viewModelScope.launch {
             val brands = store.loggedInBrands()
-            if (brands.isEmpty()) return@launch
+            if (brands.isEmpty()) {
+                // Genuinely logged out -- the real destination IS Login, so
+                // move off Screen.Loading (screen's own default) to it now
+                // rather than waiting on anything else to do it.
+                _state.update { it.copy(screen = Screen.Login) }
+                return@launch
+            }
             // repoFor(it) lazily creates+caches one VehicleRepository per brand
             // in the `repos` map (see repoFor above) so later calls just reuse it.
-            brands.forEach { repoFor(it) }
-            // Off the main thread: loadAll() touches CredentialStore's lazy
-            // `prefs`, which on first access does real work (MasterKey
-            // generation/lookup + EncryptedSharedPreferences setup) --
-            // exactly the "relatively expensive" cost that property's own
-            // doc comment warns about. This whole launch block otherwise
-            // runs on Main.immediate (viewModelScope's default dispatcher,
-            // which coroutine resumption doesn't change), and this is the
-            // one call in the cold-start auto-login path -- the app's
-            // everyday launch, for any returning user -- that actually did
-            // blocking work on it.
-            val accounts = withContext(Dispatchers.IO) { credentialStore.loadAll() }
-            _state.update { it.copy(accounts = accounts) }
-            val locked = settingsStore.appearance.first().biometricLock && canUseBiometrics()
-            // Load the garage either way so it's ready (and visible, blurred)
-            // behind the lock overlay; the overlay just gates interaction.
-            if (locked) _state.update { it.copy(locked = true) }
-            loadGarage()
+            //
+            // Wrapped in try/catch, unlike before Screen.Loading existed: this
+            // block used to have nothing riding on it completing -- the
+            // default screen was Login itself, so any exception here just
+            // left the user looking at an already-correct (if not-yet-auto-
+            // filled) login form. Now the default is a static Loading screen
+            // with no interactive escape, so an exception ANYWHERE before
+            // loadGarage() itself takes over (which has its own, separate
+            // per-brand error handling -- see loadGarageInner) must not leave
+            // the user stuck looking at it forever.
+            try {
+                brands.forEach { repoFor(it) }
+                // Off the main thread: loadAll() touches CredentialStore's lazy
+                // `prefs`, which on first access does real work (MasterKey
+                // generation/lookup + EncryptedSharedPreferences setup) --
+                // exactly the "relatively expensive" cost that property's own
+                // doc comment warns about. This whole launch block otherwise
+                // runs on Main.immediate (viewModelScope's default dispatcher,
+                // which coroutine resumption doesn't change), and this is the
+                // one call in the cold-start auto-login path -- the app's
+                // everyday launch, for any returning user -- that actually did
+                // blocking work on it.
+                val accounts = withContext(Dispatchers.IO) { credentialStore.loadAll() }
+                _state.update { it.copy(accounts = accounts) }
+                val locked = settingsStore.appearance.first().biometricLock && canUseBiometrics()
+                // Load the garage either way so it's ready (and visible, blurred)
+                // behind the lock overlay; the overlay just gates interaction.
+                if (locked) _state.update { it.copy(locked = true) }
+                loadGarage()
+            } catch (e: Exception) {
+                AppLog.log("⚠ cold-start auto-login failed: ${e.message}")
+                _state.update { if (it.screen == Screen.Loading) it.copy(screen = Screen.Login) else it }
+            }
         }
     }
 

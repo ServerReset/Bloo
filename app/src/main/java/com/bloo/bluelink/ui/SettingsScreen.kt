@@ -400,9 +400,24 @@ private fun SettingsHeaderRow(state: UiState) {
     // onPositioned, so it doesn't inherit hysteresis left over from
     // whichever DIFFERENT page (a car) was settled on the shared flight
     // before this one -- see HeroTitleFlight.onSettled's own doc.
+    //
+    // Runs SYNCHRONOUSLY, during composition -- NOT inside a LaunchedEffect.
+    // This WAS a LaunchedEffect(titleFlight) until an audit caught that it
+    // never actually got the fix its own comment claimed: a coroutine only
+    // starts running after the composition pass that adopts the new flight
+    // has already committed, which is strictly AFTER TitleFlightOverlay's
+    // own synchronous `val docked by flight.docked` read (and its cold-mount
+    // snapTo) has already consumed whatever STALE state the newly-adopted
+    // flight was left holding by whichever car page drove it last -- one
+    // whole recomposition too late, reading as a visible pop/flash right on
+    // the Settings-slot hand-off. See HeroHeader's identical
+    // `lastCorrectedFlight` latch (Screens.kt) for the proven fix this
+    // mirrors.
     val lastCoords = remember { mutableStateOf<LayoutCoordinates?>(null) }
-    LaunchedEffect(titleFlight) {
+    var lastCorrectedFlight by remember { mutableStateOf<HeroTitleFlight?>(null) }
+    if (lastCorrectedFlight !== titleFlight) {
         lastCoords.value?.let { titleFlight?.onSettled(it.positionInRoot()) }
+        lastCorrectedFlight = titleFlight
     }
     Column(Modifier.fillMaxWidth().padding(horizontal = 4.dp)) {
         Text(

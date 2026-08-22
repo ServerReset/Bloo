@@ -37,6 +37,7 @@ import androidx.compose.animation.scaleOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.SizeTransform
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.animation.core.Animatable
@@ -601,6 +602,15 @@ fun BlooApp(vm: AppViewModel) {
             // The garage draws full-bleed (content scrolls behind the bars and
             // handles its own insets); other screens stay inset by the Scaffold.
             when (screen) {
+                // Bootstrapping only -- see Screen.Loading's own doc
+                // (AppViewModel.kt) for why this exists at all. Deliberately
+                // just the app's own themed background (already painted
+                // behind this whole Scaffold) with nothing else: no spinner,
+                // no login form, no flash of a screen that doesn't belong.
+                // This is the FIRST thing a cold start ever renders, so it
+                // has to stay cheap and free of anything that could itself
+                // pop in a frame late.
+                Screen.Loading -> Box(Modifier.fillMaxSize().padding(padding))
                 Screen.Login -> Box(Modifier.padding(padding)) {
                     LoginScreen(
                         loading = state.loading,
@@ -1134,7 +1144,21 @@ private fun OnboardingSetupPage(vm: AppViewModel, state: UiState, context: andro
         // the dialog finished, the one un-animated content swap left in a step
         // whose sibling cards (notifications, fingerprint) at least keep the
         // same MorphButton in place and only recolor it.
-        AnimatedContent(targetState = syncEnabled, label = "onboardingSyncDone") { enabled ->
+        AnimatedContent(
+            targetState = syncEnabled,
+            // Explicit, not the implicit default -- every other AnimatedContent
+            // in this file specifies its own transitionSpec; this one didn't,
+            // which meant a real height difference between the two states (the
+            // MorphButton's Material3 minimum touch target vs. the plain
+            // "enabled" row) snapped instantly under the fade instead of
+            // animating, a small but visible pop right when Drive sync
+            // finishes setting up.
+            transitionSpec = {
+                (fadeIn(tween(180)) togetherWith fadeOut(tween(180)))
+                    .using(SizeTransform(clip = false))
+            },
+            label = "onboardingSyncDone",
+        ) { enabled ->
             if (enabled) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(Icons.Filled.CheckCircle, contentDescription = null, tint = scheme.primary, modifier = Modifier.size(18.dp))
@@ -13675,22 +13699,43 @@ private fun CarMap(location: GeoLocation, modifier: Modifier = Modifier) {
                 val wrappedX = MapTiles.wrapX(tx, zoom)
                 val offX = tx * tilePx - originX
                 val offY = ty * tilePx - originY
-                AsyncImage(
-                    model = ImageRequest.Builder(context)
-                        .data(MapTiles.tileUrl(zoom, wrappedX, ty))
-                        // OSM returns a "blocked" placeholder tile to clients whose
-                        // User-Agent doesn't identify the app. This one used to read
-                        // "Bloo Bluelink companion app" -- no version, no contact URL,
-                        // i.e. still shaped like the string that gets blocked, while
-                        // the widget and watch had already been fixed.
-                        .setHeader("User-Agent", MapTiles.userAgent("Android"))
-                        .crossfade(true)
-                        .build(),
-                    contentDescription = null,
-                    modifier = Modifier
-                        .size(tileDp)
-                        .offset(x = with(density) { offX.toDp() }, y = with(density) { offY.toDp() }),
-                )
+                // key(), not a bare loop body: gives each tile a stable slot
+                // keyed by its own tile coordinate, so the remember() just
+                // below is safe to use inside a plain for-loop (whose visible
+                // tile SET changes as the car/box moves) without its state
+                // silently reattaching to the wrong tile between compositions.
+                key(wrappedX, ty) {
+                    // Remembered, not rebuilt on every recomposition of this
+                    // composable (which happens on every `location` update,
+                    // i.e. while the car/phone is moving): Coil's ImageRequest
+                    // has no equals()/hashCode() override, so a fresh .build()
+                    // every time is a reference-distinct object even when the
+                    // URL/headers are identical -- AsyncImage keys its load
+                    // launch on that identity, so an unremembered request
+                    // restarted the whole load pipeline (a blank frame while
+                    // it "reloads") for every visible tile on every location
+                    // update, even for tiles already sitting in Coil's memory
+                    // cache -- visible flicker across the whole map.
+                    val request = remember(wrappedX, ty, zoom) {
+                        ImageRequest.Builder(context)
+                            .data(MapTiles.tileUrl(zoom, wrappedX, ty))
+                            // OSM returns a "blocked" placeholder tile to clients whose
+                            // User-Agent doesn't identify the app. This one used to read
+                            // "Bloo Bluelink companion app" -- no version, no contact URL,
+                            // i.e. still shaped like the string that gets blocked, while
+                            // the widget and watch had already been fixed.
+                            .setHeader("User-Agent", MapTiles.userAgent("Android"))
+                            .crossfade(true)
+                            .build()
+                    }
+                    AsyncImage(
+                        model = request,
+                        contentDescription = null,
+                        modifier = Modifier
+                            .size(tileDp)
+                            .offset(x = with(density) { offX.toDp() }, y = with(density) { offY.toDp() }),
+                    )
+                }
             }
         }
         // A pin whose tip points at the centred car position.
