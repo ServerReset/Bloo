@@ -4054,6 +4054,22 @@ internal fun GarageScreen(state: UiState, vm: AppViewModel) {
                             // near dotsAlphaState for why this is a plain
                             // `.value =` write, not a `by` delegate.
                             onNameBoundsChanged = { nameBoundsPxState.value = it },
+                            // Keeps dockedPages in sync with THIS shared
+                            // badge's own resting state, in both directions
+                            // -- see onSettledChanged's own doc for why
+                            // undocking used to be reported off the raw
+                            // scroll-threshold flag instead (from
+                            // VehicleDetailContent/SettingsScreen), which cut
+                            // this exact instance off from further position
+                            // updates while its own exit spring was often
+                            // still mid-flight, reading as a stutter back
+                            // toward the pebble. Keyed off `frozenBlock`, not
+                            // `pager.settledPage` -- this can still fire
+                            // during the AnimatedVisibility exit fade, by
+                            // which point the pager may have already settled
+                            // onto a different page; `frozenBlock` is the
+                            // page this instance was actually mounted for.
+                            onSettledChanged = { atRest -> dockedPages[dockedPageKey(frozenBlock)] = atRest },
                             measureContent = {
                                 Text(
                                     title,
@@ -8765,20 +8781,36 @@ internal fun BoxScope.TitleFlightOverlay(
      *  are not, and paid for (and were destabilized by) a correction they
      *  never needed when this used to run for all of them. */
     containerRelative: Boolean = false,
-    /** Reports whether this overlay is currently docked AND at rest (not
-     *  mid-spring) -- i.e. the ONLY moment it's actually safe for a caller
-     *  to swap this badge out for a different instance without a visible
-     *  jump. VehicleDetailContent uses this (not the raw, unsettled
-     *  `flight.docked`) to decide when to hand its per-page badge off to
-     *  GarageScreen's shared hoisted one: reporting the instant `docked`
-     *  flips true used to fire the hand-off mid-spring, before this
-     *  overlay's own animation had actually arrived at the corner -- the
-     *  incoming hoisted instance then cold-starts with `progress.snapTo()`
-     *  (see `mounted` above) at whatever position `docked` says, which is
-     *  NOT yet where this (still-arriving) instance was actually drawing,
-     *  reading as the transition snapping partway through instead of
-     *  gliding all the way in. Delaying the hand-off until the spring
-     *  itself reports "arrived" removes that gap entirely. */
+    /** Reports this overlay's resting dock state (the argument) EVERY time
+     *  it genuinely arrives at rest -- i.e. the instant a spring finishes,
+     *  in EITHER direction, not just docked-arriving. The ONLY moments
+     *  it's actually safe for a caller to swap this badge out for a
+     *  different instance, or to stop feeding it live position updates,
+     *  without a visible jump.
+     *
+     *  Docking direction: VehicleDetailContent uses this (not the raw,
+     *  unsettled `flight.docked`) to decide when to hand its per-page badge
+     *  off to GarageScreen's shared hoisted one -- reporting the instant
+     *  `docked` flips true used to fire the hand-off mid-spring, before this
+     *  overlay's own animation had actually arrived at the corner, reading
+     *  as the transition snapping partway through instead of gliding all
+     *  the way in.
+     *
+     *  Undocking direction: reporting the instant `docked` flips false (the
+     *  raw flag) used to fire the hand-off BACK to the per-page local badge
+     *  while this (shared, about-to-be-abandoned) instance's own spring was
+     *  still mid-flight -- and the moment the hand-off happens, this
+     *  instance stops receiving live position reports at all (the ambient
+     *  `LocalHeroTitleFlight` switches to the local flight instead), so its
+     *  still-running exit spring kept animating toward a now-FROZEN, stale
+     *  target while the freshly-visible local badge tracked live, still-
+     *  moving scroll coordinates -- the two visibly diverging for the
+     *  ~160ms crossfade window, reading as the pill stuttering back toward
+     *  the pebble instead of gliding.
+     *
+     *  Fires unconditionally on both directions (not just "became true")
+     *  precisely so callers can react the same way to either -- see the two
+     *  call sites' own doc for how each uses it. */
     onSettledChanged: ((Boolean) -> Unit)? = null,
     /** The flying text itself. A plain `Text(name, ...)` for every surface
      *  but the hoisted one, which wraps its own `AnimatedContent` for the
@@ -8872,12 +8904,16 @@ internal fun BoxScope.TitleFlightOverlay(
             transitioning = false
         }
     }
-    // See `onSettledChanged`'s own doc -- "settled" means genuinely at
-    // rest in the docked position, not just `docked` itself (which flips
-    // the INSTANT the raw scroll threshold crosses, well before this
-    // overlay's own spring above has actually arrived there).
-    val settled = docked && !transitioning
-    LaunchedEffect(settled) { onSettledChanged?.invoke(settled) }
+    // See `onSettledChanged`'s own doc -- fires the RESTING dock state
+    // (`docked`'s own value at the moment `transitioning` clears) every
+    // time a spring genuinely finishes, in either direction, not just
+    // "became docked". `docked` itself flips the INSTANT the raw scroll
+    // threshold crosses, well before this overlay's own spring above has
+    // actually arrived anywhere -- this is what actually being at rest
+    // means.
+    LaunchedEffect(transitioning, docked) {
+        if (!transitioning) onSettledChanged?.invoke(docked)
+    }
     // Captures this overlay's own hosting container's root-window position,
     // so the root-absolute anchors below (HeroHeader's inline title report
     // at line ~6007, and this composable's own docked-anchor measurer just
@@ -8924,7 +8960,22 @@ internal fun BoxScope.TitleFlightOverlay(
     // tiny size, then visibly re-clipped into the real pill shape the
     // instant the measurement landed -- reading as the shadow snapping from
     // square to pill partway through, not just fading in late.
-    val active = (docked || transitioning) && dockedAnchor.value != null
+    // NOT also gated on `dockedAnchor.value != null` any more -- see the
+    // chrome Box's own alpha computation below for why. That extra
+    // requirement used to mean the whole chrome subtree stayed UNCOMPOSED
+    // (not just invisible) until the first real measurement landed, which
+    // was fine for a badge that's continuously alive from idle -- but
+    // GarageScreen's shared hoisted badge is a FRESH mount on every
+    // page-switch hand-off (see its own doc), discarding this exact
+    // `dockedAnchor` along with everything else. On such a remount, `docked`
+    // can already be true (read straight off the reused shared flight
+    // object) for one or more frames before `dockedAnchor` reports again --
+    // during that window the subtree wasn't composed at all, then popped in
+    // at full opacity the instant it finally was, reading as the shadow
+    // flickering/snapping specifically on a fast page-switch between a
+    // static and a floating car, as opposed to the smooth scroll-driven
+    // dock case this was originally tuned against.
+    val active = docked || transitioning
     val measure = measureContent ?: content
     // A SEPARATE, permanently static (never transformed) measuring copy --
     // exists purely to answer "where does the pill rest, and how big is it"
@@ -8983,7 +9034,14 @@ internal fun BoxScope.TitleFlightOverlay(
     // transitioning, rather than composing it always and just animating
     // its alpha to 0. One badge paying that cost while idle is nothing; a
     // grid of several simultaneously-visible cards each paying it, all the
-    // time, is what was dragging the rest of the app down.
+    // time, is what was dragging the rest of the app down. `active` no
+    // longer ALSO requires `dockedAnchor.value != null` to start composing
+    // (see that val's own doc) -- so this Box can now be composed for one or
+    // more frames before its first real measurement lands. Kept invisible
+    // for exactly that window by the alpha computation just below, rather
+    // than by staying unmounted, so a fresh mount (a page-switch hand-off)
+    // fades this subtree in once real geometry is known instead of popping
+    // it in at full opacity the instant it finally is.
     if (active) {
     Box(
         Modifier
@@ -8991,7 +9049,13 @@ internal fun BoxScope.TitleFlightOverlay(
             .graphicsLayer {
                 val p = progress.value
                 val clamped = p.coerceIn(0f, 1f)
-                alpha = clamped
+                // 0f, not `clamped`, until dockedAnchor has actually reported
+                // -- this is the SAME guarantee the old dockedAnchor-gated
+                // `active` used to provide (an empty, wrongly-sized Row never
+                // visibly clips into its real pill shape), just expressed as
+                // an invisible-but-composed frame instead of an unmounted
+                // one, so the eventual reveal is a fade instead of a pop.
+                alpha = if (dockedAnchor.value == null) 0f else clamped
                 // 0.55 start, not 0f -- a shape growing from nothing looks like
                 // it's materializing out of a point; starting partway there
                 // reads as "arriving", not "being born".
@@ -9263,15 +9327,21 @@ private fun VehicleDetailContent(
     // a moment where the two disagree about which object HeroHeader should
     // be writing its real position/colour/scale into.
     val liveFlight = hoisted?.flight ?: local.flight
-    val liveDocked by liveFlight.docked
-    // Undocking is reported immediately off the raw flag -- there's no
-    // hand-off-timing hazard on the way OUT (the shared hoisted badge, if
-    // any, is what's springing back to inline; this page's own local badge
-    // just needs to know to start rendering again). Docking is instead
-    // reported by the local badge's own TitleFlightOverlay call below, via
-    // `onSettledChanged`, once its spring has actually arrived -- not the
-    // instant this raw flag flips -- see that parameter's own doc for why.
-    LaunchedEffect(liveDocked) { if (!liveDocked) onDockedChanged?.invoke(false) }
+    // dockedPages is now driven ENTIRELY by whichever TitleFlightOverlay is
+    // actually live's own `onSettledChanged` -- this page's own local badge
+    // below while `hoisted == null`, or GarageScreen's shared hoisted badge
+    // (its own call site) while `hoisted != null`. Used to also report the
+    // undocking direction immediately off the raw `liveFlight.docked` flag
+    // here -- reasoned at the time to have "no hand-off-timing hazard on the
+    // way out", which was wrong: the instant that raw report flipped
+    // `dockedPages` false, the shared hoisted badge got torn down as the
+    // live one (this page's local flight took back over), which cut the
+    // SHARED flight off from any further position updates while its own
+    // exit spring was often still mid-flight -- it kept animating toward a
+    // now-frozen stale target while the freshly-visible local badge tracked
+    // live coordinates, the two visibly diverging for the crossfade window.
+    // onSettledChanged (fired only once a spring genuinely finishes, see its
+    // own doc) doesn't have that hazard in either direction.
     if (hoisted != null) {
         // Register this page as the one actually driving the hoisted badge.
         // Idempotent, so re-running it every recomposition while hoisted is
@@ -9345,10 +9415,10 @@ private fun VehicleDetailContent(
                 onClick = { scope.launch { scroll.animateScrollTo(0) } },
                 onNameBoundsChanged = onNameBoundsChanged,
                 containerRelative = gridColumn,
-                // See onDockedChanged's own doc just above -- docking is
-                // reported here, once this badge's own spring has actually
-                // arrived, rather than off the raw scroll-threshold flag.
-                onSettledChanged = { settled -> if (settled) onDockedChanged?.invoke(true) },
+                // See `liveFlight`'s own doc just above -- dockedPages is
+                // driven entirely off this, in both directions, rather than
+                // the raw scroll-threshold flag.
+                onSettledChanged = { atRest -> onDockedChanged?.invoke(atRest) },
                 // See `pageLabel`'s own doc -- matches the shared hoisted
                 // badge's own extraContent (Screens.kt, GarageScreen) so
                 // the two instances' chrome measures to the same width and

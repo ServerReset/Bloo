@@ -535,16 +535,15 @@ internal fun SettingsScreen(
   val flight = remember { HeroTitleFlight(topInsetPx, with(density) { TitleDockHysteresis.toPx() }) }
   SideEffect { flight.topInsetPx = topInsetPx }
   val local = LocalSettingsPillState(flight)
-  // Mirrors VehicleDetailContent's identical `liveFlight`/`liveDocked` --
-  // see that composable's own doc for the full reasoning.
+  // Mirrors VehicleDetailContent's identical `liveFlight` -- see that
+  // composable's own doc for the full reasoning. dockedPages is driven
+  // entirely off whichever TitleFlightOverlay is actually live's own
+  // `onSettledChanged` now, in BOTH directions -- used to also report
+  // undocking immediately off the raw `liveFlight.docked` flag here, which
+  // cut the shared hoisted badge off from further position updates while
+  // its own exit spring was often still mid-flight (see onSettledChanged's
+  // own doc, Screens.kt, for the full reasoning).
   val liveFlight = hoisted?.flight ?: local.flight
-  val liveDocked by liveFlight.docked
-  // Undocking is reported immediately off the raw flag; docking is instead
-  // reported by the local badge's own TitleFlightOverlay call below, via
-  // `onSettledChanged`, once its spring has actually arrived -- mirrors
-  // VehicleDetailContent's identical split; see that parameter's own doc
-  // (Screens.kt) for the hand-off-timing bug this avoids.
-  LaunchedEffect(liveDocked) { if (!liveDocked) onDockedChanged?.invoke(false) }
   if (hoisted != null) {
       // Register this page as the one actually driving the hoisted badge.
       // Idempotent -- see VehicleDetailContent's own identical guard for
@@ -1953,9 +1952,9 @@ internal fun SettingsScreen(
                 // Fixed -- Settings has no hero photo to morph a colour against.
                 textColorOverride = MaterialTheme.colorScheme.onSurface,
                 onClick = { settingsScope.launch { settingsGridState.animateScrollToItem(0) } },
-                // See onDockedChanged's own doc just above -- mirrors
+                // See `liveFlight`'s own doc just above -- mirrors
                 // VehicleDetailContent's identical wiring.
-                onSettledChanged = { settled -> if (settled) onDockedChanged?.invoke(true) },
+                onSettledChanged = { atRest -> onDockedChanged?.invoke(atRest) },
                 // See `pageLabel`'s own doc -- matches the shared hoisted
                 // badge's own extraContent so the hand-off has no width to pop.
                 extraContent = pageLabel?.let { label ->
