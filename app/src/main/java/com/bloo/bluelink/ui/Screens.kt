@@ -8630,6 +8630,15 @@ internal class HeroTitleFlight(topInsetPx: Float, private val hysteresisPx: Floa
     // comment) and the very next onPositioned/onSettled call just picks it
     // up -- no rebuild, no reset.
     var topInsetPx: Float = topInsetPx
+    // Live source for the SAME scroll offset the real hero card's own
+    // Column places itself against (its call site's `ScrollState.value`,
+    // wired in via `SideEffect`, mirroring `topInsetPx`'s identical
+    // pattern) -- see `inlinePos`'s own doc for why this exists at all.
+    // Defaults to a constant 0f (never-scrolled) rather than null so every
+    // read site can call it unconditionally; a surface that never wires
+    // this in (there is none currently, but a future one could exist)
+    // degrades to "no scroll correction", not a crash.
+    var scrollValuePx: () -> Float = { 0f }
     private var inlineX by mutableFloatStateOf(0f)
     // Null, not a fabricated off-screen sentinel (this used to be
     // Float.MAX_VALUE). The old sentinel relied entirely on an accident of
@@ -8645,6 +8654,13 @@ internal class HeroTitleFlight(topInsetPx: Float, private val hysteresisPx: Floa
     // position" an explicit state TitleFlightOverlay checks for and fades
     // itself out on, rather than an invisible-by-coincidence magic number.
     private var inlineYState by mutableStateOf<Float?>(null)
+    // The SAME scrollValuePx() reading, captured at the exact moment
+    // inlineYState was last set -- see `inlinePos`'s own doc for why this
+    // exists. Every onPositioned/onSettled report is itself already the
+    // ground truth for "where is the anchor right now", scroll included;
+    // this baseline is what lets `inlinePos` correct that report for
+    // scrolling that's happened SINCE, without needing another report.
+    private var baselineScrollPx by mutableFloatStateOf(0f)
 
     // Bumped on every real onPositioned/onSettled report -- no external
     // reader left (an earlier round's readiness gate that consumed this via
@@ -8657,6 +8673,7 @@ internal class HeroTitleFlight(topInsetPx: Float, private val hysteresisPx: Floa
     fun onPositioned(offset: Offset) {
         inlineX = offset.x
         inlineYState = offset.y
+        baselineScrollPx = scrollValuePx()
         // Hysteresis computed HERE, not inside `docked`'s derivedStateOf
         // below -- onPositioned is the one real event source for inlineY
         // changes, called exactly once per genuine position report.
@@ -8688,6 +8705,7 @@ internal class HeroTitleFlight(topInsetPx: Float, private val hysteresisPx: Floa
     fun onSettled(offset: Offset) {
         inlineX = offset.x
         inlineYState = offset.y
+        baselineScrollPx = scrollValuePx()
         dockedNow = offset.y < topInsetPx
         reportGen++
     }
@@ -8698,9 +8716,29 @@ internal class HeroTitleFlight(topInsetPx: Float, private val hysteresisPx: Floa
      *  cause recomposition. Null until the first real [onPositioned]/
      *  [onSettled] report lands -- see [inlineYState]'s own doc for why
      *  that's a deliberate "nothing to show yet" rather than an off-screen
-     *  sentinel. */
+     *  sentinel.
+     *
+     *  Corrected for scroll that's happened SINCE the last report, not just
+     *  the report's own raw Y -- `onPositioned`/`onSettled` only fire once
+     *  per real layout pass (Compose's own `onGloballyPositioned` callbacks
+     *  are dispatched in a post-layout sweep, strictly after every sibling
+     *  in the tree -- including [TitleFlightOverlay]'s own overlay Box --
+     *  has ALREADY been placed for that same frame), so a read of the raw
+     *  report during continuous fast scrolling was always exactly one
+     *  frame's worth of scroll delta stale: the real hero card painted with
+     *  THIS frame's true scroll offset, while the flying Text painted with
+     *  the offset the anchor had on the frame before. That's what made the
+     *  name visibly trail the card it's supposed to be "planted" on rather
+     *  than track it 1:1. [scrollValuePx] is instead a live, synchronous
+     *  field read (the same `ScrollState.value` the real Column places
+     *  itself against) available in the SAME placement phase this is read
+     *  from -- so subtracting how much scroll has moved since the last
+     *  report closes the gap completely, with no callback/dispatch-order
+     *  dependency left in the per-frame scroll path at all. */
     override val inlinePos: androidx.compose.runtime.State<Offset?> =
-        derivedStateOf { inlineYState?.let { Offset(inlineX, it) } }
+        derivedStateOf {
+            inlineYState?.let { y -> Offset(inlineX, y - (scrollValuePx() - baselineScrollPx)) }
+        }
 
     /** Has the inline title's top edge crossed the status bar -- with
      *  hysteresis, not one bare threshold. A single cutoff meant a scroll
@@ -9385,6 +9423,12 @@ private fun VehicleDetailContent(
     // the new inset value.
     val heroFlight = remember { HeroTitleFlight(topInsetPx, with(density) { TitleDockHysteresis.toPx() }) }
     SideEffect { heroFlight.topInsetPx = topInsetPx }
+    // Same live-scroll-correction wiring as topInsetPx just above -- see
+    // `HeroTitleFlight.inlinePos`'s own doc for why this closes the
+    // "name feels a frame behind the card" gap. `scroll` is the exact
+    // ScrollState the real hero card's own Column (below) places itself
+    // against, so both read the identical, same-frame-fresh offset.
+    SideEffect { heroFlight.scrollValuePx = { scroll.value.toFloat() } }
     val local = LocalNamePillState(flight = heroFlight)
     // Whichever flight is actually LIVE for this page right now: the
     // caller's shared one while genuinely hoisted, this page's own
@@ -9576,6 +9620,13 @@ private fun ExpandedCar(
     // flight's accumulated dock/position state.
     val titleFlight = remember { HeroTitleFlight(topInsetPx, with(density) { TitleDockHysteresis.toPx() }) }
     SideEffect { titleFlight.topInsetPx = topInsetPx }
+    // Same live-scroll-correction wiring as VehicleDetailContent's identical
+    // construction site -- see HeroTitleFlight.inlinePos's own doc.
+    // `controlsScroll`, not `pebblesScroll`: per this composable's own doc
+    // just above, controlsScroll is always the ScrollState paired with
+    // whichever column currently hosts CriticalContent's HeroHeader,
+    // regardless of which physical side a flip has it on.
+    SideEffect { titleFlight.scrollValuePx = { controlsScroll.value.toFloat() } }
     // CriticalContent's own HeroHeader is the real hero photo card here --
     // this view was NOT missing one the way the doc above used to claim;
     // CarHeaderRow's plain-text name and HeroHeader's own (on the photo)
