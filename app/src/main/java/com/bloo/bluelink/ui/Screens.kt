@@ -10049,7 +10049,8 @@ private fun ControlsPebble(v: Vehicle, state: UiState, vm: AppViewModel, dragHan
         color = MaterialTheme.colorScheme.surfaceVariant,
         contentColor = MaterialTheme.colorScheme.onSurface,
     ) {
-        Box(Modifier.fillMaxSize().padding(horizontal = 12.dp)) {
+        // Asymmetric padding to match pebble header alignment: more left, less right.
+        Box(Modifier.fillMaxSize().padding(start = 12.dp, end = 8.dp)) {
             // PrimaryActions' own default start padding (26.dp) plus this
             // Box's 12.dp put the lock icon noticeably further right than
             // every other pebble's header icon (Charge, Climate, ...), which
@@ -11904,11 +11905,11 @@ private fun SplitExpandButton(
     // without touching how the two halves size against each other at all.
     var rowHeightDp by remember { mutableStateOf(50.dp) }
     val density = LocalDensity.current
-    // Half the row's real height, not the whole thing -- a true semicircle
-    // on one edge needs radius == height / 2 exactly; anything past that
-    // is the same undefined-overshoot territory the flat 50.dp guess used
-    // to risk.
-    val fullyRound = rowHeightDp / 2
+    // Half the row's real height, plus a small buffer to ensure full
+    // roundness when collapsed (avoids any flat edges from rounding
+    // quirks). A true semicircle needs radius == height / 2, but adding
+    // 1dp ensures it renders as fully rounded even with subpixel effects.
+    val fullyRound = rowHeightDp / 2 + 1.dp
     val leftOuter by animateDpAsState(
         if (leftMorphed) 16.dp else fullyRound,
         spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessLow),
