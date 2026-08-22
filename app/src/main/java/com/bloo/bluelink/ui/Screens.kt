@@ -10507,7 +10507,9 @@ internal fun CustomPaletteSwatch(
             }
         }
         Spacer(Modifier.height(2.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(2.dp), verticalAlignment = Alignment.CenterVertically) {
+        // Standard gap between connected button elements (matches SplitExpandButton's
+        // own 3dp gap for visual consistency across all grouped controls).
+        Row(horizontalArrangement = Arrangement.spacedBy(3.dp), verticalAlignment = Alignment.CenterVertically) {
             Text(
                 palette.name,
                 style = MaterialTheme.typography.labelSmall,
@@ -11290,7 +11292,9 @@ private fun StateControl(
         val coverTargets = LocalForceExpanded.current
         val groupBtnSize = if (coverTargets) 58.dp else 50.dp
         val actionIconSize = if (coverTargets) 26.dp else 22.dp
-        Row(horizontalArrangement = Arrangement.spacedBy(2.dp), verticalAlignment = Alignment.CenterVertically) {
+        // Standard gap between connected button elements (matches SplitExpandButton's
+        // own 3dp gap for visual consistency across all grouped controls).
+        Row(horizontalArrangement = Arrangement.spacedBy(3.dp), verticalAlignment = Alignment.CenterVertically) {
             groupActions.forEachIndexed { i, action ->
                 MorphButton(
                     onClick = action.onClick,
