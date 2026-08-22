@@ -11877,31 +11877,36 @@ private fun SplitExpandButton(
     val leftMorphed = action.active || leftPressed || expanded
     val rightMorphed = rightPressed || expanded
 
-    // Pinned to an EXACT height, not IntrinsicSize.Min (content-driven) --
-    // see the Row's own `.height(buttonHeight)` below for the full
-    // reasoning. Two things fall out of knowing this height exactly instead
-    // of only approximately:
+    // The row's own real, measured height (see the Row's onSizeChanged
+    // below) -- 50.dp is only the value used for the very first frame,
+    // before a real measurement lands. A flat 50.dp guess used to be the
+    // PERMANENT target: close to correct for this button's usual ~40-48dp
+    // content-driven height, but not exact, and Android's own rounded-rect
+    // drawing has UNDEFINED behavior (not a clean clamp) once the two
+    // radii on one edge sum past that edge's real length -- so the corner
+    // wasn't quite a clean semicircle.
     //
-    // 1. A true semicircle on the outer (left/right) edges needs radius ==
-    //    height / 2 EXACTLY -- a flat 50.dp guess used to be the permanent
-    //    "fully rounded" target, close to correct for this button's usual
-    //    ~44dp height but not exact, and Android's own rounded-rect drawing
-    //    has UNDEFINED behavior (not a clean clamp) once the two radii on
-    //    one edge sum past that edge's real length -- so whenever this
-    //    button's actual height drifted even a little, the corner stopped
-    //    being a clean semicircle and started looking subtly off instead,
-    //    exactly the "close but not" a real pill shape.
-    // 2. Sizing the button to exactly fill the header row's own content
-    //    height (PebbleHeaderHeight minus that row's own 16dp top/bottom
-    //    reach -- see below) means this button's top/bottom clearance from
-    //    the card's own edge is the SAME 16dp its right clearance already
-    //    is (the header row's `padding(horizontal = 16.dp, ...)`), instead
-    //    of whatever a content-driven height happened to centre out to.
-    val buttonHeight = PebbleHeaderHeight - 32.dp
-    // Half the button's own exact height -- a true semicircle on one edge
-    // needs radius == height / 2, not more (see buttonHeight's own doc for
-    // why "more" isn't safe here).
-    val fullyRound = buttonHeight / 2
+    // A previous version of this fix tried to force this button to an
+    // EXACT computed height instead of measuring it (replacing
+    // IntrinsicSize.Min outright) -- that broke the left/right halves'
+    // height PARITY: IntrinsicSize.Min is a real two-pass measurement
+    // (every child's own min intrinsic height first, the max of those
+    // becomes the Row's tight height, then every `fillMaxHeight()` child
+    // remeasures against that) that's what guarantees the label+icon
+    // button and the chevron nub end up the same height as each other
+    // in the first place; a plain `heightIn(min = ...)` floor doesn't
+    // reconcile the two the same way, and the chevron rendered visibly
+    // shorter than the label button as a result. Keeping the real
+    // IntrinsicSize.Min layout and only reading its OUTPUT (via
+    // onSizeChanged) for the corner-radius math gets the correct radius
+    // without touching how the two halves size against each other at all.
+    var rowHeightDp by remember { mutableStateOf(50.dp) }
+    val density = LocalDensity.current
+    // Half the row's real height, not the whole thing -- a true semicircle
+    // on one edge needs radius == height / 2 exactly; anything past that
+    // is the same undefined-overshoot territory the flat 50.dp guess used
+    // to risk.
+    val fullyRound = rowHeightDp / 2
     val leftOuter by animateDpAsState(
         if (leftMorphed) 16.dp else fullyRound,
         spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessLow),
@@ -11957,13 +11962,11 @@ private fun SplitExpandButton(
     }
 
     Row(
-        // A MINIMUM of buttonHeight, not IntrinsicSize.Min -- see that val's
-        // own doc for why matching it exactly is what makes every edge's
-        // clearance uniform. `heightIn`, not a hard `.height`, so a larger
-        // accessibility font scale (a taller label) can still grow this
-        // button past that floor instead of having its own content clipped
-        // to fit a number computed for the ordinary case.
-        modifier = Modifier.heightIn(min = buttonHeight),
+        modifier = Modifier
+            .height(IntrinsicSize.Min)
+            // Real measured height, so `fullyRound` above is exact rather
+            // than a flat guess -- see that val's own doc.
+            .onSizeChanged { rowHeightDp = with(density) { it.height.toDp() } },
         horizontalArrangement = Arrangement.spacedBy(3.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
