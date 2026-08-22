@@ -3573,6 +3573,28 @@ internal fun GarageScreen(state: UiState, vm: AppViewModel) {
                 // index, hoisting the wrong page's badge or leaving the
                 // right one stuck un-hoisted.
                 val dockedPages = remember { mutableStateMapOf<Any, Boolean>() }
+                // Cleared the instant `perPage` is observed to have actually
+                // changed (grid <-> single-car, a live foldable/multi-window
+                // resize) -- synchronously, during composition, NOT via a
+                // LaunchedEffect(perPage): a coroutine-based clear only runs
+                // after THIS recomposition (the one that first sees the new
+                // perPage value, and that ALSO swaps in the freshly-built
+                // single-car pager composables below) has already committed,
+                // leaving those fresh composables' own first `hoisted`/
+                // `hoistedVisible` reads (further down) still seeing whatever
+                // stale `true` a car left behind before the resize -- one
+                // whole recomposition too late to prevent hoisting a
+                // genuinely-undocked, just-recomposed page for a frame.
+                // dockedPages only ever gets written `if (perPage == 1)` (see
+                // onDockedChanged's own gate below), so any entries left
+                // over from a prior perPage==1 stint are unconditionally
+                // stale once perPage has changed at all -- clearing the
+                // whole map, not just one key, is correct here.
+                var lastPerPage by remember { mutableStateOf(perPage) }
+                if (lastPerPage != perPage) {
+                    dockedPages.clear()
+                    lastPerPage = perPage
+                }
                 fun dockedPageKey(page: Int): Any =
                     if (settingsAsPage && page == pageCount) "settings" else vehicles.getOrNull(page)?.vin ?: page
                 Box(Modifier.fillMaxSize()) {
@@ -3642,6 +3664,25 @@ internal fun GarageScreen(state: UiState, vm: AppViewModel) {
                         val block = realBlock(page)
                         val start = block * perPage
                         val end = minOf(start + perPage, count)
+                        // Removes this page's own dockedPages entry the instant its
+                        // key changes identity OR it leaves composition -- covers
+                        // both real disposal (scrolled past beyondViewportPageCount,
+                        // so a fresh instance later reusing this key starts from "not
+                        // reported docked yet" instead of inheriting a stale `true`)
+                        // and a reorder reassigning this pager slot to a different
+                        // car mid-life (DisposableEffect re-keys on dockedPageKey(page)
+                        // changing, cleaning up the OLD vin's entry as part of the
+                        // same recomposition instead of leaving it orphaned). Nothing
+                        // in this file previously cleared dockedPages at all, so a
+                        // stale `true` could hoist a freshly-recomposed, genuinely
+                        // undocked page for one or more frames -- exactly the class
+                        // of "flash" this whole audit was looking for. perPage > 1
+                        // never writes dockedPages (see onDockedChanged's own gate
+                        // below), so this is a no-op there.
+                        if (perPage == 1) {
+                            val dpKey = dockedPageKey(page)
+                            DisposableEffect(dpKey) { onDispose { dockedPages.remove(dpKey) } }
+                        }
                         // The "is this the settled page" test used to live here, as
                         // `page == pager.settledPage`. Discrete, yes -- but it still
                         // subscribed this page's composition to settledPage, so every
@@ -3670,6 +3711,23 @@ internal fun GarageScreen(state: UiState, vm: AppViewModel) {
                         // The transition this was meant to improve is not worth
                         // the gesture it happens during: a swipe that tracks the
                         // finger exactly IS the effect.
+                        // Computed once per page body and reused below, instead of
+                        // repeating the full expression (and its dockedPageKey()
+                        // call + map lookup) at each call-site argument -- the
+                        // "resolve once, don't re-derive per argument" rule this
+                        // file already applies elsewhere (see TitleFlightOverlay's
+                        // own textColorOverride doc).
+                        val isSettledAndDocked = perPage == 1 && page == pager.settledPage && dockedPages[dockedPageKey(page)] == true
+                        // remember(page), not a fresh lambda literal per
+                        // recomposition -- this whole per-page content block
+                        // recomposes for reasons unrelated to docking (any
+                        // UiState field this page's own descendants read), and
+                        // `page` alone is enough to make this a stable function
+                        // of "which page", the only thing the callback's own
+                        // closure actually depends on.
+                        val onPageDockedChanged: ((Boolean) -> Unit)? = remember(page) {
+                            if (perPage == 1) ({ d: Boolean -> dockedPages[dockedPageKey(page)] = d }) else null
+                        }
                         if (settingsAsPage && block == pageCount) {
                             // The extra slot: Settings itself, embedded rather than
                             // navigated to -- see SettingsScreen's own `embedded` doc.
@@ -3679,8 +3737,8 @@ internal fun GarageScreen(state: UiState, vm: AppViewModel) {
                             // "settled" alone isn't the right gate any more.
                             SettingsScreen(
                                 vm, embedded = true,
-                                hoisted = if (perPage == 1 && page == pager.settledPage && dockedPages[dockedPageKey(page)] == true) hoistedFlight else null,
-                                onDockedChanged = if (perPage == 1) ({ d -> dockedPages[dockedPageKey(page)] = d }) else null,
+                                hoisted = if (isSettledAndDocked) hoistedFlight else null,
+                                onDockedChanged = onPageDockedChanged,
                                 // See VehicleDetailContent's identical `pageLabel`
                                 // doc -- matches the shared hoisted badge's own
                                 // label so the hand-off between the two instances
@@ -3732,14 +3790,14 @@ internal fun GarageScreen(state: UiState, vm: AppViewModel) {
                                             // see dockedPages' own doc above. perPage >
                                             // 1 shows several cars at once, so there is
                                             // no single "the settled car" to hoist.
-                                            hoisted = if (perPage == 1 && page == pager.settledPage && dockedPages[dockedPageKey(page)] == true) hoistedFlight else null,
+                                            hoisted = if (isSettledAndDocked) hoistedFlight else null,
                                             // Every page in the single-car-per-page
                                             // pager (settled or the pre-composed
                                             // neighbour alike) reports its own live
                                             // docked state up into dockedPages -- see
                                             // that map's own doc for why this can no
                                             // longer be conditioned on being settled.
-                                            onDockedChanged = if (perPage == 1) ({ d -> dockedPages[dockedPageKey(page)] = d }) else null,
+                                            onDockedChanged = onPageDockedChanged,
                                             // Feeds PagerDotsFor's own collision
                                             // dodge -- was missing from this call
                                             // site entirely, which is why the dots
@@ -6123,7 +6181,25 @@ private fun HeroHeader(
         // very same frame it becomes current, with no dependency on layout
         // happening to be dirty at that moment.
         val lastHeroCoords = remember { mutableStateOf<LayoutCoordinates?>(null) }
-        LaunchedEffect(heroTitleFlight) {
+        // Runs SYNCHRONOUSLY, during composition -- NOT inside a
+        // LaunchedEffect, which is what this was until a real bug traced it
+        // here. A coroutine only starts running after this composition pass
+        // COMMITS, which is strictly AFTER TitleFlightOverlay's own
+        // synchronous `val docked by flight.docked` read (and its cold-mount
+        // `progress.snapTo()` branch, and its `settled`/onSettledChanged
+        // computation) have already consumed whatever STALE docked/position
+        // state the newly-adopted flight was left holding by whichever page
+        // or moment last drove it -- one whole recomposition too late to
+        // prevent a visible pop-to-corner/pop-to-hero flash (and, since a
+        // stale-true `docked` can make `settled` spuriously true on that
+        // same first frame, potentially a spurious re-hoist/re-unhoist
+        // oscillation right after). A remembered "last corrected identity"
+        // guard -- mirroring TitleFlightOverlay's own `lastDocked` latch
+        // just below -- fires this exactly once per real identity change,
+        // synchronously, before any sibling composable in this SAME pass
+        // (including TitleFlightOverlay) gets a chance to read the flight.
+        var lastCorrectedFlight by remember { mutableStateOf<HeroTitleFlight?>(null) }
+        if (lastCorrectedFlight !== heroTitleFlight) {
             // onSettled, not onPositioned -- this is the FIRST report the
             // (possibly newly-current) flight gets from this page becoming
             // settled, not a continuous scroll update. The shared hoisted
@@ -6137,6 +6213,7 @@ private fun HeroHeader(
             // report; onPositioned (below) still carries it correctly for
             // this page's OWN later, continuous scroll updates.
             lastHeroCoords.value?.let { heroTitleFlight?.onSettled(it.positionInRoot()) }
+            lastCorrectedFlight = heroTitleFlight
         }
         // Follows the morph rather than switching: the photo fades in over the same
         // t, so the name has to travel from the surface's own colour to the light one
@@ -9171,7 +9248,19 @@ private fun VehicleDetailContent(
         // state -- renders its own name here, as ordinary page content that
         // simply moves with the pager/scroll like everything else on the
         // page. See `hoisted`'s own doc.
-        if (hoisted == null) {
+        // AnimatedVisibility, not a bare `if`, with the SAME fade duration
+        // GarageScreen's shared hoisted badge uses for its own enter/exit
+        // (see that AnimatedVisibility's own doc) -- a real, reproducible
+        // bug traced one side of this hand-off cutting out/in instantly
+        // while the other ramped over 160ms, leaving a ~160ms window where
+        // the name was dimmer than it should be (or, on the reverse
+        // direction, two overlapping copies at mismatched alphas). Fading
+        // both sides in lockstep removes that dip entirely.
+        AnimatedVisibility(
+            visible = hoisted == null,
+            enter = fadeIn(tween(160)),
+            exit = fadeOut(tween(160)),
+        ) {
             val screenWidth = LocalConfiguration.current.screenWidthDp.dp
             TitleFlightOverlay(
                 flight = local.flight,

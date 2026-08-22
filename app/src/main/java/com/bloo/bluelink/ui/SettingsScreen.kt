@@ -1910,7 +1910,16 @@ internal fun SettingsScreen(
         // standalone route, or this slot before it's scrolled into the
         // docked state -- renders its own "Settings" title here instead.
         // See `hoisted`'s own doc.
-        if (hoisted == null) {
+        // AnimatedVisibility, not a bare `if` -- mirrors VehicleDetailContent's
+        // identical wrapping (same 160ms fade GarageScreen's shared hoisted
+        // badge uses) for the same reason: without it, this side of the
+        // hand-off cut out/in instantly while the hoisted badge ramped over
+        // 160ms, leaving a dip/flash right at the dock/undock threshold.
+        AnimatedVisibility(
+            visible = hoisted == null,
+            enter = fadeIn(tween(160)),
+            exit = fadeOut(tween(160)),
+        ) {
             val cornerX = if (embedded) 16.dp else 60.dp
             val reserveEnd = 192.dp
             val screenWidth = LocalConfiguration.current.screenWidthDp.dp
