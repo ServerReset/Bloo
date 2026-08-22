@@ -11614,9 +11614,9 @@ internal fun PebbleShell(
                             )
                             .then(dragHandle)
                             .heightIn(min = PebbleHeaderHeight)
-                            // Asymmetric padding: 16dp left, 6dp right (matching top),
-                            // so right-edge clearance equals top-edge clearance.
-                            .padding(start = 16.dp, end = 6.dp, top = 6.dp, bottom = 6.dp),
+                            // Asymmetric padding: 16dp left, 12dp right (was 16dp),
+                            // pushing buttons slightly right while keeping symmetry.
+                            .padding(start = 16.dp, end = 12.dp, top = 6.dp, bottom = 6.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Icon(icon, contentDescription = null, modifier = Modifier.size(20.dp))
@@ -12046,9 +12046,9 @@ private fun SplitExpandButton(
             modifier = Modifier.fillMaxHeight().semantics { stateDescription = if (expanded) "Expanded" else "Collapsed" },
         ) {
             Box(
-                // Asymmetric padding: 6dp start (left), 12dp end (right) to bump
-                // the chevron slightly left.
-                modifier = Modifier.fillMaxHeight().padding(start = 6.dp, end = 12.dp),
+                // Asymmetric padding: 10dp start (left), 12dp end (right) to bump
+                // the chevron slightly left (was 12dp symmetric).
+                modifier = Modifier.fillMaxHeight().padding(start = 10.dp, end = 12.dp),
                 contentAlignment = Alignment.Center,
             ) {
                 Icon(
