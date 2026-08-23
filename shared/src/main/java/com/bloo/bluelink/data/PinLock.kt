@@ -157,3 +157,9 @@ data class PinLockout(
         fun windowMs(batch: Int): Long = BASE_WINDOW_MS * (1L shl (batch - 1))
     }
 }
+/** "0:23" formatting for the lockout countdown line, shared by every surface
+ *  that renders a rejection window (the phone lock overlay and its dialogs). */
+fun formatLockoutSeconds(ms: Long): String {
+    val total = ((ms + 999) / 1000).toInt()
+    return "${total / 60}:${(total % 60).toString().padStart(2, '0')}"
+}
