@@ -3676,21 +3676,21 @@ private fun SearchSuggestions(state: UiState, compact: Boolean = false, onPick: 
         val examplesKey = examples.joinToString("|")
         examples.forEachIndexed { i, example ->
             PopVisible(visible = staggeredResultVisible(examplesKey, i)) {
-                Surface(
-                    onClick = { haptics?.click(); onPick(example) },
-                    shape = RoundedCornerShape(50),
-                    color = MaterialTheme.colorScheme.secondaryContainer,
+                // Same MorphButton every selector chip in the app uses, with
+                // the search screen's tonal fill kept as its standard colours.
+                MorphButton(
+                    onClick = { onPick(example) },
+                    containerColor = MaterialTheme.colorScheme.secondaryContainer,
                     contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                    contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp),
+                    minHeight = 0.dp,
                     modifier = Modifier.dropShadow(RoundedCornerShape(50), blurRadius = 8.dp, offsetY = 3.dp),
                 ) {
-                    Box {
-                        Text(
-                            example,
-                            Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
-                            style = MaterialTheme.typography.labelLarge,
-                            fontWeight = FontWeight.SemiBold,
-                        )
-                    }
+                    Text(
+                        example,
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = FontWeight.SemiBold,
+                    )
                 }
             }
         }

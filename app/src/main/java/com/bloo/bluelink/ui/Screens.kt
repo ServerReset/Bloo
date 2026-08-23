@@ -1332,23 +1332,24 @@ private fun OnboardingCarPage(
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Text("Extras", style = MaterialTheme.typography.labelMedium, color = scheme.primary, fontWeight = FontWeight.SemiBold)
         val extrasHaptics = LocalHaptics.current
-        Surface(
-            onClick = { extrasHaptics?.click(); vm.setSeatFlag(vehicle, "sw", !sc.steeringWheel) },
-            shape = RoundedCornerShape(50),
-            color = if (sc.steeringWheel) scheme.secondaryContainer else scheme.surfaceContainerHighest,
-            contentColor = if (sc.steeringWheel) scheme.onSecondaryContainer else scheme.onSurface,
-            border = if (sc.steeringWheel) null else BorderStroke(1.dp, scheme.outlineVariant),
+        // Same MorphButton as the rest of the app: a filled pill that lights up
+        // secondaryContainer while the feature is on (for cars with it).
+        MorphButton(
+            onClick = { vm.setSeatFlag(vehicle, "sw", !sc.steeringWheel) },
+            active = sc.steeringWheel,
+            containerColor = scheme.surfaceContainerHighest,
+            contentColor = scheme.onSurface,
+            activeContainerColor = scheme.secondaryContainer,
+            activeContentColor = scheme.onSecondaryContainer,
+            border = BorderStroke(1.dp, scheme.outlineVariant),
+            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 7.dp),
+            minHeight = 0.dp,
         ) {
-            Row(
-                Modifier.padding(horizontal = 12.dp, vertical = 7.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(5.dp),
-            ) {
-                if (sc.steeringWheel) {
-                    Icon(Icons.Filled.Check, contentDescription = null, modifier = Modifier.size(14.dp))
-                }
-                Text("Steering wheel heat", style = MaterialTheme.typography.labelMedium)
+            if (sc.steeringWheel) {
+                Icon(Icons.Filled.Check, contentDescription = null, modifier = Modifier.size(14.dp))
+                Spacer(Modifier.width(5.dp))
             }
+            Text("Steering wheel heat", style = MaterialTheme.typography.labelMedium)
         }
     }
 }
@@ -1566,7 +1567,6 @@ private fun WizardPowertrainPage(
             "fuel level for gas, or both for plug-in hybrids.",
     )
     val current = state.powertrainOf(vehicle)
-    val haptics = LocalHaptics.current
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         com.bloo.bluelink.data.Powertrain.entries.forEach { pt ->
             val selected = current == pt
@@ -1576,33 +1576,31 @@ private fun WizardPowertrainPage(
                 com.bloo.bluelink.data.Powertrain.PHEV -> Triple("🔌", "Plug-in Hybrid", "Gas + large battery you can charge")
                 com.bloo.bluelink.data.Powertrain.EV -> Triple("", "Electric", "Battery-only, no fuel tank")
             }
-            Surface(
-                // This wizard's one selection row with no haptic feedback --
-                // every sibling in the flow (Back/Next, the seat/steering
-                // toggles, WizardToggleChip) has one now.
-                onClick = { haptics?.click(); vm.setPowertrain(vehicle, pt) },
+            // Same MorphButton as every other selector: pill at rest, fills
+            // primaryContainer as a rounded square once chosen.
+            MorphButton(
+                onClick = { vm.setPowertrain(vehicle, pt) },
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(16.dp),
-                color = if (selected) scheme.primaryContainer else scheme.surfaceContainerHigh,
-                contentColor = if (selected) scheme.onPrimaryContainer else scheme.onSurface,
-                border = if (selected) null else BorderStroke(1.dp, scheme.outlineVariant),
+                active = selected,
+                containerColor = scheme.surfaceContainerHigh,
+                contentColor = scheme.onSurface,
+                activeContainerColor = scheme.primaryContainer,
+                activeContentColor = scheme.onPrimaryContainer,
+                border = BorderStroke(1.dp, scheme.outlineVariant),
+                contentPadding = PaddingValues(16.dp),
+                minHeight = 0.dp,
             ) {
-                Row(
-                    Modifier.padding(16.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(14.dp),
-                ) {
-                    Text(icon, style = MaterialTheme.typography.headlineSmall)
-                    Column(Modifier.weight(1f)) {
-                        Text(label, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-                        Text(desc, style = MaterialTheme.typography.bodySmall, color = if (selected) scheme.onPrimaryContainer.copy(alpha = 0.7f) else scheme.onSurfaceVariant)
-                    }
-                    if (selected) Icon(Icons.Filled.CheckCircle, null, tint = scheme.primary, modifier = Modifier.size(24.dp))
+                Text(icon, style = MaterialTheme.typography.headlineSmall)
+                Spacer(Modifier.width(14.dp))
+                Column(Modifier.weight(1f)) {
+                    Text(label, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                    Text(desc, style = MaterialTheme.typography.bodySmall, color = if (selected) scheme.onPrimaryContainer.copy(alpha = 0.7f) else scheme.onSurfaceVariant)
+                }
+                if (selected) Icon(Icons.Filled.CheckCircle, null, tint = scheme.primary, modifier = Modifier.size(24.dp))
                 }
             }
         }
     }
-}
 
 /**
  * One wizard page: which head-unit generation this Hyundai/Genesis US car
@@ -1627,7 +1625,6 @@ private fun WizardPlatformPage(
             "so features like Trips only show up when they're actually available.",
     )
     val current = state.platformOf(vehicle)
-    val haptics = LocalHaptics.current
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         VehiclePlatform.entries.forEach { pt ->
             val selected = current == pt
@@ -1635,25 +1632,25 @@ private fun WizardPlatformPage(
                 VehiclePlatform.GEN5W -> "Gen5W" to "Older head unit -- no Trips, no connected-car store"
                 VehiclePlatform.CCNC -> "ccNC" to "Newer head unit -- Trips and the connected-car store, where the backend supports them"
             }
-            Surface(
-                onClick = { haptics?.click(); vm.setPlatform(vehicle, pt) },
+            // Same MorphButton as the powertrain page: pill at rest, fills
+            // primaryContainer as a rounded square once chosen.
+            MorphButton(
+                onClick = { vm.setPlatform(vehicle, pt) },
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(16.dp),
-                color = if (selected) scheme.primaryContainer else scheme.surfaceContainerHigh,
-                contentColor = if (selected) scheme.onPrimaryContainer else scheme.onSurface,
-                border = if (selected) null else BorderStroke(1.dp, scheme.outlineVariant),
+                active = selected,
+                containerColor = scheme.surfaceContainerHigh,
+                contentColor = scheme.onSurface,
+                activeContainerColor = scheme.primaryContainer,
+                activeContentColor = scheme.onPrimaryContainer,
+                border = BorderStroke(1.dp, scheme.outlineVariant),
+                contentPadding = PaddingValues(16.dp),
+                minHeight = 0.dp,
             ) {
-                Row(
-                    Modifier.padding(16.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(14.dp),
-                ) {
-                    Column(Modifier.weight(1f)) {
-                        Text(label, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-                        Text(desc, style = MaterialTheme.typography.bodySmall, color = if (selected) scheme.onPrimaryContainer.copy(alpha = 0.7f) else scheme.onSurfaceVariant)
-                    }
-                    if (selected) Icon(Icons.Filled.CheckCircle, null, tint = scheme.primary, modifier = Modifier.size(24.dp))
+                Column(Modifier.weight(1f)) {
+                    Text(label, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                    Text(desc, style = MaterialTheme.typography.bodySmall, color = if (selected) scheme.onPrimaryContainer.copy(alpha = 0.7f) else scheme.onSurfaceVariant)
                 }
+                if (selected) Icon(Icons.Filled.CheckCircle, null, tint = scheme.primary, modifier = Modifier.size(24.dp))
             }
         }
     }
@@ -1739,18 +1736,22 @@ private fun WizardSeatRow(
 
 @Composable
 private fun WizardToggleChip(label: String, selected: Boolean, onClick: () -> Unit) {
-    val scheme = MaterialTheme.colorScheme
-    val haptics = LocalHaptics.current
-    Surface(
-        onClick = { haptics?.click(); onClick() },
-        shape = RoundedCornerShape(50),
-        color = if (selected) scheme.secondaryContainer else scheme.surfaceContainerHighest,
-        contentColor = if (selected) scheme.onSecondaryContainer else scheme.onSurfaceVariant,
-        border = if (selected) null else BorderStroke(1.dp, scheme.outlineVariant),
+    // The same MorphButton as everywhere: filled pill, secondaryContainer when
+    // selected, outline border only while unselected (the wrapper clears it on
+    // active). No second chip implementation left.
+    MorphButton(
+        onClick = { onClick() },
+        active = selected,
+        containerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+        contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+        activeContainerColor = MaterialTheme.colorScheme.secondaryContainer,
+        activeContentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp),
+        minHeight = 0.dp,
     ) {
         Text(
             label,
-            Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
             style = MaterialTheme.typography.labelMedium,
             fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
         )
