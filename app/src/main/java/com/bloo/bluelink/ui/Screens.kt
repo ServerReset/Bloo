@@ -7212,12 +7212,17 @@ private fun HeroVisual(
         // Coil skips the fade for memory-cache hits by design, which is exactly right
         // here: a first load fades in, but scrolling back to an already-decoded photo
         // does not re-fade, so this cannot turn into a flicker on the car pager.
+        // Memoized like the map tiles: creating a fresh ImageRequest every recomposition
+        // would trigger unnecessary reloads and cause visible flicker/jank.
         val context = LocalContext.current
-        AsyncImage(
-            model = ImageRequest.Builder(context)
+        val imageRequest = remember(model) {
+            ImageRequest.Builder(context)
                 .data(model)
                 .crossfade(true)
-                .build(),
+                .build()
+        }
+        AsyncImage(
+            model = imageRequest,
             contentDescription = v.model,
             contentScale = if (transparent) ContentScale.Fit else ContentScale.Crop,
             modifier = sizeModifier
