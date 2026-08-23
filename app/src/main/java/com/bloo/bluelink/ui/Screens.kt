@@ -11900,6 +11900,16 @@ private fun SplitExpandButton(
     val leftMorphed = action.active || leftPressed || expanded
     val rightMorphed = rightPressed || expanded
 
+    // Easter egg: rapid taps on the chevron trigger a spin animation + vibration
+    var easterEggTaps by remember { mutableIntStateOf(0) }
+    var lastEasterEggTapTime by remember { mutableLongStateOf(0L) }
+    val easterEggSpin by animateFloatAsState(
+        targetValue = if (easterEggTaps >= 5) 360f else 0f,
+        animationSpec = if (easterEggTaps >= 5) spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessLow) else snap(),
+        label = "easterEggSpin",
+        finishedListener = { if (easterEggTaps >= 5) easterEggTaps = 0 },
+    )
+
     // The row's own real, measured height (see the Row's onSizeChanged
     // below) -- 50.dp is only the value used for the very first frame,
     // before a real measurement lands. A flat 50.dp guess used to be the
@@ -12053,9 +12063,20 @@ private fun SplitExpandButton(
                 }
             }
         }
-        // Right half — chevron nub.
+        // Right half — chevron nub (with easter egg easter egg tap counter).
         Surface(
-            onClick = { if (expanded) haptics?.tick() else haptics?.click(); onToggle() },
+            onClick = {
+                val now = System.currentTimeMillis()
+                // Reset counter if more than 500ms between taps (not rapid)
+                if (now - lastEasterEggTapTime > 500) easterEggTaps = 0
+                lastEasterEggTapTime = now
+                easterEggTaps++
+
+                // Easter egg: 5 rapid taps trigger spin + vibration
+                if (easterEggTaps == 5) haptics?.heavy() else if (expanded) haptics?.tick() else haptics?.click()
+
+                onToggle()
+            },
             interactionSource = rightInteraction,
             color = buttonContainer(),
             contentColor = MaterialTheme.colorScheme.onSurface,
@@ -12080,7 +12101,9 @@ private fun SplitExpandButton(
                 Icon(
                     Icons.Filled.KeyboardArrowDown,
                     contentDescription = if (expanded) "Collapse" else "Expand",
-                    modifier = Modifier.size(20.dp).rotate(rotation),
+                    // Larger chevron icon (24dp to match action button icon size), with
+                    // easter egg spin animation when tapped 5 times rapidly.
+                    modifier = Modifier.size(24.dp).rotate(rotation + easterEggSpin),
                 )
             }
         }
