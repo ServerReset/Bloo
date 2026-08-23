@@ -61,6 +61,9 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.Canvas
+import androidx.compose.material.icons.filled.MailOutline
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
@@ -293,6 +296,7 @@ import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.zIndex
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
@@ -315,8 +319,10 @@ import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.text.lerp
 import androidx.compose.ui.unit.lerp
 import androidx.compose.ui.text.input.KeyboardCapitalization
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.composed
@@ -333,6 +339,8 @@ import coil.request.ImageRequest
 import com.bloo.bluelink.data.ambientFahrenheit
 import com.bloo.bluelink.data.Brand
 import com.bloo.bluelink.data.brand
+import com.bloo.bluelink.data.PinCrypto
+import com.bloo.bluelink.data.PinLockout
 import com.bloo.bluelink.data.CHARGE_LIMIT_RANGE
 import com.bloo.bluelink.data.CLIMATE_TEMP_RANGE_F
 import com.bloo.bluelink.data.DEFAULT_AC_CHARGE_LIMIT_PCT
@@ -830,6 +838,11 @@ private fun OnboardingScreen(vm: AppViewModel) {
     val lastIndex = steps.lastIndex
     val isLast = pageIndex == lastIndex
 
+    // Devices without biometrics MUST finish the PIN step before leaving it
+    // -- without a PIN there is no lock mechanism for this device at all.
+    // The CTA below is disabled (with a hint) until the PIN lands.
+    val pinRequired = !canBio && steps.getOrNull(pageIndex)?.kind == OnboardingStepKind.SETUP && !state.appPinSet
+
     fun goNext() {
         if (pageIndex < lastIndex) {
             haptics?.click()
@@ -965,6 +978,7 @@ private fun OnboardingScreen(vm: AppViewModel) {
                 MorphButton(
                     onClick = ::goNext,
                     active = true,
+                    enabled = !pinRequired,
                     modifier = Modifier.weight(if (pageIndex > 0) 2f else 1f),
                     contentPadding = PaddingValues(vertical = 16.dp),
                 ) {
@@ -982,6 +996,14 @@ private fun OnboardingScreen(vm: AppViewModel) {
                         },
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
+                    )
+                }
+                if (pinRequired) {
+                    Spacer(Modifier.height(6.dp))
+                    Text(
+                        "Set your PIN above to continue.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = scheme.onSurfaceVariant,
                     )
                 }
             }
@@ -1045,7 +1067,10 @@ private fun OnboardingSetupPage(vm: AppViewModel, state: UiState, context: andro
         color = scheme.onSurface,
     )
     Text(
-        "All optional -- skip anything here and turn it on later in Settings.",
+        if (canBio)
+            "All optional -- skip anything here and turn it on later in Settings."
+        else
+            "Everything here is optional -- except one thing: this device has no fingerprint sensor, so a PIN is required to lock the app.",
         style = MaterialTheme.typography.bodyMedium,
         color = scheme.onSurfaceVariant,
     )
@@ -1115,6 +1140,27 @@ private fun OnboardingSetupPage(vm: AppViewModel, state: UiState, context: andro
                 Spacer(Modifier.width(8.dp))
                 Text(if (bioEnabled) "Enabled" else "Enable fingerprint lock", fontWeight = FontWeight.SemiBold)
             }
+        }
+    }
+
+    // --- App PIN ---
+    // Required (this exact card, not a skipped option) on devices with no
+    // biometrics: without either mechanism the app could never lock at all.
+    // On biometric devices it's the optional backup PIN.
+    if (!canBio || !state.appPinSet) {
+        OnboardingSetupCard(
+            icon = Icons.Filled.Lock,
+            title = if (canBio) "Backup PIN" else "PIN lock",
+            body = if (canBio)
+                "Add a 4-8 digit PIN as a backup for days fingerprint sensors act up."
+            else
+                "This device can't read fingerprints, so Bloo needs a 4-8 digit PIN to lock itself with.",
+            done = state.appPinSet,
+        ) {
+            OnboardingPinForm(
+                existing = state.appPinSet,
+                onSet = { pin -> vm.setAppPin(pin) },
+            )
         }
     }
 
@@ -1192,6 +1238,83 @@ private fun OnboardingSetupPage(vm: AppViewModel, state: UiState, context: andro
  *  tints the icon chip to the primary color as a lightweight "this one's
  *  handled" cue, matching the checkmark treatment MorphButton itself already
  *  uses for its own active state. */
+/**
+ * The create-a-PIN mini form used by onboarding (and, in a slimmer re-use,
+ * the building block of the Settings set/change/remove dialogs): two
+ * matching 4-8 digit fields, a haptic'd Save only once valid. [existing]
+ * true just swaps the call to "Replace PIN" semantics -- the caller handles
+ * what that means; this form only ever validates and reports a valid new
+ * PIN.
+ */
+@Composable
+internal fun OnboardingPinForm(
+    existing: Boolean,
+    onSet: (String) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val haptics = LocalHaptics.current
+    val scheme = MaterialTheme.colorScheme
+    var pin by remember { mutableStateOf("") }
+    var confirm by remember { mutableStateOf("") }
+    var attempted by remember { mutableStateOf(false) }
+    val valid = pin.length in PinCrypto.PIN_MIN_DIGITS..PinCrypto.PIN_MAX_DIGITS &&
+        pin == confirm
+    val sanitize: (String) -> String = { it.take(PinCrypto.PIN_MAX_DIGITS).filter { ch -> ch.isDigit() } }
+    Column(modifier, verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        OutlinedTextField(
+            value = pin,
+            onValueChange = { pin = sanitize(it); attempted = false },
+            placeholder = { Text("4–8 digit PIN") },
+            singleLine = true,
+            shape = FieldShape,
+            colors = borderlessFieldColors(),
+            visualTransformation = PasswordVisualTransformation(),
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
+            isError = attempted && pin.isNotEmpty() && pin.length < PinCrypto.PIN_MIN_DIGITS,
+            modifier = Modifier.fillMaxWidth(),
+        )
+        OutlinedTextField(
+            value = confirm,
+            onValueChange = { confirm = sanitize(it); attempted = false },
+            placeholder = { Text("Confirm PIN") },
+            singleLine = true,
+            shape = FieldShape,
+            colors = borderlessFieldColors(),
+            visualTransformation = PasswordVisualTransformation(),
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
+            isError = attempted && confirm.isNotEmpty() && pin != confirm,
+            modifier = Modifier.fillMaxWidth(),
+        )
+        if (attempted && (pin.length < PinCrypto.PIN_MIN_DIGITS || pin != confirm)) {
+            Text(
+                "PINs must be 4-8 digits and match.",
+                style = MaterialTheme.typography.bodySmall,
+                color = scheme.error,
+            )
+        }
+        MorphButton(
+            onClick = {
+                if (valid) {
+                    haptics?.click()
+                    onSet(pin)
+                    pin = ""
+                    confirm = ""
+                } else {
+                    attempted = true
+                    haptics?.tick()
+                }
+            },
+            modifier = Modifier.fillMaxWidth(),
+            contentPadding = PaddingValues(vertical = 12.dp),
+            enabled = pin.isNotEmpty() && confirm.isNotEmpty(),
+        ) {
+            Icon(Icons.Filled.Lock, contentDescription = null, modifier = Modifier.size(18.dp))
+            Spacer(Modifier.width(8.dp))
+            Text(if (existing) "Replace PIN" else "Save PIN", fontWeight = FontWeight.SemiBold)
+        }
+    }
+}
+
 @Composable
 private fun OnboardingSetupCard(
     icon: ImageVector,
@@ -1990,6 +2113,7 @@ private fun LoginScreen(
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var pin by remember { mutableStateOf("") }
+    var showPassword by remember { mutableStateOf(false) }
     // Region gates which 3 brands the segmented picker below offers, rather
     // than cramming all 6 US+Canada entries into one row -- Hyundai/Genesis/
     // Kia Canada run on a completely different backend (see CanadaApi) with
@@ -2137,6 +2261,7 @@ private fun LoginScreen(
                         singleLine = true,
                         shape = FieldShape,
                         colors = fieldColors,
+                        leadingIcon = { Icon(Icons.Filled.MailOutline, contentDescription = null, modifier = Modifier.size(20.dp)) },
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
                         modifier = Modifier.fillMaxWidth(),
                     )
@@ -2149,7 +2274,17 @@ private fun LoginScreen(
                         singleLine = true,
                         shape = FieldShape,
                         colors = fieldColors,
-                        visualTransformation = PasswordVisualTransformation(),
+                        leadingIcon = { Icon(Icons.Filled.Lock, contentDescription = null, modifier = Modifier.size(20.dp)) },
+                        trailingIcon = {
+                            MorphIconButton(onClick = { showPassword = !showPassword }) {
+                                Icon(
+                                    if (showPassword) Icons.Filled.VisibilityOff else Icons.Filled.Visibility,
+                                    contentDescription = if (showPassword) "Hide password" else "Show password",
+                                    modifier = Modifier.size(20.dp),
+                                )
+                            }
+                        },
+                        visualTransformation = if (showPassword) VisualTransformation.None else PasswordVisualTransformation(),
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
                         modifier = Modifier.fillMaxWidth(),
                     )
@@ -2697,16 +2832,45 @@ private fun AuroraBackground(
 // --- Lock -----------------------------------------------------------------
 
 /**
- * The biometric lock, drawn as an overlay on top of the blurred app. High-contrast
- * white-on-scrim text reads over any wallpaper of cars behind it; a floating back
- * arrow returns to the login screen. Centered + width-capped so it sits well on
- * phones, flip-phone cover screens and tablets alike.
+ * The app lock, drawn as an overlay on top of the blurred app. High-contrast
+ * white-on-scrim text reads over any wallpaper of cars behind it; a floating
+ * back arrow returns to the login screen. Centered + width-capped so it sits
+ * well on phones, flip-phone cover screens and tablets alike.
+ *
+ * Two mechanisms, one overlay:
+ *  - **Fingerprint/biometric** when the device has biometrics enrolled AND
+ *    the biometric lock is on (the classic prompt, plus a "Use PIN" link);
+ *  - **PIN** when a device PIN is installed -- which is always the case on
+ *    the device when it has no biometrics at all (the onboarding flow
+ *    requires one there, since otherwise the app could never lock) -- or
+ *    when the user picks the PIN route from the biometric prompt.
+ *
+ * All controls are the app's standard components (MorphButton /
+ * MorphTextButton / the FieldShape outline field), so the lock reads as part
+ * of the same app, not a leftover scaffold screen.
  */
 @Composable
 internal fun LockOverlay(vm: AppViewModel) {
     val context = LocalContext.current
     val compact = isCompactCoverScreen()
-    fun authenticate() {
+    val appState by vm.state.collectAsState()
+    // The device-biometric gate is a binder call -- evaluate once per overlay
+    // mount, not per recomposition of the (frequently updating) state below.
+    val bioAvailable = remember { vm.canUseBiometrics() }
+    val appearance by vm.appearance.collectAsState()
+    // Start on the biometric prompt when there's one to show; the user can
+    // switch to PIN; devices without biometrics land straight on PIN.
+    var usePinMode by remember { mutableStateOf(!bioAvailable) }
+    var pin by remember { mutableStateOf("") }
+    // A wall-clock ticker that only runs while a rejection window is open --
+    // the countdown line needs a fresh "seconds left" each second, and
+    // nothing else here wants a 1s recomposition loop.
+    var nowTick by remember { mutableStateOf(System.currentTimeMillis()) }
+    val lockout = appState.pinLockout
+    val rejected = lockout.isLocked(nowTick)
+    val remainingMs = lockout.remainingMs(nowTick)
+
+    fun authenticateBiometric() {
         context.findFragmentActivity()?.let { activity ->
             showBiometricPrompt(
                 activity = activity,
@@ -2717,10 +2881,27 @@ internal fun LockOverlay(vm: AppViewModel) {
             )
         }
     }
-    LaunchedEffect(Unit) { authenticate() }
-
-    val noRipple = remember { MutableInteractionSource() }
+    fun attemptPin() {
+        if (pin.length in PinCrypto.PIN_MIN_DIGITS..PinCrypto.PIN_MAX_DIGITS && !rejected) {
+            vm.verifyAppPin(pin)
+            pin = ""
+        }
+    }
+    LaunchedEffect(Unit) {
+        // Fresh overlay (re-lock, cold start) → clear any stale rejection.
+        vm.acknowledgePinRejection()
+        if (!usePinMode) authenticateBiometric()
+        while (true) {
+            delay(250)
+            nowTick = System.currentTimeMillis()
+        }
+    }
+    // Pattern for "pick the PIN route": tapping "Use PIN" once; a failed
+    // biometric prompt stays on the biometric UI; PIN always returns here on
+    // the next lock anyway (fresh overlay remounts at the default mode).
     val haptics = LocalHaptics.current
+    val noRipple = remember { MutableInteractionSource() }
+    val showBiometric = bioAvailable && !usePinMode
     Box(
         Modifier
             .fillMaxSize()
@@ -2758,40 +2939,170 @@ internal fun LockOverlay(vm: AppViewModel) {
                 .padding(horizontal = 32.dp, vertical = 24.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            Icon(
-                Icons.Filled.Fingerprint,
-                contentDescription = null,
-                modifier = Modifier.size(if (compact) 44.dp else 72.dp),
-                tint = Color.White,
-            )
-            Spacer(Modifier.height(if (compact) 10.dp else 18.dp))
-            Text(
-                "Bloo is locked",
-                style = if (compact) MaterialTheme.typography.titleLarge else MaterialTheme.typography.headlineSmall,
-                fontWeight = FontWeight.Bold,
-                color = Color.White,
-            )
-            Spacer(Modifier.height(4.dp))
-            Text(
-                "Confirm it's you to reach your vehicles.",
-                style = MaterialTheme.typography.bodyMedium,
-                color = Color.White.copy(alpha = 0.85f),
-            )
-            Spacer(Modifier.height(if (compact) 16.dp else 28.dp))
-            // White pill for maximum contrast over the dimmed blur.
-            MorphButton(
-                onClick = { authenticate() },
-                modifier = Modifier.height(if (compact) 56.dp else ControlHeight),
-                containerColor = Color.White,
-                contentColor = Color.Black,
-                contentPadding = PaddingValues(horizontal = 40.dp, vertical = 18.dp),
-            ) {
-                Icon(Icons.Filled.Fingerprint, contentDescription = null, modifier = Modifier.size(24.dp))
-                Spacer(Modifier.width(10.dp))
-                Text("Unlock", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+            if (showBiometric) {
+                // --- Classic biometric prompt ---------------------------------
+                Icon(
+                    Icons.Filled.Fingerprint,
+                    contentDescription = null,
+                    modifier = Modifier.size(if (compact) 44.dp else 72.dp),
+                    tint = Color.White,
+                )
+                Spacer(Modifier.height(if (compact) 10.dp else 18.dp))
+                Text(
+                    "Bloo is locked",
+                    style = if (compact) MaterialTheme.typography.titleLarge else MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White,
+                )
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    if (appState.appPinSet) "Confirm it's you, or use your PIN." else "Confirm it's you to reach your vehicles.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = Color.White.copy(alpha = 0.85f),
+                )
+                Spacer(Modifier.height(if (compact) 16.dp else 28.dp))
+                // White pill for maximum contrast over the dimmed blur.
+                MorphButton(
+                    onClick = { authenticateBiometric() },
+                    modifier = Modifier.height(if (compact) 56.dp else ControlHeight),
+                    containerColor = Color.White,
+                    contentColor = Color.Black,
+                    contentPadding = PaddingValues(horizontal = 40.dp, vertical = 18.dp),
+                ) {
+                    Icon(Icons.Filled.Fingerprint, contentDescription = null, modifier = Modifier.size(24.dp))
+                    Spacer(Modifier.width(10.dp))
+                    Text("Unlock", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                }
+                if (appState.appPinSet) {
+                    Spacer(Modifier.height(12.dp))
+                    MorphTextButton(
+                        "Use PIN",
+                        onClick = { haptics?.click(); usePinMode = true },
+                        containerColor = Color.White.copy(alpha = 0.10f),
+                        contentColor = Color.White,
+                    )
+                }
+            } else if (appState.appPinSet) {
+                // --- PIN prompt (device has no biometrics, or user chose PIN) --
+                Surface(
+                    shape = RoundedCornerShape(if (compact) 20.dp else 28.dp),
+                    color = MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = glassContainerAlpha(0.97f)),
+                    contentColor = MaterialTheme.colorScheme.onSurface,
+                    border = BorderStroke(
+                        1.dp,
+                        MaterialTheme.colorScheme.outline.copy(alpha = 0.25f),
+                    ),
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Column(Modifier.padding(horizontal = 24.dp, vertical = 20.dp)) {
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+                            Box(
+                                Modifier
+                                    .size(46.dp)
+                                    .clip(CircleShape)
+                                    .background(MaterialTheme.colorScheme.primaryContainer),
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                Icon(Icons.Filled.Lock, contentDescription = null, tint = MaterialTheme.colorScheme.onPrimaryContainer)
+                            }
+                            Column {
+                                Text(
+                                    "Enter your PIN",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                )
+                                Text(
+                                    if (bioAvailable) "Your fingerprint or your PIN unlocks Bloo."
+                                    else "This device has no fingerprint sensor, so a PIN is required.",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                        }
+                        Spacer(Modifier.height(16.dp))
+                        OutlinedTextField(
+                            value = pin,
+                            onValueChange = { pin = it.take(PinCrypto.PIN_MAX_DIGITS).filter { ch -> ch.isDigit() } },
+                            placeholder = { Text("4–8 digit PIN") },
+                            singleLine = true,
+                            shape = FieldShape,
+                            colors = borderlessFieldColors(),
+                            visualTransformation = PasswordVisualTransformation(),
+                            keyboardOptions = KeyboardOptions(
+                                keyboardType = KeyboardType.NumberPassword,
+                                imeAction = ImeAction.Done,
+                            ),
+                            keyboardActions = KeyboardActions(onDone = { attemptPin() }),
+                            supportingText = {
+                                when {
+                                    rejected -> Text(
+                                        "Too many attempts — try again in ${formatLockoutSeconds(remainingMs)}",
+                                        color = MaterialTheme.colorScheme.error,
+                                    )
+                                    else -> Text(
+                                        lockout.attemptsRemainingInBatch(nowTick)?.let { left ->
+                                            if (left <= 2) "Careful — $left ${if (left == 1) "attempt" else "attempts"} before a lockout"
+                                            else "${PinLockout.STRIKES_PER_BATCH} wrong attempts lock the app for 30 seconds — the wait doubles each time"
+                                        } ?: "",
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                }
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                        Spacer(Modifier.height(14.dp))
+                        MorphButton(
+                            onClick = { attemptPin() },
+                            modifier = Modifier.fillMaxWidth().height(52.dp),
+                            enabled = !rejected && pin.length in PinCrypto.PIN_MIN_DIGITS..PinCrypto.PIN_MAX_DIGITS,
+                        ) {
+                            Icon(Icons.Filled.LockOpen, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(Modifier.width(8.dp))
+                            Text("Unlock", fontWeight = FontWeight.SemiBold)
+                        }
+                        if (bioAvailable) {
+                            Spacer(Modifier.height(8.dp))
+                            MorphTextButton(
+                                "Use fingerprint",
+                                onClick = { haptics?.click(); usePinMode = false; authenticateBiometric() },
+                                modifier = Modifier.fillMaxWidth(),
+                            )
+                        }
+                    }
+                }
+            } else {
+                // No mechanism at all -- should not be reachable (the lock
+                // gate refuses to engage without one); a calm fallback so the
+                // overlay never dead-ends silently.
+                Icon(
+                    Icons.Filled.Lock,
+                    contentDescription = null,
+                    modifier = Modifier.size(if (compact) 44.dp else 72.dp),
+                    tint = Color.White,
+                )
+                Spacer(Modifier.height(18.dp))
+                Text(
+                    "Bloo is locked",
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White,
+                )
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    "Please try opening Bloo again.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = Color.White.copy(alpha = 0.85f),
+                )
             }
         }
     }
+}
+
+/** "0:23" formatting for the lockout countdown line. */
+private fun formatLockoutSeconds(ms: Long): String {
+    val total = ((ms + 999) / 1000).toInt()
+    return "${total / 60}:${(total % 60).toString().padStart(2, '0')}"
 }
 
 // --- Empty ----------------------------------------------------------------
@@ -6357,7 +6668,7 @@ private fun HeroHeader(
             // leave the flag. onSettled bypasses that bias for this one
             // report; onPositioned (below) still carries it correctly for
             // this page's OWN later, continuous scroll updates.
-            lastHeroCoords.value?.let { heroTitleFlight?.onSettled(it.positionInRoot()) }
+            lastHeroCoords.value?.let { heroTitleFlight?.onSettled(it.positionInRoot(), it.size) }
             lastCorrectedFlight = heroTitleFlight
         }
         // Follows the morph rather than switching: the photo fades in over the same
@@ -6401,7 +6712,7 @@ private fun HeroHeader(
                 Modifier
                     .onGloballyPositioned {
                         lastHeroCoords.value = it
-                        heroTitleFlight.onPositioned(it.positionInRoot())
+                        heroTitleFlight.onPositioned(it.positionInRoot(), it.size)
                     }
                     .alpha(0f)
                     // Position anchor only -- see TitleFlightOverlay's matching
@@ -7803,15 +8114,23 @@ private fun ChargeSegmentBar(
     val scheme = MaterialTheme.colorScheme
     val limit = limitPct?.takeIf { it in 1..99 }
     val trackColor = scheme.onSurface.copy(alpha = 0.16f)
-    // The past-the-limit zone: a genuinely darker BACKDROP (fixed black, not a
-    // theme colour -- this card sits on an arbitrary car photo as often as a flat
-    // surface, and a black scrim is what already keeps text legible over that same
-    // photo elsewhere on this exact card, so it reads as "darker" regardless of
-    // what's underneath) painted first, with the ordinary dim tint layered on top of
-    // it -- carries the "won't fill past here" distinction alongside its own
-    // separately-rounded shape, not instead of it.
-    val farBackdropColor = Color.Black.copy(alpha = 0.35f)
-    val trackDimColor = scheme.onSurface.copy(alpha = 0.08f)
+    // The past-the-limit zone. It used to be a genuinely darker BACKDROP (fixed
+    // black, deliberately not a theme colour, on the "a black scrim is what
+    // already keeps text legible over the photo" argument) -- but that made it
+    // a light-gray-on-black smudge exactly where the contrast already fails:
+    // on a dark hero photo the dim gray almost disappears, and on a light card
+    // it reads as nothing. The bar now matches its own host's contrast
+    // language instead: LocalContentColor is the SAME tone every surrounding
+    // element already checked against this backdrop (HeroOnPhoto white over the
+    // photo scrim, onSurface on flat cards), so the "won't fill past here"
+    // zone paints WHITE-on-dark and DARK-on-light by construction -- black
+    // backdrop -> white segment, white backdrop -> dark segment, and it tracks
+    // whatever the backdrop behind the segment actually is (the hero photo
+    // scrim, a pebble card, the cover tile) because it inherits the reader's
+    // own text colour rather than guessing a colour itself.
+    val heavyScrim = LocalContentColor.current.luminance() < 0.5f
+    val farBackdropColor = if (heavyScrim) Color.White.copy(alpha = 0.30f) else Color.Black.copy(alpha = 0.24f)
+    val trackDimColor = if (heavyScrim) Color.White.copy(alpha = 0.13f) else scheme.onSurface.copy(alpha = 0.14f)
     // Sprung, not a plain `if`: this used to pick the two-item colour list outright,
     // so a car finishing its last percent to the limit cut from green to blue on
     // whatever single frame stuckAtLimit flipped. Springing both gradient stops gives
@@ -8599,6 +8918,17 @@ internal interface TitleFlightSource {
      *  fades itself out while this is null instead of trusting a made-up
      *  coordinate. */
     val inlinePos: androidx.compose.runtime.State<Offset?>
+    /** The inline anchor's own measured size (position + size reported
+     *  together by the same onGloballyPositioned passes). Size is how
+     *  [TitleFlightOverlay] aligns the flying name to the anchor's vertical
+     *  CENTRE line instead of its top -- the name's glyphs are centred in
+     *  their own (larger, unscaled) text box, so pinning box-tops made the
+     *  name sit low next to a shorter collapsed header row (the % / mi&km
+     *  numbers), which is what reads as "the floating name is in the wrong
+     *  place when the hero tile is collapsed". Centre-to-centre keeps it on
+     *  the same line as the collapsed readout at every anchor scale. Zero
+     *  until the first real report. */
+    val inlineSize: androidx.compose.runtime.State<IntSize>
     val docked: androidx.compose.runtime.State<Boolean>
     val color: Color
     /** Mirrors PebbleShell's own hero-title grow/shrink scale (1f = fully
@@ -8655,6 +8985,7 @@ internal class HeroTitleFlight(topInsetPx: Float, private val hysteresisPx: Floa
     // degrades to "no scroll correction", not a crash.
     var scrollValuePx: () -> Float = { 0f }
     private var inlineX by mutableFloatStateOf(0f)
+    private val inlineSizeState = mutableStateOf(IntSize.Zero)
     // Null, not a fabricated off-screen sentinel (this used to be
     // Float.MAX_VALUE). The old sentinel relied entirely on an accident of
     // arithmetic: TitleFlightOverlay's `.offset{}` lerp and its chrome
@@ -8685,9 +9016,12 @@ internal class HeroTitleFlight(topInsetPx: Float, private val hysteresisPx: Floa
     // again without re-deriving it from scratch.
     private var reportGen by mutableIntStateOf(0)
 
-    fun onPositioned(offset: Offset) {
+    fun onPositioned(offset: Offset, size: IntSize = IntSize.Zero) {
         inlineX = offset.x
         inlineYState = offset.y
+        if (size != IntSize.Zero) {
+            inlineSizeState.value = size
+        }
         baselineScrollPx = scrollValuePx()
         // Hysteresis computed HERE, not inside `docked`'s derivedStateOf
         // below -- onPositioned is the one real event source for inlineY
@@ -8717,9 +9051,12 @@ internal class HeroTitleFlight(topInsetPx: Float, private val hysteresisPx: Floa
      *  -- a real, reproducible wrong-state bug once this class started
      *  being shared continuously across page switches instead of being
      *  rebuilt fresh per page. */
-    fun onSettled(offset: Offset) {
+    fun onSettled(offset: Offset, size: IntSize = IntSize.Zero) {
         inlineX = offset.x
         inlineYState = offset.y
+        if (size != IntSize.Zero) {
+            inlineSizeState.value = size
+        }
         baselineScrollPx = scrollValuePx()
         dockedNow = offset.y < topInsetPx
         reportGen++
@@ -8754,6 +9091,8 @@ internal class HeroTitleFlight(topInsetPx: Float, private val hysteresisPx: Floa
         derivedStateOf {
             inlineYState?.let { y -> Offset(inlineX, y - (scrollValuePx() - baselineScrollPx)) }
         }
+
+    override val inlineSize: androidx.compose.runtime.State<IntSize> = inlineSizeState
 
     /** Has the inline title's top edge crossed the status bar -- with
      *  hysteresis, not one bare threshold. A single cutoff meant a scroll
@@ -9070,6 +9409,14 @@ internal fun BoxScope.TitleFlightOverlay(
     }
     val dockedAnchor = remember { mutableStateOf<Offset?>(null) }
     val dockedSize = remember { mutableStateOf<IntSize?>(null) }
+    // The flying Text's own measured size -- its glyphs are centred inside a
+    // FULL-SIZE (headline) text box, so pinning the BOX TOP to the anchor's
+    // box top made the name sit low the moment the collapsed anchor scaled
+    // down to a shorter box (the % / mi&km readout still centred in the same
+    // row). Both placement lambdas below centre the flying text against the
+    // ANCHOR's vertical centre line instead; this size is the offset between
+    // the two boxes' tops that centre alignment has to make up.
+    var flyingSize by remember { mutableStateOf(IntSize.Zero) }
     // The one recomposition-triggering read gating the expensive chrome
     // below: composed only while docked, or while a spring is actively
     // carrying it there or back. `dockedAnchor` also has to be known already
@@ -9202,13 +9549,21 @@ internal fun BoxScope.TitleFlightOverlay(
                 val origin = containerOrigin.value
                 val inline = (flight.inlinePos.value ?: dockedAnchor.value ?: origin) - origin
                 val target = (dockedAnchor.value ?: (flight.inlinePos.value ?: origin)) - origin
+                // Same centre-line alignment the flying text uses (see that
+                // Box's offset lambda): the pill chrome grows around the text,
+                // so it has to travel along the SAME centred line, not the
+                // anchor's box-top line.
+                val anchorH = flight.inlineSize.value.height.toFloat()
+                val flyH = flyingSize.height.toFloat()
+                val inlineYc = inline.y + (anchorH - flyH) / 2f
+                val targetYc = target.y + (dockedSize.value?.height ?: if (flyH > 0f) flyH.toInt() else 0) / 2f - flyH / 2f
                 // Same start-at-inline, land-at-target lerp the flying text uses,
                 // expressed as a delta from this Box's own natural (padding-only)
                 // resting position -- unclamped `p`, not `clamped`, so the
                 // container can overshoot right along with the bouncy spring
                 // instead of the shape looking stiffer than the text it holds.
                 translationX = (inline.x - target.x) * (1f - p)
-                translationY = (inline.y - target.y) * (1f - p)
+                translationY = (inlineYc - targetYc) * (1f - p)
             }
             .padding(start = cornerX, top = cornerY, end = reserveEnd),
     ) {
@@ -9248,6 +9603,7 @@ internal fun BoxScope.TitleFlightOverlay(
         Modifier
             .align(Alignment.TopStart)
             .widthIn(max = maxWidth)
+            .onSizeChanged { flyingSize = it }
             .offset {
                 // Falls back to the docked anchor, then to the origin, only
                 // to give roundToInt() something finite to chew on while
@@ -9262,9 +9618,25 @@ internal fun BoxScope.TitleFlightOverlay(
                 val inline = (flight.inlinePos.value ?: dockedAnchor.value ?: origin) - origin
                 val target = (dockedAnchor.value ?: (flight.inlinePos.value ?: origin)) - origin
                 val p = progress.value
+                // Centred against the anchor's vertical centre line, not pinned
+                // box-top-to-box-top: the flying name's glyphs are centred in a
+                // FULL-SIZE headline text box, while the collapsed anchor's own
+                // box is that height scaled to the row's real height -- top-
+                // pinning made the name sit below the % / mi&km numbers that
+                // share the collapsed row (reported: "floating name is in the
+                // wrong place when the hero tile is collapsed"). Centre-to-
+                // centre puts the name on the SAME line as that readout at any
+                // anchor scale, and is a no-op once expanded (anchor height
+                // equals the flying box's own => offset 0). Docked end is
+                // unchanged: the docked measuring copy IS the same text, so its
+                // centre line == the flying box's own centre.
+                val anchorH = flight.inlineSize.value.height.toFloat()
+                val flyH = flyingSize.height.toFloat()
+                val inlineYc = inline.y + (anchorH - flyH) / 2f
+                val targetYc = target.y + (dockedSize.value?.height ?: 0) / 2f - flyH / 2f
                 IntOffset(
                     (inline.x + (target.x - inline.x) * p).roundToInt(),
-                    (inline.y + (target.y - inline.y) * p).roundToInt(),
+                    (inlineYc + (targetYc - inlineYc) * p).roundToInt(),
                 )
             }
             // Mirrors PebbleShell's own hero title grow/shrink (see
@@ -11925,7 +12297,7 @@ private fun SplitExpandButton(
     // pills by construction, no fixed-dp radius that could exceed an edge),
     // and the chevron's morphed corner is "10dp" in that language, so the
     // percent is derived from the measured height: 10dp / rowHeight.
-    var rowHeightDp by remember { mutableStateOf(44.dp) }
+    var rowHeightDp by remember { mutableStateOf(52.dp) }
     val density = LocalDensity.current
     val morphedPercent = 100f * 10.dp.value / rowHeightDp.value
     val inner = 6.dp
@@ -11982,7 +12354,12 @@ private fun SplitExpandButton(
 
     Row(
         modifier = Modifier
+            // A fixed 52dp target (the old content-driven ~40dp pill read as
+            // undersized next to the 76dp header it sits in -- reported from
+            // a real screenshot). IntrinsicSize.Min still reconciles the two
+            // halves to the SAME height; heightIn supplies the floor.
             .height(IntrinsicSize.Min)
+            .heightIn(min = rowHeightDp)
             // Real measured height, so the 10dp corner percent above lands on
             // the right radius -- see that val's own doc.
             .onSizeChanged { rowHeightDp = with(density) { it.height.toDp() } },
@@ -12080,7 +12457,10 @@ private fun SplitExpandButton(
             // TalkBack only ever hears what tapping will do, never whether the
             // pebble is presently open, so distinguishing the two took a
             // double-tap-and-listen-again instead of being announced on focus.
-            modifier = Modifier.fillMaxHeight().semantics { stateDescription = if (expanded) "Expanded" else "Collapsed" },
+            // widthIn(min = rowHeightDp) keeps the nub a square at the row's
+            // fixed height so its pill end is a true semicircle by percent.
+            modifier = Modifier.fillMaxHeight().widthIn(min = rowHeightDp)
+                .semantics { stateDescription = if (expanded) "Expanded" else "Collapsed" },
         ) {
             Icon(
                 Icons.Filled.KeyboardArrowDown,

@@ -88,6 +88,8 @@ import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.filled.Pin
+import androidx.compose.material.icons.filled.LockReset
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.FlashOn
@@ -187,6 +189,7 @@ import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.composed
@@ -1532,6 +1535,62 @@ internal fun SettingsScreen(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
+                // --- App PIN ---
+                // The device unlock PIN: the required mechanism on devices with
+                // no biometrics, an optional backup on those that have them.
+                // Separate from the biometric rows above because it is a second,
+                // independent mechanism, not a mode of the first one.
+                Spacer(Modifier.height(14.dp))
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+                Spacer(Modifier.height(6.dp))
+                var pinDialog by remember { mutableStateOf<String?>(null) }
+                val pinSet = state.appPinSet
+                StatusHeaderRow(
+                    icon = if (pinSet) Icons.Filled.Lock else Icons.Filled.Pin,
+                    tint = if (pinSet) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.onSurfaceVariant,
+                    title = "App PIN",
+                    status = if (pinSet) "On · 4-8 digits" else "Off",
+                )
+                Spacer(Modifier.height(6.dp))
+                Text(
+                    if (canBio)
+                        "A 4-8 digit PIN that works as a backup when fingerprints aren't available."
+                    else
+                        "This device has no fingerprints, so the app unlocks with this PIN.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(Modifier.height(12.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    MorphButton(
+                        onClick = { pinDialog = "set" },
+                        modifier = Modifier.weight(1f),
+                    ) {
+                        Icon(
+                            if (pinSet) Icons.Filled.LockReset else Icons.Filled.Lock,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp),
+                        )
+                        Spacer(Modifier.width(8.dp))
+                        Text(if (pinSet) "Change PIN" else "Set up PIN", fontWeight = FontWeight.SemiBold)
+                    }
+                    if (pinSet) {
+                        MorphTextButton(
+                            "Remove",
+                            onClick = { pinDialog = "remove" },
+                            modifier = Modifier.weight(1f),
+                            containerColor = MaterialTheme.colorScheme.errorContainer,
+                            contentColor = MaterialTheme.colorScheme.onErrorContainer,
+                        )
+                    }
+                }
+                PinDialogs(
+                    mode = pinDialog,
+                    onDismiss = { pinDialog = null },
+                    vm = vm,
+                    state = state,
+                    canBio = canBio,
+                )
             }
             }
             item {
@@ -4886,3 +4945,170 @@ private fun ChoiceRow(label: String, selected: Boolean, onSelect: () -> Unit) {
     }
 }
 
+
+// --- App PIN dialogs ------------------------------------------------------
+
+/**
+ * The Security card's PIN dialogs, one [GlassAlertDialog] shell with three
+ * stages: verify the CURRENT PIN, then either enter a new one (set/change)
+ * or confirm removal. Everything is the standard component set -- the shared
+ * pin form, Morph buttons, the glass dialog shell -- so the PIN flow's UI
+ * is no more bespoke than any other dialog in the app.
+ *
+ * The current-PIN stage routes through [AppViewModel.verifyAppPin] so it
+ * enjoys the SAME lockout policy the lock screen has (and is not an
+ * unguarded oracle for it): wrong PINs here count toward the app's own
+ * rejection windows. A rejected attempt lands in [UiState.pinAttemptRejected]
+ * (cleared via acknowledgePinRejection once this dialog has shown it); a
+ * successful verify bumps [UiState.pinAcceptedTick], which advances the
+ * stage.
+ */
+@Composable
+internal fun PinDialogs(
+    mode: String?,
+    onDismiss: () -> Unit,
+    vm: AppViewModel,
+    state: UiState,
+    canBio: Boolean,
+) {
+    if (mode == null) return
+    val haptics = LocalHaptics.current
+    val scheme = MaterialTheme.colorScheme
+    val title = when (mode) {
+        "set" -> if (state.appPinSet) "Change PIN" else "Set up PIN"
+        else -> "Remove PIN"
+    }
+
+    // current-PIN gate -> (new PIN entry | remove confirm)
+    var stage by remember(mode) { mutableStateOf("current") }
+    var currentPin by remember { mutableStateOf("") }
+    var rejected by remember { mutableStateOf(false) }
+    // Baselines, so the effects below react to CHANGES only -- the initial
+    // composition must not treat a stale flag (left by an earlier lock
+    // screen session, say) as a fresh event.
+    var seenRejected by remember(mode) { mutableStateOf(state.pinAttemptRejected) }
+    var seenTick by remember(mode) { mutableStateOf(state.pinAcceptedTick) }
+    // Watch the verify outcome: a wrong PIN flags pinAttemptRejected (shown
+    // as an inline error here, then acknowledged), a right one advances.
+    LaunchedEffect(state.pinAttemptRejected) {
+        if (state.pinAttemptRejected && !seenRejected) {
+            seenRejected = true
+            rejected = true
+            currentPin = ""
+            vm.acknowledgePinRejection()
+        }
+    }
+    LaunchedEffect(state.pinAcceptedTick) {
+        if (state.pinAcceptedTick != seenTick) {
+            seenTick = state.pinAcceptedTick
+            if (stage == "current") stage = "finish"
+        }
+    }
+    val sanitize: (String) -> String = { it.take(8).filter { ch -> ch.isDigit() } }
+
+    GlassAlertDialog(
+        onDismissRequest = onDismiss,
+        title = title,
+        icon = Icons.Filled.Lock,
+        text = {
+            when (stage) {
+                "current" -> {
+                    Text(
+                        "Enter your current PIN to continue.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = scheme.onSurfaceVariant,
+                    )
+                    Spacer(Modifier.height(12.dp))
+                    OutlinedTextField(
+                        value = currentPin,
+                        onValueChange = { currentPin = sanitize(it); rejected = false },
+                        placeholder = { Text("Current PIN") },
+                        singleLine = true,
+                        shape = androidx.compose.foundation.shape.RoundedCornerShape(18.dp),
+                        colors = androidx.compose.material3.TextFieldDefaults.colors(),
+                        visualTransformation = PasswordVisualTransformation(),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword, imeAction = ImeAction.Done),
+                        keyboardActions = KeyboardActions(onDone = {
+                            if (currentPin.length >= 4) {
+                                haptics?.click()
+                                vm.verifyAppPin(currentPin)
+                            }
+                        }),
+                        isError = rejected,
+                        supportingText = if (rejected) {
+                            {
+                                Text(
+                                    "Incorrect PIN. Wrong attempts count toward a lockout.",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = scheme.error,
+                                )
+                            }
+                        } else null,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                }
+                "finish" -> {
+                    when (mode) {
+                        "set" -> {
+                            Text(
+                                "Choose a new 4-8 digit PIN.",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = scheme.onSurfaceVariant,
+                            )
+                            Spacer(Modifier.height(12.dp))
+                            OnboardingPinForm(
+                                existing = state.appPinSet,
+                                onSet = { pin -> vm.setAppPin(pin) },
+                            )
+                        }
+                        else -> {
+                            Text(
+                                if (canBio)
+                                    "Removing the PIN leaves fingerprints as the only way to lock the app."
+                                else
+                                    "This device has no fingerprints, so removing the PIN means the app can never lock.",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = scheme.onSurfaceVariant,
+                            )
+                            Spacer(Modifier.height(14.dp))
+                        }
+                    }
+                }
+            }
+        },
+        buttons = {
+            when (stage) {
+                "current" -> Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    MorphTextButton("Cancel", onDismiss, modifier = Modifier.weight(1f))
+                    MorphButton(
+                        onClick = {
+                            haptics?.click()
+                            vm.verifyAppPin(currentPin)
+                        },
+                        enabled = currentPin.length >= 4,
+                        modifier = Modifier.weight(1f),
+                    ) { Text("Continue", fontWeight = FontWeight.SemiBold) }
+                }
+                "finish" -> {
+                    if (mode == "remove") {
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            MorphTextButton("Keep PIN", onDismiss, modifier = Modifier.weight(1f))
+                            MorphButton(
+                                onClick = { haptics?.heavy(); vm.removeAppPin(); onDismiss() },
+                                containerColor = scheme.error,
+                                contentColor = scheme.onError,
+                                modifier = Modifier.weight(1f),
+                            ) { Text("Remove PIN", fontWeight = FontWeight.SemiBold) }
+                        }
+                    }
+                    Spacer(Modifier.height(6.dp))
+                    MorphTextButton(
+                        "Done",
+                        onClick = { haptics?.click(); onDismiss() },
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                }
+            }
+        },
+    )
+}

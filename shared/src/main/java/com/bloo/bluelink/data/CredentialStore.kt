@@ -100,6 +100,46 @@ class CredentialStore(context: Context) {
             .apply()
     }
 
+    // --- App PIN (device app-lock, unrelated to any car's service PIN) ----
+    //
+    // The app PIN is NOT a brand credential, but it shares this store
+    // deliberately: it is a secret that must never leave the device, and this
+    // is the file that already guarantees exactly that (AES-256-GCM via
+    // Android Keystore, see the class doc). It lives under its own flat keys
+    // so it cannot collide with the per-brand "%s_email" scheme.
+
+    /** The encoded [PinRecord] (or null when no PIN is set). */
+    fun getPinRecord(): String? = prefs.getString(KEY_PIN_RECORD, null)
+
+    /** Sets (or, with null, clears) the stored PIN record. Clearing also
+     *  wipes the failure counter -- there is nothing left to protect. */
+    fun setPinRecord(record: String?) {
+        if (record == null) {
+            prefs.edit()
+                .remove(KEY_PIN_RECORD)
+                .remove(KEY_PIN_FAILURES)
+                .remove(KEY_PIN_LOCKED_UNTIL)
+                .apply()
+        } else {
+            prefs.edit().putString(KEY_PIN_RECORD, record).apply()
+        }
+    }
+
+    /** Consecutive PIN failures since the last successful unlock. */
+    fun getPinFailures(): Int = prefs.getInt(KEY_PIN_FAILURES, 0)
+
+    /** Whether the PIN is currently in its rejection window, and for how
+     *  long -- wall-clock epoch ms until the next attempt may proceed. */
+    fun getPinLockedUntil(): Long = prefs.getLong(KEY_PIN_LOCKED_UNTIL, 0L)
+
+    /** Persists the whole [PinLockout] state atomically. */
+    fun setPinLockout(lockout: PinLockout) {
+        prefs.edit()
+            .putInt(KEY_PIN_FAILURES, lockout.failures)
+            .putLong(KEY_PIN_LOCKED_UNTIL, lockout.lockedUntilEpochMs)
+            .apply()
+    }
+
     /** Wipes the entire encrypted prefs file — all brands, all accounts. */
     fun clearAll() {
         prefs.edit().clear().apply()
@@ -135,5 +175,8 @@ class CredentialStore(context: Context) {
         // Prefs key holding the Set<String> of brand names ("HYUNDAI", "KIA", ...)
         // that currently have credentials saved.
         const val KEY_BRANDS = "brands"
+        const val KEY_PIN_RECORD = "app_pin_record"
+        const val KEY_PIN_FAILURES = "app_pin_failures"
+        const val KEY_PIN_LOCKED_UNTIL = "app_pin_locked_until"
     }
 }
