@@ -34,6 +34,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.size
@@ -43,6 +44,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -77,14 +79,14 @@ import androidx.compose.ui.unit.sp
 import androidx.wear.compose.foundation.lazy.AutoCenteringParams
 import androidx.wear.compose.foundation.lazy.ScalingLazyColumn
 import androidx.wear.compose.foundation.lazy.ScalingLazyColumnDefaults
+import androidx.wear.compose.material3.LocalContentColor
+import com.bloo.uicommon.MorphButtonCore
 import androidx.wear.compose.foundation.lazy.ScalingLazyListScope
 import androidx.wear.compose.foundation.lazy.ScalingLazyListState
 import androidx.wear.compose.foundation.lazy.ScalingParams
 import androidx.wear.compose.foundation.lazy.rememberScalingLazyListState
 import androidx.wear.compose.foundation.rotary.RotaryScrollableDefaults
 import androidx.wear.compose.foundation.rotary.rotaryScrollable
-import androidx.wear.compose.material3.Button
-import androidx.wear.compose.material3.ButtonDefaults
 import androidx.wear.compose.material3.CircularProgressIndicator
 import androidx.wear.compose.material3.Icon
 import androidx.wear.compose.material3.ListHeader
@@ -665,12 +667,15 @@ fun AnimatedSlider(
     )
 }
 
-/** The app's pill→rounded-square morphing button, for Wear. Matches the phone's MorphButton.
+/** THE watch's pill→rounded-square morphing button: a thin wear-specific shell
+ *  over the shared [com.bloo.uicommon.MorphButtonCore], which is exactly what
+ *  the phone's MorphButton is too -- one button machinery, two platform
+ *  wrappers (contrast, press feedback and the pill-morph motion stay
+ *  consistent everywhere because they ARE the same component).
  *  [secondaryLabel] adds a small caption line below [label] (e.g. a field name
  *  under its current value) — every button-shaped control in the wear app
  *  should go through this one component rather than a raw Wear Button/
- *  FilledTonalButton/OutlinedButton/SwitchButton, so contrast, press feedback,
- *  and the pill-morph motion stay consistent everywhere. */
+ *  FilledTonalButton/OutlinedButton/SwitchButton. */
 @Composable
 fun MorphButton(
     label: String,
@@ -711,71 +716,47 @@ fun MorphButton(
     contentDescription: String? = null,
 ) {
     val interaction = remember { MutableInteractionSource() }
-    val pressed by interaction.collectIsPressedAsState()
     val haptics = LocalHapticFeedback.current
     val scheme = MaterialTheme.colorScheme
 
-    // A true pill at rest, a rounded rectangle while active or pressed -- the same
-    // two corner values the phone uses, now from the one shared pair rather than
-    // hard-coded identically in both files.
-    //
-    // The spring is NOT the phone's, and the comment here used to claim it was
-    // ("phone's exact values with the same spring"). The phone runs StiffnessLow;
-    // this runs StiffnessMedium and adds the scale punch below, because on a small
-    // dark watch face the corner change alone did not register as a reaction.
-    // That difference is deliberate, so only the VALUES are shared -- but the
-    // comment asserting otherwise would have sent the next reader to "fix" one of
-    // them to match the other.
-    val pct by animateFloatAsState(
-        targetValue = if (active || pressed) com.bloo.uicommon.MorphedCornerPercent
-        else com.bloo.uicommon.PillCornerPercent,
-        animationSpec = spring(dampingRatio = com.bloo.uicommon.SoftDamping, stiffness = Spring.StiffnessMedium),
-        label = "morphCorner",
-    )
-    // A quick, snappy press-punch independent of the (slower, shape-driven)
-    // morph above — corner-radius alone was too subtle to register as "the
-    // button reacted" against the dark, low-contrast card background.
-    val pressScale by animateFloatAsState(
-        targetValue = if (pressed) 0.95f else 1f,
-        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessHigh),
-        label = "morphPressScale",
-    )
     // Shared buttonContainer formula — phone uses surfaceContainerHighest,
     // watch has only surfaceContainerHigh. Passing the closest available
     // surface + onSurface gives a consistent visual result across platforms.
     val containerColor = com.bloo.uicommon.BlooColors.buttonContainer(
         scheme.surfaceContainerHigh, scheme.onSurface
     )
-    val bg by animateColorAsState(
-        targetValue = if (active) activeColor else containerColor,
-        animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
-        label = "morphBg",
-    )
     val resolvedContent = if (active) scheme.onPrimary else scheme.onSurface
 
-    Button(
-        // A toggle turning ON, or a highlighted (active/primary) action, is a real
-        // commit → the heavier Confirm feel; every other button (navigation,
-        // pickers, plain actions) gets the lighter tap so opening a submenu no
-        // longer feels as weighty as committing a state change.
-        //
-        // `toggled == false`, not `== true`. `toggled` is the state the button is IN, so
-        // testing it for true asked "is it already on" and gave the heavy Confirm to the tap
-        // that turns something OFF -- exactly inverted from the rule above, for every toggle
-        // in the app. Checked all seven call sites: lock, climate (x2), charge, PIN lock and
-        // Aurora (x2) all pass the current state, so destination = "about to turn on" =
-        // `toggled == false` uniformly.
-        //
-        // The `active && toggled == null` clause is unchanged: it covers a plain highlighted
-        // action and a toggle whose state is genuinely UNKNOWN, neither of which this changes.
-        onClick = { if (toggled == false || (active && toggled == null)) haptics.click() else haptics.tap(); onClick() },
-        enabled = enabled && !pending,
-        interactionSource = interaction,
+    // A toggle turning ON, or a highlighted (active/primary) action, is a real
+    // commit → the heavier Confirm feel; every other button (navigation,
+    // pickers, plain actions) gets the lighter tap so opening a submenu no
+    // longer feels as weighty as committing a state change.
+    //
+    // `toggled == false`, not `== true`. `toggled` is the state the button is IN, so
+    // testing it for true asked "is it already on" and gave the heavy Confirm to the tap
+    // that turns something OFF -- exactly inverted from the rule above, for every toggle
+    // in the app. Checked all seven call sites: lock, climate (x2), charge, PIN lock and
+    // Aurora (x2) all pass the current state, so destination = "about to turn on" =
+    // `toggled == false` uniformly.
+    //
+    // The `active && toggled == null` clause is unchanged: it covers a plain highlighted
+    // action and a toggle whose state is genuinely UNKNOWN, neither of which this changes.
+    val providedContent = if (enabled && !pending) {
+        resolvedContent
+    } else {
+        resolvedContent.copy(alpha = 0.55f)
+    }
+    CompositionLocalProvider(LocalContentColor provides providedContent) {
+    MorphButtonCore(
+        onClick = {
+            if (toggled == false || (active && toggled == null)) haptics.click() else haptics.tap()
+            onClick()
+        },
         modifier = modifier.fillMaxWidth()
-            .graphicsLayer { scaleX = pressScale; scaleY = pressScale }
             .animateContentSize(
                 spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium),
             )
+            .heightIn(min = 48.dp)
             .then(
                 if (toggled != null || contentDescription != null) {
                     Modifier.semantics {
@@ -787,55 +768,61 @@ fun MorphButton(
                     }
                 } else Modifier,
             ),
-        shape = RoundedCornerShape(percent = pct.roundToInt()),
-        colors = ButtonDefaults.buttonColors(
-            containerColor = bg,
-            contentColor = resolvedContent,
-            disabledContainerColor = bg,
-            // A flat surfaceContainerHigh fill with 38%-alpha content and no
-            // border (the old `pending` case) had nothing left to read as
-            // "busy" rather than "broken" once Liquid/Ultra Glass stopped
-            // giving buttons a second depth cue -- keeping a dimmer rim and a
-            // less severe alpha dip keeps a pending button legibly "still
-            // there, just working" instead of washed-out.
-            disabledContentColor = resolvedContent.copy(alpha = 0.55f),
-        ),
+        containerColor = containerColor,
+        contentColor = scheme.onSurface,
+        activeContainerColor = activeColor,
+        activeContentColor = scheme.onPrimary,
+        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 10.dp),
+        disabledContentColor = resolvedContent.copy(alpha = 0.55f),
+        // A flat surfaceContainerHigh fill with 38%-alpha content and no
+        // border (the old `pending` case) had nothing left to read as
+        // "busy" rather than "broken" -- keeping a dimmer rim and a less
+        // severe alpha dip keeps a pending button legibly "still there,
+        // just working" instead of washed-out.
         border = when {
             active -> null
             pending -> BorderStroke(1.5.dp, scheme.outline.copy(alpha = 0.35f))
             else -> BorderStroke(1.5.dp, scheme.outline.copy(alpha = 0.85f))
         },
-        label = {
-            AnimatedContent(targetState = label, transitionSpec = {
-                (fadeIn(tween(150)) + slideInVertically(tween(150)) { -it / 3 }) togetherWith
-                    (fadeOut(tween(100)) + slideOutVertically(tween(100)) { it / 3 })
-            }, label = "btnLabel") { lbl ->
-                Text(
-                    lbl,
-                    maxLines = maxLines,
-                    overflow = TextOverflow.Ellipsis,
-                    textAlign = if (!showIcon) TextAlign.Center else null,
-                    fontWeight = FontWeight.SemiBold,
-                )
+        // The phone runs StiffnessLow; this runs StiffnessMedium and adds the
+        // scale punch below, because on a small dark watch face the corner
+        // change alone did not register as a reaction.
+        morphSpring = spring(dampingRatio = com.bloo.uicommon.SoftDamping, stiffness = Spring.StiffnessMedium),
+        pressScale = 0.95f,
+        interactionSource = interaction,
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            // Icon slot: a spinner while pending; the leading icon otherwise — unless
+            // showIcon is false (weighted pairs that need the label's full width), in
+            // which case only a pending spinner ever appears and the label gets the
+            // whole chip.
+            when {
+                pending -> CircularProgressIndicator(modifier = Modifier.size(18.dp))
+                showIcon -> Icon(icon, contentDescription = null, modifier = Modifier.size(18.dp))
             }
-        },
-        secondaryLabel = secondaryLabel?.let { s ->
-            { Text(s, maxLines = 1, overflow = TextOverflow.Ellipsis) }
-        },
-        // Icon slot: a spinner while pending; the leading icon otherwise — unless
-        // showIcon is false (weighted pairs that need the label's full width), in
-        // which case only a pending spinner ever appears and the label gets the
-        // whole chip. `icon = null` is a valid Wear M3 Button arg (renders no icon).
-        icon = when {
-            pending -> {
-                { CircularProgressIndicator(modifier = Modifier.size(18.dp)) }
+            Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
+                AnimatedContent(targetState = label, transitionSpec = {
+                    (fadeIn(tween(150)) + slideInVertically(tween(150)) { -it / 3 }) togetherWith
+                        (fadeOut(tween(100)) + slideOutVertically(tween(100)) { it / 3 })
+                }, label = "btnLabel") { lbl ->
+                    Text(
+                        lbl,
+                        maxLines = maxLines,
+                        overflow = TextOverflow.Ellipsis,
+                        textAlign = if (!showIcon) TextAlign.Center else null,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                }
+                secondaryLabel?.let { s ->
+                    Text(s, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                }
             }
-            showIcon -> {
-                { Icon(icon, contentDescription = null, modifier = Modifier.size(18.dp)) }
-            }
-            else -> null
-        },
-    )
+        }
+    }
+    }
 }
 
 /** One option in a [MorphSegmented] control; re-exported from :uicommon.

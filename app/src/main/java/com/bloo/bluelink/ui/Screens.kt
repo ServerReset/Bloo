@@ -62,7 +62,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.animation.core.snap
@@ -355,6 +354,7 @@ import com.bloo.bluelink.data.degValue
 import com.bloo.bluelink.data.MapTiles
 import com.bloo.bluelink.data.smartClimateTargetF
 import com.bloo.bluelink.data.Vehicle
+import com.bloo.uicommon.MorphButtonCore
 import com.bloo.uicommon.dropShadow
 import com.bloo.bluelink.data.VehicleStatus
 import com.bloo.bluelink.data.Weather
@@ -4703,41 +4703,39 @@ private fun RowScope.CoverActionButton(
 ) {
     val scheme = MaterialTheme.colorScheme
     val haptics = LocalHaptics.current
-    val container by androidx.compose.animation.animateColorAsState(
-        when {
-            active -> scheme.primary
-            attention -> scheme.errorContainer
-            else -> scheme.surfaceContainerHighest
-        },
-        spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessMediumLow),
-        label = "coverActionFill",
-    )
-    val content by androidx.compose.animation.animateColorAsState(
-        when {
-            active -> scheme.onPrimary
-            attention -> scheme.onErrorContainer
-            else -> scheme.onSurface
-        },
-        spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessMediumLow),
-        label = "coverActionInk",
-    )
-    Surface(
+    // Same MorphButton as everywhere: active commands wear the primary
+    // highlight, the "worth changing" state wears the error container, and
+    // idle is the standard button fill. It simply pins both corner percents
+    // to the same square 16dp value so a cover bar button never morphs.
+    val squarePct = 100f * 16.dp.value / 56.dp.value
+    // The content tone for every state the core reaches: active->onPrimary,
+    // attention->onErrorContainer, else onSurface. Passed as BOTH the idle
+    // content and the disabled content (full alpha, so the cover button's own
+    // 45% whole-pill fade is the ONLY dim when disabled -- the core's default
+    // label-only fade would compound on top of it).
+    val contentFor = if (active) scheme.onPrimary
+        else if (attention) scheme.onErrorContainer
+        else scheme.onSurface
+    MorphButton(
+        onClick = { onClick() },
+        onClickHaptic = { haptics?.click() },
+        onLongClick = onLongClick?.let { fn -> { haptics?.tick(); fn() } },
+        enabled = enabled && !pending,
+        active = active,
+        containerColor = if (attention) scheme.errorContainer else buttonContainer(),
+        contentColor = contentFor,
+        disabledContentColor = contentFor,
+        pillCornerPercent = squarePct,
+        morphedCornerPercent = squarePct,
+        contentPadding = PaddingValues(horizontal = 2.dp, vertical = 4.dp),
+        minHeight = 0.dp,
         modifier = Modifier
             .weight(1f)
             .height(56.dp)
-            .alpha(if (enabled) 1f else 0.45f)
-            .clip(RoundedCornerShape(16.dp))
-            .combinedClickable(
-                enabled = enabled && !pending,
-                onLongClick = onLongClick?.let { fn -> { haptics?.tick(); fn() } },
-                onClick = { haptics?.click(); onClick() },
-            ),
-        shape = RoundedCornerShape(16.dp),
-        color = container,
-        contentColor = content,
+            .alpha(if (enabled) 1f else 0.45f),
     ) {
         Column(
-            Modifier.fillMaxSize().padding(horizontal = 2.dp),
+            Modifier.fillMaxSize(),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center,
         ) {
@@ -4745,7 +4743,7 @@ private fun RowScope.CoverActionButton(
                 CircularProgressIndicator(
                     modifier = Modifier.size(20.dp),
                     strokeWidth = 2.dp,
-                    color = content,
+                    color = LocalContentColor.current,
                 )
             } else {
                 Icon(icon, contentDescription = null, modifier = Modifier.size(22.dp))
@@ -4755,7 +4753,7 @@ private fun RowScope.CoverActionButton(
                 text = label,
                 style = MaterialTheme.typography.labelSmall.copy(
                     fontWeight = FontWeight.SemiBold,
-                    color = content,
+                    color = LocalContentColor.current,
                 ),
             )
         }
@@ -10891,6 +10889,21 @@ private fun connectedGroupShape(index: Int, count: Int, cornerPercent: Int, smal
  * momentarily while pressed. When [active], it fills with [activeContainerColor].
  * Its width springs (with a little overshoot) whenever the content width changes,
  * e.g. the label flips Start -> Stop.
+ *
+ * This IS the shared [MorphButtonCore] from :uicommon -- the same machinery the
+ * watch's MorphButton uses -- dressed in this module's Material theme colours,
+ * haptics and M3 content padding, plus two phone-wide conventions:
+ *
+ *  - [minHeight] of 48dp (the M3 touch target the old `Button` enforced
+ *    implicitly) unless a caller opts out to keep a shorter pill
+ *    (split-button halves, preset pills).
+ *  - `selected = [active]` semantics, so TalkBack hears the state, not just
+ *    the label ("Unlock" says what happens, not what is).
+ *
+ * Every other button-looking control in this app -- the split action+chevron
+ * pills, the standalone chevron, the preset pills, the cover action bar --
+ * is this same component; the ones that look different simply pass different
+ * shapes (shapeForCorner) and colours. There are no separate button types.
  */
 @Composable
 fun MorphButton(
@@ -10904,60 +10917,81 @@ fun MorphButton(
     activeContentColor: Color = MaterialTheme.colorScheme.onPrimary,
     border: BorderStroke? = null,
     contentPadding: PaddingValues = ButtonDefaults.ContentPadding,
+    /** Overrides the disabled content tone (default: resolved content at 38%
+     *  alpha -- "only the label fades"). The cover action button passes its
+     *  own full-alpha tone because it dims the WHOLE pill itself. */
+    disabledContentColor: Color? = null,
     interactionSource: MutableInteractionSource = remember { MutableInteractionSource() },
     // An asymmetric shape to use instead of the plain pill<->square morph --
-    // for a connected button-group segment (see StateControl), whose inner
-    // (seam) corners stay small and square while the outer corner is the one
-    // that morphs. Given the same animated corner percent [MorphButton] uses
-    // internally, so a segment still visibly squeezes on press instead of
-    // being frozen into a static silhouette just because it's part of a group.
-    shapeForCorner: ((cornerPercent: Int) -> Shape)? = null,
+    // for a connected button-group segment (see StateControl), or a split
+    // button half, whose inner (seam) corners stay small while the outer
+    // corner is the one that morphs. Receives the raw morph progress
+    // (0 = pill, 1 = fully morphed) and the animated corner percent, so the
+    // shape can derive any corner geometry from the button's own spring.
+    shapeForCorner: ((morph: Float, cornerPercent: Int) -> Shape)? = null,
+    /** Hold-to-act action (chevron easter egg, cover flash-lights). */
+    onLongClick: (() -> Unit)? = null,
+    /** Haptic for a plain click; null = the standard click() pulse. The lock
+     *  button overrides with heavy(), the chevron with tick()/click() by
+     *  direction. */
+    onClickHaptic: (() -> Unit)? = null,
+    /** The pill's corner-percent when idle (50 = perfect pill) and when
+     *  [active]/pressed (default 28 = the app's standard rounded square).
+     *  Overridable so a fixed-height square button (cover actions, chevron
+     *  nub) can land on its own exact corner radius. */
+    pillCornerPercent: Float = PillCornerPercent,
+    morphedCornerPercent: Float = MorphedCornerPercent,
+    /** 48dp is the minimum touch-target height M3 `Button` enforced implicitly;
+     *  pass 0.dp to let a short pill keep its natural height. */
+    minHeight: Dp = 48.dp,
     content: @Composable RowScope.() -> Unit,
 ) {
-    val pressed by interactionSource.collectIsPressedAsState()
     val haptics = LocalHaptics.current
-    // 50% = a true pill; a lower percent = a rounded rectangle.
-    val pct by animateFloatAsState(
-        targetValue = if (active || pressed) MorphedCornerPercent else PillCornerPercent,
-        animationSpec = spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessLow),
-        label = "morphCorner",
-    )
-    val bg by androidx.compose.animation.animateColorAsState(
-        if (active) activeContainerColor else containerColor,
-        animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
-        label = "morphBg",
-    )
+    val clickHaptic = onClickHaptic ?: { haptics?.click() }
+    // The content tone content lambdas inherit, provided the way M3's Button
+    // provides it internally (the shared core is foundation-only and cannot
+    // reach material3's LocalContentColor).
     val resolvedContent = if (active) activeContentColor else contentColor
-    Button(
-        onClick = { haptics?.click(); onClick() },
-        modifier = modifier
-            .animateContentSize(
-                spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium),
-            )
-            // `active` is otherwise a colour-only change -- most call sites also
-            // swap their label text (Lock/Unlock, Start/Stop), which is why this
-            // mostly "worked" for TalkBack by accident, but that's caller
-            // discipline, not something the shared button guarantees. Setting
-            // `selected` here makes every MorphButton correct by construction:
-            // the app's one button framework, so this is the single highest-
-            // leverage place to fix it.
-            .semantics { selected = active },
-        enabled = enabled,
-        shape = shapeForCorner?.invoke(pct.roundToInt()) ?: RoundedCornerShape(percent = pct.roundToInt()),
-        interactionSource = interactionSource,
-        colors = ButtonDefaults.buttonColors(
-            containerColor = bg,
-            contentColor = resolvedContent,
-            // Keep the button's full background when disabled (only the label
-            // fades) instead of M3's default onSurface@12%, which is invisible
-            // against light cards and made disabled buttons look backgroundless.
-            disabledContainerColor = bg,
-            disabledContentColor = resolvedContent.copy(alpha = 0.38f),
-        ),
-        border = if (active) null else border,
-        contentPadding = contentPadding,
-        content = content,
-    )
+    val providedContent = if (enabled) {
+        resolvedContent
+    } else {
+        // Keep the button's full background when disabled (only the label
+        // fades) instead of M3's default onSurface@12%, which is invisible
+        // against light cards and made disabled buttons look backgroundless.
+        disabledContentColor ?: resolvedContent.copy(alpha = 0.38f)
+    }
+    CompositionLocalProvider(LocalContentColor provides providedContent) {
+        MorphButtonCore(
+            onClick = { clickHaptic(); onClick() },
+            modifier = modifier
+                // `active` is otherwise a colour-only change -- most call sites also
+                // swap their label text (Lock/Unlock, Start/Stop), which is why this
+                // mostly "worked" for TalkBack by accident, but that's caller
+                // discipline, not something the shared button guarantees. Setting
+                // `selected` here makes every MorphButton correct by construction:
+                // the app's one button framework, so this is the single highest-
+                // leverage place to fix it.
+                .semantics { selected = active }
+                .animateContentSize(
+                    spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium),
+                )
+                .then(if (minHeight > 0.dp) Modifier.heightIn(min = minHeight) else Modifier),
+            enabled = enabled,
+            active = active,
+            containerColor = containerColor,
+            contentColor = contentColor,
+            activeContainerColor = activeContainerColor,
+            activeContentColor = activeContentColor,
+            contentPadding = contentPadding,
+            border = if (active) null else border,
+            interactionSource = interactionSource,
+            onLongClick = onLongClick,
+            pillCornerPercent = pillCornerPercent,
+            morphedCornerPercent = morphedCornerPercent,
+            shapeForCorner = shapeForCorner,
+            content = content,
+        )
+    }
 }
 
 /**
@@ -11114,26 +11148,17 @@ fun MorphChip(
     icon: ImageVector? = null,
 ) {
     val haptics = LocalHaptics.current
-    val interaction = remember { MutableInteractionSource() }
-    val pressed by interaction.collectIsPressedAsState()
-    val corner by animateDpAsState(
-        targetValue = if (selected || pressed) 12.dp else 22.dp,
-        animationSpec = spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessMedium),
-        label = "chipCorner",
-    )
-    val container by androidx.compose.animation.animateColorAsState(
-        if (selected) MaterialTheme.colorScheme.primary else buttonContainer(),
-        animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
-        label = "chipBg",
-    )
-    val content = if (selected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface
     val chipSelected = selected
-    Surface(
-        onClick = { haptics?.tick(); onClick() },
-        shape = RoundedCornerShape(corner),
-        color = container,
-        contentColor = content,
-        interactionSource = interaction,
+    // The same MorphButton as everywhere: pill when idle, primary fill +
+    // rounded box when selected, standard corner-percent animation. The chip's
+    // historic 22dp/12dp corners on its ~40dp height are just under the
+    // framework's 50/28 defaults, so it uses the shared defaults verbatim.
+    MorphButton(
+        onClick = { onClick() },
+        onClickHaptic = { haptics?.tick() },
+        active = selected,
+        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 10.dp),
+        minHeight = 0.dp,
         // Same gap MorphSegmented had: a selectable pill with no `selected`
         // semantics reaching TalkBack, which announced every chip identically
         // regardless of which one was actually active. Captured into a
@@ -11142,18 +11167,12 @@ fun MorphChip(
         // not this composable's `selected` parameter of the same name.
         modifier = modifier.semantics { this.selected = chipSelected },
     ) {
-        Row(
-            Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
-        ) {
-            if (icon != null) Icon(icon, contentDescription = null, modifier = Modifier.size(16.dp))
-            Text(
-                label,
-                style = MaterialTheme.typography.labelLarge,
-                fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
-            )
-        }
+        if (icon != null) Icon(icon, contentDescription = null, modifier = Modifier.size(16.dp))
+        Text(
+            label,
+            style = MaterialTheme.typography.labelLarge,
+            fontWeight = if (chipSelected) FontWeight.Bold else FontWeight.Medium,
+        )
     }
 }
 
@@ -11316,7 +11335,7 @@ private fun StateControl(
                     onClick = action.onClick,
                     enabled = action.enabled,
                     contentPadding = PaddingValues(0.dp),
-                    shapeForCorner = { cp -> connectedGroupShape(i, segmentCount, cp) },
+                    shapeForCorner = { _, cp -> connectedGroupShape(i, segmentCount, cp) },
                     modifier = Modifier.size(groupBtnSize),
                 ) { Icon(action.icon, contentDescription = action.contentDescription, modifier = Modifier.size(actionIconSize)) }
             }
@@ -11326,13 +11345,14 @@ private fun StateControl(
             // shape param doc): a connected group's silhouette is static, not
             // something one segment morphs independently of the others.
             MorphButton(
-                onClick = { haptics?.heavy(); if (isOn == true) onDeactivate() else onActivate() },
+                onClick = { if (isOn == true) onDeactivate() else onActivate() },
+                onClickHaptic = { haptics?.heavy() },
                 enabled = enabled && !pending,
                 active = highlighted,
                 activeContainerColor = highlightColor,
                 activeContentColor = highlightContentColor,
                 shapeForCorner = if (groupActions.isNotEmpty()) {
-                    { cp -> connectedGroupShape(segmentCount - 1, segmentCount, cp) }
+                    { _, cp -> connectedGroupShape(segmentCount - 1, segmentCount, cp) }
                 } else {
                     null
                 },
@@ -11886,20 +11906,6 @@ private fun SplitExpandButton(
         animationSpec = spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessLow),
         label = "splitChevron",
     )
-    val leftInteraction = remember { MutableInteractionSource() }
-    val leftPressed by leftInteraction.collectIsPressedAsState()
-    val rightInteraction = remember { MutableInteractionSource() }
-    val rightPressed by rightInteraction.collectIsPressedAsState()
-    // Left and right each morph to rounded-rect on THEIR OWN state -- the two
-    // halves never share a boolean: action.active only ever describes the
-    // LEFT button (the action currently running), so it used to also square
-    // off the chevron's own outer-right corner right along with it, and
-    // `expanded` used to square off BOTH halves when only the chevron (the
-    // expand control) should respond to the pebble being open. The left half
-    // now only ever morphs for its own action/press, the right half only for
-    // its own press or the pebble being open.
-    val leftMorphed = action.active || leftPressed
-    val rightMorphed = rightPressed || expanded
 
     // Easter egg: HOLD the chevron (long-press) to trigger a one-shot spin
     // animation with a vibration. A long press does NOT toggle the pebble --
@@ -11913,72 +11919,34 @@ private fun SplitExpandButton(
         finishedListener = { if (easterEggTriggered) easterEggTriggered = false },
     )
 
-    // The row's own real, measured height (see the Row's onSizeChanged
-    // below) -- 50.dp is only the value used for the very first frame,
-    // before a real measurement lands. A flat 50.dp guess used to be the
-    // PERMANENT target: close to correct for this button's usual ~40-48dp
-    // content-driven height, but not exact, and Android's own rounded-rect
-    // drawing has UNDEFINED behavior (not a clean clamp) once the two
-    // radii on one edge sum past that edge's real length -- so the corner
-    // wasn't quite a clean semicircle.
-    //
-    // A previous version of this fix tried to force this button to an
-    // EXACT computed height instead of measuring it (replacing
-    // IntrinsicSize.Min outright) -- that broke the left/right halves'
-    // height PARITY: IntrinsicSize.Min is a real two-pass measurement
-    // (every child's own min intrinsic height first, the max of those
-    // becomes the Row's tight height, then every `fillMaxHeight()` child
-    // remeasures against that) that's what guarantees the label+icon
-    // button and the chevron nub end up the same height as each other
-    // in the first place; a plain `heightIn(min = ...)` floor doesn't
-    // reconcile the two the same way, and the chevron rendered visibly
-    // shorter than the label button as a result. Keeping the real
-    // IntrinsicSize.Min layout and only reading its OUTPUT (via
-    // onSizeChanged) for the corner-radius math gets the correct radius
-    // without touching how the two halves size against each other at all.
-    var rowHeightDp by remember { mutableStateOf(50.dp) }
+    // The row's own real, measured height. The halves' corners are expressed
+    // as a PERCENT of the short side (the shared MorphButton model -- exact
+    // pills by construction, no fixed-dp radius that could exceed an edge),
+    // and the chevron's morphed corner is "10dp" in that language, so the
+    // percent is derived from the measured height: 10dp / rowHeight.
+    var rowHeightDp by remember { mutableStateOf(44.dp) }
     val density = LocalDensity.current
-    // Half the row's real height, plus a small buffer to ensure full
-    // roundness when collapsed (avoids any flat edges from rounding
-    // quirks). A true semicircle needs radius == height / 2, but adding
-    // 2dp ensures it renders as fully rounded even with subpixel effects
-    // and density-dependent rounding on all device densities.
-    val fullyRound = rowHeightDp / 2 + 2.dp
-    // Independent corner morphing: left stays fully rounded until its own
-    // action or press, right becomes a tighter rounded square (10dp) when
-    // expanded -- the two halves' shapes never travel together.
-    val leftOuter by animateDpAsState(
-        if (leftMorphed) 10.dp else fullyRound,
-        spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessLow),
-        label = "splitOuterLeft",
-    )
-    val rightOuter by animateDpAsState(
-        if (rightMorphed) 10.dp else fullyRound,
-        spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessLow),
-        label = "splitOuterRight",
-    )
-
-    // Chevron shifts to the highest neutral surface tone when the pebble is
-    // open -- the same light-neutral container family the rest of the app
-    // uses, never a status colour (green stays reserved for charge/ready).
-    val rightBgColor by androidx.compose.animation.animateColorAsState(
-        if (expanded) MaterialTheme.colorScheme.surfaceContainerHighest else buttonContainer(),
-        spring(stiffness = Spring.StiffnessMediumLow),
-        label = "chevronBg",
-    )
+    val morphedPercent = 100f * 10.dp.value / rowHeightDp.value
     val inner = 6.dp
-    val rightShape = RoundedCornerShape(topStart = inner, bottomStart = inner, topEnd = rightOuter, bottomEnd = rightOuter)
+    // Each half gets its own shape: the OUTER corner morphs (pill when idle,
+    // 10dp rounded square when that half's own state says morphed), the INNER
+    // corner stays a small fixed seam nub. Both halves are the same MorphButton
+    // component; each one's active/pressed state drives only ITS morph.
+    val leftShapeForCorner: (Float, Int) -> Shape = { _, cp ->
+        RoundedCornerShape(
+            topStart = CornerSize(percent = cp), bottomStart = CornerSize(percent = cp),
+            topEnd = CornerSize(inner), bottomEnd = CornerSize(inner),
+        )
+    }
+    val rightShapeForCorner: (Float, Int) -> Shape = { _, cp ->
+        RoundedCornerShape(
+            topStart = CornerSize(inner), bottomStart = CornerSize(inner),
+            topEnd = CornerSize(percent = cp), bottomEnd = CornerSize(percent = cp),
+        )
+    }
 
     val defaultContainer = buttonContainer()
-    val leftBg by androidx.compose.animation.animateColorAsState(
-        when {
-            action.isWarning -> MaterialTheme.colorScheme.errorContainer
-            action.active -> (action.activeContainer ?: MaterialTheme.colorScheme.primary)
-            else -> defaultContainer
-        },
-        spring(stiffness = Spring.StiffnessMediumLow),
-        label = "splitLeftBg",
-    )
+    val leftContainer = if (action.isWarning) MaterialTheme.colorScheme.errorContainer else defaultContainer
     val leftFg = when {
         action.isWarning -> MaterialTheme.colorScheme.onErrorContainer
         action.active -> (action.activeContent ?: MaterialTheme.colorScheme.onPrimary)
@@ -12014,14 +11982,16 @@ private fun SplitExpandButton(
     Row(
         modifier = Modifier
             .height(IntrinsicSize.Min)
-            // Real measured height, so `fullyRound` above is exact rather
-            // than a flat guess -- see that val's own doc.
+            // Real measured height, so the 10dp corner percent above lands on
+            // the right radius -- see that val's own doc.
             .onSizeChanged { rowHeightDp = with(density) { it.height.toDp() } },
         horizontalArrangement = Arrangement.spacedBy(3.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        // Left half — action button.
-        Surface(
+        // Left half — the action (label + icon) button. Same MorphButton as
+        // everywhere else: it morphs ONLY for its own active/pressed state, so
+        // the pebble expanding never squares it off (the right half owns that).
+        MorphButton(
             onClick = {
                 if (action.bounceIcon) bounceScope.launch {
                     bouncing = true
@@ -12029,14 +11999,21 @@ private fun SplitExpandButton(
                     bounceY.animateTo(0f, spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium))
                     bouncing = false
                 }
-                haptics?.click()
                 action.onClick()
             },
             enabled = action.enabled && !action.pending,
-            interactionSource = leftInteraction,
-            color = leftBg,
+            active = action.active,
+            containerColor = leftContainer,
             contentColor = leftFg,
-            shape = RoundedCornerShape(topStart = leftOuter, bottomStart = leftOuter, topEnd = inner, bottomEnd = inner),
+            activeContainerColor = action.activeContainer ?: MaterialTheme.colorScheme.primary,
+            activeContentColor = action.activeContent ?: MaterialTheme.colorScheme.onPrimary,
+            contentPadding = PaddingValues(horizontal = 14.dp, vertical = 10.dp),
+            shapeForCorner = leftShapeForCorner,
+            morphedCornerPercent = morphedPercent,
+            pillCornerPercent = 50f,
+            // The halves keep their measured ~42-46dp height; the standard
+            // 48dp touch floor would inflate the whole pebble header.
+            minHeight = 0.dp,
             modifier = Modifier.fillMaxHeight().then(
                 if (action.label.isEmpty() && action.contentDescription != null) {
                     Modifier.semantics { contentDescription = action.contentDescription!! }
@@ -12044,9 +12021,7 @@ private fun SplitExpandButton(
             ),
         ) {
             Row(
-                modifier = Modifier
-                    .padding(horizontal = 14.dp, vertical = 10.dp)
-                    .graphicsLayer { translationY = bounceY.value },
+                modifier = Modifier.graphicsLayer { translationY = bounceY.value },
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(6.dp),
             ) {
@@ -12079,55 +12054,40 @@ private fun SplitExpandButton(
                 }
             }
         }
-        // Right half — chevron nub. When expanded its background shifts to the
-        // highest neutral surface tone and its outer corners tighten (10dp),
-        // while the left side stays unselected and rounded.
-        Surface(
-            color = rightBgColor,
-            contentColor = MaterialTheme.colorScheme.onSurface,
-            shape = rightShape,
+        // Right half — chevron nub. The expanded highlight is THE SAME active
+        // state as the lock/unlock button: active=true -> primary fill with
+        // onPrimary content, straight from MorphButton's defaults -- there is
+        // no second "expanded" colour vocabulary left in the app.
+        MorphButton(
+            onClick = { onToggle() },
+            onClickHaptic = { if (expanded) haptics?.tick() else haptics?.click() },
+            onLongClick = {
+                // Easter egg: hold the chevron to spin it + vibrate.
+                if (!easterEggTriggered) {
+                    easterEggTriggered = true
+                    haptics?.heavy()
+                }
+            },
+            active = expanded,
+            contentPadding = PaddingValues(start = 13.dp, end = 12.dp),
+            shapeForCorner = rightShapeForCorner,
+            morphedCornerPercent = morphedPercent,
+            pillCornerPercent = 50f,
+            minHeight = 0.dp,
             // The icon's own contentDescription below is the NEXT action
             // ("Expand"/"Collapse"); this is the CURRENT state -- without it
             // TalkBack only ever hears what tapping will do, never whether the
             // pebble is presently open, so distinguishing the two took a
             // double-tap-and-listen-again instead of being announced on focus.
-            // widthIn(min = rowHeightDp) ensures the button is at least as wide
-            // as it is tall, giving the right-side semicircle enough space to
-            // render cleanly without Android's undefined corner-rounding
-            // behavior kicking in.
-            modifier = Modifier.fillMaxHeight().widthIn(min = rowHeightDp)
-                .clip(rightShape)
-                .combinedClickable(
-                    interactionSource = rightInteraction,
-                    onClick = {
-                        if (expanded) haptics?.tick() else haptics?.click()
-                        onToggle()
-                    },
-                    onLongClick = {
-                        // Easter egg: hold the chevron to spin it + vibrate.
-                        if (!easterEggTriggered) {
-                            easterEggTriggered = true
-                            haptics?.heavy()
-                        }
-                    },
-                )
-                .semantics { stateDescription = if (expanded) "Expanded" else "Collapsed" },
+            modifier = Modifier.fillMaxHeight().semantics { stateDescription = if (expanded) "Expanded" else "Collapsed" },
         ) {
-            Box(
-                // Asymmetric padding: 13dp start (left), 12dp end (right) to position
-                // the chevron slightly left of center within the button pill, creating
-                // visual balance between the icon and the outer right corner.
-                modifier = Modifier.fillMaxHeight().padding(start = 13.dp, end = 12.dp),
-                contentAlignment = Alignment.Center,
-            ) {
-                Icon(
-                    Icons.Filled.KeyboardArrowDown,
-                    contentDescription = if (expanded) "Collapse" else "Expand",
-                    // Larger chevron icon (24dp to match action button icon size), with
-                    // easter egg spin animation when the chevron is held.
-                    modifier = Modifier.size(24.dp).rotate(rotation + easterEggSpin),
-                )
-            }
+            Icon(
+                Icons.Filled.KeyboardArrowDown,
+                contentDescription = if (expanded) "Collapse" else "Expand",
+                // Larger chevron icon (24dp to match action button icon size), with
+                // easter egg spin animation when the chevron is held.
+                modifier = Modifier.size(24.dp).rotate(rotation + easterEggSpin),
+            )
         }
     }
 }
@@ -12157,57 +12117,40 @@ internal fun MorphExpandButton(
         label = "easterEggMorphSpin",
         finishedListener = { if (easterEggTriggered) easterEggTriggered = false },
     )
-    // 25.dp, not 50.dp -- this button is a FIXED 50.dp square (below), so a
-    // true circle needs radius == half that, exactly. The old 50.dp target
-    // (a full size-worth of radius on a 50.dp box, 2x what's needed) relied
-    // on Android's rounded-rect drawing to clamp an oversized radius down to
-    // something sane -- which is UNDEFINED behavior, not a guaranteed clean
-    // clamp, once the corner radii sum past the side length they're on. See
-    // SplitExpandButton's own identical fix for the same reasoning.
-    val corner by animateDpAsState(
-        targetValue = if (expanded) 10.dp else 25.dp,
-        animationSpec = spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessLow),
-        label = "morphExpandCorner",
-    )
-    val bgColor by androidx.compose.animation.animateColorAsState(
-        if (expanded) MaterialTheme.colorScheme.surfaceContainerHighest else buttonContainer(),
-        spring(stiffness = Spring.StiffnessMediumLow),
-        label = "morphBg",
-    )
-    Surface(
-        shape = RoundedCornerShape(corner),
-        color = bgColor,
-        contentColor = MaterialTheme.colorScheme.onSurface,
+    // This button is a FIXED 50dp square, so a 50% corner is a true circle and
+    // 10dp is exactly 20%. The default 28 (the app's standard rounded square)
+    // is deliberately overridden to keep this control's 10dp corners, which
+    // the shared percent model expresses cleanly for a fixed-size button.
+    MorphButton(
+        onClick = { onToggle() },
+        onClickHaptic = { if (expanded) haptics?.tick() else haptics?.click() },
+        onLongClick = {
+            // Easter egg: hold the chevron to spin it + vibrate.
+            if (!easterEggTriggered) {
+                easterEggTriggered = true
+                haptics?.heavy()
+            }
+        },
+        // Expanded highlight = the SAME active state as lock/unlock: primary
+        // fill, onPrimary content, straight from MorphButton's defaults.
+        active = expanded,
+        contentPadding = PaddingValues(0.dp),
+        pillCornerPercent = 50f,
+        morphedCornerPercent = 20f,
+        minHeight = 0.dp,
         // Same as SplitExpandButton's chevron: the icon's contentDescription is
         // the next action, this is the current state -- both together instead
         // of only announcing what tapping does. Tap toggles; holding spins the
         // chevron (easter egg) without toggling.
-        modifier = Modifier.size(50.dp)
-            .clip(RoundedCornerShape(corner))
-            .combinedClickable(
-                onClick = {
-                    if (expanded) haptics?.tick() else haptics?.click()
-                    onToggle()
-                },
-                onLongClick = {
-                    // Easter egg: hold the chevron to spin it + vibrate.
-                    if (!easterEggTriggered) {
-                        easterEggTriggered = true
-                        haptics?.heavy()
-                    }
-                },
-            )
-            .semantics { stateDescription = if (expanded) "Expanded" else "Collapsed" },
+        modifier = Modifier.size(50.dp).semantics { stateDescription = if (expanded) "Expanded" else "Collapsed" },
     ) {
-        Box(contentAlignment = Alignment.Center) {
-            Icon(
-                Icons.Filled.KeyboardArrowDown,
-                contentDescription = if (expanded) "Collapse" else "Expand",
-                // Larger chevron icon (24dp to match action button icon size), with
-                // easter egg spin animation when the chevron is held.
-                modifier = Modifier.size(24.dp).rotate(rotation + easterEggSpin),
-            )
-        }
+        Icon(
+            Icons.Filled.KeyboardArrowDown,
+            contentDescription = if (expanded) "Collapse" else "Expand",
+            // Larger chevron icon (24dp to match action button icon size), with
+            // easter egg spin animation when the chevron is held.
+            modifier = Modifier.size(24.dp).rotate(rotation + easterEggSpin),
+        )
     }
 }
 
@@ -13338,29 +13281,33 @@ private fun presetDetail(req: ClimateRequest, fahrenheit: Boolean): String {
 }
 
 /**
- * The animated corner shapes for a two-segment "split pill" -- one where the two
- * halves meet at a gap. Returns `(left, right)`: each half is pill-rounded on its
- * OUTER edge and takes a small nub radius on the INNER edge facing the gap, and both
- * morph to a shared rounded-rectangle radius when [morphed] (pressed/applied). The
- * preset pill and the charge-limit pill are the two split pills in the app and had
- * byte-identical corner plumbing; this owns the two `animateDpAsState`s and the
- * mirrored shapes so their motion can't drift.
+ * Corner shapes for the two-segment "split pill" family (the preset pill and
+ * the charge-limit pill -- both byte-identical split pills until this helper):
+ * outer corner is the pill↔rounded-square morph every MorphButton runs, inner
+ * (seam) corner is a small nub that follows the same morph toward the same
+ * morphed radius. A pure function of the shared morph progress, so every half
+ * of every split pill draws the same geometry with no per-pill animation
+ * state of its own -- the pills and the split action/chevron button all speak
+ * the shared corner-percent language now.
  */
-@Composable
-private fun rememberSplitPillShapes(morphed: Boolean): Pair<Shape, Shape> {
-    val outer by animateDpAsState(
-        if (morphed) 16.dp else 50.dp,
-        spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessLow),
-        label = "splitPillOuter",
+private fun splitPillShapes(
+    morph: Float,
+    cornerPercent: Int,
+    rowHeight: Dp,
+): Pair<Shape, Shape> {
+    val base = rowHeight.value.coerceAtLeast(1f)
+    // The 16dp morphed radius and 10dp idle seam nub, in the shared percent-
+    // of-short-side language.
+    val morphedPct = 100f * 16.dp.value / base
+    val innerIdlePct = 100f * 10.dp.value / base
+    val innerPct = innerIdlePct + (morphedPct - innerIdlePct) * morph
+    fun corners(outerOnStart: Boolean) = RoundedCornerShape(
+        topStart = CornerSize(percent = if (outerOnStart) cornerPercent else innerPct.roundToInt()),
+        bottomStart = CornerSize(percent = if (outerOnStart) cornerPercent else innerPct.roundToInt()),
+        topEnd = CornerSize(percent = if (outerOnStart) innerPct.roundToInt() else cornerPercent),
+        bottomEnd = CornerSize(percent = if (outerOnStart) innerPct.roundToInt() else cornerPercent),
     )
-    val inner by animateDpAsState(
-        if (morphed) 16.dp else 10.dp,
-        spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessLow),
-        label = "splitPillInner",
-    )
-    val left = RoundedCornerShape(topStart = outer, bottomStart = outer, topEnd = inner, bottomEnd = inner)
-    val right = RoundedCornerShape(topStart = inner, bottomStart = inner, topEnd = outer, bottomEnd = outer)
-    return left to right
+    return corners(true) to corners(false)
 }
 
 /**
@@ -13385,51 +13332,46 @@ private fun PresetPill(
     dragHandle: Modifier = Modifier,
 ) {
     val haptics = LocalHaptics.current
-    val leftInteraction = remember { MutableInteractionSource() }
-    val leftPressed by leftInteraction.collectIsPressedAsState()
-    val morphed = active || leftPressed
-    // Outer edge = full pill when idle, rounded-rectangle when applied/pressed;
-    // inner edge (facing the gap) = small nub when idle, matching outer when applied.
-    val (leftShape, rightShape) = rememberSplitPillShapes(morphed)
-    val leftBg by androidx.compose.animation.animateColorAsState(
-        if (active) MaterialTheme.colorScheme.primary else buttonContainer(),
-        spring(stiffness = Spring.StiffnessMediumLow),
-        label = "presetLeftBg",
-    )
-    val leftFg = if (active) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface
-
     // Delete was a single un-confirmable tap right beside the much larger,
     // frequently-tapped Apply half -- a slightly mis-aimed tap silently and
     // irreversibly dropped a saved preset. Now requires a second tap, same
     // "tap again to confirm" pattern (with the same 4s auto-reset) used for
     // Sign out and the watch's own preset-delete confirm.
     val confirm = rememberConfirmArm()
-    val deleteBg by androidx.compose.animation.animateColorAsState(
-        if (confirm.armed) MaterialTheme.colorScheme.error else buttonContainer(),
-        spring(stiffness = Spring.StiffnessMediumLow),
-        label = "presetDeleteBg",
-    )
-    val deleteFg = if (confirm.armed) MaterialTheme.colorScheme.onError else MaterialTheme.colorScheme.onSurface
+    // Real measured row height, so the split-pill corners' "16dp"/"10dp" stay
+    // exact dp in the shared percent language (see splitPillShapes).
+    var rowHeightDp by remember { mutableStateOf(44.dp) }
+    val density = LocalDensity.current
+    val morphedPct = 100f * 16.dp.value / rowHeightDp.value
+    val leftShapeForCorner: (Float, Int) -> Shape = { morph, cp ->
+        splitPillShapes(morph, cp, rowHeightDp).first
+    }
+    val rightShapeForCorner: (Float, Int) -> Shape = { morph, cp ->
+        splitPillShapes(morph, cp, rowHeightDp).second
+    }
 
     // The drag handle wraps the whole pill so long-press anywhere reorders.
     Row(
-        modifier = dragHandle.fillMaxWidth().height(IntrinsicSize.Min),
+        modifier = dragHandle.fillMaxWidth().height(IntrinsicSize.Min)
+            .onSizeChanged { rowHeightDp = with(density) { it.height.toDp() } },
         horizontalArrangement = Arrangement.spacedBy(3.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        // Apply half — snowflake icon plus the preset name.
-        Surface(
-            onClick = { haptics?.click(); onStart() },
-            interactionSource = leftInteraction,
-            color = leftBg,
-            contentColor = leftFg,
-            shape = leftShape,
+        // Apply half — snowflake icon plus the preset name. The shared
+        // MorphButton: pill when idle, rounded rectangle + primary fill when
+        // this preset is the applied one.
+        MorphButton(
+            onClick = { onStart() },
+            onClickHaptic = { haptics?.click() },
+            active = active,
+            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 11.dp),
+            shapeForCorner = leftShapeForCorner,
+            pillCornerPercent = 50f,
+            morphedCornerPercent = morphedPct,
+            minHeight = 0.dp,
             modifier = Modifier.weight(1f).fillMaxHeight(),
         ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 11.dp),
-            ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(Icons.Filled.AcUnit, contentDescription = null, modifier = Modifier.size(18.dp))
                 Spacer(Modifier.width(10.dp))
                 Column {
@@ -13450,32 +13392,28 @@ private fun PresetPill(
                 }
             }
         }
-        // Delete nub — inner (left) corners match the gap, outer (right) corners are pill-rounded.
-        Surface(
+        // Delete nub — inner (left) corners match the gap, outer (right) corners
+        // are pill-rounded; same MorphButton as the Apply half, just mirrored
+        // corners and error colours while armed.
+        MorphButton(
             onClick = {
-                if (confirm.armed) {
-                    haptics?.tick()
-                    onDelete()
-                } else {
-                    haptics?.tick()
-                    confirm.arm()
-                }
+                haptics?.tick()
+                if (confirm.armed) onDelete() else confirm.arm()
             },
-            color = deleteBg,
-            contentColor = deleteFg,
-            shape = rightShape,
+            containerColor = if (confirm.armed) MaterialTheme.colorScheme.error else buttonContainer(),
+            contentColor = if (confirm.armed) MaterialTheme.colorScheme.onError else MaterialTheme.colorScheme.onSurface,
+            contentPadding = PaddingValues(horizontal = 14.dp),
+            shapeForCorner = rightShapeForCorner,
+            pillCornerPercent = 50f,
+            morphedCornerPercent = morphedPct,
+            minHeight = 0.dp,
             modifier = Modifier.fillMaxHeight(),
         ) {
-            Box(
-                contentAlignment = Alignment.Center,
-                modifier = Modifier.fillMaxHeight().padding(horizontal = 14.dp),
-            ) {
-                Icon(
-                    Icons.Filled.Close,
-                    contentDescription = if (confirm.armed) "Confirm delete $name" else "Delete $name",
-                    modifier = Modifier.size(15.dp),
-                )
-            }
+            Icon(
+                Icons.Filled.Close,
+                contentDescription = if (confirm.armed) "Confirm delete $name" else "Delete $name",
+                modifier = Modifier.size(15.dp),
+            )
         }
     }
 }
@@ -13499,34 +13437,35 @@ private fun ChargeLimitPill(
     onApply: () -> Unit,
 ) {
     val haptics = LocalHaptics.current
-    val leftInteraction = remember { MutableInteractionSource() }
-    val leftPressed by leftInteraction.collectIsPressedAsState()
-
-    val (leftShape, rightShape) = rememberSplitPillShapes(leftPressed)
-    val rightBg by androidx.compose.animation.animateColorAsState(
-        if (pending) MaterialTheme.colorScheme.primary else buttonContainer(),
-        spring(stiffness = Spring.StiffnessMediumLow),
-        label = "limitRightBg",
-    )
-    val rightFg = if (pending) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface
+    // Real measured row height, so splitPillShapes' corners stay exact dp (the
+    // charge-limit pill is the same split-pill geometry as the preset pill).
+    var rowHeightDp by remember { mutableStateOf(44.dp) }
+    val density = LocalDensity.current
+    val morphedPct = 100f * 16.dp.value / rowHeightDp.value
+    val leftShapeForCorner: (Float, Int) -> Shape = { morph, cp ->
+        splitPillShapes(morph, cp, rowHeightDp).first
+    }
+    val rightShapeForCorner: (Float, Int) -> Shape = { morph, cp ->
+        splitPillShapes(morph, cp, rowHeightDp).second
+    }
 
     Column(Modifier.fillMaxWidth()) {
         Row(
-            modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Min),
+            modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Min)
+                .onSizeChanged { rowHeightDp = with(density) { it.height.toDp() } },
             horizontalArrangement = Arrangement.spacedBy(3.dp),
         ) {
             // Left half — label. Tapping bumps the limit up by one step, wrapping
             // back to 50% after 100%, for quick keyboard-free adjustment.
-            Surface(
-                onClick = {
-                    haptics?.tick()
-                    onValueChange(if (limit >= 100) 50 else limit + 10)
-                },
-                interactionSource = leftInteraction,
+            MorphButton(
+                onClick = { onValueChange(if (limit >= 100) 50 else limit + 10) },
+                onClickHaptic = { haptics?.tick() },
                 enabled = enabled,
-                color = buttonContainer(),
-                contentColor = MaterialTheme.colorScheme.onSurface,
-                shape = leftShape,
+                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 11.dp),
+                shapeForCorner = leftShapeForCorner,
+                pillCornerPercent = 50f,
+                morphedCornerPercent = morphedPct,
+                minHeight = 0.dp,
                 // Both the current value and what tapping actually does (bump
                 // by 10%, wrapping at 100%) were purely visual -- TalkBack
                 // announced only the label text with no indication this half
@@ -13540,10 +13479,7 @@ private fun ChargeLimitPill(
                         }
                     },
             ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 11.dp),
-                ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(icon, contentDescription = null, modifier = Modifier.size(16.dp))
                     Spacer(Modifier.width(8.dp))
                     Text(
@@ -13559,24 +13495,28 @@ private fun ChargeLimitPill(
                     )
                 }
             }
-            // Right half — "Set" nub. Inner (left) corners match the gap; outer (right) are pill-rounded.
-            Surface(
-                onClick = { haptics?.heavy(); onApply() },
+            // Right half — "Set" nub. Inner (left) corners match the gap; outer
+            // (right) are pill-rounded. Active while the command is in flight,
+            // so it wears the same primary highlight every active button does.
+            MorphButton(
+                onClick = { onApply() },
+                onClickHaptic = { haptics?.heavy() },
                 enabled = enabled && !pending,
-                color = rightBg,
-                contentColor = rightFg,
-                shape = rightShape,
+                active = pending,
+                contentPadding = PaddingValues(horizontal = 18.dp),
+                shapeForCorner = rightShapeForCorner,
+                pillCornerPercent = 50f,
+                morphedCornerPercent = morphedPct,
+                minHeight = 0.dp,
+                // The pending spinner must not fade with the disabled content
+                // (Surface didn't dim it before), so pin the full tone.
+                disabledContentColor = MaterialTheme.colorScheme.onPrimary,
                 modifier = Modifier.fillMaxHeight(),
             ) {
-                Box(
-                    contentAlignment = Alignment.Center,
-                    modifier = Modifier.fillMaxHeight().padding(horizontal = 18.dp),
-                ) {
-                    if (pending) {
-                        LoadingIndicator(Modifier.size(18.dp))
-                    } else {
-                        Text("Set", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelLarge)
-                    }
+                if (pending) {
+                    LoadingIndicator(Modifier.size(18.dp))
+                } else {
+                    Text("Set", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelLarge)
                 }
             }
         }
