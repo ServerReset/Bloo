@@ -11912,8 +11912,9 @@ private fun SplitExpandButton(
     // Half the row's real height, plus a small buffer to ensure full
     // roundness when collapsed (avoids any flat edges from rounding
     // quirks). A true semicircle needs radius == height / 2, but adding
-    // 1dp ensures it renders as fully rounded even with subpixel effects.
-    val fullyRound = rowHeightDp / 2 + 1.dp
+    // 2dp ensures it renders as fully rounded even with subpixel effects
+    // and density-dependent rounding on all device densities.
+    val fullyRound = rowHeightDp / 2 + 2.dp
     val leftOuter by animateDpAsState(
         if (leftMorphed) 16.dp else fullyRound,
         spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessLow),
