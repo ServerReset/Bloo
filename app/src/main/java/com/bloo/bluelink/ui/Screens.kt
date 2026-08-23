@@ -8487,9 +8487,13 @@ private fun WiggleText(
     color: Color = Color.Unspecified,
 ) {
     val resolvedColor = if (color == Color.Unspecified) LocalContentColor.current else color
+    // Memoize the style copy to avoid recreating it when color/fontWeight don't change.
+    val resolvedStyle = remember(style, fontWeight, resolvedColor) {
+        style.copy(fontWeight = fontWeight, color = resolvedColor)
+    }
     com.bloo.uicommon.WiggleText(
         text = text,
-        style = style.copy(fontWeight = fontWeight, color = resolvedColor),
+        style = resolvedStyle,
         reduceMotion = LocalReduceMotion.current,
     )
 }
@@ -14273,13 +14277,19 @@ internal fun StatusRow(label: String, value: String) {
             // containerColor (usually surfaceVariant), so an uncoloured value here
             // rendered at onSurfaceVariant strength, barely distinguishable from the
             // dimmed label right next to it despite being the important half.
+            val baseStyle = LocalTextStyle.current
+            val onSurfaceColor = MaterialTheme.colorScheme.onSurface
+            // Memoized to avoid recreating the TextStyle.copy() on every recomposition.
+            val valueStyle = remember(baseStyle, onSurfaceColor) {
+                baseStyle.copy(
+                    fontWeight = FontWeight.Medium,
+                    color = onSurfaceColor,
+                    textAlign = TextAlign.End,
+                )
+            }
             com.bloo.uicommon.AnimatedValue(
                 value = value,
-                style = LocalTextStyle.current.copy(
-                    fontWeight = FontWeight.Medium,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    textAlign = TextAlign.End,
-                ),
+                style = valueStyle,
                 maxLines = 2,
                 reduceMotion = LocalReduceMotion.current,
             )
