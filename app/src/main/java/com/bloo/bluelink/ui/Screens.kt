@@ -11923,12 +11923,12 @@ private fun SplitExpandButton(
     // and density-dependent rounding on all device densities.
     val fullyRound = rowHeightDp / 2 + 2.dp
     val leftOuter by animateDpAsState(
-        if (leftMorphed) 16.dp else fullyRound,
+        if (leftMorphed) PebbleCornerExpanded else fullyRound,
         spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessLow),
         label = "splitOuterLeft",
     )
     val rightOuter by animateDpAsState(
-        if (rightMorphed) 16.dp else fullyRound,
+        if (rightMorphed) PebbleCornerExpanded else fullyRound,
         spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessLow),
         label = "splitOuterRight",
     )
@@ -12062,9 +12062,10 @@ private fun SplitExpandButton(
             modifier = Modifier.fillMaxHeight().widthIn(min = rowHeightDp).semantics { stateDescription = if (expanded) "Expanded" else "Collapsed" },
         ) {
             Box(
-                // Asymmetric padding: 10dp start (left), 12dp end (right) to bump
-                // the chevron slightly left (was 12dp symmetric).
-                modifier = Modifier.fillMaxHeight().padding(start = 10.dp, end = 12.dp),
+                // Asymmetric padding: 13dp start (left), 12dp end (right) to position
+                // the chevron slightly left of center within the button pill, creating
+                // visual balance between the icon and the outer right corner.
+                modifier = Modifier.fillMaxHeight().padding(start = 13.dp, end = 12.dp),
                 contentAlignment = Alignment.Center,
             ) {
                 Icon(
@@ -12101,7 +12102,7 @@ internal fun MorphExpandButton(
     // clamp, once the corner radii sum past the side length they're on. See
     // SplitExpandButton's own identical fix for the same reasoning.
     val corner by animateDpAsState(
-        targetValue = if (expanded) 14.dp else 25.dp,
+        targetValue = if (expanded) PebbleCornerExpanded else 25.dp,
         animationSpec = spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessLow),
         label = "morphExpandCorner",
     )
