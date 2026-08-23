@@ -6917,9 +6917,12 @@ internal fun UpdateAvailableTile(state: UiState, vm: AppViewModel, dragHandle: M
                                 // string -- this is the one piece of the line that legitimately
                                 // changes every tick, so it's the only piece that should move;
                                 // "Downloading" itself stays a completely static Text next to it.
+                                // fontFeatureSettings = "tnum" enables tabular figures (fixed-width
+                                // digits) so only the changing digit animates up without the entire
+                                // number shifting left/right -- prevents the seizure-inducing effect.
                                 com.bloo.uicommon.AnimatedValue(
                                     "${(p * 100).roundToInt()}%",
-                                    style = textStyle,
+                                    style = textStyle.copy(fontFeatureSettings = "tnum"),
                                     reduceMotion = LocalReduceMotion.current,
                                 )
                             } ?: Text("…", style = textStyle)
@@ -6965,9 +6968,13 @@ internal fun UpdateAvailableTile(state: UiState, vm: AppViewModel, dragHandle: M
                             // percent invisible against the pebble's dark background
                             // instead of inheriting the card's own content colour the
                             // way a plain Text() would have.
+                            // fontFeatureSettings = "tnum" enables tabular figures (fixed-width
+                            // digits) so only the changing digit animates up without the entire
+                            // number shifting left/right -- prevents the seizure-inducing effect.
                             style = MaterialTheme.typography.labelMedium.copy(
                                 fontWeight = FontWeight.Bold,
                                 color = LocalContentColor.current,
+                                fontFeatureSettings = "tnum",
                             ),
                             reduceMotion = LocalReduceMotion.current,
                         )
@@ -12049,7 +12056,10 @@ private fun SplitExpandButton(
             // TalkBack only ever hears what tapping will do, never whether the
             // pebble is presently open, so distinguishing the two took a
             // double-tap-and-listen-again instead of being announced on focus.
-            modifier = Modifier.fillMaxHeight().semantics { stateDescription = if (expanded) "Expanded" else "Collapsed" },
+            // widthIn(min = rowHeightDp) ensures the button is at least as wide as it
+            // is tall, giving the right-side semicircle enough space to render cleanly
+            // without Android's undefined corner-rounding behavior kicking in.
+            modifier = Modifier.fillMaxHeight().widthIn(min = rowHeightDp).semantics { stateDescription = if (expanded) "Expanded" else "Collapsed" },
         ) {
             Box(
                 // Asymmetric padding: 10dp start (left), 12dp end (right) to bump
