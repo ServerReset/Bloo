@@ -11941,15 +11941,26 @@ private fun SplitExpandButton(
     // 2dp ensures it renders as fully rounded even with subpixel effects
     // and density-dependent rounding on all device densities.
     val fullyRound = rowHeightDp / 2 + 2.dp
+    // Independent corner morphing: left stays rounded until active, right becomes
+    // sharp (8dp) when expanded. This creates a visual distinction showing that
+    // the right side (chevron) is the "expand" control while the left stays ready
+    // for its own action.
     val leftOuter by animateDpAsState(
-        if (leftMorphed) PebbleCornerExpanded else fullyRound,
+        if (leftMorphed) 8.dp else fullyRound,
         spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessLow),
         label = "splitOuterLeft",
     )
     val rightOuter by animateDpAsState(
-        if (rightMorphed) PebbleCornerExpanded else fullyRound,
+        if (rightMorphed) 8.dp else fullyRound,
         spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessLow),
         label = "splitOuterRight",
+    )
+
+    // Chevron changes to ChargeGreen (unlocked/active color) when pebble expands
+    val rightBgColor by androidx.compose.animation.animateColorAsState(
+        if (expanded) ChargeGreen else buttonContainer(),
+        spring(stiffness = Spring.StiffnessMediumLow),
+        label = "chevronBg",
     )
     val inner = 6.dp
 
@@ -12063,7 +12074,9 @@ private fun SplitExpandButton(
                 }
             }
         }
-        // Right half — chevron nub (with easter egg easter egg tap counter).
+        // Right half — chevron nub (with easter egg tap counter).
+        // When expanded, the chevron background changes to ChargeGreen and corners
+        // become sharp (8dp), while the left side remains unselected and rounded.
         Surface(
             onClick = {
                 val now = System.currentTimeMillis()
@@ -12078,8 +12091,8 @@ private fun SplitExpandButton(
                 onToggle()
             },
             interactionSource = rightInteraction,
-            color = buttonContainer(),
-            contentColor = MaterialTheme.colorScheme.onSurface,
+            color = rightBgColor,
+            contentColor = if (expanded) Color.White else MaterialTheme.colorScheme.onSurface,
             shape = RoundedCornerShape(topStart = inner, bottomStart = inner, topEnd = rightOuter, bottomEnd = rightOuter),
             // The icon's own contentDescription below is the NEXT action
             // ("Expand"/"Collapse"); this is the CURRENT state -- without it
@@ -12126,6 +12139,16 @@ internal fun MorphExpandButton(
         animationSpec = spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessLow),
         label = "morphChevron",
     )
+
+    // Easter egg: same as SplitExpandButton — rapid taps trigger spin + vibration
+    var easterEggTaps by remember { mutableIntStateOf(0) }
+    var lastEasterEggTapTime by remember { mutableLongStateOf(0L) }
+    val easterEggSpin by animateFloatAsState(
+        targetValue = if (easterEggTaps >= 5) 360f else 0f,
+        animationSpec = if (easterEggTaps >= 5) spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessLow) else snap(),
+        label = "easterEggMorphSpin",
+        finishedListener = { if (easterEggTaps >= 5) easterEggTaps = 0 },
+    )
     // 25.dp, not 50.dp -- this button is a FIXED 50.dp square (below), so a
     // true circle needs radius == half that, exactly. The old 50.dp target
     // (a full size-worth of radius on a 50.dp box, 2x what's needed) relied
@@ -12134,15 +12157,31 @@ internal fun MorphExpandButton(
     // clamp, once the corner radii sum past the side length they're on. See
     // SplitExpandButton's own identical fix for the same reasoning.
     val corner by animateDpAsState(
-        targetValue = if (expanded) PebbleCornerExpanded else 25.dp,
+        targetValue = if (expanded) 8.dp else 25.dp,
         animationSpec = spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessLow),
         label = "morphExpandCorner",
     )
+    val bgColor by androidx.compose.animation.animateColorAsState(
+        if (expanded) ChargeGreen else buttonContainer(),
+        spring(stiffness = Spring.StiffnessMediumLow),
+        label = "morphBg",
+    )
     Surface(
-        onClick = { if (expanded) haptics?.tick() else haptics?.click(); onToggle() },
+        onClick = {
+            val now = System.currentTimeMillis()
+            // Reset counter if more than 500ms between taps (not rapid)
+            if (now - lastEasterEggTapTime > 500) easterEggTaps = 0
+            lastEasterEggTapTime = now
+            easterEggTaps++
+
+            // Easter egg: 5 rapid taps trigger spin + vibration
+            if (easterEggTaps == 5) haptics?.heavy() else if (expanded) haptics?.tick() else haptics?.click()
+
+            onToggle()
+        },
         shape = RoundedCornerShape(corner),
-        color = buttonContainer(),
-        contentColor = MaterialTheme.colorScheme.onSurface,
+        color = bgColor,
+        contentColor = if (expanded) Color.White else MaterialTheme.colorScheme.onSurface,
         // Same as SplitExpandButton's chevron: the icon's contentDescription is
         // the next action, this is the current state -- both together instead
         // of only announcing what tapping does.
@@ -12152,7 +12191,9 @@ internal fun MorphExpandButton(
             Icon(
                 Icons.Filled.KeyboardArrowDown,
                 contentDescription = if (expanded) "Collapse" else "Expand",
-                modifier = Modifier.size(20.dp).rotate(rotation),
+                // Larger chevron icon (24dp to match action button icon size), with
+                // easter egg spin animation when tapped 5 times rapidly.
+                modifier = Modifier.size(24.dp).rotate(rotation + easterEggSpin),
             )
         }
     }
