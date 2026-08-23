@@ -11890,24 +11890,27 @@ private fun SplitExpandButton(
     val leftPressed by leftInteraction.collectIsPressedAsState()
     val rightInteraction = remember { MutableInteractionSource() }
     val rightPressed by rightInteraction.collectIsPressedAsState()
-    // Left and right each morph to rounded-rect on THEIR OWN state, not a
-    // single shared boolean -- action.active only ever describes the LEFT
-    // button (the action currently running), so it used to also square off
-    // the chevron's own outer-right corner right along with it, even though
-    // nothing about the chevron itself had changed. `expanded` still
-    // affects both: opening the pebble's body is a whole-row state, not
-    // either button's own.
-    val leftMorphed = action.active || leftPressed || expanded
+    // Left and right each morph to rounded-rect on THEIR OWN state -- the two
+    // halves never share a boolean: action.active only ever describes the
+    // LEFT button (the action currently running), so it used to also square
+    // off the chevron's own outer-right corner right along with it, and
+    // `expanded` used to square off BOTH halves when only the chevron (the
+    // expand control) should respond to the pebble being open. The left half
+    // now only ever morphs for its own action/press, the right half only for
+    // its own press or the pebble being open.
+    val leftMorphed = action.active || leftPressed
     val rightMorphed = rightPressed || expanded
 
-    // Easter egg: rapid taps on the chevron trigger a spin animation + vibration
-    var easterEggTaps by remember { mutableIntStateOf(0) }
-    var lastEasterEggTapTime by remember { mutableLongStateOf(0L) }
+    // Easter egg: HOLD the chevron (long-press) to trigger a one-shot spin
+    // animation with a vibration. A long press does NOT toggle the pebble --
+    // only a plain tap does. After the spin completes the chevron returns to
+    // normal operation and can be held again.
+    var easterEggTriggered by remember { mutableStateOf(false) }
     val easterEggSpin by animateFloatAsState(
-        targetValue = if (easterEggTaps >= 5) 360f else 0f,
-        animationSpec = if (easterEggTaps >= 5) spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessLow) else snap(),
+        targetValue = if (easterEggTriggered) 360f else 0f,
+        animationSpec = if (easterEggTriggered) spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessLow) else snap(),
         label = "easterEggSpin",
-        finishedListener = { if (easterEggTaps >= 5) easterEggTaps = 0 },
+        finishedListener = { if (easterEggTriggered) easterEggTriggered = false },
     )
 
     // The row's own real, measured height (see the Row's onSizeChanged
@@ -11941,28 +11944,30 @@ private fun SplitExpandButton(
     // 2dp ensures it renders as fully rounded even with subpixel effects
     // and density-dependent rounding on all device densities.
     val fullyRound = rowHeightDp / 2 + 2.dp
-    // Independent corner morphing: left stays rounded until active, right becomes
-    // sharp (8dp) when expanded. This creates a visual distinction showing that
-    // the right side (chevron) is the "expand" control while the left stays ready
-    // for its own action.
+    // Independent corner morphing: left stays fully rounded until its own
+    // action or press, right becomes a tighter rounded square (10dp) when
+    // expanded -- the two halves' shapes never travel together.
     val leftOuter by animateDpAsState(
-        if (leftMorphed) 8.dp else fullyRound,
+        if (leftMorphed) 10.dp else fullyRound,
         spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessLow),
         label = "splitOuterLeft",
     )
     val rightOuter by animateDpAsState(
-        if (rightMorphed) 8.dp else fullyRound,
+        if (rightMorphed) 10.dp else fullyRound,
         spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessLow),
         label = "splitOuterRight",
     )
 
-    // Chevron changes to ChargeGreen (unlocked/active color) when pebble expands
+    // Chevron shifts to the highest neutral surface tone when the pebble is
+    // open -- the same light-neutral container family the rest of the app
+    // uses, never a status colour (green stays reserved for charge/ready).
     val rightBgColor by androidx.compose.animation.animateColorAsState(
-        if (expanded) ChargeGreen else buttonContainer(),
+        if (expanded) MaterialTheme.colorScheme.surfaceContainerHighest else buttonContainer(),
         spring(stiffness = Spring.StiffnessMediumLow),
         label = "chevronBg",
     )
     val inner = 6.dp
+    val rightShape = RoundedCornerShape(topStart = inner, bottomStart = inner, topEnd = rightOuter, bottomEnd = rightOuter)
 
     val defaultContainer = buttonContainer()
     val leftBg by androidx.compose.animation.animateColorAsState(
@@ -12074,35 +12079,39 @@ private fun SplitExpandButton(
                 }
             }
         }
-        // Right half — chevron nub (with easter egg tap counter).
-        // When expanded, the chevron background changes to ChargeGreen and corners
-        // become sharp (8dp), while the left side remains unselected and rounded.
+        // Right half — chevron nub. When expanded its background shifts to the
+        // highest neutral surface tone and its outer corners tighten (10dp),
+        // while the left side stays unselected and rounded.
         Surface(
-            onClick = {
-                val now = System.currentTimeMillis()
-                // Reset counter if more than 500ms between taps (not rapid)
-                if (now - lastEasterEggTapTime > 500) easterEggTaps = 0
-                lastEasterEggTapTime = now
-                easterEggTaps++
-
-                // Easter egg: 5 rapid taps trigger spin + vibration
-                if (easterEggTaps == 5) haptics?.heavy() else if (expanded) haptics?.tick() else haptics?.click()
-
-                onToggle()
-            },
-            interactionSource = rightInteraction,
             color = rightBgColor,
-            contentColor = if (expanded) Color.White else MaterialTheme.colorScheme.onSurface,
-            shape = RoundedCornerShape(topStart = inner, bottomStart = inner, topEnd = rightOuter, bottomEnd = rightOuter),
+            contentColor = MaterialTheme.colorScheme.onSurface,
+            shape = rightShape,
             // The icon's own contentDescription below is the NEXT action
             // ("Expand"/"Collapse"); this is the CURRENT state -- without it
             // TalkBack only ever hears what tapping will do, never whether the
             // pebble is presently open, so distinguishing the two took a
             // double-tap-and-listen-again instead of being announced on focus.
-            // widthIn(min = rowHeightDp) ensures the button is at least as wide as it
-            // is tall, giving the right-side semicircle enough space to render cleanly
-            // without Android's undefined corner-rounding behavior kicking in.
-            modifier = Modifier.fillMaxHeight().widthIn(min = rowHeightDp).semantics { stateDescription = if (expanded) "Expanded" else "Collapsed" },
+            // widthIn(min = rowHeightDp) ensures the button is at least as wide
+            // as it is tall, giving the right-side semicircle enough space to
+            // render cleanly without Android's undefined corner-rounding
+            // behavior kicking in.
+            modifier = Modifier.fillMaxHeight().widthIn(min = rowHeightDp)
+                .clip(rightShape)
+                .combinedClickable(
+                    interactionSource = rightInteraction,
+                    onClick = {
+                        if (expanded) haptics?.tick() else haptics?.click()
+                        onToggle()
+                    },
+                    onLongClick = {
+                        // Easter egg: hold the chevron to spin it + vibrate.
+                        if (!easterEggTriggered) {
+                            easterEggTriggered = true
+                            haptics?.heavy()
+                        }
+                    },
+                )
+                .semantics { stateDescription = if (expanded) "Expanded" else "Collapsed" },
         ) {
             Box(
                 // Asymmetric padding: 13dp start (left), 12dp end (right) to position
@@ -12115,7 +12124,7 @@ private fun SplitExpandButton(
                     Icons.Filled.KeyboardArrowDown,
                     contentDescription = if (expanded) "Collapse" else "Expand",
                     // Larger chevron icon (24dp to match action button icon size), with
-                    // easter egg spin animation when tapped 5 times rapidly.
+                    // easter egg spin animation when the chevron is held.
                     modifier = Modifier.size(24.dp).rotate(rotation + easterEggSpin),
                 )
             }
@@ -12140,14 +12149,13 @@ internal fun MorphExpandButton(
         label = "morphChevron",
     )
 
-    // Easter egg: same as SplitExpandButton — rapid taps trigger spin + vibration
-    var easterEggTaps by remember { mutableIntStateOf(0) }
-    var lastEasterEggTapTime by remember { mutableLongStateOf(0L) }
+    // Easter egg: same hold as SplitExpandButton — long-press spins + vibrates
+    var easterEggTriggered by remember { mutableStateOf(false) }
     val easterEggSpin by animateFloatAsState(
-        targetValue = if (easterEggTaps >= 5) 360f else 0f,
-        animationSpec = if (easterEggTaps >= 5) spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessLow) else snap(),
+        targetValue = if (easterEggTriggered) 360f else 0f,
+        animationSpec = if (easterEggTriggered) spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessLow) else snap(),
         label = "easterEggMorphSpin",
-        finishedListener = { if (easterEggTaps >= 5) easterEggTaps = 0 },
+        finishedListener = { if (easterEggTriggered) easterEggTriggered = false },
     )
     // 25.dp, not 50.dp -- this button is a FIXED 50.dp square (below), so a
     // true circle needs radius == half that, exactly. The old 50.dp target
@@ -12157,42 +12165,46 @@ internal fun MorphExpandButton(
     // clamp, once the corner radii sum past the side length they're on. See
     // SplitExpandButton's own identical fix for the same reasoning.
     val corner by animateDpAsState(
-        targetValue = if (expanded) 8.dp else 25.dp,
+        targetValue = if (expanded) 10.dp else 25.dp,
         animationSpec = spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessLow),
         label = "morphExpandCorner",
     )
     val bgColor by androidx.compose.animation.animateColorAsState(
-        if (expanded) ChargeGreen else buttonContainer(),
+        if (expanded) MaterialTheme.colorScheme.surfaceContainerHighest else buttonContainer(),
         spring(stiffness = Spring.StiffnessMediumLow),
         label = "morphBg",
     )
     Surface(
-        onClick = {
-            val now = System.currentTimeMillis()
-            // Reset counter if more than 500ms between taps (not rapid)
-            if (now - lastEasterEggTapTime > 500) easterEggTaps = 0
-            lastEasterEggTapTime = now
-            easterEggTaps++
-
-            // Easter egg: 5 rapid taps trigger spin + vibration
-            if (easterEggTaps == 5) haptics?.heavy() else if (expanded) haptics?.tick() else haptics?.click()
-
-            onToggle()
-        },
         shape = RoundedCornerShape(corner),
         color = bgColor,
-        contentColor = if (expanded) Color.White else MaterialTheme.colorScheme.onSurface,
+        contentColor = MaterialTheme.colorScheme.onSurface,
         // Same as SplitExpandButton's chevron: the icon's contentDescription is
         // the next action, this is the current state -- both together instead
-        // of only announcing what tapping does.
-        modifier = Modifier.size(50.dp).semantics { stateDescription = if (expanded) "Expanded" else "Collapsed" },
+        // of only announcing what tapping does. Tap toggles; holding spins the
+        // chevron (easter egg) without toggling.
+        modifier = Modifier.size(50.dp)
+            .clip(RoundedCornerShape(corner))
+            .combinedClickable(
+                onClick = {
+                    if (expanded) haptics?.tick() else haptics?.click()
+                    onToggle()
+                },
+                onLongClick = {
+                    // Easter egg: hold the chevron to spin it + vibrate.
+                    if (!easterEggTriggered) {
+                        easterEggTriggered = true
+                        haptics?.heavy()
+                    }
+                },
+            )
+            .semantics { stateDescription = if (expanded) "Expanded" else "Collapsed" },
     ) {
         Box(contentAlignment = Alignment.Center) {
             Icon(
                 Icons.Filled.KeyboardArrowDown,
                 contentDescription = if (expanded) "Collapse" else "Expand",
                 // Larger chevron icon (24dp to match action button icon size), with
-                // easter egg spin animation when tapped 5 times rapidly.
+                // easter egg spin animation when the chevron is held.
                 modifier = Modifier.size(24.dp).rotate(rotation + easterEggSpin),
             )
         }
