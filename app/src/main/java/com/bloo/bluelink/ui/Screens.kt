@@ -7883,7 +7883,7 @@ private fun HeroCollapsedNumbers(
             .onGloballyPositioned(onPositioned),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        HeroNumbers(data, t = 0f)
+        HeroNumbers(data, t = 0f, verticalAlign = Alignment.CenterVertically)
     }
 }
 
@@ -7916,6 +7916,13 @@ private fun HeroNumbers(
     // t = 0f and never shows the line at all, see the `t > 0.01f` guard below) and the
     // CoverTile call site need no changes.
     statusAlpha: Float = t,
+    /** Vertical alignment for the numbers themselves. The EXPANDED copy
+     *  bottom-aligns (the range and the status line stack under the pct);
+     *  the COLLAPSED instance sits beside the car name in the header row
+     *  where Bottom pinned the whole block a line lower than the name
+     *  ("the name and the % / mi&km aren't aligned" -- reported). The row
+     *  it lives in is already centered, so the numbers should be too. */
+    verticalAlign: Alignment.Vertical = Alignment.Bottom,
 ) {
     val type = MaterialTheme.typography
     val pctStyle = lerp(type.titleMedium, type.displayMedium, t)
@@ -7930,7 +7937,7 @@ private fun HeroNumbers(
             fillWidth -> Modifier.fillMaxWidth()
             else -> Modifier
         },
-        verticalAlignment = Alignment.Bottom,
+        verticalAlignment = verticalAlign,
         // Given a width, the two ends push apart: percentage on the left, range on
         // the right. Collapsed the width IS the natural content width, so
         // SpaceBetween lays out exactly as a wrapped Row would and there is no jump
@@ -8021,6 +8028,13 @@ private fun HeroMorphReadout(
      *  `statusAlpha` for why it isn't just `t`. Defaults to `t` so the CoverTile call
      *  site (a fixed t = 1f, nothing animating) keeps behaving exactly as before. */
     statusAlpha: Float = t,
+    /** Vertical alignment for the numbers themselves. The EXPANDED copy
+     *  bottom-aligns (the range and the status line stack under the pct);
+     *  the COLLAPSED instance sits beside the car name in the header row
+     *  where Bottom pinned the whole block a line lower than the name
+     *  ("the name and the % / mi&km aren't aligned" -- reported). The row
+     *  it lives in is already centered, so the numbers should be too. */
+    verticalAlign: Alignment.Vertical = Alignment.Bottom,
 ) {
     val type = MaterialTheme.typography
     // Real type steps, lerped -- not a graphicsLayer scale -- and the reason is DEPENDENT
@@ -8132,6 +8146,10 @@ private fun HeroMorphReadout(
             limitPct = data.limitPct,
             stuckAtLimit = data.stuckAtLimit,
             charging = data.charging,
+            // This readout's bar always sits over the hero's photo + dark
+            // scrim when the card is open -- the fixed-white "won't charge
+            // past here" zone reads against it, regardless of theme.
+            darkBackdrop = true,
         )
     }
 }
@@ -8187,6 +8205,13 @@ private fun ChargeSegmentBar(
     stuckAtLimit: Boolean,
     charging: Boolean,
     modifier: Modifier = Modifier,
+    /** True when the segment sits on a genuinely dark backdrop (the hero's
+     *  photo + scrim, the cover tile): the "won't charge past here" zone then
+     *  paints LIGHT so it stays legible. The LocalContentColor heuristic
+     *  this used got the hero wrong (HeroOnPhoto is near-white content, but
+     *  the BACKDROP behind it is the dark scrim), which is exactly the two
+     *  impossible-to-infer facts this override exists for. */
+    darkBackdrop: Boolean = false,
 ) {
     val scheme = MaterialTheme.colorScheme
     val limit = limitPct?.takeIf { it in 1..99 }
@@ -8205,7 +8230,7 @@ private fun ChargeSegmentBar(
     // whatever the backdrop behind the segment actually is (the hero photo
     // scrim, a pebble card, the cover tile) because it inherits the reader's
     // own text colour rather than guessing a colour itself.
-    val heavyScrim = LocalContentColor.current.luminance() < 0.5f
+    val heavyScrim = darkBackdrop || LocalContentColor.current.luminance() < 0.5f
     val farBackdropColor = if (heavyScrim) Color.White.copy(alpha = 0.30f) else Color.Black.copy(alpha = 0.24f)
     val trackDimColor = if (heavyScrim) Color.White.copy(alpha = 0.13f) else scheme.onSurface.copy(alpha = 0.14f)
     // Sprung, not a plain `if`: this used to pick the two-item colour list outright,

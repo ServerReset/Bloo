@@ -425,7 +425,22 @@ private fun SettingsHeaderRow(state: UiState, compact: Boolean = false) {
         lastCoords.value?.let { titleFlight?.onSettled(it.positionInRoot()) }
         lastCorrectedFlight = titleFlight
     }
-    Column(Modifier.fillMaxWidth().padding(horizontal = 4.dp)) {
+    // Entrance animation: the page header slides up and fades in (same motion
+    // the empty screen and hero use) instead of appearing with no motion --
+    // "the settings header is not animated" -- while the invisible title
+    // anchor inside still reports its real position every frame, so the
+    // floating overlay tracks the animated header perfectly.
+    val headerAppear = remember { Animatable(0f) }
+    LaunchedEffect(Unit) { headerAppear.animateTo(1f, tween(400)) }
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 4.dp)
+            .graphicsLayer {
+                alpha = headerAppear.value
+                translationY = (1f - headerAppear.value) * 12.dp.toPx()
+            },
+    ) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             // Tonal icon badge, the same visual language every SettingsCard
             // header uses -- the page top previously stood bare next to cards
@@ -5113,25 +5128,32 @@ internal fun SettingsCard(title: String, icon: ImageVector? = null, vm: AppViewM
 @Composable
 private fun SecretRow(label: String, value: String) {
     var show by remember { mutableStateOf(false) }
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        // maxLines=1 so a one-word label ("Password") can't wrap character-by-
-        // character ("Pass/word") when the shown value + Show/Hide button take the
-        // rest of a large-font row. The label keeps its share; the value ellipsizes.
+    // A clean three-part row: label hugs the left, value hugs the button on
+    // the right, no midpoint reservation. The old value used
+    // `weight(1f, fill = false)`, which still RESERVED half the width and
+    // parked the value mid-row with a void behind it -- the "weirdly
+    // indented password" report. SpaceBetween on the row does the exact
+    // thing that existed for nothing.
+    Row(
+        Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween,
+    ) {
         Text(
             label,
-            Modifier.weight(1f),
             style = MaterialTheme.typography.bodyMedium,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f),
         )
-        Spacer(Modifier.width(8.dp))
+        Spacer(Modifier.width(12.dp))
         Text(
             if (show) value else "•".repeat(value.length.coerceIn(4, 10)),
             fontWeight = FontWeight.Medium,
             color = MaterialTheme.colorScheme.onSurface,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.weight(1f, fill = false),
+            modifier = Modifier.widthIn(max = 168.dp),
         )
         Spacer(Modifier.width(10.dp))
         MorphTextButton(if (show) "Hide" else "Show", onClick = { show = !show })
