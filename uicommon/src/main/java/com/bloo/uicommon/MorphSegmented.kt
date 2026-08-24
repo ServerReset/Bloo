@@ -257,17 +257,28 @@ fun MorphSegmented(
             // not dragging), so no label falsely bolds via the index-0 fallback.
             val visualIndex = dragXPx?.let { indexFor(it) } ?: if (indicatorVisible) selectedIndex else -1
 
-            // Motion blur on the indicator: subtle while still, intensifies during drag
-            // and fades as the spring settles — gives the sliding highlight a fluid,
-            // refractive feel without a real directional blur.
-            val isMoving = dragXPx != null
-            // snap() jumps motionBlurX straight to 6f the instant dragging starts (no
-            // ramp-up lag behind the finger); the spring only governs the fade back to
-            // 0f once the finger lifts, so the blur relaxes smoothly instead of
-            // vanishing abruptly the same frame the drag ends.
+// Motion blur on the indicator ONLY after the finger lifts, on the
+            // spring-back: while the finger is actually dragging, the highlight
+            // stays perfectly crisp. Blurring it for the whole ride read as a
+            // "low-resolution preview" (the highlight smearing at every position
+            // the finger passed) -- the blur's job is to soften the RETURN
+            // wobble, not the drag itself, which is exactly the split
+            // AnimatedSlider already makes (crisp while tracking, blurred only
+            // while settling).
+            var settling by remember { mutableStateOf(false) }
+            LaunchedEffect(settling) {
+                if (settling) {
+                    delay(300)
+                    settling = false
+                }
+            }
+            // snap() jumps motionBlurX straight to 6f the instant the release
+            // lands (no ramp-up lag behind the spring); the spring only governs
+            // the fade back to 0f, so the blur relaxes smoothly instead of
+            // vanishing abruptly.
             val motionBlurX by animateFloatAsState(
-                targetValue = if (isMoving) 6f else 0f,
-                animationSpec = if (isMoving) snap() else spring(dampingRatio = 0.6f, stiffness = Spring.StiffnessMediumLow),
+                targetValue = if (settling) 6f else 0f,
+                animationSpec = if (settling) snap() else spring(dampingRatio = 0.6f, stiffness = Spring.StiffnessMediumLow),
                 label = "segMotionBlur",
             )
             // The sliding highlight pill. Declared before the Row of segment labels
@@ -380,6 +391,8 @@ fun MorphSegmented(
                                 // visibly snap back before the caller's prop round-trips (see
                                 // the comment on pendingIndex above).
                                 if (claimed) {
+                                    // Arm the settle blur now that the finger is up.
+                                    settling = true
                                     val x = dragXPx ?: offsetFor(down.position.x)
                                     val idx = indexFor(x)
                                     pendingIndex = idx
