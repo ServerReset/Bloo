@@ -659,7 +659,7 @@ fun BlooApp(vm: AppViewModel) {
                         // redrawing the blurred backdrop underneath at ~12fps --
                         // real contention on exactly the frames search is using.
                         if (appearance.auroraBackground) AuroraBackground(Modifier.matchParentSize(), appearance, refreshing = state.refreshing, paused = searchOpen)
-                        GarageScreen(state, vm)
+                        GarageScreen(rememberUpdatedState(state), vm)
                     }
                 }
                 // The full phone Settings (search + keyboard, photo pickers, crop,
@@ -3465,8 +3465,8 @@ internal fun isCompactCoverScreen(): Boolean {
  */
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
-internal fun GarageScreen(state: UiState, vm: AppViewModel) {
-    val vehicles = state.vehicles
+internal fun GarageScreen(state: State<UiState>, vm: AppViewModel) {
+    val vehicles = state.value.vehicles
     if (vehicles.isEmpty()) return
     val appearance = LocalAppearance.current
 
@@ -3476,7 +3476,7 @@ internal fun GarageScreen(state: UiState, vm: AppViewModel) {
     // one of the few places that genuinely needs it, and it is above the pages.
     val currentIndex by vm.currentIndex.collectAsState()
     val currentVehicle = vehicles.getOrNull(currentIndex.coerceIn(0, vehicles.lastIndex))
-    val currentFetchedAt = currentVehicle?.let { state.fetchedAt(it) }
+    val currentFetchedAt = currentVehicle?.let { state.value.fetchedAt(it) }
     val sessionStartMs = remember { System.currentTimeMillis() }
     LaunchedEffect(currentVehicle?.vin, currentFetchedAt) {
         if (currentFetchedAt != null &&
@@ -3491,8 +3491,8 @@ internal fun GarageScreen(state: UiState, vm: AppViewModel) {
     }
 
     // Gentle one-time nudge after onboarding, encouraging a Settings visit.
-    LaunchedEffect(state.showSettingsHint) {
-        if (state.showSettingsHint) {
+    LaunchedEffect(state.value.showSettingsHint) {
+        if (state.value.showSettingsHint) {
             vm.reportInfo("Tip: fine-tune each car's seats, photo and pebble order in Settings")
             vm.dismissSettingsHint()
         }
@@ -3501,9 +3501,9 @@ internal fun GarageScreen(state: UiState, vm: AppViewModel) {
     // Settle haptic when a refresh lands.
     val haptics = LocalHaptics.current
     var wasRefreshing by remember { mutableStateOf(false) }
-    LaunchedEffect(state.refreshing) {
-        if (wasRefreshing && !state.refreshing) haptics?.slotSettle()
-        wasRefreshing = state.refreshing
+    LaunchedEffect(state.value.refreshing) {
+        if (wasRefreshing && !state.value.refreshing) haptics?.slotSettle()
+        wasRefreshing = state.value.refreshing
     }
     // Live pull distance reported by Refreshable, so the overlays react the moment
     // the user starts pulling - not only once a refresh is in flight.
@@ -3524,7 +3524,7 @@ internal fun GarageScreen(state: UiState, vm: AppViewModel) {
     // the moment the pull passes 1%.
     val pulling by remember { derivedStateOf { pullFractionState.value > 0.01f } }
     val dotsAlphaState = animateFloatAsState(
-        targetValue = if (state.refreshing || pulling) 0f else 1f,
+        targetValue = if (state.value.refreshing || pulling) 0f else 1f,
         animationSpec = tween(durationMillis = 200),
         label = "dotsFade",
     )
@@ -3547,13 +3547,13 @@ internal fun GarageScreen(state: UiState, vm: AppViewModel) {
     // which meant every one of the ~12 frames it takes to spring back up also
     // recomposed GarageScreen, for a value only ever consumed inside an
     // offset { } at its two use sites.
-    val overlayShiftTarget = if (state.refreshing) RefreshPullShift
+    val overlayShiftTarget = if (state.value.refreshing) RefreshPullShift
         else (RefreshPullShift * pullFraction).coerceIn(0.dp, RefreshPullShift)
     val refreshShiftState = animateDpAsState(
         targetValue = overlayShiftTarget,
         animationSpec = spring(
             dampingRatio = Spring.DampingRatioNoBouncy,
-            stiffness = if (state.refreshing) Spring.StiffnessLow else Spring.StiffnessMedium,
+            stiffness = if (state.value.refreshing) Spring.StiffnessLow else Spring.StiffnessMedium,
         ),
         label = "refreshShift",
     )
@@ -3593,7 +3593,7 @@ internal fun GarageScreen(state: UiState, vm: AppViewModel) {
         }
     }
     if (compact) {
-        CompactGarage(state, vm, appearance)
+        CompactGarage(state.value, vm, appearance)
         return
     }
     // How many full-height cards fit side by side; pages advance by this many.
@@ -3602,7 +3602,7 @@ internal fun GarageScreen(state: UiState, vm: AppViewModel) {
     val canExpand = large && count > 1
     val singleLarge = large && count == 1
     // A car expanded by the user (multi-car), or the lone car on a big screen.
-    val expandedByUser = state.expandedIndex?.takeIf { it in vehicles.indices && canExpand }
+    val expandedByUser = state.value.expandedIndex?.takeIf { it in vehicles.indices && canExpand }
     val expandedIdx = if (singleLarge) 0 else expandedByUser
 
     BackHandler(enabled = expandedByUser != null) { vm.collapse() }
@@ -3730,7 +3730,7 @@ internal fun GarageScreen(state: UiState, vm: AppViewModel) {
                 // renderer. block == pageCount (never a valid car block index, which
                 // only ever run 0 until pageCount-1) is what marks it as the
                 // Settings slot rather than a car.
-                // appearance.settingsAsPage || state.landOnSettingsPage, not
+                // appearance.settingsAsPage || state.value.landOnSettingsPage, not
                 // appearance.settingsAsPage alone: the preference write behind that
                 // flag goes through DataStore, and DataStore is genuinely async --
                 // the frame right after closeSettings(landOnSettingsPage = true)
@@ -3742,16 +3742,16 @@ internal fun GarageScreen(state: UiState, vm: AppViewModel) {
                 // a block that doesn't exist yet -- landOnSettingsPage is
                 // unambiguous proof the slot is about to exist regardless of
                 // which frame the DataStore write actually lands on.
-                val settingsAsPage = appearance.settingsAsPage || state.landOnSettingsPage
+                val settingsAsPage = appearance.settingsAsPage || state.value.landOnSettingsPage
                 val totalBlocks = if (settingsAsPage) pageCount + 1 else pageCount
                 // Normally the car currentIndex was already parked on. The one
-                // exception is state.landOnSettingsPage (see its own doc): Settings
+                // exception is state.value.landOnSettingsPage (see its own doc): Settings
                 // itself just switched settingsAsPage on and asked to be followed,
                 // so this fresh mount seeds straight onto the just-created Settings
                 // slot instead of whichever car was selected before Settings was
                 // ever opened -- otherwise the user would land on a car for one
                 // frame before having to go find the page themselves.
-                val initialBlock = if (state.landOnSettingsPage && settingsAsPage) {
+                val initialBlock = if (state.value.landOnSettingsPage && settingsAsPage) {
                     pageCount
                 } else {
                     (currentIndex.coerceIn(0, count - 1)) / perPage
@@ -3774,8 +3774,8 @@ internal fun GarageScreen(state: UiState, vm: AppViewModel) {
                 // MOVES the pager there instead of hoping the seed took, which costs
                 // nothing extra in the common case (wrap.snapToReal no-ops when
                 // already there) and is the actual fix in the uncommon one.
-                LaunchedEffect(state.landOnSettingsPage) {
-                    if (state.landOnSettingsPage) {
+                LaunchedEffect(state.value.landOnSettingsPage) {
+                    if (state.value.landOnSettingsPage) {
                         if (settingsAsPage) wrap.snapToReal(pageCount)
                         vm.consumeLandOnSettingsPage()
                     }
@@ -3860,7 +3860,7 @@ internal fun GarageScreen(state: UiState, vm: AppViewModel) {
                     // animation -- see the totalBlocks effect below for the exact
                     // trigger (settingsAsPage flipping mid-exit) and why it read as
                     // jank rather than a clean transition.
-                    if (state.screen != Screen.Garage) return@LaunchedEffect
+                    if (state.value.screen != Screen.Garage) return@LaunchedEffect
                     val targetBlock = currentIndex.coerceIn(0, count - 1) / perPage
                     wrap.snapToReal(targetBlock)
                 }
@@ -3893,10 +3893,10 @@ internal fun GarageScreen(state: UiState, vm: AppViewModel) {
                 val skipFirstBlocksSnap = remember { mutableStateOf(true) }
                 LaunchedEffect(totalBlocks) {
                     if (skipFirstBlocksSnap.value) { skipFirstBlocksSnap.value = false; return@LaunchedEffect }
-                    if (state.screen != Screen.Garage) return@LaunchedEffect
+                    if (state.value.screen != Screen.Garage) return@LaunchedEffect
                     // Toggling settingsAsPage ON from the standalone route
                     // (SettingsScreen's own toggle) changes totalBlocks AND
-                    // sets state.landOnSettingsPage in the very same
+                    // sets state.value.landOnSettingsPage in the very same
                     // transition -- this effect exists to snap back to
                     // currentIndex's own block when totalBlocks changes for
                     // its OWN reasons (see the doc above), but that's
@@ -3910,7 +3910,7 @@ internal fun GarageScreen(state: UiState, vm: AppViewModel) {
                     // consumeLandOnSettingsPage() call clears this flag once
                     // it's genuinely done, so deferring to it here is safe
                     // even if this effect happens to run first.
-                    if (state.landOnSettingsPage) return@LaunchedEffect
+                    if (state.value.landOnSettingsPage) return@LaunchedEffect
                     val targetBlock = currentIndex.coerceIn(0, count - 1) / perPage
                     wrap.snapToReal(targetBlock)
                 }
@@ -3925,7 +3925,7 @@ internal fun GarageScreen(state: UiState, vm: AppViewModel) {
                 // next layout pass -- onPositioned only ever fires from the
                 // page currently holding the hoisted flight), and if the new
                 // page's answer differs the badge just fades -- its only
-                // move -- rather than flashing through a wrong state.
+                // move -- rather than flashing through a wrong state.value.
                 val density = LocalDensity.current
                 val hoistedTopInset = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
                 val hoistedTopInsetPx = with(density) { hoistedTopInset.toPx() }
@@ -4025,7 +4025,7 @@ internal fun GarageScreen(state: UiState, vm: AppViewModel) {
                 // would relabel the still-fading badge with the new page's
                 // identity, or (see `isSettledAndDocked` below) incorrectly
                 // extend the new page's own hoisted grace period using the
-                // OLD page's fade state. Written plainly here in
+                // OLD page's fade state.value. Written plainly here in
                 // composition, not inside an effect/coroutine -- every
                 // reader in this same pass sees the just-written value
                 // immediately.
@@ -4088,7 +4088,7 @@ internal fun GarageScreen(state: UiState, vm: AppViewModel) {
                         // compared by reference instead, which is strictly less permissive.
                         //
                         // Fixed: SinglePebble now wraps the `state` it hands each pebble in
-                        // remember(<that pebble's own catalogued fields>) { state }, so an
+                        // remember(<that pebble's own catalogued fields>) { state.value }, so an
                         // unrelated field changing (another car's weather, an AI/update
                         // probe, a status fetch for a page that isn't even visible) no
                         // longer forces every pebble on every in-composition page to
@@ -4339,7 +4339,7 @@ internal fun GarageScreen(state: UiState, vm: AppViewModel) {
                         )
                     }
                     // Grid mode (perPage > 1, wide/large screens) hides each
-                    // card's own pull-to-refresh indicator above -- state.refreshing
+                    // card's own pull-to-refresh indicator above -- state.value.refreshing
                     // is one app-wide flag, not per-car, so leaving them unhidden
                     // would light up every visible card's spinner for a refresh
                     // that only touched one of them. But that left a real gap:
@@ -4350,7 +4350,7 @@ internal fun GarageScreen(state: UiState, vm: AppViewModel) {
                     // covers every grid case, page dots or not.
                     if (perPage > 1) {
                         AnimatedVisibility(
-                            visible = state.refreshing,
+                            visible = state.value.refreshing,
                             enter = fadeIn(tween(150)),
                             exit = fadeOut(tween(200)),
                             modifier = Modifier.align(Alignment.TopCenter).statusBarsPadding().padding(top = HeaderCornerGap),
@@ -5647,6 +5647,8 @@ private fun CompactCar(
      *  whether the page below it is already showing the car's name. */
     onTileChange: (String) -> Unit = {},
 ) {
+    // Live source passed to SinglePebble (which takes State<UiState> now).
+    val stateSource = rememberUpdatedState(state)
     val status = state.statusFor(v)
     val isGen5W = remember(v.brand, v.generation, state.platforms[v.vin]) { state.isGen5WEffective(v) }
     // Cover-screen tiles follow the same order the user arranged the pebbles in
@@ -5839,7 +5841,7 @@ private fun CompactCar(
                         ) { state }
                         CoverMainTile(v, mainState, vm)
                     } else {
-                        SinglePebble(tiles[i], v, state, vm, Modifier)
+                        SinglePebble(tiles[i], v, stateSource, vm, Modifier)
                     }
                 }
             }
@@ -9866,7 +9868,12 @@ internal fun BoxScope.TitleFlightOverlay(
 @Composable
 private fun VehicleDetailContent(
     v: Vehicle,
-    state: UiState,
+    /**
+     * State SOURCE (vm.state.value.collectAsState()), consistent with PebbleList/SinglePebble:
+     * per-use state.value reads keep this page and its pebble rows stable against
+     * emissions that don't touch the values they actually read.
+     */
+    state: State<UiState>,
     vm: AppViewModel,
     onExpand: (() -> Unit)? = null,
     reserveHeaderEnd: Boolean = false,
@@ -9999,7 +10006,7 @@ private fun VehicleDetailContent(
         // two pages fighting over the same hoisted state.
         hoisted.scrollToTop.value = { scroll.animateScrollTo(0) }
     }
-    Refreshable(v, state, vm, hideIndicator = hideIndicator) {
+    Refreshable(v, state.value, vm, hideIndicator = hideIndicator) {
         CompositionLocalProvider(LocalHeroTitleFlight provides liveFlight) {
             Column(
                 Modifier
@@ -10014,7 +10021,7 @@ private fun VehicleDetailContent(
                 // PagerDotClearance when the dots are showing -- see
                 // reserveTopForDots's own doc.
                 Spacer(Modifier.height(topInset + if (reserveTopForDots) PagerDotClearance else 0.dp))
-                CarHeaderRow(v, state, onExpand, reserveHeaderEnd, hideName = true)
+                CarHeaderRow(v, state.value, onExpand, reserveHeaderEnd, hideName = true)
                 // summary (image+gauge) and controls are reorderable pebbles too. The full
                 // pebble column always renders while swiping; smoothness comes from
                 // PebbleList's own one-frame lazy-fill (filled/EAGER_PEBBLES) + the pager's
@@ -10124,7 +10131,8 @@ private fun VehicleDetailContent(
 @Composable
 private fun ExpandedCar(
     v: Vehicle,
-    state: UiState,
+    /** See VehicleDetailContent's `state` doc -- same source plumbing. */
+    state: State<UiState>,
     vm: AppViewModel,
     flipped: Boolean,
     // See the call site's own doc (GarageScreen's exPager block) -- feeds
@@ -10133,9 +10141,9 @@ private fun ExpandedCar(
     // page-dot indicator that needs to know.
     onNameBoundsChanged: ((Rect?) -> Unit)? = null,
 ) {
-    val hotspot = state.hotspotFor(v.vin)
+    val hotspot = state.value.hotspotFor(v.vin)
         ?.takeIf {
-            it in state.sectionsFor(v) && state.isSectionAvailable(v, it)
+            it in state.value.sectionsFor(v) && state.value.isSectionAvailable(v, it)
         }
     val hotDrag = remember { HotSeatDrag() }
     // Hoisted (not recreated on flip) so each column keeps its own scroll
@@ -10176,9 +10184,9 @@ private fun ExpandedCar(
     // below, which HeroHeader already knows how to use -- no changes needed
     // there), not from this plain header.
     val controls: @Composable ColumnScope.() -> Unit = {
-        CarHeaderRow(v, state, onExpand = null, reserveEnd = false, hideName = true)
-        CriticalContent(v, state, vm)
-        HotspotSlot(v, hotspot, state, vm)
+        CarHeaderRow(v, state.value, onExpand = null, reserveEnd = false, hideName = true)
+        CriticalContent(v, state.value, vm)
+        HotspotSlot(v, hotspot, state.value, vm)
     }
     val pebbles: @Composable ColumnScope.() -> Unit = {
         PebbleList(v, state, vm, exclude = setOfNotNull("summary", "controls", hotspot))
@@ -10190,7 +10198,7 @@ private fun ExpandedCar(
     // view, unconditionally. This is a single car's own detail screen, not
     // the multi-car grid the flag was meant for, so the real M3 Expressive
     // indicator should show here too.
-    Refreshable(v, state, vm) {
+    Refreshable(v, state.value, vm) {
         Box(Modifier.fillMaxSize()) {
         // Animate the swap when the columns are flipped. Same spring the
         // expand/collapse transition (GarageScreen) and the collapsed
@@ -10302,6 +10310,7 @@ private fun sectionLabel(section: String): String = when (section) {
  */
 @Composable
 private fun HotspotSlot(v: Vehicle, hotspot: String?, state: UiState, vm: AppViewModel) {
+    val stateSource = rememberUpdatedState(state)
     if (hotspot != null) {
         val haptics = LocalHaptics.current
         // Drag the pinned pebble away (long-press, then drag past a threshold) to
@@ -10343,7 +10352,7 @@ private fun HotspotSlot(v: Vehicle, hotspot: String?, state: UiState, vm: AppVie
                             )
                         },
                 ) {
-                    SinglePebble(hotspot, v, state, vm, Modifier)
+                    SinglePebble(hotspot, v, stateSource, vm, Modifier)
                 }
             }
         }
@@ -10602,23 +10611,24 @@ private fun ControlsPebble(v: Vehicle, state: UiState, vm: AppViewModel, dragHan
 
 /** The reorderable pebble stack for a car. */
 @Composable
-private fun PebbleList(v: Vehicle, state: UiState, vm: AppViewModel, exclude: Set<String> = emptySet()) {
-    val allSections = state.sectionsFor(v)
+private fun PebbleList(v: Vehicle, state: State<UiState>, vm: AppViewModel, exclude: Set<String> = emptySet()) {
+    val sel = state.value
+    val allSections = sel.sectionsFor(v)
     // Memoized on the exact slices the predicate reads (the `eager` set below was
     // already remembered; this sibling filter was missed). PebbleList takes the whole
     // UiState so it recomposes on every emission — without this the filter re-allocated
     // the visible-section list on every refresh/command tick for the visible car.
-    val hasBattery = state.hasBattery(v)
+    val hasBattery = sel.hasBattery(v)
     // state.updateTileDismissed is in the key because isSectionAvailable now reads it: without
     // it this memo would keep the stale section list and the dismissed tile's phantom slot
     // would survive until some unrelated key changed. Every input the predicate reads has to be
     // a key, which is the contract this line already follows for the other six.
     val sections = remember(
-        allSections, exclude, state.hiddenPebbles, state.aiEnabled, hasBattery, v.isGen5W, state.platforms[v.vin],
-        state.updateAvailable, state.updateTileDismissed,
+        allSections, exclude, sel.hiddenPebbles, sel.aiEnabled, hasBattery, v.isGen5W, sel.platforms[v.vin],
+        sel.updateAvailable, sel.updateTileDismissed,
     ) {
         allSections.filter {
-            it !in exclude && state.isSectionAvailable(v, it)
+            it !in exclude && sel.isSectionAvailable(v, it)
         }
     }
     val hotDrag = LocalHotSeatDrag.current
@@ -10712,19 +10722,19 @@ private const val EAGER_PEBBLES = 3
  * dependency set, not a guess at "probably enough."
  */
 @Composable
-private fun SinglePebble(section: String, v: Vehicle, state: UiState, vm: AppViewModel, dragHandle: Modifier) {
-    val status = state.statusFor(v)
-    val seats = state.seatConfigFor(v)
-    val enabled = !state.loading
+private fun SinglePebble(section: String, v: Vehicle, state: State<UiState>, vm: AppViewModel, dragHandle: Modifier) {
+    val status = state.value.statusFor(v)
+    val seats = state.value.seatConfigFor(v)
+    val enabled = !state.value.loading
     val mSingle = LocalAppearance.current.unitSystem == "metric"
     when (section) {
         "summary" -> {
             // HeroHeader itself takes no `state` param -- its dependency is entirely
             // in the derived arguments built here, so THOSE are what's memoized.
             val heroState = remember(
-                status, state.imageUrls[v.vin], state.hasBattery(v), state.hasFuel(v),
-                state.locations[v.vin], state.isPebbleExpanded(v.vin, com.bloo.bluelink.data.HERO_PHOTO_SECTION),
-            ) { state }
+                status, state.value.imageUrls[v.vin], state.value.hasBattery(v), state.value.hasFuel(v),
+                state.value.locations[v.vin], state.value.isPebbleExpanded(v.vin, com.bloo.bluelink.data.HERO_PHOTO_SECTION),
+            ) { state.value }
             HeroHeader(
                 v, status, heroState.imageUrls[v.vin], heroState.hasBattery(v), heroState.hasFuel(v), vm,
                 heroState.drivingLabel(v), dragHandle = dragHandle, metric = mSingle,
@@ -10732,7 +10742,7 @@ private fun SinglePebble(section: String, v: Vehicle, state: UiState, vm: AppVie
             )
         }
         // Its own reorderable/pinnable slot now, like every other pebble --
-        // only actually present in the list while state.updateAvailable != null
+        // only actually present in the list while state.value.updateAvailable != null
         // (see PebbleList's filter and the two hotspot-eligibility checks). Global,
         // not per-car fields, but still worth memoizing: this section is rendered
         // on every car page, so an unrelated per-car state change (another car's
@@ -10740,68 +10750,68 @@ private fun SinglePebble(section: String, v: Vehicle, state: UiState, vm: AppVie
         // other pebble.
         "update" -> {
             val updateState = remember(
-                state.updateAvailable, state.updateTileDismissed, state.shizukuAvailable,
-                state.updateInstalling, state.updateDownloading, state.updateApkReady,
-                state.updatePendingDismiss,
-            ) { state }
+                state.value.updateAvailable, state.value.updateTileDismissed, state.value.shizukuAvailable,
+                state.value.updateInstalling, state.value.updateDownloading, state.value.updateApkReady,
+                state.value.updatePendingDismiss,
+            ) { state.value }
             UpdateAvailableTile(updateState, vm, dragHandle)
         }
         "controls" -> {
-            val controlsState = remember(status, state.isPending(v.vin, "doors"), state.isPending(v.vin, "hornLights")) { state }
+            val controlsState = remember(status, state.value.isPending(v.vin, "doors"), state.value.isPending(v.vin, "hornLights")) { state.value }
             ControlsPebble(v, controlsState, vm, dragHandle)
         }
         "climate" -> {
             val climateState = remember(
-                status, seats, state.isPending(v.vin, "climate"), state.climatePresets[v.vin],
-                state.climateSync[v.vin], state.locations[v.vin], state.carWeather[v.vin],
-                state.homeWeather, state.settingsMode, state.isPebbleExpanded(v.vin, "climate"),
-                state.defaultClimatePresets[v.vin],
-            ) { state }
+                status, seats, state.value.isPending(v.vin, "climate"), state.value.climatePresets[v.vin],
+                state.value.climateSync[v.vin], state.value.locations[v.vin], state.value.carWeather[v.vin],
+                state.value.homeWeather, state.value.settingsMode, state.value.isPebbleExpanded(v.vin, "climate"),
+                state.value.defaultClimatePresets[v.vin],
+            ) { state.value }
             ClimatePebble(v, status, seats, climateState, vm, dragHandle)
         }
         // The "charge" slot is the powertrain's energy pebble: charging for an
         // EV/PHEV, a fuel readout for a gas/hybrid car (no charge UI at all).
-        "charge" -> if (state.hasBattery(v)) {
+        "charge" -> if (state.value.hasBattery(v)) {
             val chargeState = remember(
-                status, enabled, state.isPending(v.vin, "charge"), state.isPending(v.vin, "chargeLimit"),
-                state.hasBattery(v), state.hasFuel(v), state.locations[v.vin],
-                state.isPebbleExpanded(v.vin, "charge"),
-            ) { state }
+                status, enabled, state.value.isPending(v.vin, "charge"), state.value.isPending(v.vin, "chargeLimit"),
+                state.value.hasBattery(v), state.value.hasFuel(v), state.value.locations[v.vin],
+                state.value.isPebbleExpanded(v.vin, "charge"),
+            ) { state.value }
             ChargePebble(v, status, enabled, chargeState, vm, dragHandle)
         } else {
-            val fuelState = remember(status, state.refreshing, state.isPebbleExpanded(v.vin, "charge")) { state }
+            val fuelState = remember(status, state.value.refreshing, state.value.isPebbleExpanded(v.vin, "charge")) { state.value }
             FuelPebble(v, status, fuelState, vm, dragHandle)
         }
         "location" -> {
             val locationState = remember(
-                state.locations[v.vin], state.placeNames[v.vin], state.isPending(v.vin, "locate"),
-                state.carWeather[v.vin], state.isPebbleExpanded(v.vin, "location"),
-            ) { state }
+                state.value.locations[v.vin], state.value.placeNames[v.vin], state.value.isPending(v.vin, "locate"),
+                state.value.carWeather[v.vin], state.value.isPebbleExpanded(v.vin, "location"),
+            ) { state.value }
             LocationPebble(v, locationState, vm, dragHandle)
         }
         "weather" -> {
-            val weatherState = remember(state.homeWeather, state.isPebbleExpanded(v.vin, "weather")) { state }
+            val weatherState = remember(state.value.homeWeather, state.value.isPebbleExpanded(v.vin, "weather")) { state.value }
             WeatherPebble(v, weatherState, vm, dragHandle)
         }
         // Trip history rides on the EV trip-details endpoint, so EVs only.
         "trips" -> {
-            val tripsState = remember(state.trips[v.vin], state.isPending(v.vin, "trips"), state.isPebbleExpanded(v.vin, "trips")) { state }
+            val tripsState = remember(state.value.trips[v.vin], state.value.isPending(v.vin, "trips"), state.value.isPebbleExpanded(v.vin, "trips")) { state.value }
             TripsPebble(v, tripsState, vm, dragHandle)
         }
         "info" -> {
             val infoState = remember(
-                status, state.locations[v.vin], state.licensePlates[v.vin], state.lastServiceMiles[v.vin],
-                state.serviceIntervalMiles[v.vin], state.refreshing, state.hasBattery(v),
-                state.placeNames[v.vin], state.fetchedAt(v), state.isPebbleExpanded(v.vin, "info"),
-            ) { state }
+                status, state.value.locations[v.vin], state.value.licensePlates[v.vin], state.value.lastServiceMiles[v.vin],
+                state.value.serviceIntervalMiles[v.vin], state.value.refreshing, state.value.hasBattery(v),
+                state.value.placeNames[v.vin], state.value.fetchedAt(v), state.value.isPebbleExpanded(v.vin, "info"),
+            ) { state.value }
             InfoPebble(v, status, infoState, vm, dragHandle)
         }
         "diagnostics" -> {
-            val diagnosticsState = remember(status, state.hasBattery(v), state.isPebbleExpanded(v.vin, "diagnostics")) { state }
+            val diagnosticsState = remember(status, state.value.hasBattery(v), state.value.isPebbleExpanded(v.vin, "diagnostics")) { state.value }
             DiagnosticsPebble(v, status, diagnosticsState, vm, dragHandle)
         }
         "ai" -> {
-            val aiState = remember(v.vin in state.aiBusy, state.aiSummaries[v.vin], state.isPebbleExpanded(v.vin, "ai")) { state }
+            val aiState = remember(v.vin in state.value.aiBusy, state.value.aiSummaries[v.vin], state.value.isPebbleExpanded(v.vin, "ai")) { state.value }
             AiPebble(v, aiState, vm, dragHandle)
         }
         else -> Spacer(Modifier.fillMaxWidth())
