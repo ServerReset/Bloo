@@ -601,6 +601,13 @@ fun BlooApp(vm: AppViewModel) {
     ) { padding ->
         // Adding an account shows the login form even while already signed in.
         val target = if (state.addingAccount) Screen.Login else state.screen
+        // Shared with the search layer and the garage aurora: while the search
+        // panel is open the blurred aurora beneath it pauses (see
+        // AuroraBackground's `paused`), so typing/panel frames don't contend
+        // with a full-screen blur redraw. Hoisted here, above the screen
+        // switch, because BOTH the per-screen background and the search layer
+        // (which sits above every screen) read it.
+        var searchOpen by remember { mutableStateOf(false) }
         AnimatedContent(
             targetState = target,
             transitionSpec = {
@@ -645,7 +652,12 @@ fun BlooApp(vm: AppViewModel) {
                     // for the CompositionLocalProvider) instead of re-subscribing
                     // to the same StateFlow a second time here.
                     Box(Modifier.fillMaxSize()) {
-                        if (appearance.auroraBackground) AuroraBackground(Modifier.matchParentSize(), appearance, refreshing = state.refreshing)
+                        // `paused = searchOpen`: the search panel sits ABOVE this
+                        // background, and while it's up (typing frames, panel
+                        // scrolling) the ambient drift would otherwise keep
+                        // redrawing the blurred backdrop underneath at ~12fps --
+                        // real contention on exactly the frames search is using.
+                        if (appearance.auroraBackground) AuroraBackground(Modifier.matchParentSize(), appearance, refreshing = state.refreshing, paused = searchOpen)
                         GarageScreen(state, vm)
                     }
                 }
@@ -656,8 +668,13 @@ fun BlooApp(vm: AppViewModel) {
                 // one unfold away. (The cover's gear button is also removed, so this
                 // is a belt-and-suspenders fallback for the back-stack landing here.)
                 Screen.Settings ->
-                    if (isCompactCoverScreen()) CoverManageOnPhoneCard(vm)
-                    else SettingsScreen(vm)
+                    if (isCompactCoverScreen()) {
+                        // The cover can scroll settings fine (the grid scrolls as
+                        // it does on the phone), but it is a cramped view of a
+                        // screen built for a tall display -- say so once, then let
+                        // them use it anyway.
+                        CoverSettingsGate(vm)
+                    } else SettingsScreen(vm)
             }
         }
         // Search lives HERE, above the screen-switching AnimatedContent and
@@ -689,6 +706,7 @@ fun BlooApp(vm: AppViewModel) {
                     notif = notifPrefs,
                     onSettings = effectivelyInSettings && !cover,
                     compact = cover,
+                    onOpenChanged = { searchOpen = it },
                 )
             }
         }
@@ -2648,6 +2666,12 @@ private fun AuroraBackground(
     modifier: Modifier = Modifier,
     appearance: SettingsStore.Appearance? = null,
     refreshing: Boolean = false,
+    /** Freezes the ambient drift (and the tilt sensor) while true. The search
+     *  panel pauses it so typing/keyboard frames don't contend with a
+     *  full-screen blur redraw -- the background's own drift is 12fps of
+     *  blur work, exactly the cost a small low-end screen can't afford on
+     *  top of an IME animation. */
+    paused: Boolean = false,
 ) {
     val scheme = MaterialTheme.colorScheme
     val motionMode = appearance?.auroraMotion ?: "static"
@@ -2668,6 +2692,9 @@ private fun AuroraBackground(
     // that automatic drift at all, so tilt is the only thing moving it.
     var tiltX by remember { mutableFloatStateOf(0f) }
     var tiltY by remember { mutableFloatStateOf(0f) }
+    // LIVE pause flag (the coroutines and the sensor callback start once and
+    // must keep seeing the newest value, not the first composition's).
+    val currentPaused by rememberUpdatedState(paused)
     val motionActive = motionMode == "motion"
     if (motionActive) {
         val ctx = LocalContext.current
@@ -2692,6 +2719,10 @@ private fun AuroraBackground(
             var baseX = 0f; var baseY = 0f
             val listener = object : SensorEventListener {
                 override fun onSensorChanged(event: SensorEvent) {
+                    // No writes while paused: a tilt sample just stalls (the
+                    // sensor keeps delivering; we simply stop turning those
+                    // samples into invalidation).
+                    if (currentPaused) return
                     val fastAlpha = 0.08f
                     val slowAlpha = 0.01f
                     val x = -event.values[0]
@@ -2804,6 +2835,10 @@ private fun AuroraBackground(
     LaunchedEffect(Unit) {
         val start = System.currentTimeMillis()
         while (true) {
+            if (currentPaused) {
+                delay(120)
+                continue
+            }
             val elapsed = System.currentTimeMillis() - start
             p1 = 0.32f + (0.68f - 0.32f) * triangleWave(elapsed, 9_000L)
             p2 = 0.68f + (0.32f - 0.68f) * triangleWave(elapsed, 7_000L)
@@ -2818,7 +2853,14 @@ private fun AuroraBackground(
             // Lighter than before (was 120dp): that much blur smoothed three
             // drifting blobs into a wash that barely changed frame to frame,
             // reading as "not animating" even though the drift was running.
-            .blur((90.dp * (1f + explosionValue * 0.5f)), edgeTreatment = BlurredEdgeTreatment.Unbounded)
+            // Blur cut from 90dp to 44dp: the old radius was tuned when the
+            // blobs were denser, but a full-screen 90dp blur redraws at every
+            // drift tick (~12fps) any time this is on screen -- the single
+            // most expensive steady-state draw in the app. 44dp still reads
+            // as a soft wash over three large circles and costs a fraction
+            // (and the pause hook above means it isn't redrawing at all
+            // while the search panel is up with the keyboard animating).
+            .blur((44.dp * (1f + explosionValue * 0.5f)), edgeTreatment = BlurredEdgeTreatment.Unbounded)
             .drawBehind {
                 drawRect(scheme.surface)
                 fun blob(c: Color, fx: Float, fy: Float, r: Float) =
@@ -2913,28 +2955,20 @@ internal fun LockOverlay(vm: AppViewModel) {
             .background(Color.Black.copy(alpha = 0.45f))
             .clickable(interactionSource = noRipple, indication = null) {},
     ) {
-        // Floating back arrow -> login. A hand-rolled Surface, not
-        // FloatingIcon itself -- this sits over the dark lock scrim above,
-        // not a photo/card background, so it deliberately uses plain white
-        // instead of FloatingIcon's glass-container fill. Size/padding still
-        // match every other header button (HeaderButtonSize/HeaderCornerGap)
-        // -- this used to be its own one-off 46dp, 2dp smaller than every
-        // other floating button in the app for no reason.
-        Surface(
+        // Floating back arrow -> login: the same FloatingIcon every other floating
+        // circular button in the app uses, with the lock scrim's plain-white
+        // override colours (this is what its old hand-rolled Surface now
+        // passes in -- one circle button, one component).
+        FloatingIcon(
+            icon = Icons.Filled.ArrowBack,
+            description = "Back to login",
             onClick = { haptics?.click(); vm.lockToLogin() },
-            shape = CircleShape,
-            color = Color.White.copy(alpha = 0.16f),
+            containerColor = Color.White.copy(alpha = 0.16f),
             contentColor = Color.White,
             modifier = Modifier
                 .align(Alignment.TopStart)
-                .statusBarsPadding()
-                .padding(HeaderCornerGap)
-                .size(HeaderButtonSize),
-        ) {
-            Box(contentAlignment = Alignment.Center) {
-                Icon(Icons.Filled.ArrowBack, contentDescription = "Back to login")
-            }
-        }
+                .statusBarsPadding(),
+        )
 
         Column(
             Modifier
@@ -5306,57 +5340,43 @@ private fun CoverScaffold(
 }
 
 /**
- * Cover-screen stand-in for the full phone Settings screen. The real Settings
- * (search + keyboard, photo pickers/crop, drag-reorder lists, sign-out) is
- * unusable on a ~1-inch flip cover, so on the cover we route here instead (see
- * BlooApp) — a single centered card telling the user to unfold / open Bloo on the
- * phone, with one Back button.
- *
- * Routed through [CoverScaffold] for its corner-safe padding, not a hand-rolled
- * stack of its own -- this used to chain `.windowInsetsPadding(navigationBars +
- * displayCutout)` and `.padding(cameraBumpPadding())` as two separate, ADDITIVE
- * modifiers (plus a third gutter padding on top). That is exactly the
- * double-reservation CoverScaffold's own doc explains at length: on a device
- * where both the window-inset channel and the boundingRect-derived clearance
- * report the same camera bump, this card reserved it twice -- "the 'crammed
- * into the left half' bug", on the one screen every cover user reaches when
- * they try to open Settings.
+ * Flip-cover Settings: the REAL scrollable SettingsScreen (the settings grid
+ * scrolls exactly as it does on the phone -- the old "manage on your phone"
+ * gate card locked the whole screen away behind itself, double-blocking
+ * everything from the update card onward), introduced once by a polite
+ * "this was built for a taller phone" prompt with a persistent "don't show
+ * again". The prompt is a doorbell, not a bouncer: after it, settings just
+ * scroll on the cover.
  */
 @Composable
-private fun CoverManageOnPhoneCard(vm: AppViewModel) {
-    CoverScaffold(reserveRailGutter = false) { metrics ->
-    Box(
-        Modifier
-            .fillMaxSize()
-            .padding(metrics.contentPadding),
-        contentAlignment = Alignment.Center,
-    ) {
-        Surface(
-            shape = RoundedCornerShape(PebbleCornerExpanded),
-            color = MaterialTheme.colorScheme.surfaceContainer,
-            contentColor = MaterialTheme.colorScheme.onSurface,
-            modifier = Modifier.fillMaxWidth(),
-        ) {
-            Column(
-                Modifier.padding(20.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-            ) {
-                Icon(
-                    Icons.Filled.Smartphone,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(34.dp),
+private fun CoverSettingsGate(vm: AppViewModel) {
+    val appearance = LocalAppearance.current
+    var promptOpen by remember { mutableStateOf(true) }
+    SettingsScreen(vm, compact = true)
+    if (promptOpen && !appearance.coverSettingsHintDismissed) {
+        GlassAlertDialog(
+            onDismissRequest = { promptOpen = false },
+            title = "Settings on the cover",
+            icon = Icons.Filled.Smartphone,
+            text = {
+                Text("This screen is designed for a taller phone display. You can scroll through everything here, but unfolding the phone makes settings much easier to read and tweak.")
+            },
+            buttons = {
+                MorphButton(
+                    onClick = { promptOpen = false },
+                    modifier = Modifier.fillMaxWidth(),
+                ) { Text("Continue on the cover", fontWeight = FontWeight.SemiBold) }
+                Spacer(Modifier.height(8.dp))
+                MorphTextButton(
+                    "Don't show this again",
+                    onClick = {
+                        promptOpen = false
+                        vm.setCoverSettingsHintDismissed(true)
+                    },
+                    modifier = Modifier.fillMaxWidth(),
                 )
-                Text(
-                    "Open Bloo on your phone to change settings.",
-                    style = MaterialTheme.typography.bodyMedium,
-                    textAlign = TextAlign.Center,
-                )
-                MorphTextButton("Back", onClick = vm::closeSettings, modifier = Modifier.fillMaxWidth())
-            }
-        }
-    }
+            },
+        )
     }
 }
 
@@ -6175,6 +6195,13 @@ internal fun FloatingIcon(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     outerPadding: Dp = HeaderCornerGap,
+    // Overrides for surfaces that float over something other than the app's
+    // content: the lock overlay's back arrow sits on a dark scrim, not a
+    // card, so it deliberately uses plain white instead of the glass fill
+    // (see LockOverlay's own note -- the old hand-rolled Surface there was
+    // this exact shape re-built by hand; it now passes these instead).
+    containerColor: Color? = null,
+    contentColor: Color = MaterialTheme.colorScheme.onSurface,
 ) {
     val haptics = LocalHaptics.current
     val interaction = remember { MutableInteractionSource() }
@@ -6190,8 +6217,8 @@ internal fun FloatingIcon(
     Surface(
         onClick = { haptics?.click(); onClick() },
         shape = CircleShape,
-        color = MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = glassContainerAlpha()),
-        contentColor = MaterialTheme.colorScheme.onSurface,
+        color = containerColor ?: MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = glassContainerAlpha()),
+        contentColor = contentColor,
         interactionSource = interaction,
         modifier = modifier
             .padding(outerPadding)
@@ -7155,141 +7182,7 @@ internal fun UpdateAvailableTile(state: UiState, vm: AppViewModel, dragHandle: M
             // the static word was animating right along with the number that actually changed.
             // Only the percent itself is a moving target now (rendered with its own
             // AnimatedValue below), and the sentence around it stays put.
-            val (statusIcon, statusKind, statusTint) = when {
-                state.updateInstalling -> Triple(Icons.Filled.SystemUpdate, "installing", scheme.onSurfaceVariant)
-                state.updateDownloading -> Triple(Icons.Filled.Download, "downloading", scheme.onSurfaceVariant)
-                state.updateApkReady && seamless -> Triple(Icons.Filled.CheckCircle, "ready_seamless", ChargeGreen)
-                state.updateApkReady -> Triple(Icons.Filled.CheckCircle, "ready", ChargeGreen)
-                seamless -> Triple(Icons.Filled.Bolt, "seamless", scheme.onSurfaceVariant)
-                else -> Triple(Icons.Filled.SystemUpdate, "update", scheme.primary)
-            }
-            // Sprung, not a snap -- the tint is what carries "this got a step further along"
-            // (neutral -> ChargeGreen once the APK is ready), so it gets the same treatment
-            // the charge bar's own fill-colour spring does rather than cutting on one frame.
-            val animatedStatusTint by androidx.compose.animation.animateColorAsState(
-                targetValue = statusTint,
-                animationSpec = spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessLow),
-                label = "updateStatusTint",
-            )
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                // A tonal badge behind the icon, not a bare glyph -- the same "icon gets its
-                // own coloured circle" weight CoverHero gives every stat it leads with,
-                // which this tile otherwise lacked next to every pebble that opens on one.
-                Box(
-                    Modifier
-                        .size(36.dp)
-                        .clip(CircleShape)
-                        .background(animatedStatusTint.copy(alpha = 0.15f)),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    // AnimatedContent, not a bare Icon swap -- installing -> downloading ->
-                    // ready is a real sequence of distinct states, and a plain `when` cut
-                    // between their icons on one frame while everything else on this card is
-                    // now springing and cascading into place.
-                    AnimatedContent(
-                        targetState = statusIcon,
-                        transitionSpec = { (fadeIn() + scaleIn(initialScale = 0.6f)) togetherWith (fadeOut() + scaleOut(targetScale = 0.6f)) },
-                        label = "updateStatusIcon",
-                    ) { icon ->
-                        Icon(icon, contentDescription = null, tint = animatedStatusTint, modifier = Modifier.size(20.dp))
-                    }
-                }
-                AnimatedContent(
-                    targetState = statusKind,
-                    transitionSpec = {
-                        (fadeIn(tween(180)) + slideInVertically { it / 3 }) togetherWith
-                            (fadeOut(tween(120)) + slideOutVertically { -it / 3 })
-                    },
-                    label = "updateStatusText",
-                    modifier = Modifier.weight(1f),
-                ) { kind ->
-                    // color resolved explicitly, not left Color.Unspecified -- the
-                    // "Downloading X%" AnimatedValue below renders through BasicText,
-                    // which (unlike Text) does NOT fall back to LocalContentColor for
-                    // an unspecified color; it fell back to Android's own paint
-                    // default (black) instead, on a dark pebble background essentially
-                    // invisible. Every plain Text() sharing this style already got the
-                    // right colour by accident (Text does resolve Unspecified); this
-                    // is fixing it at the source instead of only where it happened to
-                    // get caught.
-                    val textStyle = MaterialTheme.typography.titleMedium.copy(
-                        fontWeight = FontWeight.Bold,
-                        color = LocalContentColor.current,
-                    )
-                    when (kind) {
-                        "installing" -> Text("Installing silently via Shizuku…", style = textStyle)
-                        "downloading" -> Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text("Downloading", style = textStyle)
-                            downloadProgress?.let { p ->
-                                Text(" ", style = textStyle)
-                                // Its own AnimatedValue, not part of this AnimatedContent's own
-                                // string -- this is the one piece of the line that legitimately
-                                // changes every tick, so it's the only piece that should move;
-                                // "Downloading" itself stays a completely static Text next to it.
-                                // fontFeatureSettings = "tnum" enables tabular figures (fixed-width
-                                // digits) so only the changing digit animates up without the entire
-                                // number shifting left/right -- prevents the seizure-inducing effect.
-                                com.bloo.uicommon.AnimatedValue(
-                                    "${(p * 100).roundToInt()}%",
-                                    style = textStyle.copy(fontFeatureSettings = "tnum"),
-                                    reduceMotion = LocalReduceMotion.current,
-                                )
-                            } ?: Text("…", style = textStyle)
-                        }
-                        "ready_seamless" -> Text("Downloaded · installs silently via Shizuku", style = textStyle)
-                        "ready" -> Text("Downloaded · tap Install", style = textStyle)
-                        "seamless" -> Text("Installs silently via Shizuku, no prompts", style = textStyle)
-                        else -> Text(deltaLabel, style = textStyle)
-                    }
-                }
-            }
-            // Live download progress bar. Own PopVisible rather than a bare `if` --
-            // this bar arrives and leaves while the tile is already open (download
-            // starts, download finishes), which is exactly the "pops in/out on its
-            // own" case PopVisible exists for.
-            PopVisible(visible = state.updateDownloading) {
-                // A taller, fully-rounded bar in its own tonal track, with the live percent
-                // riding alongside it -- the plain default-height LinearProgressIndicator
-                // read as a stray system control dropped into a card that otherwise draws
-                // every other number (build, delta) as its own styled readout.
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    val p = downloadProgress
-                    // CircleShape on the Surface, not a strokeCap param on the indicator
-                    // itself -- clipping the whole track to a pill gives both ends the same
-                    // rounded read without depending on exactly which LinearProgressIndicator
-                    // overloads this BOM happens to expose a strokeCap parameter on.
-                    Surface(
-                        modifier = Modifier.weight(1f).height(8.dp),
-                        shape = CircleShape,
-                        color = scheme.onSurface.copy(alpha = 0.12f),
-                    ) {
-                        if (p != null) {
-                            LinearProgressIndicator(progress = { p }, modifier = Modifier.fillMaxSize(), trackColor = Color.Transparent)
-                        } else {
-                            LinearProgressIndicator(modifier = Modifier.fillMaxSize(), trackColor = Color.Transparent)
-                        }
-                    }
-                    if (p != null) {
-                        com.bloo.uicommon.AnimatedValue(
-                            "${(p * 100).roundToInt()}%",
-                            // color resolved explicitly -- see the textStyle comment
-                            // above for why an unspecified color here rendered this
-                            // percent invisible against the pebble's dark background
-                            // instead of inheriting the card's own content colour the
-                            // way a plain Text() would have.
-                            // fontFeatureSettings = "tnum" enables tabular figures (fixed-width
-                            // digits) so only the changing digit animates up without the entire
-                            // number shifting left/right -- prevents the seizure-inducing effect.
-                            style = MaterialTheme.typography.labelMedium.copy(
-                                fontWeight = FontWeight.Bold,
-                                color = LocalContentColor.current,
-                                fontFeatureSettings = "tnum",
-                            ),
-                            reduceMotion = LocalReduceMotion.current,
-                        )
-                    }
-                }
-            }
+        UpdateStatusLine(deltaLabel, seamless, state, vm)
             // Release notes ("What's new"), capped, with a "Full notes" link to the
             // release page when there's more than we show.
             PopVisible(visible = info.run.releaseNotes != null) {
@@ -7355,6 +7248,52 @@ internal fun UpdateAvailableTile(state: UiState, vm: AppViewModel, dragHandle: M
                     }
                 }
             }
+            // A body-level action for the two moments the header button alone can
+            // be missed -- the idle "Download" state (the header just says
+            // "Update") and the ready "Install" state. Same state logic as the
+            // header action, spelled out here so the body reads as one complete
+            // flow whether or not the pill is spotted.
+            if (!state.updateDownloading && !state.updateInstalling) {
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    MorphButton(
+                        onClick = {
+                            when {
+                                state.updateApkReady -> vm.installDownloadedUpdate()
+                                hasDirectDownload -> vm.downloadUpdateInBackground()
+                                else -> {
+                                    val opened = runCatching {
+                                        context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(info.run.htmlUrl)))
+                                    }.isSuccess
+                                    if (opened) vm.dismissUpdate() else vm.reportError("Couldn't open the release page.")
+                                }
+                            }
+                        },
+                        active = state.updateApkReady,
+                        activeContainerColor = ChargeGreen,
+                        activeContentColor = Color.White,
+                        modifier = Modifier.weight(1f),
+                    ) {
+                        Icon(
+                            if (state.updateApkReady) Icons.Filled.CheckCircle else Icons.Filled.Download,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp),
+                        )
+                        Spacer(Modifier.width(8.dp))
+                        Text(
+                            when {
+                                state.updateApkReady -> if (seamless) "Install now" else "Install"
+                                hasDirectDownload -> "Download now"
+                                else -> "Open release page"
+                            },
+                            fontWeight = FontWeight.SemiBold,
+                        )
+                    }
+                    if (state.updatePendingDismiss) {
+                        MorphTextButton("Keep it", onClick = vm::undoDismissUpdate)
+                    }
+                }
+                Spacer(Modifier.height(4.dp))
+            }
             // Dismiss / undo / remind — hierarchy: during the undo window "Keep it" is
             // the recoverable emphasis; otherwise "Remind me" (deferral) is emphasized
             // over the plainer "Not now".
@@ -7393,6 +7332,145 @@ internal fun UpdateAvailableTile(state: UiState, vm: AppViewModel, dragHandle: M
 /** The tonal primary→tertiary→secondary gradient used as the fallback fill
  *  behind car photos across the garage/settings surfaces. Callers apply their
  *  own `.alpha(...)` where they want it dimmed -- this returns only the brush. */
+/**
+ * The live status half of the update flow: the tonal icon badge, the
+ * animated one-line status ("Downloading 46%", "Downloaded · tap Install",
+ * "Installing silently via Shizuku…") and the download progress bar.
+ *
+ * Shared by the update pebble's body and the Settings Updates card, so the
+ * two can never drift apart -- this is the same state machine rendered the
+ * same way in both places, exactly the "one implementation" rule the
+ * Settings card's remake is about.
+ *
+ * [deltaLabel] ("build 812 → 828") is what the idle state says; [seamless]
+ * selects the Shizuku phrasing and the "installs silently" hint.
+ */
+@Composable
+internal fun UpdateStatusLine(
+    deltaLabel: String,
+    seamless: Boolean,
+    state: UiState,
+    vm: AppViewModel,
+) {
+    val scheme = MaterialTheme.colorScheme
+    val downloadProgress by vm.updateDownloadProgress.collectAsState()
+    // ONE state-driven status line -- see the tile's own long comment (git
+    // history) on why statusKind, not the rendered string, drives the
+    // AnimatedContent: the static word must stay put while the percent moves.
+    val (statusIcon, statusKind, statusTint) = when {
+        state.updateInstalling -> Triple(Icons.Filled.SystemUpdate, "installing", scheme.onSurfaceVariant)
+        state.updateDownloading -> Triple(Icons.Filled.Download, "downloading", scheme.onSurfaceVariant)
+        state.updateApkReady && seamless -> Triple(Icons.Filled.CheckCircle, "ready_seamless", ChargeGreen)
+        state.updateApkReady -> Triple(Icons.Filled.CheckCircle, "ready", ChargeGreen)
+        seamless -> Triple(Icons.Filled.Bolt, "seamless", scheme.onSurfaceVariant)
+        else -> Triple(Icons.Filled.SystemUpdate, "update", scheme.primary)
+    }
+    // Sprung, not a snap -- the tint is what carries "this got a step further along"
+    // (neutral -> ChargeGreen once the APK is ready), so it gets the same treatment
+    // the charge bar's own fill-colour spring does rather than cutting on one frame.
+    val animatedStatusTint by androidx.compose.animation.animateColorAsState(
+        targetValue = statusTint,
+        animationSpec = spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessLow),
+        label = "updateStatusTint",
+    )
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+        // A tonal badge behind the icon, not a bare glyph -- the same "icon gets its
+        // own coloured circle" weight CoverHero gives every stat it leads with.
+        Box(
+            Modifier
+                .size(36.dp)
+                .clip(CircleShape)
+                .background(animatedStatusTint.copy(alpha = 0.15f)),
+            contentAlignment = Alignment.Center,
+        ) {
+            // AnimatedContent, not a bare Icon swap -- installing -> downloading ->
+            // ready is a real sequence of distinct states, and a plain `when` cut
+            // between their icons on one frame while everything else on this card is
+            // now springing and cascading into place.
+            AnimatedContent(
+                targetState = statusIcon,
+                transitionSpec = { (fadeIn() + scaleIn(initialScale = 0.6f)) togetherWith (fadeOut() + scaleOut(targetScale = 0.6f)) },
+                label = "updateStatusIcon",
+            ) { icon ->
+                Icon(icon, contentDescription = null, tint = animatedStatusTint, modifier = Modifier.size(20.dp))
+            }
+        }
+        AnimatedContent(
+            targetState = statusKind,
+            transitionSpec = {
+                (fadeIn(tween(180)) + slideInVertically { it / 3 }) togetherWith
+                    (fadeOut(tween(120)) + slideOutVertically { -it / 3 })
+            },
+            label = "updateStatusText",
+            modifier = Modifier.weight(1f),
+        ) { kind ->
+            // color resolved explicitly, not left Color.Unspecified -- the
+            // "Downloading X%" AnimatedValue below renders through BasicText,
+            // which (unlike Text) does NOT fall back to LocalContentColor for
+            // an unspecified color; it fell back to Android's own paint
+            // default (black) instead.
+            val textStyle = MaterialTheme.typography.titleMedium.copy(
+                fontWeight = FontWeight.Bold,
+                color = LocalContentColor.current,
+            )
+            when (kind) {
+                "installing" -> Text("Installing silently via Shizuku…", style = textStyle)
+                "downloading" -> Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("Downloading", style = textStyle)
+                    downloadProgress?.let { p ->
+                        Text(" ", style = textStyle)
+                        // Its own AnimatedValue, not part of this AnimatedContent's own
+                        // string -- this is the one piece of the line that legitimately
+                        // changes every tick, so it's the only piece that should move.
+                        // fontFeatureSettings = "tnum" enables tabular figures so only
+                        // the changing digit animates up without the whole number
+                        // shifting left/right.
+                        com.bloo.uicommon.AnimatedValue(
+                            "${(p * 100).roundToInt()}%",
+                            style = textStyle.copy(fontFeatureSettings = "tnum"),
+                            reduceMotion = LocalReduceMotion.current,
+                        )
+                    } ?: Text("…", style = textStyle)
+                }
+                "ready_seamless" -> Text("Downloaded · installs silently via Shizuku", style = textStyle)
+                "ready" -> Text("Downloaded · tap Install", style = textStyle)
+                "seamless" -> Text("Installs silently via Shizuku, no prompts", style = textStyle)
+                else -> Text(deltaLabel, style = textStyle)
+            }
+        }
+    }
+    // Live download progress bar. Own PopVisible rather than a bare `if` --
+    // this bar arrives and leaves while the card is already open (download
+    // starts, download finishes).
+    PopVisible(visible = state.updateDownloading) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            val p = downloadProgress
+            Surface(
+                modifier = Modifier.weight(1f).height(8.dp),
+                shape = CircleShape,
+                color = scheme.onSurface.copy(alpha = 0.12f),
+            ) {
+                if (p != null) {
+                    LinearProgressIndicator(progress = { p }, modifier = Modifier.fillMaxSize(), trackColor = Color.Transparent)
+                } else {
+                    LinearProgressIndicator(modifier = Modifier.fillMaxSize(), trackColor = Color.Transparent)
+                }
+            }
+            if (p != null) {
+                com.bloo.uicommon.AnimatedValue(
+                    "${(p * 100).roundToInt()}%",
+                    style = MaterialTheme.typography.labelMedium.copy(
+                        fontWeight = FontWeight.Bold,
+                        color = LocalContentColor.current,
+                        fontFeatureSettings = "tnum",
+                    ),
+                    reduceMotion = LocalReduceMotion.current,
+                )
+            }
+        }
+    }
+}
+
 private fun carTonalBrush(scheme: ColorScheme): Brush =
     Brush.linearGradient(listOf(scheme.primary, scheme.tertiary, scheme.secondary))
 
@@ -8386,7 +8464,12 @@ private val CompactKnownTiles = setOf(
     // controls now live in CoverMainTile's permanent action bar, on the page
     // the cover opens on -- so a separate page for them would be a second,
     // emptier copy of something already on screen.
-    "climate", "charge", "location", "weather", "trips", "info", "diagnostics", "ai"
+    // "update" IS here: the update-available card is a first-class pebble on
+    // every phone page, and it silently vanished from the cover (reported).
+    // Rendered through the same SinglePebble routing as every other tile, so
+    // the Install/Remind-me/Not-now card works on the flip screen exactly as
+    // it does unfolded.
+    "climate", "charge", "location", "weather", "trips", "info", "diagnostics", "ai", "update"
 )
 
 /**

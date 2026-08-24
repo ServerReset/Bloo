@@ -88,6 +88,9 @@ import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.filled.Download
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material.icons.filled.Pin
 import androidx.compose.material.icons.filled.LockReset
 import androidx.compose.material.icons.filled.ArrowBack
@@ -394,7 +397,7 @@ private class LocalSettingsPillState(
  * undocked.
  */
 @Composable
-private fun SettingsHeaderRow(state: UiState) {
+private fun SettingsHeaderRow(state: UiState, compact: Boolean = false) {
     val titleFlight = LocalHeroTitleFlight.current
     // Same fix as HeroHeader's own identical block (Screens.kt) -- force a
     // fresh report the instant the ambient flight identity changes (this
@@ -423,33 +426,80 @@ private fun SettingsHeaderRow(state: UiState) {
         lastCorrectedFlight = titleFlight
     }
     Column(Modifier.fillMaxWidth().padding(horizontal = 4.dp)) {
-        Text(
-            "Settings",
-            style = MaterialTheme.typography.headlineSmall,
-            fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.onSurface,
-            modifier = if (titleFlight != null) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            // Tonal icon badge, the same visual language every SettingsCard
+            // header uses -- the page top previously stood bare next to cards
+            // that all carry this badge, reading as a leftover plain heading.
+            Box(
                 Modifier
-                    .onGloballyPositioned {
-                        lastCoords.value = it
-                        titleFlight.onPositioned(it.positionInRoot())
-                    }
-                    .alpha(0f)
-                    // Position anchor only -- see TitleFlightOverlay's matching
-                    // measuring-copy comment (Screens.kt) for why this can't stay
-                    // in the accessibility tree.
-                    .clearAndSetSemantics {}
-            } else {
-                Modifier
-            },
-        )
-        val carCount = state.vehicles.size
-        val modeLabel = if (state.settingsMode == "advanced") "Advanced" else "Simple"
-        Text(
-            "$carCount car${if (carCount == 1) "" else "s"} · $modeLabel mode",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
+                    .size(if (compact) 36.dp else 46.dp)
+                    .clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.85f)),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    Icons.Filled.Settings,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                )
+            }
+            Column {
+            Text(
+                "Settings",
+                style = if (compact) MaterialTheme.typography.titleLarge else MaterialTheme.typography.headlineSmall,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface,
+                modifier = if (titleFlight != null) {
+                    Modifier
+                        .onGloballyPositioned {
+                            lastCoords.value = it
+                            titleFlight.onPositioned(it.positionInRoot())
+                        }
+                        .alpha(0f)
+                        // Position anchor only -- see TitleFlightOverlay's matching
+                        // measuring-copy comment (Screens.kt) for why this can't stay
+                        // in the accessibility tree.
+                        .clearAndSetSemantics {}
+                } else {
+                    Modifier
+                },
+            )
+            val carCount = state.vehicles.size
+            val modeLabel = if (state.settingsMode == "advanced") "Advanced" else "Simple"
+            Text(
+                "$carCount car${if (carCount == 1) "" else "s"} · $modeLabel mode",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            }
+            // Simple/Advanced lives in the header now (it was a bare row of
+            // segmented options further down, easily lost) -- a small tonal
+            // chip carrying the current mode, standard surface treatment.
+            Spacer(Modifier.weight(1f))
+            Surface(
+                shape = RoundedCornerShape(50),
+                color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.75f),
+                contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                modifier = Modifier.padding(top = 6.dp),
+            ) {
+                Row(
+                    Modifier.padding(horizontal = 12.dp, vertical = 5.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
+                    Icon(
+                        Icons.Filled.Tune,
+                        contentDescription = null,
+                        modifier = Modifier.size(14.dp),
+                    )
+                    Text(
+                        if (state.settingsMode == "advanced") "Advanced" else "Simple",
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                }
+            }
+        }
     }
 }
 
@@ -481,6 +531,11 @@ internal fun SettingsScreen(
     // parameter's own doc (Screens.kt) for why this local badge needs the
     // identical "N / M" label the shared hoisted badge shows.
     pageLabel: String? = null,
+    /** True on the flip cover, where every dimension is precious: tighter
+     *  gutters, a slimmer header, closer card spacing. The grid still
+     *  scrolls exactly as it does on the phone -- compactness here is
+     *  density, not reachability. */
+    compact: Boolean = false,
 ) {
     val appearance = LocalAppearance.current
     val notif by vm.notifications.collectAsState()
@@ -522,6 +577,35 @@ internal fun SettingsScreen(
   // behaviour underneath (GarageScreen's own handling, or the app backgrounding)
   // is what should run instead.
   if (!embedded) BackHandler { vm.closeSettings() }
+  if (embedded) {
+      // The Settings pager page is the LAST page -- there is no car page
+      // left of it for system-back to land on, so a single back press would
+      // slam the whole app shut. Double-back instead: the first press arms
+      // a two-second window and says so, the second press inside it really
+      // closes. Kept to the pager page only -- the standalone Settings
+      // screen's back returns to the garage (above).
+      var backArmed by remember { mutableStateOf(false) }
+      LaunchedEffect(backArmed) {
+          if (backArmed) {
+              delay(2000)
+              backArmed = false
+          }
+      }
+      BackHandler {
+          if (backArmed) {
+              haptics?.heavy()
+              (context as? android.app.Activity)?.finish()
+          } else {
+              haptics?.tick()
+              backArmed = true
+              android.widget.Toast.makeText(
+                  context,
+                  "Press back one more time to close",
+                  android.widget.Toast.LENGTH_SHORT,
+              ).show()
+          }
+      }
+  }
   // Built UNCONDITIONALLY now -- mirrors VehicleDetailContent's identical
   // `local` exactly, including why: this slot needs a live, continuously
   // up-to-date flight of its OWN even before (or without ever) becoming the
@@ -573,8 +657,8 @@ internal fun SettingsScreen(
             modifier = Modifier
                 .widthIn(max = 1100.dp)
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp),
-            verticalItemSpacing = 12.dp,
+                .padding(horizontal = if (compact) 10.dp else 16.dp),
+            verticalItemSpacing = if (compact) 8.dp else 12.dp,
             horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             // Content scrolls behind the status bar; clear the floating back-arrow/
@@ -582,13 +666,13 @@ internal fun SettingsScreen(
             // spacer, not a card, so it needs the full row rather than being squeezed
             // into one column.
             item(span = StaggeredGridItemSpan.FullLine) {
-                Spacer(Modifier.height(topInset + 56.dp))
+                Spacer(Modifier.height(topInset + (if (compact) 42.dp else 56.dp)))
             }
             // Settings' own in-content header -- same visual weight a car page's own
             // CarHeaderRow has, so this reads as another page in the pager instead of
             // a differently-designed screen bolted on.
             item(span = StaggeredGridItemSpan.FullLine) {
-                SettingsHeaderRow(state)
+                SettingsHeaderRow(state, compact)
             }
             run {
                 val advanced = state.settingsMode == "advanced"
@@ -1872,6 +1956,121 @@ internal fun SettingsScreen(
                         vm.setSeamlessInstallShizuku(it)
                     }
                 }
+                // --- The full download -> install flow, right here in the card ---
+                // The old card stopped at "Check": it could tell you an update existed
+                // and then point at GitHub. Now the card drives the same state machine
+                // the update pebble does -- download, progress, install -- rendered
+                // through the shared UpdateStatusLine so neither surface can drift.
+                val updateInfo = state.updateAvailable
+                if (updateInfo != null && !state.updateTileDismissed) {
+                    Spacer(Modifier.height(14.dp))
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Text(
+                            "Update available",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            modifier = Modifier.weight(1f),
+                        )
+                        UpdateStatusChip(state)
+                    }
+                    val newLabel = com.bloo.bluelink.data.buildLabel(updateInfo.run.runNumber)
+                    val deltaLabel = if (vm.currentBuildNumber > 0) {
+                        "${com.bloo.bluelink.data.buildLabel(vm.currentBuildNumber)} → $newLabel"
+                    } else newLabel
+                    val seamless = appearance.seamlessInstallShizuku && state.shizukuAvailable
+                    Spacer(Modifier.height(6.dp))
+                    UpdateStatusLine(deltaLabel, seamless, state, vm)
+                    Spacer(Modifier.height(12.dp))
+                    MorphButton(
+                        onClick = {
+                            when {
+                                state.updateApkReady -> vm.installDownloadedUpdate()
+                                updateInfo.run.phoneApkUrl != null -> vm.downloadUpdateInBackground()
+                                else -> {
+                                    val opened = runCatching {
+                                        context.startActivity(
+                                            Intent(Intent.ACTION_VIEW, Uri.parse(updateInfo.run.htmlUrl))
+                                                .apply { addFlags(Intent.FLAG_ACTIVITY_NEW_TASK) },
+                                        )
+                                    }.isSuccess
+                                    if (opened) vm.dismissUpdate() else vm.reportError("Couldn't open the release page.")
+                                }
+                            }
+                        },
+                        active = state.updateApkReady,
+                        activeContainerColor = com.bloo.bluelink.ui.ChargeGreen,
+                        activeContentColor = Color.White,
+                        enabled = !state.updateInstalling && !state.updateDownloading,
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Icon(
+                            when {
+                                state.updateApkReady -> Icons.Filled.CheckCircle
+                                state.updateDownloading -> Icons.Filled.Download
+                                else -> Icons.Filled.SystemUpdate
+                            },
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp),
+                        )
+                        Spacer(Modifier.width(8.dp))
+                        Text(
+                            when {
+                                state.updateInstalling -> "Installing…"
+                                state.updateApkReady -> if (seamless) "Install now" else "Install"
+                                updateInfo.run.phoneApkUrl != null -> "Download"
+                                else -> "Open release page"
+                            },
+                            fontWeight = FontWeight.SemiBold,
+                        )
+                    }
+                    val notes = updateInfo.run.releaseNotes
+                    if (notes != null) {
+                        Spacer(Modifier.height(10.dp))
+                        Surface(
+                            shape = RoundedCornerShape(12.dp),
+                            color = MaterialTheme.colorScheme.surfaceContainerHighest,
+                            contentColor = MaterialTheme.colorScheme.onSurface,
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
+                            Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Text(
+                                        "What's new",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        modifier = Modifier.weight(1f),
+                                    )
+                                    MorphTextButton("Full notes", onClick = {
+                                        runCatching {
+                                            context.startActivity(
+                                                Intent(Intent.ACTION_VIEW, Uri.parse(updateInfo.run.htmlUrl))
+                                                    .apply { addFlags(Intent.FLAG_ACTIVITY_NEW_TASK) },
+                                            )
+                                        }
+                                    })
+                                }
+                                Text(
+                                    notes.trim(),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    maxLines = 3,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+                            }
+                        }
+                    }
+                    Spacer(Modifier.height(8.dp))
+                    Row(Modifier.fillMaxWidth()) {
+                        Spacer(Modifier.weight(1f))
+                        MorphTextButton(
+                            "Not now",
+                            onClick = vm::dismissUpdate,
+                            enabled = !state.updateDownloading && !state.updateInstalling,
+                        )
+                    }
+                }
             }
             }
             item {
@@ -3064,6 +3263,10 @@ internal fun SearchLayer(
     notif: SettingsStore.NotificationPrefs,
     onSettings: Boolean,
     compact: Boolean,
+    /** Reports whether the search UI is open (pill/panel showing) -- the
+     *  ambient blurred aurora behind it pauses while this is true, so the
+     *  keyboard/typing frames don't contend with a full-screen blur redraw. */
+    onOpenChanged: ((Boolean) -> Unit)? = null,
 ) {
     var query by rememberSaveable { mutableStateOf("") }
     var submitted by rememberSaveable { mutableStateOf("") }
@@ -3090,6 +3293,9 @@ internal fun SearchLayer(
     val haptics = LocalHaptics.current
 
     BackHandler(enabled = open) { query = ""; focused = false }
+    // Say when the open-state flips, so the aurora behind this layer can
+    // pause while the panel is up (see AuroraBackground's `paused`).
+    SideEffect { onOpenChanged?.invoke(open) }
     // A click when it opens, a tick when it closes -- the same asymmetry
     // PebbleShell's own header tap uses (expand is the weightier confirm; collapse
     // is the lighter step), so search reads as one more instance of the app's
@@ -3115,15 +3321,30 @@ internal fun SearchLayer(
         if (query.isBlank()) { vm.clearAiReply(); submitted = "" }
     }
 
+    // IME tracking, hoisted OUT of the BoxWithConstraints lambda below (the
+    // box's scope re-runs on every relevant state change, and the old
+    // in-lambda `WindowInsets.ime.asPaddingValues()` attached a fresh
+    // insets LISTENER on every one of those re-runs -- each keystroke
+    // added one more listener, so a typing session accumulated N listeners
+    // and every IME frame recomposed the whole panel against all of them.
+    // That accumulation is what read as "the search screen stutters more
+    // the longer you type". One snapshotFlow collector in SearchLayer's own
+    // scope replaces the whole dance: a single State, a single listener,
+    // and the panel only re-measures when the keyboard actually crosses
+    // the open/closed threshold.
     BoxWithConstraints(Modifier.fillMaxSize()) {
-        val bottomInset = WindowInsets.navigationBars.union(WindowInsets.ime)
-            .asPaddingValues().calculateBottomPadding()
         // With the keyboard up, the panel and the bar together are competing
         // for the sliver of screen that is left -- on a phone that is a couple
         // of hundred dp, not the 360 the panel would otherwise take. Measure
         // what is actually free rather than guessing: the panel gets what
         // remains above the bar, minus a margin so it never looks wedged.
+        // (The heavy cost that used to make this read as "laggy while typing"
+        // -- the blurred aurora redrawing underneath every IME frame -- is
+        // handled at the source: AuroraBackground's `paused`, which the root
+        // drives from this layer's `onOpenChanged`.)
         val keyboardUp = WindowInsets.ime.asPaddingValues().calculateBottomPadding() > 80.dp
+        val bottomInset = WindowInsets.navigationBars.union(WindowInsets.ime)
+            .asPaddingValues().calculateBottomPadding()
         val edge = if (compact) 8.dp else 16.dp
         // On the cover, a camera band beside the island (see coverCutoutBand)
         // is real, unoccluded space with nothing else fixed in it once the
@@ -4842,6 +5063,17 @@ private fun UpdateStatusChip(state: UiState) {
 @Composable
 internal fun SettingsCard(title: String, icon: ImageVector? = null, vm: AppViewModel, content: @Composable () -> Unit) {
     var expanded by rememberSaveable(title) { mutableStateOf(true) }
+    // A soft lift while the card is OPEN: the expanded card scales up ~1.5%
+    // and settles back -- the same "the thing that changed just came
+    // forward" language the pebble cards' own open bounce already speaks,
+    // so an expansion reads as the card arriving rather than the neighbours
+    // merely moving out of its way. Pure draw-phase (graphicsLayer), so it
+    // never re-measures the grid.
+    val lift by animateFloatAsState(
+        targetValue = if (expanded) 1f else 0f,
+        animationSpec = spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessLow),
+        label = "settingsCardLift",
+    )
     // heading() on the outer wrapper, not inside PebbleShell's own header Text -- PebbleShell
     // doesn't expose a hook into its title's own Modifier, so this is applied one level up
     // instead. PebbleShell's header row is already ONE merged TalkBack stop (tap-to-toggle),
@@ -4860,6 +5092,11 @@ internal fun SettingsCard(title: String, icon: ImageVector? = null, vm: AppViewM
             // the cards, then it snaps". Living on this wrapper instead means the gap sits
             // INSIDE that same outer AnimatedVisibility and shrinks away with the card.
             .padding(bottom = SettingsCardGap)
+            .graphicsLayer {
+                val s = 1f + 0.015f * lift
+                scaleX = s
+                scaleY = s
+            }
             .semantics { heading() },
     ) {
         PebbleShell(
@@ -4903,44 +5140,30 @@ private fun SecretRow(label: String, value: String) {
 
 @Composable
 private fun ChoiceRow(label: String, selected: Boolean, onSelect: () -> Unit) {
-    val haptics = LocalHaptics.current
-    val interaction = remember { MutableInteractionSource() }
-    val pressed by interaction.collectIsPressedAsState()
-    val corner by animateDpAsState(
-        targetValue = if (selected || pressed) 14.dp else 24.dp,
-        animationSpec = spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessMedium),
-        label = "choiceCorner",
-    )
-    val bg by androidx.compose.animation.animateColorAsState(
-        if (selected) MaterialTheme.colorScheme.primaryContainer else buttonContainer(),
-        animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
-        label = "choiceBg",
-    )
-    val fg = if (selected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface
-    Surface(
-        onClick = { haptics?.click(); onSelect() },
-        shape = RoundedCornerShape(corner),
-        color = bg,
-        contentColor = fg,
-        interactionSource = interaction,
+    // The same MorphButton every selectable option uses: pill at rest,
+    // primaryContainer rounded square once chosen, pressed-state included.
+    MorphButton(
+        onClick = { onSelect() },
+        active = selected,
+        containerColor = buttonContainer(),
+        contentColor = MaterialTheme.colorScheme.onSurface,
+        activeContainerColor = MaterialTheme.colorScheme.primaryContainer,
+        activeContentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
+        minHeight = 0.dp,
         modifier = Modifier.fillMaxWidth(),
     ) {
-        Row(
-            Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
-            verticalAlignment = Alignment.CenterVertically,
+        Text(label, Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge)
+        AnimatedVisibility(
+            visible = selected,
+            enter = scaleIn(spring(dampingRatio = Spring.DampingRatioMediumBouncy)) + fadeIn(),
+            exit = scaleOut() + fadeOut(),
         ) {
-            Text(label, Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge)
-            AnimatedVisibility(
-                visible = selected,
-                enter = scaleIn(spring(dampingRatio = Spring.DampingRatioMediumBouncy)) + fadeIn(),
-                exit = scaleOut() + fadeOut(),
-            ) {
-                Icon(
-                    Icons.Filled.Check,
-                    contentDescription = null,
-                    modifier = Modifier.size(18.dp),
-                )
-            }
+            Icon(
+                Icons.Filled.Check,
+                contentDescription = null,
+                modifier = Modifier.size(18.dp),
+            )
         }
     }
 }
@@ -4980,7 +5203,12 @@ internal fun PinDialogs(
     }
 
     // current-PIN gate -> (new PIN entry | remove confirm)
-    var stage by remember(mode) { mutableStateOf("current") }
+    // A fresh setup (no PIN installed yet) has no "current PIN" to prove --
+    // jump straight to choosing the new one. Change and Remove always gate
+    // on knowing the existing PIN first.
+    var stage by remember(mode) {
+        mutableStateOf(if (mode == "set" && !state.appPinSet) "finish" else "current")
+    }
     var currentPin by remember { mutableStateOf("") }
     var rejected by remember { mutableStateOf(false) }
     // Baselines, so the effects below react to CHANGES only -- the initial

@@ -195,6 +195,7 @@ class SettingsStore(private val context: Context) {
         val VIBRANCY = stringPreferencesKey("vibrancy")
         val HAPTICS = stringPreferencesKey("haptics_enabled")
         val PEBBLE_OUTLINE = stringPreferencesKey("pebble_outline")
+        val COVER_SETTINGS_HINT = stringPreferencesKey("cover_settings_hint_dismissed")
         val SHOW_SEARCH = stringPreferencesKey("show_search")
         val SEAMLESS_INSTALL_SHIZUKU = stringPreferencesKey("seamless_install_shizuku")
         val SETTINGS_AS_PAGE = stringPreferencesKey("settings_as_page")
@@ -282,6 +283,10 @@ class SettingsStore(private val context: Context) {
          *  so the screen showing the car is where it earns its place. Settings
          *  always has it regardless -- that is how you find a setting. */
         val showSearch: Boolean = true,
+        /** Whether the flip-cover "open your phone for settings" hint has been
+         *  dismissed once. Pure UI dust; roaming it to other devices is
+         *  harmless (they may just never see the hint, which is fine). */
+        val coverSettingsHintDismissed: Boolean = false,
         /** When on, this device installs downloaded updates silently via Shizuku
          *  (local ADB) instead of the tap-through system installer. Off by default;
          *  device-local capability (Shizuku may not be present on other devices), so
@@ -351,6 +356,7 @@ class SettingsStore(private val context: Context) {
             watchPinLockEnabled = prefs[Keys.WATCH_PIN_ENABLED]?.toBooleanStrictOrNull() ?: false,
             watchPinLockTiming = prefs[Keys.WATCH_PIN_TIMING] ?: "immediate",
             pebbleOutline = prefs[Keys.PEBBLE_OUTLINE]?.toBooleanStrictOrNull() ?: false,
+            coverSettingsHintDismissed = prefs[Keys.COVER_SETTINGS_HINT]?.toBooleanStrictOrNull() ?: false,
             showSearch = prefs[Keys.SHOW_SEARCH]?.toBooleanStrictOrNull() ?: true,
             seamlessInstallShizuku = prefs[Keys.SEAMLESS_INSTALL_SHIZUKU]?.toBooleanStrictOrNull() ?: false,
             settingsAsPage = prefs[Keys.SETTINGS_AS_PAGE]?.toBooleanStrictOrNull() ?: false,
@@ -369,6 +375,10 @@ class SettingsStore(private val context: Context) {
 
     suspend fun setHapticsEnabled(value: Boolean) {
         editTracked { it[Keys.HAPTICS] = value.toString() }
+    }
+
+    suspend fun setCoverSettingsHintDismissed(value: Boolean) {
+        editTracked { it[Keys.COVER_SETTINGS_HINT] = value.toString() }
     }
 
     suspend fun setPebbleOutline(value: Boolean) {

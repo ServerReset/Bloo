@@ -1285,6 +1285,11 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch { settingsStore.setBiometricLock(enabled) }
     }
 
+    /** Flip-cover "open your phone for settings" hint dismissal (persists). */
+    fun setCoverSettingsHintDismissed(value: Boolean) {
+        viewModelScope.launch { settingsStore.setCoverSettingsHintDismissed(value) }
+    }
+
     // --- App PIN (device unlock PIN) -------------------------------------
 
     /** Whether a PIN record currently exists in the credential store. */
