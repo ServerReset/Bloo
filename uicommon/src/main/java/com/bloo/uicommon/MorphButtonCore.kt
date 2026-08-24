@@ -15,7 +15,9 @@ import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -122,6 +124,71 @@ fun MorphButtonCore(
     content: @Composable RowScope.() -> Unit,
 ) {
     val pressed by interactionSource.collectIsPressedAsState()
+    val resolvedContent = if (active) activeContentColor else contentColor
+    val disabledContent = disabledContentColor ?: resolvedContent.copy(alpha = 0.38f)
+
+    // The split: the clickable ANIMATED half lives in `MorphChrome` (child
+    // scope -- it recomposes every morph frame), the CONTENT is a stable
+    // sibling that never recomposes for the animation. Previously all three
+    // animations (corner shape, background, press scale) were read in THIS
+    // scope, so every frame of any morph/active/pressed state re-ran the
+    // entire button including the icon/label Texts -- a dozen buttons on a
+    // page re-running all their labels for every frame of a single morph.
+    // Now the per-frame work is the tiny chrome Box; the Texts sit above it,
+    // composed once.
+    Box(modifier = modifier) {
+        MorphChrome(
+            pressed = pressed,
+            active = active,
+            interactionSource = interactionSource,
+            pillCornerPercent = pillCornerPercent,
+            morphedCornerPercent = morphedCornerPercent,
+            shapeForCorner = shapeForCorner,
+            activeContainerColor = activeContainerColor,
+            containerColor = containerColor,
+            disabledContainerColor = disabledContainerColor,
+            border = border,
+            morphSpring = morphSpring,
+            colorSpring = colorSpring,
+            pressScale = pressScale,
+            enabled = enabled,
+            onLongClick = onLongClick,
+            onClick = onClick,
+        )
+        // Stable content -- drawn OVER the chrome; taps reach the chrome
+        // below (nothing here consumes them).
+        Row(
+            modifier = Modifier.fillMaxSize().padding(contentPadding),
+            horizontalArrangement = Arrangement.Center,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            content()
+        }
+    }
+}
+
+/** The clickable animated half: morphing shape + clip (so the ripple exactly
+ *  tracks it), sprung background, press scale, clickable + long-click. The
+ *  ONLY composable that recomposes per animation frame. */
+@Composable
+private fun MorphChrome(
+    pressed: Boolean,
+    active: Boolean,
+    interactionSource: MutableInteractionSource,
+    pillCornerPercent: Float,
+    morphedCornerPercent: Float,
+    shapeForCorner: ((morph: Float, cornerPercent: Int) -> Shape)?,
+    activeContainerColor: Color,
+    containerColor: Color,
+    disabledContainerColor: Color?,
+    border: BorderStroke?,
+    morphSpring: SpringSpec<Float>,
+    colorSpring: FiniteAnimationSpec<Color>,
+    pressScale: Float?,
+    enabled: Boolean,
+    onLongClick: (() -> Unit)?,
+    onClick: () -> Unit,
+) {
     val morph by animateFloatAsState(
         targetValue = if (active || pressed) 1f else 0f,
         animationSpec = morphSpring,
@@ -134,44 +201,34 @@ fun MorphButtonCore(
         animationSpec = colorSpring,
         label = "morphBg",
     )
-    val resolvedContent = if (active) activeContentColor else contentColor
-    val disabledContent = disabledContentColor ?: resolvedContent.copy(alpha = 0.38f)
     val scale by animateFloatAsState(
         targetValue = if (pressed && pressScale != null) pressScale else 1f,
         animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessHigh),
         label = "morphPressScale",
     )
     val fill = disabledContainerColor ?: bg
-    val decoration = if (border != null) {
-        Modifier.background(color = fill, shape = shape).border(border, shape)
-    } else {
-        Modifier.background(color = fill, shape = shape)
-    }
-    // Note: content colour inheritance (LocalContentColor) is deliberately NOT
-    // provided here -- the platform-local is material3's, and this module is
-    // foundation-only by design. The phone/wear wrappers wrap this call in
-    // their own LocalContentColor provider, exactly the way M3 `Button` does
-    // internally, so content lambdas keep inheriting the resolved content tone.
-    Row(
-        modifier = modifier
-            .then(decoration)
+    // The BorderStroke passed in by the caller is the same mutable object in
+    // the parent scope; Modifier.border reads it here on every morph frame --
+    // cheap, and it keeps the reference semantics identical to before.
+    Box(
+        Modifier
+            .fillMaxSize()
             .graphicsLayer { scaleX = scale; scaleY = scale }
-            // Clipped to the ANIMATED shape so the ripple follows the pill;
-            // combinedClickable is the standard framework long-click surface.
             .clip(shape)
+            .then(
+                if (border != null) {
+                    Modifier.background(color = fill, shape = shape).border(border, shape)
+                } else {
+                    Modifier.background(color = fill, shape = shape)
+                },
+            )
             .combinedClickable(
                 interactionSource = interactionSource,
-                // LocalIndication = the host theme's ripple (Material on both
-                // platforms); the clip below bounds it to the animated shape.
                 indication = LocalIndication.current,
                 enabled = enabled,
                 onLongClick = onLongClick,
                 onClick = onClick,
-            )
-            .padding(contentPadding),
-        horizontalArrangement = Arrangement.Center,
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        content()
-    }
+            ),
+    )
 }
+
