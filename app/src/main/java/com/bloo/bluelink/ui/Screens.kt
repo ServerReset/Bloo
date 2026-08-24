@@ -3707,7 +3707,7 @@ internal fun GarageScreen(state: UiState, vm: AppViewModel) {
                         }
                     }
                     StatusBarScrim()
-                    if (count > 1) {
+                    if (count > 1 && !LocalReorderActive.current) {
                         PagerDotsFor(
                             pager = exPager,
                             real = { exWrap.real(it) },
@@ -4321,7 +4321,7 @@ internal fun GarageScreen(state: UiState, vm: AppViewModel) {
                     // Floating animated page indicator (no thin top bar). totalBlocks,
                     // not pageCount -- the dots include the Settings slot (one more,
                     // trailing dot) when settingsAsPage is on, same as any other page.
-                    if (totalBlocks > 1) {
+                    if (totalBlocks > 1 && !LocalReorderActive.current) {
                         PagerDotsFor(
                             pager = pager,
                             real = { realBlock(it) },
@@ -5531,7 +5531,7 @@ private fun CompactGarage(state: UiState, vm: AppViewModel, appearance: Settings
                     textAlign = TextAlign.Center,
                 )
             }
-            if (count > 1) {
+            if (count > 1 && !LocalReorderActive.current) {
                 Spacer(Modifier.height(6.dp))
                 PagerDotsFor(
                     pager = pager,
@@ -5919,7 +5919,7 @@ private fun CompactCar(
         }
         // Vertical page dots on the right edge - show which pebble tile is visible.
         // (Car-switching dots are hoisted up to CompactGarage -- see there.)
-        if (tiles.size > 1) {
+        if (tiles.size > 1 && !LocalReorderActive.current) {
             VerticalPagerDots(
                 current = current,
                 count = tiles.size,
@@ -8703,6 +8703,12 @@ private fun Modifier.animatePlacement(): Modifier = composed {
  * unrelated to dragging -- they drive a one-time entrance stagger, see
  * [coldStartIntroPlayed].
  */
+/** True while ANY [ReorderColumn] item is being dragged (the "floating
+ *  pebble" state). The page switchers (dots) read this and hide themselves
+ *  for the drag -- a floating card under the finger plus an animated dots
+ *  rail is the exact clutter the dots-tracking code warns about. */
+internal val LocalReorderActive = staticCompositionLocalOf { false }
+
 @Composable
 internal fun <T> ReorderColumn(
     items: List<T>,
@@ -8735,6 +8741,8 @@ internal fun <T> ReorderColumn(
     val onDragReleaseNow by rememberUpdatedState(onDragRelease)
     var order by remember { mutableStateOf(items) }
     var draggingKey by remember { mutableStateOf<Any?>(null) }
+    val reorderActive = draggingKey != null
+    CompositionLocalProvider(LocalReorderActive provides reorderActive) {
     var offsetY by remember { mutableFloatStateOf(0f) }
     val heights = remember { mutableStateMapOf<Any, Int>() }
     // Consumed the instant this key is first read, so navigating back to the
@@ -8883,6 +8891,7 @@ internal fun <T> ReorderColumn(
             }
         }
     }
+}
 }
 
 /**
