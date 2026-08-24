@@ -114,6 +114,7 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.VerticalPager
@@ -6584,14 +6585,20 @@ private fun HeroHeader(
         // wait primes the eye to expect a discrete change. 350ms is closer to what the
         // original 500ms-delay version's own fadeIn spec would have taken to settle,
         // just without the long wait in front of it.
-        val statusAlpha by animateFloatAsState(
-            targetValue = if (photoExpanded) 1f else 0f,
-            animationSpec = tween(
-                durationMillis = 350,
-                delayMillis = if (photoExpanded) 250 else 0,
-            ),
-            label = "heroStatusFade",
-        )
+        // ONE reveal curve for the whole expanded readout -- the travelling
+        // numbers, the status line and the fuel row all fade in AROUND THE
+        // SAME WINDOW (a single smoothstep on heroT, with a soft head start
+        // so the card's own open bounce has begun before the content lands),
+        // instead of three pieces each skipping in on their own threshold.
+        // Same clock = no "one part pops in, the rest follows later" stagger
+        // (reported: fade in gracefully, and in lockstep). Pieces that ride
+        // the card's photo (numbers/status/fuel) share this alpha; the bar
+        // itself stays persistent because it is the "what the card shows you"
+        // element, not a detail of it.
+        val statusAlpha = run {
+            val t = ((heroT - 0.15f) / 0.5f).coerceIn(0f, 1f)
+            t * t * (3f - 2f * t)
+        }
 
         // ---- The travelling numbers -------------------------------------------
         //
@@ -6948,7 +6955,9 @@ private fun HeroHeader(
                     val y = androidx.compose.ui.util.lerp(from.top, to.top, heroT)
                     val w = androidx.compose.ui.util.lerp(from.width, to.width, heroT)
                     Box(
-                        Modifier.offset { IntOffset(x.roundToInt(), y.roundToInt()) },
+                        Modifier
+                            .offset { IntOffset(x.roundToInt(), y.roundToInt()) }
+                            .graphicsLayer { alpha = statusAlpha },
                     ) {
                         CompositionLocalProvider(
                             LocalContentColor provides
@@ -8127,9 +8136,9 @@ private fun HeroMorphReadout(
         // The pump icon is here because dropping it was a second regression in my first pass
         // at this morph -- ChargeFuelBar has always drawn one, and "Fuel 40%" on its own reads
         // as another battery figure in a card that is otherwise all battery.
-        data.fuelPct?.takeIf { t > 0.5f }?.let { fuelPct ->
+        data.fuelPct?.takeIf { statusAlpha > 0.01f }?.let { fuelPct ->
             val fuelColor = MaterialTheme.colorScheme.onSurfaceVariant
-                .copy(alpha = ((t - 0.5f) * 2f).coerceIn(0f, 1f))
+                .copy(alpha = statusAlpha)
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(
                     Icons.Filled.LocalGasStation,
@@ -8531,20 +8540,31 @@ internal fun RollingNumber(
     fontWeight: FontWeight,
     color: Color = Color.Unspecified,
 ) {
-    // Track the previous numeric value so we can roll in the right direction.
-    val current = text.filter { it.isDigit() }.toIntOrNull()
+    // Split into the rolling digits and the STATIC suffix ("%"): only the
+    // digits roll up/down, the unit glyph rides with them as one unmoved
+    // companion -- rolling the whole string including the "%" read as the
+    // entire readout lifting off, which is not what a digit roll is.
+    val digits = text.takeWhile { it.isDigit() }
+    val suffix = text.drop(digits.length)
+    // Track the previous NUMERIC value so we can roll in the right direction.
+    val current = digits.toIntOrNull()
     var previous by remember { mutableStateOf(current) }
     val goingUp = (current ?: 0) >= (previous ?: 0)
     LaunchedEffect(current) { previous = current }
-    AnimatedContent(
-        targetState = text,
-        transitionSpec = {
-            val dir = if (goingUp) 1 else -1
-            (fadeIn(tween(180)) + slideInVertically { dir * it / 2 }) togetherWith
-                (fadeOut(tween(120)) + slideOutVertically { -dir * it / 2 })
-        },
-        label = "num",
-    ) { t -> WiggleText(t, style = style, fontWeight = fontWeight, color = color) }
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(0.dp), modifier = Modifier.wrapContentWidth()) {
+        AnimatedContent(
+            targetState = digits,
+            transitionSpec = {
+                val dir = if (goingUp) 1 else -1
+                (fadeIn(tween(180)) + slideInVertically { dir * it / 2 }) togetherWith
+                    (fadeOut(tween(120)) + slideOutVertically { -dir * it / 2 })
+            },
+            label = "num",
+        ) { t -> WiggleText(t, style = style, fontWeight = fontWeight, color = color) }
+        if (suffix.isNotEmpty()) {
+            WiggleText(suffix, style = style, fontWeight = fontWeight, color = color)
+        }
+    }
 }
 
 /**
@@ -9046,6 +9066,9 @@ internal interface TitleFlightSource {
      *  surface without a hero photo to collapse against (Settings, a
      *  frozen exiting snapshot, ExpandedCar). */
     val titleScale: Float
+
+    /** Optional Y-override for the inline end: see [HeroTitleFlight.inlineYOverride]. */
+    val inlineYOverride: () -> Float?
 }
 
 /**
@@ -9233,6 +9256,17 @@ internal class HeroTitleFlight(topInsetPx: Float, private val hysteresisPx: Floa
      *  [HeroHeader]'s own grow/shrink spring, the same way [color] tracks
      *  its colour morph. */
     override var titleScale by mutableFloatStateOf(1f)
+
+    /**
+     * Optional Y-override for the INLINE (not docked) end of the flight: the
+     * hero sets this to the collapsed numbers row's own centre (in the same
+     * root coordinates inlinePos reports) while the hero is collapsed, so the
+     * flying NAME lands on the numbers' line rather than the title slot's
+     * line. Null (every surface that doesn't set it) = current behaviour.
+     * Called from the overlay's deferred placement, so the value arrives at
+     * draw time with no extra recomposition.
+     */
+    override var inlineYOverride: () -> Float? = { null }
 }
 
 /** Null (the default) everywhere except inside [VehicleDetailContent]. */
@@ -9662,7 +9696,8 @@ internal fun BoxScope.TitleFlightOverlay(
                 // anchor's box-top line.
                 val anchorH = flight.inlineSize.value.height.toFloat()
                 val flyH = flyingSize.height.toFloat()
-                val inlineYc = inline.y + (anchorH - flyH) / 2f
+                val inlineYc = flight.inlineYOverride()?.let { it - flyH / 2f }
+                    ?: (inline.y + (anchorH - flyH) / 2f)
                 val targetYc = target.y + (dockedSize.value?.height ?: if (flyH > 0f) flyH.toInt() else 0) / 2f - flyH / 2f
                 // Same start-at-inline, land-at-target lerp the flying text uses,
                 // expressed as a delta from this Box's own natural (padding-only)
@@ -9739,7 +9774,8 @@ internal fun BoxScope.TitleFlightOverlay(
                 // centre line == the flying box's own centre.
                 val anchorH = flight.inlineSize.value.height.toFloat()
                 val flyH = flyingSize.height.toFloat()
-                val inlineYc = inline.y + (anchorH - flyH) / 2f
+                val inlineYc = flight.inlineYOverride()?.let { it - flyH / 2f }
+                    ?: (inline.y + (anchorH - flyH) / 2f)
                 val targetYc = target.y + (dockedSize.value?.height ?: 0) / 2f - flyH / 2f
                 IntOffset(
                     (inline.x + (target.x - inline.x) * p).roundToInt(),
