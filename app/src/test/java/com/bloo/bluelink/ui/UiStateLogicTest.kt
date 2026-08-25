@@ -7,6 +7,7 @@ import com.bloo.bluelink.data.VehiclePlatform
 import com.bloo.bluelink.data.isGen5W
 import com.bloo.bluelink.data.platformOverridable
 import com.bloo.bluelink.data.Brand
+import com.bloo.bluelink.data.WorkflowRun
 import com.bloo.bluelink.data.DEFAULT_SECTIONS
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -224,5 +225,58 @@ class UiStateLogicTest {
         assertTrue(s.isShortcutEnabled("V1", "horn"))
         assertFalse(s.isShortcutEnabled("V2", "horn"))
         assertFalse(s.isShortcutEnabled("V1", "lights"))
+    }
+    // --- isSectionAvailable: the per-section gate everything renders through ----
+
+    @Test
+    fun sectionHidden_alwaysWinsOverGates() {
+        val s = UiState(hiddenPebbles = setOf("V1:ai"))
+        assertFalse(s.isSectionAvailable(usHyundai, "ai"))
+    }
+
+    @Test
+    fun section_aiRequiresTheFeatureFlag() {
+        assertFalse(UiState(aiEnabled = false).isSectionAvailable(usHyundai, "ai"))
+        assertTrue(UiState(aiEnabled = true).isSectionAvailable(usHyundai, "ai"))
+    }
+
+    @Test
+    fun section_tripsGatedTriple() {
+        // EV + modern (ccNC) + brand with a real trips endpoint = available.
+        assertTrue(UiState().isSectionAvailable(usHyundai, "trips"))
+        // Gas car -> no trips plot.
+        assertFalse(UiState().isSectionAvailable(usKia, "trips"))
+        // Old Gen5W unit (gen 2) -> the feed doesn't exist.
+        assertFalse(UiState().isSectionAvailable(oldHyundai, "trips"))
+        // Kia Canada -> no endpoint.
+        assertFalse(UiState().isSectionAvailable(kiaCanada, "trips"))
+        // A forced GEN5W override kills it for the Hyundai too, same as the
+        // hardware truth -- these all read isGen5WEffective, not the raw gen.
+        assertFalse(
+            UiState(platforms = mapOf(usHyundai.vin to VehiclePlatform.GEN5W))
+                .isSectionAvailable(usHyundai, "trips"),
+        )
+    }
+
+    @Test
+    fun section_updateOnlyWhileAnUpdateExistsAndNotDismissed() {
+        val update = com.bloo.bluelink.update.UpdateInfo(WorkflowRun(runNumber = 900, htmlUrl = "https://example.invalid"))
+        assertFalse(UiState().isSectionAvailable(usHyundai, "update"))
+        assertTrue(UiState(updateAvailable = update).isSectionAvailable(usHyundai, "update"))
+        assertFalse(
+            UiState(updateAvailable = update, updateTileDismissed = true).isSectionAvailable(usHyundai, "update"),
+        )
+        // The dismissed flag follows the SOURCE, not just the section key, but a
+        // dismissed update on one car doesn't hide another car's section.
+    }
+
+    @Test
+    fun section_unchangedSectionsStayAvailable() {
+        for (section in DEFAULT_SECTIONS - setOf("ai", "trips", "update")) {
+            assertTrue(
+                UiState().isSectionAvailable(usHyundai, section),
+                "expected $section to be available on a fresh state",
+            )
+        }
     }
 }
