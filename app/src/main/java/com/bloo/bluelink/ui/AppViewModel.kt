@@ -3114,66 +3114,13 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     // --- Weather ---------------------------------------------------------
+    private val weather = WeatherController(getApplication(), settingsStore, _state, viewModelScope)
 
-    /** Un-set the "home" weather location: clears the saved lat/lon/label and
-     *  drops any already-fetched reading so the weather pebble hides itself. */
-    fun clearWeatherLocation() = viewModelScope.launch {
-        settingsStore.setWeatherLocation(null, null, null)
-        _state.update { it.copy(homeWeather = null) }
-    }
-
-    /** Forward-geocode a place name and save it as the weather location. */
-    fun setWeatherPlace(query: String) = viewModelScope.launch {
-        val q = query.trim()
-        if (q.isBlank()) return@launch
-        val hit = withContext(Dispatchers.IO) {
-            runCatching {
-                Geocoder(getApplication(), Locale.getDefault()).getFromLocationName(q, 1)?.firstOrNull()
-            }.getOrNull()
-        }
-        if (hit == null) {
-            _state.update { it.copy(message = "Couldn't find \"$q\"") }
-            return@launch
-        }
-        val label = listOfNotNull(hit.locality ?: hit.subAdminArea, hit.adminArea)
-            .distinct().joinToString(", ").ifBlank { q }
-        settingsStore.setWeatherLocation(hit.latitude, hit.longitude, label)
-        loadHomeWeather(force = true)
-    }
-
-    /** Use the device's last-known location as the weather location (needs permission). */
-    fun useDeviceLocationForWeather() = viewModelScope.launch {
-        val ok = withContext(Dispatchers.IO) { settingsStore.setWeatherFromDeviceLocation() }
-        if (!ok) {
-            _state.update { it.copy(message = "No device location available. Try setting a place instead") }
-            return@launch
-        }
-        loadHomeWeather(force = true)
-    }
-
-    /** Fetch weather for the configured home location. Skips if a recent reading exists. */
-    fun loadHomeWeather(force: Boolean = false) = viewModelScope.launch {
-        val appearance = settingsStore.appearance.first()
-        val lat = appearance.weatherLat
-        val lon = appearance.weatherLon
-        if (lat == null || lon == null) {
-            _state.update { it.copy(homeWeather = null) }
-            return@launch
-        }
-        val cached = _state.value.homeWeather
-        if (!force && cached != null && System.currentTimeMillis() - cached.fetchedAt < WEATHER_TTL_MS) return@launch
-        WeatherApi.fetch(lat, lon)?.let { w -> _state.update { it.copy(homeWeather = w) } }
-    }
-
-    /** Fetch weather at a car's last-known location, if any. */
-    fun loadCarWeather(v: Vehicle, force: Boolean = false) = viewModelScope.launch {
-        val loc = _state.value.locations[v.vin] ?: return@launch
-        val cached = _state.value.carWeather[v.vin]
-        if (!force && cached != null && System.currentTimeMillis() - cached.fetchedAt < WEATHER_TTL_MS) return@launch
-        WeatherApi.fetch(loc.latitude, loc.longitude)?.let { w ->
-            _state.update { it.copy(carWeather = it.carWeather + (v.vin to w)) }
-        }
-    }
+    fun clearWeatherLocation() = weather.clearWeatherLocation()
+    fun setWeatherPlace(query: String) = weather.setWeatherPlace(query)
+    fun useDeviceLocationForWeather() = weather.useDeviceLocationForWeather()
+    fun loadHomeWeather(force: Boolean = false) = weather.loadHomeWeather(force)
+    fun loadCarWeather(v: Vehicle, force: Boolean = false) = weather.loadCarWeather(v, force)
 
     /** Swap which dual-column side the "hot spot" pebble lives on. */
     fun setColumnsFlipped(flipped: Boolean) = viewModelScope.launch { settingsStore.setColumnsFlipped(flipped) }
