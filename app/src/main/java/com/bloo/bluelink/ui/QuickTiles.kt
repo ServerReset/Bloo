@@ -1,0 +1,565 @@
+@file:OptIn(
+    ExperimentalMaterial3Api::class,
+    ExperimentalMaterial3ExpressiveApi::class,
+    ExperimentalFoundationApi::class,
+    ExperimentalLayoutApi::class,
+)
+
+package com.bloo.bluelink.ui
+
+/** Quick-tiles surface: the per-car Quick Settings tile manager, its tiles and
+ *  add/label/action helpers, plus the Updates status chip. Peeled out of
+ *  SettingsWidgets.kt into its own file. */
+
+import android.app.StatusBarManager
+import android.content.Context
+import android.content.Intent
+import android.os.Build
+import android.net.Uri
+import android.widget.Toast
+import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.togetherWith
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.animation.core.snap
+import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.only
+import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.ime
+import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.union
+import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.lazy.staggeredgrid.LazyVerticalStaggeredGrid
+import androidx.compose.foundation.lazy.staggeredgrid.StaggeredGridCells
+import androidx.compose.foundation.lazy.staggeredgrid.StaggeredGridItemSpan
+import androidx.compose.foundation.lazy.staggeredgrid.rememberLazyStaggeredGridState
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.text.selection.SelectionContainer
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.filled.Download
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Tune
+import androidx.compose.material.icons.filled.Pin
+import androidx.compose.material.icons.filled.LockReset
+import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.Bolt
+import androidx.compose.material.icons.filled.FlashOn
+import androidx.compose.material.icons.filled.Build
+import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.Straighten
+import androidx.compose.material.icons.filled.TextFields
+import androidx.compose.material.icons.filled.Dashboard
+import androidx.compose.material.icons.filled.Vibration
+import androidx.compose.material.icons.filled.Palette
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.CloudOff
+import androidx.compose.material.icons.filled.CloudDone
+import androidx.compose.material.icons.filled.CloudSync
+import androidx.compose.material.icons.filled.Description
+import androidx.compose.material.icons.filled.SystemUpdate
+import androidx.compose.material.icons.filled.DirectionsCar
+import androidx.compose.material.icons.filled.OpenInNew
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Power
+import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.LockOpen
+import androidx.compose.material.icons.filled.Thermostat
+import androidx.compose.material.icons.filled.LocalGasStation
+import androidx.compose.material.icons.filled.LocationOn
+import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material.icons.filled.Map
+import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.WbSunny
+import androidx.compose.material.icons.filled.MyLocation
+import androidx.compose.material3.Button
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.onClick
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.material3.Card
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
+import androidx.compose.material3.surfaceColorAtElevation
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.blur
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.LayoutCoordinates
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInRoot
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.composed
+import androidx.compose.ui.unit.dp
+import coil.compose.AsyncImage
+import com.bloo.bluelink.data.ambientFahrenheit
+import com.bloo.bluelink.data.brand
+import com.bloo.bluelink.data.CHARGE_LIMIT_RANGE
+import com.bloo.bluelink.data.LiveCharge
+import com.bloo.bluelink.data.CLIMATE_TEMP_RANGE_F
+import com.bloo.bluelink.data.LockTiming
+import com.bloo.bluelink.data.Powertrain
+import com.bloo.bluelink.data.platformOverridable
+import com.bloo.bluelink.data.SeatConfig
+import com.bloo.bluelink.data.SettingsStore
+import com.bloo.bluelink.data.degValue
+import com.bloo.bluelink.data.TileCommandRunner
+import com.bloo.bluelink.data.Vehicle
+import com.bloo.uicommon.dropShadow
+import com.bloo.bluelink.data.VehicleStatus
+import com.bloo.bluelink.data.Weather
+import com.bloo.bluelink.data.coordString
+import com.bloo.bluelink.data.links
+import com.bloo.bluelink.data.rangeMiFor
+import com.bloo.bluelink.data.formatDistance
+import com.bloo.bluelink.data.displayChargeLimit
+import com.bloo.bluelink.data.parseOdometerMiles
+import com.bloo.bluelink.data.degLabel
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import kotlin.math.max
+import kotlin.math.roundToInt
+import com.bloo.uicommon.ReorderColumn
+import com.bloo.uicommon.LocalReorderActive
+import com.bloo.uicommon.coldStartIntroPlayed
+import com.bloo.uicommon.animatePlacement
+
+internal val TileActions = listOf(
+    Triple("doors", "Lock / unlock", Icons.Filled.Lock),
+    Triple("climate", "Climate", Icons.Filled.Thermostat),
+    Triple("charge", "Charge", Icons.Filled.Bolt),
+    Triple("open", "Open", Icons.Filled.DirectionsCar),
+)
+
+/** Label for a tile action key (falls back to the key). */
+internal fun tileActionLabel(cmd: String): String =
+    TileActions.firstOrNull { it.first == cmd }?.second ?: cmd
+
+/** Expressive per-car header: a tonal thumbnail/gradient bubble, name, and tile count. */
+@Composable
+internal fun CarTilesHeader(name: String, img: String?, assignedCount: Int, totalTiles: Int) {
+    val scheme = MaterialTheme.colorScheme
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        CarThumb(img = img, size = 44.dp, cornerRadius = 16.dp, iconSize = 22.dp)
+        Column(Modifier.weight(1f)) {
+            Text(
+                name,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Text(
+                if (assignedCount == 0) "No tiles yet" else "$assignedCount of $totalTiles tiles used",
+                style = MaterialTheme.typography.labelMedium,
+                color = scheme.onSurfaceVariant,
+            )
+            // A slim capacity bar reads the per-car tile budget at a glance,
+            // instead of just a count with no sense of how much room is left.
+            Spacer(Modifier.height(6.dp))
+            val fill by animateFloatAsState(
+                targetValue = if (totalTiles > 0) assignedCount / totalTiles.toFloat() else 0f,
+                animationSpec = spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessMediumLow),
+                label = "tileCapacityFill",
+            )
+            Box(
+                Modifier
+                    .fillMaxWidth()
+                    .height(4.dp)
+                    .clip(RoundedCornerShape(50))
+                    .background(scheme.surfaceContainerHighest),
+            ) {
+                Box(
+                    Modifier
+                        .fillMaxWidth(fill.coerceIn(0f, 1f))
+                        .fillMaxHeight()
+                        .clip(RoundedCornerShape(50))
+                        .background(scheme.primary),
+                )
+            }
+        }
+    }
+}
+
+/** Shared muted hint line for the tile manager's empty/full states. */
+@Composable
+internal fun TileEmptyHint(text: String) {
+    Surface(
+        shape = RoundedCornerShape(16.dp),
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+    ) {
+        Text(
+            text,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
+        )
+    }
+}
+
+/** Per-car Quick Settings tile manager with live previews. Each car gets its
+ *  own tonal card (mirroring CarSettingsCard's per-car container elsewhere in
+ *  Settings) so two cars' tile groups never read as one continuous list. */
+@Composable
+internal fun QuickTilesManager(state: UiState, vm: AppViewModel) {
+    if (state.vehicles.isEmpty()) {
+        Text(
+            "Add a car to set up quick tiles.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        return
+    }
+    val count = com.bloo.bluelink.data.TILE_COUNT
+    Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+        state.vehicles.forEach { car ->
+            val assigned = (0 until count).filter { state.tileConfigs.getOrNull(it)?.first == car.vin }
+            Card(
+                Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceColorAtElevation(2.dp)),
+            ) {
+                Column(Modifier.padding(12.dp)) {
+                    CarTilesHeader(
+                        name = car.name,
+                        img = state.imageUrls[car.vin],
+                        assignedCount = assigned.size,
+                        totalTiles = count,
+                    )
+                    Spacer(Modifier.height(10.dp))
+                    assigned.forEach { idx ->
+                        key(idx) { QuickTileCard(idx, car.vin, state, vm) }
+                    }
+                    val free = (0 until count).firstOrNull { state.tileConfigs.getOrNull(it) == null }
+                    when {
+                        free != null -> AddTilePill(
+                            label = if (assigned.isEmpty()) "Add a quick tile" else "Add another",
+                            onClick = { vm.setTileAssignment(free, car.vin, if (assigned.isEmpty()) "doors" else "climate") },
+                        )
+                        assigned.isEmpty() -> TileEmptyHint("All $count tiles are in use. Remove one to add another.")
+                    }
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Prompt the OS to add this configured tile straight to the Quick Settings shade.
+ * The system dialog previews [label] + the action's icon before adding, so the
+ * tile's name/properties are shown up front. On API < 33 (no add-tile API) we
+ * guide the user to add it manually instead.
+ */
+internal fun addTileToQuickSettings(context: Context, index: Int, cmd: String, label: String, unlocked: Boolean) {
+    val iconRes = com.bloo.bluelink.tiles.BlooTileService.iconResFor(cmd, unlocked)
+    val requested = com.bloo.bluelink.tiles.BlooTileService.requestAddToQuickSettings(
+        context, index, label, iconRes,
+    ) { result ->
+        val msg = when (result) {
+            StatusBarManager.TILE_ADD_REQUEST_RESULT_TILE_ADDED -> "“$label” added to Quick Settings"
+            StatusBarManager.TILE_ADD_REQUEST_RESULT_TILE_ALREADY_ADDED -> "“$label” is already in Quick Settings"
+            else -> null
+        }
+        msg?.let { Toast.makeText(context, it, Toast.LENGTH_SHORT).show() }
+    }
+    if (!requested) {
+        Toast.makeText(
+            context,
+            "Open Quick Settings, tap edit, and add “$label” from the tile list.",
+            Toast.LENGTH_LONG,
+        ).show()
+    }
+}
+
+internal fun tileSummary(cmd: String, climateTarget: String, presetName: String?): String = when (cmd) {
+    "doors" -> "Lock / unlock"
+    "climate" -> when (climateTarget) {
+        "smart" -> "Climate · Smart"
+        "default" -> "Climate · Basic"
+        else -> "Climate · ${presetName ?: "Preset"}"
+    }
+    "charge" -> "Start / stop charge"
+    "open" -> "Opens the app"
+    else -> cmd
+}
+
+/**
+ * One configured tile, built on the exact same [PebbleShell] every car pebble
+ * uses (see [UpdateAvailableTile] for the other non-car-scoped caller) instead
+ * of a bespoke static-shape split row -- its collapsed header IS the live
+ * preview (icon, name, current state), and its [PebbleHeaderAction] doubles as
+ * the actual "Add" button so the common case (configure once, add it) never
+ * needs to expand at all. Expanding is only for changing the action, custom
+ * name, what climate runs, or removing the tile.
+ */
+@Composable
+internal fun QuickTileCard(index: Int, vin: String, state: UiState, vm: AppViewModel) {
+    val context = LocalContext.current
+    val cmd = state.tileConfigs.getOrNull(index)?.second ?: "doors"
+    val customName = state.tileLabels.getOrNull(index)?.takeIf { it.isNotBlank() }
+    val presets = state.climatePresets[vin].orEmpty()
+    val target = state.tileClimateTargets.getOrNull(index) ?: "default"
+    val presetName = presets.firstOrNull { it.id == target }?.name
+    var expanded by remember { mutableStateOf(false) }
+
+    // Live car state so the preview matches what the tile will actually show.
+    val status = state.vehicles.firstOrNull { it.vin == vin }?.let { state.statusFor(it) }
+    val active = when (cmd) {
+        "doors" -> status?.doorLock == false
+        "climate" -> status?.airCtrlOn == true
+        "charge" -> status?.evStatus?.batteryCharge == true
+        else -> false
+    }
+    val liveLabel = when (cmd) {
+        "doors" -> status?.doorLock?.let { if (it) "Locked" else "Unlocked" }
+        "climate" -> if (status?.airCtrlOn == true) "On" else null
+        "charge" -> if (status?.evStatus?.batteryCharge == true) "Charging" else null
+        else -> null
+    }
+    val headerIcon = when (cmd) {
+        "doors" -> if (status?.doorLock == false) Icons.Filled.LockOpen else Icons.Filled.Lock
+        "climate" -> Icons.Filled.Thermostat
+        "charge" -> Icons.Filled.Bolt
+        else -> Icons.Filled.DirectionsCar
+    }
+    val title = if (cmd == "open") "Open" else (customName ?: tileActionLabel(cmd))
+
+    PebbleShell(
+        expanded = expanded,
+        onToggle = { expanded = !expanded },
+        icon = headerIcon,
+        title = title,
+        vm = vm,
+        summary = liveLabel ?: tileSummary(cmd, target, presetName),
+        headerAction = PebbleHeaderAction(
+            label = "Add",
+            icon = Icons.Filled.Add,
+            active = active,
+            onClick = { addTileToQuickSettings(context, index, cmd, title, unlocked = status?.doorLock == false) },
+        ),
+    ) {
+        Text("Action", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Spacer(Modifier.height(4.dp))
+        MorphSegmented(
+            options = TileActions.map { (key, label, icon) ->
+                SegmentOption(key, if (key == "doors") "Lock" else label, icon)
+            },
+            selectedKey = cmd,
+            onSelect = { key -> vm.setTileAssignment(index, vin, key) },
+        )
+
+        if (cmd != "open") {
+            Spacer(Modifier.height(10.dp))
+            var name by remember(state.tileLabels.getOrNull(index)) {
+                mutableStateOf(customName.orEmpty())
+            }
+            OutlinedTextField(
+                value = name,
+                onValueChange = { name = it; vm.setTileLabel(index, it) },
+                label = { Text("Custom name (optional)") },
+                singleLine = true,
+                shape = FieldShape,
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
+
+        if (cmd == "climate") {
+            Spacer(Modifier.height(10.dp))
+            Text("Runs", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Spacer(Modifier.height(4.dp))
+            MorphSegmented(
+                options = buildList {
+                    add(SegmentOption("default", "Basic", null))
+                    add(SegmentOption("smart", "Smart", null))
+                    presets.forEach { p -> add(SegmentOption(p.id, p.name, null)) }
+                },
+                selectedKey = target,
+                onSelect = { vm.setTileClimateTarget(index, it) },
+            )
+        }
+
+        Spacer(Modifier.height(4.dp))
+        MorphButton(
+            onClick = { vm.setTileAssignment(index, null, null) },
+            modifier = Modifier.fillMaxWidth(),
+            containerColor = MaterialTheme.colorScheme.errorContainer,
+            contentColor = MaterialTheme.colorScheme.onErrorContainer,
+            contentPadding = PaddingValues(horizontal = 18.dp, vertical = 10.dp),
+        ) {
+            Icon(Icons.Filled.Close, contentDescription = null, modifier = Modifier.size(18.dp))
+            Spacer(Modifier.width(8.dp))
+            Text("Remove tile", fontWeight = FontWeight.SemiBold)
+        }
+    }
+}
+
+/** An outlined "add" pill that morphs like the app's other buttons. */
+@Composable
+internal fun AddTilePill(label: String, onClick: () -> Unit) {
+    MorphButton(
+        onClick = onClick,
+        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+        containerColor = MaterialTheme.colorScheme.surface,
+        contentColor = MaterialTheme.colorScheme.primary,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+        contentPadding = PaddingValues(horizontal = 18.dp, vertical = 12.dp),
+    ) {
+        Icon(Icons.Filled.Add, contentDescription = null, modifier = Modifier.size(18.dp))
+        Spacer(Modifier.width(8.dp))
+        Text(label, fontWeight = FontWeight.SemiBold)
+    }
+}
+
+/**
+ * The Updates card's tonal status chip, split out of the card body so the
+ * spring-animated tint (`updateTint`) only recomposes this small Row/Icon/Text
+ * scope on every animation frame, instead of the whole card content lambda
+ * (which also hosts the RollingNumber hero stat and outer Surface/Row layout).
+ */
+@Composable
+internal fun UpdateStatusChip(state: UiState) {
+    val updateTint by androidx.compose.animation.animateColorAsState(
+        targetValue = when {
+            state.updateAvailable != null -> MaterialTheme.colorScheme.tertiary
+            else -> MaterialTheme.colorScheme.onSurfaceVariant
+        },
+        // Sprung rather than snapped -- "up to date" turning tertiary the instant
+        // a check lands is the one moment this card actually has news, and a cut
+        // read as flat next to how much of the rest of the app now springs.
+        animationSpec = spring(
+            dampingRatio = SoftDamping,
+            stiffness = androidx.compose.animation.core.Spring.StiffnessLow,
+        ),
+        label = "settingsUpdateTint",
+    )
+    Row(
+        Modifier
+            .clip(CircleShape)
+            .background(updateTint.copy(alpha = 0.15f))
+            .padding(horizontal = 12.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(Icons.Filled.SystemUpdate, contentDescription = null, tint = updateTint, modifier = Modifier.size(16.dp))
+        Spacer(Modifier.width(6.dp))
+        AnimatedContent(
+            targetState = when {
+                state.updateChecking -> "Checking…"
+                state.updateAvailable != null -> "Build ${state.updateAvailable!!.run.runNumber} ready"
+                else -> "Up to date"
+            },
+            label = "settingsUpdateChipText",
+        ) { text ->
+            Text(text, style = MaterialTheme.typography.labelMedium, color = updateTint, fontWeight = FontWeight.Bold)
+        }
+    }
+}

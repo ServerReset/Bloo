@@ -77,30 +77,6 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import java.util.Locale
 
-/** How long a cached weather reading is considered fresh (15 minutes). */
-private const val WEATHER_TTL_MS = 15 * 60 * 1000L
-
-// Debounce window for the auto-push-on-change collector: a burst of edits (e.g.
-// dragging pebbles, sliding a value) coalesces into one Drive write this long
-// after the LAST change. Short enough to feel instant, long enough not to write
-// per keystroke.
-private const val AUTO_PUSH_DEBOUNCE_MS = 2000L
-
-// How long after launch the orphaned-car-photo sweep runs. Pure housekeeping with
-// nothing waiting on it, so it yields to the garage load, the first status fetches,
-// the first Drive pass and composition rather than competing with them.
-private const val PHOTO_SWEEP_DELAY_MS = 8000L
-
-// How long the update tile lingers with an "Undo" strip after "Not now" before
-// the dismiss commits — the call-back window.
-private const val UPDATE_DISMISS_UNDO_MS = 4500L
-
-// "Remind me": both the reminder-notification worker delay and the matching
-// snooze window. Kept as one value so the two stay aligned (see snoozeUpdate).
-private const val UPDATE_REMINDER_DELAY_MS = 24L * 60 * 60 * 1000L
-/** Request code for the Shizuku runtime-permission prompt (seamless install). */
-private const val SHIZUKU_INSTALL_REQUEST_CODE = 4711
-
 
 /**
  * A pending Kia one-time-code challenge shown over the login form. [sentTo] is
@@ -119,8 +95,6 @@ data class CanadaOtpUi(
     val brand: Brand,
 )
 
-/** Minimum time a command control stays locked after firing, to block double-taps. */
-private const val MIN_COMMAND_LOCK_MS = 3000L
 
 /**
  * @Stable, and this is the parameter that would otherwise undo the work done
@@ -3459,3 +3433,4 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 }
+
