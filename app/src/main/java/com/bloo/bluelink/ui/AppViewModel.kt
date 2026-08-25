@@ -2243,7 +2243,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         val status = s.statusFor(v) ?: return
         _state.update { it.copy(aiBusy = it.aiBusy + v.vin) }
         viewModelScope.launch {
-            val result = runCatching { ai.summarize(summaryPrompt(v, status)) }
+            val result = runCatching { ai.summarize(summaryPrompt(v, status, _state.value)) }
             _state.update { st ->
                 result.fold(
                     onSuccess = { sum ->
@@ -2276,7 +2276,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         _state.update { it.copy(aiBusy = it.aiBusy + v.vin) }
         viewModelScope.launch {
             // Build the prompt for THIS car only, so the result reflects just it.
-            val prompt = summaryPrompt(v, status)
+            val prompt = summaryPrompt(v, status, _state.value)
             val result = runCatching { ai.summarize(prompt) }
             _state.update { st ->
                 result.fold(
@@ -2301,7 +2301,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         _state.update { it.copy(aiBusy = it.aiBusy + "search") }
         viewModelScope.launch {
             val data = _state.value.vehicles.joinToString("\n\n") { v ->
-                carText(v, _state.value.statusFor(v))
+                carText(v, _state.value.statusFor(v), _state.value)
             }
             val reply = runCatching {
                 ai.summarize("Answer this question using only the data below.\nQuestion: $query\n\nData:\n$data")
@@ -2380,66 +2380,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
      * charging + time-to-full, driving) and the data block describes only [v], so
      * the summary reflects exactly the car the user tapped Summarize on.
      */
-    private fun summaryPrompt(v: Vehicle, status: VehicleStatus?): String =
-        "${v.name} vehicle status:\n" + carText(v, status)
-
-    /**
-     * A compact, readable description of a single car's current state for the AI,
-     * ordered by importance (doors, charging, driving, then the rest).
-     */
-    private fun carText(v: Vehicle, status: VehicleStatus?): String {
-        val s = _state.value
-        val parts = mutableListOf<String>()
-        parts += "Vehicle: ${v.name} (${v.model})."
-        if (status == null) {
-            parts += "No live status has been fetched yet for this car."
-            return parts.joinToString(" ")
-        }
-        // Priority 1 — doors.
-        // Only when the car has actually REPORTED it. `doorLock == true` collapsed null into
-        // "unlocked", so a car that has never reported its doors had "The doors are unlocked."
-        // fed to the AI as a fact -- and the summary then tells the user their car is unlocked.
-        status.doorLock?.let { parts += "The doors are ${if (it) "locked" else "unlocked"}." }
-        // Priority 2 — charging + time to full (EV/PHEV only).
-        if (s.hasBattery(v)) {
-            if (status.evStatus?.batteryCharge == true) {
-                val mins = status.evStatus?.minutesToFull
-                parts += if (mins != null) {
-                    "It is charging, with about ${fmtTimeToFull(mins)} until fully charged."
-                } else {
-                    "It is currently charging."
-                }
-            } else {
-                parts += "It is not charging."
-            }
-        }
-        // Priority 3 — driving / parked.
-        s.drivingLabel(v)?.let { parts += "The car is currently ${it.lowercase(Locale.US)}." }
-        status.engine?.let { parts += "The engine is ${if (it) "on" else "off"}." }
-        // Remaining status, most useful first.
-        if (s.hasBattery(v)) status.evStatus?.batteryStatus?.let { parts += "The drive battery is at $it%." }
-        if (s.hasFuel(v)) status.fuelLevel?.let { parts += "Fuel is at $it%." }
-        status.rangeMiFor(s.hasBattery(v))?.let { parts += "Estimated driving range is $it miles." }
-        status.airCtrlOn?.let { parts += "Climate is ${if (it) "on" else "off"}." }
-        status.battery?.batSoc?.let { parts += "The 12V starter battery is at $it%." }
-        v.odometer?.trim()?.takeIf { it.isNotBlank() }?.let { parts += "The odometer reads $it miles." }
-        s.placeNames[v.vin]?.let { parts += "Last known location: $it." }
-        // Warnings.
-        if (status.tirePressureLamp?.hasWarning == true) parts += "There is a tire pressure warning."
-        if (status.washerFluidStatus == true) parts += "The washer fluid is low."
-        if (status.breakOilStatus == true) parts += "The brake fluid needs attention."
-        if (status.smartKeyBatteryWarning == true) parts += "The key fob battery is low."
-        return parts.joinToString(" ")
-    }
-
     /** "45 minutes" or "1 hour 5 minutes" for a charge-time-to-full readout. */
-    private fun fmtTimeToFull(minutes: Int): String {
-        if (minutes < 60) return "$minutes minutes"
-        val h = minutes / 60
-        val m = minutes % 60
-        val hStr = if (h == 1) "1 hour" else "$h hours"
-        return if (m == 0) hStr else "$hStr $m minutes"
-    }
 
     /** Toggle whether a given car+action app-icon shortcut is shown. */
     fun setShortcutEnabled(vin: String, cmd: String, enabled: Boolean) {
