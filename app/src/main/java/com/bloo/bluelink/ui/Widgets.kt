@@ -601,16 +601,19 @@ internal fun RollingNumber(
     // entire readout lifting off, which is not what a digit roll is.
     val digits = text.takeWhile { it.isDigit() }
     val suffix = text.drop(digits.length)
-    // Track the previous NUMERIC value so we can roll in the right direction.
-    val current = digits.toIntOrNull()
-    var previous by remember { mutableStateOf(current) }
-    val goingUp = (current ?: 0) >= (previous ?: 0)
-    LaunchedEffect(current) { previous = current }
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(0.dp), modifier = Modifier.wrapContentWidth()) {
         AnimatedContent(
             targetState = digits,
             transitionSpec = {
-                val dir = if (goingUp) 1 else -1
+                // Direction is derived HERE from the transition's own
+                // initialState/targetState, not from a separately-tracked
+                // "previous value" state: AnimatedContent already knows both
+                // ends of the very transition it's composing, so the derived
+                // direction can never lag the actual change (a two-step flip
+                // landing in the same frame used to compared against a
+                // previous value a LaunchedEffect wrote one frame later --
+                // rolling UP on a number that had just gone DOWN).
+                val dir = if ((targetState.toIntOrNull() ?: 0) >= (initialState.toIntOrNull() ?: 0)) 1 else -1
                 (fadeIn(tween(180)) + slideInVertically { dir * it / 2 }) togetherWith
                     (fadeOut(tween(120)) + slideOutVertically { -dir * it / 2 })
             },

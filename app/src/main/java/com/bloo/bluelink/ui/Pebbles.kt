@@ -1849,9 +1849,16 @@ internal fun SplitExpandButton(
             // 48dp touch floor would inflate the whole pebble header.
             minHeight = 0.dp,
             modifier = Modifier.fillMaxHeight().then(
-                if (action.label.isEmpty() && action.contentDescription != null) {
-                    Modifier.semantics { contentDescription = action.contentDescription!! }
-                } else Modifier,
+                run {
+                    // Local copy so the smart cast works inside the semantics
+                    // lambda (class properties are not stable for smart-cast
+                    // capture; the !! form read fine but would crash if the
+                    // guard and the call ever drifted apart).
+                    val desc = action.contentDescription
+                    if (action.label.isEmpty() && desc != null) {
+                        Modifier.semantics { contentDescription = desc }
+                    } else Modifier
+                },
             ),
         ) {
             Row(

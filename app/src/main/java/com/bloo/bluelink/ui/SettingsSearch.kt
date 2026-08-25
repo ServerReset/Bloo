@@ -333,17 +333,23 @@ internal fun SearchLayer(
         if (query.isBlank()) { vm.clearAiReply(); submitted = "" }
     }
 
-    // IME tracking, hoisted OUT of the BoxWithConstraints lambda below (the
-    // box's scope re-runs on every relevant state change, and the old
-    // in-lambda `WindowInsets.ime.asPaddingValues()` attached a fresh
-    // insets LISTENER on every one of those re-runs -- each keystroke
-    // added one more listener, so a typing session accumulated N listeners
-    // and every IME frame recomposed the whole panel against all of them.
-    // That accumulation is what read as "the search screen stutters more
-    // the longer you type". One snapshotFlow collector in SearchLayer's own
-    // scope replaces the whole dance: a single State, a single listener,
-    // and the panel only re-measures when the keyboard actually crosses
-    // the open/closed threshold.
+    // IME/nav observation, hoisted OUT of the BoxWithConstraints lambda
+    // below. The insets API works by snapshot reads: each read site is one
+    // subscription, and the reads happen ONCE per SearchLayer recomposition
+    // here instead of once per re-run of the BoxWithConstraints lambda
+    // (whose scope re-runs on every relevant state change a keystroke
+    // produces). One reader slot, one subscriber, and the box only re-runs
+    // when the value it actually drew from changes -- the panel re-measures
+    // when the keyboard crosses the open/closed threshold, not on every
+    // keystroke tick. (The older claim that inline reads accumulate N
+    // WINDOW LISTENERS per keystroke no longer holds with the modern
+    // siteless insets API, but the hoist is exactly right for the same
+    // reason: the inner lambda runs for unrelated recompositions, and
+    // subscribing to IME state inside it feeds those recompositions with
+    // fake insets changes every time any of them happens.)
+    val keyboardUp = WindowInsets.ime.asPaddingValues().calculateBottomPadding() > 80.dp
+    val bottomInset = WindowInsets.navigationBars.union(WindowInsets.ime)
+        .asPaddingValues().calculateBottomPadding()
     BoxWithConstraints(Modifier.fillMaxSize()) {
         // With the keyboard up, the panel and the bar together are competing
         // for the sliver of screen that is left -- on a phone that is a couple
@@ -354,9 +360,6 @@ internal fun SearchLayer(
         // -- the blurred aurora redrawing underneath every IME frame -- is
         // handled at the source: AuroraBackground's `paused`, which the root
         // drives from this layer's `onOpenChanged`.)
-        val keyboardUp = WindowInsets.ime.asPaddingValues().calculateBottomPadding() > 80.dp
-        val bottomInset = WindowInsets.navigationBars.union(WindowInsets.ime)
-            .asPaddingValues().calculateBottomPadding()
         val edge = if (compact) 8.dp else 16.dp
         // On the cover, a camera band beside the island (see coverCutoutBand)
         // is real, unoccluded space with nothing else fixed in it once the
