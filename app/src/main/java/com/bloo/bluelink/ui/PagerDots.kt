@@ -406,6 +406,7 @@ import kotlin.math.max
 import kotlin.math.roundToInt
 import java.util.UUID
 import androidx.compose.ui.graphics.toArgb
+import com.bloo.uicommon.PagerDotColors
 
 /** Vertical sibling of [PagerDots] for the cover-screen tile stack.
  *
@@ -648,168 +649,27 @@ internal fun PagerDotsFor(
     real: (Int) -> Int,
     modifier: Modifier = Modifier,
     onRefresh: (() -> Unit)? = null,
-    // Root-coordinate, POST-transform bounds of whatever car name is
-    // currently flying/docked on this same screen (see TitleFlightOverlay's
-    // own `onNameBoundsChanged`), if this call site tracks one. Handed down
-    // as the State object itself, not read here with `by` -- this
-    // composable is a direct child of the same GarageScreen scope
-    // PagerDotsFor's own doc above warns is expensive to recompose (it
-    // hosts the whole car pager), so the value is only ever read inside
-    // PagerDots' own graphicsLayer{} below, at draw time, the same
-    // established pattern pullFractionState/dotsAlphaState already use
-    // here for exactly that reason.
-    nameBoundsPx: State<Rect?>? = null,
-) = PagerDots(current = real(pager.currentPage), count = count, modifier = modifier, onRefresh = onRefresh, nameBoundsPx = nameBoundsPx)
-
-@Composable
-internal fun PagerDots(
-    current: Int,
-    count: Int,
-    modifier: Modifier = Modifier,
-    onRefresh: (() -> Unit)? = null,
     nameBoundsPx: State<Rect?>? = null,
 ) {
+    // Theme-only choices stay in the app: this wrapper is the one place that
+    // translates Material colors + app chrome into the uicommon core's
+    // parameterized [PagerDotColors], so the core never imports material3.
     val haptics = LocalHaptics.current
-    val expandProgress = remember { Animatable(0f) }
-    var holding by remember { mutableStateOf(false) }
-    // This control's own natural on-screen bounds, captured once per layout
-    // pass via onGloballyPositioned below -- NOT affected by the hide
-    // graphicsLayer{} this function applies to itself, because
-    // onGloballyPositioned is chained BEFORE that graphicsLayer (outer
-    // node), and a child's own graphicsLayer transform never moves how an
-    // ANCESTOR node reports its own placement. That's exactly what's
-    // needed here: comparing the dots' resting position against the
-    // name's bounds.
-    val selfBoundsPx = remember { mutableStateOf<Rect?>(null) }
-    val density = LocalDensity.current
-    // Breathing room kept between the name's own bounds and the dots, on
-    // top of whatever raw overlap check finds -- a name ellipsizing right
-    // up against the dots' edge would still read as a collision even
-    // without literal pixel overlap.
-    val collisionMarginPx = with(density) { 8.dp.toPx() }
-
-    if (onRefresh != null) {
-        LaunchedEffect(holding) {
-            if (holding) {
-                expandProgress.snapTo(0f)
-                expandProgress.animateTo(
-                    1f,
-                    animationSpec = tween(durationMillis = 1000, easing = FastOutSlowInEasing),
-                )
-                onRefresh.invoke()
-                // Linger the full ring briefly, then ease it back to nothing --
-                // this must happen BEFORE flipping `holding` back to false,
-                // because that write re-keys (and thus cancels) this very
-                // LaunchedEffect(holding) coroutine, which used to kill the
-                // delay+collapse before it ever ran (the ring snapped away).
-                delay(300)
-                expandProgress.animateTo(0f, tween(200))
-                holding = false
-            } else if (expandProgress.value > 0f) {
-                // Released (or the gesture was cancelled) before the hold
-                // completed -- LaunchedEffect(holding) cancels the coroutine
-                // above outright when holding flips back to false, which used to
-                // leave the ring frozen at whatever fill it had reached instead
-                // of easing back to nothing (matches the edge-trace gesture's
-                // own release/cancel handling elsewhere on the cover screen).
-                expandProgress.animateTo(0f, tween(200))
-            }
-        }
-    }
-
-    Box(
-        modifier = modifier
-            .onGloballyPositioned { selfBoundsPx.value = it.boundsInRoot() }
-            // Hide entirely while a colliding car name overlaps this
-            // control -- a conservative rect-overlap test against the
-            // name's OWN live measured/painted bounds (see
-            // TitleFlightOverlay's onNameBoundsChanged), not a hardcoded
-            // character-count/name-length threshold -- real device text
-            // width varies with font, locale and Dynamic Type scale, so a
-            // fixed threshold would either under- or over-trigger there.
-            // Draw-phase only (graphicsLayer{}), same reasoning as
-            // dotsAlphaState's own read just above this function's call
-            // sites -- never invalidates composition.
-            .graphicsLayer {
-                alpha = if (dotsOverlapsName(selfBoundsPx.value, nameBoundsPx?.value, collisionMarginPx)) 0f else 1f
-            },
-        contentAlignment = Alignment.Center,
-    ) {
-        // Overlay ring that fills as the user holds
-        if (onRefresh != null && expandProgress.value > 0.01f) {
-            CircularProgressIndicator(
-                progress = { expandProgress.value.coerceIn(0f, 1f) },
-                modifier = Modifier.size(36.dp),
-                strokeWidth = 3.dp,
-                trackColor = MaterialTheme.colorScheme.surfaceVariant,
-            )
-        }
-        Surface(
-            modifier = Modifier
-                .then(
-                    if (onRefresh != null) {
-                        Modifier.pointerInput(Unit) {
-                            awaitEachGesture {
-                                val down = awaitFirstDown(requireUnconsumed = false)
-                                down.consume()
-                                haptics?.tick()
-                                holding = true
-                                try { waitForUpOrCancellation() }
-                                finally { holding = false }
-                            }
-                        }
-                    } else {
-                        Modifier
-                    },
-                )
-                // This whole control is a raw pointerInput gesture (long-press
-                // to refresh) with zero semantics -- with TalkBack's touch
-                // exploration intercepting single-finger gestures, it was both
-                // unreachable as its own focus stop and the long-press gesture
-                // itself couldn't be triggered. contentDescription announces
-                // which car is showing (the dots' only visual information);
-                // onLongClick exposes the refresh gesture as a real
-                // accessibility action instead of a gesture no assistive
-                // technology can perform.
-                .then(
-                    if (onRefresh != null) {
-                        Modifier.semantics {
-                            contentDescription = "Car ${current + 1} of $count"
-                            onLongClick("Refresh") { onRefresh(); true }
-                        }
-                    } else {
-                        Modifier.semantics { contentDescription = "Car ${current + 1} of $count" }
-                    },
-                )
-                // Was relying only on Material's own tonal shadowElevation (2dp) --
-                // barely-there against a car photo, same gap as every other
-                // piece of floating chrome the frostedRim/dropShadow pass
-                // already covers (FloatingIcon, the name pill, the Settings
-                // pill). This is one of the most visible floating pills in the
-                // app (car-switcher dots at the top of the garage), so it
-                // shouldn't have been the one left out.
-                .ambientRing(CircleShape)
-                .dropShadow(CircleShape)
-                .frostedRim(CircleShape),
-            shape = CircleShape,
-            color = MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = glassContainerAlpha()),
-        ) {
-            Row(
-                Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                repeat(count) { i ->
-                    val selected = i == current
-                    val w by animateDpAsState(if (selected) 20.dp else 7.dp, label = "dotW")
-                    val color by androidx.compose.animation.animateColorAsState(
-                        if (selected) MaterialTheme.colorScheme.primary
-                        else MaterialTheme.colorScheme.outlineVariant,
-                        label = "dotC",
-                    )
-                    Box(Modifier.height(7.dp).width(w).clip(CircleShape).background(color))
-                }
-            }
-        }
-    }
+    val colors = PagerDotColors(
+        active = MaterialTheme.colorScheme.primary,
+        inactive = MaterialTheme.colorScheme.outlineVariant,
+        ringTrack = MaterialTheme.colorScheme.surfaceVariant,
+        ringFill = MaterialTheme.colorScheme.primary,
+        pill = MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = glassContainerAlpha()),
+    )
+    com.bloo.uicommon.PagerDots(
+        current = real(pager.currentPage),
+        count = count,
+        modifier = modifier,
+        onRefresh = onRefresh,
+        nameBoundsPx = nameBoundsPx,
+        haptics = haptics?.let { { it.tick() } },
+        colors = colors,
+    )
 }
+
