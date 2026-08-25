@@ -1108,7 +1108,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         // Still saveVehiclesKeepingStatus, and still snapshotOf(it, null): the store carries
         // the status fields forward inside its own edit transaction, which has no race
         // against the separately-launched cache restore. That reasoning was already right.
-        snapshotStore.saveVehiclesKeepingStatus(vehicles.map { snapshotOf(it, null) })
+        snapshotStore.saveVehiclesKeepingStatus(vehicles.map { snapshotOf(it, null, _state.value) })
         // Per-load, and it must run whether or not bootstrapDriveSync below does any work: on a
         // cold start whose FIRST garage load returned nothing, that guard was already consumed by
         // the empty path, so its call here is a no-op and this is the only thing that fills the
@@ -1762,7 +1762,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     private suspend fun persistSnapshots(vehicles: List<Vehicle> = _state.value.vehicles) {
-        snapshotStore.saveVehicles(vehicles.map { snapshotOf(it, _state.value.statuses[it.vin]) })
+        snapshotStore.saveVehicles(vehicles.map { snapshotOf(it, _state.value.statuses[it.vin], _state.value) })
         // Mirror the fresh snapshots to a paired watch (no-op when none is connected).
         com.bloo.bluelink.wear.WearBridge.publish(getApplication())
         // Refresh Quick Settings tiles too.
@@ -1833,73 +1833,6 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         if (anyCharging) com.bloo.bluelink.work.LiveChargePollWorker.kick(getApplication())
     }
 
-    private fun snapshotOf(v: Vehicle, status: VehicleStatus?): VehicleSnapshot {
-        // Use the effective powertrain (a PHEV reads battery %, not fuel %).
-        val hasBattery = _state.value.hasBattery(v)
-        // Same idea for generation: write the EFFECTIVE (override-applied) number,
-        // not the raw API one, so the watch/widget/tile runners -- which only ever
-        // see this snapshot, never the live in-memory Vehicle -- agree with the
-        // user's own correction via the exact same isGen5W numeric check they
-        // already run on whatever Vehicle they rebuild from it. A no-op for a
-        // vehicle where platformOverridable is false (Kia US, Canada, Europe):
-        // isGen5W ignores the generation number outright for those, so which
-        // string ends up here can't change anything either way.
-        val effectiveGeneration = if (v.platformOverridable) {
-            when (_state.value.platformOf(v)) {
-                VehiclePlatform.GEN5W -> "2"
-                VehiclePlatform.CCNC -> "3"
-            }
-        } else {
-            v.generation
-        }
-        val percent = status?.percentFor(hasBattery)
-        val range = status?.rangeMiFor(hasBattery)
-        // A fix that did NOT ride along on the status. `locate()` prefers the GPS carried
-        // by a status refresh, but falls back to `repoFor(v).location(v)` (findMyCar) and
-        // stores that in `_state.locations` only -- and Canada's repo has no GPS on its
-        // status at all, so that fallback is its ONLY source. Reading `status` alone meant
-        // every surface fed from a snapshot -- widget map, watch map, the location info
-        // field -- showed no position for a car whose location the phone was displaying on
-        // screen at that moment. Status wins when it has a coord (it is same-fetch fresh);
-        // this is the fallback, not an override.
-        //
-        // Chosen as ONE fix rather than per-field `?:`, so a status carrying a lat but no
-        // lon cannot combine with a cached lon into coordinates that were never a real
-        // position. Same all-or-nothing shape `locate()` uses to build `statusLoc`.
-        val fix = status.toGeoLocation() ?: _state.value.locations[v.vin]
-        return VehicleSnapshot(
-            vin = v.vin,
-            name = v.name,
-            model = v.model,
-            isEv = v.isEv,
-            hasBattery = hasBattery,
-            regId = v.regId,
-            generation = effectiveGeneration,
-            brandIndicator = v.brandIndicator,
-            percent = percent,
-            rangeMi = range,
-            locked = status?.doorLock,
-            charging = status?.evStatus?.batteryCharge,
-            climateOn = status?.airCtrlOn,
-            engineOn = status?.engine,
-            lat = fix?.latitude,
-            lon = fix?.longitude,
-            speedMph = fix?.speed,
-            updated = status?.dateTime,
-            // A non-null status is freshly-fetched data; null means we're building a
-            // placeholder snapshot with no live status yet (leave fetchedAt unknown).
-            fetchedAt = if (status != null) System.currentTimeMillis() else 0L,
-            odometer = v.odometer,
-            licensePlate = _state.value.licensePlates[v.vin],
-            lastServiceMiles = _state.value.lastServiceMiles[v.vin],
-            serviceIntervalMiles = _state.value.serviceIntervalMiles[v.vin],
-            // displayChargeLimit, not targetForCurrentPlug directly -- see that
-            // function's own doc: the widget/watch both read this field, and it used to
-            // go null the instant the car was unplugged, silently dropping their charge
-            // bars back to a plain unsplit track for every parked car.
-            chargeLimitPct = status?.evStatus?.displayChargeLimit(),
-        )
-    }
 
     /** Re-sort a freshly-fetched vehicle list to match the user's saved
      *  drag-and-drop [order] (a list of VINs). Any VIN in [order] that no
@@ -1907,13 +1840,6 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
      *  any newly-appeared vehicle not yet in [order] (a car added to the
      *  account since the order was last saved) is appended at the end rather
      *  than dropped, so new cars still show up somewhere. */
-    private fun applyOrder(vehicles: List<Vehicle>, order: List<String>): List<Vehicle> {
-        if (order.isEmpty()) return vehicles
-        val byVin = vehicles.associateBy { it.vin }
-        val ordered = order.mapNotNull { byVin[it] }
-        val rest = vehicles.filter { it.vin !in order }
-        return ordered + rest
-    }
 
     /** Set (or, with a blank string, clear) a custom car photo URL. */
     fun setVehicleImage(vin: String, url: String) {
@@ -2797,8 +2723,6 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
      * mark a car as a plug-in hybrid that the API reports as gas. Honour that so
      * PHEVs use the EV climate/charge endpoints.
      */
-    private fun electric(v: Vehicle): Vehicle =
-        if (_state.value.hasBattery(v)) v.copy(isEv = true) else v
 
     // Lock/unlock share the "doors" action key, so a lock command in flight
     // blocks a rapid-fire unlock (and vice versa) rather than letting them
@@ -2920,14 +2844,14 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
      *  the nested `?.copy` on a null receiver stays null). */
     fun startCharge(v: Vehicle) =
         runCommand(v.vin, "charge", "Charging", { it.copy(evStatus = it.evStatus?.copy(batteryCharge = true)) }) {
-            repoFor(v).startCharge(electric(v))
+            repoFor(v).startCharge(electric(v, _state.value))
         }
 
     /** Stop charging; mirrors [startCharge]'s optimistic-patch shape but with
      *  the flag flipped false. Shares the "charge" action key with it. */
     fun stopCharge(v: Vehicle) =
         runCommand(v.vin, "charge", "Charging stopped", { it.copy(evStatus = it.evStatus?.copy(batteryCharge = false)) }) {
-            repoFor(v).stopCharge(electric(v))
+            repoFor(v).stopCharge(electric(v, _state.value))
         }
 
     /** Set the AC (slow/L2) and DC (fast) charge-target percentages. Its own
@@ -2965,7 +2889,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 }
             },
         ) {
-            repoFor(v).setChargeTargets(electric(v), acPercent, dcPercent)
+            repoFor(v).setChargeTargets(electric(v, _state.value), acPercent, dcPercent)
         }
 
     /**
