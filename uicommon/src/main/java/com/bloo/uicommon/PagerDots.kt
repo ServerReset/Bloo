@@ -120,8 +120,14 @@ fun PagerDots(
     count: Int,
     modifier: Modifier = Modifier,
     onRefresh: (() -> Unit)? = null,
+    /** Post-transform root bounds of a title that may overlap this control;
+     *  read at DRAW time (see the graphicsLayer below) so the collision
+     *  dodge never recomposes. */
     nameBoundsPx: State<Rect?>? = null,
+    /** Ticked once when the long-press-to-refresh gesture lands (lifted from
+     *  Haptics on the consumer side; null = no tick). */
     haptics: (() -> Unit)? = null,
+    /** Theme resolution: inactive/active dots, ring colors and the pill fill. */
     colors: PagerDotColors = PagerDotColors(),
 ) {
     val expandProgress = remember { Animatable(0f) }
@@ -189,14 +195,14 @@ fun PagerDots(
             },
         contentAlignment = Alignment.Center,
     ) {
-        // Overlay ring that fills as the user holds
-        if (onRefresh != null && expandProgress.value > 0.01f) {
-            // Foundation-only refresh ring: a Canvas draws the track + the
-            // fill arc the user gets by holding, so the component stays
-            // Material-free (a CircularProgressIndicator dragged the whole
-            // module into material3). Draws once per animate frame by the
-            // Animatable read here, exactly like the dot animations below.
-            Canvas(Modifier.size(36.dp)) {
+        // Overlay ring that fills as the user holds. The Canvas node is
+        // always present and the visibility + progress reads happen INSIDE
+        // its draw lambda: during the 1s hold the Animatable ticks every
+        // frame, and drawing is what needs that value -- reading it in
+        // composition would recompose this control per frame for no reason
+        // (and a conditional Canvas node would churn the layout tree).
+        Canvas(Modifier.size(36.dp)) {
+            if (onRefresh != null && expandProgress.value > 0.01f) {
                 val stroke = 3.dp.toPx()
                 val inset = stroke / 2f
                 val sweep = size.minDimension - stroke
