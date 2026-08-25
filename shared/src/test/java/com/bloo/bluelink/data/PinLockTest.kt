@@ -146,3 +146,65 @@ class PinLockTest {
         assertNull(s.attemptsRemainingInBatch(t0)) // rejected → no "attempts" shown
     }
 }
+class PinLockBoundaryTest {
+
+    // --- formatLockoutSeconds: ceil-to-second rounding ----------------------
+
+    @Test
+    fun formatLockout_roundsUpEveryPartialSecond() {
+        // (ms + 999) / 1000 -- any partial second renders as a full one so a
+        // countdown never shows "0:00" while the user is actually still locked.
+        assertEquals("0:00", formatLockoutSeconds(0L))
+        assertEquals("0:01", formatLockoutSeconds(1L))
+        assertEquals("0:01", formatLockoutSeconds(999L))
+        assertEquals("0:01", formatLockoutSeconds(1000L))
+        assertEquals("0:02", formatLockoutSeconds(1001L))
+    }
+
+    @Test
+    fun formatLockout_minuteBorders() {
+        assertEquals("1:00", formatLockoutSeconds(59_999L))
+        assertEquals("1:00", formatLockoutSeconds(60_000L))
+        assertEquals("1:01", formatLockoutSeconds(60_001L))
+        // The 10th-strike window is 30s * 2^9 = 256 minutes -- the escalation
+        // is exponential, and the renderer must not choke on it.
+        assertEquals("256:00", formatLockoutSeconds(PinLockout.windowMs(10)))
+    }
+
+    // --- remainingMs / isLocked at exact boundaries --------------------------
+
+    @Test
+    fun remainingMs_exactlyAtBoundaryIsZeroAndUnlocked() {
+        val lock = PinLockout(failures = 5, lockedUntilEpochMs = 1_000_000L)
+        assertEquals(0L, lock.remainingMs(1_000_000L))
+        assertEquals(false, lock.isLocked(1_000_000L))
+        // One millisecond before the end: still locked, exactly 1ms left.
+        assertEquals(1L, lock.remainingMs(999_999L))
+        assertEquals(true, lock.isLocked(999_999L))
+    }
+
+    @Test
+    fun remainingMs_neverLocked_isZero() {
+        val lock = PinLockout()
+        assertEquals(0L, lock.remainingMs(123456789L))
+        assertEquals(false, lock.isLocked(123456789L))
+    }
+
+    // --- window arithmetic ----------------------------------------------------
+
+    @Test
+    fun windowMs_doublesPerBatch() {
+        assertEquals(30_000L, PinLockout.windowMs(1))
+        assertEquals(60_000L, PinLockout.windowMs(2))
+        assertEquals(480_000L, PinLockout.windowMs(5))
+    }
+
+    @Test
+    fun success_midWindow_resetsFailuresAndWindow() {
+        val locked = PinLockout(failures = 5, lockedUntilEpochMs = 1_000_000L)
+        val reset = locked.onSuccess()
+        assertEquals(0, reset.failures)
+        assertEquals(0L, reset.lockedUntilEpochMs)
+        assertEquals(false, reset.isLocked(1_000_000L))
+    }
+}
