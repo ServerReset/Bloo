@@ -83,7 +83,7 @@ import androidx.compose.ui.graphics.StrokeCap
  *  block without touching composition. `null` [dots] (no layout pass yet)
  *  or [name] (nothing flying/docked on this screen) both mean "nothing to
  *  hide against." */
-private fun dotsOverlapsName(dots: Rect?, name: Rect?, marginPx: Float): Boolean {
+internal fun dotsOverlapsName(dots: Rect?, name: Rect?, marginPx: Float): Boolean {
     if (dots == null || name == null) return false
     // Vertical gate first -- an inline name usually sits well below the
     // dots' fixed top row (only a DOCKED pill, or one mid-flight toward it,

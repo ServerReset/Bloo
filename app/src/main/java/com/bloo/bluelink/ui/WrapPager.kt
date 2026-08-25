@@ -418,18 +418,51 @@ private const val PAGER_SHRINK = 0.06f
  * real items the pages cycle through (cars, car-blocks, or tiles depending on
  * the site); when it is <= 1 there is no wrap and [real] is always 0.
  */
+/**
+ * Pure wrap arithmetic: the real item index a virtual page maps to.
+ *
+ * Extracted as an `internal` top-level function (not a member) so the modulo
+ * trick is pinnable from a plain JVM test -- WrapPagerState's own member
+ * forwards here, so the pin lives where the bugs would be. The double-modulo
+ * form is deliberate: Kotlin's `%` keeps the NEGATIVE operand's sign, so a
+ * page ever so slightly below the virtual midpoint (page 0 vs realCount 1m?)
+ * -- i.e. a wrap pushed a page below zero by a snapshot/offset quirk -- would
+ * map to a NEGATIVE real index and silently read a non-existent item. Adding
+ * realCount once and modding again pulls every result into [0, realCount).
+ */
+internal fun wrapRealIndex(page: Int, realCount: Int): Int =
+    if (realCount <= 1) 0 else ((page % realCount) + realCount) % realCount
+
+/**
+ * Pure wrap arithmetic: the nearest virtual page whose real index is [target],
+ * without animating a long fly-through across the virtual range.
+ *
+ * [currentPage] is the page the pager is on, [pageCount] is the pager's total
+ * virtual page count, [realCount] is the number of real items. When
+ * [realCount] <= 1 there is only ever one item and [currentPage] is returned
+ * unchanged. `delta` is computed FROM the real index of the CURRENT page (not
+ * from [currentPage] itself), so jumping from any virtual copy of an item to
+ * another item always takes the shortest real step; the result is clamped to
+ * the pager's own [pageCount] - 1 because the virtual range is finite.
+ */
+internal fun wrapPageToward(currentPage: Int, pageCount: Int, realCount: Int, target: Int): Int {
+    if (realCount <= 1) return currentPage
+    val t = target.coerceIn(0, realCount - 1)
+    val delta = t - wrapRealIndex(currentPage, realCount)
+    return (currentPage + delta).coerceIn(0, pageCount - 1)
+}
+
 @Stable
 internal class WrapPagerState(val pager: PagerState, val realCount: Int) {
-    fun real(page: Int): Int = if (realCount <= 1) 0 else ((page % realCount) + realCount) % realCount
+    fun real(page: Int): Int = wrapRealIndex(page, realCount)
     val currentReal: Int get() = real(pager.currentPage)
     val settledReal: Int get() = real(pager.settledPage)
     /** Jump so the currently-shown page maps to [target], picking the nearest
      *  virtual page in the current direction (no long fly-through). */
     suspend fun snapToReal(target: Int) {
         if (realCount <= 1) return
-        val t = target.coerceIn(0, realCount - 1)
-        val delta = t - currentReal
-        if (delta != 0) pager.scrollToPage((pager.currentPage + delta).coerceIn(0, pager.pageCount - 1))
+        val page = wrapPageToward(pager.currentPage, pager.pageCount, realCount, target)
+        if (page != pager.currentPage) pager.scrollToPage(page)
     }
 }
 

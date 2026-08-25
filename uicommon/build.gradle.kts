@@ -49,4 +49,5 @@ dependencies {
     // Icons needed for weatherIcon(); the material-icons artifact is pure ImageVector
     // data — no Material theme dependency — so it's safe to add here.
     implementation("androidx.compose.material:material-icons-extended")
+    testImplementation("org.jetbrains.kotlin:kotlin-test-junit:2.2.20")
 }
