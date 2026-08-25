@@ -83,10 +83,9 @@ object Notifications {
         // an absent channel is NOT a block (ensureChannel creates it on the way to posting), so
         // absence must answer true.
         return runCatching {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                val ch = mgr.getNotificationChannel(channelId)
-                ch == null || ch.importance != NotificationManager.IMPORTANCE_NONE
-            } else true
+            // No SDK guard: channels exist since O and the app minSdk is 26.
+            val ch = mgr.getNotificationChannel(channelId)
+            ch == null || ch.importance != NotificationManager.IMPORTANCE_NONE
         }.getOrDefault(true)
     }
 
@@ -167,6 +166,17 @@ object Notifications {
         // Returns whether the notification actually went out. Every caller but one ignores
         // it; UpdateCheckWorker must not, because it records "already told them about this
         // build" and had been doing so even when this returned early.
+        // Re-check explicitly right before the call (not just through
+        // [hasPermission], which lint can't reason through): the check above is
+        // still the TOCTOU race the runCatching guards, but this local read makes
+        // the permission contract explicit at the call site and keeps lint's
+        // MissingPermission analysis honest.
+        if (androidx.core.app.ActivityCompat.checkSelfPermission(
+                context, android.Manifest.permission.POST_NOTIFICATIONS,
+            ) != android.content.pm.PackageManager.PERMISSION_GRANTED
+        ) {
+            return false
+        }
         return runCatching { NotificationManagerCompat.from(context).notify(id, builder.build()) }
             .isSuccess
     }
@@ -288,13 +298,11 @@ object LiveCharge {
             // No launcher badge: a persistent live-progress bar shouldn't dot the app icon.
             showBadge = false,
         )
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val mgr = context.getSystemService(NotificationManager::class.java)
-            // Cheap once this device's orphans are gone: deleteNotificationChannel is a
-            // no-op (not an error) for an id that doesn't exist, so this never needs its
-            // own "already cleaned up" flag.
-            LEGACY_CHANNELS.forEach { legacyId -> runCatching { mgr.deleteNotificationChannel(legacyId) } }
-        }
+        val mgr = context.getSystemService(NotificationManager::class.java)
+        // Cheap once this device's orphans are gone: deleteNotificationChannel is a
+        // no-op (not an error) for an id that doesn't exist, so this never needs its
+        // own "already cleaned up" flag. No SDK guard (channels are O+, minSdk 26).
+        LEGACY_CHANNELS.forEach { legacyId -> runCatching { mgr.deleteNotificationChannel(legacyId) } }
     }
 
     /** Clears every car's live-charge notification at once -- used when the
@@ -716,6 +724,14 @@ object LiveCharge {
 
         // Same TOCTOU reasoning as Notifications.post: permission could be
         // revoked between the hasPermission() check above and this call.
+        // The local check is explicit so lint's MissingPermission analysis
+        // sees the grant right next to the notify and stays honest.
+        if (androidx.core.app.ActivityCompat.checkSelfPermission(
+                context, android.Manifest.permission.POST_NOTIFICATIONS,
+            ) != android.content.pm.PackageManager.PERMISSION_GRANTED
+        ) {
+            return
+        }
         runCatching { NotificationManagerCompat.from(context).notify(id, builder.build()) }
     }
 }

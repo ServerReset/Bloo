@@ -54,22 +54,20 @@ class Haptics(context: Context) {
         runCatching { v.vibrate(effect) }
     }
 
-    /** A one-shot fallback for pre-31 devices, honouring amplitude when possible. */
+    /** A one-shot fallback for pre-31 devices, honouring amplitude when possible.
+     *  No SDK guard: createOneShot exists since O and the module minSdk is 26. */
     private fun oneShot(ms: Long, amplitude: Int) {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val amp = if (hasAmplitude) amplitude else VibrationEffect.DEFAULT_AMPLITUDE
-            play(VibrationEffect.createOneShot(ms, amp))
-        }
+        val amp = if (hasAmplitude) amplitude else VibrationEffect.DEFAULT_AMPLITUDE
+        play(VibrationEffect.createOneShot(ms, amp))
     }
 
     /** Multi-step fallback for devices without composition primitives: [timings] and
      *  [amplitudes] are parallel arrays alternating off/on segments in milliseconds and
      *  0-255 strength (the `-1` argument means "don't repeat, play once end-to-end"). */
     private fun waveform(timings: LongArray, amplitudes: IntArray) {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            if (hasAmplitude) play(VibrationEffect.createWaveform(timings, amplitudes, -1))
-            else play(VibrationEffect.createWaveform(timings, -1))
-        }
+        // No SDK guard, same reason as oneShot (minSdk 26 = O).
+        if (hasAmplitude) play(VibrationEffect.createWaveform(timings, amplitudes, -1))
+        else play(VibrationEffect.createWaveform(timings, -1))
     }
 
     // --- The vocabulary --------------------------------------------------
@@ -201,11 +199,18 @@ class Haptics(context: Context) {
      *  list instead of manually managing a [VibrationEffect.Composition] builder; wraps
      *  the whole built sequence into one [play] call once [build] finishes adding steps. */
     private inline fun composed(build: CompositionBuilder.() -> Unit) {
+        // startComposition/addPrimitive are API 30+; the `composes` gate above
+        // only lets callers through on API 31+, but the gate lives in a
+        // separate property and lint can't track that -- explicit guard keeps
+        // the invariant self-contained and absolutely crash-proof on
+        // API 26-29 devices (oneShot/waveform covers those).
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) return
         val c = VibrationEffect.startComposition()
         CompositionBuilder(c).build()
         play(c.compose())
     }
 
+    @androidx.annotation.RequiresApi(android.os.Build.VERSION_CODES.R)
     private class CompositionBuilder(val c: VibrationEffect.Composition) {
         /** [scale] is per-primitive strength (0..1); [delayMs] is the gap before this
          *  primitive starts, relative to the previous one finishing. */

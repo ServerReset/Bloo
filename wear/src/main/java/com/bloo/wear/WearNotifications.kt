@@ -86,6 +86,14 @@ object WearNotifications {
 
         // notify() can throw if the permission was revoked between the check
         // above and here (a race on the OS side); swallow it rather than crash.
+        // The local check below mirrors the one above so lint's MissingPermission
+        // analysis sees the grant reading right next to the notify.
+        if (androidx.core.app.ActivityCompat.checkSelfPermission(
+                context, android.Manifest.permission.POST_NOTIFICATIONS,
+            ) != android.content.pm.PackageManager.PERMISSION_GRANTED
+        ) {
+            return
+        }
         runCatching { NotificationManagerCompat.from(context).notify(id, notification) }
     }
 

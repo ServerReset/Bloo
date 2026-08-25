@@ -2422,6 +2422,17 @@ class SettingsStore(private val context: Context) {
      *  own). Returns false when no location is available (e.g. permission
      *  never granted on this device) so the caller can report that clearly. */
     suspend fun setWeatherFromDeviceLocation(): Boolean {
+        // GetLastKnownLocation requires an active location grant; fail fast and
+        // explicitly instead of relying on the SecurityException throw inside
+        // the runCatching below to do the same thing. Keep the runCatching
+        // anyway -- TIME is revoked mid-call by the user sometimes, and a
+        // missed weather label must never crash a settings click.
+        if (androidx.core.app.ActivityCompat.checkSelfPermission(
+                context, android.Manifest.permission.ACCESS_COARSE_LOCATION,
+            ) != android.content.pm.PackageManager.PERMISSION_GRANTED
+        ) {
+            return false
+        }
         val loc = runCatching {
             val lm = context.getSystemService(android.content.Context.LOCATION_SERVICE) as android.location.LocationManager
             listOf(
