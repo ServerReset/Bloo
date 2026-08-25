@@ -18,3 +18,4 @@ __pycache__/
 # else at the root matching this is scratch that `git add -A` would otherwise
 # sweep in -- three of them reached commits before this rule existed.
 /*.py
+.kotlin
