@@ -550,9 +550,8 @@ internal fun CropScreen(vin: String, uriString: String, onCancel: () -> Unit, on
     }
 }
 // --- Settings -------------------------------------------------------------
-// Moved to SettingsScreen.kt (3,407 lines). See that file's header for why, and for why
-// the two commits before it -- UiTokens.kt, then the private -> internal promotions --
-// had to come first.
+// (The settings screen is owned by SettingsScreen.kt's family: SettingsScreen,
+// SettingsCards, SettingsIndex, SettingsSearch, SettingsWidgets.)
 
 
 // --- Small reusable pieces ------------------------------------------------

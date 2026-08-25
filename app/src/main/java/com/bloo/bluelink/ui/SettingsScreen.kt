@@ -229,27 +229,22 @@ import com.bloo.uicommon.ReorderColumn
 import com.bloo.uicommon.LocalReorderActive
 import com.bloo.uicommon.coldStartIntroPlayed
 import com.bloo.uicommon.animatePlacement
-
 /**
- * The Settings screen, moved verbatim out of Screens.kt.
+ * The whole Settings screen.
  *
- * 3,407 lines, 23% of that file. Nothing here was rewritten: this is a relocation, and the
- * two commits before it exist so that it could be. `UiTokens.kt` took the shared design
- * vocabulary, and the commit after it promoted the 42 declarations that cross this boundary
- * from file-`private` to `internal` -- Kotlin's top-level `private` is FILE-scoped, so every
- * one of those would otherwise have become invisible the moment these lines moved.
+ * History: this began as a 3.4k-line slice peeled out of Screens.kt (the
+ * 14.6k-line monolith), and then had its pure search/index logic, its card
+ * bodies, its search surface and its settings-widget cluster extracted into
+ * SettingsIndex.kt, SettingsSearch.kt, SettingsCards.kt and
+ * SettingsWidgets.kt. What remains is the screen itself: the floating
+ * SettingsHeaderRow, the simple/advanced mode harness and its stagger, and
+ * the one long scrolling [Column] of [SettingsCard]s that is what this file
+ * exists to own.
  *
- * Splitting the file is worth being honest about: the empirical literature does not support
- * doing it to reduce defects (every study controlling for size either reverses the effect or
- * dissolves it, and none performs a refactoring intervention), and the build-speed argument
- * does not survive verification. What it buys is navigability -- and, specifically here, a
- * file an agent can edit by anchored replacement without the accidents a 14.6k-line file
- * invites.
- *
- * The import list is Screens.kt's, copied whole. Unused imports are warnings, not errors
- * (checked: no `allWarningsAsErrors`), and copying them all is what makes this a mechanical
- * move rather than a judgement call about which of 390 imports these 3,407 lines need.
- * Tidying them is a separate, individually-verifiable pass.
+ * The file's import list is still the (deduplicated) copy of the original
+ * Screens.kt import list carried through the splits: unused imports are
+ * warnings, not errors, and pruning each file's list is a separate,
+ * individually-verifiable pass.
  */
 
 // --- Settings -------------------------------------------------------------
