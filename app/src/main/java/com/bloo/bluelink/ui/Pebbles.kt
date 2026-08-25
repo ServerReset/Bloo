@@ -406,6 +406,10 @@ import kotlin.math.max
 import kotlin.math.roundToInt
 import java.util.UUID
 import androidx.compose.ui.graphics.toArgb
+import com.bloo.uicommon.ReorderColumn
+import com.bloo.uicommon.LocalReorderActive
+import com.bloo.uicommon.coldStartIntroPlayed
+import com.bloo.uicommon.animatePlacement
 
 /** A friendly label for a pebble/section id. */
 internal fun sectionLabel(section: String): String = when (section) {

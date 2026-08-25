@@ -406,6 +406,10 @@ import kotlin.math.max
 import kotlin.math.roundToInt
 import java.util.UUID
 import androidx.compose.ui.graphics.toArgb
+import com.bloo.uicommon.ReorderColumn
+import com.bloo.uicommon.LocalReorderActive
+import com.bloo.uicommon.coldStartIntroPlayed
+import com.bloo.uicommon.animatePlacement
 
 /**
  * A soft blurred scrim behind the status bar so scrolling content underneath
@@ -709,25 +713,6 @@ internal fun LastUpdatedLabel(v: Vehicle, state: UiState, modifier: Modifier = M
 }
 
 
-/**
- * Animates an item gliding to its new placement when siblings reorder around it,
- * instead of snapping. Used for the non-dragged pebbles so they slide out of the
- * way smoothly. The dragged item is offset manually and must not use this.
- */
-internal fun Modifier.animatePlacement(): Modifier = composed {
-    val scope = rememberCoroutineScope()
-    var target by remember { mutableStateOf(IntOffset.Zero) }
-    var anim by remember { mutableStateOf<Animatable<IntOffset, *>?>(null) }
-    this
-        .onPlaced { target = it.positionInParent().round() }
-        .offset {
-            val a = anim ?: Animatable(target, IntOffset.VectorConverter).also { anim = it }
-            if (a.targetValue != target) {
-                scope.launch { a.animateTo(target, spring(stiffness = Spring.StiffnessMediumLow)) }
-            }
-            a.value - target
-        }
-}
 
 
 /**

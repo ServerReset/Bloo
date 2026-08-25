@@ -393,6 +393,7 @@ import com.bloo.bluelink.data.CLIMATE_EXTENDED_DURATION_RANGE
 import com.bloo.bluelink.data.climateChunks
 import com.bloo.bluelink.data.isPluggedOrCharging
 import com.bloo.uicommon.rememberConfirmArm
+import com.bloo.uicommon.coldStartIntroPlayed
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first

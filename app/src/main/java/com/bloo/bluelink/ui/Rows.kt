@@ -406,6 +406,10 @@ import kotlin.math.max
 import kotlin.math.roundToInt
 import java.util.UUID
 import androidx.compose.ui.graphics.toArgb
+import com.bloo.uicommon.ReorderColumn
+import com.bloo.uicommon.LocalReorderActive
+import com.bloo.uicommon.coldStartIntroPlayed
+import com.bloo.uicommon.animatePlacement
 
 /**
  * Lightweight, crash-free crop: pinch-zoom + drag the picked image inside a 16:9
