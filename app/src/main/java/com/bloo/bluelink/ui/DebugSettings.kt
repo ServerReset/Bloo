@@ -22,6 +22,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -40,7 +41,7 @@ import android.os.Build
 data class DebugInfo(
     val label: String,
     val value: String,
-    val icon: androidx.compose.material.icons.Icons? = null,
+    val icon: ImageVector? = null,
     val copyable: Boolean = false,
 )
 
