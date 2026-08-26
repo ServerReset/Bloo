@@ -929,6 +929,7 @@ internal fun AiPebble(v: Vehicle, state: UiState, vm: AppViewModel, dragHandle: 
             onClick = { vm.summarizeCar(v) },
             pending = busy,
         ),
+        alwaysExpandedInSimpleMode = true,
     ) {
         // On the flip cover this tile fills the screen; two short text lines centred
         // in it read as a big empty purple void. Lead with a proper glance hero (big
