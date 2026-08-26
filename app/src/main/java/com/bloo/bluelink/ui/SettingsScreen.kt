@@ -2000,24 +2000,18 @@ internal fun SettingsScreen(
             enter = fadeIn(tween(160)),
             exit = fadeOut(tween(160)),
         ) {
-            val cornerX = if (embedded) 16.dp else 60.dp
-            val reserveEnd = 192.dp
             val screenWidth = LocalConfiguration.current.screenWidthDp.dp
-            TitleFlightOverlay(
+            // FloatingNamePill resolves cornerX/reserveEnd/maxWidth/textColor
+            // from the context enum -- SETTINGS_EMBEDDED and SETTINGS map to
+            // the exact same values this call site used to hand-compute
+            // (16dp/60dp cornerX, 192dp reserveEnd, onSurface text). See
+            // FloatingNameContext.config for the single source of truth.
+            FloatingNamePill(
+                context = if (embedded) FloatingNameContext.SETTINGS_EMBEDDED else FloatingNameContext.SETTINGS,
                 flight = local.flight,
-                // Standalone route's own back arrow already claims the
-                // top-left corner (12dp outer padding + 48dp) -- clear it.
-                // Embedded has no back arrow, so it sits at the same 16dp
-                // the grid's own content uses, matching the car pages.
-                cornerX = cornerX,
-                cornerY = topInset + HeaderCornerGap,
-                // Clears the Simple/Advanced segmented toggle in the
-                // top-right (172dp wide, plus its own breathing room).
-                reserveEnd = reserveEnd,
-                maxWidth = screenWidth - cornerX - reserveEnd - 32.dp,
-                // Fixed -- Settings has no hero photo to morph a colour against.
-                textColorOverride = MaterialTheme.colorScheme.onSurface,
-                onClick = { settingsScope.launch { settingsGridState.animateScrollToItem(0) } },
+                screenWidth = screenWidth,
+                topInset = topInset,
+                onScrollToTop = { settingsScope.launch { settingsGridState.animateScrollToItem(0) } },
                 // See `liveFlight`'s own doc just above -- mirrors
                 // VehicleDetailContent's identical wiring.
                 onSettledChanged = { atRest -> onDockedChanged?.invoke(atRest) },
