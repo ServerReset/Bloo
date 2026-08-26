@@ -132,6 +132,12 @@ fun PagerDots(
 ) {
     val expandProgress = remember { Animatable(0f) }
     var holding by remember { mutableStateOf(false) }
+    // Animated collision dodge: smooth spring transition between visible (1f) and
+    // hidden (0f) when the floating name pill overlaps the dots. This replaces
+    // the instant alpha snap, so dots gracefully bounce/fade out when the name
+    // flies in, and bounce back in when it flies out.
+    val collisionAlpha = remember { Animatable(1f) }
+    var isColliding by remember { mutableStateOf(false) }
     // This control's own natural on-screen bounds, captured once per layout
     // pass via onGloballyPositioned below -- NOT affected by the hide
     // graphicsLayer{} this function applies to itself, because
@@ -177,21 +183,33 @@ fun PagerDots(
         }
     }
 
+    // Smooth animated collision dodge: when the floating name pill flies in or
+    // out, animate the dots' alpha to hide/show instead of snapping instantly.
+    // Uses a spring with moderate bounce for natural-feeling motion.
+    LaunchedEffect(nameBoundsPx?.value, selfBoundsPx.value) {
+        val nowColliding = dotsOverlapsName(selfBoundsPx.value, nameBoundsPx?.value, collisionMarginPx)
+        if (nowColliding != isColliding) {
+            isColliding = nowColliding
+            collisionAlpha.animateTo(
+                targetValue = if (nowColliding) 0f else 1f,
+                animationSpec = androidx.compose.animation.core.spring(
+                    dampingRatio = 0.6f,
+                    stiffness = androidx.compose.animation.core.Spring.StiffnessMedium,
+                ),
+            )
+        }
+    }
+
     Box(
         modifier = modifier
             .onGloballyPositioned { selfBoundsPx.value = it.boundsInRoot() }
-            // Hide entirely while a colliding car name overlaps this
-            // control -- a conservative rect-overlap test against the
-            // name's OWN live measured/painted bounds (see
-            // TitleFlightOverlay's onNameBoundsChanged), not a hardcoded
-            // character-count/name-length threshold -- real device text
-            // width varies with font, locale and Dynamic Type scale, so a
-            // fixed threshold would either under- or over-trigger there.
-            // Draw-phase only (graphicsLayer{}), same reasoning as
-            // dotsAlphaState's own read just above this function's call
-            // sites -- never invalidates composition.
+            // Hide smoothly (with spring bounce) while a colliding car name
+            // overlaps this control. Uses collisionAlpha for animated dodge
+            // instead of instant snap -- the FloatingNamePill flying in/out
+            // triggers a smooth fade with bounce, not a jarring disappearance.
+            // Draw-phase only (graphicsLayer{}), never invalidates composition.
             .graphicsLayer {
-                alpha = if (dotsOverlapsName(selfBoundsPx.value, nameBoundsPx?.value, collisionMarginPx)) 0f else 1f
+                alpha = collisionAlpha.value
             },
         contentAlignment = Alignment.Center,
     ) {
