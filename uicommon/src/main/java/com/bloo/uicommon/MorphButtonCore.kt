@@ -243,8 +243,34 @@ private fun BoxScope.MorphChrome(
     // cheap, and it keeps the reference semantics identical to before.
     Box(
         Modifier
-            // matchParentSize, NOT fillMaxSize -- see the caller's own comment:
-            // this covers the button without taking part in sizing it.
+            // === matchParentSize() CRITICAL: NOT fillMaxSize() ===
+            // This is the animated background layer. It MUST match the parent
+            // Box's actual size without influencing that size.
+            //
+            // WHY NOT fillMaxSize()?
+            // fillMaxSize() measures against incoming layout CONSTRAINTS, not
+            // against the parent Box's actual content size. This caused:
+            //   - Buttons in bounded containers (Row): parent Box gets real size
+            //     from content → fillMaxSize() also gets that constraint →
+            //     MorphChrome fills it → but ALSO influences sizing → in an
+            //     un-weighted SplitExpandButton, this made it eat the entire row
+            //   - Buttons in unbounded containers (Column in scrollable, height
+            //     constraint = Infinity): parent Box measures content size (e.g.,
+            //     48dp for label + padding) → fillMaxSize() sees maxHeight=Infinity
+            //     → cannot apply that to the chrome → chrome becomes 0-height →
+            //     background disappears even though content Row is visible
+            //
+            // WHY matchParentSize()?
+            // matchParentSize() is measured AFTER the parent Box has its real
+            // size. It then exactly matches that size. This means:
+            //   - Chrome always exactly covers what the Button became
+            //   - Chrome never adds to the button's size (even when scaled in
+            //     press animation, the scale happens around the chrome's own
+            //     measured bounds, not against incoming constraints)
+            //   - Caller's modifier (weight, fillMaxWidth, heightIn, etc.) can
+            //     still stretch the Button, and chrome adapts to match
+            //   - In unbounded heights, chrome measures the Row's actual height
+            //     (not Infinity) and draws the background correctly
             .matchParentSize()
             .graphicsLayer { scaleX = scale; scaleY = scale }
             .clip(shape)
