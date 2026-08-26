@@ -448,7 +448,16 @@ internal fun SettingsScreen(
         // neighbouring cards are almost never the same height, and a fixed-row
         // grid would force every card in a row to the tallest one's height --
         // exactly the "wrong tool" a masonry layout exists to avoid.
-        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
+        Box(
+            Modifier
+                .fillMaxSize()
+                .pullToRefresh(
+                    isRefreshing = state.syncing,
+                    state = ptrState,
+                    onRefresh = { haptics?.diceRoll(); vm.syncNow() },
+                ),
+            contentAlignment = Alignment.TopCenter
+        ) {
         CompositionLocalProvider(LocalHeroTitleFlight provides liveFlight) {
         LazyVerticalStaggeredGrid(
             columns = StaggeredGridCells.Adaptive(minSize = 380.dp),
@@ -456,12 +465,7 @@ internal fun SettingsScreen(
             modifier = Modifier
                 .widthIn(max = 1100.dp)
                 .fillMaxWidth()
-                .padding(horizontal = if (compact) 10.dp else 16.dp)
-                .pullToRefresh(
-                    isRefreshing = state.syncing,
-                    state = ptrState,
-                    onRefresh = { haptics?.diceRoll(); vm.syncNow() },
-                ),
+                .padding(horizontal = if (compact) 10.dp else 16.dp),
             verticalItemSpacing = if (compact) 8.dp else 12.dp,
             horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
