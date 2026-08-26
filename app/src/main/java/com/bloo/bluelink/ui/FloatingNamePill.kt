@@ -134,9 +134,11 @@ internal fun BoxScope.FloatingNamePill(
     screenWidth: Dp,
     topInset: Dp,
     onNameBoundsChanged: ((Rect?) -> Unit)? = null,
-    onDockedChanged: ((Boolean) -> Unit)? = null,
+    onSettledChanged: ((Boolean) -> Unit)? = null,
     onScrollToTop: (() -> Unit)? = null,
     extraContent: (@Composable RowScope.() -> Unit)? = null,
+    measureContent: (@Composable () -> Unit)? = null,
+    containerRelative: Boolean = false,
     content: @Composable () -> Unit,
 ) {
     val config = context.config
@@ -154,9 +156,11 @@ internal fun BoxScope.FloatingNamePill(
         maxWidth = maxWidth,
         textColorOverride = textColor,
         onClick = { onScrollToTop?.invoke() },
-        onNameBoundsChanged = onNameBoundsChanged,
-        onSettledChanged = onDockedChanged,
         extraContent = extraContent,
+        measureContent = measureContent,
+        onNameBoundsChanged = onNameBoundsChanged,
+        containerRelative = containerRelative,
+        onSettledChanged = onSettledChanged,
         content = content
     )
 }
