@@ -158,7 +158,10 @@ fun getDebugInfo(): List<DebugInfo> {
         // Runtime Info
         DebugInfo(
             label = "Java Runtime",
-            value = "${System.getProperty("java.vm.name")} ${System.getProperty("java.vm.version")}",
+            value = listOfNotNull(
+                System.getProperty("java.vm.name"),
+                System.getProperty("java.vm.version")
+            ).joinToString(" ").ifBlank { "Unknown" },
         ),
         DebugInfo(
             label = "Kotlin Runtime",

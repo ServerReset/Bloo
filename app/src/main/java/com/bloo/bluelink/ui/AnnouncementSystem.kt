@@ -289,11 +289,20 @@ private fun AnnouncementHistoryItem(announcement: Announcement) {
 
 /**
  * Simple time formatter for display.
- * Shows "Today HH:MM", "Yesterday HH:MM", or date if older.
+ * Shows "HH:MM" from ISO 8601 timestamp, or fallback if malformed.
+ * Defensive against missing "T" or truncated timestamps.
  */
 private fun formatTime(timestamp: String): String {
-    // This is a simplified version - in production, use proper date formatting
-    return timestamp.substringAfter("T").substring(0, 5)  // HH:MM
+    return try {
+        val afterT = timestamp.substringAfter("T")
+        if (afterT.isEmpty()) {
+            timestamp.take(10)  // Fallback to YYYY-MM-DD if no time part
+        } else {
+            afterT.take(5)  // HH:MM (substring safe)
+        }
+    } catch (e: Exception) {
+        timestamp.take(10)  // Final fallback to date portion
+    }
 }
 
 /**
