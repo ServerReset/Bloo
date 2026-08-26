@@ -122,9 +122,11 @@ val FloatingNameContext.config: FloatingNameConfig
  * @param screenWidth Available screen width for calculating maxWidth
  * @param topInset Status bar inset for cornerY calculation
  * @param onNameBoundsChanged Optional callback for bounds changes (used by hero car for collision detection)
- * @param onDockedChanged Optional callback when docking state settles (used by Settings for hand-off)
+ * @param onSettledChanged Optional callback when docking state settles (used by Settings for hand-off)
  * @param onScrollToTop Optional action when pill is clicked (can be null for read-only contexts)
  * @param extraContent Optional extra content shown alongside the name (e.g., page label)
+ * @param measureContent Optional plain composable for invisible anchor measurement
+ * @param containerRelative Whether bounds are relative to a grid container (default false)
  * @param content The flying text content (typically a Text, but can be AnimatedContent or other composable)
  */
 @Composable
