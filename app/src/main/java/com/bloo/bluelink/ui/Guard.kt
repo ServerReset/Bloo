@@ -864,7 +864,6 @@ internal fun EmptyScreen(vm: AppViewModel) {
         }
         // Pull-to-refresh indicator
         val topInset = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
-        val density = LocalDensity.current
         PullToRefreshDefaults.LoadingIndicator(
             state = ptrState,
             isRefreshing = state.loading,
