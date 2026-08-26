@@ -3,6 +3,7 @@
 package com.bloo.bluelink.ui
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -28,6 +29,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import android.os.Build
+import com.bloo.bluelink.BuildConfig
 
 /**
  * Represents a debug information item displayed in DebugSettingsPanel.
@@ -57,6 +59,13 @@ private fun DebugInfoItem(
     Row(
         modifier = Modifier
             .fillMaxWidth()
+            .then(
+                if (info.copyable && onCopy != null) {
+                    Modifier.clickable { onCopy(info.value) }
+                } else {
+                    Modifier
+                }
+            )
             .padding(horizontal = 12.dp, vertical = 8.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically,
@@ -114,17 +123,17 @@ fun getDebugInfo(): List<DebugInfo> {
         // App Info
         DebugInfo(
             label = "App Version",
-            value = "1.2.3",  // BuildConfig.VERSION_NAME in production
+            value = BuildConfig.VERSION_NAME,
             copyable = true,
         ),
         DebugInfo(
             label = "Build Number",
-            value = "1584",  // BuildConfig.VERSION_CODE in production
+            value = BuildConfig.VERSION_CODE.toString(),
             copyable = true,
         ),
         DebugInfo(
-            label = "Flavor",
-            value = "production",  // BuildConfig.FLAVOR in production
+            label = "Build Type",
+            value = BuildConfig.BUILD_TYPE,
         ),
 
         // Device Info
@@ -153,7 +162,7 @@ fun getDebugInfo(): List<DebugInfo> {
         ),
         DebugInfo(
             label = "Kotlin Runtime",
-            value = "1.9.0",  // Or dynamically determined
+            value = KotlinVersion.CURRENT.toString(),
         ),
     )
 }

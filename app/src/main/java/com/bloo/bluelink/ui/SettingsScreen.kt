@@ -120,6 +120,7 @@ import androidx.compose.material.icons.filled.Thermostat
 import androidx.compose.material.icons.filled.LocalGasStation
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.BugReport
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Map
 import androidx.compose.material.icons.filled.Refresh
@@ -1138,6 +1139,21 @@ internal fun SettingsScreen(
                         }
                     }
                 }
+            }
+            }
+            }
+            item {
+
+            // Debug -- app/device diagnostics for support troubleshooting.
+            // Placed right after Logs, both power-user diagnostic cards --
+            // shares this screen's stagger sequence (index 7, the next
+            // unused slot) rather than reusing Logs' index 3, since the two
+            // cards animate independently.
+            AnimatedVisibility(visible = staggeredAdvancedVisible(advanced, 7), enter = collapseEnter(), exit = collapseExit()) {
+            SettingsCard("Debug", Icons.Filled.BugReport, vm) {
+                DebugSettingsPanel(
+                    onCopyToClipboard = { text -> clipboard.setText(AnnotatedString(text)) },
+                )
             }
             }
             }
