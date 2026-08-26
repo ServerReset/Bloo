@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.Info
@@ -90,9 +91,9 @@ data class Announcement(
 @Composable
 private fun getAnnouncementIcon(severity: AnnouncementSeverity): ImageVector {
     return when (severity) {
-        AnnouncementSeverity.INFO -> Info
-        AnnouncementSeverity.WARNING -> Warning
-        AnnouncementSeverity.CRITICAL -> ErrorOutline
+        AnnouncementSeverity.INFO -> Icons.Filled.Info
+        AnnouncementSeverity.WARNING -> Icons.Filled.Warning
+        AnnouncementSeverity.CRITICAL -> Icons.Filled.ErrorOutline
     }
 }
 
@@ -207,7 +208,7 @@ fun AnnouncementToast(
                         modifier = Modifier.padding(0.dp)
                     ) {
                         Icon(
-                            imageVector = Close,
+                            imageVector = Icons.Filled.Close,
                             contentDescription = "Dismiss",
                             tint = foregroundColor(announcement.severity),
                         )

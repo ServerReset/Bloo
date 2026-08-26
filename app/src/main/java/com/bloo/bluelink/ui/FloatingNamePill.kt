@@ -12,7 +12,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import android.graphics.Rect
+import androidx.compose.ui.geometry.Rect
 
 /**
  * Specifies which screen context the floating name pill is rendered in.

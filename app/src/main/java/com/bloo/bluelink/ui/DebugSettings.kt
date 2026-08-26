@@ -12,9 +12,9 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Security
-import androidx.compose.material.icons.filled.Storage
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -205,7 +205,7 @@ fun DebugSettingsPanel(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Icon(
-                imageVector = Info,
+                imageVector = Icons.Filled.Info,
                 contentDescription = "Debug Info",
                 tint = MaterialTheme.colorScheme.primary,
             )
@@ -257,7 +257,7 @@ fun DebugSettingsPanel(
                         verticalAlignment = Alignment.Top,
                     ) {
                         Icon(
-                            imageVector = Security,
+                            imageVector = Icons.Filled.Security,
                             contentDescription = null,
                             tint = MaterialTheme.colorScheme.error,
                             modifier = Modifier.padding(top = 2.dp),
