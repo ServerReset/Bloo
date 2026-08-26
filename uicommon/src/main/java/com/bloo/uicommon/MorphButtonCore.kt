@@ -210,26 +210,10 @@ private fun MorphChrome(
     // The BorderStroke passed in by the caller is the same mutable object in
     // the parent scope; Modifier.border reads it here on every morph frame --
     // cheap, and it keeps the reference semantics identical to before.
-    //
-    // graphicsLayer{} is only added when pressScale is actually set (the watch's
-    // press-punch). Most callers (every phone MorphButton that doesn't pass
-    // pressScale) never press-scale at all, so `scale` is permanently 1f for them --
-    // but the modifier was being added unconditionally anyway, forcing every single
-    // one of those buttons onto its own RenderNode/compositing layer regardless. That
-    // layer, nested INSIDE the per-row compositing layer StaggeredRevealColumn's
-    // placeWithLayer already creates for pebble/settings-card body rows (see that
-    // composable's own doc), is what was making button backgrounds vanish entirely
-    // while their label text still rendered fine: confirmed from a real screenshot
-    // showing "Check"/"GitHub"/"Clear" et al. as bare text with no pill behind them,
-    // specifically only for buttons living INSIDE an expanded card's body -- the
-    // exact same buttons render correctly as standalone pills outside that nesting.
-    // A permanently-identity graphicsLayer (scale always 1f) has no visual purpose
-    // to lose by skipping it, so this closes the gap without touching anything the
-    // watch's real press-punch still needs.
     Box(
         Modifier
             .fillMaxSize()
-            .then(if (pressScale != null) Modifier.graphicsLayer { scaleX = scale; scaleY = scale } else Modifier)
+            .graphicsLayer { scaleX = scale; scaleY = scale }
             .clip(shape)
             .then(
                 if (border != null) {
