@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -238,8 +239,14 @@ fun RemoteActionsHistoryCard(
                     )
             ) {
                 LazyColumn(
+                    // heightIn is load-bearing, not cosmetic: this card is meant
+                    // to sit inside a car detail page's own scrollable column, and
+                    // a nested LazyColumn with no height cap crashes there
+                    // ("infinity maximum height constraints") -- same class of
+                    // guard SettingsScreen's Announcements/Logs cards apply.
                     modifier = Modifier
                         .fillMaxWidth()
+                        .heightIn(max = 300.dp)
                         .padding(vertical = 8.dp),
                     verticalArrangement = Arrangement.spacedBy(0.dp),
                 ) {

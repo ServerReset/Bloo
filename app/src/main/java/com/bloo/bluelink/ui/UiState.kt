@@ -202,6 +202,11 @@ data class UiState(
     val serviceIntervalMiles: Map<String, Int> = emptyMap(),
     /** In-flight commands, keyed "vin:action", so each control can show its own spinner. */
     val pending: Set<String> = emptySet(),
+    /** Recent remote commands (Lock/Unlock/Climate/etc.) by VIN, newest first,
+     *  capped at [REMOTE_ACTION_HISTORY_LIMIT] entries per car -- written by
+     *  [AppViewModel.runCommand] as the single choke point every remote
+     *  command already passes through. Surfaced in RemoteActionsHistoryCard. */
+    val remoteActionHistory: Map<String, List<RemoteAction>> = emptyMap(),
     /** Collapsed pebbles, keyed "vin:section". Absent = expanded. */
     val collapsedPebbles: Set<String> = emptySet(),
     /** Hidden pebbles, keyed "vin:section". */

@@ -35,3 +35,6 @@ internal const val SHIZUKU_INSTALL_REQUEST_CODE = 4711
 
 /** Minimum time a command control stays locked after firing, to block double-taps. */
 internal const val MIN_COMMAND_LOCK_MS = 3000L
+
+/** Max entries kept per car in [UiState.remoteActionHistory] -- oldest trimmed first. */
+internal const val REMOTE_ACTION_HISTORY_LIMIT = 20

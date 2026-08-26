@@ -2842,6 +2842,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 // requests with "a previous request is pending".
                 statusMutex.withLock { block() }
                 AppLog.log(success)
+                recordRemoteAction(vin, success, status = "Success")
                 // Confirm the optimistic state (or reapply if it wasn't set above).
                 _state.update { st ->
                     val statuses = if (optimistic != null && st.statuses[vin] != null) {
@@ -2857,6 +2858,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 _state.value.vehicles.firstOrNull { it.vin == vin }?.let { autoSummarize(it) }
             } catch (e: Exception) {
                 val msg = e.message ?: "Command failed"
+                recordRemoteAction(vin, success, status = "Failed", details = msg)
                 AppLog.log("⚠ $msg")
                 _state.update { it.copy(message = msg, messageType = "error") }
                 // Revert the optimistic flip LOCALLY first, then re-persist, so every
@@ -2886,6 +2888,28 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 }
                 _state.update { it.copy(pending = it.pending - key) }
             }
+        }
+    }
+
+    /** Appends one entry to [UiState.remoteActionHistory] for [vin], newest
+     *  first, trimmed to [REMOTE_ACTION_HISTORY_LIMIT]. Called from the two
+     *  places [runCommand] resolves (success/catch) -- every remote command
+     *  the app issues passes through there, so this one hook covers all of
+     *  them without touching each individual call site. */
+    private fun recordRemoteAction(vin: String, action: String, status: String, details: String? = null) {
+        val entry = RemoteAction(
+            id = java.util.UUID.randomUUID().toString(),
+            action = action,
+            timestamp = java.time.Instant.now().toString(),
+            status = status,
+            details = details,
+        )
+        _state.update { st ->
+            val existing = st.remoteActionHistory[vin].orEmpty()
+            st.copy(
+                remoteActionHistory = st.remoteActionHistory +
+                    (vin to (listOf(entry) + existing).take(REMOTE_ACTION_HISTORY_LIMIT)),
+            )
         }
     }
 
