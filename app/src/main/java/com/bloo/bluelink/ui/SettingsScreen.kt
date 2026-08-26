@@ -147,6 +147,9 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.surfaceColorAtElevation
 import androidx.compose.material3.Text
+import androidx.compose.material3.pulltorefresh.PullToRefreshDefaults
+import androidx.compose.material3.pulltorefresh.pullToRefresh
+import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
@@ -195,8 +198,10 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.composed
 import androidx.compose.ui.unit.dp
+import kotlin.math.roundToInt
 import coil.compose.AsyncImage
 import com.bloo.bluelink.data.ambientFahrenheit
 import com.bloo.bluelink.data.brand
@@ -341,6 +346,8 @@ internal fun SettingsScreen(
     val settingsScope = rememberCoroutineScope()
     val density = LocalDensity.current
     val haptics = LocalHaptics.current
+    // Pull-to-refresh for Settings: syncs with Drive and other periodic tasks
+    val ptrState = rememberPullToRefreshState()
     // System back returns to the garage, not out of the app.
     var pickTarget by remember { mutableStateOf<String?>(null) }
     var cropUri by remember { mutableStateOf<Uri?>(null) }
@@ -444,7 +451,12 @@ internal fun SettingsScreen(
             modifier = Modifier
                 .widthIn(max = 1100.dp)
                 .fillMaxWidth()
-                .padding(horizontal = if (compact) 10.dp else 16.dp),
+                .padding(horizontal = if (compact) 10.dp else 16.dp)
+                .pullToRefresh(
+                    isRefreshing = state.syncing,
+                    state = ptrState,
+                    onRefresh = { haptics?.diceRoll(); vm.syncNow() },
+                ),
             verticalItemSpacing = if (compact) 8.dp else 12.dp,
             horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
@@ -1960,6 +1972,19 @@ internal fun SettingsScreen(
           }
           }
         }
+        // Pull-to-refresh indicator
+        PullToRefreshDefaults.LoadingIndicator(
+            state = ptrState,
+            isRefreshing = state.syncing,
+            modifier = Modifier
+                .align(Alignment.TopCenter)
+                .offset {
+                    val indicatorProgress = if (state.syncing) 1f else ptrState.distanceFraction.coerceIn(0f, 1f)
+                    val offScreenPx = -(topInset + 56.dp).roundToPx()
+                    val onScreenPx = (topInset + 28.dp).roundToPx()
+                    IntOffset(0, offScreenPx + ((onScreenPx - offScreenPx) * indicatorProgress).roundToInt())
+                },
+        )
         } // CompositionLocalProvider(LocalHeroTitleFlight)
         } // Box (wide-screen centering)
         // Same blurred scrim GarageScreen uses behind the system clock/battery
