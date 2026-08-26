@@ -701,6 +701,9 @@ internal fun LockOverlay(vm: AppViewModel) {
 internal fun EmptyScreen(vm: AppViewModel) {
     val state by vm.state.collectAsState()
     val scheme = MaterialTheme.colorScheme
+    // Pull-to-refresh for Empty screen: reload garage or trigger refresh
+    val ptrState = rememberPullToRefreshState()
+    val haptics = LocalHaptics.current
 
     // Three distinct causes used to collapse into the same "No vehicles
     // found" / "Not signed in" copy -- including a real network/API
@@ -737,7 +740,24 @@ internal fun EmptyScreen(vm: AppViewModel) {
         launch { contentOffset.animateTo(0f, spring(dampingRatio = 0.7f, stiffness = Spring.StiffnessMediumLow)) }
     }
 
-    Box(Modifier.fillMaxSize()) {
+    Box(
+        Modifier
+            .fillMaxSize()
+            .pullToRefresh(
+                isRefreshing = state.loading,
+                state = ptrState,
+                onRefresh = {
+                    haptics?.diceRoll()
+                    if (state.accounts.isEmpty()) {
+                        // Empty accounts: user needs to sign in first, so just open settings
+                        vm.openSettings()
+                    } else {
+                        // Load failed: reload the garage
+                        vm.loadGarage()
+                    }
+                },
+            ),
+    ) {
         // The rest of the app never sits on a flat black/theme-background
         // screen with a stock opaque TopAppBar -- Garage, Settings, and
         // Onboarding all float their header over an animated Aurora backdrop
@@ -836,5 +856,20 @@ internal fun EmptyScreen(vm: AppViewModel) {
                 }
             }
         }
+        // Pull-to-refresh indicator
+        val topInset = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
+        val density = LocalDensity.current
+        PullToRefreshDefaults.LoadingIndicator(
+            state = ptrState,
+            isRefreshing = state.loading,
+            modifier = Modifier
+                .align(Alignment.TopCenter)
+                .offset {
+                    val indicatorProgress = if (state.loading) 1f else ptrState.distanceFraction.coerceIn(0f, 1f)
+                    val offScreenPx = -(topInset + 56.dp).roundToPx()
+                    val onScreenPx = (topInset + 28.dp).roundToPx()
+                    IntOffset(0, offScreenPx + ((onScreenPx - offScreenPx) * indicatorProgress).roundToInt())
+                },
+        )
     }
 }
