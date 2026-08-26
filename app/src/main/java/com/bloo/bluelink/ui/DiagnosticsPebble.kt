@@ -504,6 +504,7 @@ internal fun DiagnosticsPebble(v: Vehicle, status: VehicleStatus?, state: UiStat
             isWarning = true,
             contentDescription = "Diagnostics warning",
         ) else null,
+        alwaysExpandedInSimpleMode = true,
     ) {
         // COVER SCREEN only: a health-verdict hero — green check + "All systems OK",
         // or an error warning + "N issues" — so the tile reads at a glance instead of
