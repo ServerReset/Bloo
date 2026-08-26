@@ -443,13 +443,19 @@ internal fun Pebble(
      *  fill. Forwarded now, which is what lets the AI pebble carry a gradient
      *  without either of them growing a special case for it. */
     background: (@Composable BoxScope.() -> Unit)? = null,
+    /** If true and in simple mode, the pebble is always expanded and cannot be collapsed.
+     *  Use for pebbles with a single setting that benefit from inline display without expand/collapse. */
+    alwaysExpandedInSimpleMode: Boolean = false,
     content: @Composable ColumnScope.() -> Unit,
 ) {
     val forceExpanded = LocalForceExpanded.current
-    val expanded = forceExpanded || state.isPebbleExpanded(v.vin, section)
+    val simpleMode = state.settingsMode != "advanced"
+    val forceAlwaysExpanded = alwaysExpandedInSimpleMode && simpleMode
+    val expanded = forceExpanded || forceAlwaysExpanded || state.isPebbleExpanded(v.vin, section)
+    val canToggle = !forceAlwaysExpanded
     PebbleShell(
         expanded = expanded,
-        onToggle = { vm.togglePebble(v, section) },
+        onToggle = if (canToggle) { { vm.togglePebble(v, section) } } else { {} },
         icon = icon,
         title = title,
         vm = vm,
@@ -458,6 +464,7 @@ internal fun Pebble(
         containerColor = containerColor,
         headerAction = headerAction,
         forceExpanded = forceExpanded,
+        canToggle = canToggle,
         background = background,
         content = content,
     )
@@ -543,6 +550,8 @@ internal fun PebbleShell(
     containerColor: Color = MaterialTheme.colorScheme.surfaceVariant,
     headerAction: PebbleHeaderAction? = null,
     forceExpanded: Boolean = false,
+    /** If false, the expand/collapse chevron is hidden and onToggle is not called. */
+    canToggle: Boolean = true,
     /**
      * Drawn BEHIND the header and the collapsing body, inside the card's clip.
      *
@@ -697,7 +706,7 @@ internal fun PebbleShell(
                             // never fires mid-bounce with a transient wrong value.
                             .onSizeChanged { headerRowHeightPx = it.height }
                             .then(
-                                if (forceExpanded) Modifier
+                                if (forceExpanded || !canToggle) Modifier
                                 else Modifier.clickable {
                                     if (expanded) haptics?.tick() else haptics?.click()
                                     onToggle()
@@ -1120,39 +1129,42 @@ internal fun SplitExpandButton(
         // state as the lock/unlock button: active=true -> primary fill with
         // onPrimary content, straight from MorphButton's defaults -- there is
         // no second "expanded" colour vocabulary left in the app.
-        MorphButton(
-            onClick = { onToggle() },
-            onClickHaptic = { if (expanded) haptics?.tick() else haptics?.click() },
-            onLongClick = {
-                // Easter egg: hold the chevron to spin it + vibrate.
-                if (!easterEggTriggered) {
-                    easterEggTriggered = true
-                    haptics?.heavy()
-                }
-            },
-            active = expanded,
-            contentPadding = PaddingValues(start = 13.dp, end = 12.dp),
-            shapeForCorner = rightShapeForCorner,
-            morphedCornerPercent = morphedPercent,
-            pillCornerPercent = 50f,
-            minHeight = 0.dp,
-            // The icon's own contentDescription below is the NEXT action
-            // ("Expand"/"Collapse"); this is the CURRENT state -- without it
-            // TalkBack only ever hears what tapping will do, never whether the
-            // pebble is presently open, so distinguishing the two took a
-            // double-tap-and-listen-again instead of being announced on focus.
-            // widthIn(min = rowHeightDp) keeps the nub a square at the row's
-            // fixed height so its pill end is a true semicircle by percent.
-            modifier = Modifier.fillMaxHeight().widthIn(min = rowHeightDp)
-                .semantics { stateDescription = if (expanded) "Expanded" else "Collapsed" },
-        ) {
-            Icon(
-                Icons.Filled.KeyboardArrowDown,
-                contentDescription = if (expanded) "Collapse" else "Expand",
-                // Larger chevron icon (24dp to match action button icon size), with
-                // easter egg spin animation when the chevron is held.
-                modifier = Modifier.size(24.dp).rotate(rotation + easterEggSpin),
-            )
+        // Hidden if canToggle is false (single-setting pebbles in simple mode).
+        if (canToggle) {
+            MorphButton(
+                onClick = { onToggle() },
+                onClickHaptic = { if (expanded) haptics?.tick() else haptics?.click() },
+                onLongClick = {
+                    // Easter egg: hold the chevron to spin it + vibrate.
+                    if (!easterEggTriggered) {
+                        easterEggTriggered = true
+                        haptics?.heavy()
+                    }
+                },
+                active = expanded,
+                contentPadding = PaddingValues(start = 13.dp, end = 12.dp),
+                shapeForCorner = rightShapeForCorner,
+                morphedCornerPercent = morphedPercent,
+                pillCornerPercent = 50f,
+                minHeight = 0.dp,
+                // The icon's own contentDescription below is the NEXT action
+                // ("Expand"/"Collapse"); this is the CURRENT state -- without it
+                // TalkBack only ever hears what tapping will do, never whether the
+                // pebble is presently open, so distinguishing the two took a
+                // double-tap-and-listen-again instead of being announced on focus.
+                // widthIn(min = rowHeightDp) keeps the nub a square at the row's
+                // fixed height so its pill end is a true semicircle by percent.
+                modifier = Modifier.fillMaxHeight().widthIn(min = rowHeightDp)
+                    .semantics { stateDescription = if (expanded) "Expanded" else "Collapsed" },
+            ) {
+                Icon(
+                    Icons.Filled.KeyboardArrowDown,
+                    contentDescription = if (expanded) "Collapse" else "Expand",
+                    // Larger chevron icon (24dp to match action button icon size), with
+                    // easter egg spin animation when the chevron is held.
+                    modifier = Modifier.size(24.dp).rotate(rotation + easterEggSpin),
+                )
+            }
         }
     }
 }

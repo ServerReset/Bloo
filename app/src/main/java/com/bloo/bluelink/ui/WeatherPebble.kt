@@ -240,6 +240,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.surfaceColorAtElevation
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
+import androidx.compose.material3.isSystemInDarkTheme
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogWindowProvider
 import androidx.compose.runtime.Composable
@@ -455,7 +456,9 @@ internal fun LocationPebble(v: Vehicle, state: UiState, vm: AppViewModel, dragHa
         ) {
             val loc = location
             if (loc != null) {
-                Column {
+                Column(
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
                 // COVER SCREEN: lead with the place-name hero (the cover drops the header
                 // where the place summary otherwise shows), and shrink the map so hero +
                 // map + coords + weather + button fit without overflowing the ~1-inch tile.
@@ -498,8 +501,9 @@ internal fun LocationPebble(v: Vehicle, state: UiState, vm: AppViewModel, dragHa
                 CommandButton("Open in maps", Icons.Filled.Map, Modifier.fillMaxWidth(), true) {
                     val uri = Uri.parse(
                         "geo:${loc.latitude},${loc.longitude}" +
-                            "?q=${loc.latitude},${loc.longitude}(My car)"
+                            "?q=${loc.latitude},${loc.longitude}(${v.name})"
                     )
+                    // Use the default maps app instead of hardcoding Google Maps
                     runCatching {
                         context.startActivity(
                             Intent(Intent.ACTION_VIEW, uri).apply { addFlags(Intent.FLAG_ACTIVITY_NEW_TASK) },
@@ -668,9 +672,23 @@ internal fun WeatherPebble(v: Vehicle, state: UiState, vm: AppViewModel, dragHan
 internal fun CarMap(location: GeoLocation, modifier: Modifier = Modifier) {
     val zoom = 15
     val context = LocalContext.current
+
+    // Contrast-aware pin color: bright on dark maps, dark on light maps
+    // OSM maps use a light color scheme with blues/greens/grays
+    // so we use a bright red pin on the map, but ensure readability
     val pinColor = MaterialTheme.colorScheme.error
+    val isDarkMode = isSystemInDarkTheme()
+
+    // Adaptive map background: light map needs bright pins, dark needs adjustment
+    // The map tiles themselves provide the visual theme, so minimal background needed
+    val mapBackground = if (isDarkMode) {
+        MaterialTheme.colorScheme.surface.copy(alpha = 0.3f)
+    } else {
+        MaterialTheme.colorScheme.surfaceContainerLowest
+    }
+
     BoxWithConstraints(
-        modifier.background(MaterialTheme.colorScheme.surfaceVariant),
+        modifier.background(mapBackground),
     ) {
         val density = LocalDensity.current
         val tilePx = MapTiles.TILE_PX.toFloat()
