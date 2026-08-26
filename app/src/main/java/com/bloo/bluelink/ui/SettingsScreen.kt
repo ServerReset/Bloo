@@ -346,7 +346,12 @@ internal fun SettingsScreen(
     val settingsScope = rememberCoroutineScope()
     val density = LocalDensity.current
     val haptics = LocalHaptics.current
-    // Pull-to-refresh for Settings: syncs with Drive and other periodic tasks
+    // === PULL-TO-REFRESH FOR SETTINGS ===
+    // Settings uses Material 3's native PullToRefresh on the LazyVerticalStaggeredGrid.
+    // When the user drags from the top, it triggers vm.syncNow() to sync with Google Drive.
+    // The loading indicator floats at the top with spring animation, appearing only once
+    // the user pulls past the threshold and fading out once the sync completes.
+    // Status: uses state.syncing to drive the indicator progress and completion state.
     val ptrState = rememberPullToRefreshState()
     // System back returns to the garage, not out of the app.
     var pickTarget by remember { mutableStateOf<String?>(null) }

@@ -701,7 +701,13 @@ internal fun LockOverlay(vm: AppViewModel) {
 internal fun EmptyScreen(vm: AppViewModel) {
     val state by vm.state.collectAsState()
     val scheme = MaterialTheme.colorScheme
-    // Pull-to-refresh for Empty screen: reload garage or trigger refresh
+    // === PULL-TO-REFRESH FOR EMPTY SCREEN ===
+    // EmptyScreen (shown when signed out or garage load fails) supports Material 3's
+    // PullToRefresh on the main Box. The action taken depends on the failure reason:
+    //   - No accounts (signed out): Opens Settings to add an account
+    //   - Load failed (garage load error): Calls vm.loadGarage() to retry
+    // Uses state.loading to drive the loading indicator progress and completion.
+    // The indicator floats at the top with spring animation, fading in as the user pulls.
     val ptrState = rememberPullToRefreshState()
     val haptics = LocalHaptics.current
 
