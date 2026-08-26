@@ -438,6 +438,7 @@ internal fun LocationPebble(v: Vehicle, state: UiState, vm: AppViewModel, dragHa
             pending = locating,
             bounceIcon = true,
         ),
+        alwaysExpandedInSimpleMode = true,
     ) {
         val coverGlance = LocalForceExpanded.current
         AnimatedVisibility(
@@ -601,6 +602,7 @@ internal fun WeatherPebble(v: Vehicle, state: UiState, vm: AppViewModel, dragHan
             enabled = hasLocation,
             spinning = weatherSpinning,
         ),
+        alwaysExpandedInSimpleMode = true,
     ) {
         when {
             !hasLocation -> Text(
