@@ -549,7 +549,7 @@ internal fun UpdateAvailableTile(state: UiState, vm: AppViewModel, dragHandle: M
                         // "Full notes" rides in the section header rather than taking a
                         // whole row of its own below the excerpt — one less stacked block
                         // in a tile that already carries status, notes and two dismissals.
-                        Row(verticalAlignment = Alignment.CenterVertically) {
+                        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                             Text(
                                 "What's new",
                                 style = MaterialTheme.typography.labelSmall,
