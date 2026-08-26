@@ -90,9 +90,9 @@ data class Announcement(
 @Composable
 private fun getAnnouncementIcon(severity: AnnouncementSeverity): ImageVector {
     return when (severity) {
-        AnnouncementSeverity.INFO -> androidx.compose.material.icons.filled.Info
-        AnnouncementSeverity.WARNING -> androidx.compose.material.icons.filled.Warning
-        AnnouncementSeverity.CRITICAL -> androidx.compose.material.icons.filled.ErrorOutline
+        AnnouncementSeverity.INFO -> Info
+        AnnouncementSeverity.WARNING -> Warning
+        AnnouncementSeverity.CRITICAL -> ErrorOutline
     }
 }
 
@@ -207,7 +207,7 @@ fun AnnouncementToast(
                         modifier = Modifier.padding(0.dp)
                     ) {
                         Icon(
-                            imageVector = androidx.compose.material.icons.filled.Close,
+                            imageVector = Close,
                             contentDescription = "Dismiss",
                             tint = foregroundColor(announcement.severity),
                         )

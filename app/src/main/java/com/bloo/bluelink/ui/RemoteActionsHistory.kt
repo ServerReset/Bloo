@@ -193,7 +193,7 @@ fun RemoteActionsHistoryCard(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 Icon(
-                    imageVector = androidx.compose.material.icons.filled.History,
+                    imageVector = History,
                     contentDescription = "Actions History",
                     modifier = Modifier.padding(4.dp),
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,

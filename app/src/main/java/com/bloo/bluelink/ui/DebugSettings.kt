@@ -205,7 +205,7 @@ fun DebugSettingsPanel(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Icon(
-                imageVector = androidx.compose.material.icons.filled.Info,
+                imageVector = Info,
                 contentDescription = "Debug Info",
                 tint = MaterialTheme.colorScheme.primary,
             )
@@ -257,7 +257,7 @@ fun DebugSettingsPanel(
                         verticalAlignment = Alignment.Top,
                     ) {
                         Icon(
-                            imageVector = androidx.compose.material.icons.filled.Security,
+                            imageVector = Security,
                             contentDescription = null,
                             tint = MaterialTheme.colorScheme.error,
                             modifier = Modifier.padding(top = 2.dp),
