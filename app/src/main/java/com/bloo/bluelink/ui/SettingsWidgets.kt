@@ -448,6 +448,7 @@ internal fun SettingsCard(title: String, icon: ImageVector? = null, vm: AppViewM
             icon = icon ?: Icons.Filled.Settings,
             title = title,
             vm = vm,
+            canToggle = true,
             content = { content() },
         )
     }
