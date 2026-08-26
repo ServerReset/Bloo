@@ -222,9 +222,6 @@ import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
-import androidx.compose.material3.pulltorefresh.PullToRefreshDefaults
-import androidx.compose.material3.pulltorefresh.pullToRefresh
-import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
@@ -700,14 +697,6 @@ internal fun LockOverlay(vm: AppViewModel) {
 internal fun EmptyScreen(vm: AppViewModel) {
     val state by vm.state.collectAsState()
     val scheme = MaterialTheme.colorScheme
-    // === PULL-TO-REFRESH FOR EMPTY SCREEN ===
-    // EmptyScreen (shown when signed out or garage load fails) supports Material 3's
-    // PullToRefresh on the main Box. The action taken depends on the failure reason:
-    //   - No accounts (signed out): Opens Settings to add an account
-    //   - Load failed (garage load error): Calls vm.loadGarage() to retry
-    // Uses state.loading to drive the loading indicator progress and completion.
-    // The indicator floats at the top with spring animation, fading in as the user pulls.
-    val ptrState = rememberPullToRefreshState()
     val haptics = LocalHaptics.current
 
     // Three distinct causes used to collapse into the same "No vehicles
@@ -747,21 +736,7 @@ internal fun EmptyScreen(vm: AppViewModel) {
 
     Box(
         Modifier
-            .fillMaxSize()
-            .pullToRefresh(
-                isRefreshing = state.loading,
-                state = ptrState,
-                onRefresh = {
-                    haptics?.diceRoll()
-                    if (state.accounts.isEmpty()) {
-                        // Empty accounts: user needs to sign in first, so just open settings
-                        vm.openSettings()
-                    } else {
-                        // Load failed: reload the garage
-                        vm.loadGarage()
-                    }
-                },
-            ),
+            .fillMaxSize(),
     ) {
         // The rest of the app never sits on a flat black/theme-background
         // screen with a stock opaque TopAppBar -- Garage, Settings, and
@@ -861,19 +836,5 @@ internal fun EmptyScreen(vm: AppViewModel) {
                 }
             }
         }
-        // Pull-to-refresh indicator
-        val topInset = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
-        PullToRefreshDefaults.LoadingIndicator(
-            state = ptrState,
-            isRefreshing = state.loading,
-            modifier = Modifier
-                .align(Alignment.TopCenter)
-                .offset {
-                    val indicatorProgress = if (state.loading) 1f else ptrState.distanceFraction.coerceIn(0f, 1f)
-                    val offScreenPx = -(topInset + 56.dp).roundToPx()
-                    val onScreenPx = (topInset + 28.dp).roundToPx()
-                    IntOffset(0, offScreenPx + ((onScreenPx - offScreenPx) * indicatorProgress).roundToInt())
-                },
-        )
     }
 }

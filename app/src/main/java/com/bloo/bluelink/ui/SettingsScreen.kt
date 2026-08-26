@@ -147,9 +147,6 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.surfaceColorAtElevation
 import androidx.compose.material3.Text
-import androidx.compose.material3.pulltorefresh.PullToRefreshDefaults
-import androidx.compose.material3.pulltorefresh.pullToRefresh
-import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
@@ -352,7 +349,6 @@ internal fun SettingsScreen(
     // The loading indicator floats at the top with spring animation, appearing only once
     // the user pulls past the threshold and fading out once the sync completes.
     // Status: uses state.syncing to drive the indicator progress and completion state.
-    val ptrState = rememberPullToRefreshState()
     // System back returns to the garage, not out of the app.
     var pickTarget by remember { mutableStateOf<String?>(null) }
     var cropUri by remember { mutableStateOf<Uri?>(null) }
@@ -450,12 +446,7 @@ internal fun SettingsScreen(
         // exactly the "wrong tool" a masonry layout exists to avoid.
         Box(
             Modifier
-                .fillMaxSize()
-                .pullToRefresh(
-                    isRefreshing = state.syncing,
-                    state = ptrState,
-                    onRefresh = { haptics?.diceRoll(); vm.syncNow() },
-                ),
+                .fillMaxSize(),
             contentAlignment = Alignment.TopCenter
         ) {
         CompositionLocalProvider(LocalHeroTitleFlight provides liveFlight) {
@@ -1981,19 +1972,6 @@ internal fun SettingsScreen(
           }
           }
         }
-        // Pull-to-refresh indicator
-        PullToRefreshDefaults.LoadingIndicator(
-            state = ptrState,
-            isRefreshing = state.syncing,
-            modifier = Modifier
-                .align(Alignment.TopCenter)
-                .offset {
-                    val indicatorProgress = if (state.syncing) 1f else ptrState.distanceFraction.coerceIn(0f, 1f)
-                    val offScreenPx = -(topInset + 56.dp).roundToPx()
-                    val onScreenPx = (topInset + 28.dp).roundToPx()
-                    IntOffset(0, offScreenPx + ((onScreenPx - offScreenPx) * indicatorProgress).roundToInt())
-                },
-        )
         } // CompositionLocalProvider(LocalHeroTitleFlight)
         } // Box (wide-screen centering)
         // Same blurred scrim GarageScreen uses behind the system clock/battery
