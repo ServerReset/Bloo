@@ -431,15 +431,18 @@ internal fun SettingsHeaderRow(state: UiState, compact: Boolean = false) {
             // Simple/Advanced lives in the header now (it was a bare row of
             // segmented options further down, easily lost) -- a small tonal
             // chip carrying the current mode, standard surface treatment.
+            // CRITICAL: This must align vertically with the floating back button
+            // and floating Settings name pill. Removed the top padding that was
+            // throwing off vertical alignment; the pill now centers naturally
+            // with Alignment.CenterVertically in the Row.
             Spacer(Modifier.weight(1f))
             Surface(
                 shape = RoundedCornerShape(50),
                 color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.75f),
                 contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                modifier = Modifier.padding(top = 6.dp),
             ) {
                 Row(
-                    Modifier.padding(horizontal = 12.dp, vertical = 5.dp),
+                    Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(6.dp),
                 ) {
