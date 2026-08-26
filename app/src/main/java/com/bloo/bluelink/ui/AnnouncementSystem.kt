@@ -84,15 +84,14 @@ data class Announcement(
 )
 
 /**
- * Get icon and colors for announcement based on severity.
+ * Get icon for announcement based on severity.
  */
 @Composable
-private fun AnnouncementTheme(severity: AnnouncementSeverity): Pair<ImageVector, androidx.compose.material3.ColorScheme> {
-    val scheme = MaterialTheme.colorScheme
+private fun getAnnouncementIcon(severity: AnnouncementSeverity): ImageVector {
     return when (severity) {
-        AnnouncementSeverity.INFO -> androidx.compose.material.icons.filled.Info to scheme
-        AnnouncementSeverity.WARNING -> androidx.compose.material.icons.filled.Warning to scheme
-        AnnouncementSeverity.CRITICAL -> androidx.compose.material.icons.filled.ErrorOutline to scheme
+        AnnouncementSeverity.INFO -> androidx.compose.material.icons.filled.Info
+        AnnouncementSeverity.WARNING -> androidx.compose.material.icons.filled.Warning
+        AnnouncementSeverity.CRITICAL -> androidx.compose.material.icons.filled.ErrorOutline
     }
 }
 
@@ -169,7 +168,7 @@ fun AnnouncementToast(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Icon(
-                    imageVector = AnnouncementTheme(announcement.severity).first,
+                    imageVector = getAnnouncementIcon(announcement.severity),
                     contentDescription = null,
                     modifier = Modifier.padding(4.dp),
                     tint = foregroundColor(announcement.severity),
@@ -245,7 +244,7 @@ private fun AnnouncementHistoryItem(announcement: Announcement) {
                 verticalAlignment = Alignment.Top,
             ) {
                 Icon(
-                    imageVector = AnnouncementTheme(announcement.severity).first,
+                    imageVector = getAnnouncementIcon(announcement.severity),
                     contentDescription = null,
                     modifier = Modifier.padding(top = 2.dp),
                     tint = foregroundColor(announcement.severity),
