@@ -546,8 +546,9 @@ internal fun FuelPebble(v: Vehicle, status: VehicleStatus?, state: UiState, vm: 
         else -> "--"
     }
     Pebble(
-        v, "charge", "Fuel", Icons.Filled.LocalGasStation, state, vm, dragHandle,
+        v, "fuel", "Fuel", Icons.Filled.LocalGasStation, state, vm, dragHandle,
         summary = summary,
+        alwaysExpandedInSimpleMode = true,
     ) {
         // COVER SCREEN only: lead with a big fuel-% hero so the gas tile gets the same
         // glance treatment the EV Charge tile gets from ChargeFuelBar (it previously
