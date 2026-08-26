@@ -121,6 +121,7 @@ import androidx.compose.material.icons.filled.LocalGasStation
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.BugReport
+import androidx.compose.material.icons.filled.Campaign
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Map
 import androidx.compose.material.icons.filled.Refresh
@@ -1153,6 +1154,53 @@ internal fun SettingsScreen(
             SettingsCard("Debug", Icons.Filled.BugReport, vm) {
                 DebugSettingsPanel(
                     onCopyToClipboard = { text -> clipboard.setText(AnnotatedString(text)) },
+                )
+            }
+            }
+            }
+            item {
+
+            // Announcements -- currently sourced from the one real signal this
+            // app has for it (an available build, same state.updateAvailable
+            // the Updates card above renders) rather than a synthetic feed.
+            // AnnouncementHistory's LazyColumn needs an explicit height cap:
+            // it's placed inside this screen's own LazyVerticalStaggeredGrid
+            // item{}, an unbounded-height vertical container, and a nested
+            // LazyColumn with no height constraint crashes there (same class
+            // of bug the Logs card's heightIn(max = 300.dp) above guards
+            // against, just via Modifier.verticalScroll there instead of a
+            // second lazy layout).
+            AnimatedVisibility(visible = staggeredAdvancedVisible(advanced, 8), enter = collapseEnter(), exit = collapseExit()) {
+            SettingsCard("Announcements", Icons.Filled.Campaign, vm) {
+                val update = state.updateAvailable
+                val announcements = remember(update) {
+                    if (update == null) {
+                        emptyList()
+                    } else {
+                        listOf(
+                            Announcement(
+                                id = "update-${update.run.runNumber}",
+                                title = "Build #${update.run.runNumber} available",
+                                message = update.run.releaseNotes?.trim().takeUnless { it.isNullOrBlank() }
+                                    ?: "A new build is ready to view.",
+                                severity = if (state.updateApkReady) AnnouncementSeverity.WARNING else AnnouncementSeverity.INFO,
+                                timestamp = java.time.Instant.now().toString(),
+                                actionLabel = "View",
+                                onAction = {
+                                    runCatching {
+                                        context.startActivity(
+                                            Intent(Intent.ACTION_VIEW, Uri.parse(update.run.htmlUrl))
+                                                .apply { addFlags(Intent.FLAG_ACTIVITY_NEW_TASK) },
+                                        )
+                                    }
+                                },
+                            ),
+                        )
+                    }
+                }
+                AnnouncementHistory(
+                    announcements = announcements,
+                    modifier = Modifier.heightIn(max = 300.dp),
                 )
             }
             }
