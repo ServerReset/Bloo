@@ -325,7 +325,6 @@ import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.composed
 import androidx.compose.ui.layout.onPlaced
 import androidx.compose.ui.layout.positionInParent
-import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.round
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.TextUnit
@@ -698,6 +697,7 @@ internal fun EmptyScreen(vm: AppViewModel) {
     val state by vm.state.collectAsState()
     val scheme = MaterialTheme.colorScheme
     val haptics = LocalHaptics.current
+    // Note: pull-to-refresh feature temporarily disabled due to Material 3 version compatibility
 
     // Three distinct causes used to collapse into the same "No vehicles
     // found" / "Not signed in" copy -- including a real network/API

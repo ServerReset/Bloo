@@ -195,10 +195,8 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.Dp
-import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.composed
 import androidx.compose.ui.unit.dp
-import kotlin.math.roundToInt
 import coil.compose.AsyncImage
 import com.bloo.bluelink.data.ambientFahrenheit
 import com.bloo.bluelink.data.brand
@@ -347,8 +345,6 @@ internal fun SettingsScreen(
     // Settings uses Material 3's native PullToRefresh on the LazyVerticalStaggeredGrid.
     // When the user drags from the top, it triggers vm.syncNow() to sync with Google Drive.
     // The loading indicator floats at the top with spring animation, appearing only once
-    // the user pulls past the threshold and fading out once the sync completes.
-    // Status: uses state.syncing to drive the indicator progress and completion state.
     // System back returns to the garage, not out of the app.
     var pickTarget by remember { mutableStateOf<String?>(null) }
     var cropUri by remember { mutableStateOf<Uri?>(null) }
