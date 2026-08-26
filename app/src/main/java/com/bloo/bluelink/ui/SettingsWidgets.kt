@@ -406,17 +406,6 @@ internal fun InlineSegmentedRow(
 @Composable
 internal fun SettingsCard(title: String, icon: ImageVector? = null, vm: AppViewModel, content: @Composable () -> Unit) {
     var expanded by rememberSaveable(title) { mutableStateOf(true) }
-    // A soft lift while the card is OPEN: the expanded card scales up ~1.5%
-    // and settles back -- the same "the thing that changed just came
-    // forward" language the pebble cards' own open bounce already speaks,
-    // so an expansion reads as the card arriving rather than the neighbours
-    // merely moving out of its way. Pure draw-phase (graphicsLayer), so it
-    // never re-measures the grid.
-    val lift by animateFloatAsState(
-        targetValue = if (expanded) 1f else 0f,
-        animationSpec = spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessLow),
-        label = "settingsCardLift",
-    )
     // heading() on the outer wrapper, not inside PebbleShell's own header Text -- PebbleShell
     // doesn't expose a hook into its title's own Modifier, so this is applied one level up
     // instead. PebbleShell's header row is already ONE merged TalkBack stop (tap-to-toggle),
@@ -435,11 +424,6 @@ internal fun SettingsCard(title: String, icon: ImageVector? = null, vm: AppViewM
             // the cards, then it snaps". Living on this wrapper instead means the gap sits
             // INSIDE that same outer AnimatedVisibility and shrinks away with the card.
             .padding(bottom = SettingsCardGap)
-            .graphicsLayer {
-                val s = 1f + 0.015f * lift
-                scaleX = s
-                scaleY = s
-            }
             .semantics { heading() },
     ) {
         PebbleShell(
