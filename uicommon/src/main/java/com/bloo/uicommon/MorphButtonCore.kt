@@ -17,7 +17,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -136,7 +136,37 @@ fun MorphButtonCore(
     // page re-running all their labels for every frame of a single morph.
     // Now the per-frame work is the tiny chrome Box; the Texts sit above it,
     // composed once.
-    Box(modifier = modifier) {
+    // contentAlignment = Center, and the content Row below WRAPS instead of
+    // filling: between them they reproduce exactly what the single-Row version
+    // of this component did before the chrome/content split, which is that the
+    // CONTENT decides the button's size and `modifier` (weight/fillMaxWidth/
+    // heightIn from the callers) is what stretches it.
+    //
+    // Both children used to be fillMaxSize(), which left this Box with NO
+    // wrap-content child at all -- so the button had no intrinsic size of its
+    // own and simply took whatever the incoming constraints allowed. That is
+    // one bug with two very different-looking symptoms, both reported from
+    // real screenshots:
+    //
+    //  - Width is bounded almost everywhere, so every button GREW to the full
+    //    width available. In a pebble header that meant the un-weighted
+    //    SplitExpandButton ate the whole row, leaving nothing for the weighted
+    //    title Column (titles vanished) and pushing the chevron half out past
+    //    the clip (chevrons vanished) -- "the main buttons are just totally
+    //    fucked, no chevrons, big and the sizes are all weird".
+    //  - Height inside a vertically-unbounded parent (a settings card body, an
+    //    info pebble's rows -- any Column in a scrollable) has maxHeight
+    //    Infinity, where fillMaxSize() cannot apply a height at all. The chrome
+    //    Box holds no content, so it wrapped to ZERO height and its background
+    //    drew nothing, while the content Row still wrapped its label normally
+    //    and stayed visible -- "the smaller buttons don't have a shape or
+    //    background anymore", text with no pill behind it.
+    //
+    // matchParentSize() (not fillMaxSize) is the fix on the chrome side: it is
+    // measured AFTER, and against, the size this Box got from its real content,
+    // so the chrome always exactly covers the button without ever contributing
+    // to -- or inflating -- its size.
+    Box(modifier = modifier, contentAlignment = Alignment.Center) {
         MorphChrome(
             pressed = pressed,
             active = active,
@@ -156,9 +186,10 @@ fun MorphButtonCore(
             onClick = onClick,
         )
         // Stable content -- drawn OVER the chrome; taps reach the chrome
-        // below (nothing here consumes them).
+        // below (nothing here consumes them). Wrap-content (see the Box's own
+        // comment): this is the child that gives the button its size.
         Row(
-            modifier = Modifier.fillMaxSize().padding(contentPadding),
+            modifier = Modifier.padding(contentPadding),
             horizontalArrangement = Arrangement.Center,
             verticalAlignment = Alignment.CenterVertically,
         ) {
@@ -171,7 +202,7 @@ fun MorphButtonCore(
  *  tracks it), sprung background, press scale, clickable + long-click. The
  *  ONLY composable that recomposes per animation frame. */
 @Composable
-private fun MorphChrome(
+private fun BoxScope.MorphChrome(
     pressed: Boolean,
     active: Boolean,
     interactionSource: MutableInteractionSource,
@@ -212,7 +243,9 @@ private fun MorphChrome(
     // cheap, and it keeps the reference semantics identical to before.
     Box(
         Modifier
-            .fillMaxSize()
+            // matchParentSize, NOT fillMaxSize -- see the caller's own comment:
+            // this covers the button without taking part in sizing it.
+            .matchParentSize()
             .graphicsLayer { scaleX = scale; scaleY = scale }
             .clip(shape)
             .then(
