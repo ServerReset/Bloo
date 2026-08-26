@@ -1874,11 +1874,24 @@ internal fun SettingsScreen(
                 // PopVisible, not a bare `?.let` -- was snapping in/out with zero
                 // animation whenever a place got set or cleared.
                 PopVisible(visible = appearance.weatherLabel != null) {
-                  Column {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
+                  Column(Modifier.fillMaxWidth()) {
+                    // fillMaxWidth() on the Row, not just the Column: a weighted child
+                    // needs its immediate parent to actually claim the available width,
+                    // not just an ancestor further up -- without it here, the place-name
+                    // Text (weight(1f)) had no real width to size against and wrapped
+                    // character-by-character ("S/u/n/n/y/v/a/l/e" one letter per line),
+                    // ballooning the whole card's height. Same class of bug StatusRow's
+                    // own doc warns about; maxLines/ellipsis added as the same guard.
+                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                         Icon(Icons.Filled.LocationOn, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
                         Spacer(Modifier.width(6.dp))
-                        Text(appearance.weatherLabel.orEmpty(), Modifier.weight(1f), fontWeight = FontWeight.SemiBold)
+                        Text(
+                            appearance.weatherLabel.orEmpty(),
+                            Modifier.weight(1f),
+                            fontWeight = FontWeight.SemiBold,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
                         MorphTextButton("Clear", onClick = { vm.clearWeatherLocation() })
                     }
                     Spacer(Modifier.height(10.dp))

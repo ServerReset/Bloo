@@ -534,7 +534,13 @@ internal fun UpdateAvailableTile(state: UiState, vm: AppViewModel, dragHandle: M
                 // Its own tonal card, matching the install-help disclosure just below it --
                 // bare text here made the release notes read as an unstyled afterthought
                 // next to that block's Surface treatment.
+                // fillMaxWidth() required: this Surface is a PopVisible/AnimatedVisibility
+                // descendant with a weight()-bearing Text further down ("What's new" row) --
+                // without an explicit fillMaxWidth somewhere in this chain, that Text
+                // collapses to a near-zero width and wraps one character per line. See
+                // SettingsScreen.kt's Weather-card place-name Row for the confirmed case.
                 Surface(
+                    modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(12.dp),
                     color = scheme.surfaceContainerHighest,
                     contentColor = scheme.onSurface,
@@ -572,7 +578,11 @@ internal fun UpdateAvailableTile(state: UiState, vm: AppViewModel, dragHandle: M
                 var showHelp by rememberSaveable(info.run.runNumber) { mutableStateOf(false) }
                 MorphTextButton(if (showHelp) "Hide install help" else "Trouble installing?", onClick = { showHelp = !showHelp })
                 PopVisible(visible = showHelp) {
+                    // fillMaxWidth() to match the release-notes Surface right above --
+                    // without it this panel wrap-contents to its widest line instead of
+                    // matching its sibling's full-card width.
                     Surface(
+                        modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(12.dp),
                         color = scheme.surfaceContainerHighest,
                         contentColor = scheme.onSurface,
@@ -784,7 +794,14 @@ internal fun UpdateStatusLine(
     // this bar arrives and leaves while the card is already open (download
     // starts, download finishes).
     PopVisible(visible = state.updateDownloading) {
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+        // fillMaxWidth() is required here, not optional: a Row that's a DIRECT child of
+        // PopVisible (AnimatedVisibility) and relies on weight() to size a child (the
+        // progress bar below) collapses to a near-zero width without it -- AnimatedVisibility
+        // measures its content's "natural" size before it has anything but the weighted
+        // child to size against, unlike a Row inside an already-bounded parent. See
+        // SettingsScreen.kt's Weather-card place-name Row for the same bug, confirmed by
+        // screenshot (text wrapped one character per line).
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             val p = downloadProgress
             Surface(
                 modifier = Modifier.weight(1f).height(8.dp),
