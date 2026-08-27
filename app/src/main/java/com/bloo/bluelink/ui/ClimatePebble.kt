@@ -691,20 +691,27 @@ internal fun ClimatePebble(
                 val smartLabel = if (smartClimateIsCooling(ambientF)) "Cool to $targetLabel" else "Heat to $targetLabel"
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     SectionLabel("Smart climate")
-                    MorphButton(
-                        onClick = {
-                            tempF = smartTarget
-                            defrost = false
-                            activePresetId = null
-                            vm.startClimate(v, currentReq.copy(tempF = smartTarget, defrost = false))
-                        },
+                    val smartSource = remember { MutableInteractionSource() }
+                    SafeExpansiveButton(
+                        interactionSource = smartSource,
                         enabled = !pending && !climateOn,
-                        modifier = Modifier.fillMaxWidth(),
-                        contentPadding = PaddingValues(vertical = 12.dp),
                     ) {
-                        Icon(Icons.Filled.AcUnit, contentDescription = null, modifier = Modifier.size(18.dp))
-                        Spacer(Modifier.width(8.dp))
-                        Text(smartLabel, fontWeight = FontWeight.SemiBold)
+                        MorphButton(
+                            onClick = {
+                                tempF = smartTarget
+                                defrost = false
+                                activePresetId = null
+                                vm.startClimate(v, currentReq.copy(tempF = smartTarget, defrost = false))
+                            },
+                            enabled = !pending && !climateOn,
+                            interactionSource = smartSource,
+                            modifier = Modifier.fillMaxWidth(),
+                            contentPadding = PaddingValues(vertical = 12.dp),
+                        ) {
+                            Icon(Icons.Filled.AcUnit, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(Modifier.width(8.dp))
+                            Text(smartLabel, fontWeight = FontWeight.SemiBold)
+                        }
                     }
                     Text(
                         "It's $ambientLabel where your car is. Smart climate is targeting $targetLabel.",
@@ -871,17 +878,24 @@ internal fun ClimatePebble(
                     )
                 },
                 buttons = {
-                    MorphButton(
-                        onClick = {
-                            if (presetName.isNotBlank()) {
-                                vm.saveClimatePreset(v, presetName.trim(), currentReq)
-                                showAddPreset = false
-                            }
-                        },
+                    val saveSource = remember { MutableInteractionSource() }
+                    SafeExpansiveButton(
+                        interactionSource = saveSource,
                         enabled = presetName.isNotBlank(),
-                        active = true,
-                        modifier = Modifier.fillMaxWidth(),
-                    ) { Text("Save", fontWeight = FontWeight.SemiBold) }
+                    ) {
+                        MorphButton(
+                            onClick = {
+                                if (presetName.isNotBlank()) {
+                                    vm.saveClimatePreset(v, presetName.trim(), currentReq)
+                                    showAddPreset = false
+                                }
+                            },
+                            enabled = presetName.isNotBlank(),
+                            active = true,
+                            interactionSource = saveSource,
+                            modifier = Modifier.fillMaxWidth(),
+                        ) { Text("Save", fontWeight = FontWeight.SemiBold) }
+                    }
                     MorphTextButton("Cancel", onClick = { showAddPreset = false }, modifier = Modifier.fillMaxWidth())
                 },
             )
