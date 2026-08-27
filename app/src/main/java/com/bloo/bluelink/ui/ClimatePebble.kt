@@ -855,11 +855,18 @@ internal fun ClimatePebble(
         }
 
         SectionLabel("Save")
-        MorphTextButton(
-            text = "Save as preset",
-            onClick = { presetName = ""; showAddPreset = true },
-            modifier = Modifier.fillMaxWidth(),
-        )
+        val savePresetSource = remember { MutableInteractionSource() }
+        SafeExpansiveButton(
+            interactionSource = savePresetSource,
+            enabled = true,
+        ) {
+            MorphTextButton(
+                text = "Save as preset",
+                interactionSource = savePresetSource,
+                onClick = { presetName = ""; showAddPreset = true },
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
 
         if (showAddPreset) {
             // Standardized on the shared GlassAlertDialog shell (stacked buttons).
