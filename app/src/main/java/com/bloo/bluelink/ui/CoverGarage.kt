@@ -440,19 +440,33 @@ internal fun CoverSettingsGate(vm: AppViewModel) {
                 Text("This screen is designed for a taller phone display. You can scroll through everything here, but unfolding the phone makes settings much easier to read and tweak.")
             },
             buttons = {
-                MorphButton(
-                    onClick = { promptOpen = false },
-                    modifier = Modifier.fillMaxWidth(),
-                ) { Text("Continue on the cover", fontWeight = FontWeight.SemiBold) }
+                val continueSource = remember { MutableInteractionSource() }
+                SafeExpansiveButton(
+                    interactionSource = continueSource,
+                    enabled = true,
+                ) {
+                    MorphButton(
+                        onClick = { promptOpen = false },
+                        interactionSource = continueSource,
+                        modifier = Modifier.fillMaxWidth(),
+                    ) { Text("Continue on the cover", fontWeight = FontWeight.SemiBold) }
+                }
                 Spacer(Modifier.height(8.dp))
-                MorphTextButton(
-                    "Don't show this again",
-                    onClick = {
-                        promptOpen = false
-                        vm.setCoverSettingsHintDismissed(true)
-                    },
-                    modifier = Modifier.fillMaxWidth(),
-                )
+                val dismissSource = remember { MutableInteractionSource() }
+                SafeExpansiveButton(
+                    interactionSource = dismissSource,
+                    enabled = true,
+                ) {
+                    MorphTextButton(
+                        "Don't show this again",
+                        onClick = {
+                            promptOpen = false
+                            vm.setCoverSettingsHintDismissed(true)
+                        },
+                        interactionSource = dismissSource,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                }
             },
         )
     }
