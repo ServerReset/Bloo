@@ -833,23 +833,41 @@ internal fun PaletteEditorDialog(
                 }
         },
         buttons = {
-            MorphButton(
-                onClick = {
-                    onSave(
-                        CustomPaletteData(
-                            id = paletteId,
-                            name = name.ifBlank { "Custom" },
-                            primaryArgb = primaryColor.toArgb(),
-                            secondaryArgb = if (useSecondary) secondaryColor.toArgb() else null,
-                            tertiaryArgb = if (useTertiary) tertiaryColor.toArgb() else null,
+            val saveSource = remember { MutableInteractionSource() }
+            SafeExpansiveButton(
+                interactionSource = saveSource,
+                enabled = true,
+            ) {
+                MorphButton(
+                    onClick = {
+                        onSave(
+                            CustomPaletteData(
+                                id = paletteId,
+                                name = name.ifBlank { "Custom" },
+                                primaryArgb = primaryColor.toArgb(),
+                                secondaryArgb = if (useSecondary) secondaryColor.toArgb() else null,
+                                tertiaryArgb = if (useTertiary) tertiaryColor.toArgb() else null,
+                            )
                         )
-                    )
-                    onDismiss()
-                },
-                active = true,
-                modifier = Modifier.fillMaxWidth(),
-            ) { MorphButtonLabel(Icons.Filled.Check, "Save", pending = false, iconSize = 18.dp) }
-            MorphTextButton("Cancel", onDismiss, modifier = Modifier.fillMaxWidth())
+                        onDismiss()
+                    },
+                    active = true,
+                    interactionSource = saveSource,
+                    modifier = Modifier.fillMaxWidth(),
+                ) { MorphButtonLabel(Icons.Filled.Check, "Save", pending = false, iconSize = 18.dp) }
+            }
+            val cancelSource = remember { MutableInteractionSource() }
+            SafeExpansiveButton(
+                interactionSource = cancelSource,
+                enabled = true,
+            ) {
+                MorphTextButton(
+                    "Cancel",
+                    onDismiss,
+                    interactionSource = cancelSource,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
         },
     )
 }
