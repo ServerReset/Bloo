@@ -540,11 +540,13 @@ fun MorphTextButton(
     enabled: Boolean = true,
     containerColor: Color = buttonContainer(),
     contentColor: Color = MaterialTheme.colorScheme.onSurface,
+    interactionSource: MutableInteractionSource = remember { MutableInteractionSource() },
 ) {
     MorphButton(
         onClick = onClick,
         modifier = modifier,
         enabled = enabled,
+        interactionSource = interactionSource,
         containerColor = containerColor,
         contentColor = contentColor,
         contentPadding = PaddingValues(horizontal = 18.dp, vertical = 10.dp),

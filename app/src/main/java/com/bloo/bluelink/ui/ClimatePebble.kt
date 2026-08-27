@@ -896,7 +896,18 @@ internal fun ClimatePebble(
                             modifier = Modifier.fillMaxWidth(),
                         ) { Text("Save", fontWeight = FontWeight.SemiBold) }
                     }
-                    MorphTextButton("Cancel", onClick = { showAddPreset = false }, modifier = Modifier.fillMaxWidth())
+                    val cancelSource = remember { MutableInteractionSource() }
+                    SafeExpansiveButton(
+                        interactionSource = cancelSource,
+                        enabled = true,
+                    ) {
+                        MorphTextButton(
+                            "Cancel",
+                            onClick = { showAddPreset = false },
+                            interactionSource = cancelSource,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                    }
                 },
             )
         }
