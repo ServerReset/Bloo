@@ -629,38 +629,45 @@ internal fun UpdateAvailableTile(state: UiState, vm: AppViewModel, dragHandle: M
             // flow whether or not the pill is spotted.
             if (!state.updateDownloading && !state.updateInstalling) {
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    MorphButton(
-                        onClick = {
-                            when {
-                                state.updateApkReady -> vm.installDownloadedUpdate()
-                                hasDirectDownload -> vm.downloadUpdateInBackground()
-                                else -> {
-                                    val opened = runCatching {
-                                        context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(info.run.htmlUrl)))
-                                    }.isSuccess
-                                    if (opened) vm.dismissUpdate() else vm.reportError("Couldn't open the release page.")
-                                }
-                            }
-                        },
-                        active = state.updateApkReady,
-                        activeContainerColor = ChargeGreen,
-                        activeContentColor = Color.White,
-                        modifier = Modifier.weight(1f),
+                    val tileUpdateSource = remember { MutableInteractionSource() }
+                    SafeExpansiveButton(
+                        interactionSource = tileUpdateSource,
+                        enabled = true,
                     ) {
-                        Icon(
-                            if (state.updateApkReady) Icons.Filled.CheckCircle else Icons.Filled.Download,
-                            contentDescription = null,
-                            modifier = Modifier.size(18.dp),
-                        )
-                        Spacer(Modifier.width(8.dp))
-                        Text(
-                            when {
-                                state.updateApkReady -> if (seamless) "Install now" else "Install"
-                                hasDirectDownload -> "Download now"
-                                else -> "Open release page"
+                        MorphButton(
+                            onClick = {
+                                when {
+                                    state.updateApkReady -> vm.installDownloadedUpdate()
+                                    hasDirectDownload -> vm.downloadUpdateInBackground()
+                                    else -> {
+                                        val opened = runCatching {
+                                            context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(info.run.htmlUrl)))
+                                        }.isSuccess
+                                        if (opened) vm.dismissUpdate() else vm.reportError("Couldn't open the release page.")
+                                    }
+                                }
                             },
-                            fontWeight = FontWeight.SemiBold,
-                        )
+                            active = state.updateApkReady,
+                            activeContainerColor = ChargeGreen,
+                            activeContentColor = Color.White,
+                            interactionSource = tileUpdateSource,
+                            modifier = Modifier.weight(1f),
+                        ) {
+                            Icon(
+                                if (state.updateApkReady) Icons.Filled.CheckCircle else Icons.Filled.Download,
+                                contentDescription = null,
+                                modifier = Modifier.size(18.dp),
+                            )
+                            Spacer(Modifier.width(8.dp))
+                            Text(
+                                when {
+                                    state.updateApkReady -> if (seamless) "Install now" else "Install"
+                                    hasDirectDownload -> "Download now"
+                                    else -> "Open release page"
+                                },
+                                fontWeight = FontWeight.SemiBold,
+                            )
+                        }
                     }
                     if (state.updatePendingDismiss) {
                         val keepSource = remember { MutableInteractionSource() }

@@ -988,16 +988,34 @@ internal fun SyncDevicesSection(state: UiState, vm: AppViewModel) {
                 )
             },
             buttons = {
-                MorphButton(
-                    onClick = {
-                        if (draft.isNotBlank()) vm.renameThisDevice(draft)
-                        renaming = false
-                    },
-                    active = true,
+                val saveRenameSource = remember { MutableInteractionSource() }
+                SafeExpansiveButton(
+                    interactionSource = saveRenameSource,
                     enabled = draft.isNotBlank(),
-                    modifier = Modifier.fillMaxWidth(),
-                ) { Text("Save", fontWeight = FontWeight.SemiBold) }
-                MorphTextButton("Cancel", onClick = { renaming = false }, modifier = Modifier.fillMaxWidth())
+                ) {
+                    MorphButton(
+                        onClick = {
+                            if (draft.isNotBlank()) vm.renameThisDevice(draft)
+                            renaming = false
+                        },
+                        active = true,
+                        interactionSource = saveRenameSource,
+                        enabled = draft.isNotBlank(),
+                        modifier = Modifier.fillMaxWidth(),
+                    ) { Text("Save", fontWeight = FontWeight.SemiBold) }
+                }
+                val cancelRenameSource = remember { MutableInteractionSource() }
+                SafeExpansiveButton(
+                    interactionSource = cancelRenameSource,
+                    enabled = true,
+                ) {
+                    MorphTextButton(
+                        "Cancel",
+                        onClick = { renaming = false },
+                        interactionSource = cancelRenameSource,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
             },
         )
     }
