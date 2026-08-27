@@ -456,15 +456,22 @@ fun BlooTheme(
     }
 
     val context = LocalContext.current
-    val scheme = blooColorScheme(
-        context = context,
-        dark = dark,
-        themeMode = themeMode,
-        dynamicColor = dynamicColor,
-        colorPalette = colorPalette,
-        customPalette = customPalette,
-        vibrancy = vibrancy,
-    )
+    // Memoize color scheme computation: dynamicDarkColorScheme/dynamicLightColorScheme
+    // can be expensive (wallpaper extraction), and vibrancy saturation involves HSV
+    // conversions. Only recompute when inputs actually change.
+    val scheme = remember(
+        dark, themeMode, dynamicColor, colorPalette, customPalette, vibrancy
+    ) {
+        blooColorScheme(
+            context = context,
+            dark = dark,
+            themeMode = themeMode,
+            dynamicColor = dynamicColor,
+            colorPalette = colorPalette,
+            customPalette = customPalette,
+            vibrancy = vibrancy,
+        )
+    }
 
     // Deliberately NOT density.fontScale * uiScale any more. That multiplied the
     // device's own accessibility font-scale setting through, so a phone set to a
@@ -482,10 +489,13 @@ fun BlooTheme(
     val reduceMotion = remember {
         Settings.Global.getFloat(context.contentResolver, Settings.Global.ANIMATOR_DURATION_SCALE, 1f) == 0f
     }
+    // Memoize typography and motion computations to avoid recomputing on every recomposition
+    val typography = remember(fontChoice) { expressiveTypography(fontChoice) }
+    val motionScheme = remember { MotionScheme.expressive() }
     MaterialExpressiveTheme(
         colorScheme = scheme,
-        motionScheme = MotionScheme.expressive(),
-        typography = expressiveTypography(fontChoice),
+        motionScheme = motionScheme,
+        typography = typography,
         shapes = ExpressiveShapes,
     ) {
         // Defensive, matching the fix required on the watch (see BlooWearTheme):

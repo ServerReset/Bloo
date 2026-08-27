@@ -10,6 +10,7 @@ import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.lifecycleScope
 import com.bloo.bluelink.ui.AppViewModel
@@ -116,9 +117,14 @@ class MainActivity : FragmentActivity() {
         }
         setContent {
             val appearance by viewModel.appearance.collectAsState()
-            val activeCustom = if (!appearance.dynamicColor)
-                appearance.customPalettes.find { it.id == appearance.activeCustomPaletteId }
-            else null
+            // Memoize palette lookup to avoid repeated linear search through custom palettes
+            val activeCustom = remember(
+                appearance.dynamicColor, appearance.customPalettes, appearance.activeCustomPaletteId
+            ) {
+                if (!appearance.dynamicColor)
+                    appearance.customPalettes.find { it.id == appearance.activeCustomPaletteId }
+                else null
+            }
             BlooTheme(
                 themeMode = appearance.themeMode,
                 fontChoice = appearance.fontChoice,
