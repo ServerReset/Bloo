@@ -345,7 +345,7 @@ fun AnnouncementHistory(
         verticalArrangement = Arrangement.spacedBy(8.dp),
         contentPadding = PaddingValues(12.dp),
     ) {
-        items(announcements) { announcement ->
+        items(announcements, key = { it.id }) { announcement ->
             AnnouncementHistoryItem(announcement)
         }
     }
