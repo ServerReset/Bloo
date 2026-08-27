@@ -652,7 +652,7 @@ internal fun SettingsSearchResults(
                             "Which car? Mention its name, e.g. “${command.label} my $example”."
                         }
                         actionRunning -> "${command.label} ${targetVehicle.name}…"
-                        actionResult != null -> actionResult!!
+                        actionResult != null -> actionResult
                         else -> "${command.label} ${targetVehicle.name}"
                     },
                     style = MaterialTheme.typography.bodyMedium,

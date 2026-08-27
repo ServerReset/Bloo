@@ -554,7 +554,7 @@ internal fun UpdateStatusChip(state: UiState) {
         AnimatedContent(
             targetState = when {
                 state.updateChecking -> "Checking…"
-                state.updateAvailable != null -> "Build ${state.updateAvailable!!.run.runNumber} ready"
+                state.updateAvailable != null -> "Build ${state.updateAvailable.run.runNumber} ready"
                 else -> "Up to date"
             },
             label = "settingsUpdateChipText",
