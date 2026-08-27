@@ -485,7 +485,17 @@ internal fun SecretRow(label: String, value: String) {
             modifier = Modifier.widthIn(max = 168.dp),
         )
         Spacer(Modifier.width(10.dp))
-        MorphTextButton(if (show) "Hide" else "Show", onClick = { show = !show })
+        val toggleSource = remember { MutableInteractionSource() }
+        SafeExpansiveButton(
+            interactionSource = toggleSource,
+            enabled = true,
+        ) {
+            MorphTextButton(
+                if (show) "Hide" else "Show",
+                onClick = { show = !show },
+                interactionSource = toggleSource,
+            )
+        }
     }
 }
 
@@ -493,17 +503,24 @@ internal fun SecretRow(label: String, value: String) {
 internal fun ChoiceRow(label: String, selected: Boolean, onSelect: () -> Unit) {
     // The same MorphButton every selectable option uses: pill at rest,
     // primaryContainer rounded square once chosen, pressed-state included.
-    MorphButton(
-        onClick = { onSelect() },
-        active = selected,
-        containerColor = buttonContainer(),
-        contentColor = MaterialTheme.colorScheme.onSurface,
-        activeContainerColor = MaterialTheme.colorScheme.primaryContainer,
-        activeContentColor = MaterialTheme.colorScheme.onPrimaryContainer,
-        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
-        minHeight = 0.dp,
-        modifier = Modifier.fillMaxWidth(),
+    // With expansion animation.
+    val choiceSource = remember { MutableInteractionSource() }
+    SafeExpansiveButton(
+        interactionSource = choiceSource,
+        enabled = true,
     ) {
+        MorphButton(
+            onClick = { onSelect() },
+            active = selected,
+            interactionSource = choiceSource,
+            containerColor = buttonContainer(),
+            contentColor = MaterialTheme.colorScheme.onSurface,
+            activeContainerColor = MaterialTheme.colorScheme.primaryContainer,
+            activeContentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
+            minHeight = 0.dp,
+            modifier = Modifier.fillMaxWidth(),
+        ) {
         Text(label, Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge)
         AnimatedVisibility(
             visible = selected,
@@ -516,6 +533,7 @@ internal fun ChoiceRow(label: String, selected: Boolean, onSelect: () -> Unit) {
                 modifier = Modifier.size(18.dp),
             )
         }
+    }
     }
 }
 
