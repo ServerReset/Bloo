@@ -742,35 +742,43 @@ internal fun MorphExpandButton(
     // 10dp is exactly 20%. The default 28 (the app's standard rounded square)
     // is deliberately overridden to keep this control's 10dp corners, which
     // the shared percent model expresses cleanly for a fixed-size button.
-    MorphButton(
-        onClick = { onToggle() },
-        onClickHaptic = { if (expanded) haptics?.tick() else haptics?.click() },
-        onLongClick = {
-            // Easter egg: hold the chevron to spin it + vibrate.
-            if (!easterEggTriggered) {
-                easterEggTriggered = true
-                haptics?.heavy()
-            }
-        },
-        // Expanded highlight = the SAME active state as lock/unlock: primary
-        // fill, onPrimary content, straight from MorphButton's defaults.
-        active = expanded,
-        contentPadding = PaddingValues(0.dp),
-        pillCornerPercent = 50f,
-        morphedCornerPercent = 20f,
-        minHeight = 0.dp,
-        // Same as SplitExpandButton's chevron: the icon's contentDescription is
-        // the next action, this is the current state -- both together instead
-        // of only announcing what tapping does. Tap toggles; holding spins the
-        // chevron (easter egg) without toggling.
-        modifier = Modifier.size(50.dp).semantics { stateDescription = if (expanded) "Expanded" else "Collapsed" },
+    // With expansion animation.
+    val chevronSource = remember { MutableInteractionSource() }
+    SafeExpansiveButton(
+        interactionSource = chevronSource,
+        enabled = true,
     ) {
-        Icon(
-            Icons.Filled.KeyboardArrowDown,
-            contentDescription = if (expanded) "Collapse" else "Expand",
-            // Larger chevron icon (24dp to match action button icon size), with
-            // easter egg spin animation when the chevron is held.
-            modifier = Modifier.size(24.dp).rotate(rotation + easterEggSpin),
-        )
+        MorphButton(
+            onClick = { onToggle() },
+            onClickHaptic = { if (expanded) haptics?.tick() else haptics?.click() },
+            onLongClick = {
+                // Easter egg: hold the chevron to spin it + vibrate.
+                if (!easterEggTriggered) {
+                    easterEggTriggered = true
+                    haptics?.heavy()
+                }
+            },
+            // Expanded highlight = the SAME active state as lock/unlock: primary
+            // fill, onPrimary content, straight from MorphButton's defaults.
+            active = expanded,
+            interactionSource = chevronSource,
+            contentPadding = PaddingValues(0.dp),
+            pillCornerPercent = 50f,
+            morphedCornerPercent = 20f,
+            minHeight = 0.dp,
+            // Same as SplitExpandButton's chevron: the icon's contentDescription is
+            // the next action, this is the current state -- both together instead
+            // of only announcing what tapping does. Tap toggles; holding spins the
+            // chevron (easter egg) without toggling.
+            modifier = Modifier.size(50.dp).semantics { stateDescription = if (expanded) "Expanded" else "Collapsed" },
+        ) {
+            Icon(
+                Icons.Filled.KeyboardArrowDown,
+                contentDescription = if (expanded) "Collapse" else "Expand",
+                // Larger chevron icon (24dp to match action button icon size), with
+                // easter egg spin animation when the chevron is held.
+                modifier = Modifier.size(24.dp).rotate(rotation + easterEggSpin),
+            )
+        }
     }
 }

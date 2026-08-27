@@ -1052,118 +1052,127 @@ internal fun SplitExpandButton(
         horizontalArrangement = Arrangement.spacedBy(3.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        // Left half — the action (label + icon) button. Same MorphButton as
-        // everywhere else: it morphs ONLY for its own active/pressed state, so
-        // the pebble expanding never squares it off (the right half owns that).
-        MorphButton(
-            onClick = {
-                if (action.bounceIcon) bounceScope.launch {
-                    bouncing = true
-                    bounceY.animateTo(-9f, spring(stiffness = Spring.StiffnessHigh))
-                    bounceY.animateTo(0f, spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium))
-                    bouncing = false
-                }
-                action.onClick()
-            },
+        // Left half — the action (label + icon) button with expansion animation.
+        val actionSource = remember { MutableInteractionSource() }
+        SafeExpansiveButton(
+            interactionSource = actionSource,
             enabled = action.enabled && !action.pending,
-            active = action.active,
-            containerColor = leftContainer,
-            contentColor = leftFg,
-            activeContainerColor = action.activeContainer ?: MaterialTheme.colorScheme.primary,
-            activeContentColor = action.activeContent ?: MaterialTheme.colorScheme.onPrimary,
-            contentPadding = PaddingValues(horizontal = 14.dp, vertical = 10.dp),
-            shapeForCorner = leftShapeForCorner,
-            morphedCornerPercent = morphedPercent,
-            pillCornerPercent = 50f,
-            // The halves keep their measured ~42-46dp height; the standard
-            // 48dp touch floor would inflate the whole pebble header.
-            minHeight = 0.dp,
-            modifier = Modifier.fillMaxHeight().then(
-                run {
-                    // Local copy so the smart cast works inside the semantics
-                    // lambda (class properties are not stable for smart-cast
-                    // capture; the !! form read fine but would crash if the
-                    // guard and the call ever drifted apart).
-                    val desc = action.contentDescription
-                    if (action.label.isEmpty() && desc != null) {
-                        Modifier.semantics { contentDescription = desc }
-                    } else Modifier
-                },
-            ),
         ) {
-            Row(
-                modifier = Modifier.graphicsLayer { translationY = bounceY.value },
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
+            MorphButton(
+                onClick = {
+                    if (action.bounceIcon) bounceScope.launch {
+                        bouncing = true
+                        bounceY.animateTo(-9f, spring(stiffness = Spring.StiffnessHigh))
+                        bounceY.animateTo(0f, spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium))
+                        bouncing = false
+                    }
+                    action.onClick()
+                },
+                enabled = action.enabled && !action.pending,
+                active = action.active,
+                interactionSource = actionSource,
+                containerColor = leftContainer,
+                contentColor = leftFg,
+                activeContainerColor = action.activeContainer ?: MaterialTheme.colorScheme.primary,
+                activeContentColor = action.activeContent ?: MaterialTheme.colorScheme.onPrimary,
+                contentPadding = PaddingValues(horizontal = 14.dp, vertical = 10.dp),
+                shapeForCorner = leftShapeForCorner,
+                morphedCornerPercent = morphedPercent,
+                pillCornerPercent = 50f,
+                // The halves keep their measured ~42-46dp height; the standard
+                // 48dp touch floor would inflate the whole pebble header.
+                minHeight = 0.dp,
+                modifier = Modifier.fillMaxHeight().then(
+                    run {
+                        // Local copy so the smart cast works inside the semantics
+                        // lambda (class properties are not stable for smart-cast
+                        // capture; the !! form read fine but would crash if the
+                        // guard and the call ever drifted apart).
+                        val desc = action.contentDescription
+                        if (action.label.isEmpty() && desc != null) {
+                            Modifier.semantics { contentDescription = desc }
+                        } else Modifier
+                    },
+                ),
             ) {
-                if (action.pending && !bouncing) {
-                    LoadingIndicator(Modifier.size(16.dp))
-                } else {
-                    Icon(
-                        action.icon,
-                        contentDescription = null,
-                        // graphicsLayer lambda, not rotate(): rotate() reads the
-                        // Animatable in composition, and the spin runs for as long
-                        // as climate is on - recomposing this button every frame
-                        // indefinitely. The lambda defers the read to the draw phase.
-                        modifier = Modifier.size(16.dp).graphicsLayer { rotationZ = spinAngle.value },
-                    )
-                }
-                if (action.label.isNotEmpty()) {
-                    Text(
-                        action.label,
-                        style = MaterialTheme.typography.labelLarge,
-                        fontWeight = FontWeight.SemiBold,
-                        maxLines = 1,
-                        // Cap the label width so a long action ("Summarize",
-                        // "Downloading…") at a large font size can't grow this button
-                        // unbounded and squeeze the pebble title into wrapping/overlap.
-                        // The label ellipsizes past the cap; the icon still identifies it.
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.widthIn(max = 110.dp),
-                    )
+                Row(
+                    modifier = Modifier.graphicsLayer { translationY = bounceY.value },
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
+                    if (action.pending && !bouncing) {
+                        LoadingIndicator(Modifier.size(16.dp))
+                    } else {
+                        Icon(
+                            action.icon,
+                            contentDescription = null,
+                            // graphicsLayer lambda, not rotate(): rotate() reads the
+                            // Animatable in composition, and the spin runs for as long
+                            // as climate is on - recomposing this button every frame
+                            // indefinitely. The lambda defers the read to the draw phase.
+                            modifier = Modifier.size(16.dp).graphicsLayer { rotationZ = spinAngle.value },
+                        )
+                    }
+                    if (action.label.isNotEmpty()) {
+                        Text(
+                            action.label,
+                            style = MaterialTheme.typography.labelLarge,
+                            fontWeight = FontWeight.SemiBold,
+                            maxLines = 1,
+                            // Cap the label width so a long action ("Summarize",
+                            // "Downloading…") at a large font size can't grow this button
+                            // unbounded and squeeze the pebble title into wrapping/overlap.
+                            // The label ellipsizes past the cap; the icon still identifies it.
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.widthIn(max = 110.dp),
+                        )
+                    }
                 }
             }
         }
-        // Right half — chevron nub. The expanded highlight is THE SAME active
-        // state as the lock/unlock button: active=true -> primary fill with
-        // onPrimary content, straight from MorphButton's defaults -- there is
-        // no second "expanded" colour vocabulary left in the app.
+        // Right half — chevron nub with expansion animation.
         // Hidden if canToggle is false (single-setting pebbles in simple mode).
         if (canToggle) {
-            MorphButton(
-                onClick = { onToggle() },
-                onClickHaptic = { if (expanded) haptics?.tick() else haptics?.click() },
-                onLongClick = {
-                    // Easter egg: hold the chevron to spin it + vibrate.
-                    if (!easterEggTriggered) {
-                        easterEggTriggered = true
-                        haptics?.heavy()
-                    }
-                },
-                active = expanded,
-                contentPadding = PaddingValues(start = 13.dp, end = 12.dp),
-                shapeForCorner = rightShapeForCorner,
-                morphedCornerPercent = morphedPercent,
-                pillCornerPercent = 50f,
-                minHeight = 0.dp,
-                // The icon's own contentDescription below is the NEXT action
-                // ("Expand"/"Collapse"); this is the CURRENT state -- without it
-                // TalkBack only ever hears what tapping will do, never whether the
-                // pebble is presently open, so distinguishing the two took a
-                // double-tap-and-listen-again instead of being announced on focus.
-                // widthIn(min = rowHeightDp) keeps the nub a square at the row's
-                // fixed height so its pill end is a true semicircle by percent.
-                modifier = Modifier.fillMaxHeight().widthIn(min = rowHeightDp)
-                    .semantics { stateDescription = if (expanded) "Expanded" else "Collapsed" },
+            val chevronSource = remember { MutableInteractionSource() }
+            SafeExpansiveButton(
+                interactionSource = chevronSource,
+                enabled = true,
             ) {
-                Icon(
-                    Icons.Filled.KeyboardArrowDown,
-                    contentDescription = if (expanded) "Collapse" else "Expand",
-                    // Larger chevron icon (24dp to match action button icon size), with
-                    // easter egg spin animation when the chevron is held.
-                    modifier = Modifier.size(24.dp).rotate(rotation + easterEggSpin),
-                )
+                MorphButton(
+                    onClick = { onToggle() },
+                    onClickHaptic = { if (expanded) haptics?.tick() else haptics?.click() },
+                    onLongClick = {
+                        // Easter egg: hold the chevron to spin it + vibrate.
+                        if (!easterEggTriggered) {
+                            easterEggTriggered = true
+                            haptics?.heavy()
+                        }
+                    },
+                    active = expanded,
+                    interactionSource = chevronSource,
+                    contentPadding = PaddingValues(start = 13.dp, end = 12.dp),
+                    shapeForCorner = rightShapeForCorner,
+                    morphedCornerPercent = morphedPercent,
+                    pillCornerPercent = 50f,
+                    minHeight = 0.dp,
+                    // The icon's own contentDescription below is the NEXT action
+                    // ("Expand"/"Collapse"); this is the CURRENT state -- without it
+                    // TalkBack only ever hears what tapping will do, never whether the
+                    // pebble is presently open, so distinguishing the two took a
+                    // double-tap-and-listen-again instead of being announced on focus.
+                    // widthIn(min = rowHeightDp) keeps the nub a square at the row's
+                    // fixed height so its pill end is a true semicircle by percent.
+                    modifier = Modifier.fillMaxHeight().widthIn(min = rowHeightDp)
+                        .semantics { stateDescription = if (expanded) "Expanded" else "Collapsed" },
+                ) {
+                    Icon(
+                        Icons.Filled.KeyboardArrowDown,
+                        contentDescription = if (expanded) "Collapse" else "Expand",
+                        // Larger chevron icon (24dp to match action button icon size), with
+                        // easter egg spin animation when the chevron is held.
+                        modifier = Modifier.size(24.dp).rotate(rotation + easterEggSpin),
+                    )
+                }
             }
         }
     }
