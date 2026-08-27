@@ -16,7 +16,9 @@ package com.bloo.uicommon
  */
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.Canvas
@@ -192,9 +194,9 @@ fun PagerDots(
             isColliding = nowColliding
             collisionAlpha.animateTo(
                 targetValue = if (nowColliding) 0f else 1f,
-                animationSpec = androidx.compose.animation.core.spring(
+                animationSpec = spring(
                     dampingRatio = 0.6f,
-                    stiffness = androidx.compose.animation.core.Spring.StiffnessMedium,
+                    stiffness = Spring.StiffnessMedium,
                 ),
             )
         }
