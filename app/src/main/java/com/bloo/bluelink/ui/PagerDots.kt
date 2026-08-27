@@ -572,12 +572,14 @@ internal fun VerticalPagerDots(
                         horizontalArrangement = Arrangement.spacedBy(10.dp),
                     ) {
                         if (scrubbing) {
-                            Text(
-                                tileName(tiles[i]),
-                                style = MaterialTheme.typography.titleSmall,
-                                fontWeight = if (highlight) FontWeight.Bold else FontWeight.Normal,
-                                color = color,
-                            )
+                            tiles.getOrNull(i)?.let { tileName ->
+                                Text(
+                                    tileName(tileName),
+                                    style = MaterialTheme.typography.titleSmall,
+                                    fontWeight = if (highlight) FontWeight.Bold else FontWeight.Normal,
+                                    color = color,
+                                )
+                            }
                         }
                         Box(Modifier.width(dotW).height(dotH).clip(CircleShape).background(color))
                     }

@@ -900,7 +900,7 @@ internal fun SeatControl(
     val range = SeatLevel.rangeFor(canCool, canHeat)
     if (range.size <= 1) return
     val index = range.indexOf(level).let { if (it < 0) range.indexOf(SeatLevel.OFF) else it }
-    val current = range[index]
+    val current = range.getOrNull(index) ?: range.firstOrNull() ?: return
     // Deeper colour the stronger the setting; smoothly cross-fades as you slide
     // through neutral between cooling (blues) and heating (reds).
     val tint by androidx.compose.animation.animateColorAsState(
