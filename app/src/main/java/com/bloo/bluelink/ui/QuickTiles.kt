@@ -503,20 +503,28 @@ internal fun QuickTileCard(index: Int, vin: String, state: UiState, vm: AppViewM
     }
 }
 
-/** An outlined "add" pill that morphs like the app's other buttons. */
+/** An outlined "add" pill that morphs like the app's other buttons with expansion animation. */
 @Composable
 internal fun AddTilePill(label: String, onClick: () -> Unit) {
-    MorphButton(
-        onClick = onClick,
-        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
-        containerColor = MaterialTheme.colorScheme.surface,
-        contentColor = MaterialTheme.colorScheme.primary,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-        contentPadding = PaddingValues(horizontal = 18.dp, vertical = 12.dp),
+    val interactionSource = remember { MutableInteractionSource() }
+
+    SafeExpansiveButton(
+        interactionSource = interactionSource,
+        enabled = true,
     ) {
-        Icon(Icons.Filled.Add, contentDescription = null, modifier = Modifier.size(18.dp))
-        Spacer(Modifier.width(8.dp))
-        Text(label, fontWeight = FontWeight.SemiBold)
+        MorphButton(
+            onClick = onClick,
+            interactionSource = interactionSource,
+            modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+            containerColor = MaterialTheme.colorScheme.surface,
+            contentColor = MaterialTheme.colorScheme.primary,
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+            contentPadding = PaddingValues(horizontal = 18.dp, vertical = 12.dp),
+        ) {
+            Icon(Icons.Filled.Add, contentDescription = null, modifier = Modifier.size(18.dp))
+            Spacer(Modifier.width(8.dp))
+            Text(label, fontWeight = FontWeight.SemiBold)
+        }
     }
 }
 

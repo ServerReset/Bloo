@@ -1061,61 +1061,75 @@ internal fun PresetPill(
     ) {
         // Apply half — snowflake icon plus the preset name. The shared
         // MorphButton: pill when idle, rounded rectangle + primary fill when
-        // this preset is the applied one.
-        MorphButton(
-            onClick = { onStart() },
-            onClickHaptic = { haptics?.click() },
-            active = active,
-            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 11.dp),
-            shapeForCorner = leftShapeForCorner,
-            pillCornerPercent = 50f,
-            morphedCornerPercent = morphedPct,
-            minHeight = 0.dp,
-            modifier = Modifier.weight(1f).fillMaxHeight(),
+        // this preset is the applied one. With expansion animation.
+        val applySource = remember { MutableInteractionSource() }
+        SafeExpansiveButton(
+            interactionSource = applySource,
+            enabled = true,
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(Icons.Filled.AcUnit, contentDescription = null, modifier = Modifier.size(18.dp))
-                Spacer(Modifier.width(10.dp))
-                Column {
-                    Text(
-                        name,
-                        style = MaterialTheme.typography.labelLarge,
-                        fontWeight = FontWeight.SemiBold,
-                        maxLines = 1,
-                    )
-                    if (detail.isNotBlank()) {
+            MorphButton(
+                onClick = { onStart() },
+                onClickHaptic = { haptics?.click() },
+                active = active,
+                interactionSource = applySource,
+                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 11.dp),
+                shapeForCorner = leftShapeForCorner,
+                pillCornerPercent = 50f,
+                morphedCornerPercent = morphedPct,
+                minHeight = 0.dp,
+                modifier = Modifier.weight(1f).fillMaxHeight(),
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Filled.AcUnit, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(10.dp))
+                    Column {
                         Text(
-                            detail,
-                            style = MaterialTheme.typography.labelSmall,
-                            color = LocalContentColor.current.copy(alpha = MutedContentAlpha),
+                            name,
+                            style = MaterialTheme.typography.labelLarge,
+                            fontWeight = FontWeight.SemiBold,
                             maxLines = 1,
                         )
+                        if (detail.isNotBlank()) {
+                            Text(
+                                detail,
+                                style = MaterialTheme.typography.labelSmall,
+                                color = LocalContentColor.current.copy(alpha = MutedContentAlpha),
+                                maxLines = 1,
+                            )
+                        }
                     }
                 }
             }
         }
         // Delete nub — inner (left) corners match the gap, outer (right) corners
         // are pill-rounded; same MorphButton as the Apply half, just mirrored
-        // corners and error colours while armed.
-        MorphButton(
-            onClick = {
-                haptics?.tick()
-                if (confirm.armed) onDelete() else confirm.arm()
-            },
-            containerColor = if (confirm.armed) MaterialTheme.colorScheme.error else buttonContainer(),
-            contentColor = if (confirm.armed) MaterialTheme.colorScheme.onError else MaterialTheme.colorScheme.onSurface,
-            contentPadding = PaddingValues(horizontal = 14.dp),
-            shapeForCorner = rightShapeForCorner,
-            pillCornerPercent = 50f,
-            morphedCornerPercent = morphedPct,
-            minHeight = 0.dp,
-            modifier = Modifier.fillMaxHeight(),
+        // corners and error colours while armed. With expansion animation.
+        val deleteSource = remember { MutableInteractionSource() }
+        SafeExpansiveButton(
+            interactionSource = deleteSource,
+            enabled = true,
         ) {
-            Icon(
-                Icons.Filled.Close,
-                contentDescription = if (confirm.armed) "Confirm delete $name" else "Delete $name",
-                modifier = Modifier.size(15.dp),
-            )
+            MorphButton(
+                onClick = {
+                    haptics?.tick()
+                    if (confirm.armed) onDelete() else confirm.arm()
+                },
+                interactionSource = deleteSource,
+                containerColor = if (confirm.armed) MaterialTheme.colorScheme.error else buttonContainer(),
+                contentColor = if (confirm.armed) MaterialTheme.colorScheme.onError else MaterialTheme.colorScheme.onSurface,
+                contentPadding = PaddingValues(horizontal = 14.dp),
+                shapeForCorner = rightShapeForCorner,
+                pillCornerPercent = 50f,
+                morphedCornerPercent = morphedPct,
+                minHeight = 0.dp,
+                modifier = Modifier.fillMaxHeight(),
+            ) {
+                Icon(
+                    Icons.Filled.Close,
+                    contentDescription = if (confirm.armed) "Confirm delete $name" else "Delete $name",
+                    modifier = Modifier.size(15.dp),
+                )
+            }
         }
     }
 }
