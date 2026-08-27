@@ -690,43 +690,63 @@ internal fun LoginScreen(
                     }
 
                     // Sign in CTA — label reflects the chosen brand.
-                    MorphButton(
-                        onClick = { onLogin(email, password, pin, brand) },
-                        modifier = Modifier.fillMaxWidth().height(56.dp),
+                    val signInSource = remember { MutableInteractionSource() }
+                    SafeExpansiveButton(
+                        interactionSource = signInSource,
                         enabled = !loading,
-                        containerColor = scheme.primary,
-                        contentColor = scheme.onPrimary,
                     ) {
-                        if (loading) {
-                            LoadingIndicator()
-                        } else {
-                            AnimatedContent(
-                                targetState = brand.label,
-                                // Same duration as the email label's own crossfade just
-                                // above -- both are driven by the same brand-selection
-                                // change, so they should settle together instead of at
-                                // three slightly different paces.
-                                transitionSpec = { fadeIn(tween(220)) togetherWith fadeOut(tween(160)) },
-                                label = "signInLabel",
-                            ) { label ->
-                                Text("Sign in to $label", fontWeight = FontWeight.SemiBold)
+                        MorphButton(
+                            onClick = { onLogin(email, password, pin, brand) },
+                            modifier = Modifier.fillMaxWidth().height(56.dp),
+                            interactionSource = signInSource,
+                            enabled = !loading,
+                            containerColor = scheme.primary,
+                            contentColor = scheme.onPrimary,
+                        ) {
+                            if (loading) {
+                                LoadingIndicator()
+                            } else {
+                                AnimatedContent(
+                                    targetState = brand.label,
+                                    // Same duration as the email label's own crossfade just
+                                    // above -- both are driven by the same brand-selection
+                                    // change, so they should settle together instead of at
+                                    // three slightly different paces.
+                                    transitionSpec = { fadeIn(tween(220)) togetherWith fadeOut(tween(160)) },
+                                    label = "signInLabel",
+                                ) { label ->
+                                    Text("Sign in to $label", fontWeight = FontWeight.SemiBold)
+                                }
                             }
                         }
                     }
 
                     if (onCancel != null) {
-                        MorphButton(
-                            onClick = onCancel,
-                            modifier = Modifier.fillMaxWidth(),
-                            containerColor = scheme.secondaryContainer,
-                            contentColor = scheme.onSecondaryContainer,
-                        ) { Text("Cancel", fontWeight = FontWeight.SemiBold) }
+                        val cancelSource = remember { MutableInteractionSource() }
+                        SafeExpansiveButton(
+                            interactionSource = cancelSource,
+                            enabled = true,
+                        ) {
+                            MorphButton(
+                                onClick = onCancel,
+                                modifier = Modifier.fillMaxWidth(),
+                                interactionSource = cancelSource,
+                                containerColor = scheme.secondaryContainer,
+                                contentColor = scheme.onSecondaryContainer,
+                            ) { Text("Cancel", fontWeight = FontWeight.SemiBold) }
+                        }
                     }
 
                     // Forgot password — MorphTextButton that routes to the right brand portal.
                     Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-                        MorphTextButton(
-                            text = "Forgot password?",
+                        val forgotSource = remember { MutableInteractionSource() }
+                        SafeExpansiveButton(
+                            interactionSource = forgotSource,
+                            enabled = true,
+                        ) {
+                            MorphTextButton(
+                                text = "Forgot password?",
+                                interactionSource = forgotSource,
                             onClick = {
                                 val forgotUrl = when (brand) {
                                     Brand.HYUNDAI -> "https://owners.hyundaiusa.com/us/en/forgot-password"
@@ -741,6 +761,7 @@ internal fun LoginScreen(
                             },
                             contentColor = scheme.onSurfaceVariant,
                         )
+                        }
                     }
 
                     AnimatedContent(
@@ -780,18 +801,32 @@ internal fun KiaOtpDialog(otp: KiaOtpUi, loading: Boolean, vm: AppViewModel) {
             if (otp.sentTo == null) {
                 Text("Kia needs to verify this sign-in with a one-time code. Where should it go?")
                 if (otp.challenge.hasEmail) {
-                    MorphButton(
-                        onClick = { vm.kiaSendOtp("EMAIL") },
+                    val emailSource = remember { MutableInteractionSource() }
+                    SafeExpansiveButton(
+                        interactionSource = emailSource,
                         enabled = !loading,
-                        modifier = Modifier.fillMaxWidth(),
-                    ) { Text("Email" + (otp.challenge.email?.let { " · $it" } ?: "")) }
+                    ) {
+                        MorphButton(
+                            onClick = { vm.kiaSendOtp("EMAIL") },
+                            interactionSource = emailSource,
+                            enabled = !loading,
+                            modifier = Modifier.fillMaxWidth(),
+                        ) { Text("Email" + (otp.challenge.email?.let { " · $it" } ?: "")) }
+                    }
                 }
                 if (otp.challenge.hasSms) {
-                    MorphButton(
-                        onClick = { vm.kiaSendOtp("SMS") },
+                    val smsSource = remember { MutableInteractionSource() }
+                    SafeExpansiveButton(
+                        interactionSource = smsSource,
                         enabled = !loading,
-                        modifier = Modifier.fillMaxWidth(),
-                    ) { Text("Text message" + (otp.challenge.sms?.let { " · $it" } ?: "")) }
+                    ) {
+                        MorphButton(
+                            onClick = { vm.kiaSendOtp("SMS") },
+                            interactionSource = smsSource,
+                            enabled = !loading,
+                            modifier = Modifier.fillMaxWidth(),
+                        ) { Text("Text message" + (otp.challenge.sms?.let { " · $it" } ?: "")) }
+                    }
                 }
             } else {
                 Text(
@@ -805,15 +840,34 @@ internal fun KiaOtpDialog(otp: KiaOtpUi, loading: Boolean, vm: AppViewModel) {
             // Verify shown only once a code's been sent; Cancel always. Stacked
             // full-width (primary on top) per the shell's convention.
             if (otp.sentTo != null) {
-                MorphButton(
-                    onClick = { vm.kiaVerifyOtp(code) },
+                val verifySource = remember { MutableInteractionSource() }
+                SafeExpansiveButton(
+                    interactionSource = verifySource,
                     enabled = !loading && code.isNotBlank(),
-                    modifier = Modifier.fillMaxWidth(),
                 ) {
-                    if (loading) LoadingIndicator() else Text("Verify", fontWeight = FontWeight.SemiBold)
+                    MorphButton(
+                        onClick = { vm.kiaVerifyOtp(code) },
+                        interactionSource = verifySource,
+                        enabled = !loading && code.isNotBlank(),
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        if (loading) LoadingIndicator() else Text("Verify", fontWeight = FontWeight.SemiBold)
+                    }
                 }
             }
-            MorphTextButton("Cancel", vm::kiaCancelOtp, enabled = !loading, modifier = Modifier.fillMaxWidth())
+            val cancelKiaSource = remember { MutableInteractionSource() }
+            SafeExpansiveButton(
+                interactionSource = cancelKiaSource,
+                enabled = !loading,
+            ) {
+                MorphTextButton(
+                    "Cancel",
+                    vm::kiaCancelOtp,
+                    interactionSource = cancelKiaSource,
+                    enabled = !loading,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
         },
     )
 }
@@ -838,14 +892,33 @@ internal fun CanadaOtpDialog(otp: CanadaOtpUi, loading: Boolean, vm: AppViewMode
             OtpCodeField(code) { code = it }
         },
         buttons = {
-            MorphButton(
-                onClick = { vm.canadaVerifyOtp(code) },
+            val canadaVerifySource = remember { MutableInteractionSource() }
+            SafeExpansiveButton(
+                interactionSource = canadaVerifySource,
                 enabled = !loading && code.isNotBlank(),
-                modifier = Modifier.fillMaxWidth(),
             ) {
-                if (loading) LoadingIndicator() else Text("Verify", fontWeight = FontWeight.SemiBold)
+                MorphButton(
+                    onClick = { vm.canadaVerifyOtp(code) },
+                    interactionSource = canadaVerifySource,
+                    enabled = !loading && code.isNotBlank(),
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    if (loading) LoadingIndicator() else Text("Verify", fontWeight = FontWeight.SemiBold)
+                }
             }
-            MorphTextButton("Cancel", vm::canadaCancelOtp, enabled = !loading, modifier = Modifier.fillMaxWidth())
+            val canadaCancelSource = remember { MutableInteractionSource() }
+            SafeExpansiveButton(
+                interactionSource = canadaCancelSource,
+                enabled = !loading,
+            ) {
+                MorphTextButton(
+                    "Cancel",
+                    vm::canadaCancelOtp,
+                    interactionSource = canadaCancelSource,
+                    enabled = !loading,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
         },
     )
 }
