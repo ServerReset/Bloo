@@ -863,24 +863,30 @@ internal fun RowScope.CoverActionButton(
     val contentFor = if (active) scheme.onPrimary
         else if (attention) scheme.onErrorContainer
         else scheme.onSurface
-    MorphButton(
-        onClick = { onClick() },
-        onClickHaptic = { haptics?.click() },
-        onLongClick = onLongClick?.let { fn -> { haptics?.tick(); fn() } },
+    val coverSource = remember { MutableInteractionSource() }
+    SafeExpansiveButton(
+        interactionSource = coverSource,
         enabled = enabled && !pending,
-        active = active,
-        containerColor = if (attention) scheme.errorContainer else buttonContainer(),
-        contentColor = contentFor,
-        disabledContentColor = contentFor,
-        pillCornerPercent = squarePct,
-        morphedCornerPercent = squarePct,
-        contentPadding = PaddingValues(horizontal = 2.dp, vertical = 4.dp),
-        minHeight = 0.dp,
-        modifier = Modifier
-            .weight(1f)
-            .height(56.dp)
-            .alpha(if (enabled) 1f else 0.45f),
     ) {
+        MorphButton(
+            onClick = { onClick() },
+            onClickHaptic = { haptics?.click() },
+            onLongClick = onLongClick?.let { fn -> { haptics?.tick(); fn() } },
+            enabled = enabled && !pending,
+            active = active,
+            interactionSource = coverSource,
+            containerColor = if (attention) scheme.errorContainer else buttonContainer(),
+            contentColor = contentFor,
+            disabledContentColor = contentFor,
+            pillCornerPercent = squarePct,
+            morphedCornerPercent = squarePct,
+            contentPadding = PaddingValues(horizontal = 2.dp, vertical = 4.dp),
+            minHeight = 0.dp,
+            modifier = Modifier
+                .weight(1f)
+                .height(56.dp)
+                .alpha(if (enabled) 1f else 0.45f),
+        ) {
         Column(
             Modifier.fillMaxSize(),
             horizontalAlignment = Alignment.CenterHorizontally,
@@ -904,5 +910,6 @@ internal fun RowScope.CoverActionButton(
                 ),
             )
         }
+    }
     }
 }
