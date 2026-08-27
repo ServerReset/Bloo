@@ -499,8 +499,24 @@ internal fun CropScreen(vin: String, uriString: String, onCancel: () -> Unit, on
                 }
             }
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                MorphTextButton("Cancel", onClick = onCancel, modifier = Modifier.weight(1f))
-                MorphButton(
+                val cancelSource = remember { MutableInteractionSource() }
+                SafeExpansiveButton(
+                    interactionSource = cancelSource,
+                    enabled = true,
+                ) {
+                    MorphTextButton(
+                        "Cancel",
+                        onClick = onCancel,
+                        interactionSource = cancelSource,
+                        modifier = Modifier.weight(1f),
+                    )
+                }
+                val confirmSource = remember { MutableInteractionSource() }
+                SafeExpansiveButton(
+                    interactionSource = confirmSource,
+                    enabled = true,
+                ) {
+                    MorphButton(
                     onClick = {
                         val image = bmp ?: return@MorphButton
                         val f = frame
@@ -542,9 +558,11 @@ internal fun CropScreen(vin: String, uriString: String, onCancel: () -> Unit, on
                         }
                     },
                     enabled = bmp != null,
+                    interactionSource = confirmSource,
                     modifier = Modifier.weight(1f),
                     contentPadding = PaddingValues(horizontal = 18.dp, vertical = 10.dp),
                 ) { Text("Use photo", fontWeight = FontWeight.SemiBold) }
+                }
             }
         }
     }
