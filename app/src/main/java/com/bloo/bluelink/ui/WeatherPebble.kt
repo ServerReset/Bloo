@@ -489,15 +489,18 @@ internal fun LocationPebble(v: Vehicle, state: UiState, vm: AppViewModel, dragHa
                 // as a fallback while geocoding hasn't (yet, or ever) resolved a name.
                 if (!coverGlance && place == null) StatusRow("Location", loc.coordString())
                 // Weather where the car is parked. Fetched lazily once we have a fix.
-                LaunchedEffect(loc.latitude, loc.longitude) { vm.loadCarWeather(v) }
+                // Only load if not already fetched/loading to prevent redundant requests
+                val carWeather = state.carWeather[v.vin]
+                val weatherLoading = state.isPending(v.vin, "carWeather")
+                LaunchedEffect(loc.latitude, loc.longitude) {
+                    if (carWeather == null && !weatherLoading) vm.loadCarWeather(v)
+                }
                 // Its own PopVisible: weather can arrive AFTER this pebble is already
                 // open (it's a separate fetch triggered above), so this row pops in
                 // live rather than only ever being present from the first frame --
                 // same idiom the Climate pebble's smart-climate section uses.
-                val weather = state.carWeather[v.vin]
-                PopVisible(visible = weather != null) {
-                    val w = weather
-                    if (w != null) WeatherStripe(w, fahrenheit, place ?: "At the car")
+                PopVisible(visible = carWeather != null) {
+                    if (carWeather != null) WeatherStripe(carWeather, fahrenheit, place ?: "At the car")
                 }
                 CommandButton("Open in maps", Icons.Filled.Map, Modifier.fillMaxWidth(), true) {
                     val uri = Uri.parse(
