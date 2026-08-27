@@ -1,5 +1,10 @@
 pluginManagement {
     repositories {
+        // Try Maven Central mirror first for Android/Google artifacts
+        maven { url = uri("https://repo1.maven.org/maven2/") }
+        mavenCentral()
+        gradlePluginPortal()
+        // Google repo - may be blocked by proxy
         google {
             content {
                 includeGroupByRegex("com\\.android.*")
@@ -7,8 +12,6 @@ pluginManagement {
                 includeGroupByRegex("androidx.*")
             }
         }
-        mavenCentral()
-        gradlePluginPortal()
     }
 }
 dependencyResolutionManagement {
