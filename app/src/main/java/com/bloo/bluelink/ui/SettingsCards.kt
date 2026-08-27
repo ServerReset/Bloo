@@ -291,17 +291,42 @@ internal fun LiveUpdateTroubleshootDialog(onDismiss: () -> Unit) {
             }
         },
         buttons = {
-            MorphButton(
-                onClick = { LiveCharge.requestBackgroundUnrestricted(context) },
-                modifier = Modifier.fillMaxWidth(),
-            ) { Text("Allow background activity") }
-            if (isSamsung) {
+            val bgSource = remember { MutableInteractionSource() }
+            SafeExpansiveButton(
+                interactionSource = bgSource,
+                enabled = true,
+            ) {
                 MorphButton(
-                    onClick = { LiveCharge.openDeveloperOptions(context) },
+                    onClick = { LiveCharge.requestBackgroundUnrestricted(context) },
+                    interactionSource = bgSource,
                     modifier = Modifier.fillMaxWidth(),
-                ) { Text("Open Developer options") }
+                ) { Text("Allow background activity") }
             }
-            MorphTextButton("Close", onDismiss, modifier = Modifier.fillMaxWidth())
+            if (isSamsung) {
+                val devSource = remember { MutableInteractionSource() }
+                SafeExpansiveButton(
+                    interactionSource = devSource,
+                    enabled = true,
+                ) {
+                    MorphButton(
+                        onClick = { LiveCharge.openDeveloperOptions(context) },
+                        interactionSource = devSource,
+                        modifier = Modifier.fillMaxWidth(),
+                    ) { Text("Open Developer options") }
+                }
+            }
+            val closeSource = remember { MutableInteractionSource() }
+            SafeExpansiveButton(
+                interactionSource = closeSource,
+                enabled = true,
+            ) {
+                MorphTextButton(
+                    "Close",
+                    onDismiss,
+                    interactionSource = closeSource,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
         },
     )
 }
