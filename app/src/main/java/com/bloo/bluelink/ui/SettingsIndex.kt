@@ -325,7 +325,10 @@ internal fun aiCommandLabel(cmd: String): String = when (cmd) {
     else -> "Run on"
 }
 
-internal class SearchEntry(val title: String, val haystack: String, val content: @Composable () -> Unit)
+internal class SearchEntry(val title: String, val haystack: String, val content: @Composable () -> Unit) {
+    // Memoized lowercase title to avoid recomputing on every search score call
+    val titleLowercase: String = title.lowercase()
+}
 
 /**
  * Declarative description of one plain on/off setting, so a new simple toggle
@@ -559,7 +562,7 @@ internal fun hasFuzzyWord(hay: String, token: String): Boolean {
  * limit".
  */
 internal fun searchScore(tokens: List<String>, e: SearchEntry, fuzzy: Boolean): Int? {
-    val title = e.title.lowercase()
+    val title = e.titleLowercase  // Use memoized lowercase title instead of recomputing
     var total = 0
     for (t in tokens) {
         // Best hit across the token and its synonyms. A synonym that lands is
