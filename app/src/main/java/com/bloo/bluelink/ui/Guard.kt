@@ -551,25 +551,39 @@ internal fun LockOverlay(vm: AppViewModel) {
                 )
                 Spacer(Modifier.height(if (compact) 16.dp else 28.dp))
                 // White pill for maximum contrast over the dimmed blur.
-                MorphButton(
-                    onClick = { authenticateBiometric() },
-                    modifier = Modifier.height(if (compact) 56.dp else ControlHeight),
-                    containerColor = Color.White,
-                    contentColor = Color.Black,
-                    contentPadding = PaddingValues(horizontal = 40.dp, vertical = 18.dp),
+                val unlockSource = remember { MutableInteractionSource() }
+                SafeExpansiveButton(
+                    interactionSource = unlockSource,
+                    enabled = true,
                 ) {
-                    Icon(Icons.Filled.Fingerprint, contentDescription = null, modifier = Modifier.size(24.dp))
-                    Spacer(Modifier.width(10.dp))
-                    Text("Unlock", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                    MorphButton(
+                        onClick = { authenticateBiometric() },
+                        modifier = Modifier.height(if (compact) 56.dp else ControlHeight),
+                        interactionSource = unlockSource,
+                        containerColor = Color.White,
+                        contentColor = Color.Black,
+                        contentPadding = PaddingValues(horizontal = 40.dp, vertical = 18.dp),
+                    ) {
+                        Icon(Icons.Filled.Fingerprint, contentDescription = null, modifier = Modifier.size(24.dp))
+                        Spacer(Modifier.width(10.dp))
+                        Text("Unlock", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                    }
                 }
                 if (appState.appPinSet) {
                     Spacer(Modifier.height(12.dp))
-                    MorphTextButton(
-                        "Use PIN",
-                        onClick = { haptics?.click(); usePinMode = true },
-                        containerColor = Color.White.copy(alpha = 0.10f),
-                        contentColor = Color.White,
-                    )
+                    val pinSource = remember { MutableInteractionSource() }
+                    SafeExpansiveButton(
+                        interactionSource = pinSource,
+                        enabled = true,
+                    ) {
+                        MorphTextButton(
+                            "Use PIN",
+                            onClick = { haptics?.click(); usePinMode = true },
+                            interactionSource = pinSource,
+                            containerColor = Color.White.copy(alpha = 0.10f),
+                            contentColor = Color.White,
+                        )
+                    }
                 }
             } else if (appState.appPinSet) {
                 // --- PIN prompt (device has no biometrics, or user chose PIN) --
@@ -641,22 +655,36 @@ internal fun LockOverlay(vm: AppViewModel) {
                             modifier = Modifier.fillMaxWidth(),
                         )
                         Spacer(Modifier.height(14.dp))
-                        MorphButton(
-                            onClick = { attemptPin() },
-                            modifier = Modifier.fillMaxWidth().height(52.dp),
+                        val pinUnlockSource = remember { MutableInteractionSource() }
+                        SafeExpansiveButton(
+                            interactionSource = pinUnlockSource,
                             enabled = !rejected && pin.length in PinCrypto.PIN_MIN_DIGITS..PinCrypto.PIN_MAX_DIGITS,
                         ) {
-                            Icon(Icons.Filled.LockOpen, contentDescription = null, modifier = Modifier.size(18.dp))
-                            Spacer(Modifier.width(8.dp))
-                            Text("Unlock", fontWeight = FontWeight.SemiBold)
+                            MorphButton(
+                                onClick = { attemptPin() },
+                                modifier = Modifier.fillMaxWidth().height(52.dp),
+                                interactionSource = pinUnlockSource,
+                                enabled = !rejected && pin.length in PinCrypto.PIN_MIN_DIGITS..PinCrypto.PIN_MAX_DIGITS,
+                            ) {
+                                Icon(Icons.Filled.LockOpen, contentDescription = null, modifier = Modifier.size(18.dp))
+                                Spacer(Modifier.width(8.dp))
+                                Text("Unlock", fontWeight = FontWeight.SemiBold)
+                            }
                         }
                         if (bioAvailable) {
                             Spacer(Modifier.height(8.dp))
-                            MorphTextButton(
-                                "Use fingerprint",
-                                onClick = { haptics?.click(); usePinMode = false; authenticateBiometric() },
-                                modifier = Modifier.fillMaxWidth(),
-                            )
+                            val bioSource = remember { MutableInteractionSource() }
+                            SafeExpansiveButton(
+                                interactionSource = bioSource,
+                                enabled = true,
+                            ) {
+                                MorphTextButton(
+                                    "Use fingerprint",
+                                    onClick = { haptics?.click(); usePinMode = false; authenticateBiometric() },
+                                    interactionSource = bioSource,
+                                    modifier = Modifier.fillMaxWidth(),
+                                )
+                            }
                         }
                     }
                 }
@@ -820,19 +848,50 @@ internal fun EmptyScreen(vm: AppViewModel) {
                     )
                     Spacer(Modifier.height(8.dp))
                     if (state.accounts.isEmpty()) {
-                        MorphButton(onClick = { vm.openSettings() }, modifier = Modifier.fillMaxWidth()) {
-                            Icon(Icons.Filled.Settings, contentDescription = null, modifier = Modifier.size(18.dp))
-                            Spacer(Modifier.width(8.dp))
-                            Text("Open Settings", fontWeight = FontWeight.SemiBold)
+                        val settingsSource = remember { MutableInteractionSource() }
+                        SafeExpansiveButton(
+                            interactionSource = settingsSource,
+                            enabled = true,
+                        ) {
+                            MorphButton(
+                                onClick = { vm.openSettings() },
+                                interactionSource = settingsSource,
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Icon(Icons.Filled.Settings, contentDescription = null, modifier = Modifier.size(18.dp))
+                                Spacer(Modifier.width(8.dp))
+                                Text("Open Settings", fontWeight = FontWeight.SemiBold)
+                            }
                         }
                     } else {
-                        MorphButton(onClick = { vm.loadGarage() }, modifier = Modifier.fillMaxWidth()) {
-                            Icon(Icons.Filled.Refresh, contentDescription = null, modifier = Modifier.size(18.dp))
-                            Spacer(Modifier.width(8.dp))
-                            Text(if (loadFailed) "Try again" else "Reload", fontWeight = FontWeight.SemiBold)
+                        val reloadSource = remember { MutableInteractionSource() }
+                        SafeExpansiveButton(
+                            interactionSource = reloadSource,
+                            enabled = true,
+                        ) {
+                            MorphButton(
+                                onClick = { vm.loadGarage() },
+                                interactionSource = reloadSource,
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Icon(Icons.Filled.Refresh, contentDescription = null, modifier = Modifier.size(18.dp))
+                                Spacer(Modifier.width(8.dp))
+                                Text(if (loadFailed) "Try again" else "Reload", fontWeight = FontWeight.SemiBold)
+                            }
                         }
                     }
-                    MorphTextButton("Account Settings", onClick = { vm.openSettings() }, modifier = Modifier.fillMaxWidth())
+                    val accountSource = remember { MutableInteractionSource() }
+                    SafeExpansiveButton(
+                        interactionSource = accountSource,
+                        enabled = true,
+                    ) {
+                        MorphTextButton(
+                            "Account Settings",
+                            onClick = { vm.openSettings() },
+                            interactionSource = accountSource,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
                 }
             }
         }
