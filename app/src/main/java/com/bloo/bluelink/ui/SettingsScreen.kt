@@ -887,16 +887,30 @@ internal fun SettingsScreen(
                     )
                     Spacer(Modifier.height(8.dp))
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        MorphTextButton(
-                            "Change Drive file",
-                            modifier = Modifier.weight(1f),
-                            onClick = { showDriveDialog = true },
-                        )
-                        MorphTextButton(
-                            "Disable",
-                            modifier = Modifier.weight(1f),
-                            onClick = { vm.clearSyncUri() },
-                        )
+                        val changeFileSource = remember { MutableInteractionSource() }
+                        SafeExpansiveButton(
+                            interactionSource = changeFileSource,
+                            enabled = true,
+                        ) {
+                            MorphTextButton(
+                                "Change Drive file",
+                                modifier = Modifier.weight(1f),
+                                interactionSource = changeFileSource,
+                                onClick = { showDriveDialog = true },
+                            )
+                        }
+                        val disableSource = remember { MutableInteractionSource() }
+                        SafeExpansiveButton(
+                            interactionSource = disableSource,
+                            enabled = true,
+                        ) {
+                            MorphTextButton(
+                                "Disable",
+                                modifier = Modifier.weight(1f),
+                                interactionSource = disableSource,
+                                onClick = { vm.clearSyncUri() },
+                            )
+                        }
                     }
                     // Troubleshooting tools, not daily controls: the last-synced
                     // stamp (already summarised in the header above), the file
@@ -904,11 +918,18 @@ internal fun SettingsScreen(
                     // default so the card stops reading as a wall of equal pills.
                     Spacer(Modifier.height(8.dp))
                     var showSyncDiagnostics by rememberSaveable { mutableStateOf(false) }
-                    MorphTextButton(
-                        if (showSyncDiagnostics) "Hide diagnostics" else "Diagnostics",
-                        modifier = Modifier.fillMaxWidth(),
-                        onClick = { showSyncDiagnostics = !showSyncDiagnostics },
-                    )
+                    val diagnosticsSource = remember { MutableInteractionSource() }
+                    SafeExpansiveButton(
+                        interactionSource = diagnosticsSource,
+                        enabled = true,
+                    ) {
+                        MorphTextButton(
+                            if (showSyncDiagnostics) "Hide diagnostics" else "Diagnostics",
+                            modifier = Modifier.fillMaxWidth(),
+                            interactionSource = diagnosticsSource,
+                            onClick = { showSyncDiagnostics = !showSyncDiagnostics },
+                        )
+                    }
                     AnimatedVisibility(
                         visible = showSyncDiagnostics,
                         enter = collapseEnter(Alignment.Bottom),
@@ -938,13 +959,35 @@ internal fun SettingsScreen(
                             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                 // Non-destructive real-provider round-trip so the user can confirm
                                 // sync actually works.
-                                MorphTextButton("Test sync", modifier = Modifier.weight(1f), onClick = { vm.testSync() })
+                                val testSyncSource = remember { MutableInteractionSource() }
+                                SafeExpansiveButton(
+                                    interactionSource = testSyncSource,
+                                    enabled = true,
+                                ) {
+                                    MorphTextButton(
+                                        "Test sync",
+                                        modifier = Modifier.weight(1f),
+                                        interactionSource = testSyncSource,
+                                        onClick = { vm.testSync() }
+                                    )
+                                }
                                 // "Pull from primary now": force this device to adopt the
                                 // primary's full settings — only when a primary exists AND it
                                 // isn't this device (pulling from yourself is a no-op). When not
                                 // shown, Test sync spans the row on its own.
                                 if (state.syncPrimaryId != null && state.syncPrimaryId != state.thisDeviceId) {
-                                    MorphTextButton("Pull from primary", modifier = Modifier.weight(1f), onClick = { vm.pullFromPrimary() })
+                                    val pullSource = remember { MutableInteractionSource() }
+                                    SafeExpansiveButton(
+                                        interactionSource = pullSource,
+                                        enabled = true,
+                                    ) {
+                                        MorphTextButton(
+                                            "Pull from primary",
+                                            modifier = Modifier.weight(1f),
+                                            interactionSource = pullSource,
+                                            onClick = { vm.pullFromPrimary() }
+                                        )
+                                    }
                                 }
                             }
                         }
@@ -973,16 +1016,30 @@ internal fun SettingsScreen(
                     )
                     Spacer(Modifier.height(10.dp))
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        MorphTextButton(
-                            "Export",
-                            modifier = Modifier.weight(1f),
-                            onClick = { vm.exportSettings(context) },
-                        )
-                        MorphTextButton(
-                            "Restore",
-                            modifier = Modifier.weight(1f),
-                            onClick = { settingsImportLauncher.launch("application/json") },
-                        )
+                        val exportSource = remember { MutableInteractionSource() }
+                        SafeExpansiveButton(
+                            interactionSource = exportSource,
+                            enabled = true,
+                        ) {
+                            MorphTextButton(
+                                "Export",
+                                modifier = Modifier.weight(1f),
+                                interactionSource = exportSource,
+                                onClick = { vm.exportSettings(context) },
+                            )
+                        }
+                        val restoreSource = remember { MutableInteractionSource() }
+                        SafeExpansiveButton(
+                            interactionSource = restoreSource,
+                            enabled = true,
+                        ) {
+                            MorphTextButton(
+                                "Restore",
+                                modifier = Modifier.weight(1f),
+                                interactionSource = restoreSource,
+                                onClick = { settingsImportLauncher.launch("application/json") },
+                            )
+                        }
                     }
                   }
                 }
@@ -1162,10 +1219,17 @@ internal fun SettingsScreen(
                     // that shouldn't blast into view every time the card itself opens,
                     // so it keeps its own disclosure -- just spelled out in words
                     // instead of an icon that mimics the outer one.
-                    MorphTextButton(
-                        if (logsExpanded) "Hide" else "Show",
-                        onClick = { logsExpanded = !logsExpanded },
-                    )
+                    val logsExpandSource = remember { MutableInteractionSource() }
+                    SafeExpansiveButton(
+                        interactionSource = logsExpandSource,
+                        enabled = true,
+                    ) {
+                        MorphTextButton(
+                            if (logsExpanded) "Hide" else "Show",
+                            interactionSource = logsExpandSource,
+                            onClick = { logsExpanded = !logsExpanded },
+                        )
+                    }
                 }
                 AnimatedVisibility(
                     visible = logsExpanded,
@@ -1564,26 +1628,40 @@ internal fun SettingsScreen(
                 )
                 Spacer(Modifier.height(12.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    MorphButton(
-                        onClick = { pinDialog = "set" },
-                        modifier = Modifier.weight(1f),
+                    val pinSource = remember { MutableInteractionSource() }
+                    SafeExpansiveButton(
+                        interactionSource = pinSource,
+                        enabled = true,
                     ) {
-                        Icon(
-                            if (pinSet) Icons.Filled.LockReset else Icons.Filled.Lock,
-                            contentDescription = null,
-                            modifier = Modifier.size(18.dp),
-                        )
-                        Spacer(Modifier.width(8.dp))
-                        Text(if (pinSet) "Change PIN" else "Set up PIN", fontWeight = FontWeight.SemiBold)
+                        MorphButton(
+                            onClick = { pinDialog = "set" },
+                            interactionSource = pinSource,
+                            modifier = Modifier.weight(1f),
+                        ) {
+                            Icon(
+                                if (pinSet) Icons.Filled.LockReset else Icons.Filled.Lock,
+                                contentDescription = null,
+                                modifier = Modifier.size(18.dp),
+                            )
+                            Spacer(Modifier.width(8.dp))
+                            Text(if (pinSet) "Change PIN" else "Set up PIN", fontWeight = FontWeight.SemiBold)
+                        }
                     }
                     if (pinSet) {
-                        MorphTextButton(
-                            "Remove",
-                            onClick = { pinDialog = "remove" },
-                            modifier = Modifier.weight(1f),
-                            containerColor = MaterialTheme.colorScheme.errorContainer,
-                            contentColor = MaterialTheme.colorScheme.onErrorContainer,
-                        )
+                        val removeSource = remember { MutableInteractionSource() }
+                        SafeExpansiveButton(
+                            interactionSource = removeSource,
+                            enabled = true,
+                        ) {
+                            MorphTextButton(
+                                "Remove",
+                                onClick = { pinDialog = "remove" },
+                                modifier = Modifier.weight(1f),
+                                interactionSource = removeSource,
+                                containerColor = MaterialTheme.colorScheme.errorContainer,
+                                contentColor = MaterialTheme.colorScheme.onErrorContainer,
+                            )
+                        }
                     }
                 }
                 PinDialogs(
@@ -1841,30 +1919,44 @@ internal fun SettingsScreen(
                 // Releases page (a second source that still works when the
                 // checker says up-to-date or GitHub's API is flaky).
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    MorphButton(
-                        onClick = { vm.checkForUpdateManually() },
-                        modifier = Modifier.weight(1f),
+                    val checkSource = remember { MutableInteractionSource() }
+                    SafeExpansiveButton(
+                        interactionSource = checkSource,
                         enabled = !state.updateChecking,
-                        active = true,
                     ) {
-                        MorphButtonLabel(
-                            icon = Icons.Filled.Refresh,
-                            label = if (state.updateChecking) "Checking…" else "Check",
-                            pending = state.updateChecking,
+                        MorphButton(
+                            onClick = { vm.checkForUpdateManually() },
+                            modifier = Modifier.weight(1f),
+                            interactionSource = checkSource,
+                            enabled = !state.updateChecking,
+                            active = true,
+                        ) {
+                            MorphButtonLabel(
+                                icon = Icons.Filled.Refresh,
+                                label = if (state.updateChecking) "Checking…" else "Check",
+                                pending = state.updateChecking,
+                            )
+                        }
+                    }
+                    val githubSource = remember { MutableInteractionSource() }
+                    SafeExpansiveButton(
+                        interactionSource = githubSource,
+                        enabled = true,
+                    ) {
+                        MorphTextButton(
+                            "GitHub",
+                            interactionSource = githubSource,
+                            onClick = {
+                                runCatching {
+                                    context.startActivity(
+                                        Intent(Intent.ACTION_VIEW, Uri.parse(com.bloo.bluelink.data.UpdateApi.RELEASES_URL))
+                                            .apply { addFlags(Intent.FLAG_ACTIVITY_NEW_TASK) },
+                                    )
+                                }
+                            },
+                            modifier = Modifier.weight(1f),
                         )
                     }
-                    MorphTextButton(
-                        "GitHub",
-                        onClick = {
-                            runCatching {
-                                context.startActivity(
-                                    Intent(Intent.ACTION_VIEW, Uri.parse(com.bloo.bluelink.data.UpdateApi.RELEASES_URL))
-                                        .apply { addFlags(Intent.FLAG_ACTIVITY_NEW_TASK) },
-                                )
-                            }
-                        },
-                        modifier = Modifier.weight(1f),
-                    )
                 }
                 // Shizuku silent-install: the ROW is gated on Shizuku being present, but
                 // the card is not — so the update controls above always show.
@@ -1900,47 +1992,54 @@ internal fun SettingsScreen(
                     Spacer(Modifier.height(6.dp))
                     UpdateStatusLine(deltaLabel, seamless, state, vm)
                     Spacer(Modifier.height(12.dp))
-                    MorphButton(
-                        onClick = {
-                            when {
-                                state.updateApkReady -> vm.installDownloadedUpdate()
-                                updateInfo.run.phoneApkUrl != null -> vm.downloadUpdateInBackground()
-                                else -> {
-                                    val opened = runCatching {
-                                        context.startActivity(
-                                            Intent(Intent.ACTION_VIEW, Uri.parse(updateInfo.run.htmlUrl))
-                                                .apply { addFlags(Intent.FLAG_ACTIVITY_NEW_TASK) },
-                                        )
-                                    }.isSuccess
-                                    if (opened) vm.dismissUpdate() else vm.reportError("Couldn't open the release page.")
-                                }
-                            }
-                        },
-                        active = state.updateApkReady,
-                        activeContainerColor = com.bloo.bluelink.ui.ChargeGreen,
-                        activeContentColor = Color.White,
+                    val updateSource = remember { MutableInteractionSource() }
+                    SafeExpansiveButton(
+                        interactionSource = updateSource,
                         enabled = !state.updateInstalling && !state.updateDownloading,
-                        modifier = Modifier.fillMaxWidth(),
                     ) {
-                        Icon(
-                            when {
-                                state.updateApkReady -> Icons.Filled.CheckCircle
-                                state.updateDownloading -> Icons.Filled.Download
-                                else -> Icons.Filled.SystemUpdate
+                        MorphButton(
+                            onClick = {
+                                when {
+                                    state.updateApkReady -> vm.installDownloadedUpdate()
+                                    updateInfo.run.phoneApkUrl != null -> vm.downloadUpdateInBackground()
+                                    else -> {
+                                        val opened = runCatching {
+                                            context.startActivity(
+                                                Intent(Intent.ACTION_VIEW, Uri.parse(updateInfo.run.htmlUrl))
+                                                    .apply { addFlags(Intent.FLAG_ACTIVITY_NEW_TASK) },
+                                            )
+                                        }.isSuccess
+                                        if (opened) vm.dismissUpdate() else vm.reportError("Couldn't open the release page.")
+                                    }
+                                }
                             },
-                            contentDescription = null,
-                            modifier = Modifier.size(18.dp),
-                        )
-                        Spacer(Modifier.width(8.dp))
-                        Text(
-                            when {
-                                state.updateInstalling -> "Installing…"
-                                state.updateApkReady -> if (seamless) "Install now" else "Install"
-                                updateInfo.run.phoneApkUrl != null -> "Download"
-                                else -> "Open release page"
-                            },
-                            fontWeight = FontWeight.SemiBold,
-                        )
+                            active = state.updateApkReady,
+                            activeContainerColor = com.bloo.bluelink.ui.ChargeGreen,
+                            activeContentColor = Color.White,
+                            enabled = !state.updateInstalling && !state.updateDownloading,
+                            interactionSource = updateSource,
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
+                            Icon(
+                                when {
+                                    state.updateApkReady -> Icons.Filled.CheckCircle
+                                    state.updateDownloading -> Icons.Filled.Download
+                                    else -> Icons.Filled.SystemUpdate
+                                },
+                                contentDescription = null,
+                                modifier = Modifier.size(18.dp),
+                            )
+                            Spacer(Modifier.width(8.dp))
+                            Text(
+                                when {
+                                    state.updateInstalling -> "Installing…"
+                                    state.updateApkReady -> if (seamless) "Install now" else "Install"
+                                    updateInfo.run.phoneApkUrl != null -> "Download"
+                                    else -> "Open release page"
+                                },
+                                fontWeight = FontWeight.SemiBold,
+                            )
+                        }
                     }
                     val notes = updateInfo.run.releaseNotes
                     if (notes != null) {
@@ -1960,14 +2059,24 @@ internal fun SettingsScreen(
                                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                                         modifier = Modifier.weight(1f),
                                     )
-                                    MorphTextButton("Full notes", onClick = {
-                                        runCatching {
-                                            context.startActivity(
-                                                Intent(Intent.ACTION_VIEW, Uri.parse(updateInfo.run.htmlUrl))
-                                                    .apply { addFlags(Intent.FLAG_ACTIVITY_NEW_TASK) },
-                                            )
-                                        }
-                                    })
+                                    val notesSource = remember { MutableInteractionSource() }
+                                    SafeExpansiveButton(
+                                        interactionSource = notesSource,
+                                        enabled = true,
+                                    ) {
+                                        MorphTextButton(
+                                            "Full notes",
+                                            interactionSource = notesSource,
+                                            onClick = {
+                                                runCatching {
+                                                    context.startActivity(
+                                                        Intent(Intent.ACTION_VIEW, Uri.parse(updateInfo.run.htmlUrl))
+                                                            .apply { addFlags(Intent.FLAG_ACTIVITY_NEW_TASK) },
+                                                    )
+                                                }
+                                            }
+                                        )
+                                    }
                                 }
                                 Text(
                                     notes.trim(),
@@ -1982,11 +2091,18 @@ internal fun SettingsScreen(
                     Spacer(Modifier.height(8.dp))
                     Row(Modifier.fillMaxWidth()) {
                         Spacer(Modifier.weight(1f))
-                        MorphTextButton(
-                            "Not now",
-                            onClick = vm::dismissUpdate,
+                        val notNowSource = remember { MutableInteractionSource() }
+                        SafeExpansiveButton(
+                            interactionSource = notNowSource,
                             enabled = !state.updateDownloading && !state.updateInstalling,
-                        )
+                        ) {
+                            MorphTextButton(
+                                "Not now",
+                                interactionSource = notNowSource,
+                                onClick = vm::dismissUpdate,
+                                enabled = !state.updateDownloading && !state.updateInstalling,
+                            )
+                        }
                     }
                 }
             }
@@ -2058,20 +2174,34 @@ internal fun SettingsScreen(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
-                    MorphTextButton(
-                        "Set place",
-                        modifier = Modifier.weight(1f),
+                    val setPlaceSource = remember { MutableInteractionSource() }
+                    SafeExpansiveButton(
+                        interactionSource = setPlaceSource,
                         enabled = weatherQuery.isNotBlank(),
-                        onClick = { vm.setWeatherPlace(weatherQuery); weatherQuery = "" },
-                    )
-                    MorphButton(
-                        onClick = { locationPermission.launch(android.Manifest.permission.ACCESS_COARSE_LOCATION) },
-                        modifier = Modifier.weight(1f),
-                        contentPadding = PaddingValues(horizontal = 14.dp, vertical = 10.dp),
                     ) {
-                        Icon(Icons.Filled.MyLocation, null, modifier = Modifier.size(18.dp))
-                        Spacer(Modifier.width(8.dp))
-                        Text("My location", fontWeight = FontWeight.SemiBold, maxLines = 1)
+                        MorphTextButton(
+                            "Set place",
+                            modifier = Modifier.weight(1f),
+                            interactionSource = setPlaceSource,
+                            enabled = weatherQuery.isNotBlank(),
+                            onClick = { vm.setWeatherPlace(weatherQuery); weatherQuery = "" },
+                        )
+                    }
+                    val myLocationSource = remember { MutableInteractionSource() }
+                    SafeExpansiveButton(
+                        interactionSource = myLocationSource,
+                        enabled = true,
+                    ) {
+                        MorphButton(
+                            onClick = { locationPermission.launch(android.Manifest.permission.ACCESS_COARSE_LOCATION) },
+                            modifier = Modifier.weight(1f),
+                            interactionSource = myLocationSource,
+                            contentPadding = PaddingValues(horizontal = 14.dp, vertical = 10.dp),
+                        ) {
+                            Icon(Icons.Filled.MyLocation, null, modifier = Modifier.size(18.dp))
+                            Spacer(Modifier.width(8.dp))
+                            Text("My location", fontWeight = FontWeight.SemiBold, maxLines = 1)
+                        }
                     }
                 }
             }
