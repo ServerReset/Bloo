@@ -656,14 +656,21 @@ internal fun OwnerLinks(v: Vehicle, state: UiState, context: Context, inApp: Boo
 internal fun LinkButton(label: String, icon: ImageVector, onClick: () -> Unit) {
     // Same morphing pill framework as every other button, with a tonal fill that
     // reads clearly on the car-info pebble.
-    MorphButton(
-        onClick = onClick,
-        containerColor = MaterialTheme.colorScheme.secondaryContainer,
-        contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
-        contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp),
+    val linkSource = remember { MutableInteractionSource() }
+    SafeExpansiveButton(
+        interactionSource = linkSource,
+        enabled = true,
     ) {
-        Icon(icon, contentDescription = null, modifier = Modifier.size(16.dp))
-        Spacer(Modifier.width(6.dp))
-        Text(label, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold)
+        MorphButton(
+            onClick = onClick,
+            interactionSource = linkSource,
+            containerColor = MaterialTheme.colorScheme.secondaryContainer,
+            contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+            contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp),
+        ) {
+            Icon(icon, contentDescription = null, modifier = Modifier.size(16.dp))
+            Spacer(Modifier.width(6.dp))
+            Text(label, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold)
+        }
     }
 }

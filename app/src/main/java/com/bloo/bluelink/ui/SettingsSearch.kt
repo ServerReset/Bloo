@@ -963,19 +963,26 @@ internal fun SearchSuggestions(state: UiState, compact: Boolean = false, onPick:
             PopVisible(visible = staggeredResultVisible(examplesKey, i)) {
                 // Same MorphButton every selector chip in the app uses, with
                 // the search screen's tonal fill kept as its standard colours.
-                MorphButton(
-                    onClick = { onPick(example) },
-                    containerColor = MaterialTheme.colorScheme.secondaryContainer,
-                    contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
-                    contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp),
-                    minHeight = 0.dp,
-                    modifier = Modifier.dropShadow(RoundedCornerShape(50), blurRadius = 8.dp, offsetY = 3.dp),
+                val exampleSource = remember { MutableInteractionSource() }
+                SafeExpansiveButton(
+                    interactionSource = exampleSource,
+                    enabled = true,
                 ) {
-                    Text(
-                        example,
-                        style = MaterialTheme.typography.labelLarge,
-                        fontWeight = FontWeight.SemiBold,
-                    )
+                    MorphButton(
+                        onClick = { onPick(example) },
+                        interactionSource = exampleSource,
+                        containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                        contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                        contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp),
+                        minHeight = 0.dp,
+                        modifier = Modifier.dropShadow(RoundedCornerShape(50), blurRadius = 8.dp, offsetY = 3.dp),
+                    ) {
+                        Text(
+                            example,
+                            style = MaterialTheme.typography.labelLarge,
+                            fontWeight = FontWeight.SemiBold,
+                        )
+                    }
                 }
             }
         }
