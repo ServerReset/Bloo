@@ -250,7 +250,7 @@ fun RemoteActionsHistoryCard(
                         .padding(vertical = 8.dp),
                     verticalArrangement = Arrangement.spacedBy(0.dp),
                 ) {
-                    items(displayedActions) { action ->
+                    items(displayedActions, key = { it.id }) { action ->
                         RemoteActionItem(action)
                     }
 
