@@ -1172,67 +1172,81 @@ internal fun ChargeLimitPill(
             horizontalArrangement = Arrangement.spacedBy(3.dp),
         ) {
             // Left half — label. Tapping bumps the limit up by one step, wrapping
-            // back to 50% after 100%, for quick keyboard-free adjustment.
-            MorphButton(
-                onClick = { onValueChange(if (limit >= 100) 50 else limit + 10) },
-                onClickHaptic = { haptics?.tick() },
+            // back to 50% after 100%, for quick keyboard-free adjustment. With expansion.
+            val incrementSource = remember { MutableInteractionSource() }
+            SafeExpansiveButton(
+                interactionSource = incrementSource,
                 enabled = enabled,
-                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 11.dp),
-                shapeForCorner = leftShapeForCorner,
-                pillCornerPercent = 50f,
-                morphedCornerPercent = morphedPct,
-                minHeight = 0.dp,
-                // Both the current value and what tapping actually does (bump
-                // by 10%, wrapping at 100%) were purely visual -- TalkBack
-                // announced only the label text with no indication this half
-                // was itself a stepper, distinct from "Set" on the right.
-                modifier = Modifier.weight(1f).fillMaxHeight()
-                    .semantics(mergeDescendants = true) {
-                        contentDescription = "$label, $limit percent"
-                        onClick(label = "Increase by 10 percent") {
-                            onValueChange(if (limit >= 100) 50 else limit + 10)
-                            true
-                        }
-                    },
             ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(icon, contentDescription = null, modifier = Modifier.size(16.dp))
-                    Spacer(Modifier.width(8.dp))
-                    Text(
-                        label,
-                        style = MaterialTheme.typography.labelLarge,
-                        fontWeight = FontWeight.SemiBold,
-                        modifier = Modifier.weight(1f),
-                    )
-                    RollingNumber(
-                        text = "$limit%",
-                        style = MaterialTheme.typography.labelLarge,
-                        fontWeight = FontWeight.Bold,
-                    )
+                MorphButton(
+                    onClick = { onValueChange(if (limit >= 100) 50 else limit + 10) },
+                    onClickHaptic = { haptics?.tick() },
+                    enabled = enabled,
+                    interactionSource = incrementSource,
+                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 11.dp),
+                    shapeForCorner = leftShapeForCorner,
+                    pillCornerPercent = 50f,
+                    morphedCornerPercent = morphedPct,
+                    minHeight = 0.dp,
+                    // Both the current value and what tapping actually does (bump
+                    // by 10%, wrapping at 100%) were purely visual -- TalkBack
+                    // announced only the label text with no indication this half
+                    // was itself a stepper, distinct from "Set" on the right.
+                    modifier = Modifier.weight(1f).fillMaxHeight()
+                        .semantics(mergeDescendants = true) {
+                            contentDescription = "$label, $limit percent"
+                            onClick(label = "Increase by 10 percent") {
+                                onValueChange(if (limit >= 100) 50 else limit + 10)
+                                true
+                            }
+                        },
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(icon, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text(
+                            label,
+                            style = MaterialTheme.typography.labelLarge,
+                            fontWeight = FontWeight.SemiBold,
+                            modifier = Modifier.weight(1f),
+                        )
+                        RollingNumber(
+                            text = "$limit%",
+                            style = MaterialTheme.typography.labelLarge,
+                            fontWeight = FontWeight.Bold,
+                        )
+                    }
                 }
             }
             // Right half — "Set" nub. Inner (left) corners match the gap; outer
-            // (right) are pill-rounded. Active while the command is in flight,
-            // so it wears the same primary highlight every active button does.
-            MorphButton(
-                onClick = { onApply() },
-                onClickHaptic = { haptics?.heavy() },
+            // (right) are pill-rounded. Active while the command is in flight.
+            // With expansion animation.
+            val applySource = remember { MutableInteractionSource() }
+            SafeExpansiveButton(
+                interactionSource = applySource,
                 enabled = enabled && !pending,
-                active = pending,
-                contentPadding = PaddingValues(horizontal = 18.dp),
-                shapeForCorner = rightShapeForCorner,
-                pillCornerPercent = 50f,
-                morphedCornerPercent = morphedPct,
-                minHeight = 0.dp,
-                // The pending spinner must not fade with the disabled content
-                // (Surface didn't dim it before), so pin the full tone.
-                disabledContentColor = MaterialTheme.colorScheme.onPrimary,
-                modifier = Modifier.fillMaxHeight(),
             ) {
-                if (pending) {
-                    LoadingIndicator(Modifier.size(18.dp))
-                } else {
-                    Text("Set", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelLarge)
+                MorphButton(
+                    onClick = { onApply() },
+                    onClickHaptic = { haptics?.heavy() },
+                    enabled = enabled && !pending,
+                    active = pending,
+                    interactionSource = applySource,
+                    contentPadding = PaddingValues(horizontal = 18.dp),
+                    shapeForCorner = rightShapeForCorner,
+                    pillCornerPercent = 50f,
+                    morphedCornerPercent = morphedPct,
+                    minHeight = 0.dp,
+                    // The pending spinner must not fade with the disabled content
+                    // (Surface didn't dim it before), so pin the full tone.
+                    disabledContentColor = MaterialTheme.colorScheme.onPrimary,
+                    modifier = Modifier.fillMaxHeight(),
+                ) {
+                    if (pending) {
+                        LoadingIndicator(Modifier.size(18.dp))
+                    } else {
+                        Text("Set", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelLarge)
+                    }
                 }
             }
         }
