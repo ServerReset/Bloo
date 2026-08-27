@@ -462,7 +462,10 @@ internal fun ChargePebble(v: Vehicle, status: VehicleStatus?, enabled: Boolean, 
     // Set would only ever send the 80/90 defaults, so the whole editable control is suppressed.
     var acSeeded by remember(v.vin) { mutableStateOf(false) }
     var dcSeeded by remember(v.vin) { mutableStateOf(false) }
-    LaunchedEffect(v.vin, ev?.reservChargeInfos) {
+    // Only seed on first composition; ev?.reservChargeInfos changes frequently (during
+    // charging status updates) so depending on it would restart this effect constantly.
+    // Once seeded, we never need to run this again.
+    LaunchedEffect(v.vin) {
         if (!acSeeded) ev?.reservChargeInfos?.level(1)?.let { acLimit = it; acSeeded = true }
         if (!dcSeeded) ev?.reservChargeInfos?.level(0)?.let { dcLimit = it; dcSeeded = true }
     }

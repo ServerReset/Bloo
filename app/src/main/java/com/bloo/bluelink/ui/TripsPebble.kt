@@ -440,7 +440,11 @@ internal fun TripsPebble(v: Vehicle, state: UiState, vm: AppViewModel, dragHandl
     if (!v.brand.supportsTrips) return
     val trips = state.trips[v.vin]
     val loading = state.isPending(v.vin, "trips")
-    LaunchedEffect(v.vin) { vm.loadTrips(v) }
+    // Only load trips if they haven't been fetched yet; prevent redundant loads
+    // on recomposition or when data is already available/loading
+    LaunchedEffect(v.vin) {
+        if (trips == null && !loading) vm.loadTrips(v)
+    }
     val summary = when {
         trips == null -> if (loading) "Loading…" else null
         trips.isEmpty() -> "No recent trips"
