@@ -557,9 +557,19 @@ internal fun UpdateAvailableTile(state: UiState, vm: AppViewModel, dragHandle: M
                                 color = scheme.onSurfaceVariant,
                                 modifier = Modifier.weight(1f),
                             )
-                            MorphTextButton("Full notes", onClick = {
-                                runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(info.run.htmlUrl))) }
-                            })
+                            val notesSource = remember { MutableInteractionSource() }
+                            SafeExpansiveButton(
+                                interactionSource = notesSource,
+                                enabled = true,
+                            ) {
+                                MorphTextButton(
+                                    "Full notes",
+                                    onClick = {
+                                        runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(info.run.htmlUrl))) }
+                                    },
+                                    interactionSource = notesSource,
+                                )
+                            }
                         }
                         Text(
                             notes.trim(),
@@ -576,7 +586,17 @@ internal fun UpdateAvailableTile(state: UiState, vm: AppViewModel, dragHandle: M
             // something to shout before the user has even tapped Update.
             if (!seamless) {
                 var showHelp by rememberSaveable(info.run.runNumber) { mutableStateOf(false) }
-                MorphTextButton(if (showHelp) "Hide install help" else "Trouble installing?", onClick = { showHelp = !showHelp })
+                val helpSource = remember { MutableInteractionSource() }
+                SafeExpansiveButton(
+                    interactionSource = helpSource,
+                    enabled = true,
+                ) {
+                    MorphTextButton(
+                        if (showHelp) "Hide install help" else "Trouble installing?",
+                        onClick = { showHelp = !showHelp },
+                        interactionSource = helpSource,
+                    )
+                }
                 PopVisible(visible = showHelp) {
                     // fillMaxWidth() to match the release-notes Surface right above --
                     // without it this panel wrap-contents to its widest line instead of
@@ -643,7 +663,17 @@ internal fun UpdateAvailableTile(state: UiState, vm: AppViewModel, dragHandle: M
                         )
                     }
                     if (state.updatePendingDismiss) {
-                        MorphTextButton("Keep it", onClick = vm::undoDismissUpdate)
+                        val keepSource = remember { MutableInteractionSource() }
+                        SafeExpansiveButton(
+                            interactionSource = keepSource,
+                            enabled = true,
+                        ) {
+                            MorphTextButton(
+                                "Keep it",
+                                onClick = vm::undoDismissUpdate,
+                                interactionSource = keepSource,
+                            )
+                        }
                     }
                 }
                 Spacer(Modifier.height(4.dp))
@@ -663,20 +693,46 @@ internal fun UpdateAvailableTile(state: UiState, vm: AppViewModel, dragHandle: M
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.weight(1f),
                     )
-                    MorphButton(
-                        onClick = { vm.undoDismissUpdate() },
+                    val undoSource = remember { MutableInteractionSource() }
+                    SafeExpansiveButton(
+                        interactionSource = undoSource,
                         enabled = !state.updateDownloading,
-                        active = true,
-                    ) { Text("Keep it", fontWeight = FontWeight.SemiBold) }
+                    ) {
+                        MorphButton(
+                            onClick = { vm.undoDismissUpdate() },
+                            enabled = !state.updateDownloading,
+                            active = true,
+                            interactionSource = undoSource,
+                        ) { Text("Keep it", fontWeight = FontWeight.SemiBold) }
+                    }
                 }
             } else {
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    MorphButton(
-                        onClick = { vm.snoozeUpdate() },
-                        modifier = Modifier.weight(1f),
+                    val remindSource = remember { MutableInteractionSource() }
+                    SafeExpansiveButton(
+                        interactionSource = remindSource,
                         enabled = !state.updateDownloading,
-                    ) { Text("Remind me") }
-                    MorphTextButton("Not now", onClick = vm::dismissUpdate, enabled = !state.updateDownloading, modifier = Modifier.weight(1f))
+                    ) {
+                        MorphButton(
+                            onClick = { vm.snoozeUpdate() },
+                            modifier = Modifier.weight(1f),
+                            enabled = !state.updateDownloading,
+                            interactionSource = remindSource,
+                        ) { Text("Remind me") }
+                    }
+                    val notNowSource = remember { MutableInteractionSource() }
+                    SafeExpansiveButton(
+                        interactionSource = notNowSource,
+                        enabled = !state.updateDownloading,
+                    ) {
+                        MorphTextButton(
+                            "Not now",
+                            onClick = vm::dismissUpdate,
+                            enabled = !state.updateDownloading,
+                            interactionSource = notNowSource,
+                            modifier = Modifier.weight(1f),
+                        )
+                    }
                 }
             }
         }
