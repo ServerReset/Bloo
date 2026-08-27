@@ -642,37 +642,52 @@ internal fun OnboardingScreen(vm: AppViewModel) {
                     // treatment, matching how every other Back/secondary action
                     // in the app already reaches for the same component rather
                     // than a bespoke look-alike for "the quieter one."
-                    MorphButton(
-                        onClick = ::goBack,
-                        modifier = Modifier.fillMaxWidth(),
-                        contentPadding = PaddingValues(vertical = 16.dp),
-                        border = BorderStroke(1.dp, scheme.outlineVariant),
+                    // With expansion animation.
+                    val backSource = remember { MutableInteractionSource() }
+                    SafeExpansiveButton(
+                        interactionSource = backSource,
+                        enabled = true,
                     ) {
-                        Text("Back", style = MaterialTheme.typography.titleMedium)
+                        MorphButton(
+                            onClick = ::goBack,
+                            interactionSource = backSource,
+                            modifier = Modifier.fillMaxWidth(),
+                            contentPadding = PaddingValues(vertical = 16.dp),
+                            border = BorderStroke(1.dp, scheme.outlineVariant),
+                        ) {
+                            Text("Back", style = MaterialTheme.typography.titleMedium)
+                        }
                     }
                 }
-                MorphButton(
-                    onClick = ::goNext,
-                    active = true,
+                val nextSource = remember { MutableInteractionSource() }
+                SafeExpansiveButton(
+                    interactionSource = nextSource,
                     enabled = !pinRequired,
-                    modifier = Modifier.weight(if (pageIndex > 0) 2f else 1f),
-                    contentPadding = PaddingValues(vertical = 16.dp),
                 ) {
-                    Icon(
-                        if (isLast) Icons.Filled.CheckCircle else Icons.Filled.Check,
-                        contentDescription = null,
-                        modifier = Modifier.size(20.dp),
-                    )
-                    Spacer(Modifier.width(8.dp))
-                    Text(
-                        when {
-                            isLast -> "Enter Bloo"
-                            pageIndex == 0 -> "Get started"
-                            else -> "Next"
-                        },
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                    )
+                    MorphButton(
+                        onClick = ::goNext,
+                        active = true,
+                        enabled = !pinRequired,
+                        interactionSource = nextSource,
+                        modifier = Modifier.weight(if (pageIndex > 0) 2f else 1f),
+                        contentPadding = PaddingValues(vertical = 16.dp),
+                    ) {
+                        Icon(
+                            if (isLast) Icons.Filled.CheckCircle else Icons.Filled.Check,
+                            contentDescription = null,
+                            modifier = Modifier.size(20.dp),
+                        )
+                        Spacer(Modifier.width(8.dp))
+                        Text(
+                            when {
+                                isLast -> "Enter Bloo"
+                                pageIndex == 0 -> "Get started"
+                                else -> "Next"
+                            },
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                        )
+                    }
                 }
                 if (pinRequired) {
                     Spacer(Modifier.height(6.dp))
