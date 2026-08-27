@@ -556,26 +556,51 @@ internal fun SettingsScreen(
                         }
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             if (creds.brand.requiresPin) {
-                                MorphTextButton(
-                                    "Update PIN",
-                                    onClick = { vm.updatePin(creds.brand, pin) },
+                                val pinSource = remember { MutableInteractionSource() }
+                                SafeExpansiveButton(
+                                    interactionSource = pinSource,
                                     enabled = pin.isNotBlank() && pin != creds.pin,
+                                ) {
+                                    MorphTextButton(
+                                        "Update PIN",
+                                        onClick = { vm.updatePin(creds.brand, pin) },
+                                        enabled = pin.isNotBlank() && pin != creds.pin,
+                                        interactionSource = pinSource,
+                                    )
+                                }
+                            }
+                            val signOutSource = remember { MutableInteractionSource() }
+                            SafeExpansiveButton(
+                                interactionSource = signOutSource,
+                                enabled = true,
+                            ) {
+                                MorphTextButton(
+                                    if (confirmSignOut) "Tap again to confirm" else "Sign out",
+                                    onClick = {
+                                        if (confirmSignOut) { vm.logout(creds.brand); confirmSignOut = false }
+                                        else confirmSignOut = true
+                                    },
+                                    containerColor = MaterialTheme.colorScheme.errorContainer,
+                                    contentColor = MaterialTheme.colorScheme.onErrorContainer,
+                                    interactionSource = signOutSource,
                                 )
                             }
-                            MorphTextButton(
-                                if (confirmSignOut) "Tap again to confirm" else "Sign out",
-                                onClick = {
-                                    if (confirmSignOut) { vm.logout(creds.brand); confirmSignOut = false }
-                                    else confirmSignOut = true
-                                },
-                                containerColor = MaterialTheme.colorScheme.errorContainer,
-                                contentColor = MaterialTheme.colorScheme.onErrorContainer,
-                            )
                         }
                     }
                 }
                 Spacer(Modifier.height(12.dp))
-                MorphTextButton("Add another account", onClick = { vm.beginAddAccount() }, modifier = Modifier.fillMaxWidth())
+                val addAccountSource = remember { MutableInteractionSource() }
+                SafeExpansiveButton(
+                    interactionSource = addAccountSource,
+                    enabled = true,
+                ) {
+                    MorphTextButton(
+                        "Add another account",
+                        onClick = { vm.beginAddAccount() },
+                        interactionSource = addAccountSource,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                }
                 Text(
                     "If commands fail with a locked PIN, fix the Service PIN above. Too " +
                         "many wrong-PIN attempts lock it for a few minutes server-side.",
@@ -793,20 +818,34 @@ internal fun SettingsScreen(
                     // Not configured: one unmissable primary CTA, nothing else to
                     // read past. The old layout led with a paragraph explaining
                     // Drive sync and put setup in a quiet text button beside it.
-                    MorphButton(
-                        onClick = { showDriveDialog = true },
-                        modifier = Modifier.fillMaxWidth(),
-                        active = true,
-                    ) { MorphButtonLabel(icon = Icons.Filled.CloudSync, label = "Set up auto-sync", pending = false) }
+                    val setupSource = remember { MutableInteractionSource() }
+                    SafeExpansiveButton(
+                        interactionSource = setupSource,
+                        enabled = true,
+                    ) {
+                        MorphButton(
+                            onClick = { showDriveDialog = true },
+                            interactionSource = setupSource,
+                            modifier = Modifier.fillMaxWidth(),
+                            active = true,
+                        ) { MorphButtonLabel(icon = Icons.Filled.CloudSync, label = "Set up auto-sync", pending = false) }
+                    }
                 } else {
                     // Configured: "Sync now" is THE daily control, so it leads —
                     // ahead of the device registry and the setup/teardown pair,
                     // which are both occasional by comparison.
-                    MorphButton(
-                        onClick = { vm.syncNow() },
-                        modifier = Modifier.fillMaxWidth(),
-                        active = true,
-                    ) { MorphButtonLabel(icon = Icons.Filled.CloudSync, label = "Sync now", pending = false) }
+                    val syncSource = remember { MutableInteractionSource() }
+                    SafeExpansiveButton(
+                        interactionSource = syncSource,
+                        enabled = true,
+                    ) {
+                        MorphButton(
+                            onClick = { vm.syncNow() },
+                            interactionSource = syncSource,
+                            modifier = Modifier.fillMaxWidth(),
+                            active = true,
+                        ) { MorphButtonLabel(icon = Icons.Filled.CloudSync, label = "Sync now", pending = false) }
+                    }
                     // A live failure is the one fact that never hides behind the
                     // diagnostics disclosure below — if sync is broken, say so here.
                     state.syncError?.let { err ->
@@ -1087,11 +1126,31 @@ internal fun SettingsScreen(
                     // exists for rather than the whole-block collapseEnter/collapseExit pair.
                     PopVisible(logsExpanded) {
                         Row {
-                            MorphTextButton("Copy", onClick = {
-                                clipboard.setText(AnnotatedString(logs.joinToString("\n")))
-                            })
+                            val copySource = remember { MutableInteractionSource() }
+                            SafeExpansiveButton(
+                                interactionSource = copySource,
+                                enabled = true,
+                            ) {
+                                MorphTextButton(
+                                    "Copy",
+                                    onClick = {
+                                        clipboard.setText(AnnotatedString(logs.joinToString("\n")))
+                                    },
+                                    interactionSource = copySource,
+                                )
+                            }
                             Spacer(Modifier.width(8.dp))
-                            MorphTextButton("Clear", onClick = { vm.clearLogs() })
+                            val clearSource = remember { MutableInteractionSource() }
+                            SafeExpansiveButton(
+                                interactionSource = clearSource,
+                                enabled = true,
+                            ) {
+                                MorphTextButton(
+                                    "Clear",
+                                    onClick = { vm.clearLogs() },
+                                    interactionSource = clearSource,
+                                )
+                            }
                             Spacer(Modifier.width(4.dp))
                         }
                     }
@@ -1964,7 +2023,17 @@ internal fun SettingsScreen(
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
                         )
-                        MorphTextButton("Clear", onClick = { vm.clearWeatherLocation() })
+                        val weatherClearSource = remember { MutableInteractionSource() }
+                        SafeExpansiveButton(
+                            interactionSource = weatherClearSource,
+                            enabled = true,
+                        ) {
+                            MorphTextButton(
+                                "Clear",
+                                onClick = { vm.clearWeatherLocation() },
+                                interactionSource = weatherClearSource,
+                            )
+                        }
                     }
                     Spacer(Modifier.height(10.dp))
                   }
