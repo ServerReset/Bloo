@@ -2177,13 +2177,17 @@ class SettingsStore(private val context: Context) {
         val longest = maxOf(bounds.outWidth, bounds.outHeight)
         while (longest / sample > SYNCED_PHOTO_MAX_DIM * 2) sample *= 2
         val decoded = BitmapFactory.decodeFile(path, BitmapFactory.Options().apply { inSampleSize = sample }) ?: return null
-        val scale = SYNCED_PHOTO_MAX_DIM.toFloat() / maxOf(decoded.width, decoded.height)
-        val resized = if (scale < 1f) {
-            Bitmap.createScaledBitmap(decoded, (decoded.width * scale).toInt().coerceAtLeast(1), (decoded.height * scale).toInt().coerceAtLeast(1), true)
-        } else decoded
-        val out = java.io.ByteArrayOutputStream()
-        resized.compress(Bitmap.CompressFormat.JPEG, 78, out)
-        return out.toByteArray()
+        try {
+            val scale = SYNCED_PHOTO_MAX_DIM.toFloat() / maxOf(decoded.width, decoded.height)
+            val resized = if (scale < 1f) {
+                Bitmap.createScaledBitmap(decoded, (decoded.width * scale).toInt().coerceAtLeast(1), (decoded.height * scale).toInt().coerceAtLeast(1), true)
+            } else decoded
+            val out = java.io.ByteArrayOutputStream()
+            resized.compress(Bitmap.CompressFormat.JPEG, 78, out)
+            return out.toByteArray()
+        } finally {
+            decoded.recycle()
+        }
     }
 
     /** Writes any embedded per-car photos from a backup's "photos" object to
