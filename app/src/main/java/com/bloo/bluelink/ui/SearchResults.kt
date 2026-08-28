@@ -649,7 +649,7 @@ internal fun SettingsSearchResults(
                     when {
                         targetVehicle == null -> {
                             val example = state.vehicles.firstOrNull()?.name ?: “car”
-                            “Which car? Mention its name, e.g. “${command.label} my $example”.”
+                            “Which car? Mention its name, e.g. \”${command.label} my $example\”.”
                         }
                         actionRunning -> “${command.label} ${targetVehicle.name}…”
                         actionResult != null -> actionResult ?: “${command.label} ${targetVehicle.name}”

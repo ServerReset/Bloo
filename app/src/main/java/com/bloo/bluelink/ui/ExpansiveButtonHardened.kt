@@ -138,12 +138,9 @@ fun ExpansiveButtonHardened(
     // Cleanup on disposal to prevent memory leaks
     DisposableEffect(Unit) {
         onDispose {
-            // Cancel any pending animations (use snapTo instead of stop since onDispose is not suspend)
-            try {
-                scaleAnimatable.snapTo(1f)
-            } catch (e: Exception) {
-                // Animation already finished or disposed
-            }
+            // Reset press state tracker to prevent memory leaks
+            // Note: Animatable will be garbage collected when the composable is disposed,
+            // so we don't need to explicitly reset it (snapTo is suspend and can't be called here)
             pressStateTracker.reset()
         }
     }
