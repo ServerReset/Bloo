@@ -543,7 +543,7 @@ internal fun SettingsSearchResults(
     if (results.isEmpty()) {
         Card(resultCardModifier, shape = resultCardShape, colors = resultCardColors) {
             Text(
-                "No matches for “$query”",
+                "No matches for "$query"",
                 Modifier.padding(16.dp),
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -648,12 +648,12 @@ internal fun SettingsSearchResults(
                 Text(
                     when {
                         targetVehicle == null -> {
-                            val example = state.vehicles.firstOrNull()?.name ?: “car”
-                            “Which car? Mention its name, e.g. \”${command.label} my $example\”.”
+                            val example = state.vehicles.firstOrNull()?.name ?: "car"
+                            "Which car? Mention its name, e.g. \"${command.label} my $example\"."
                         }
-                        actionRunning -> “${command.label} ${targetVehicle.name}…”
-                        actionResult != null -> actionResult ?: “${command.label} ${targetVehicle.name}”
-                        else -> “${command.label} ${targetVehicle.name}”
+                        actionRunning -> "${command.label} ${targetVehicle.name}…"
+                        actionResult != null -> actionResult ?: "${command.label} ${targetVehicle.name}"
+                        else -> "${command.label} ${targetVehicle.name}"
                     },
                     style = MaterialTheme.typography.bodyMedium,
                 )
