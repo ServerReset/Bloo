@@ -2462,7 +2462,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             val fetched = runCatching { statusMutex.withLock { repoFor(v).trips(v) } }
                 .onFailure { e -> AppLog.log("⚠ Trips for ${v.name}: ${e.message ?: "failed"}") }
                 .getOrNull()
-                ?.filter { it.distance != null && it.distance > 0 }
+                ?.filter { (it.distance ?: 0.0) > 0 }
             _state.update {
                 it.copy(
                     trips = if (fetched != null) it.trips + (v.vin to fetched) else it.trips,

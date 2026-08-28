@@ -878,6 +878,7 @@ internal fun PebbleShell(
                                     action = headerAction,
                                     expanded = expanded,
                                     onToggle = onToggle,
+                                    canToggle = canToggle,
                                 )
                             } else {
                                 MorphExpandButton(
@@ -958,6 +959,7 @@ internal fun SplitExpandButton(
     action: PebbleHeaderAction,
     expanded: Boolean,
     onToggle: () -> Unit,
+    canToggle: Boolean = true,
 ) {
     val haptics = LocalHaptics.current
     val rotation by animateFloatAsState(
