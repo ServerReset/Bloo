@@ -543,7 +543,7 @@ internal fun SettingsSearchResults(
     if (results.isEmpty()) {
         Card(resultCardModifier, shape = resultCardShape, colors = resultCardColors) {
             Text(
-                "No matches for "$query"",
+                "No matches for \"$query\"",
                 Modifier.padding(16.dp),
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
