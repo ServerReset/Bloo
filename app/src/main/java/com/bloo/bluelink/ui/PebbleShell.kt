@@ -446,13 +446,32 @@ internal fun Pebble(
     /** If true and in simple mode, the pebble is always expanded and cannot be collapsed.
      *  Use for pebbles with a single setting that benefit from inline display without expand/collapse. */
     alwaysExpandedInSimpleMode: Boolean = false,
+    /**
+     * For a pebble whose entire body IS a single setting: in simple mode, render that setting's
+     * control directly on the title row (via [PebbleShell]'s `titleTrailing` slot) instead of
+     * behind an expand/collapse control, and skip the body/disclosure entirely -- there is
+     * nothing left to disclose once the one thing it holds is already showing next to the name.
+     * Null (the default) leaves the pebble's normal expand/collapse behavior untouched.
+     *
+     * Distinct from [alwaysExpandedInSimpleMode], which keeps the body (all of `content`)
+     * permanently visible instead of replacing it -- that's for a pebble whose body is worth
+     * seeing at a glance but isn't literally one control (the AI summary text, say). This is for
+     * the narrower case the two are easy to conflate: an actual single control, which doesn't
+     * need its own disclosure at all once it's inline.
+     */
+    inlineSettingInSimpleMode: (@Composable () -> Unit)? = null,
     content: @Composable ColumnScope.() -> Unit,
 ) {
     val forceExpanded = LocalForceExpanded.current
     val simpleMode = state.settingsMode != "advanced"
     val forceAlwaysExpanded = alwaysExpandedInSimpleMode && simpleMode
-    val expanded = forceExpanded || forceAlwaysExpanded || state.isPebbleExpanded(v.vin, section)
-    val canToggle = !forceAlwaysExpanded
+    val inlineSimple = inlineSettingInSimpleMode != null && simpleMode
+    // Body only ever opens via the user's own stored toggle when neither special mode is
+    // active -- forceAlwaysExpanded already shows the body unconditionally, and inlineSimple
+    // has nothing left to disclose (the one setting it holds is already on the title row).
+    val expanded = forceExpanded || forceAlwaysExpanded ||
+        (!inlineSimple && state.isPebbleExpanded(v.vin, section))
+    val canToggle = !forceAlwaysExpanded && !inlineSimple
     PebbleShell(
         expanded = expanded,
         onToggle = if (canToggle) { { vm.togglePebble(v, section) } } else { {} },
@@ -465,6 +484,7 @@ internal fun Pebble(
         headerAction = headerAction,
         forceExpanded = forceExpanded,
         canToggle = canToggle,
+        titleTrailing = if (inlineSimple) inlineSettingInSimpleMode else null,
         background = background,
         content = content,
     )
@@ -991,12 +1011,22 @@ internal fun SplitExpandButton(
     val inner = 6.dp
     // Each half gets its own shape: the OUTER corner morphs (pill when idle,
     // 10dp rounded square when that half's own state says morphed), the INNER
-    // corner stays a small fixed seam nub. Both halves are the same MorphButton
+    // corner stays a small fixed seam nub -- meant to seam against the chevron
+    // half immediately to its right. Both halves are the same MorphButton
     // component; each one's active/pressed state drives only ITS morph.
+    //
+    // That seam nub is wrong when canToggle is false: the chevron half is never
+    // rendered then (see the `if (canToggle)` below), so the action button sits
+    // alone with nothing to seam against -- a small fixed corner on a side with
+    // no neighbor just reads as a broken/half-finished pill (reported from a
+    // real screenshot: the Summarize action, whose pebble is permanently
+    // expanded in simple mode and so never shows a chevron). Full pill on both
+    // sides in that case instead.
     val leftShapeForCorner: (Float, Int) -> Shape = { _, cp ->
+        val end = if (canToggle) CornerSize(inner) else CornerSize(percent = cp)
         RoundedCornerShape(
             topStart = CornerSize(percent = cp), bottomStart = CornerSize(percent = cp),
-            topEnd = CornerSize(inner), bottomEnd = CornerSize(inner),
+            topEnd = end, bottomEnd = end,
         )
     }
     val rightShapeForCorner: (Float, Int) -> Shape = { _, cp ->

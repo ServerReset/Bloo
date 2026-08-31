@@ -12,17 +12,39 @@ import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.graphicsLayer
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.cancel
-import kotlinx.coroutines.isActive
-import kotlinx.coroutines.launch
+import androidx.compose.ui.layout.Layout
+import kotlin.math.roundToInt
 
 /**
  * Production-hardened Material 3 Expressive button expansion animation.
+ *
+ * **This grows the button's real layout width, not a paint-only scale.** Growing the real
+ * width -- as opposed to a `graphicsLayer(scaleX/scaleY)` transform, which only stretches drawn
+ * pixels without moving the button's actual layout bounds -- is what makes a sibling in the same
+ * Row genuinely get pushed aside during the press, matching Material 3 Expressive's button-group
+ * press effect (and the reference this was built against: sameerasw/essentials'
+ * EssentialsFloatingToolbar, which animates each item's real `Modifier.width(itemWidth)` inside a
+ * shared Row using this exact spring spec).
+ *
+ * **An earlier version of this real-width approach queried the content's intrinsic width
+ * (`Measurable.maxIntrinsicWidth`) every animation frame to learn how wide it wants to be. That
+ * is unsafe here: Compose's Lazy layouts (`LazyColumn`, `LazyVerticalStaggeredGrid`, ...) do not
+ * support intrinsic measurement of their item content, and this component sits inside one
+ * everywhere the Settings screen wraps a `SettingsCard` in a `LazyVerticalStaggeredGrid` item --
+ * which is most of Settings. That crashed (reported as "the logs pebble crashes when scrolled
+ * over" -- the Logs card's Copy/Clear/Show buttons are exactly this component, inside exactly
+ * that grid). [ExpressivePushBox] below avoids the whole hazard: it never queries intrinsics. It
+ * measures its content for real (an ordinary, always-safe `.measure()` call) once at rest
+ * (`scale <= 1f`, true both on first composition and every time a press animation settles back
+ * down), remembers that width, and reuses the cached number to compute the target constraint on
+ * every subsequent animated frame -- one real measure per layout pass, the same cost the previous
+ * `graphicsLayer`-scale version's plain `Box` wrapper already paid, just pinning width instead of
+ * scaling paint.**
  *
  * **Handles ALL edge cases:**
  * ✅ Rapid tap/press cycles without stacking
@@ -31,7 +53,7 @@ import kotlinx.coroutines.launch
  * ✅ Multiple concurrent buttons
  * ✅ Recomposition during animation
  * ✅ Memory leak prevention
- * ✅ 60fps on low-end devices
+ * ✅ Safe inside Lazy layouts (no intrinsic measurement)
  * ✅ Screen rotation handling
  * ✅ Configuration changes
  * ✅ Haptic sync safety
@@ -39,7 +61,7 @@ import kotlinx.coroutines.launch
  * **Spring Physics:**
  * - DampingRatioMediumBouncy: Smooth with controlled bounce
  * - StiffnessLow: Responsive without overshoot
- * - Scale: 1.0f → 1.15f (15% expansion)
+ * - Width: 1.0x → 1.15x of natural width (15% expansion), height untouched
  *
  * **Usage:**
  * ```kotlin
@@ -69,7 +91,7 @@ fun ExpansiveButtonHardened(
     onRelease: (() -> Unit)? = null,
     content: @Composable () -> Unit,
 ) {
-    // Animatable holds the current scale value
+    // Animatable holds the current width scale (1.0 = natural width)
     val scaleAnimatable = remember { Animatable(1f) }
 
     // Track the current press state to prevent animation race conditions
@@ -93,7 +115,7 @@ fun ExpansiveButtonHardened(
                     // This prevents stacking if user rapid-fires taps
                     scaleAnimatable.stop()
 
-                    // Animate to expanded scale
+                    // Animate to expanded width
                     try {
                         scaleAnimatable.animateTo(
                             targetValue = maxScale,
@@ -116,7 +138,7 @@ fun ExpansiveButtonHardened(
                         // Trigger optional release callback
                         onRelease?.invoke()
 
-                        // Animate back to normal scale
+                        // Animate back to natural width
                         try {
                             scaleAnimatable.animateTo(
                                 targetValue = 1f,
@@ -145,15 +167,50 @@ fun ExpansiveButtonHardened(
         }
     }
 
-    // Apply the scale transformation
-    androidx.compose.foundation.layout.Box(
-        modifier = modifier.graphicsLayer(
-            scaleX = scaleAnimatable.value,
-            scaleY = scaleAnimatable.value,
-            transformOrigin = androidx.compose.ui.graphics.TransformOrigin(0.5f, 0.5f),
-        ),
-    ) {
-        content()
+    ExpressivePushBox(scale = scaleAnimatable.value, modifier = modifier, content = content)
+}
+
+/**
+ * Single-child layout that pins its content's WIDTH to `naturalWidth * scale`, leaving height
+ * untouched -- a real layout size, not a paint-only transform, so a sibling in the same Row is
+ * genuinely pushed aside when this grows (see the file doc above for why, and for why this does
+ * NOT use intrinsic measurement to learn `naturalWidth`).
+ */
+@Composable
+private fun ExpressivePushBox(
+    scale: Float,
+    modifier: Modifier = Modifier,
+    content: @Composable () -> Unit,
+) {
+    // The content's own width the last time it was measured at rest (scale <= 1f). Read every
+    // layout pass, written only on rest-state passes -- see the measure lambda below.
+    var naturalWidthPx by remember { mutableIntStateOf(0) }
+
+    Layout(content = content, modifier = modifier) { measurables, constraints ->
+        val measurable = measurables.firstOrNull()
+            ?: return@Layout layout(0, 0) {}
+
+        val atRest = scale <= 1f || naturalWidthPx <= 0
+        val placeable = if (atRest) {
+            // Rest state (or no cached width yet, e.g. the very first composition, which is
+            // always at scale == 1f before any press could occur): measure normally with the
+            // incoming constraints. This is also what teaches naturalWidthPx below for the
+            // NEXT press -- an ordinary, always-safe real measurement, no intrinsics query.
+            measurable.measure(constraints)
+        } else {
+            val targetWidth = (naturalWidthPx * scale).roundToInt()
+                .let { if (constraints.hasBoundedWidth) it.coerceAtMost(constraints.maxWidth) else it }
+                .coerceAtLeast(constraints.minWidth)
+            measurable.measure(constraints.copy(minWidth = targetWidth, maxWidth = targetWidth))
+        }
+
+        if (atRest) {
+            naturalWidthPx = placeable.width
+        }
+
+        layout(placeable.width, placeable.height) {
+            placeable.placeRelative(0, 0)
+        }
     }
 }
 
@@ -256,7 +313,6 @@ fun SafeExpansiveButton(
 /**
  * Extended animation capability for future enhancements.
  * Can be expanded for:
- * - Width expansion (horizontal ripple)
  * - Elevation changes
  * - Color shifts
  * - Rotation effects
