@@ -505,15 +505,6 @@ internal fun GarageScreen(state: State<UiState>, vm: AppViewModel) {
         animationSpec = tween(durationMillis = 200),
         label = "dotsFade",
     )
-    // Live bounds of whichever car name is currently flying/docked on this
-    // screen -- written from inside TitleFlightOverlay's onNameBoundsChanged
-    // (both the hoisted single-car-per-page badge below, and each
-    // ExpandedCar page's own badge), read by PagerDotsFor's own collision
-    // dodge. A plain remembered State, never read here with `by` -- see
-    // pullFractionState's identical doc just above for why a GarageScreen-
-    // scope read of something that changes every animation frame would be
-    // expensive; PagerDots reads `.value` itself, at draw time.
-    val nameBoundsPxState = remember { mutableStateOf<Rect?>(null) }
     // Slide the floating overlays (dots, settings, back/flip) down: in real time as
     // the user pulls, then settle/spring back up once the refresh completes.
     // overlayShiftTarget genuinely needs the continuous fraction (the shift is
@@ -678,7 +669,6 @@ internal fun GarageScreen(state: State<UiState>, vm: AppViewModel) {
                                     // either way: only one page is ever actually
                                     // composed here (beyondViewportPageCount = 0), so
                                     // there's no simultaneous writer to race against.
-                                    onNameBoundsChanged = { nameBoundsPxState.value = it },
                                 )
                             }
                         }
@@ -692,7 +682,6 @@ internal fun GarageScreen(state: State<UiState>, vm: AppViewModel) {
                             modifier = Modifier.align(Alignment.TopCenter).statusBarsPadding().padding(top = HeaderCornerGap)
                                 .graphicsLayer { alpha = dotsAlphaState.value },
                             onRefresh = { vm.refreshStatus(vehicles[exWrap.settledReal]) },
-                            nameBoundsPx = nameBoundsPxState,
                         )
                     }
                 }
@@ -1267,8 +1256,7 @@ internal fun GarageScreen(state: State<UiState>, vm: AppViewModel) {
                                             // phase, in BOTH single-car and grid
                                             // mode, and nothing here was reporting
                                             // its bounds at all.
-                                            onNameBoundsChanged = { nameBoundsPxState.value = it },
-                                            // Only a grid column's container is
+                                                    // Only a grid column's container is
                                             // genuinely offset from the
                                             // composition root -- see
                                             // TitleFlightOverlay's own
@@ -1312,7 +1300,6 @@ internal fun GarageScreen(state: State<UiState>, vm: AppViewModel) {
                             // out of range; an unguarded vehicles[currentIndex] here
                             // would crash the screen on a mistimed pull-to-refresh.
                             onRefresh = { vehicles.getOrNull(currentIndex)?.let { vm.refreshStatus(it) } },
-                            nameBoundsPx = nameBoundsPxState,
                         )
                     }
                     // Grid mode (perPage > 1, wide/large screens) hides each
@@ -1438,11 +1425,6 @@ internal fun GarageScreen(state: State<UiState>, vm: AppViewModel) {
                             // matters).
                             textColorOverride = if (onSettingsSlot) MaterialTheme.colorScheme.onSurface else null,
                             onClick = { pillScope.launch { hoistedScrollToTop.value?.invoke() } },
-                            // Feeds PagerDotsFor's own collision dodge just
-                            // above -- see nameBoundsPxState's declaration
-                            // near dotsAlphaState for why this is a plain
-                            // `.value =` write, not a `by` delegate.
-                            onNameBoundsChanged = { nameBoundsPxState.value = it },
                             // Keeps dockedPages in sync with THIS shared
                             // badge's own resting state, in both directions
                             // -- see onSettledChanged's own doc for why

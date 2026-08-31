@@ -121,7 +121,6 @@ val FloatingNameContext.config: FloatingNameConfig
  * @param flight The TitleFlightSource backing the animation (life cycle state, position tracking)
  * @param screenWidth Available screen width for calculating maxWidth
  * @param topInset Status bar inset for cornerY calculation
- * @param onNameBoundsChanged Optional callback for bounds changes (used by hero car for collision detection)
  * @param onSettledChanged Optional callback when docking state settles (used by Settings for hand-off)
  * @param onScrollToTop Optional action when pill is clicked (can be null for read-only contexts)
  * @param extraContent Optional extra content shown alongside the name (e.g., page label)
@@ -135,7 +134,6 @@ internal fun BoxScope.FloatingNamePill(
     flight: TitleFlightSource,
     screenWidth: Dp,
     topInset: Dp,
-    onNameBoundsChanged: ((Rect?) -> Unit)? = null,
     onSettledChanged: ((Boolean) -> Unit)? = null,
     onScrollToTop: (() -> Unit)? = null,
     extraContent: (@Composable RowScope.() -> Unit)? = null,
@@ -160,7 +158,6 @@ internal fun BoxScope.FloatingNamePill(
         onClick = { onScrollToTop?.invoke() },
         extraContent = extraContent,
         measureContent = measureContent,
-        onNameBoundsChanged = onNameBoundsChanged,
         containerRelative = containerRelative,
         onSettledChanged = onSettledChanged,
         content = content

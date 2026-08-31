@@ -758,14 +758,6 @@ internal fun BoxScope.TitleFlightOverlay(
      *  instead, so only ONE AnimatedContent instance -- the visible one --
      *  ever exists. */
     measureContent: (@Composable () -> Unit)? = null,
-    /** Reports the REAL visible flying Text's current root-coordinate,
-     *  post-transform bounds (position AND size, after scale/translation)
-     *  on every layout pass -- null once it has nothing to report (before
-     *  either anchor exists, mirrors the alpha-gate below). Purely an
-     *  outward report for a sibling overlay (the page-dot indicator) to
-     *  test for collision against; nothing in here ever reads it back. See
-     *  [PagerDots]' own call site for the consumer. */
-    onNameBoundsChanged: ((Rect?) -> Unit)? = null,
     /** True ONLY for a perPage>1 grid column -- see `containerOrigin`'s own
      *  doc below for why this must default to false and stay opt-in rather
      *  than running unconditionally for every caller. A grid column's
@@ -814,14 +806,6 @@ internal fun BoxScope.TitleFlightOverlay(
      *  rather than this function needing to know about it at all. */
     content: @Composable () -> Unit,
 ) {
-    // Clear any stale bounds report the instant this overlay leaves
-    // composition (e.g. the hoisted single-car badge unmounting when its
-    // page un-docks, or an ExpandedCar page pager throws away its
-    // off-screen neighbour) -- otherwise PagerDots keeps dodging/hiding
-    // against a Rect belonging to a name overlay that no longer exists.
-    DisposableEffect(onNameBoundsChanged) {
-        onDispose { onNameBoundsChanged?.invoke(null) }
-    }
     val docked by flight.docked
     val haptics = LocalHaptics.current
     val shape = RoundedCornerShape(50)
@@ -1204,25 +1188,24 @@ internal fun BoxScope.TitleFlightOverlay(
                 // reported" for a live flight object.
                 alpha = if (flight.inlinePos.value == null && dockedAnchor.value == null) 0f else 1f
             }
-            // Reports this Text's real, post-transform screen bounds for
-            // the page-dot collision dodge (see onNameBoundsChanged's own
-            // doc). Chained AFTER the graphicsLayer above so the reported
-            // bounds include that scale/offset -- callers need where the
-            // name is actually PAINTED, not its untransformed layout slot.
+            // Publishes this Text's real, post-transform screen bounds to the
+            // floating registry, so anything else floating (today: the page
+            // dots) can get out of its way without either of them knowing the
+            // other exists. Chained AFTER the graphicsLayer above so the
+            // reported bounds include that scale/offset -- a dodger needs
+            // where the name is actually PAINTED, not its untransformed slot.
             //
-            // Gated on `active` (docked or mid-transition, same condition
-            // the chrome Box above uses): a name can only ever climb high
-            // enough to actually reach the dots' row right around that
-            // window, and skipping the report the rest of the time avoids
-            // real per-frame cost (a coordinate-space walk, a Rect
-            // allocation, a snapshot write) landing on every idle relayout.
-            // That cost used to run unconditionally, including on the busy
-            // frames a badge is mid-spring INTO the corner -- competing
-            // with the spring's own work on the UI thread for exactly the
-            // surface (VehicleDetailContent's own per-page badge) whose
-            // transition needs to stay smooth, which is what was reading
-            // as a stutter/snap rather than a glide.
-            .onGloballyPositioned { if (active) onNameBoundsChanged?.invoke(it.boundsInRoot()) },
+            // Gated on `active` (docked or mid-transition, same condition the
+            // chrome Box above uses): a name can only ever climb high enough
+            // to actually reach the dots' row right around that window, and
+            // skipping the report the rest of the time keeps real per-frame
+            // cost (a coordinate-space walk, a Rect allocation, a snapshot
+            // write) off every idle relayout. That cost used to run
+            // unconditionally, including on the busy frames a badge is
+            // mid-spring INTO the corner -- competing with the spring's own
+            // work on the UI thread for exactly the surface whose transition
+            // needs to stay smooth, which read as a stutter rather than a glide.
+            .floatingElement(FloatingIds.Title, active = active),
     ) {
         // Read HERE, inside TitleFlightOverlay's own (small) recompose scope
         // -- not by the caller, as a call-site argument expression, which is

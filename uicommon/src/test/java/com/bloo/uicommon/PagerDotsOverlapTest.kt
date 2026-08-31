@@ -6,7 +6,7 @@ import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 /**
- * JVM pins for [dotsOverlapsName] -- the pure rect-overlap check that hides
+ * JVM pins for [floatersOverlap] -- the pure rect-overlap check that hides
  * the page-dot pill whenever the car's name collides with it.
  *
  * Wrong answers here are directly visible to users: a FALSE negative lets the
@@ -25,27 +25,27 @@ class PagerDotsOverlapTest {
     @Test
     fun nothingOverlapsWhenNameIsBelowDots() {
         // The common case: the name sits well below the dots' fixed top row.
-        assertFalse(dotsOverlapsName(dots, name, marginPx = 0f))
+        assertFalse(floatersOverlap(dots, name, marginPx = 0f))
         // And even the generous margin can't invent an overlap there.
-        assertFalse(dotsOverlapsName(dots, name, marginPx = 40f))
+        assertFalse(floatersOverlap(dots, name, marginPx = 40f))
     }
 
     @Test
     fun nullEitherSideMeansNoConflict() {
-        assertFalse(dotsOverlapsName(null, name, 0f))
-        assertFalse(dotsOverlapsName(dots, null, 0f))
-        assertFalse(dotsOverlapsName(null, null, 0f))
+        assertFalse(floatersOverlap(null, name, 0f))
+        assertFalse(floatersOverlap(dots, null, 0f))
+        assertFalse(floatersOverlap(null, null, 0f))
     }
 
     @Test
     fun verticalGateRejectsNamesFullyAboveOrBelow() {
         // Entirely below: bottom < dots.top -> reject, even with a fat margin.
-        assertFalse(dotsOverlapsName(dots, Rect(120f, 50f, 160f, 70f), marginPx = 40f))
+        assertFalse(floatersOverlap(dots, Rect(120f, 50f, 160f, 70f), marginPx = 40f))
         // Entirely above: top > dots.bottom -> reject.
-        assertFalse(dotsOverlapsName(dots, Rect(120f, -50f, 160f, -20f), marginPx = 40f))
+        assertFalse(floatersOverlap(dots, Rect(120f, -50f, 160f, -20f), marginPx = 40f))
         // The vertical gate swallows MARGIN too: a name below is never dragged
         // into conflict by the horizontal expansion.
-        assertFalse(dotsOverlapsName(dots, Rect(120f, 31f, 160f, 60f), marginPx = 8f))
+        assertFalse(floatersOverlap(dots, Rect(120f, 31f, 160f, 60f), marginPx = 8f))
     }
 
     @Test
@@ -55,20 +55,20 @@ class PagerDotsOverlapTest {
         // leading, so "exactly touching" usually IS a visible collision).
         // Equal-boundary touch vertically IS reported, zero-padding included.
         val touching = Rect(120f, 30f, 160f, 50f)
-        assertTrue(dotsOverlapsName(dots, touching, marginPx = 0f))
+        assertTrue(floatersOverlap(dots, touching, marginPx = 0f))
         // And one dp into the band also counts.
         val entered = Rect(120f, 29.9f, 160f, 50f)
-        assertTrue(dotsOverlapsName(dots, entered, marginPx = 0f))
+        assertTrue(floatersOverlap(dots, entered, marginPx = 0f))
     }
 
     @Test
     fun horizontalOverlapRespected() {
         // Vertically inside the dots band; horizontally overlapping the pill.
         val mid = Rect(90f, 20f, 130f, 24f)
-        assertTrue(dotsOverlapsName(dots, mid, marginPx = 0f))
+        assertTrue(floatersOverlap(dots, mid, marginPx = 0f))
         // Horizontally fully clear -> no.
         val beside = Rect(5f, 20f, 95f, 24f) // ends at 95 < dots.left 100
-        assertFalse(dotsOverlapsName(dots, beside, marginPx = 0f))
+        assertFalse(floatersOverlap(dots, beside, marginPx = 0f))
     }
 
     @Test
@@ -77,11 +77,11 @@ class PagerDotsOverlapTest {
         // which is still "overlapping" given a margin because a real device
         // could render the ellipsis into that exact gutter.
         val close = Rect(182f, 20f, 200f, 24f) // 2dp past dots.right 180
-        assertFalse(dotsOverlapsName(dots, close, marginPx = 0f))
-        assertTrue(dotsOverlapsName(dots, close, marginPx = 8f))
+        assertFalse(floatersOverlap(dots, close, marginPx = 0f))
+        assertTrue(floatersOverlap(dots, close, marginPx = 8f))
         val closeLeft = Rect(60f, 20f, 96f, 24f) // 4dp before dots.left 100
-        assertFalse(dotsOverlapsName(dots, closeLeft, marginPx = 2f))
-        assertTrue(dotsOverlapsName(dots, closeLeft, marginPx = 8f))
+        assertFalse(floatersOverlap(dots, closeLeft, marginPx = 2f))
+        assertTrue(floatersOverlap(dots, closeLeft, marginPx = 8f))
     }
 
     @Test
@@ -89,6 +89,6 @@ class PagerDotsOverlapTest {
         // A docked pill with a much taller name (or a letter landing in the
         // band) still counts: the dot pill is INSIDE the name's vertical span.
         val wrapping = Rect(0f, 15f, 300f, 35f)
-        assertTrue(dotsOverlapsName(dots, wrapping, marginPx = 0f))
+        assertTrue(floatersOverlap(dots, wrapping, marginPx = 0f))
     }
 }

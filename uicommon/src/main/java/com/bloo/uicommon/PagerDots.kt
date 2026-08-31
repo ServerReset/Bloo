@@ -18,7 +18,6 @@ import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateDpAsState
-import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.Canvas
@@ -39,11 +38,9 @@ import androidx.compose.ui.semantics.onLongClick
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.State
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -56,11 +53,8 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.layout.boundsInRoot
-import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import com.bloo.uicommon.dropShadow
 import kotlinx.coroutines.delay
@@ -78,24 +72,22 @@ import androidx.compose.ui.graphics.StrokeCap
  *  component stays Material-free and renders identically under
  *  compose.material3 and wear.compose.material3. */
 
-/** Whether the centered page-dot indicator currently overlaps a colliding
- *  car name -- a plain rect-overlap test against [name]'s live measured
- *  bounds (not a guessed width), padded by [marginPx] so a name ellipsizing
- *  right up against the dots' edge still counts. Pure/non-composable so
- *  it's cheap to call every frame from inside a `graphicsLayer{}` draw
- *  block without touching composition. `null` [dots] (no layout pass yet)
- *  or [name] (nothing flying/docked on this screen) both mean "nothing to
- *  hide against." */
-internal fun dotsOverlapsName(dots: Rect?, name: Rect?, marginPx: Float): Boolean {
-    if (dots == null || name == null) return false
-    // Vertical gate first -- an inline name usually sits well below the
-    // dots' fixed top row (only a DOCKED pill, or one mid-flight toward it,
-    // climbs high enough to matter), so most frames bail out here without
-    // ever reaching the horizontal check below.
-    if (name.bottom < dots.top || name.top > dots.bottom) return false
-    val paddedLeft = name.left - marginPx
-    val paddedRight = name.right + marginPx
-    return paddedRight >= dots.left && paddedLeft <= dots.right
+/** Whether two pieces of floating chrome overlap, with [marginPx] of slop around [b] -- so a
+ *  name ellipsizing right up against the page dots' edge still counts as being in the way,
+ *  without literal pixel overlap. Pure and non-composable, so a caller can run it every frame
+ *  (from a draw block, or a derivedStateOf) without touching composition. A null rect means
+ *  "not on screen / nothing measured yet", which never collides.
+ *
+ *  Lives here rather than beside its one-time only caller because the app's floating registry
+ *  (FloatingSystem.kt) now runs every floater-vs-floater test through it, and this module is
+ *  where the JVM tests that pin its boundary behaviour can reach it. */
+fun floatersOverlap(a: Rect?, b: Rect?, marginPx: Float): Boolean {
+    if (a == null || b == null) return false
+    // Vertical gate first -- floating elements usually sit on different rows (an inline name
+    // sits well below the dots' fixed top row; only a DOCKED pill, or one mid-flight toward
+    // it, climbs high enough to matter), so most calls bail out here.
+    if (b.bottom < a.top || b.top > a.bottom) return false
+    return b.right + marginPx >= a.left && b.left - marginPx <= a.right
 }
 /** Material-free color spec for [PagerDots]: the one theme coupling a
  *  cross-surface call site must supply. Defaults are neutral grayscale so a
@@ -123,10 +115,6 @@ fun PagerDots(
     count: Int,
     modifier: Modifier = Modifier,
     onRefresh: (() -> Unit)? = null,
-    /** Post-transform root bounds of a title that may overlap this control;
-     *  read at DRAW time (see the graphicsLayer below) so the collision
-     *  dodge never recomposes. */
-    nameBoundsPx: State<Rect?>? = null,
     /** Ticked once when the long-press-to-refresh gesture lands (lifted from
      *  Haptics on the consumer side; null = no tick). */
     haptics: (() -> Unit)? = null,
@@ -135,26 +123,6 @@ fun PagerDots(
 ) {
     val expandProgress = remember { Animatable(0f) }
     var holding by remember { mutableStateOf(false) }
-    // Animated collision dodge: smooth spring transition between visible (1f) and
-    // hidden (0f) when the floating name pill overlaps the dots. This replaces
-    // the instant alpha snap, so dots gracefully bounce/fade out when the name
-    // flies in, and bounce back in when it flies out.
-    val collisionAlpha = remember { Animatable(1f) }
-    // This control's own natural on-screen bounds, captured once per layout
-    // pass via onGloballyPositioned below -- NOT affected by the hide
-    // graphicsLayer{} this function applies to itself, because
-    // onGloballyPositioned is chained BEFORE that graphicsLayer (outer
-    // node), and a child's own graphicsLayer transform never moves how an
-    // ANCESTOR node reports its own placement. That's exactly what's
-    // needed here: comparing the dots' resting position against the
-    // name's bounds.
-    val selfBoundsPx = remember { mutableStateOf<Rect?>(null) }
-    val density = LocalDensity.current
-    // Breathing room kept between the name's own bounds and the dots, on
-    // top of whatever raw overlap check finds -- a name ellipsizing right
-    // up against the dots' edge would still read as a collision even
-    // without literal pixel overlap.
-    val collisionMarginPx = with(density) { 8.dp.toPx() }
 
     if (onRefresh != null) {
         LaunchedEffect(holding) {
@@ -185,47 +153,13 @@ fun PagerDots(
         }
     }
 
-    // Smooth animated collision dodge: when the floating name pill flies in or
-    // out, animate the dots' alpha to hide/show instead of snapping instantly.
-    //
-    // The collision test is DERIVED, and the animation effect is keyed on that
-    // derived boolean -- not on the raw bounds. Keying the effect on the bounds
-    // themselves (which is what this did) restarted it on EVERY frame the name
-    // moved, and a restarted LaunchedEffect cancels the coroutine it was
-    // running: the very first colliding frame set the flag and started
-    // animateTo, the next frame cancelled it mid-flight, and from then on the
-    // "did the flag change" guard matched, so the cancelled animation was never
-    // restarted. The dots froze at whatever alpha that one cancelled frame had
-    // reached and simply never finished hiding -- the floating name sitting on
-    // top of still-visible dots. Deriving the boolean also keeps the promise
-    // nameBoundsPx' own doc makes: derivedStateOf only notifies when the RESULT
-    // flips, so a moving name no longer invalidates this composable every frame.
-    val colliding by remember(collisionMarginPx) {
-        derivedStateOf {
-            dotsOverlapsName(selfBoundsPx.value, nameBoundsPx?.value, collisionMarginPx)
-        }
-    }
-    LaunchedEffect(colliding) {
-        collisionAlpha.animateTo(
-            targetValue = if (colliding) 0f else 1f,
-            animationSpec = spring(
-                dampingRatio = 0.6f,
-                stiffness = Spring.StiffnessMedium,
-            ),
-        )
-    }
-
+    // Getting out of a colliding floater's way is NOT handled here any more: the consumer
+    // applies Modifier.dodgeFloating (see the app's FloatingSystem.kt), so every floating
+    // element negotiates through one shared registry instead of this control carrying its own
+    // private copy of the rule and a `nameBoundsPx` parameter that had to be hand-threaded
+    // down through four composables to reach it.
     Box(
-        modifier = modifier
-            .onGloballyPositioned { selfBoundsPx.value = it.boundsInRoot() }
-            // Hide smoothly (with spring bounce) while a colliding car name
-            // overlaps this control. Uses collisionAlpha for animated dodge
-            // instead of instant snap -- the FloatingNamePill flying in/out
-            // triggers a smooth fade with bounce, not a jarring disappearance.
-            // Draw-phase only (graphicsLayer{}), never invalidates composition.
-            .graphicsLayer {
-                alpha = collisionAlpha.value
-            },
+        modifier = modifier,
         contentAlignment = Alignment.Center,
     ) {
         // Overlay ring that fills as the user holds. The Canvas node is

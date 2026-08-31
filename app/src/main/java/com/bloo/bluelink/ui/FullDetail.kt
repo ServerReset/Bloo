@@ -485,12 +485,6 @@ internal fun VehicleDetailContent(
     onDockedChanged: ((Boolean) -> Unit)? = null,
     // Forwarded to this page's own (non-hoisted) TitleFlightOverlay call
     // below -- see that parameter's own doc (Screens.kt). Was missing
-    // entirely from this call site until it was found to be the reason the
-    // page-dot collision dodge never triggered: the hoisted badge and
-    // ExpandedCar's badge both wired this, but the flying name most likely
-    // to actually be near the dots (this composable's own per-page badge,
-    // live for the whole undocked/pre-dock phase) never reported anything.
-    onNameBoundsChanged: ((Rect?) -> Unit)? = null,
     // True ONLY when this is a perPage>1 grid column -- forwarded to this
     // page's own TitleFlightOverlay call as `containerRelative`. See that
     // parameter's own doc for why this must stay opt-in and default false.
@@ -652,7 +646,6 @@ internal fun VehicleDetailContent(
                 // parameter's own doc for why resolving it there instead of
                 // here is load-bearing, not stylistic.
                 onClick = { scope.launch { scroll.animateScrollTo(0) } },
-                onNameBoundsChanged = onNameBoundsChanged,
                 containerRelative = gridColumn,
                 // See `liveFlight`'s own doc just above -- dockedPages is
                 // driven entirely off this, in both directions, rather than
@@ -718,11 +711,6 @@ internal fun ExpandedCar(
     state: State<UiState>,
     vm: AppViewModel,
     flipped: Boolean,
-    // See the call site's own doc (GarageScreen's exPager block) -- feeds
-    // the sibling PagerDotsFor's collision dodge. Null (the default) for
-    // every OTHER caller of ExpandedCar, none of which pair it with a
-    // page-dot indicator that needs to know.
-    onNameBoundsChanged: ((Rect?) -> Unit)? = null,
 ) {
     val hotspot = state.value.hotspotFor(v.vin)
         ?.takeIf {
@@ -859,7 +847,6 @@ internal fun ExpandedCar(
             // own call site: flight IS titleFlight, so TitleFlightOverlay reads
             // its live colour itself.
             onClick = { scope.launch { controlsScroll.animateScrollTo(0) } },
-            onNameBoundsChanged = onNameBoundsChanged,
         ) {
             Text(
                 v.name,

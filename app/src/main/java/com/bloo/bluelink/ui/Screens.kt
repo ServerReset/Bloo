@@ -481,7 +481,12 @@ fun BlooApp(vm: AppViewModel) {
         }
     }
 
+    // One floating registry for the whole app: every floating element (the flying car name, the
+    // page dots, corner chrome) publishes its bounds here and asks here who else is in the way,
+    // instead of screens hand-threading each other's positions around. See FloatingSystem.kt.
+    val floatingRegistry = remember { FloatingRegistry() }
     CompositionLocalProvider(
+        LocalFloatingRegistry provides floatingRegistry,
         LocalHaptics provides haptics,
         // Provided once here (the app root already collects `appearance` above) so
         // every pebble/tile reads LocalAppearance.current instead of opening its own
