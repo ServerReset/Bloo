@@ -51,6 +51,7 @@ import androidx.compose.ui.semantics.onClick
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.material3.LocalRippleConfiguration
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
@@ -180,7 +181,16 @@ fun BlooApp(vm: AppViewModel) {
     CompositionLocalProvider(
         // Kills Android's default ripple app-wide -- see NoTapHighlight for why this app
         // answers a press with its own motion instead of a borrowed grey fill.
+        //
+        // Both halves are needed. LocalIndication covers everything that resolves indication
+        // the ordinary way: every plain Modifier.clickable, and MorphButtonCore (the component
+        // behind essentially every button here), which takes indication = LocalIndication.current.
+        // Material 3's own components do NOT read it -- Surface(onClick), IconButton, Switch and
+        // Card each construct their own ripple internally -- and LocalRippleConfiguration set to
+        // null is the supported way to turn those off, without rewriting each component and
+        // inheriting its layout quirks.
         LocalIndication provides NoTapHighlight,
+        LocalRippleConfiguration provides null,
         LocalFloatingRegistry provides floatingRegistry,
         LocalHaptics provides haptics,
         // Provided once here (the app root already collects `appearance` above) so
