@@ -504,7 +504,11 @@ internal fun DiagnosticsPebble(v: Vehicle, status: VehicleStatus?, state: UiStat
             isWarning = true,
             contentDescription = "Diagnostics warning",
         ) else null,
-        alwaysExpandedInSimpleMode = true,
+        // NOT alwaysExpandedInSimpleMode: that flag is for pebbles with a single setting
+        // that reads better inline without an expand/collapse control (see its own doc).
+        // This one renders ~12 diagnostic rows -- forcing it permanently open in simple
+        // mode, as an earlier pass did, just removed the ability to collapse a long list
+        // that most people only want to check occasionally.
     ) {
         // COVER SCREEN only: a health-verdict hero — green check + "All systems OK",
         // or an error warning + "N issues" — so the tile reads at a glance instead of

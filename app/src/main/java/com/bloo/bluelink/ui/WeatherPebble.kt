@@ -605,7 +605,10 @@ internal fun WeatherPebble(v: Vehicle, state: UiState, vm: AppViewModel, dragHan
             enabled = hasLocation,
             spinning = weatherSpinning,
         ),
-        alwaysExpandedInSimpleMode = true,
+        // NOT alwaysExpandedInSimpleMode: that flag is for pebbles with a single setting
+        // that reads better inline without an expand/collapse control (see its own doc).
+        // This one renders temperature, condition, and several more StatusRows below,
+        // so forcing it always open in simple mode just removed the ability to collapse it.
     ) {
         when {
             !hasLocation -> Text(

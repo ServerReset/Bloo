@@ -442,7 +442,11 @@ internal fun InfoPebble(v: Vehicle, status: VehicleStatus?, state: UiState, vm: 
     // text and to TalkBack. Matches CoverMainTile / StateControl, which already handle unknown.
     val infoSummary = status?.doorLock?.let { if (it) "Locked" else "Unlocked" }
     val coverGlance = LocalForceExpanded.current
-    Pebble(v, "info", "Car info", Icons.Filled.Info, state, vm, dragHandle, summary = infoSummary, alwaysExpandedInSimpleMode = true) {
+    // NOT alwaysExpandedInSimpleMode: that flag is for pebbles with a single setting
+    // that reads better inline without an expand/collapse control (see its own doc).
+    // This one renders ~15 info rows (below), so forcing it always open in simple
+    // mode just removed the ability to collapse it.
+    Pebble(v, "info", "Car info", Icons.Filled.Info, state, vm, dragHandle, summary = infoSummary) {
         // COVER SCREEN only: lead with a big lock-state hero. On the cover the info
         // tile drops its header (so the "Locked/Unlocked" summary is otherwise
         // buried as one row among ~15). A large icon + word makes it the glance

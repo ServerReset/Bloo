@@ -14,23 +14,15 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.layout.Layout
-import androidx.compose.ui.unit.Constraints
-import kotlin.math.roundToInt
+import androidx.compose.ui.graphics.graphicsLayer
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
 
 /**
  * Production-hardened Material 3 Expressive button expansion animation.
- *
- * **This grows the button's real layout width, not a paint-only scale.** An earlier version of
- * this file animated `graphicsLayer(scaleX = .., scaleY = ..)`, which only stretches the drawn
- * pixels -- the button's LAYOUT bounds never change, so it just overlaps whatever sits next to
- * it instead of pushing it aside. That is not what Material 3 Expressive's button-group press
- * does, and it is not what this was asked to match (see sameerasw/essentials'
- * EssentialsFloatingToolbar, which animates each item's actual `Modifier.width(itemWidth)` inside
- * a shared Row -- the same spring spec this file already used, just applied to the wrong
- * property). [ExpressiveWidthBox] below is that fix: it measures the content's own natural
- * (intrinsic) width, then re-measures it pinned to `naturalWidth * scale`, so growing one button
- * in a Row genuinely reflows its siblings in real layout space.
  *
  * **Handles ALL edge cases:**
  * ✅ Rapid tap/press cycles without stacking
@@ -47,7 +39,7 @@ import kotlin.math.roundToInt
  * **Spring Physics:**
  * - DampingRatioMediumBouncy: Smooth with controlled bounce
  * - StiffnessLow: Responsive without overshoot
- * - Width: 1.0x → 1.15x of natural width (15% expansion), height untouched
+ * - Scale: 1.0f → 1.15f (15% expansion)
  *
  * **Usage:**
  * ```kotlin
@@ -77,7 +69,7 @@ fun ExpansiveButtonHardened(
     onRelease: (() -> Unit)? = null,
     content: @Composable () -> Unit,
 ) {
-    // Animatable holds the current width scale (1.0 = natural width)
+    // Animatable holds the current scale value
     val scaleAnimatable = remember { Animatable(1f) }
 
     // Track the current press state to prevent animation race conditions
@@ -101,7 +93,7 @@ fun ExpansiveButtonHardened(
                     // This prevents stacking if user rapid-fires taps
                     scaleAnimatable.stop()
 
-                    // Animate to expanded width
+                    // Animate to expanded scale
                     try {
                         scaleAnimatable.animateTo(
                             targetValue = maxScale,
@@ -124,7 +116,7 @@ fun ExpansiveButtonHardened(
                         // Trigger optional release callback
                         onRelease?.invoke()
 
-                        // Animate back to natural width
+                        // Animate back to normal scale
                         try {
                             scaleAnimatable.animateTo(
                                 targetValue = 1f,
@@ -153,44 +145,15 @@ fun ExpansiveButtonHardened(
         }
     }
 
-    ExpressiveWidthBox(scale = scaleAnimatable.value, modifier = modifier, content = content)
-}
-
-/**
- * Single-child layout that pins its content's WIDTH to `naturalWidth * scale`, leaving height
- * untouched. Unlike a `graphicsLayer` scale, this is a real layout size -- a sibling in the same
- * Row physically moves when this grows, which is the whole point (see the file doc above).
- *
- * Measures the content's own intrinsic width first (a query, not a real measurement -- Compose
- * allows querying intrinsics on a Measurable any number of times before the one real `.measure()`
- * call each Measurable gets per pass), then measures it for real pinned to the scaled width. Every
- * composable this app wraps with [SafeExpansiveButton] bottoms out in ordinary Compose layouts
- * (Row/Box/Text/Button and friends), which all support intrinsic measurement, so this works
- * generically without each call site having to know its own natural size up front.
- */
-@Composable
-private fun ExpressiveWidthBox(
-    scale: Float,
-    modifier: Modifier = Modifier,
-    content: @Composable () -> Unit,
-) {
-    Layout(content = content, modifier = modifier) { measurables, constraints ->
-        val measurable = measurables.firstOrNull()
-            ?: return@Layout layout(0, 0) {}
-
-        // Intrinsic width queries take a height hint; 0 is the conventional value when height
-        // isn't (yet) pinned, matching how Compose's own IntrinsicSize.Max plumbing does this.
-        val heightHint = constraints.maxHeight.takeIf { it != Constraints.Infinity } ?: 0
-        val naturalWidth = measurable.maxIntrinsicWidth(heightHint)
-        val scaledWidth = (naturalWidth * scale).roundToInt().coerceAtLeast(0)
-        val targetWidth = scaledWidth
-            .coerceAtLeast(constraints.minWidth)
-            .let { if (constraints.hasBoundedWidth) it.coerceAtMost(constraints.maxWidth) else it }
-
-        val placeable = measurable.measure(constraints.copy(minWidth = targetWidth, maxWidth = targetWidth))
-        layout(placeable.width, placeable.height) {
-            placeable.placeRelative(0, 0)
-        }
+    // Apply the scale transformation
+    androidx.compose.foundation.layout.Box(
+        modifier = modifier.graphicsLayer(
+            scaleX = scaleAnimatable.value,
+            scaleY = scaleAnimatable.value,
+            transformOrigin = androidx.compose.ui.graphics.TransformOrigin(0.5f, 0.5f),
+        ),
+    ) {
+        content()
     }
 }
 
@@ -293,6 +256,7 @@ fun SafeExpansiveButton(
 /**
  * Extended animation capability for future enhancements.
  * Can be expanded for:
+ * - Width expansion (horizontal ripple)
  * - Elevation changes
  * - Color shifts
  * - Rotation effects

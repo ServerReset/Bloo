@@ -548,10 +548,13 @@ internal fun FuelPebble(v: Vehicle, status: VehicleStatus?, state: UiState, vm: 
         range != null -> "${formatDistance(range, metric)}"
         else -> "--"
     }
+    // NOT alwaysExpandedInSimpleMode: that flag is for pebbles with a single setting
+    // that reads better inline without an expand/collapse control (see its own doc).
+    // This one renders both a fuel-level row and a range row, so forcing it always
+    // open in simple mode just removed the ability to collapse it.
     Pebble(
         v, "fuel", "Fuel", Icons.Filled.LocalGasStation, state, vm, dragHandle,
         summary = summary,
-        alwaysExpandedInSimpleMode = true,
     ) {
         // COVER SCREEN only: lead with a big fuel-% hero so the gas tile gets the same
         // glance treatment the EV Charge tile gets from ChargeFuelBar (it previously
