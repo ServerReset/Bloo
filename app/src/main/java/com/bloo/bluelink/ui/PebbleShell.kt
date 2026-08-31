@@ -599,13 +599,24 @@ internal fun PebbleShell(
                         }
                         if (!forceExpanded) {
                             if (headerAction != null) {
+                                // Renders the action half regardless; canToggle decides whether
+                                // the chevron half comes with it (and reshapes the action's
+                                // seam corner when it does not -- see SplitExpandButton).
                                 SplitExpandButton(
                                     action = headerAction,
                                     expanded = expanded,
                                     onToggle = onToggle,
                                     canToggle = canToggle,
                                 )
-                            } else {
+                            } else if (canToggle) {
+                                // Gated on canToggle, which this branch used to ignore. Without
+                                // the gate a pebble with nothing to disclose still drew a
+                                // chevron and, since onToggle is a no-op in that state, tapping
+                                // it did nothing -- the exact "there should be no chevron" case
+                                // that inlineSettingInSimpleMode and SettingsCard's inlineSetting
+                                // exist to produce. Only pebbles carrying a headerAction ever
+                                // honoured canToggle, purely because that path happened to
+                                // forward it.
                                 MorphExpandButton(
                                     expanded = expanded,
                                     onToggle = onToggle,
