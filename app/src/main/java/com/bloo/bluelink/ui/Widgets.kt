@@ -507,7 +507,13 @@ internal fun FloatingIcon(
         modifier = modifier
             .padding(outerPadding)
             .size(HeaderButtonSize)
-            .graphicsLayer(scaleX = scale, scaleY = scale)
+            // Lambda form: the press spring is read at DRAW time, so the animation
+            // never recomposes this button (the arg-taking overload reads it in
+            // composition instead -- see ExpressiveButtons.kt for the same fix).
+            .graphicsLayer {
+                scaleX = scale
+                scaleY = scale
+            }
             .ambientRing(CircleShape)
             .dropShadow(CircleShape)
             .appGlassRim(CircleShape),

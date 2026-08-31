@@ -275,7 +275,6 @@ import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.drawBehind
-import androidx.compose.ui.draw.rotate
 import androidx.lifecycle.repeatOnLifecycle
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
@@ -662,7 +661,11 @@ fun MorphButtonLabel(
         Icon(
             icon,
             contentDescription = null,
-            modifier = Modifier.size(iconSize).rotate(angle.value),
+            // Draw-phase read. This one matters most of the three: `angle` is a
+            // continuously-running spin (the pending/refresh indicator loops
+            // `while (true)`), so reading it through Modifier.rotate()'s argument
+            // recomposed this Icon on EVERY FRAME for as long as the spinner ran.
+            modifier = Modifier.size(iconSize).graphicsLayer { rotationZ = angle.value },
         )
     }
     Spacer(Modifier.width(8.dp))
@@ -779,7 +782,12 @@ internal fun MorphExpandButton(
                 contentDescription = if (expanded) "Collapse" else "Expand",
                 // Larger chevron icon (24dp to match action button icon size), with
                 // easter egg spin animation when the chevron is held.
-                modifier = Modifier.size(24.dp).rotate(rotation + easterEggSpin),
+                // Draw-phase read -- see PebbleShell's identical chevron for why
+                // Modifier.rotate() (which takes the angle as an argument, and so reads
+                // the spring in composition) is the wrong tool here.
+                modifier = Modifier.size(24.dp).graphicsLayer {
+                    rotationZ = rotation + easterEggSpin
+                },
             )
         }
     }

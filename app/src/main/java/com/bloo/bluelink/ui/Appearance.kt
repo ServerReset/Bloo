@@ -501,7 +501,12 @@ internal fun CustomPaletteSwatch(
             Box(
                 modifier = Modifier
                     .size(48.dp)
-                    .graphicsLayer(scaleX = scale, scaleY = scale)
+                    // Read at DRAW time, not in composition -- see Widgets.kt's
+                    // FloatingIcon for the same change and why it matters.
+                    .graphicsLayer {
+                        scaleX = scale
+                        scaleY = scale
+                    }
                     .clip(CircleShape)
                     .background(MaterialTheme.colorScheme.outline)
                     .padding(ring)

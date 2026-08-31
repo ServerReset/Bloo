@@ -284,7 +284,6 @@ import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.drawBehind
-import androidx.compose.ui.draw.rotate
 import androidx.lifecycle.repeatOnLifecycle
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
@@ -1208,7 +1207,13 @@ internal fun SplitExpandButton(
                         contentDescription = if (expanded) "Collapse" else "Expand",
                         // Larger chevron icon (24dp to match action button icon size), with
                         // easter egg spin animation when the chevron is held.
-                        modifier = Modifier.size(24.dp).rotate(rotation + easterEggSpin),
+                        // rotationZ in a graphicsLayer LAMBDA, not Modifier.rotate(): rotate()
+                        // takes the angle as an argument, so the spring is read in COMPOSITION
+                        // and this Icon recomposes on every frame of every expand/collapse, on
+                        // every pebble header in the app. Read in the lambda it is draw-phase.
+                        modifier = Modifier.size(24.dp).graphicsLayer {
+                            rotationZ = rotation + easterEggSpin
+                        },
                     )
                 }
             }
