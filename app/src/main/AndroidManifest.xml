@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
 
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
@@ -108,6 +109,26 @@
             android:enabled="true"
             android:exported="true"
             android:permission="android.permission.INTERACT_ACROSS_USERS_FULL" />
+
+        <!-- Disables androidx.work's automatic self-initialization. That default path is
+             an androidx.startup.InitializationProvider entry (WorkManagerInitializer) that
+             Android instantiates as a ContentProvider during process attach -- synchronously
+             on the MAIN thread, before Application.onCreate() and therefore before every
+             deliberately-off-main-thread WorkManager scheduling call in MainActivity. It opens
+             WorkManager's own Room database and stands up its executors right there on the
+             critical path to first frame. WorkManagerInit (see that class) now does the same
+             init call on demand instead, from whichever call site needs a WorkManager first --
+             see its doc for why every "get a WorkManager" call in this app must go through it. -->
+        <provider
+            android:name="androidx.startup.InitializationProvider"
+            android:authorities="${applicationId}.androidx-startup"
+            android:exported="false"
+            tools:node="merge">
+            <meta-data
+                android:name="androidx.work.WorkManagerInitializer"
+                android:value="androidx.startup"
+                tools:node="remove" />
+        </provider>
 
         <!-- Wear OS Data Layer: receives the watch's remote commands and sync
              requests. Bound on-demand by Play Services when a /bloo message

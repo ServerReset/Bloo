@@ -6,7 +6,6 @@ import androidx.work.CoroutineWorker
 import androidx.work.ExistingPeriodicWorkPolicy
 import androidx.work.NetworkType
 import androidx.work.PeriodicWorkRequestBuilder
-import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import androidx.glance.appwidget.updateAll
 import com.bloo.bluelink.widget.CarWidget
@@ -154,7 +153,7 @@ class DriveSyncWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(
             // is already scheduled, leave the existing one running as-is rather
             // than replacing it -- so calling schedule() again (e.g. on every app
             // launch) doesn't reset the periodic timer or cancel an in-flight run.
-            WorkManager.getInstance(context).enqueueUniquePeriodicWork(
+            WorkManagerInit.of(context).enqueueUniquePeriodicWork(
                 NAME,
                 ExistingPeriodicWorkPolicy.KEEP,
                 request,

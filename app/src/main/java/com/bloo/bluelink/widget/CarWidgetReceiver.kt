@@ -9,7 +9,7 @@ import androidx.work.CoroutineWorker
 import androidx.work.ExistingPeriodicWorkPolicy
 import androidx.work.NetworkType
 import androidx.work.PeriodicWorkRequestBuilder
-import androidx.work.WorkManager
+import com.bloo.bluelink.work.WorkManagerInit
 import androidx.work.WorkerParameters
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -108,12 +108,12 @@ class WidgetRefreshWorker(ctx: Context, params: WorkerParameters) : CoroutineWor
                     Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build(),
                 )
                 .build()
-            WorkManager.getInstance(context)
+            WorkManagerInit.of(context)
                 .enqueueUniquePeriodicWork(WORK, ExistingPeriodicWorkPolicy.KEEP, req)
         }
 
         fun cancel(context: Context) {
-            WorkManager.getInstance(context).cancelUniqueWork(WORK)
+            WorkManagerInit.of(context).cancelUniqueWork(WORK)
         }
     }
 }

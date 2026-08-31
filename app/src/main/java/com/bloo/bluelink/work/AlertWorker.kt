@@ -6,7 +6,6 @@ import androidx.work.CoroutineWorker
 import androidx.work.ExistingPeriodicWorkPolicy
 import androidx.work.NetworkType
 import androidx.work.PeriodicWorkRequestBuilder
-import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import com.bloo.bluelink.data.BlueLinkGate
 import com.bloo.bluelink.data.CarAlerts
@@ -212,7 +211,7 @@ class AlertWorker(context: Context, params: WorkerParameters) : CoroutineWorker(
                     Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build(),
                 )
                 .build()
-            WorkManager.getInstance(context).enqueueUniquePeriodicWork(
+            WorkManagerInit.of(context).enqueueUniquePeriodicWork(
                 "bloo_alerts",
                 ExistingPeriodicWorkPolicy.KEEP,
                 request,

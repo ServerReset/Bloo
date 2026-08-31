@@ -7,7 +7,7 @@ import androidx.glance.appwidget.action.ActionCallback
 import androidx.glance.appwidget.updateAll
 import androidx.work.CoroutineWorker
 import androidx.work.OneTimeWorkRequestBuilder
-import androidx.work.WorkManager
+import com.bloo.bluelink.work.WorkManagerInit
 import androidx.work.WorkerParameters
 import androidx.work.workDataOf
 import androidx.work.ExistingWorkPolicy
@@ -170,7 +170,7 @@ class WidgetCommandWorker(ctx: Context, params: WorkerParameters) : CoroutineWor
                 .build()
             // Unique per (vin, action) so a double-tap can't fire two concurrent
             // sessions for the same command.
-            WorkManager.getInstance(context)
+            WorkManagerInit.of(context)
                 .enqueueUniqueWork("widget_cmd_${vin}_$resolvedAction", ExistingWorkPolicy.REPLACE, req)
         }
 
@@ -178,7 +178,7 @@ class WidgetCommandWorker(ctx: Context, params: WorkerParameters) : CoroutineWor
             val req = OneTimeWorkRequestBuilder<WidgetCommandWorker>()
                 .setInputData(workDataOf(KEY_VIN to vin, KEY_REFRESH to true))
                 .build()
-            WorkManager.getInstance(context)
+            WorkManagerInit.of(context)
                 .enqueueUniqueWork("widget_refresh_$vin", ExistingWorkPolicy.REPLACE, req)
         }
     }

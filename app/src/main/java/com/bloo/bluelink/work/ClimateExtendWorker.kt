@@ -4,7 +4,6 @@ import android.content.Context
 import androidx.work.CoroutineWorker
 import androidx.work.ExistingWorkPolicy
 import androidx.work.OneTimeWorkRequestBuilder
-import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import androidx.work.workDataOf
 import com.bloo.bluelink.data.AppLog
@@ -133,7 +132,7 @@ class ClimateExtendWorker(ctx: Context, params: WorkerParameters) : CoroutineWor
                 .setInitialDelay(delayMinutes.toLong(), TimeUnit.MINUTES)
                 .setInputData(data)
                 .build()
-            WorkManager.getInstance(context)
+            WorkManagerInit.of(context)
                 .enqueueUniqueWork(uniqueName(vin), ExistingWorkPolicy.REPLACE, request)
         }
 
@@ -161,7 +160,7 @@ class ClimateExtendWorker(ctx: Context, params: WorkerParameters) : CoroutineWor
          * payload -- a cross-process schema change that wants a device to validate.
          */
         fun cancel(context: Context, vin: String) {
-            WorkManager.getInstance(context).cancelUniqueWork(uniqueName(vin))
+            WorkManagerInit.of(context).cancelUniqueWork(uniqueName(vin))
         }
     }
 }

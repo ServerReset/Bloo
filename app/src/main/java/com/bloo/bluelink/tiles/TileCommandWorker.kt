@@ -4,7 +4,7 @@ import android.content.Context
 import androidx.work.CoroutineWorker
 import androidx.work.ExistingWorkPolicy
 import androidx.work.OneTimeWorkRequestBuilder
-import androidx.work.WorkManager
+import com.bloo.bluelink.work.WorkManagerInit
 import androidx.work.WorkerParameters
 import androidx.work.workDataOf
 import com.bloo.bluelink.data.AppLog
@@ -99,7 +99,7 @@ class TileCommandWorker(ctx: Context, params: WorkerParameters) : CoroutineWorke
             // the second could read the first's optimistic flip and send the OPPOSITE
             // command (two "lock" taps ending with the car unlocked). APPEND_OR_REPLACE
             // chains them so they run one after another, each seeing the prior result.
-            WorkManager.getInstance(ctx).enqueueUniqueWork(
+            WorkManagerInit.of(ctx).enqueueUniqueWork(
                 "tile_cmd_${vin}_$cmd",
                 ExistingWorkPolicy.APPEND_OR_REPLACE,
                 req,

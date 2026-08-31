@@ -7,7 +7,6 @@ import androidx.work.CoroutineWorker
 import androidx.work.ExistingWorkPolicy
 import androidx.work.NetworkType
 import androidx.work.OneTimeWorkRequestBuilder
-import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import com.bloo.bluelink.data.Brand
 import com.bloo.bluelink.data.BlueLinkGate
@@ -155,7 +154,7 @@ class LiveChargePollWorker(context: Context, params: WorkerParameters) : Corouti
                 .setConstraints(constraints())
                 .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 30, TimeUnit.SECONDS)
                 .build()
-            WorkManager.getInstance(context)
+            WorkManagerInit.of(context)
                 .enqueueUniqueWork(UNIQUE_WORK_NAME, ExistingWorkPolicy.KEEP, request)
         }
 
@@ -167,14 +166,14 @@ class LiveChargePollWorker(context: Context, params: WorkerParameters) : Corouti
                 .setConstraints(constraints())
                 .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 30, TimeUnit.SECONDS)
                 .build()
-            WorkManager.getInstance(context)
+            WorkManagerInit.of(context)
                 .enqueueUniqueWork(UNIQUE_WORK_NAME, ExistingWorkPolicy.REPLACE, request)
         }
 
         /** Stops the chain -- charging ended, or the user turned the
          *  feature off entirely. */
         fun cancel(context: Context) {
-            WorkManager.getInstance(context).cancelUniqueWork(UNIQUE_WORK_NAME)
+            WorkManagerInit.of(context).cancelUniqueWork(UNIQUE_WORK_NAME)
         }
     }
 }

@@ -4,7 +4,6 @@ import android.content.Context
 import androidx.work.CoroutineWorker
 import androidx.work.ExistingWorkPolicy
 import androidx.work.OneTimeWorkRequestBuilder
-import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import com.bloo.bluelink.data.Notifications
 import com.bloo.bluelink.update.UpdateCheckResult
@@ -62,7 +61,7 @@ class UpdateReminderWorker(context: Context, params: WorkerParameters) : Corouti
             val request = OneTimeWorkRequestBuilder<UpdateReminderWorker>()
                 .setInitialDelay(1, TimeUnit.DAYS)
                 .build()
-            WorkManager.getInstance(context).enqueueUniqueWork(
+            WorkManagerInit.of(context).enqueueUniqueWork(
                 NAME,
                 ExistingWorkPolicy.REPLACE,
                 request,
