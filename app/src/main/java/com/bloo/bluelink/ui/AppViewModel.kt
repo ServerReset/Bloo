@@ -1900,6 +1900,35 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     /** Toggle a pebble (detail section) open/closed for a car (persisted). */
+    /**
+     * Collapse keys ("<vin>:<section>") on their own small flow.
+     *
+     * Settings cards are pebbles too (SettingsCard renders through PebbleShell), so they get
+     * their open/closed state from the same place car pebbles do -- but a card observing the
+     * whole UiState to learn one boolean would recompose all ~19 of them on every status poll.
+     * This is the one field they actually need, so a change to anything else cannot touch them.
+     */
+    val collapsedSections: StateFlow<Set<String>> = state
+        .map { it.collapsedPebbles }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, emptySet())
+
+    /**
+     * The Settings-screen counterpart of [togglePebble], keyed by card title under a reserved
+     * pseudo-VIN. Same state, same store, same persistence -- so a Settings card remembers
+     * whether it was open across launches exactly the way a car's pebble does, rather than
+     * through a local rememberSaveable that a process death throws away.
+     */
+    fun toggleSettingsCard(title: String) {
+        val key = "$SETTINGS_CARD_VIN:$title"
+        val collapsedNow = key !in _state.value.collapsedPebbles
+        _state.update {
+            it.copy(
+                collapsedPebbles = if (collapsedNow) it.collapsedPebbles + key else it.collapsedPebbles - key,
+            )
+        }
+        viewModelScope.launch { settingsStore.setSectionCollapsed(SETTINGS_CARD_VIN, title, collapsedNow) }
+    }
+
     fun togglePebble(v: Vehicle, section: String) {
         val key = "${v.vin}:$section"
         val collapsedNow = key !in _state.value.collapsedPebbles

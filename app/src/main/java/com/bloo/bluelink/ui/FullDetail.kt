@@ -52,7 +52,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Fullscreen
-import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.ui.semantics.onClick
 import androidx.compose.ui.text.style.TextOverflow
@@ -254,14 +253,6 @@ internal fun VehicleDetailContent(
                 // PebbleList's own one-frame lazy-fill (filled/EAGER_PEBBLES) + the pager's
                 // beyondViewportPageCount=1 pre-compose, not from an in-transit skeleton.
                 PebbleList(v, state, vm)
-                // Recent Lock/Unlock/Climate/etc. commands for this car. The card
-                // returns nothing (no empty placeholder) until the first command is
-                // issued -- see runCommand/recordRemoteAction in AppViewModel, the
-                // single choke point that writes state.remoteActionHistory.
-                RemoteActionsHistoryCard(
-                    vehicleName = v.name,
-                    actions = state.value.remoteActionHistory[v.vin].orEmpty(),
-                )
                 // bottomInset + 132.dp, not +16.dp: this pager's own floating search
                 // bubble (SearchLayer, mounted globally for Screen.Garage -- see
                 // Screens.kt's `searchable` gate) sits fixed to the screen's bottom

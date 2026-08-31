@@ -16,6 +16,7 @@ import androidx.compose.animation.togetherWith
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.Canvas
@@ -177,6 +178,9 @@ fun BlooApp(vm: AppViewModel) {
     // instead of screens hand-threading each other's positions around. See FloatingSystem.kt.
     val floatingRegistry = remember { FloatingRegistry() }
     CompositionLocalProvider(
+        // Kills Android's default ripple app-wide -- see NoTapHighlight for why this app
+        // answers a press with its own motion instead of a borrowed grey fill.
+        LocalIndication provides NoTapHighlight,
         LocalFloatingRegistry provides floatingRegistry,
         LocalHaptics provides haptics,
         // Provided once here (the app root already collects `appearance` above) so

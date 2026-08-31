@@ -17,6 +17,8 @@ import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
@@ -345,8 +347,21 @@ internal fun ControlsPebble(v: Vehicle, state: UiState, vm: AppViewModel, dragHa
     // rolls its own Surface instead of going through Pebble(), so it had been
     // missed -- the setting simply did nothing here.
     val pebbleOutline = LocalAppearance.current.pebbleOutline
+    // Recent remote commands for this car, revealed by pressing this pebble's own background.
+    // Deliberately undiscoverable-by-chrome: no chevron, no header, no affordance of any kind --
+    // the history is a thing you find, not a control the pebble advertises. Kept per-car and NOT
+    // rememberSaveable: reopening the app should land on the plain lock control, not on whatever
+    // was last revealed.
+    var showHistory by remember(v.vin) { mutableStateOf(false) }
+    val history = state.remoteActionHistory[v.vin].orEmpty()
     Surface(
-        modifier = Modifier.fillMaxWidth().height(ControlHeight).then(dragHandle)
+        modifier = Modifier.fillMaxWidth().then(dragHandle)
+            // AFTER dragHandle, and on the same node rather than on a child. Order matters both
+            // ways: detectDragGesturesAfterLongPress does not consume the initial down until a
+            // long press actually fires, so a quick tap falls through to this detector, while a
+            // long press is claimed by the drag and never toggles. On a CHILD it would instead
+            // consume the press outright and silently kill drag-to-reorder for this pebble.
+            .pointerInput(v.vin) { detectTapGestures { showHistory = !showHistory } }
             .dropShadow(shape, blurRadius = 12.dp, offsetY = 4.dp)
             .then(
                 if (pebbleOutline) {
@@ -357,14 +372,25 @@ internal fun ControlsPebble(v: Vehicle, state: UiState, vm: AppViewModel, dragHa
         color = MaterialTheme.colorScheme.surfaceVariant,
         contentColor = MaterialTheme.colorScheme.onSurface,
     ) {
-        // Asymmetric padding to match pebble header alignment: more left, less right.
-        Box(Modifier.fillMaxSize().padding(start = 12.dp, end = 8.dp)) {
-            // PrimaryActions' own default start padding (26.dp) plus this
-            // Box's 12.dp put the lock icon noticeably further right than
-            // every other pebble's header icon (Charge, Climate, ...), which
-            // only ever get Pebble's flat 16.dp row padding. 4.dp here lines
-            // the two icons up (4 + 12 = 16, matching Pebble's inset).
-            PrimaryActions(v, state, vm, contentPadding = PaddingValues(start = 4.dp, end = 8.dp))
+        Column(Modifier.fillMaxWidth()) {
+            // Asymmetric padding to match pebble header alignment: more left, less right.
+            // Height stays pinned here (not on the Surface) so the pebble keeps its exact
+            // resting silhouette and only grows when the history is actually showing.
+            Box(Modifier.fillMaxWidth().height(ControlHeight).padding(start = 12.dp, end = 8.dp)) {
+                // PrimaryActions' own default start padding (26.dp) plus this
+                // Box's 12.dp put the lock icon noticeably further right than
+                // every other pebble's header icon (Charge, Climate, ...), which
+                // only ever get Pebble's flat 16.dp row padding. 4.dp here lines
+                // the two icons up (4 + 12 = 16, matching Pebble's inset).
+                PrimaryActions(v, state, vm, contentPadding = PaddingValues(start = 4.dp, end = 8.dp))
+            }
+            AnimatedVisibility(
+                visible = showHistory && history.isNotEmpty(),
+                enter = collapseEnter(Alignment.Top),
+                exit = collapseExit(Alignment.Top),
+            ) {
+                RemoteActionsInline(history)
+            }
         }
     }
 }

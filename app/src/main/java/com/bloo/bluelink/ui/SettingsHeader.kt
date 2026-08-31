@@ -55,6 +55,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.animation.core.MutableTransitionState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -91,6 +93,49 @@ import kotlinx.coroutines.delay
  * deliberate; hiding in sequence looks like a bug, so only the reveal gets one.
  */
 internal const val STAGGER_STEP_MS = 45L
+
+/** How many advanced-only cards Settings staggers in. Kept beside the stagger itself so the
+ *  count and the sequence cannot drift apart when a card is added. */
+internal const val ADVANCED_CARD_COUNT = 9
+
+/**
+ * The same staggered reveal as [staggeredAdvancedVisible], but for ALL advanced cards at once,
+ * hoisted OUT of the lazy grid's item content and into the screen's own composition.
+ *
+ * That hoist is the point. Read from inside `item { AnimatedVisibility(visible = ...) }`, the
+ * visibility can only ever hide a card's CONTENT -- the `item {}` itself still occupies a slot
+ * in the LazyVerticalStaggeredGrid, and the grid still applies its `verticalItemSpacing` around
+ * that now zero-height slot. Every advanced-only card left a phantom gap behind in simple mode,
+ * which is what "bad spacing when pebbles are hidden" is: not one wrong padding, but eight
+ * invisible items each holding a grid gap open. Returned as a plain list the grid's DSL can
+ * read, the screen can decide not to emit the item at all -- no slot, no spacing, no gap.
+ */
+@Composable
+internal fun rememberAdvancedVisibility(advanced: Boolean, count: Int): List<Boolean> {
+    val visible = remember { mutableStateListOf(*Array(count) { false }) }
+    LaunchedEffect(advanced) {
+        if (advanced) {
+            // Cumulative delay == the index * STAGGER_STEP_MS the per-card version used.
+            repeat(count) { i -> delay(STAGGER_STEP_MS); visible[i] = true }
+        } else {
+            // Immediate, never staggered -- see STAGGER_STEP_MS' own doc on why hiding in
+            // sequence reads as a bug where revealing in sequence reads as deliberate.
+            repeat(count) { i -> visible[i] = false }
+        }
+    }
+    return visible
+}
+
+/**
+ * An [AnimatedVisibility] state that starts hidden and animates itself in on first composition.
+ *
+ * Needed by anything only COMPOSED once it should already be visible (see
+ * [rememberAdvancedVisibility]): there is no false -> true flip left inside composition for a
+ * plain `visible =` boolean to animate from, so it would otherwise just appear.
+ */
+@Composable
+internal fun rememberAppearedState(): MutableTransitionState<Boolean> =
+    remember { MutableTransitionState(false) }.apply { targetState = true }
 
 @Composable
 internal fun staggeredAdvancedVisible(advanced: Boolean, index: Int): Boolean {

@@ -58,6 +58,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
@@ -255,8 +256,30 @@ internal fun InlineSegmentedRow(
  */
 
 @Composable
-internal fun SettingsCard(title: String, icon: ImageVector? = null, vm: AppViewModel, content: @Composable () -> Unit) {
-    var expanded by rememberSaveable(title) { mutableStateOf(true) }
+internal fun SettingsCard(
+    title: String,
+    icon: ImageVector? = null,
+    vm: AppViewModel,
+    /**
+     * For a card whose entire body is ONE control: render that control on the title row and drop
+     * the expand/collapse entirely. A card holding a single switch had nothing worth disclosing
+     * -- you tapped a chevron to reveal one toggle, then tapped it again to put it away.
+     *
+     * Unconditional, not gated on simple mode (unlike Pebble's own
+     * `inlineSettingInSimpleMode`, which exists because a car pebble has genuinely more to show
+     * in advanced): a card that declares an inline setting has nothing else to show in ANY mode,
+     * so a chevron there is never right.
+     */
+    inlineSetting: (@Composable () -> Unit)? = null,
+    content: @Composable () -> Unit,
+) {
+    // Open/closed now lives where a car pebble's does -- the same collapse set, persisted to the
+    // same store under a reserved pseudo-VIN (see AppViewModel.toggleSettingsCard). This used to
+    // be a local `rememberSaveable`, which is why a Settings card forgot whether it was open
+    // whenever the process was killed while a car's pebble two screens away remembered.
+    val collapsed by vm.collapsedSections.collectAsState()
+    val inline = inlineSetting != null
+    val expanded = !inline && "$SETTINGS_CARD_VIN:$title" !in collapsed
     // A soft lift while the card is OPEN: the expanded card scales up ~1.5%
     // and settles back -- the same "the thing that changed just came
     // forward" language the pebble cards' own open bounce already speaks,
@@ -295,11 +318,12 @@ internal fun SettingsCard(title: String, icon: ImageVector? = null, vm: AppViewM
     ) {
         PebbleShell(
             expanded = expanded,
-            onToggle = { expanded = !expanded },
+            onToggle = { if (!inline) vm.toggleSettingsCard(title) },
             icon = icon ?: Icons.Filled.Settings,
             title = title,
             vm = vm,
-            canToggle = true,
+            canToggle = !inline,
+            titleTrailing = inlineSetting,
             content = { content() },
         )
     }

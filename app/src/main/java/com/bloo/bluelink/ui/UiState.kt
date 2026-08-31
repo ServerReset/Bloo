@@ -62,6 +62,10 @@ sealed interface Screen {
     data object Settings : Screen
 }
 
+/** Reserved pseudo-VIN for Settings cards, so they can share car pebbles' collapse state and
+ *  store without inventing a parallel mechanism. No real VIN can collide with it. */
+internal const val SETTINGS_CARD_VIN = "__settings__"
+
 /**
  * PERF, and it matters more than it looks: every pebble on every live car-pager
  * page takes this whole object as a parameter. Kotlin's `List`/`Map`/`Set` are
@@ -150,7 +154,7 @@ data class UiState(
     /** Recent remote commands (Lock/Unlock/Climate/etc.) by VIN, newest first,
      *  capped at [REMOTE_ACTION_HISTORY_LIMIT] entries per car -- written by
      *  [AppViewModel.runCommand] as the single choke point every remote
-     *  command already passes through. Surfaced in RemoteActionsHistoryCard. */
+     *  command already passes through. Surfaced by RemoteActionsInline, revealed by pressing the lock pebble background. */
     val remoteActionHistory: Map<String, List<RemoteAction>> = emptyMap(),
     /** Collapsed pebbles, keyed "vin:section". Absent = expanded. */
     val collapsedPebbles: Set<String> = emptySet(),

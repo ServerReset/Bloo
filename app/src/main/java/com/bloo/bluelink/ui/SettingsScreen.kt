@@ -113,6 +113,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -375,6 +376,12 @@ internal fun SettingsScreen(
             contentAlignment = Alignment.TopCenter
         ) {
         CompositionLocalProvider(LocalHeroTitleFlight provides liveFlight) {
+        // Hoisted OUT of the grid's item content, which is not a composable scope and so could
+        // never have called this. That hoist is what lets an advanced-only card be skipped as a
+        // grid ITEM rather than merely rendered empty -- see rememberAdvancedVisibility for why
+        // an empty item is not free (it keeps its slot, and the grid's verticalItemSpacing with
+        // it, which is the gap left behind all over simple mode).
+        val advVisible = rememberAdvancedVisibility(state.settingsMode == "advanced", ADVANCED_CARD_COUNT)
         LazyVerticalStaggeredGrid(
             columns = StaggeredGridCells.Adaptive(minSize = 380.dp),
             state = settingsGridState,
@@ -587,13 +594,13 @@ internal fun SettingsScreen(
                 }
             }
             }
-            item {
+            if (advVisible[0]) item {
 
             // (The "Updates" card now lives after Notifications — its natural home —
             // ungated so its controls show with or without Shizuku. See below.)
 
             // App-icon shortcuts (long-press the launcher icon)
-            AnimatedVisibility(visible = staggeredAdvancedVisible(advanced, 0), enter = collapseEnter(), exit = collapseExit()) {
+            AnimatedVisibility(visibleState = rememberAppearedState(), enter = collapseEnter(), exit = collapseExit()) {
                 SettingsCard("App shortcuts", Icons.Filled.Bolt, vm) {
                     // No inner MorphExpandButton any more -- this used to have its
                     // own second chevron gating the per-vehicle toggles below,
@@ -1072,10 +1079,10 @@ internal fun SettingsScreen(
                 }
             }
             }
-            item {
+            if (advVisible[2]) item {
 
             // Links
-            AnimatedVisibility(visible = staggeredAdvancedVisible(advanced, 2), enter = collapseEnter(), exit = collapseExit()) {
+            AnimatedVisibility(visibleState = rememberAppearedState(), enter = collapseEnter(), exit = collapseExit()) {
             SettingsCard("Links", Icons.Filled.OpenInNew, vm) {
                 SettingsSegmentedRow(
                     label = "Open links",
@@ -1089,10 +1096,10 @@ internal fun SettingsScreen(
             }
             }
             }
-            item {
+            if (advVisible[3]) item {
 
             // Logs
-            AnimatedVisibility(visible = staggeredAdvancedVisible(advanced, 3), enter = collapseEnter(), exit = collapseExit()) {
+            AnimatedVisibility(visibleState = rememberAppearedState(), enter = collapseEnter(), exit = collapseExit()) {
             SettingsCard("Logs", Icons.Filled.Info, vm) {
                 var logsExpanded by remember { mutableStateOf(false) }
                 val lineCount = logs.size
@@ -1193,14 +1200,14 @@ internal fun SettingsScreen(
             }
             }
             }
-            item {
+            if (advVisible[7]) item {
 
             // Debug -- app/device diagnostics for support troubleshooting.
             // Placed right after Logs, both power-user diagnostic cards --
             // shares this screen's stagger sequence (index 7, the next
             // unused slot) rather than reusing Logs' index 3, since the two
             // cards animate independently.
-            AnimatedVisibility(visible = staggeredAdvancedVisible(advanced, 7), enter = collapseEnter(), exit = collapseExit()) {
+            AnimatedVisibility(visibleState = rememberAppearedState(), enter = collapseEnter(), exit = collapseExit()) {
             SettingsCard("Debug", Icons.Filled.BugReport, vm) {
                 DebugSettingsPanel(
                     onCopyToClipboard = { text -> clipboard.setText(AnnotatedString(text)) },
@@ -1208,7 +1215,7 @@ internal fun SettingsScreen(
             }
             }
             }
-            item {
+            if (advVisible[8]) item {
 
             // Announcements -- currently sourced from the one real signal this
             // app has for it (an available build, same state.updateAvailable
@@ -1220,7 +1227,7 @@ internal fun SettingsScreen(
             // of bug the Logs card's heightIn(max = 300.dp) above guards
             // against, just via Modifier.verticalScroll there instead of a
             // second lazy layout).
-            AnimatedVisibility(visible = staggeredAdvancedVisible(advanced, 8), enter = collapseEnter(), exit = collapseExit()) {
+            AnimatedVisibility(visibleState = rememberAppearedState(), enter = collapseEnter(), exit = collapseExit()) {
             SettingsCard("Announcements", Icons.Filled.Campaign, vm) {
                 val update = state.updateAvailable
                 val announcements = remember(update) {
@@ -1380,11 +1387,11 @@ internal fun SettingsScreen(
                 )
             }
             }
-            item {
+            if (advVisible[4]) item {
 
             // Quick Settings tiles -- per-tile config is power-user territory,
             // same tier as App shortcuts/Cars above.
-            AnimatedVisibility(visible = staggeredAdvancedVisible(advanced, 4), enter = collapseEnter(), exit = collapseExit()) {
+            AnimatedVisibility(visibleState = rememberAppearedState(), enter = collapseEnter(), exit = collapseExit()) {
             SettingsCard("Quick tiles", Icons.Filled.Dashboard, vm) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(Icons.Filled.Bolt, contentDescription = null, modifier = Modifier.size(20.dp), tint = MaterialTheme.colorScheme.primary)
@@ -1603,9 +1610,20 @@ internal fun SettingsScreen(
             item {
 
             // Sounds & vibration
-            SettingsCard("Sounds & vibration", Icons.Filled.Vibration, vm) {
-                ToggleRow("Haptic feedback", appearance.hapticsEnabled) { vm.setHapticsEnabled(it) }
-            }
+            // The whole card is one switch, so it renders as one row: title on the left, the
+            // switch on the right, no chevron and nothing to expand into. See SettingsCard's
+            // inlineSetting.
+            SettingsCard(
+                "Sounds & vibration",
+                Icons.Filled.Vibration,
+                vm,
+                inlineSetting = {
+                    Switch(
+                        checked = appearance.hapticsEnabled,
+                        onCheckedChange = { vm.setHapticsEnabled(it) },
+                    )
+                },
+            ) {}
             }
             item {
 

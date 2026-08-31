@@ -2,11 +2,7 @@
 
 package com.bloo.bluelink.ui
 
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.expandVertically
-import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -15,20 +11,13 @@ import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.History
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontFamily
@@ -117,7 +106,7 @@ private fun RemoteActionItem(action: RemoteAction) {
                     color = MaterialTheme.colorScheme.onSurface,
                 )
                 Text(
-                    text = action.timestamp,
+                    text = shortTime(action.timestamp),
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     fontSize = 11.sp,
@@ -143,130 +132,42 @@ private fun RemoteActionItem(action: RemoteAction) {
 }
 
 /**
- * Expandable card showing remote actions history for a vehicle.
- * Appears as a collapsible section in the vehicle detail view.
- * Helps users see what commands were sent and their status for debugging.
+ * The action's own recorded instant, as a plain wall-clock time ("14:32") -- or the date too if
+ * it did not happen today. [RemoteAction.timestamp] is a raw `Instant.toString()`, which is
+ * exactly what this used to render: "2026-08-31T21:33:15.123456Z" in an 11sp monospace label
+ * under every row.
+ */
+private fun shortTime(iso: String): String = runCatching {
+    val at = java.time.Instant.parse(iso).atZone(java.time.ZoneId.systemDefault())
+    val today = java.time.LocalDate.now(java.time.ZoneId.systemDefault())
+    val fmt = if (at.toLocalDate() == today) "HH:mm" else "d MMM HH:mm"
+    at.format(java.time.format.DateTimeFormatter.ofPattern(fmt))
+}.getOrDefault(iso)
+
+/**
+ * Recent remote commands for one car, rendered inline -- no card of its own, no header, and no
+ * disclosure control.
  *
- * **Usage:**
- * ```kotlin
- * RemoteActionsHistoryCard(
- *     vehicleName = "2024 Ioniq 5",
- *     actions = vm.getActionsFor(vehicleId),
- * )
- * ```
- *
- * @param vehicleName Name of the vehicle for the header
- * @param actions List of RemoteAction objects to display (newest first)
- * @param maxItems Maximum number of actions to show (rest are cut off)
+ * This is deliberately not a card. It is revealed by pressing the lock pebble's own background
+ * (see ControlsPebble), so it is already inside a pebble: a second card with its own chrome and
+ * its own "▶" toggle -- which is what the previous RemoteActionsHistoryCard was -- would be a
+ * card inside a card, disclosed twice. It also drops that card's nested LazyColumn, which was a
+ * standing hazard: a lazy list inside another scrollable needs a height cap to avoid an infinite
+ * -constraint crash, and a plain Column over a handful of already-capped rows cannot hit it at all.
  */
 @Composable
-fun RemoteActionsHistoryCard(
-    vehicleName: String,
-    actions: List<RemoteAction>,
-    maxItems: Int = 10,
-) {
-    val isExpanded = remember { mutableStateOf(false) }
-    val displayedActions = actions.take(maxItems)
-
-    // Don't show card if no actions
+internal fun RemoteActionsInline(actions: List<RemoteAction>, max: Int = 6) {
     if (actions.isEmpty()) return
-
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(
-                color = MaterialTheme.colorScheme.surfaceContainer,
-                shape = RoundedCornerShape(12.dp)
-            )
-            .padding(0.dp) // Padding added inside header and content
-    ) {
-        // Header - collapsible toggle
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clickable { isExpanded.value = !isExpanded.value }
-                .padding(12.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                Icon(
-                    imageVector = Icons.Filled.History,
-                    contentDescription = "Actions History",
-                    modifier = Modifier.padding(4.dp),
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                Column {
-                    Text(
-                        text = "Remote Actions",
-                        style = MaterialTheme.typography.titleSmall,
-                        fontWeight = FontWeight.SemiBold,
-                        color = MaterialTheme.colorScheme.onSurface,
-                    )
-                    Text(
-                        text = "${actions.size} action${if (actions.size != 1) "s" else ""} (showing ${displayedActions.size})",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        fontSize = 11.sp,
-                    )
-                }
-            }
-
-            // Expand/collapse indicator
+    Column(Modifier.fillMaxWidth().padding(bottom = 6.dp)) {
+        actions.take(max).forEach { RemoteActionItem(it) }
+        if (actions.size > max) {
             Text(
-                text = if (isExpanded.value) "▼" else "▶",
+                text = "+${actions.size - max} older",
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
+                fontSize = 10.sp,
             )
-        }
-
-        // Expandable content - list of actions
-        AnimatedVisibility(
-            visible = isExpanded.value,
-            enter = expandVertically(),
-            exit = shrinkVertically(),
-        ) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(
-                        color = MaterialTheme.colorScheme.surface,
-                        shape = RoundedCornerShape(bottomStart = 12.dp, bottomEnd = 12.dp)
-                    )
-            ) {
-                LazyColumn(
-                    // heightIn is load-bearing, not cosmetic: this card is meant
-                    // to sit inside a car detail page's own scrollable column, and
-                    // a nested LazyColumn with no height cap crashes there
-                    // ("infinity maximum height constraints") -- same class of
-                    // guard SettingsScreen's Announcements/Logs cards apply.
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .heightIn(max = 300.dp)
-                        .padding(vertical = 8.dp),
-                    verticalArrangement = Arrangement.spacedBy(0.dp),
-                ) {
-                    items(displayedActions, key = { it.id }) { action ->
-                        RemoteActionItem(action)
-                    }
-
-                    // Show truncation message if needed
-                    if (actions.size > maxItems) {
-                        item {
-                            Text(
-                                text = "+${actions.size - maxItems} more actions (scroll in full view)",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.padding(12.dp),
-                                fontSize = 10.sp,
-                            )
-                        }
-                    }
-                }
-            }
         }
     }
 }
