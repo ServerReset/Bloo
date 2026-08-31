@@ -112,12 +112,12 @@
 
         <!-- Disables androidx.work's automatic self-initialization. That default path is
              an androidx.startup.InitializationProvider entry (WorkManagerInitializer) that
-             Android instantiates as a ContentProvider during process attach -- synchronously
+             Android instantiates as a ContentProvider during process attach, synchronously
              on the MAIN thread, before Application.onCreate() and therefore before every
              deliberately-off-main-thread WorkManager scheduling call in MainActivity. It opens
              WorkManager's own Room database and stands up its executors right there on the
              critical path to first frame. WorkManagerInit (see that class) now does the same
-             init call on demand instead, from whichever call site needs a WorkManager first --
+             init call on demand instead, from whichever call site needs a WorkManager first,
              see its doc for why every "get a WorkManager" call in this app must go through it. -->
         <provider
             android:name="androidx.startup.InitializationProvider"
