@@ -38,7 +38,16 @@ jobs:
         run: chmod +x ./gradlew
 
       - name: Build debug APK
-        run: ./gradlew assembleDebug --stacktrace
+        run: |
+          ./gradlew compileDebugKotlin --stacktrace > /tmp/build.log 2>&1 || true
+          echo "===== FULL LOG ====="
+          cat /tmp/build.log
+          echo "===== END LOG ====="
+          if grep -q "^e:" /tmp/build.log; then
+            echo "Kotlin compilation had errors (see above)"
+            exit 1
+          fi
+          ./gradlew assembleDebug --stacktrace
 
       - name: Run unit tests
         run: ./gradlew testDebugUnitTest --stacktrace
