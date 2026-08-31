@@ -1,5 +1,15 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <style name="Theme.Bloo" parent="android:Theme.Material.Light.NoActionBar" />
+    <!-- android:windowBackground is what's actually on screen for the gap between the
+         launcher tapping this Activity and Compose's first drawn frame. The platform
+         default (plain white, inherited from the Material.Light parent below) painted
+         a flash of white before every cold start, on an app whose real first frame is
+         a surface-toned gradient (see BlooApp's own background Brush.verticalGradient
+         in Screens.kt). window_background (this file's values-night sibling carries the
+         dark counterpart) mirrors Theme.kt's LightExpressive/DarkExpressive `surface`,
+         so that gap now reads as the app already being there instead of a blank flash. -->
+    <style name="Theme.Bloo" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:windowBackground">@color/window_background</item>
+    </style>
     <style name="Theme.Bloo.Transparent" parent="android:Theme.Translucent.NoTitleBar" />
 </resources>

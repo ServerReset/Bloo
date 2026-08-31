@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Dark counterpart of values/colors.xml's window_background, see that file's
+         comment. Matches DarkExpressive.surface in Theme.kt. -->
+    <color name="window_background">#111318</color>
+</resources>

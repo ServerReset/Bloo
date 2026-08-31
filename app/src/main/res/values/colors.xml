@@ -1,4 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <color name="ic_launcher_background">#0B5FFF</color>
+
+    <!-- Matches LightExpressive.surface / DarkExpressive.surface in Theme.kt (this
+         file's own values-night variant carries the dark counterpart). Used only as
+         the Activity window's background, see themes.xml for why. -->
+    <color name="window_background">#FAF8FF</color>
 </resources>
