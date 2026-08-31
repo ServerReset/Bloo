@@ -40,6 +40,10 @@ jobs:
       - name: Build debug APK
         run: ./gradlew assembleDebug --stacktrace
 
+      - name: DIAGNOSTIC - dump merged manifest androidx.startup initializers
+        run: |
+          find app/build -iname "AndroidManifest.xml" -path "*merged*" -exec echo "=== {} ===" \; -exec grep -A2 "androidx.startup\|InitializationProvider\|meta-data" {} \;
+
       - name: Run unit tests
         run: ./gradlew testDebugUnitTest --stacktrace
 
