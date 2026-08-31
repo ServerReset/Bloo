@@ -110,15 +110,24 @@
             android:exported="true"
             android:permission="android.permission.INTERACT_ACROSS_USERS_FULL" />
 
-        <!-- Disables androidx.work's automatic self-initialization. That default path is
-             an androidx.startup.InitializationProvider entry (WorkManagerInitializer) that
-             Android instantiates as a ContentProvider during process attach, synchronously
-             on the MAIN thread, before Application.onCreate() and therefore before every
-             deliberately-off-main-thread WorkManager scheduling call in MainActivity. It opens
-             WorkManager's own Room database and stands up its executors right there on the
-             critical path to first frame. WorkManagerInit (see that class) now does the same
-             init call on demand instead, from whichever call site needs a WorkManager first,
-             see its doc for why every "get a WorkManager" call in this app must go through it. -->
+        <!-- Disables two androidx.startup auto-initializers that otherwise run as a
+             ContentProvider's onCreate(), synchronously on the MAIN thread, during process
+             attach, before Application.onCreate() and therefore before every deliberately
+             off-main-thread scheduling call in MainActivity.
+
+             WorkManagerInitializer opens WorkManager's own Room database and stands up its
+             executors right there on the critical path to first frame. WorkManagerInit (see
+             that class) now does the same init call on demand instead, from whichever call
+             site needs a WorkManager first, see its doc for why every "get a WorkManager"
+             call in this app must go through it.
+
+             EmojiCompatInitializer sets up EmojiCompat's font-fallback machinery for legacy
+             View-based text rendering (AppCompatTextView / EmojiTextView, or an explicit
+             EmojiCompat.get().process() call). This app has neither: it is Compose-only for
+             its own UI, has no androidx.appcompat dependency, and never references
+             EmojiCompat anywhere in its source. Compose's own text rendering does not consult
+             the EmojiCompat singleton at all, so this initializer's work was pure overhead on
+             every cold start for a mechanism nothing in the app ever uses. -->
         <provider
             android:name="androidx.startup.InitializationProvider"
             android:authorities="${applicationId}.androidx-startup"
@@ -126,6 +135,10 @@
             tools:node="merge">
             <meta-data
                 android:name="androidx.work.WorkManagerInitializer"
+                android:value="androidx.startup"
+                tools:node="remove" />
+            <meta-data
+                android:name="androidx.emoji2.text.EmojiCompatInitializer"
                 android:value="androidx.startup"
                 tools:node="remove" />
         </provider>
