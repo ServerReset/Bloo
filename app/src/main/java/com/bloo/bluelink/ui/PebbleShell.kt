@@ -1070,7 +1070,13 @@ internal fun SplitExpandButton(
         }
     }
 
-    Row(
+    // ExpressiveButtonGroup, not a plain Row: these two halves are the app's clearest case of
+    // buttons that should physically shove each other on press (they are a single connected
+    // pill), and the group is what makes that safe -- it redistributes width BETWEEN the halves
+    // so its own outer size never changes, which matters because this header also renders inside
+    // Settings' LazyVerticalStaggeredGrid items, where a size change during scroll crashes the
+    // grid. See ExpressiveButtons.kt for the full why.
+    ExpressiveButtonGroup(
         modifier = Modifier
             // A fixed 52dp target (the old content-driven ~40dp pill read as
             // undersized next to the 76dp header it sits in -- reported from
@@ -1081,12 +1087,12 @@ internal fun SplitExpandButton(
             // Real measured height, so the 10dp corner percent above lands on
             // the right radius -- see that val's own doc.
             .onSizeChanged { rowHeightDp = with(density) { it.height.toDp() } },
-        horizontalArrangement = Arrangement.spacedBy(3.dp),
+        spacing = 3.dp,
         verticalAlignment = Alignment.CenterVertically,
     ) {
         // Left half — the action (label + icon) button with expansion animation.
         val actionSource = remember { MutableInteractionSource() }
-        SafeExpansiveButton(
+        GroupButton(
             interactionSource = actionSource,
             enabled = action.enabled && !action.pending,
         ) {
@@ -1166,7 +1172,7 @@ internal fun SplitExpandButton(
         // Hidden if canToggle is false (single-setting pebbles in simple mode).
         if (canToggle) {
             val chevronSource = remember { MutableInteractionSource() }
-            SafeExpansiveButton(
+            GroupButton(
                 interactionSource = chevronSource,
                 enabled = true,
             ) {

@@ -39,6 +39,7 @@ import androidx.compose.ui.semantics.onLongClick
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -139,7 +140,6 @@ fun PagerDots(
     // the instant alpha snap, so dots gracefully bounce/fade out when the name
     // flies in, and bounce back in when it flies out.
     val collisionAlpha = remember { Animatable(1f) }
-    var isColliding by remember { mutableStateOf(false) }
     // This control's own natural on-screen bounds, captured once per layout
     // pass via onGloballyPositioned below -- NOT affected by the hide
     // graphicsLayer{} this function applies to itself, because
@@ -187,19 +187,32 @@ fun PagerDots(
 
     // Smooth animated collision dodge: when the floating name pill flies in or
     // out, animate the dots' alpha to hide/show instead of snapping instantly.
-    // Uses a spring with moderate bounce for natural-feeling motion.
-    LaunchedEffect(nameBoundsPx?.value, selfBoundsPx.value) {
-        val nowColliding = dotsOverlapsName(selfBoundsPx.value, nameBoundsPx?.value, collisionMarginPx)
-        if (nowColliding != isColliding) {
-            isColliding = nowColliding
-            collisionAlpha.animateTo(
-                targetValue = if (nowColliding) 0f else 1f,
-                animationSpec = spring(
-                    dampingRatio = 0.6f,
-                    stiffness = Spring.StiffnessMedium,
-                ),
-            )
+    //
+    // The collision test is DERIVED, and the animation effect is keyed on that
+    // derived boolean -- not on the raw bounds. Keying the effect on the bounds
+    // themselves (which is what this did) restarted it on EVERY frame the name
+    // moved, and a restarted LaunchedEffect cancels the coroutine it was
+    // running: the very first colliding frame set the flag and started
+    // animateTo, the next frame cancelled it mid-flight, and from then on the
+    // "did the flag change" guard matched, so the cancelled animation was never
+    // restarted. The dots froze at whatever alpha that one cancelled frame had
+    // reached and simply never finished hiding -- the floating name sitting on
+    // top of still-visible dots. Deriving the boolean also keeps the promise
+    // nameBoundsPx' own doc makes: derivedStateOf only notifies when the RESULT
+    // flips, so a moving name no longer invalidates this composable every frame.
+    val colliding by remember(collisionMarginPx) {
+        derivedStateOf {
+            dotsOverlapsName(selfBoundsPx.value, nameBoundsPx?.value, collisionMarginPx)
         }
+    }
+    LaunchedEffect(colliding) {
+        collisionAlpha.animateTo(
+            targetValue = if (colliding) 0f else 1f,
+            animationSpec = spring(
+                dampingRatio = 0.6f,
+                stiffness = Spring.StiffnessMedium,
+            ),
+        )
     }
 
     Box(

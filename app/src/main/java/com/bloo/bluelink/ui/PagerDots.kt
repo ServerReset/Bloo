@@ -623,27 +623,6 @@ internal fun VerticalPagerDots(
  *  sitting behind the "Updated x ago" text. */
 internal val PagerDotClearance = 40.dp
 
-/** Whether the centered page-dot indicator currently overlaps a colliding
- *  car name -- a plain rect-overlap test against [name]'s live measured
- *  bounds (not a guessed width), padded by [marginPx] so a name ellipsizing
- *  right up against the dots' edge still counts. Pure/non-composable so
- *  it's cheap to call every frame from inside a `graphicsLayer{}` draw
- *  block (see [PagerDots]' own call site) without touching composition.
- *  `null` [dots] (no layout pass yet) or [name] (nothing flying/docked on
- *  this screen) both mean "nothing to hide against."
- */
-private fun dotsOverlapsName(dots: Rect?, name: Rect?, marginPx: Float): Boolean {
-    if (dots == null || name == null) return false
-    // Vertical gate first -- the hero-card inline name usually sits well
-    // below the dots' fixed top row (only a DOCKED pill, or one mid-flight
-    // toward it, climbs high enough to matter), so most frames bail out
-    // here without ever reaching the horizontal check below.
-    if (name.bottom < dots.top || name.top > dots.bottom) return false
-    val paddedLeft = name.left - marginPx
-    val paddedRight = name.right + marginPx
-    return paddedRight >= dots.left && paddedLeft <= dots.right
-}
-
 @Composable
 internal fun PagerDotsFor(
     pager: PagerState,
