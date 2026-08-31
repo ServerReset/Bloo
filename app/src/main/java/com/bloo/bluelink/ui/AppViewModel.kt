@@ -37,16 +37,11 @@ import com.bloo.bluelink.data.ReservChargeInfos
 import com.bloo.bluelink.data.TargetSOC
 import com.bloo.bluelink.data.STALE_STATUS_MS
 import com.bloo.bluelink.data.StatusCache
-import com.bloo.bluelink.data.percentFor
-import com.bloo.bluelink.data.rangeMiFor
 import com.bloo.bluelink.data.toGeoLocation
-import com.bloo.bluelink.data.DEFAULT_SECTIONS
-import com.bloo.bluelink.data.EvTrip
 import com.bloo.bluelink.data.GeoLocation
 import com.bloo.bluelink.data.Powertrain
 import com.bloo.bluelink.data.VehiclePlatform
 import com.bloo.bluelink.data.isGen5W
-import com.bloo.bluelink.data.platformOverridable
 import com.bloo.bluelink.data.brand
 import com.bloo.bluelink.data.SeatConfig
 import com.bloo.bluelink.data.SessionStore
@@ -56,9 +51,7 @@ import com.bloo.bluelink.data.toClimateSync
 import com.bloo.bluelink.data.Vehicle
 import com.bloo.bluelink.data.VehicleSnapshot
 import com.bloo.bluelink.data.VehicleStatus
-import com.bloo.bluelink.data.displayChargeLimit
 import com.bloo.bluelink.data.Weather
-import com.bloo.bluelink.data.WeatherApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -75,7 +68,6 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
-import java.util.Locale
 
 
 /**
