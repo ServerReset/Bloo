@@ -150,10 +150,27 @@ class FloatingRegistry {
      * things that merely come close still count as colliding -- a name ellipsizing right up
      * against the dots reads as a collision long before the rectangles actually intersect.
      */
-    fun collidesWithOthers(self: FloatingId, rect: Rect?, marginPx: Float): Boolean {
+    fun collidesWithOthers(
+        self: FloatingId,
+        rect: Rect?,
+        marginPx: Float,
+        /**
+         * Which ids are worth yielding to. Null means every other floater.
+         *
+         * Naming them matters because "collides with anything registered" quietly grants every
+         * new floater the power to hide an existing one. The search bubble is the sharp case:
+         * on a cover screen a person can drag it and park it anywhere along an edge, so parking
+         * it at the top permanently faded the page dots, with nothing on screen to connect the
+         * cause to the effect. Dodging is for chrome that arrives over you on its own -- the
+         * flying car name -- not for something the user deliberately put there.
+         */
+        avoid: Set<FloatingId>? = null,
+    ): Boolean {
         if (rect == null) return false
         bounds.forEach { (id, other) ->
-            if (id != self && overlaps(rect, other, marginPx)) return true
+            if (id == self) return@forEach
+            if (avoid != null && id !in avoid) return@forEach
+            if (overlaps(rect, other, marginPx)) return true
         }
         return false
     }
@@ -247,6 +264,8 @@ fun Modifier.floatingElement(id: FloatingId, active: Boolean = true): Modifier =
  */
 fun Modifier.dodgeFloating(
     self: FloatingId,
+    /** Which floaters to yield to; null means all of them. See [FloatingRegistry.collidesWithOthers]. */
+    avoid: Set<FloatingId>? = null,
     margin: Dp = 8.dp,
     dampingRatio: Float = 0.6f,
     stiffness: Float = Spring.StiffnessMedium,
@@ -254,8 +273,8 @@ fun Modifier.dodgeFloating(
     val registry = LocalFloatingRegistry.current
     val marginPx = with(LocalDensity.current) { margin.toPx() }
     val alpha = remember { Animatable(1f) }
-    val colliding by remember(registry, self, marginPx) {
-        derivedStateOf { registry.collidesWithOthers(self, registry.boundsOf(self), marginPx) }
+    val colliding by remember(registry, self, marginPx, avoid) {
+        derivedStateOf { registry.collidesWithOthers(self, registry.boundsOf(self), marginPx, avoid) }
     }
     LaunchedEffect(colliding) {
         alpha.animateTo(

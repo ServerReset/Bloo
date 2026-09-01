@@ -323,7 +323,11 @@ internal fun PagerDotsFor(
         count = count,
         modifier = modifier
             .then(if (registerBounds) Modifier.floatingElement(FloatingIds.PagerDots) else Modifier)
-            .dodgeFloating(FloatingIds.PagerDots),
+            // The car name, and only the car name. That is what this dodge was built for, and
+            // an unfiltered "anything registered" test means every floater added later silently
+            // gains the ability to hide these -- the draggable search bubble most of all, which
+            // a person can park directly on top of them.
+            .dodgeFloating(FloatingIds.PagerDots, avoid = setOf(FloatingIds.Title)),
         onRefresh = onRefresh,
         haptics = haptics?.let { { it.tick() } },
         colors = colors,

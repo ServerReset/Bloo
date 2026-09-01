@@ -888,7 +888,15 @@ internal fun BoxScope.TitleFlightOverlay(
             // mid-spring INTO the corner -- competing with the spring's own
             // work on the UI thread for exactly the surface whose transition
             // needs to stay smooth, which read as a stutter rather than a glide.
-            .floatingElement(FloatingIds.Title, active = active),
+            //
+            // AND visible. The alpha above goes to 0 in the one window where neither anchor
+            // has reported yet, and an invisible badge that still publishes its bounds pushes
+            // the dots out of the way of nothing -- the dots fade for a name that is not on
+            // screen. Same expression as the alpha, so the two cannot disagree.
+            .floatingElement(
+                FloatingIds.Title,
+                active = active && !(flight.inlinePos.value == null && dockedAnchor.value == null),
+            ),
     ) {
         // Read HERE, inside TitleFlightOverlay's own (small) recompose scope
         // -- not by the caller, as a call-site argument expression, which is
