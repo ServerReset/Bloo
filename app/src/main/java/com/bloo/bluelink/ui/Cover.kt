@@ -16,7 +16,6 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
-import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
@@ -27,7 +26,6 @@ import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -377,23 +375,35 @@ internal fun CoverTile(
                     overflow = TextOverflow.Ellipsis,
                 )
             }
-            // BoxWithConstraints captures the real available height, undisturbed
-            // by verticalScroll one level in, so heightIn(min = ...) can force
-            // the scrolling Column to at least that tall -- which is what makes
-            // a short body centre in the band instead of collapsing to its top
-            // with dead space underneath, while a tall one still scrolls.
+            // A scrolling Box that CENTERS its content, rather than a BoxWithConstraints whose
+            // only job was to read maxHeight and feed it back as heightIn(min = ...).
+            //
+            // Both centre a short body instead of letting it collapse to the top, and both let a
+            // tall one scroll -- but BoxWithConstraints is a SubcomposeLayout, and this one sat
+            // inside every cover tile. The cover pager keeps neighbouring pages composed, and
+            // each page has its own tile pager doing the same, so that was a handful of live
+            // subcompositions at once on the weakest display in the app, to obtain a number the
+            // layout already knows.
+            //
+            // weight(1f) is what makes the plain Box work: it fixes this Box's height to the
+            // band, so its own size is the viewport no matter how short the content is, and
+            // contentAlignment can centre against it. The scroll then only engages once the
+            // content is taller than that.
             val scroll = scrollState ?: rememberScrollState()
-            BoxWithConstraints(Modifier.weight(1f).fillMaxWidth()) {
-                val minHeight = maxHeight
-                CompositionLocalProvider(LocalCoverTileTitled provides true) {
+            CompositionLocalProvider(LocalCoverTileTitled provides true) {
+                Box(
+                    Modifier
+                        .weight(1f)
+                        .fillMaxWidth()
+                        .fadingEdges(scroll)
+                        .verticalScroll(scroll),
+                    contentAlignment = Alignment.Center,
+                ) {
                     Column(
                         Modifier
                             .fillMaxWidth()
-                            .fadingEdges(scroll)
-                            .verticalScroll(scroll)
-                            .heightIn(min = minHeight)
                             .padding(vertical = coverBodyPad()),
-                        verticalArrangement = Arrangement.spacedBy(coverBodyGap(), Alignment.CenterVertically),
+                        verticalArrangement = Arrangement.spacedBy(coverBodyGap()),
                         content = body,
                     )
                 }

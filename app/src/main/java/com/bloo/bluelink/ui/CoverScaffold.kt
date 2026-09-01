@@ -88,9 +88,26 @@ internal fun cutoutClearanceDp(): EdgeDp {
     val view = LocalView.current
     val density = LocalDensity.current
     if (Build.VERSION.SDK_INT < Build.VERSION_CODES.P) return EdgeDp(0f, 0f, 0f, 0f)
-    val cutout = view.rootWindowInsets?.displayCutout ?: return EdgeDp(0f, 0f, 0f, 0f)
+    val insets = view.rootWindowInsets
     val vw = view.width
     val vh = view.height
+    // Remembered on everything it reads. This walks the cutout's bounding rects and does float
+    // work per rect, and it used to do all of it on EVERY recomposition of whoever called it --
+    // for a value that changes only when the window's insets or size actually change. The insets
+    // object is the key rather than a flag, so a genuine change (rotation, cutout mode, a fold)
+    // still recomputes, while the far commoner "something else recomposed" costs a map lookup.
+    return remember(insets, vw, vh, density.density) {
+        cutoutClearance(insets?.displayCutout, vw, vh, density)
+    }
+}
+
+private fun cutoutClearance(
+    cutout: android.view.DisplayCutout?,
+    vw: Int,
+    vh: Int,
+    density: Density,
+): EdgeDp {
+    if (cutout == null) return EdgeDp(0f, 0f, 0f, 0f)
     if (vw <= 0 || vh <= 0) return EdgeDp(0f, 0f, 0f, 0f)
     val edgeBandPx = with(density) { 24.dp.toPx() }
     val margin = with(density) { 8.dp.toPx() }
@@ -183,9 +200,24 @@ internal fun coverCutoutBand(): CoverBand? {
     val view = LocalView.current
     val density = LocalDensity.current
     if (Build.VERSION.SDK_INT < Build.VERSION_CODES.P) return null
-    val cutout = view.rootWindowInsets?.displayCutout ?: return null
+    val insets = view.rootWindowInsets
     val vw = view.width
     val vh = view.height
+    // Remembered for the same reason as cutoutClearanceDp above, and it matters more here: one
+    // of this function's callers is the search layer, which recomposes on every keystroke and
+    // on every frame of a bubble drag.
+    return remember(insets, vw, vh, density.density) {
+        coverBand(insets?.displayCutout, vw, vh, density)
+    }
+}
+
+private fun coverBand(
+    cutout: android.view.DisplayCutout?,
+    vw: Int,
+    vh: Int,
+    density: Density,
+): CoverBand? {
+    if (cutout == null) return null
     if (vw <= 0 || vh <= 0) return null
     val edgeBandPx = with(density) { 24.dp.toPx() }
     var best: CoverBand? = null
