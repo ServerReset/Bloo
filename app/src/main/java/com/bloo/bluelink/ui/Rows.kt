@@ -106,6 +106,7 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardCapitalization
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import com.bloo.uicommon.dropShadow
@@ -438,10 +439,19 @@ fun ToggleRow(
  * explains, and the gap that matters is the one before the NEXT control.
  */
 @Composable
-internal fun SettingsCaption(text: String, modifier: Modifier = Modifier) {
+internal fun SettingsCaption(
+    text: String,
+    modifier: Modifier = Modifier,
+    /**
+     * The gap below. The default is the group gap, because a caption normally trails the
+     * control it explains and what matters is the distance to the NEXT one. Pass a smaller one
+     * where the caption instead LEADS its own control, so the two read as a pair.
+     */
+    bottomGap: Dp = SettingsGapGroup,
+) {
     Text(
         text,
-        modifier = modifier.padding(top = 2.dp, bottom = SettingsGapGroup),
+        modifier = modifier.padding(top = 2.dp, bottom = bottomGap),
         style = MaterialTheme.typography.labelSmall,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
     )

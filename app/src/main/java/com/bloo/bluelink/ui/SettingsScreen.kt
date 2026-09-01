@@ -95,6 +95,7 @@ import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material.icons.filled.WbSunny
 import androidx.compose.material.icons.filled.MyLocation
 import androidx.compose.ui.semantics.Role
@@ -1308,32 +1309,37 @@ internal fun SettingsScreen(
                     // Android version this app supports.
                     run {
                         val ctx = LocalContext.current
+                        // Real buttons, not clickable labels. These three were bare lines of
+                        // small text whose only affordance was the words "Tap to fix" -- the
+                        // one place in Settings where something important to press did not
+                        // look pressable, and an 8dp-tall target when it was.
                         if (!LiveCharge.isBackgroundUnrestricted(ctx)) {
-                            Text(
-                                "Not starting when charging begins? Tap to fix",
-                                style = MaterialTheme.typography.labelSmall,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier
-                                    .clickable { LiveCharge.requestBackgroundUnrestricted(ctx) }
-                                    .padding(vertical = 4.dp)
-                                    .padding(bottom = 4.dp),
+                            // The question is a caption and the action is a button, rather
+                            // than one long sentence inside the button: a standard button label
+                            // is one line that never wraps (see MorphButtonLabel), and "Not
+                            // starting when charging begins? Tap to fix" does not fit one
+                            // inside a Settings card.
+                            SettingsCaption("Not starting when charging begins?", bottomGap = SettingsGapHairline)
+                            MorphTextButton(
+                                text = "Allow background",
+                                onClick = { LiveCharge.requestBackgroundUnrestricted(ctx) },
+                                contentColor = MaterialTheme.colorScheme.primary,
+                                icon = Icons.Filled.Warning,
                             )
+                            Spacer(Modifier.height(SettingsGapRow))
                         }
                     }
                     if (Build.VERSION.SDK_INT >= 36) {
                         val ctx = LocalContext.current
                         if (!LiveCharge.isPromotable(ctx)) {
-                            Text(
-                                "Not showing in the status bar? Tap to fix",
-                                style = MaterialTheme.typography.labelSmall,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier
-                                    .clickable { LiveCharge.openLiveUpdateSettings(ctx) }
-                                    .padding(vertical = 4.dp)
-                                    .padding(bottom = 4.dp),
+                            SettingsCaption("Not showing in the status bar?", bottomGap = SettingsGapHairline)
+                            MorphTextButton(
+                                text = "Open live update settings",
+                                onClick = { LiveCharge.openLiveUpdateSettings(ctx) },
+                                contentColor = MaterialTheme.colorScheme.primary,
+                                icon = Icons.Filled.Warning,
                             )
+                            Spacer(Modifier.height(SettingsGapRow))
                         }
                     }
                     // Still shown even when isPromotable is already true: that check only
@@ -1341,15 +1347,12 @@ internal fun SettingsScreen(
                     // LiveUpdateTroubleshootDialog) gates the chip behind a second switch that
                     // permission can't see -- confirmed on a real device this app had no way
                     // to detect from here.
-                    Text(
-                        "Live update not showing up? Troubleshooting steps",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier
-                            .clickable { showTroubleshoot = true }
-                            .padding(vertical = 4.dp)
-                            .padding(bottom = 6.dp),
+                    MorphTextButton(
+                        text = "Troubleshooting steps",
+                        onClick = { showTroubleshoot = true },
+                        icon = Icons.Filled.Info,
                     )
+                    Spacer(Modifier.height(SettingsGapRow))
                     if (showTroubleshoot) {
                         LiveUpdateTroubleshootDialog(onDismiss = { showTroubleshoot = false })
                     }
