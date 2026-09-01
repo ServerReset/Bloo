@@ -123,7 +123,39 @@ internal const val COVER_TINY_DP = 300f
  * proportionally more room than the same inset costs a larger cover.
  */
 @Composable
-internal fun coverContentInset(): Dp = if (LocalCoverMetrics.current?.isTiny == true) 12.dp else 16.dp
+internal fun coverContentInset(): Dp = if (coverIsTiny()) 10.dp else 12.dp
+
+/** True when the measured cover region is small enough to warrant the tighter of each pair
+ *  below. Reads [LocalCoverMetrics], so it is the real region and not a guess from the config. */
+@Composable
+internal fun coverIsTiny(): Boolean = LocalCoverMetrics.current?.isTiny == true
+
+/**
+ * The cover tile's own spacing, as three named steps instead of the literals that had settled in
+ * (a 14dp gap above the title, 10dp of vertical padding inside the scrolling body, 10dp between
+ * its children and another 14dp below).
+ *
+ * Those totalled ~48dp of pure padding before a single glyph, on a screen whose usable height is
+ * frequently under 300 -- roughly a sixth of the tile spent on air. Phone-sized gaps do not
+ * transfer to a one-inch display: the same 14dp that reads as comfortable on a 6" screen is a
+ * visible chunk of a cover tile. Each step is tighter here and tighter again when the region is
+ * genuinely tiny, which buys back about 20dp of vertical room -- a whole extra line of body text
+ * on most tiles -- without any gap collapsing to nothing.
+ *
+ * Touch targets are deliberately NOT in here and are not shrunk: the cover is operated by a thumb
+ * on a small square, which is why the action bar and the grouped buttons are already LARGER here
+ * than on the phone. Compactness comes out of padding, never out of what you have to hit.
+ */
+@Composable
+internal fun coverTileEdgeGap(): Dp = if (coverIsTiny()) 8.dp else 10.dp
+
+/** Vertical padding inside the tile's scrolling body. */
+@Composable
+internal fun coverBodyPad(): Dp = if (coverIsTiny()) 4.dp else 6.dp
+
+/** Gap between the body's own children. */
+@Composable
+internal fun coverBodyGap(): Dp = if (coverIsTiny()) 6.dp else 8.dp
 
 /** True inside a [CoverTile]'s body, i.e. below a title band that already
  *  shows the page's icon and name. [CoverHero] reads it to avoid drawing that
@@ -270,7 +302,7 @@ internal fun CoverTile(
       Box(Modifier.fillMaxSize()) {
         background?.invoke(this)
         Column(Modifier.fillMaxSize().padding(horizontal = coverContentInset())) {
-            Spacer(Modifier.height(14.dp))
+            Spacer(Modifier.height(coverTileEdgeGap()))
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -324,20 +356,20 @@ internal fun CoverTile(
                             .fadingEdges(scroll)
                             .verticalScroll(scroll)
                             .heightIn(min = minHeight)
-                            .padding(vertical = 10.dp),
-                        verticalArrangement = Arrangement.spacedBy(10.dp, Alignment.CenterVertically),
+                            .padding(vertical = coverBodyPad()),
+                        verticalArrangement = Arrangement.spacedBy(coverBodyGap(), Alignment.CenterVertically),
                         content = body,
                     )
                 }
             }
             if (actions != null) {
                 Row(
-                    Modifier.fillMaxWidth().padding(bottom = 14.dp),
+                    Modifier.fillMaxWidth().padding(bottom = coverTileEdgeGap()),
                     horizontalArrangement = Arrangement.spacedBy(6.dp),
                     content = actions,
                 )
             } else {
-                Spacer(Modifier.height(14.dp))
+                Spacer(Modifier.height(coverTileEdgeGap()))
             }
         }
       }

@@ -15,7 +15,6 @@ package com.bloo.bluelink.ui
 
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
@@ -59,6 +58,7 @@ import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -211,11 +211,14 @@ internal fun CompactGarage(state: UiState, vm: AppViewModel, appearance: Setting
     // Held as State, not read via `by` — see the same treatment in GarageScreen.
     // Read in composition scope this fade recomposed the whole cover pager (and,
     // as a plain Float parameter, every CompactCar page) once per animation frame.
-    val dotsAlphaState = animateFloatAsState(
-        targetValue = if (state.refreshing) 0f else 1f,
-        animationSpec = tween(durationMillis = 250),
-        label = "coverDotsFade",
-    )
+    // Published to the shared floating registry rather than animated here. This was the THIRD
+    // hand-rolled copy of "fade the chrome while a refresh runs" -- GarageScreen had two of its
+    // own before they moved -- and keeping it local is what forced it to be threaded down into
+    // CompactCar as a parameter just so one dot row could read it. Modifier.floatingOverlay owns
+    // the spring now; this screen publishes the target and nothing recomposes per frame.
+    val coverFloatingRegistry = LocalFloatingRegistry.current
+    val coverChromeHidden = state.refreshing
+    SideEffect { coverFloatingRegistry.chromeHidden = coverChromeHidden }
     Box(Modifier.fillMaxSize()) {
         // Which cover tile is showing. The home tile titles ITSELF with the
         // car's name (see CoverMainTile), so the shared overlay saying it too
@@ -244,7 +247,7 @@ internal fun CompactGarage(state: UiState, vm: AppViewModel, appearance: Setting
                     vibrancy = appearance.vibrancy,
                 ) {
                     CompositionLocalProvider(LocalCoverScrubbing provides scrubbing) {
-                        CompactCar(v, state, vm, dotsAlphaState, onTileChange = { visibleTile = it })
+                        CompactCar(v, state, vm, onTileChange = { visibleTile = it })
                     }
                 }
             }
@@ -276,7 +279,9 @@ internal fun CompactGarage(state: UiState, vm: AppViewModel, appearance: Setting
                 .align(Alignment.TopCenter)
                 .statusBarsPadding()
                 .padding(top = HeaderCornerGap, start = HeaderCornerGap, end = HeaderCornerGap)
-                .graphicsLayer { alpha = dotsAlphaState.value },
+                // shift = false: the cover has no pull-to-refresh shift of its own -- its refresh
+                // is the edge-trace gesture -- so only the fade applies here.
+                .floatingOverlay(FloatingIds.Title, shift = false),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             // Skipped when the camera band is showing the name instead -- see
@@ -301,7 +306,7 @@ internal fun CompactGarage(state: UiState, vm: AppViewModel, appearance: Setting
                 )
             }
             if (count > 1 && !LocalReorderActive.current) {
-                Spacer(Modifier.height(6.dp))
+                Spacer(Modifier.height(4.dp))
                 PagerDotsFor(
                     pager = pager,
                     real = { realCar(it) },
@@ -408,10 +413,6 @@ internal fun CompactCar(
     v: Vehicle,
     state: UiState,
     vm: AppViewModel,
-    // State, not Float: a plain Float parameter changes on every frame of the
-    // dots fade, which made this whole page recompose ~15 times per fade. As
-    // State the value is read draw-phase only (see its graphicsLayer use below).
-    dotsAlphaState: androidx.compose.runtime.State<Float>,
     /** Which tile is centred, reported up so the shared top overlay knows
      *  whether the page below it is already showing the car's name. */
     onTileChange: (String) -> Unit = {},
@@ -708,8 +709,8 @@ internal fun CompactCar(
                     // bump. Native displayCutout (End side only) floats it inboard;
                     // it's a no-op when the cutout doesn't touch the right edge.
                     .windowInsetsPadding(WindowInsets.displayCutout.only(WindowInsetsSides.End))
-                    .padding(end = 6.dp)
-                    .graphicsLayer { alpha = dotsAlphaState.value }
+                    .padding(end = 4.dp)
+                    .floatingOverlay(FloatingIds.TileRail, shift = false)
                     .onGloballyPositioned { dotsBounds = it.boundsInParent() },
             )
         }

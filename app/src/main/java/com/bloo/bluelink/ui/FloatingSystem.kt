@@ -76,6 +76,10 @@ object FloatingIds {
     val Search = FloatingId("search")
     /** The pull-to-refresh spinner, which takes the page dots' place while a refresh runs. */
     val RefreshIndicator = FloatingId("refreshIndicator")
+    /** The cover screen's right-edge tile scrubber. Its own id, not the page dots': it is a
+     *  different control in a different place, and sharing an id would have two elements
+     *  overwriting each other's bounds. */
+    val TileRail = FloatingId("tileRail")
 }
 
 @Stable
