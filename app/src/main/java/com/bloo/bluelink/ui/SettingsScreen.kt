@@ -544,7 +544,7 @@ internal fun SettingsScreen(
                 )
             }
             }
-            // Gates the ITEM for the same reason the AI card above does: with no cars yet
+            // Gates the ITEM for the same reason the AI card does: with no cars yet
             // (fresh install, before the first sign-in) this composed nothing but still held a
             // slot and a gap open at the top of Settings.
             if (state.vehicles.isNotEmpty()) item {
@@ -634,7 +634,10 @@ internal fun SettingsScreen(
                         },
                     )
                     Spacer(Modifier.height(SettingsGapGroup))
-                    ToggleRow("On-device AI (Gemini Nano)", state.aiEnabled) { vm.setAiEnabled(it) }
+                    // Names the ENGINE. The card is titled "AI" and the header right above
+                    // says "On-device AI" with its own on/off status, so a third "On-device
+                    // AI" here said the same thing a third time and told you nothing new.
+                    ToggleRow("Gemini Nano", state.aiEnabled) { vm.setAiEnabled(it) }
                     Text(
                         "Adds an AI summary pebble to each car and lets you ask the search " +
                             "box plain questions like \"what's the odometer\". Everything runs " +
@@ -668,12 +671,12 @@ internal fun SettingsScreen(
 
             // Announcements -- currently sourced from the one real signal this
             // app has for it (an available build, same state.updateAvailable
-            // the Updates card above renders) rather than a synthetic feed.
+            // the Updates card renders) rather than a synthetic feed.
             // AnnouncementHistory's LazyColumn needs an explicit height cap:
             // it's placed inside this screen's own LazyVerticalStaggeredGrid
             // item{}, an unbounded-height vertical container, and a nested
             // LazyColumn with no height constraint crashes there (same class
-            // of bug the Logs card's heightIn(max = 300.dp) above guards
+            // of bug the Logs card's heightIn(max = 300.dp) guards
             // against, just via Modifier.verticalScroll there instead of a
             // second lazy layout).
             AnimatedVisibility(visibleState = rememberAppearedState(), enter = collapseEnter(), exit = collapseExit()) {
@@ -1030,11 +1033,9 @@ internal fun SettingsScreen(
             }
             if (advVisible[2]) item {
 
-            // Debug -- app/device diagnostics for support troubleshooting.
-            // Placed right after Logs, both power-user diagnostic cards --
-            // shares this screen's stagger sequence (index 7, the next
-            // unused slot) rather than reusing Logs' index 3, since the two
-            // cards animate independently.
+            // Debug -- app/device diagnostics for support troubleshooting. A power-user
+            // diagnostic card like Logs, and it takes its OWN slot in this screen's stagger
+            // sequence rather than sharing Logs': the two animate independently.
             AnimatedVisibility(visibleState = rememberAppearedState(), enter = collapseEnter(), exit = collapseExit()) {
             SettingsCard("Debug", Icons.Filled.BugReport, vm) {
                 DebugSettingsPanel(
@@ -1889,7 +1890,9 @@ internal fun SettingsScreen(
                 // the card is not — so the update controls above always show.
                 if (state.shizukuAvailable) {
                     Spacer(Modifier.height(SettingsGapHairline))
-                    ToggleRow("Install updates seamlessly (Shizuku)", appearance.seamlessInstallShizuku) {
+                    // Not "Install updates seamlessly": the card is already titled
+                    // "Updates", so the word was doing no work in the row beneath it.
+                    ToggleRow("Install seamlessly (Shizuku)", appearance.seamlessInstallShizuku) {
                         vm.setSeamlessInstallShizuku(it)
                     }
                 }
