@@ -403,7 +403,52 @@ internal fun StepRow(label: String, value: String, valueColor: Color = Color.Uns
  * highlight, especially over the AI toggle's already-boxed row.
  */
 @Composable
-fun ToggleRow(label: String, checked: Boolean, onChange: (Boolean) -> Unit) {
+fun ToggleRow(
+    label: String,
+    checked: Boolean,
+    /**
+     * The explanatory line under the switch, if the setting needs one.
+     *
+     * A parameter and not a Text the caller writes itself: Settings had eleven of those,
+     * hand-written at their call sites, and they had drifted -- some carried a 10dp bottom
+     * padding, some none, and the gap above them was whatever the previous control happened
+     * to leave. Owning the caption here means one style and one rhythm for all of them, and
+     * it stays outside the toggleable below so TalkBack still reports the row as a single
+     * switch rather than a switch followed by a paragraph.
+     */
+    description: String? = null,
+    onChange: (Boolean) -> Unit,
+) {
+    // No wrapper at all when there is no caption, so every existing call site keeps exactly
+    // the layout it had -- a Column around a single fillMaxWidth Row measures the same, but
+    // "the same" is not worth asserting across ~25 call sites for a branch that costs nothing.
+    if (description == null) {
+        ToggleRowControl(label, checked, onChange)
+    } else {
+        Column(Modifier.fillMaxWidth()) {
+            ToggleRowControl(label, checked, onChange)
+            SettingsCaption(description)
+        }
+    }
+}
+
+/**
+ * The caption style shared by [ToggleRow]'s own `description` and by the settings rows that
+ * need one without a switch attached. Bottom padding, not top: it belongs to the control it
+ * explains, and the gap that matters is the one before the NEXT control.
+ */
+@Composable
+internal fun SettingsCaption(text: String, modifier: Modifier = Modifier) {
+    Text(
+        text,
+        modifier = modifier.padding(top = 2.dp, bottom = SettingsGapGroup),
+        style = MaterialTheme.typography.labelSmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
+}
+
+@Composable
+private fun ToggleRowControl(label: String, checked: Boolean, onChange: (Boolean) -> Unit) {
     val haptics = LocalHaptics.current
     Row(
         Modifier

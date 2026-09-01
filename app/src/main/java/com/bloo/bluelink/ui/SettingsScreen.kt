@@ -58,6 +58,7 @@ import androidx.compose.foundation.lazy.staggeredgrid.StaggeredGridCells
 import androidx.compose.foundation.lazy.staggeredgrid.StaggeredGridItemSpan
 import androidx.compose.foundation.lazy.staggeredgrid.rememberLazyStaggeredGridState
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
@@ -96,6 +97,7 @@ import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.WbSunny
 import androidx.compose.material.icons.filled.MyLocation
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.onClick
 import androidx.compose.ui.semantics.heading
@@ -111,7 +113,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -1072,15 +1073,13 @@ internal fun SettingsScreen(
                 // every time you open the app, which is the test for whether a
                 // switch belongs in the small set. The text-scale slider above
                 // it is advanced by the same test -- it is a knob you set once.
-                ToggleRow("Search on the car screen", appearance.showSearch) { vm.setShowSearch(it) }
-                Text(
-                    "A search bubble at the bottom of the car screen and the cover screen. " +
+                ToggleRow(
+                    "Search on the car screen",
+                    appearance.showSearch,
+                    description = "A search bubble at the bottom of the car screen and the cover screen. " +
                         "Ask about the car (\"battery level\"), run a command (\"lock my car\"), " +
                         "or jump to a setting. Settings always has it.",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(bottom = 10.dp),
-                )
+                ) { vm.setShowSearch(it) }
                 // SIMPLE, not advanced -- same test as Search above: this changes
                 // how you get to Settings every single time, not a knob set once.
                 //
@@ -1098,7 +1097,13 @@ internal fun SettingsScreen(
                 // from the embedded page opens the standalone route in its place,
                 // back arrow included, before the pager gets a chance to bounce
                 // you to a car instead.
-                ToggleRow("Settings as a swipeable page", appearance.settingsAsPage) { turningOn ->
+                ToggleRow(
+                    "Settings as a swipeable page",
+                    appearance.settingsAsPage,
+                    description = "Reach Settings by swiping past your last car instead of the gear " +
+                        "button -- one continuous pager, with Settings as its own page at " +
+                        "the end instead of a separate screen.",
+                ) { turningOn ->
                     vm.setSettingsAsPage(turningOn)
                     if (turningOn && !embedded) {
                         vm.closeSettings(landOnSettingsPage = true)
@@ -1106,14 +1111,6 @@ internal fun SettingsScreen(
                         vm.openSettings()
                     }
                 }
-                Text(
-                    "Reach Settings by swiping past your last car instead of the gear " +
-                        "button -- one continuous pager, with Settings as its own page at " +
-                        "the end instead of a separate screen.",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(bottom = 10.dp),
-                )
                 // Unit system: controls temperature, distance, and speed display.
                 SettingsSegmentedRow(
                     label = "Units",
@@ -1288,15 +1285,13 @@ internal fun SettingsScreen(
                 // First, not last: every other switch in this card is an
                 // ALERT the user hopes never fires. This is a live surface
                 // they watch on purpose while the car charges.
-                ToggleRow("Live charging updates", notif.charging) { vm.setNotifyCharging(it) }
-                Text(
-                    "A progress bar in the shade and, on Android 16+, in the status bar and " +
+                ToggleRow(
+                    "Live charging updates",
+                    notif.charging,
+                    description = "A progress bar in the shade and, on Android 16+, in the status bar and " +
                         "lock screen while the car charges -- with the charge limit marked and " +
                         "a Stop button.",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(bottom = 6.dp),
-                )
+                ) { vm.setNotifyCharging(it) }
                 // Whether it actually promotes to the status-bar chip is a
                 // system decision this app cannot force -- Android 16+ has a
                 // real API to check the user's per-app toggle for it, though,
@@ -1617,11 +1612,26 @@ internal fun SettingsScreen(
                 "Sounds & vibration",
                 Icons.Filled.Vibration,
                 vm,
+                // MorphToggleTrack inside a toggleable, NOT a stock Material Switch: this was
+                // the one switch in the whole app still drawing Material's own track, sitting
+                // in Settings among a dozen ToggleRows that all draw the spring-timed Morph
+                // one. Same control, visibly different shape and thumb, on the same screen.
                 inlineSetting = {
-                    Switch(
-                        checked = appearance.hapticsEnabled,
-                        onCheckedChange = { vm.setHapticsEnabled(it) },
-                    )
+                    val haptics = LocalHaptics.current
+                    Box(
+                        Modifier.toggleable(
+                            value = appearance.hapticsEnabled,
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = null,
+                            role = Role.Switch,
+                        ) {
+                            val next = !appearance.hapticsEnabled
+                            if (next) haptics?.toggleOn() else haptics?.toggleOff()
+                            vm.setHapticsEnabled(next)
+                        },
+                    ) {
+                        MorphToggleTrack(appearance.hapticsEnabled)
+                    }
                 },
             ) {}
             }

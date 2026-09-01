@@ -176,6 +176,8 @@ fun SettingsSegmentedRow(
     label: String,
     options: List<SegmentOption>,
     selectedKey: String,
+    /** See ToggleRow's own `description` doc -- same caption, same rhythm. */
+    description: String? = null,
     onSelect: (String) -> Unit,
 ) {
     Column(Modifier.fillMaxWidth()) {
@@ -186,6 +188,7 @@ fun SettingsSegmentedRow(
         )
         Spacer(Modifier.height(6.dp))
         MorphSegmented(options = options, selectedKey = selectedKey, onSelect = onSelect)
+        if (description != null) SettingsCaption(description)
     }
 }
 
