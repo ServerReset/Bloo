@@ -424,7 +424,22 @@ class EuApi(private val brand: Brand) {
 
         val evStatus = if (green == null) null else EvStatus(
             batteryStatus = soc,
-            batteryCharge = chargeRemain?.let { it > 0.0 },
+            // TRUE or unknown, never a definite false derived from a time estimate.
+            //
+            // This was `chargeRemain?.let { it > 0.0 }`, which turns a missing or zero
+            // RemainTime into "the car told us it stopped charging". Notifications.LiveCharge.sync
+            // documents that its `charging = false` means exactly that and never "we don't know",
+            // and it acts on it: it cancels the live charging notification, clears the dismissal
+            // flag, and LiveChargePollWorker ends its 5-minute chain. Meanwhile the snapshot
+            // keeps charging = true through `evStatus?.batteryCharge ?: charging`, so the widget
+            // still shows a green ring and TOGGLE_CHARGE resolves to CHARGE_OFF -- three surfaces
+            // disagreeing, all from one parse.
+            //
+            // A remaining-time estimate is evidence of charging when present and positive, and
+            // evidence of nothing at all otherwise: cars stop reporting it near the top of a
+            // charge, and CCS2 payloads omit it entirely. null flows correctly through
+            // VehicleSnapshot.merged's `?:` as "no new information", which is the honest answer.
+            batteryCharge = if (chargeRemain != null && chargeRemain > 0.0) true else null,
             batteryPlugin = plug,
             drvDistance = rangeKm?.kmToMi()?.let { listOf(DrvDistance(RangeByFuel(Dte(it, 3)))) } ?: emptyList(),
             remainTime2 = chargeRemain?.let { RemainTime2(atc = TimeValue(it, 1)) },
