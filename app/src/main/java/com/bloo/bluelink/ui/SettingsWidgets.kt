@@ -113,7 +113,10 @@ fun MorphSegmented(
         indicatorColor = scheme.primary,
         selectedTextColor = scheme.onPrimary,
         unselectedTextColor = scheme.onSurfaceVariant,
-        textStyle = MaterialTheme.typography.labelLarge,
+        // The one button label style. A segmented picker is a row of tappable labels, so it sat
+        // a size below every button beside it -- which is exactly the "different family on the
+        // same card" the standardisation is for.
+        textStyle = ButtonLabelStyle,
         onTick = { haptics?.tick() },
         modifier = modifier,
         trackHeight = trackHeight ?: (if (options.any { it.icon != null }) 48.dp else 44.dp),

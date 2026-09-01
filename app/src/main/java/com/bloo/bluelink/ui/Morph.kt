@@ -84,6 +84,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.composed
@@ -248,13 +249,27 @@ fun MorphTextButton(
         if (glyph != null) {
             MorphButtonLabel(glyph, text, pending = false)
         } else {
-            Text(text, style = ButtonLabelStyle, fontWeight = FontWeight.SemiBold)
+            Text(
+                text,
+                style = ButtonLabelStyle,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 1,
+                softWrap = false,
+                overflow = TextOverflow.Ellipsis,
+            )
         }
     }
 }
 
 /** Every button in the app is this tall, so a row of them lines up whatever it contains. */
 val ButtonTargetHeight = 48.dp
+
+/** The glyph beside a label. One size for push buttons, chips and cover actions alike. */
+val ButtonIconSize = 18.dp
+
+/** The glyph in a button that has NO label -- the expand chevron. Larger on purpose: with no
+ *  word beside it the icon IS the button, and an 18dp glyph in a 48dp target reads as a speck. */
+val ButtonIconOnlySize = 24.dp
 
 /** The one label style every button uses. Bigger and heavier than the ambient body default the
  *  buttons used to inherit, which is what made them read as text that happened to be tappable. */
@@ -383,7 +398,7 @@ fun MorphButtonLabel(
     icon: ImageVector,
     label: String,
     pending: Boolean,
-    iconSize: Dp = 18.dp,
+    iconSize: Dp = ButtonIconSize,
     spinning: Boolean = false,
 ) {
     if (pending) {
@@ -428,7 +443,20 @@ fun MorphButtonLabel(
     // The one button label style, shared with MorphTextButton -- this pair is the reference the
     // rest of the app standardises on, so the size lives in a token rather than being whatever
     // each button happened to inherit.
-    Text(label, style = ButtonLabelStyle, fontWeight = FontWeight.SemiBold)
+    //
+    // softWrap = false is a guarantee, not a nicety: these buttons are squeezed by their
+    // neighbours in a group, and a label that wraps turns a one-line button into a two-line one
+    // mid-press, which shoves the whole row's height around. The group will not squeeze below a
+    // child's intrinsic width, so this should never trigger -- it is the backstop for the case
+    // where a button is narrow for some other reason.
+    Text(
+        label,
+        style = ButtonLabelStyle,
+        fontWeight = FontWeight.SemiBold,
+        maxLines = 1,
+        softWrap = false,
+        overflow = TextOverflow.Ellipsis,
+    )
 }
 
 /**
@@ -446,6 +474,12 @@ fun MorphChip(
 ) {
     val haptics = LocalHaptics.current
     val chipSelected = selected
+    // Wrapped like every other button, so a chip presses the same way: inside an
+    // ExpressiveButtonRow it takes width from its neighbours, and on its own it grows. Chips
+    // were the one tappable control with no press wrapper at all, which is why a row of them
+    // sat still while the buttons above them moved.
+    val chipSource = remember { MutableInteractionSource() }
+    SafeExpansiveButton(interactionSource = chipSource, enabled = true) {
     // The same MorphButton as everywhere: pill when idle, primary fill +
     // rounded box when selected, standard corner-percent animation. The chip's
     // historic 22dp/12dp corners on its ~40dp height are just under the
@@ -453,9 +487,13 @@ fun MorphChip(
     MorphButton(
         onClick = { onClick() },
         onClickHaptic = { haptics?.tick() },
+        interactionSource = chipSource,
         active = selected,
         contentPadding = PaddingValues(horizontal = 16.dp, vertical = 10.dp),
-        minHeight = 0.dp,
+        // Same target height as every other button. A chip was 0-min and so ended up shorter
+        // than the buttons beside it, which is most of why the seat-heat row read as a
+        // different family from the rest of a card.
+        minHeight = ButtonTargetHeight,
         // Same gap MorphSegmented had: a selectable pill with no `selected`
         // semantics reaching TalkBack, which announced every chip identically
         // regardless of which one was actually active. Captured into a
@@ -464,12 +502,16 @@ fun MorphChip(
         // not this composable's `selected` parameter of the same name.
         modifier = modifier.semantics { this.selected = chipSelected },
     ) {
-        if (icon != null) Icon(icon, contentDescription = null, modifier = Modifier.size(16.dp))
+        if (icon != null) Icon(icon, contentDescription = null, modifier = Modifier.size(ButtonIconSize))
         Text(
             label,
-            style = MaterialTheme.typography.labelLarge,
-            fontWeight = if (chipSelected) FontWeight.Bold else FontWeight.Medium,
+            style = ButtonLabelStyle,
+            fontWeight = if (chipSelected) FontWeight.Bold else FontWeight.SemiBold,
+            maxLines = 1,
+            softWrap = false,
+            overflow = TextOverflow.Ellipsis,
         )
+    }
     }
 }
 
@@ -534,7 +576,11 @@ internal fun MorphExpandButton(
             // the next action, this is the current state -- both together instead
             // of only announcing what tapping does. Tap toggles; holding spins the
             // chevron (easter egg) without toggling.
-            modifier = Modifier.size(50.dp).semantics { stateDescription = if (expanded) "Expanded" else "Collapsed" },
+            // ButtonTargetHeight, like everything else tappable -- it was a lone 50dp so it
+            // stood 2dp proud of every button beside it for no reason anyone chose.
+            modifier = Modifier
+                .size(ButtonTargetHeight)
+                .semantics { stateDescription = if (expanded) "Expanded" else "Collapsed" },
         ) {
             Icon(
                 Icons.Filled.KeyboardArrowDown,
@@ -544,7 +590,7 @@ internal fun MorphExpandButton(
                 // Draw-phase read -- see PebbleShell's identical chevron for why
                 // Modifier.rotate() (which takes the angle as an argument, and so reads
                 // the spring in composition) is the wrong tool here.
-                modifier = Modifier.size(24.dp).graphicsLayer {
+                modifier = Modifier.size(ButtonIconOnlySize).graphicsLayer {
                     rotationZ = rotation + easterEggSpin
                 },
             )

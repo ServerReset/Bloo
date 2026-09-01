@@ -262,6 +262,9 @@ fun ExpressiveButtonGroup(
             val press = FloatArray(n) { i ->
                 (measurables[i].parentData as? ExpressiveGroupData)?.pressFraction?.invoke() ?: 0f
             }
+            // Intrinsics are asked against a real height where we have one; Infinity is not a
+            // number a child can reason about.
+            val intrinsicHeight = if (constraints.hasBoundedHeight) constraints.maxHeight else 0
             val resting = press.all { it <= 0.001f }
             val cached = naturals.widths
             // Only MEMBER widths have to be sane: a legitimately zero-width non-member (an
@@ -331,8 +334,22 @@ fun ExpressiveButtonGroup(
                 // spare above their floor. Whichever is smaller is what moves -- so with
                 // nothing to take from (a lone button in the row) NOTHING moves, rather than
                 // the row quietly growing to accommodate it.
+                // What a donor may give up is bounded by its own CONTENT, not just by a
+                // fraction. A fraction alone is why squeezed buttons wrapped their labels onto a
+                // second line: at 28% off, any label wider than about 92dp no longer fits the
+                // padding it had, and Text does the only thing it can. minIntrinsicWidth is the
+                // width below which this child cannot lay out without breaking -- for a row of
+                // icon + label, exactly the point the label would have to wrap -- so a donor
+                // stops there and the pressed button simply grows by less.
+                val floorOf = IntArray(n) { i ->
+                    if (!member[i]) cached[i]
+                    else maxOf(
+                        (cached[i] * MinDonorFraction).roundToInt(),
+                        measurables[i].minIntrinsicWidth(intrinsicHeight),
+                    ).coerceAtMost(cached[i])
+                }
                 val want = growers.sumOf { (cached[it] * ExpressivePressGrowth * press[it]).toDouble() }
-                val capacity = donors.sumOf { (cached[it] * (1f - MinDonorFraction)).toDouble() }
+                val capacity = donors.sumOf { (cached[it] - floorOf[it]).toDouble() }
                 val give = minOf(want, capacity)
 
                 val exact = DoubleArray(n) { cached[it].toDouble() }
@@ -342,7 +359,7 @@ fun ExpressiveButtonGroup(
                         exact[i] = cached[i] + give * share
                     }
                     for (i in donors) {
-                        val share = (cached[i] * (1f - MinDonorFraction)).toDouble() / capacity
+                        val share = (cached[i] - floorOf[i]).toDouble() / capacity
                         exact[i] = cached[i] - give * share
                     }
                 }

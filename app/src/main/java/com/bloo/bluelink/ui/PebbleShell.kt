@@ -652,6 +652,14 @@ internal fun PebbleShell(
                             }
                             headerContent?.invoke()
                         }
+                        // The gap between the header's text column and whatever control ends the
+                        // row. Without it a title-row status ran straight into the chevron --
+                        // "Imperial" and "Atkinson" touching the button beside them, reported
+                        // from a real screenshot. The text column is weighted, so nothing else
+                        // was ever going to introduce this space.
+                        if (!forceExpanded && (headerAction != null || canToggle)) {
+                            Spacer(Modifier.width(10.dp))
+                        }
                         if (!forceExpanded) {
                             if (headerAction != null) {
                                 // Renders the action half regardless; canToggle decides whether

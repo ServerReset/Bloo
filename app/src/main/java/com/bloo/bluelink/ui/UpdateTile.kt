@@ -255,7 +255,9 @@ internal fun UpdateAvailableTile(state: UiState, vm: AppViewModel, dragHandle: M
             // header action, spelled out here so the body reads as one complete
             // flow whether or not the pill is spotted.
             if (!state.updateDownloading && !state.updateInstalling) {
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                // A group: these two share one space, so pressing one takes width from the
+                // other instead of shoving it.
+                ExpressiveButtonRow(modifier = Modifier.fillMaxWidth(), spacing = 8.dp) {
                     val tileUpdateSource = remember { MutableInteractionSource() }
                     SafeExpansiveButton(
                         interactionSource = tileUpdateSource,
@@ -278,21 +280,20 @@ internal fun UpdateAvailableTile(state: UiState, vm: AppViewModel, dragHandle: M
                             activeContainerColor = ChargeGreen,
                             activeContentColor = Color.White,
                             interactionSource = tileUpdateSource,
-                            modifier = Modifier.weight(1f),
+                            // No weight(1f): its parent is SafeExpansiveButton's own layout, not
+                            // the row, so it never did anything -- and now that the row is a
+                            // group it would not compile either. The group hands out the width.
                         ) {
-                            Icon(
+                            // Hand-assembled Icon + Spacer + Text before, which is how this
+                            // button ended up a size off from its neighbours.
+                            MorphButtonLabel(
                                 if (state.updateApkReady) Icons.Filled.CheckCircle else Icons.Filled.Download,
-                                contentDescription = null,
-                                modifier = Modifier.size(18.dp),
-                            )
-                            Spacer(Modifier.width(8.dp))
-                            Text(
                                 when {
                                     state.updateApkReady -> if (seamless) "Install now" else "Install"
                                     hasDirectDownload -> "Download now"
                                     else -> "Open release page"
                                 },
-                                fontWeight = FontWeight.SemiBold,
+                                pending = false,
                             )
                         }
                     }

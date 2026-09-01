@@ -515,9 +515,12 @@ internal fun SeatConfigRow(
             overflow = TextOverflow.Ellipsis,
         )
         Spacer(Modifier.width(8.dp))
-        MorphChip(selected = heat, onClick = { onHeat(!heat) }, label = "Heat")
-        Spacer(Modifier.width(8.dp))
-        MorphChip(selected = cool, onClick = { onCool(!cool) }, label = "Cool")
+        // A group, so pressing Heat takes width from Cool rather than shoving it -- the pair is
+        // exactly the "several buttons in one space" case, and it was a plain Row.
+        ExpressiveButtonRow(spacing = 8.dp) {
+            MorphChip(selected = heat, onClick = { onHeat(!heat) }, label = "Heat")
+            MorphChip(selected = cool, onClick = { onCool(!cool) }, label = "Cool")
+        }
     }
 }
 
