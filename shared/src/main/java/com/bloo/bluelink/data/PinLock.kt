@@ -165,7 +165,12 @@ data class PinLockout(
         if (lockedUntilElapsedMs <= 0L || nowElapsedMs <= 0L) return 0L
         val remaining = lockedUntilElapsedMs - nowElapsedMs
         if (remaining <= 0L) return 0L
-        return if (remaining > MAX_WINDOW_MS) 0L else remaining
+        // Bounded by the window that actually produced this anchor, which [failures] tells us
+        // exactly -- no arbitrary ceiling required. An anchor with more left than its own window
+        // could ever have granted can only have been measured against a clock that no longer
+        // exists, which is precisely what a reboot does to elapsedRealtime.
+        val batch = (failures / STRIKES_PER_BATCH).coerceAtLeast(1)
+        return if (remaining > windowMs(batch)) 0L else remaining
     }
 
     /** How many attempts remain in the current batch before the next window
@@ -198,17 +203,17 @@ data class PinLockout(
         const val BASE_WINDOW_MS = 30_000L
 
         /**
-         * The escalation is capped. Doubling forever overflows into nonsense (batch 60 is
-         * longer than the age of the universe), and a window nobody can outlast is a bricked
-         * app rather than a deterrent. It also gives [elapsedRemainingMs] a bound to sanity
-         * check a restored anchor against.
+         * The window length for batch number [batch] (1-based).
+         *
+         * The doubling is deliberate and unbounded in spirit -- PinLockBoundaryTest pins the
+         * 10th-strike window at 256 minutes precisely because the escalation is meant to become
+         * punishing -- so this does NOT cap it. The clamp exists only to keep the shift legal:
+         * `1L shl 63` is negative and Kotlin masks the count above that, so a batch in the 60s
+         * would silently wrap back to a 30-second window, turning the deterrent inside out at
+         * exactly the point someone is grinding through it. Batch 40 is already longer than any
+         * attacker will wait.
          */
-        const val MAX_WINDOW_MS = 60L * 60_000L
-
-        /** The window length for batch number [batch] (1-based). */
-        fun windowMs(batch: Int): Long =
-            if (batch >= 32) MAX_WINDOW_MS
-            else (BASE_WINDOW_MS * (1L shl (batch - 1))).coerceAtMost(MAX_WINDOW_MS)
+        fun windowMs(batch: Int): Long = BASE_WINDOW_MS * (1L shl (batch.coerceIn(1, 40) - 1))
     }
 }
 /** "0:23" formatting for the lockout countdown line, shared by every surface

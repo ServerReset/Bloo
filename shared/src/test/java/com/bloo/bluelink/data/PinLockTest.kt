@@ -207,11 +207,16 @@ class PinLockTest {
     }
 
     @Test
-    fun lockout_windowIsCapped() {
-        // Doubling forever overflows into nonsense, and a window nobody can outlast is a
-        // bricked app rather than a deterrent.
-        assertEquals(PinLockout.MAX_WINDOW_MS, PinLockout.windowMs(40))
-        assertTrue(PinLockout.windowMs(12) <= PinLockout.MAX_WINDOW_MS)
+    fun lockout_windowKeepsDoublingAndNeverWrapsNegative() {
+        // The escalation is meant to become punishing -- PinLockBoundaryTest pins the 10th
+        // strike at 256 minutes -- so this is NOT capped. What must not happen is the shift
+        // going out of range: 1L shl 63 is negative and the count is masked above that, which
+        // would wrap a huge window back down to a short one at exactly the point somebody is
+        // grinding through the escalation.
+        assertEquals(PinLockout.BASE_WINDOW_MS * 512, PinLockout.windowMs(10))
+        assertTrue("must keep growing", PinLockout.windowMs(20) > PinLockout.windowMs(19))
+        assertTrue("must never go negative", PinLockout.windowMs(64) > 0L)
+        assertTrue("must never wrap below a real window", PinLockout.windowMs(64) >= PinLockout.windowMs(10))
     }
 }
 class PinLockBoundaryTest {
