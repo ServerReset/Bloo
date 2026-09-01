@@ -27,7 +27,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.ui.semantics.contentDescription
@@ -114,12 +113,10 @@ internal fun DiagnosticsPebble(v: Vehicle, status: VehicleStatus?, state: UiStat
         if (status?.hoodOpen == true) add(DiagRow("Hood", "Open"))
         if (status?.doorLock == false && status.engine != true) add(DiagRow("Lock", "Car is unlocked while parked"))
     } }
-    val diagSummary = remember(rows) { if (rows.isEmpty()) "No data" else "${rows.count { !it.indent }} checks" }
-    // The count of actual problems, for the cover health-verdict hero below. diagSummary is a
-    // *checks* count, not an issue count. The warning affordance is then just "any problem at
-    // all" -- issueCount > 0 -- rather than a second hand-kept copy of these five predicates,
-    // which is what this used to be (a parallel `hasWarning` ||-chain that had to stay in sync
-    // with this list by hand). One source now; they can't drift.
+    // The count of actual problems. The warning affordance is then just "any problem at all"
+    // -- issueCount > 0 -- rather than a second hand-kept copy of these five predicates, which
+    // is what this used to be (a parallel `hasWarning` ||-chain that had to stay in sync with
+    // this list by hand). One source now; they can't drift.
     val issueCount = remember(status) {
         listOf(
             status?.tirePressureLamp?.hasWarning == true,
@@ -130,6 +127,19 @@ internal fun DiagnosticsPebble(v: Vehicle, status: VehicleStatus?, state: UiStat
         ).count { it }
     }
     val hasWarning = issueCount > 0
+    // A VERDICT, not a tally. This used to read "12 checks", which is a count of rows rendered
+    // rather than anything about the car -- it cannot tell you whether to care, which is the
+    // only question a collapsed diagnostics pebble is asked. The cover's hero already computed
+    // the verdict and showed it one line below the tally; now the one line says it, on both
+    // surfaces, and the hero is gone.
+    val diagSummary = remember(rows, hasWarning, issueCount) {
+        when {
+            rows.isEmpty() -> "No data"
+            !hasWarning -> "All systems OK"
+            issueCount == 1 -> "1 issue"
+            else -> "$issueCount issues"
+        }
+    }
     Pebble(
         v, "diagnostics", "Diagnostics", Icons.Filled.ErrorOutline, state, vm, dragHandle,
         summary = diagSummary,
@@ -147,17 +157,8 @@ internal fun DiagnosticsPebble(v: Vehicle, status: VehicleStatus?, state: UiStat
         // mode, as an earlier pass did, just removed the ability to collapse a long list
         // that most people only want to check occasionally.
     ) {
-        // COVER SCREEN only: a health-verdict hero — green check + "All systems OK",
-        // or an error warning + "N issues" — so the tile reads at a glance instead of
-        // as a flat list of ~12 rows. Gated on LocalForceExpanded (phone untouched).
-        if (LocalForceExpanded.current && status != null) {
-            CoverHero(
-                icon = if (hasWarning) Icons.Filled.Warning else Icons.Filled.CheckCircle,
-                value = if (hasWarning) (if (issueCount == 1) "1 issue" else "$issueCount issues") else "All systems OK",
-                iconTint = if (hasWarning) MaterialTheme.colorScheme.error else ChargeGreen,
-                valueColor = if (hasWarning) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface,
-            )
-        }
+        // No cover hero: the verdict it rendered is now the pebble's own summary, which
+        // CoverTile shows as the tile headline. See diagSummary above.
         if (rows.isEmpty()) {
             Text(
                 "No diagnostics yet.",

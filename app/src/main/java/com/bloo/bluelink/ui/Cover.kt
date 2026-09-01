@@ -29,7 +29,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -41,7 +40,6 @@ import androidx.compose.material.icons.filled.DirectionsCar
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.LockOpen
 import androidx.compose.material.icons.filled.Thermostat
-import androidx.compose.material.icons.filled.Info
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.onClick
 import androidx.compose.ui.semantics.onLongClick
@@ -79,7 +77,6 @@ import com.bloo.uicommon.dropShadow
 import com.bloo.bluelink.data.supportsHornLights
 import com.bloo.bluelink.data.isPluggedOrCharging
 import kotlinx.coroutines.flow.first
-import kotlin.math.max
 
 /**
  * Measured, adaptive metrics for the cover-screen content region, provided by
@@ -160,85 +157,6 @@ internal fun coverBodyGap(): Dp = if (coverIsTiny()) 6.dp else 8.dp
  */
 internal val LocalCoverCarName = staticCompositionLocalOf<String?> { null }
 
-/** True inside a [CoverTile]'s body, i.e. below a title band that already
- *  shows the page's icon and name. [CoverHero] reads it to avoid drawing that
- *  same glyph a second time, a few dp lower and larger. */
-internal val LocalCoverTileTitled = staticCompositionLocalOf { false }
-
-/** The one converged cover-hero icon size. Was drifting 30/48/64 across tiles; a single
- *  scale is what makes the cover read as one system. Device-verify the exact value
- *  (32–36 is the safe window at ~1.15x font scale); 34 is one nudge up from the old majority. */
-internal val CoverHeroIcon = 34.dp
-
-/**
- * The one shared glance-hero every cover tile opens with: a shrink-to-fit
- * headline [value] (via [com.bloo.uicommon.FittedText], so it can never
- * clip/wrap), optionally a [trailing] value pushed to the row end (e.g. Climate setpoint)
- * and a [subline] below (e.g. AI status, Location coordinates). Left-aligned, full-width,
- * and — critically — emits NO trailing Spacer: the cover shell's `spacedBy(CenterVertically)`
- * owns the gap to the next child, so Climate/Info/Diagnostics/AI/Fuel/Trips/Location all
- * share the exact same rhythm. Color must be baked into the FittedText style (it ignores
- * LocalContentColor).
- */
-@Composable
-internal fun CoverHero(
-    icon: ImageVector,
-    value: String,
-    modifier: Modifier = Modifier,
-    iconTint: Color = MaterialTheme.colorScheme.primary,
-    valueColor: Color = MaterialTheme.colorScheme.onSurface,
-    trailing: String? = null,
-    trailingColor: Color = MaterialTheme.colorScheme.onSurface,
-    subline: String? = null,
-) {
-    Column(modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
-        ) {
-            // The [icon] is drawn ONLY when this hero isn't already inside a
-            // CoverTile that named the page with the same glyph. It always is,
-            // now that every cover page goes through the template -- so in
-            // practice this draws nothing and the value gets the full width,
-            // which on a one-inch screen is several characters of headline.
-            // The parameter stays because the icon is what a caller reaches
-            // for first, and silently ignoring one passed outside a titled
-            // tile would be worse than honouring it.
-            if (!LocalCoverTileTitled.current) {
-                Icon(icon, contentDescription = null, tint = iconTint, modifier = Modifier.size(CoverHeroIcon))
-            }
-            com.bloo.uicommon.FittedText(
-                text = value,
-                style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold, color = valueColor),
-                modifier = Modifier.weight(1f),
-            )
-            if (trailing != null) {
-                com.bloo.uicommon.FittedText(
-                    text = trailing,
-                    style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold, color = trailingColor),
-                    modifier = Modifier.widthIn(max = 120.dp),
-                )
-            }
-        }
-        if (subline != null) {
-            Text(
-                subline,
-                style = MaterialTheme.typography.bodyMedium,
-                // Not MutedContentAlpha (0.7): CoverHero only ever renders inside an
-                // already cover-gated branch (FuelPebble, LocationPebble,
-                // AiSummaryPebble, ...), where the ambient content color is already
-                // the dimmer onSurfaceVariant role (the pebble's default container is
-                // surfaceVariant) -- 0.7 on top compounds into the same "overly gray"
-                // pattern StatusRow's label had. This is the hero every cover page
-                // actually opens with, so it's a bigger legibility cost than a list
-                // row's label.
-                color = LocalContentColor.current.copy(alpha = 0.92f),
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-            )
-        }
-    }
-}
 
 /**
  * THE cover-screen tile template. Every page on the flip cover is one of
@@ -285,6 +203,20 @@ internal fun CoverTile(
      * says both what it is and whose car it belongs to in one line.
      */
     trailingLabel: String? = null,
+    /**
+     * The tile's one glanceable VALUE, rendered large on the header row in place of [title].
+     *
+     * A section tile used to say its subject three or four times over: the title named the
+     * section, the subtitle carried the pebble's summary, and the body opened with a hero whose
+     * value was -- on climate, info, location, trips, fuel and AI -- the very same expression as
+     * that subtitle, ten dp below it. Location managed the address three times at once.
+     *
+     * So the summary IS the value, and it belongs on the header row where the eye lands, at
+     * headline size, with the section carried by the icon beside it and the car by
+     * [trailingLabel]. One line: "[bolt] Charging   Kona". [title] remains as the fallback for a
+     * tile with nothing to report yet, and as the tile's identity for the scrubber rail.
+     */
+    headline: String? = null,
     actions: (@Composable () -> Unit)? = null,
     // Drawn BEHIND the title/body/actions, inside the card's own clip -- the same
     // slot PebbleShell's own `background` is for the phone hero, and for the same
@@ -328,7 +260,7 @@ internal fun CoverTile(
                     modifier = Modifier.size(20.dp),
                 )
                 com.bloo.uicommon.FittedText(
-                    text = title,
+                    text = headline?.takeIf { it.isNotBlank() } ?: title,
                     style = MaterialTheme.typography.titleLarge.copy(
                         fontWeight = FontWeight.Bold,
                         color = titleColor,
@@ -356,7 +288,10 @@ internal fun CoverTile(
                     )
                 }
             }
-            if (!subtitle.isNullOrBlank()) {
+            // Only when it is not already the headline. Passing the summary as both was the
+            // duplication this merge exists to remove, and a caller that hands over the same
+            // string twice should get one line, not two.
+            if (!subtitle.isNullOrBlank() && subtitle != (headline ?: title)) {
                 Text(
                     subtitle,
                     style = MaterialTheme.typography.bodyMedium,
@@ -390,23 +325,21 @@ internal fun CoverTile(
             // contentAlignment can centre against it. The scroll then only engages once the
             // content is taller than that.
             val scroll = scrollState ?: rememberScrollState()
-            CompositionLocalProvider(LocalCoverTileTitled provides true) {
-                Box(
+            Box(
+                Modifier
+                    .weight(1f)
+                    .fillMaxWidth()
+                    .fadingEdges(scroll)
+                    .verticalScroll(scroll),
+                contentAlignment = Alignment.Center,
+            ) {
+                Column(
                     Modifier
-                        .weight(1f)
                         .fillMaxWidth()
-                        .fadingEdges(scroll)
-                        .verticalScroll(scroll),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Column(
-                        Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = coverBodyPad()),
-                        verticalArrangement = Arrangement.spacedBy(coverBodyGap()),
-                        content = body,
-                    )
-                }
+                        .padding(vertical = coverBodyPad()),
+                    verticalArrangement = Arrangement.spacedBy(coverBodyGap()),
+                    content = body,
+                )
             }
             if (actions != null) {
                 // ExpressiveButtonRow with equal shares: these are several buttons in one

@@ -38,8 +38,6 @@ import androidx.compose.material.icons.filled.Place
 import androidx.compose.material.icons.filled.Storefront
 import androidx.compose.material.icons.filled.Call
 import androidx.compose.material.icons.filled.OpenInNew
-import androidx.compose.material.icons.filled.Lock
-import androidx.compose.material.icons.filled.LockOpen
 import androidx.compose.material.icons.filled.VpnKey
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Settings
@@ -111,33 +109,9 @@ internal fun InfoPebble(v: Vehicle, status: VehicleStatus?, state: UiState, vm: 
         // tile drops its header (so the "Locked/Unlocked" summary is otherwise
         // buried as one row among ~15). A large icon + word makes it the glance
         // value. Phone is untouched (coverGlance = LocalForceExpanded, false there).
-        if (coverGlance && status != null) {
-            // Three-way: an unknown lock state (doorLock == null) shows a neutral "Unknown"
-            // glance rather than a red "Unlocked", which would assert as fact a state the car
-            // never reported. Locked/unlocked keep their existing icon + colour treatment.
-            when (status.doorLock) {
-                true -> CoverHero(
-                    icon = Icons.Filled.Lock,
-                    value = "Locked",
-                    iconTint = MaterialTheme.colorScheme.primary,
-                    valueColor = MaterialTheme.colorScheme.onSurface,
-                )
-                false -> CoverHero(
-                    icon = Icons.Filled.LockOpen,
-                    value = "Unlocked",
-                    iconTint = MaterialTheme.colorScheme.error,
-                    valueColor = MaterialTheme.colorScheme.error,
-                )
-                null -> CoverHero(
-                    // Info (the pebble's own glyph, already imported) rather than a lock icon:
-                    // showing either padlock would imply a state we don't have.
-                    icon = Icons.Filled.Info,
-                    value = "Lock state unknown",
-                    iconTint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    valueColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-        }
+        // No cover hero: this pebble's summary is already "Locked"/"Unlocked" and CoverTile
+        // renders it as the tile's headline. The lock state used to appear THREE times on one
+        // tile -- as the summary, as this hero, and again as the "Doors" status row below.
         when {
             status == null && state.refreshing -> Text("Fetching live status…")
             status == null -> Text("No status yet.")

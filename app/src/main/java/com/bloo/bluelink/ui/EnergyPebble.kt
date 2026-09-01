@@ -200,11 +200,9 @@ internal fun FuelPebble(v: Vehicle, status: VehicleStatus?, state: UiState, vm: 
         // fell straight to two dim StatusRows). Gated on LocalForceExpanded → phone
         // untouched.
         if (LocalForceExpanded.current && status != null) {
-            CoverHero(
-                icon = Icons.Filled.LocalGasStation,
-                value = fuelPct?.let { "$it%" } ?: "--",
-                subline = range?.let { "${formatDistance(it, metric)} to empty" },
-            )
+            // No cover hero: the pebble summary is already "84% · 120 mi" and CoverTile
+            // renders it as the headline, with the two StatusRows below carrying the detail.
+            // The percentage used to appear three times on this tile.
         }
         when {
             status == null && state.refreshing -> Text("Fetching live status…")

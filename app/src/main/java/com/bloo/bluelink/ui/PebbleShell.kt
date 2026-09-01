@@ -353,7 +353,10 @@ internal fun PebbleShell(
         CoverTile(
             title = title,
             icon = icon,
-            subtitle = summary,
+            // The summary IS this tile's glanceable value, so it goes on the header row at
+            // headline size rather than as a muted second line under a title that repeats what
+            // the icon already says. See CoverTile.headline.
+            headline = summary,
             // Which car this section belongs to. Cover pebbles are header-less, so a section
             // tile ("Charge", "Climate") named the section and nothing else -- which is what the
             // floating car-name overlay was added to fix, by drawing a second title over the

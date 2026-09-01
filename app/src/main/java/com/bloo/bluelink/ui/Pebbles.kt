@@ -688,15 +688,10 @@ internal fun AiPebble(v: Vehicle, state: UiState, vm: AppViewModel, dragHandle: 
             // Shared CoverHero rhythm (converged 34dp icon + headline + status subline),
             // so the AI tile matches Climate/Info/Diagnostics/etc instead of its old
             // ad-hoc 48dp centered column.
-            CoverHero(
-                icon = Icons.Filled.AutoAwesome,
-                value = "AI summary",
-                subline = when {
-                    busy -> "Summarizing on-device…"
-                    summary != null -> "On-device Gemini Nano · updated"
-                    else -> "On-device Gemini Nano"
-                },
-            )
+            // No cover hero: its value was the tile TITLE verbatim ("AI summary") and its
+            // subline was the tile subtitle verbatim ("On-device Gemini Nano"). Four lines
+            // carrying two strings, before a word of the actual summary. CoverTile's headline
+            // covers it; what follows is the summary itself, which is the point of the tile.
         }
         if (summary != null) {
             Text(summary, style = MaterialTheme.typography.bodyMedium)

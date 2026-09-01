@@ -134,11 +134,9 @@ internal fun LocationPebble(v: Vehicle, state: UiState, vm: AppViewModel, dragHa
                     // showing an address and its own coordinates in the same glance.
                     // Only fall back to coordinates here while nothing better exists
                     // yet; once an address resolves, it's the only thing shown.
-                    CoverHero(
-                        icon = Icons.Filled.LocationOn,
-                        value = place ?: "Located",
-                        subline = if (place == null) "Resolving address…" else null,
-                    )
+                    // No cover hero: `place` is already the tile's summary and therefore its
+                    // headline. This tile rendered the address three times at once -- headline,
+                    // hero and the map stripe's caption.
                 }
                 CarMap(
                     loc,

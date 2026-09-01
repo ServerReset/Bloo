@@ -303,18 +303,9 @@ internal fun ClimatePebble(
             spinning = climateOn,
         ),
     ) {
-        // COVER SCREEN only: lead with a big on/off + setpoint hero so the climate
-        // tile reads at a glance instead of opening on a wall of sliders. Gated on
-        // LocalForceExpanded (phone untouched); shown even while driving.
-        if (LocalForceExpanded.current) {
-            CoverHero(
-                icon = Icons.Filled.AcUnit,
-                value = if (climateOn) "On" else "Off",
-                iconTint = if (climateOn) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                valueColor = if (climateOn) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
-                trailing = status?.airTemp?.let { t -> t.value?.let { degLabel(it, fahrenheit, t.unit) } },
-            )
-        }
+        // No cover hero here any more: this pebble's summary ("On · driving" / "On" / "Off")
+        // is the identical expression, and CoverTile now renders it as the tile's headline.
+        // Two lines saying "On" ten dp apart was the duplication, not the glance.
         if (driving) {
             if (climateOn) {
                 Text(
