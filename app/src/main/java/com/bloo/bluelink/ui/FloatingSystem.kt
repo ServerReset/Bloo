@@ -105,9 +105,42 @@ class FloatingRegistry {
     var chromeShiftTarget by mutableStateOf(0.dp)
     var chromeHidden by mutableStateOf(false)
 
-    /** Publish (or with null, withdraw) this element's live bounds. */
-    fun report(id: FloatingId, rect: Rect?) {
-        if (rect == null) bounds.remove(id) else bounds[id] = rect
+    /**
+     * Back to rest. A screen that publishes these must call this when it leaves, or the last
+     * thing it asserted outlives it -- and "hidden, shifted down 96dp" is a state no screen
+     * should be able to leave behind for the next one.
+     */
+    fun resetChrome() {
+        chromeShiftTarget = 0.dp
+        chromeHidden = false
+    }
+
+    /** Who last published each id, so a withdrawal can be checked against it. */
+    private val owners = mutableStateMapOf<FloatingId, Any>()
+
+    /**
+     * Publish (or with null, withdraw) this element's live bounds under [id].
+     *
+     * [owner] identifies the publishing instance, and a withdrawal only takes effect if that
+     * instance is the one currently holding the id. Without this check, withdrawal was deletion
+     * by key: one id can legitimately have several publishers alive at once -- the flying title
+     * is composed by every page the pager keeps warm, by every column in grid mode, and by both
+     * sides of the garage/settings crossfade -- and a NEW neighbour mounts inactive, so its
+     * "I am not floating" withdrawal fired immediately and erased the bounds of the settled
+     * page's docked, visible pill. The dots then stopped dodging a name that was still on
+     * screen, once per swipe. Checking ownership makes a withdrawal mean "I am leaving", not
+     * "nobody is here".
+     */
+    fun report(id: FloatingId, rect: Rect?, owner: Any) {
+        if (rect == null) {
+            if (owners[id] === owner) {
+                bounds.remove(id)
+                owners.remove(id)
+            }
+        } else {
+            bounds[id] = rect
+            owners[id] = owner
+        }
     }
 
     fun boundsOf(id: FloatingId): Rect? = bounds[id]
@@ -182,16 +215,19 @@ val LocalFloatingRegistry = staticCompositionLocalOf { FloatingRegistry() }
  */
 fun Modifier.floatingElement(id: FloatingId, active: Boolean = true): Modifier = composed {
     val registry = LocalFloatingRegistry.current
-    DisposableEffect(registry, id) {
-        onDispose { registry.report(id, null) }
+    // Identifies THIS instance to the registry. Several instances can share one id -- see
+    // FloatingRegistry.report -- so a withdrawal has to say which of them is leaving.
+    val owner = remember { Any() }
+    DisposableEffect(registry, id, owner) {
+        onDispose { registry.report(id, null, owner) }
     }
     // Withdraw immediately on going inactive rather than waiting for a layout pass that may
     // never come (nothing moved, so onGloballyPositioned would not fire again).
-    DisposableEffect(registry, id, active) {
-        if (!active) registry.report(id, null)
+    DisposableEffect(registry, id, active, owner) {
+        if (!active) registry.report(id, null, owner)
         onDispose { }
     }
-    onGloballyPositioned { if (active) registry.report(id, it.boundsInRoot()) }
+    onGloballyPositioned { if (active) registry.report(id, it.boundsInRoot(), owner) }
 }
 
 /**

@@ -204,16 +204,6 @@ internal fun GarageScreen(state: State<UiState>, vm: AppViewModel) {
     // which meant every one of the ~12 frames it takes to spring back up also
     // recomposed GarageScreen, for a value only ever consumed inside an
     // offset { } at its two use sites.
-    val overlayShiftTarget = if (state.value.refreshing) RefreshPullShift
-        else (RefreshPullShift * pullFraction).coerceIn(0.dp, RefreshPullShift)
-    val chromeHidden = state.value.refreshing || pulling
-    // SideEffect, not a bare assignment: these are snapshot writes, and writing state during
-    // composition invalidates the composition that is running.
-    SideEffect {
-        floatingRegistry.chromeShiftTarget = overlayShiftTarget
-        floatingRegistry.chromeHidden = chromeHidden
-    }
-
     val count = vehicles.size
     val cfg = LocalConfiguration.current
     val widthDp = cfg.screenWidthDp
@@ -249,8 +239,31 @@ internal fun GarageScreen(state: State<UiState>, vm: AppViewModel) {
         }
     }
     if (compact) {
+        // Returns BEFORE publishing the chrome targets below. CompactGarage is a child of this
+        // composable and publishes its own, so leaving this screen's SideEffect above the
+        // short-circuit meant two writers on one shared pair of fields in a single composition.
+        // They agreed only by accident -- the compact path returns before LocalPullFraction is
+        // provided, so `pulling` was always false here and both reduced to `refreshing`. One
+        // change to either expression and it becomes last-writer-wins flicker.
         CompactGarage(state.value, vm, appearance)
         return
+    }
+    val overlayShiftTarget = if (state.value.refreshing) RefreshPullShift
+        else (RefreshPullShift * pullFraction).coerceIn(0.dp, RefreshPullShift)
+    val chromeHidden = state.value.refreshing || pulling
+    // SideEffect, not a bare assignment: these are snapshot writes, and writing state during
+    // composition invalidates the composition that is running.
+    SideEffect {
+        floatingRegistry.chromeShiftTarget = overlayShiftTarget
+        floatingRegistry.chromeHidden = chromeHidden
+    }
+    // Cleared when this screen goes away. Nothing else resets these, so leaving mid-pull or
+    // mid-refresh -- opening Settings, locking the phone -- left the registry asserting
+    // "hidden, shifted 96dp" for as long as no GarageScreen was around to say otherwise. The
+    // outgoing screen's own overlays are still composed during the crossfade, so they held that
+    // offset and alpha 0 all the way through the transition.
+    DisposableEffect(floatingRegistry) {
+        onDispose { floatingRegistry.resetChrome() }
     }
     // How many full-height cards fit side by side; pages advance by this many.
     val perPage = (widthDp / MIN_CARD_DP).coerceIn(1, count)

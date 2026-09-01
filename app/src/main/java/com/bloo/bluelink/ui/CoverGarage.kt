@@ -56,6 +56,7 @@ import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
@@ -217,6 +218,11 @@ internal fun CompactGarage(state: UiState, vm: AppViewModel, appearance: Setting
     val coverFloatingRegistry = LocalFloatingRegistry.current
     val coverChromeHidden = state.refreshing
     SideEffect { coverFloatingRegistry.chromeHidden = coverChromeHidden }
+    // Same reason as the garage's: nothing else resets this, so a refresh in flight when the
+    // cover goes away would leave every floating element faded out for whatever comes next.
+    DisposableEffect(coverFloatingRegistry) {
+        onDispose { coverFloatingRegistry.resetChrome() }
+    }
     Box(Modifier.fillMaxSize()) {
         // Measured once and shared by every reader below: the tiles' car-name label, the band
         // itself, and the search dock. Hoisted ABOVE the pager because the tiles need to know
@@ -281,6 +287,7 @@ internal fun CompactGarage(state: UiState, vm: AppViewModel, appearance: Setting
         // The name now rides each tile's own title row instead (CoverTile.trailingLabel), where
         // it costs no height and cannot collide with anything. What is left here is the dots,
         // which are chrome about the pager rather than about the page.
+        val dotsShowing = count > 1 && !LocalReorderActive.current
         Column(
             modifier = Modifier
                 .align(Alignment.TopCenter)
@@ -291,10 +298,17 @@ internal fun CompactGarage(state: UiState, vm: AppViewModel, appearance: Setting
                 // gap), so it publishes and PagerDotsFor below opts out.
                 // shift = false: the cover has no pull-to-refresh shift of its own -- its
                 // refresh is the edge-trace gesture -- so only the fade applies here.
-                .floatingOverlay(FloatingIds.PagerDots, shift = false),
+                //
+                // active mirrors the dots' OWN condition below. This Column publishes the dots'
+                // bounds, but its child is conditional, so with a single car -- or while
+                // reordering -- it was publishing a padding-sized rectangle at top-centre for
+                // dots that were not there. Nothing reads PagerDots except the dots themselves
+                // today, so it was invisible; it is still a lie in the registry, and the whole
+                // point of the registry is that other elements can trust what is in it.
+                .floatingOverlay(FloatingIds.PagerDots, active = dotsShowing, shift = false),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            if (count > 1 && !LocalReorderActive.current) {
+            if (dotsShowing) {
                 PagerDotsFor(
                     pager = pager,
                     real = { realCar(it) },

@@ -300,13 +300,13 @@ internal fun PagerDotsFor(
     // FloatingNamePill -> FullDetail to get there in the first place): .dodgeFloating fades
     // these out whenever anything else floating -- today the flying car name -- is in that spot.
     //
-    // [registerBounds] decides who publishes. A caller that floats these itself -- the garage,
-    // whose modifier carries the status-bar inset and the pull-to-refresh shift -- registers via
-    // Modifier.floatingOverlay, because ITS node is the one that knows where the dots really
-    // ended up; this then stays out of the way rather than racing a second writer on one id. A
-    // caller that just drops the dots into a column (the cover screen) has no such node, so this
-    // publishes for it. Either way something must, since dodgeFloating asks the registry where
-    // `self` is and silently never dodges if the answer is nothing.
+    // [registerBounds] decides who publishes. Every caller today passes false and publishes from
+    // its own node via Modifier.floatingOverlay, because that node is the one carrying the
+    // status-bar inset, the corner gap and (on the garage) the pull-to-refresh shift -- so it is
+    // the one that knows where the dots really ended up. The default stays true because
+    // dodgeFloating below asks the registry where `self` is and silently never dodges if the
+    // answer is nothing: a new caller that forgets should get a working dodge, not a quiet
+    // no-op. Two publishers on one id is the failure this parameter exists to prevent.
     // Theme-only choices stay in the app: this wrapper is the one place that
     // translates Material colors + app chrome into the uicommon core's
     // parameterized [PagerDotColors], so the core never imports material3.
