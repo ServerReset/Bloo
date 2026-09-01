@@ -346,7 +346,9 @@ internal fun CarSettingsCard(
                     modifier = Modifier.fillMaxWidth(),
                 )
             }
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            // A group, not a plain Row: pressing "Choose photo" should take its extra width
+            // from "Clear" beside it rather than shove it sideways. See ExpressiveButtons.kt.
+            ExpressiveButtonRow(spacing = 8.dp) {
                 MorphTextButton("Choose photo", onClick = onPickPhoto)
                 if (state.imageUrls[v.vin] != null) {
                     MorphTextButton("Clear", onClick = { vm.setVehicleImage(v.vin, "") })

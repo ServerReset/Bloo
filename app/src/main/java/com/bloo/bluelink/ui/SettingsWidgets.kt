@@ -593,13 +593,21 @@ internal fun PinDialogs(
                 }
                 "finish" -> {
                     if (mode == "remove") {
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            MorphTextButton("Keep PIN", onDismiss, modifier = Modifier.weight(1f))
+                        // equalWidths on the group, NOT Modifier.weight on each child.
+                        // RowScope.weight is parent data read by a Row's own measure policy;
+                        // inside this group's policy it is not read at all, so it would have
+                        // silently done nothing while the two halves went back to hugging
+                        // their labels. See ExpressiveButtons.kt.
+                        ExpressiveButtonRow(
+                            modifier = Modifier.fillMaxWidth(),
+                            spacing = 8.dp,
+                            equalWidths = true,
+                        ) {
+                            MorphTextButton("Keep PIN", onDismiss)
                             MorphButton(
                                 onClick = { haptics?.heavy(); vm.removeAppPin(); onDismiss() },
                                 containerColor = scheme.error,
                                 contentColor = scheme.onError,
-                                modifier = Modifier.weight(1f),
                             ) { Text("Remove PIN", fontWeight = FontWeight.SemiBold) }
                         }
                     }
