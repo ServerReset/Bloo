@@ -114,22 +114,28 @@ fun SafeExpansiveButton(
         content = { content() },
         modifier = modifier,
         measurePolicy = { measurables, constraints ->
-            val m = measurables.firstOrNull() ?: return@Layout layout(0, 0) {}
+            if (measurables.isEmpty()) return@Layout layout(0, 0) {}
             // Read at LAYOUT time, so a press invalidates layout only and never composition.
             val p = press
             val cached = naturals.widths?.firstOrNull() ?: 0
-            // One measure per pass, never two: measuring the same Measurable twice in a single
-            // pass throws, so the resting width is CACHED on the resting passes and the pressed
-            // passes size themselves from that cache.
-            val placeable = if (p <= 0.001f || cached <= 0) {
-                m.measure(constraints).also { naturals.widths = intArrayOf(it.width) }
+            // One measure per child per pass, never two: measuring the same Measurable twice in
+            // a single pass throws, so the resting width is CACHED on the resting passes and the
+            // pressed passes size themselves from that cache.
+            val placeables = if (p <= 0.001f || cached <= 0) {
+                measurables.map { it.measure(constraints) }
+                    .also { naturals.widths = intArrayOf(it.maxOf { pl -> pl.width }) }
             } else {
                 val target = (cached * (1f + ExpressivePressGrowth * p)).roundToInt()
                     .coerceAtMost(if (constraints.hasBoundedWidth) constraints.maxWidth else Int.MAX_VALUE)
                     .coerceAtLeast(0)
-                m.measure(constraints.copy(minWidth = target, maxWidth = target))
+                measurables.map { it.measure(constraints.copy(minWidth = target, maxWidth = target)) }
             }
-            layout(placeable.width, placeable.height) { placeable.place(0, 0) }
+            // Stacked at the origin, like the Box this replaced: a handful of call sites emit
+            // more than one root into this slot (a button with a label and an AnimatedVisibility
+            // beside it), and measuring only the first would make the rest silently vanish.
+            val w = placeables.maxOf { it.width }.coerceIn(constraints.minWidth, constraints.maxWidth)
+            val h = placeables.maxOf { it.height }.coerceIn(constraints.minHeight, constraints.maxHeight)
+            layout(w, h) { placeables.forEach { it.place(0, 0) } }
         },
     )
 }
