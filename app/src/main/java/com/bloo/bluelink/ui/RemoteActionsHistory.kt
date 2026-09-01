@@ -20,6 +20,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -84,7 +85,7 @@ private fun StatusBadge(status: String) {
  * Shows action name, timestamp, status, and optional details.
  */
 @Composable
-private fun RemoteActionItem(action: RemoteAction) {
+private fun RemoteActionItem(action: RemoteAction, use24Hour: Boolean) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -106,7 +107,7 @@ private fun RemoteActionItem(action: RemoteAction) {
                     color = MaterialTheme.colorScheme.onSurface,
                 )
                 Text(
-                    text = shortTime(action.timestamp),
+                    text = shortTime(action.timestamp, use24Hour),
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     fontSize = 11.sp,
@@ -137,10 +138,16 @@ private fun RemoteActionItem(action: RemoteAction) {
  * exactly what this used to render: "2026-08-31T21:33:15.123456Z" in an 11sp monospace label
  * under every row.
  */
-private fun shortTime(iso: String): String = runCatching {
+private fun shortTime(iso: String, use24Hour: Boolean): String = runCatching {
     val at = java.time.Instant.parse(iso).atZone(java.time.ZoneId.systemDefault())
     val today = java.time.LocalDate.now(java.time.ZoneId.systemDefault())
-    val fmt = if (at.toLocalDate() == today) "HH:mm" else "d MMM HH:mm"
+    // Clock style follows the DEVICE's 12/24h setting rather than being hardcoded. This is the
+    // app's only user-facing wall-clock string (the other patterns in the codebase are wire
+    // formats and the debug log), so there was no house convention to inherit -- and a fixed
+    // "21:33" is the wrong default for a US-market Hyundai/Genesis/Kia app whose units already
+    // default to imperial.
+    val clock = if (use24Hour) "HH:mm" else "h:mm a"
+    val fmt = if (at.toLocalDate() == today) clock else "d MMM $clock"
     at.format(java.time.format.DateTimeFormatter.ofPattern(fmt))
 }.getOrDefault(iso)
 
@@ -158,8 +165,11 @@ private fun shortTime(iso: String): String = runCatching {
 @Composable
 internal fun RemoteActionsInline(actions: List<RemoteAction>, max: Int = 6) {
     if (actions.isEmpty()) return
+    // Resolved once here, not per row: is24HourFormat reads a system setting, and every row in
+    // the list would otherwise ask the same question again.
+    val use24Hour = android.text.format.DateFormat.is24HourFormat(LocalContext.current)
     Column(Modifier.fillMaxWidth().padding(bottom = 6.dp)) {
-        actions.take(max).forEach { RemoteActionItem(it) }
+        actions.take(max).forEach { RemoteActionItem(it, use24Hour) }
         if (actions.size > max) {
             Text(
                 text = "+${actions.size - max} older",
