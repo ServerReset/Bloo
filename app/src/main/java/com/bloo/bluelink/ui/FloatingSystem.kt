@@ -13,7 +13,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.foundation.layout.offset
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateMapOf
@@ -28,6 +27,7 @@ import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import kotlin.math.roundToInt
 
 /**
  * One place that knows where every floating thing on screen currently is.
@@ -102,7 +102,16 @@ class FloatingRegistry {
      * Targets, not animated values: the modifier owns the springs, so a screen publishing these
      * does not recompose on every frame of them.
      */
-    var chromeShiftTarget by mutableStateOf(0.dp)
+    /**
+     * How far through a pull-to-refresh drag the page is, 0..1, as a LAMBDA.
+     *
+     * A lambda and not a value, because this changes on every pixel of the gesture. As a plain
+     * Dp target it had to be computed in the publishing screen's composition -- which meant the
+     * garage, its pager and all three live car pages recomposed on every drag frame, to move
+     * some chrome a few dp. [Modifier.floatingOverlay] calls this inside its offset lambda
+     * instead, so the follow happens in the layout phase and composition never runs for it.
+     */
+    var chromePull: () -> Float = { 0f }
     var chromeHidden by mutableStateOf(false)
 
     /**
@@ -111,7 +120,7 @@ class FloatingRegistry {
      * should be able to leave behind for the next one.
      */
     fun resetChrome() {
-        chromeShiftTarget = 0.dp
+        chromePull = { 0f }
         chromeHidden = false
     }
 
@@ -200,15 +209,18 @@ fun Modifier.floatingOverlay(
     shift: Boolean = true,
 ): Modifier = composed {
     val registry = LocalFloatingRegistry.current
-    val shiftDp by animateDpAsState(
-        targetValue = if (shift) registry.chromeShiftTarget else 0.dp,
+    // The HOLD is animated (a refresh starting or ending is a state change worth easing); the
+    // DRAG is not, because a pull should track the finger exactly rather than lag a spring
+    // behind it. Both are read inside the offset lambda below, so neither recomposes anything.
+    val holdState = animateFloatAsState(
+        targetValue = if (registry.chromeHidden) 1f else 0f,
         animationSpec = spring(
             dampingRatio = Spring.DampingRatioNoBouncy,
-            stiffness = if (registry.chromeHidden) Spring.StiffnessLow else Spring.StiffnessMedium,
+            stiffness = Spring.StiffnessMedium,
         ),
-        label = "floatingShift",
+        label = "floatingShiftHold",
     )
-    val alpha by animateFloatAsState(
+    val alphaState = animateFloatAsState(
         targetValue = if (fade && registry.chromeHidden) 0f else 1f,
         animationSpec = tween(durationMillis = 200),
         label = "floatingFade",
@@ -216,8 +228,13 @@ fun Modifier.floatingOverlay(
     this
         // Layout phase and draw phase respectively -- neither re-runs composition per frame,
         // which is the whole reason these are read inside lambdas.
-        .offset { IntOffset(0, shiftDp.roundToPx()) }
-        .graphicsLayer { this.alpha = alpha }
+        .offset {
+            if (!shift) return@offset IntOffset.Zero
+            // Whichever is further along: the finger, or the settled refresh hold.
+            val f = maxOf(registry.chromePull().coerceIn(0f, 1f), holdState.value)
+            IntOffset(0, (RefreshPullShift.toPx() * f).roundToInt())
+        }
+        .graphicsLayer { this.alpha = alphaState.value }
         .floatingElement(id, active)
 }
 

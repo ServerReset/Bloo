@@ -63,6 +63,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.State
@@ -232,7 +233,10 @@ internal fun VehicleDetailContent(
         // two pages fighting over the same hoisted state.
         hoisted.scrollToTop.value = { scroll.animateScrollTo(0) }
     }
-    Refreshable(v, state.value, vm, hideIndicator = hideIndicator) {
+    // Narrowed, not `state.value.refreshing`: a bare read here would subscribe this whole page
+    // -- all three of them live at once in the pager -- to every UiState emission.
+    val refreshing by remember { derivedStateOf { state.value.refreshing } }
+    Refreshable(v, refreshing, vm, hideIndicator = hideIndicator) {
         CompositionLocalProvider(LocalHeroTitleFlight provides liveFlight) {
             Column(
                 Modifier
@@ -247,7 +251,7 @@ internal fun VehicleDetailContent(
                 // PagerDotClearance when the dots are showing -- see
                 // reserveTopForDots's own doc.
                 Spacer(Modifier.height(topInset + if (reserveTopForDots) PagerDotClearance else 0.dp))
-                CarHeaderRow(v, state.value, onExpand, reserveHeaderEnd, hideName = true)
+                CarHeaderRow(v, state, onExpand, reserveHeaderEnd, hideName = true)
                 // summary (image+gauge) and controls are reorderable pebbles too. The full
                 // pebble column always renders while swiping; smoothness comes from
                 // PebbleList's own one-frame lazy-fill (filled/EAGER_PEBBLES) + the pager's
@@ -370,10 +374,17 @@ internal fun ExpandedCar(
     vm: AppViewModel,
     flipped: Boolean,
 ) {
-    val hotspot = state.value.hotspotFor(v.vin)
-        ?.takeIf {
-            it in state.value.sectionsFor(v) && state.value.isSectionAvailable(v, it)
+    // All derived, so this view recomposes when the hotspot section or the refresh flag
+    // actually changes -- not on every UiState emission for every car.
+    val hotspot by remember(v) {
+        derivedStateOf {
+            state.value.hotspotFor(v.vin)
+                ?.takeIf {
+                    it in state.value.sectionsFor(v) && state.value.isSectionAvailable(v, it)
+                }
         }
+    }
+    val refreshing by remember { derivedStateOf { state.value.refreshing } }
     val hotDrag = remember { HotSeatDrag() }
     // Hoisted (not recreated on flip) so each column keeps its own scroll
     // position when the columns swap sides. controlsScroll always belongs
@@ -413,9 +424,9 @@ internal fun ExpandedCar(
     // below, which HeroHeader already knows how to use -- no changes needed
     // there), not from this plain header.
     val controls: @Composable ColumnScope.() -> Unit = {
-        CarHeaderRow(v, state.value, onExpand = null, reserveEnd = false, hideName = true)
-        CriticalContent(v, state.value, vm)
-        HotspotSlot(v, hotspot, state.value, vm)
+        CarHeaderRow(v, state, onExpand = null, reserveEnd = false, hideName = true)
+        CriticalContent(v, state, vm)
+        HotspotSlot(v, hotspot, state, vm)
     }
     val pebbles: @Composable ColumnScope.() -> Unit = {
         PebbleList(v, state, vm, exclude = setOfNotNull("summary", "controls", hotspot))
@@ -427,7 +438,7 @@ internal fun ExpandedCar(
     // view, unconditionally. This is a single car's own detail screen, not
     // the multi-car grid the flag was meant for, so the real M3 Expressive
     // indicator should show here too.
-    Refreshable(v, state.value, vm) {
+    Refreshable(v, refreshing, vm) {
         Box(Modifier.fillMaxSize()) {
         // Animate the swap when the columns are flipped. Same spring the
         // expand/collapse transition (GarageScreen) and the collapsed
@@ -549,11 +560,20 @@ internal fun ExpandedCar(
 @Composable
 internal fun CarHeaderRow(
     v: Vehicle,
-    state: UiState,
+    /**
+     * State SOURCE, not a snapshot -- see VehicleDetailContent's own `state` doc. Taking a
+     * plain UiState here made this row's two callers (a page body, and the expanded view)
+     * subscribe to EVERY UiState emission just to render a model name and a relative
+     * timestamp. Both slices below are derived, so this row recomposes when the two strings
+     * it actually shows change, and not when some other car's weather ticks.
+     */
+    state: State<UiState>,
     onExpand: (() -> Unit)?,
     reserveEnd: Boolean,
     hideName: Boolean = false,
 ) {
+    val meta by remember(v) { derivedStateOf { "${v.model} · ${state.value.powertrainLabel(v)}" } }
+    val fetchedAt by remember(v) { derivedStateOf { state.value.fetchedAt(v) } }
     Row(
         Modifier
             .fillMaxWidth()
@@ -574,8 +594,8 @@ internal fun CarHeaderRow(
                 horizontalArrangement = Arrangement.spacedBy(6.dp),
                 verticalArrangement = Arrangement.spacedBy(6.dp),
             ) {
-                MetaChip("${v.model} · ${state.powertrainLabel(v)}")
-                LastUpdatedLabel(v, state)
+                MetaChip(meta)
+                LastUpdatedLabel(fetchedAt)
             }
         }
         if (onExpand != null) {

@@ -137,8 +137,19 @@ internal fun sectionLabel(section: String): String = when (section) {
  * a chooser to pin one. Pinning moves the pebble out of the scrolling list.
  */
 @Composable
-internal fun HotspotSlot(v: Vehicle, hotspot: String?, state: UiState, vm: AppViewModel) {
-    val stateSource = rememberUpdatedState(state)
+internal fun HotspotSlot(
+    v: Vehicle,
+    hotspot: String?,
+    /**
+     * State SOURCE. It was already immediately re-wrapped into a rememberUpdatedState here,
+     * so nothing downstream ever wanted the snapshot -- but taking the snapshot meant the
+     * CALLER had to read state.value in its own body, subscribing the whole dual-column view
+     * to every UiState emission. Reading it here confines that to this slot.
+     */
+    stateSource: State<UiState>,
+    vm: AppViewModel,
+) {
+    val state = stateSource.value
     if (hotspot != null) {
         val haptics = LocalHaptics.current
         // Drag the pinned pebble away (long-press, then drag past a threshold) to
@@ -250,7 +261,11 @@ internal val RefreshPullShift = 96.dp
 @Composable
 internal fun Refreshable(
     v: Vehicle,
-    state: UiState,
+    // The single UiState field this needs, and NOT the whole UiState: passing the state object
+    // subscribed every caller's composition to every emission -- a weather tick for another car,
+    // an AI probe, a log line -- for all three live pager pages at once, which is exactly what
+    // the callers' State<UiState> indirection exists to avoid.
+    refreshing: Boolean,
     vm: AppViewModel,
     hideIndicator: Boolean = false,
     content: @Composable BoxScope.() -> Unit,
@@ -269,7 +284,7 @@ internal fun Refreshable(
         Modifier
             .fillMaxSize()
             .pullToRefresh(
-                isRefreshing = state.refreshing,
+                isRefreshing = refreshing,
                 state = ptrState,
                 onRefresh = { haptics?.diceRoll(); vm.refreshStatus(v) },
             ),
@@ -288,11 +303,11 @@ internal fun Refreshable(
         if (!hideIndicator) {
             PullToRefreshDefaults.LoadingIndicator(
                 state = ptrState,
-                isRefreshing = state.refreshing,
+                isRefreshing = refreshing,
                 modifier = Modifier
                     .align(Alignment.TopCenter)
                     .offset {
-                        val indicatorProgress = if (state.refreshing) 1f else ptrState.distanceFraction.coerceIn(0f, 1f)
+                        val indicatorProgress = if (refreshing) 1f else ptrState.distanceFraction.coerceIn(0f, 1f)
                         val offScreenPx = -(topInset + 56.dp).roundToPx()
                         val onScreenPx = (topInset + 28.dp).roundToPx()
                         IntOffset(0, offScreenPx + ((onScreenPx - offScreenPx) * indicatorProgress).roundToInt())
@@ -303,7 +318,11 @@ internal fun Refreshable(
 }
 /** Hero image + gauge, then the primary lock/charge controls (expanded view). */
 @Composable
-internal fun CriticalContent(v: Vehicle, state: UiState, vm: AppViewModel) {
+internal fun CriticalContent(v: Vehicle, stateSource: State<UiState>, vm: AppViewModel) {
+    // Read here rather than at the call site, for the same reason as HotspotSlot above: this
+    // does need most of UiState, but its caller does not, and a read in the caller's body
+    // subscribes the caller's whole subtree.
+    val state = stateSource.value
     val status = state.statusFor(v)
     val hMetric = LocalAppearance.current.unitSystem == "metric"
     // Same fix as SinglePebble's "summary" branch, same reasoning: HeroHeader takes no

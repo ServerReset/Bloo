@@ -173,7 +173,6 @@ internal fun GarageScreen(state: State<UiState>, vm: AppViewModel) {
     // Live pull distance reported by Refreshable, so the overlays react the moment
     // the user starts pulling - not only once a refresh is in flight.
     val pullFractionState = remember { mutableStateOf(0f) }
-    val pullFraction by pullFractionState
     // Hide the page indicator as soon as the pull begins (and through the refresh),
     // so the squiggly indicator has the stage to itself; fade it back in when done.
     // NOT read via `by` here: this is GarageScreen scope, the car pager's parent.
@@ -248,13 +247,16 @@ internal fun GarageScreen(state: State<UiState>, vm: AppViewModel) {
         CompactGarage(state.value, vm, appearance)
         return
     }
-    val overlayShiftTarget = if (state.value.refreshing) RefreshPullShift
-        else (RefreshPullShift * pullFraction).coerceIn(0.dp, RefreshPullShift)
     val chromeHidden = state.value.refreshing || pulling
     // SideEffect, not a bare assignment: these are snapshot writes, and writing state during
     // composition invalidates the composition that is running.
+    //
+    // The pull is published as a LAMBDA over the State, never as a value. Computing a Dp target
+    // here meant reading pullFractionState in THIS composition -- and it changes on every pixel
+    // of the gesture, so the garage, its pager and all three live car pages recomposed on every
+    // drag frame to move some chrome. The modifier reads it in its offset lambda instead.
     SideEffect {
-        floatingRegistry.chromeShiftTarget = overlayShiftTarget
+        floatingRegistry.chromePull = { pullFractionState.value }
         floatingRegistry.chromeHidden = chromeHidden
     }
     // Cleared when this screen goes away. Nothing else resets these, so leaving mid-pull or

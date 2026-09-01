@@ -403,8 +403,8 @@ internal fun MetaChip(text: String, modifier: Modifier = Modifier, icon: ImageVe
 /** "Updated x ago" fact, as a [MetaChip]. Null (renders nothing) until a
  *  first fetch has actually landed for [v]. */
 @Composable
-internal fun LastUpdatedLabel(v: Vehicle, state: UiState, modifier: Modifier = Modifier) {
-    val rel = rememberRelativeTime(state.fetchedAt(v)) ?: return
+internal fun LastUpdatedLabel(fetchedAt: Long?, modifier: Modifier = Modifier) {
+    val rel = rememberRelativeTime(fetchedAt) ?: return
     MetaChip("Updated $rel", modifier, icon = Icons.Filled.Refresh)
 }
 
