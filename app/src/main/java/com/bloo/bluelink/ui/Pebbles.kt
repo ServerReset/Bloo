@@ -55,7 +55,9 @@ import androidx.compose.material.icons.filled.PushPin
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.LockOpen
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.customActions
 import androidx.compose.ui.semantics.onClick
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
@@ -362,6 +364,23 @@ internal fun ControlsPebble(v: Vehicle, state: UiState, vm: AppViewModel, dragHa
             // long press is claimed by the drag and never toggles. On a CHILD it would instead
             // consume the press outright and silently kill drag-to-reorder for this pebble.
             .pointerInput(v.vin) { detectTapGestures { showHistory = !showHistory } }
+            // The tap above is a bare pointerInput, which contributes NO semantics -- so to a
+            // screen reader the history simply did not exist. "Hidden" here means hidden from
+            // the visual chrome, not withheld from TalkBack, and a custom action is exactly the
+            // right shape for that: it adds nothing on screen and no extra focus stop, but the
+            // gesture is announced and invokable through the actions menu. Guarded on there
+            // being history to show, so it isn't offered when it would do nothing.
+            .then(
+                if (history.isNotEmpty()) {
+                    Modifier.semantics {
+                        customActions = listOf(
+                            CustomAccessibilityAction(
+                                if (showHistory) "Hide recent remote actions" else "Show recent remote actions",
+                            ) { showHistory = !showHistory; true },
+                        )
+                    }
+                } else Modifier,
+            )
             .dropShadow(shape, blurRadius = 12.dp, offsetY = 4.dp)
             .then(
                 if (pebbleOutline) {
