@@ -35,29 +35,23 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.HelpOutline
 import androidx.compose.material.icons.automirrored.filled.Logout
 import androidx.compose.material.icons.automirrored.filled.OpenInNew
-import androidx.compose.material.icons.filled.Block
-import androidx.compose.material.icons.filled.BookmarkAdd
+import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.CloudDone
 import androidx.compose.material.icons.filled.CloudSync
 import androidx.compose.material.icons.filled.ContentCopy
-import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Download
-import androidx.compose.material.icons.filled.ExpandLess
-import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.Fingerprint
-import androidx.compose.material.icons.filled.FormatPaint
 import androidx.compose.material.icons.filled.KeyboardArrowDown
-import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.Pin
-import androidx.compose.material.icons.filled.PlaceOutlined
-import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Place
 import androidx.compose.material.icons.filled.PushPin
-import androidx.compose.material.icons.filled.Restore
-import androidx.compose.material.icons.filled.Schedule
+import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.ui.semantics.contentDescription
@@ -233,11 +227,12 @@ fun MorphTextButton(
     contentColor: Color = MaterialTheme.colorScheme.onSurface,
     interactionSource: MutableInteractionSource = remember { MutableInteractionSource() },
     /**
-     * The glyph to lead with. Defaults to [standardButtonIcon]'s choice for [text], so an
-     * existing call site gets one without being touched; pass explicitly to override, and pass
-     * [NoButtonIcon] for the rare button that genuinely should not have one.
+     * The glyph to lead with. Null asks [standardButtonIcon] for the standard one for [text],
+     * so an existing call site gets one without being touched; pass one to override, or set
+     * [showIcon] false for the rare button that should not have any.
      */
-    icon: ImageVector? = standardButtonIcon(text),
+    icon: ImageVector? = null,
+    showIcon: Boolean = true,
 ) {
     MorphButton(
         onClick = onClick,
@@ -249,16 +244,14 @@ fun MorphTextButton(
         contentPadding = PaddingValues(horizontal = 18.dp, vertical = 10.dp),
         minHeight = ButtonTargetHeight,
     ) {
-        if (icon != null && icon !== NoButtonIcon) {
-            MorphButtonLabel(icon, text, pending = false)
+        val glyph = (icon ?: standardButtonIcon(text)).takeIf { showIcon }
+        if (glyph != null) {
+            MorphButtonLabel(glyph, text, pending = false)
         } else {
             Text(text, style = ButtonLabelStyle, fontWeight = FontWeight.SemiBold)
         }
     }
 }
-
-/** Sentinel for "deliberately no icon" -- distinguishable from "use the default". */
-val NoButtonIcon: ImageVector = Icons.Filled.Block
 
 /** Every button in the app is this tall, so a row of them lines up whatever it contains. */
 val ButtonTargetHeight = 48.dp
@@ -282,37 +275,40 @@ val ButtonLabelStyle: TextStyle
  * meaning rather than alphabetised -- a rename lands next to its neighbours.
  */
 fun standardButtonIcon(label: String): ImageVector? = when (label) {
-    // Destructive / dismissive
+    // Dismissive
     "Cancel", "Not now", "Dismiss" -> Icons.Filled.Close
-    "Clear", "Remove", "Delete" -> Icons.Filled.Delete
+    // Destructive. Close, not a bin: this app's vocabulary has no delete glyph, and every icon
+    // here is one the codebase already uses -- see the note above on why that constraint exists.
+    "Clear", "Remove", "Delete" -> Icons.Filled.Close
     "Sign out" -> Icons.AutoMirrored.Filled.Logout
     "Unpin" -> Icons.Filled.PushPin
-    // Confirmation -- these are the second tap of a two-step action, so they take the
-    // affirmative glyph rather than the destructive one they are confirming.
+    // Confirmation -- the second tap of a two-step action, so it takes the affirmative glyph
+    // rather than the destructive one it is confirming.
     "Tap again to confirm", "Tap again to reset", "Keep it", "Keep PIN" -> Icons.Filled.Check
     // Content
     "Copy" -> Icons.Filled.ContentCopy
     "Export" -> Icons.Filled.Download
-    "Restore" -> Icons.Filled.Restore
-    "Save as preset" -> Icons.Filled.BookmarkAdd
-    // Disclosure
-    "Show", "Full notes", "Trouble installing?" -> Icons.Filled.ExpandMore
-    "Hide", "Hide install help", "Hide diagnostics" -> Icons.Filled.ExpandLess
+    "Restore" -> Icons.Filled.CloudDone
+    "Save as preset" -> Icons.Filled.Star
+    // Disclosure. KeyboardArrowDown for both directions: the chevron this app already uses for
+    // every expand control, rather than a second pair of glyphs meaning the same thing.
+    "Show", "Full notes", "Trouble installing?" -> Icons.Filled.KeyboardArrowDown
+    "Hide", "Hide install help", "Hide diagnostics" -> Icons.Filled.KeyboardArrowDown
     // Navigation / external
     "GitHub", "Open release page" -> Icons.AutoMirrored.Filled.OpenInNew
-    "Forgot password?" -> Icons.AutoMirrored.Filled.HelpOutline
     // Sync / run
     "Test sync", "Pull from primary" -> Icons.Filled.CloudSync
-    "Run it", "Working…" -> Icons.Filled.PlayArrow
-    "Remind me" -> Icons.Filled.Schedule
+    "Run it", "Working…" -> Icons.Filled.Bolt
+    "Remind me" -> Icons.Filled.Refresh
     // Security
     "Use fingerprint" -> Icons.Filled.Fingerprint
     "Use PIN", "Update PIN", "Change PIN", "Set up PIN" -> Icons.Filled.Pin
-    // Places
-    "Set place" -> Icons.Filled.PlaceOutlined
-    "Reset appearance" -> Icons.Filled.FormatPaint
+    // Places / appearance
+    "Set place" -> Icons.Filled.Place
+    "Reset appearance" -> Icons.Filled.Palette
     else -> null
 }
+
 
 /**
  * The morph family's icon-only member.
