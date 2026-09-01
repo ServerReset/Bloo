@@ -49,6 +49,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.State
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -688,15 +689,20 @@ internal fun ChargeSegmentBar(
     // pays nothing for an InfiniteTransition it will never render: no ticket, no
     // per-frame invalidation, nothing running in the background of a page that's
     // sitting on a fully charged or unplugged car.
-    val shimmerX = if (charging) {
+    // The STATE, not its value. `by` reads at the use site, and the use site was this
+    // composable's body -- so a charging car recomposed this bar on every display frame,
+    // indefinitely, re-running its colour animations and rebuilding the Canvas lambda. Not
+    // during a gesture: for as long as the car is plugged in. Everything else in this file was
+    // moved into draw scope for exactly this reason; the shimmer was the one that leaked.
+    // Read inside the Canvas below instead, where it invalidates draw and nothing more.
+    val shimmerX: State<Float>? = if (charging) {
         val shimmer = rememberInfiniteTransition(label = "chargeShimmer")
-        val x by shimmer.animateFloat(
+        shimmer.animateFloat(
             initialValue = -0.6f,
             targetValue = 1.6f,
             animationSpec = infiniteRepeatable(tween(1800, easing = LinearEasing), RepeatMode.Restart),
             label = "chargeShimmerX",
         )
-        x
     } else {
         null
     }
@@ -745,7 +751,7 @@ internal fun ChargeSegmentBar(
             // as the band enters and leaves.
             if (shimmerX != null) {
                 val bandWidth = layout.fillWidth * 0.35f
-                val bandCenter = layout.fillWidth * shimmerX
+                val bandCenter = layout.fillWidth * shimmerX.value
                 drawRoundRect(
                     brush = Brush.linearGradient(
                         colors = listOf(Color.Transparent, Color.White.copy(alpha = 0.30f), Color.Transparent),

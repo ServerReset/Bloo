@@ -2103,8 +2103,18 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         _state.update { it.copy(updateDownloading = true, updatePendingDismiss = false, updateTileDismissed = false) }
         viewModelScope.launch {
             val dest = apkCacheFile()
+            // Throttled to whole percents. UpdateApi calls back once per 64KB buffer, which on
+            // a fast connection is hundreds of emissions a second for a multi-MB APK -- and
+            // every one of them recomposed the whole update tile, on the main thread, while the
+            // user may well be scrolling. A progress bar cannot show more than a percent
+            // anyway, so the emissions it cannot render are pure cost.
+            var lastPercent = -1
             val ok = com.bloo.bluelink.data.UpdateApi.downloadApk(url, dest) { progress ->
-                _updateDownloadProgress.value = progress
+                val percent = (progress * 100f).toInt()
+                if (percent != lastPercent) {
+                    lastPercent = percent
+                    _updateDownloadProgress.value = progress
+                }
             }
             _updateDownloadProgress.value = null
             _state.update { it.copy(updateDownloading = false, updateApkReady = ok) }

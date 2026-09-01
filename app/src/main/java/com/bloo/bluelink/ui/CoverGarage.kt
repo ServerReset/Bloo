@@ -64,6 +64,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.State
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
@@ -657,7 +658,13 @@ internal fun CompactCar(
         // the top-left. Full circuit = refresh. Purely decorative here --
         // this Box has no pointerInput of its own to conflict with anything.
         Box(Modifier.fillMaxSize()) {
-            if (edgeTraceProgress.value > 0.001f) {
+            // A derived BOOLEAN, not the animation value. edgeTraceProgress runs a 1200ms tween,
+            // and reading it here put roughly 72 frames of full CompactCar recomposition -- the
+            // VerticalPager and every composed tile -- inside the gesture that starts it. The
+            // Canvas below already reads .value in its draw lambda; only this gate was wrong,
+            // and derivedStateOf means it notifies twice per gesture rather than 72 times.
+            val tracing by remember { derivedStateOf { edgeTraceProgress.value > 0.001f } }
+            if (tracing) {
                 val accent = MaterialTheme.colorScheme.primary
                 // The rounded-rect perimeter Path + PathMeasure only depend on the
                 // Canvas size/density (constant while this composable is on screen),

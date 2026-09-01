@@ -51,6 +51,7 @@ import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.State
+import androidx.compose.runtime.Stable
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.compositionLocalOf
@@ -166,6 +167,14 @@ internal interface TitleFlightSource {
  * is no second copy for any of that to happen between.
  */
 
+/**
+ * @Stable because this is passed as a composable PARAMETER. Compose infers it unstable (two
+ * plain `var`s), and an unstable parameter makes the composable holding it non-skippable
+ * ENTIRELY -- so every recomposition of GarageScreen re-executed each live car page's whole
+ * body instead of skipping it, for a flight object that never changes identity. The two vars
+ * are write-only inputs consumed inside snapshot-aware derivations, so the contract holds.
+ */
+@Stable
 internal class HeroTitleFlight(topInsetPx: Float, private val hysteresisPx: Float) : TitleFlightSource {
     // Live field, not a constructor `val` captured once -- the OLD shape
     // forced every one of this class's 4 construction sites to
@@ -360,6 +369,7 @@ internal val LocalHeroTitleFlight = compositionLocalOf<HeroTitleFlight?> { null 
  * nothing of its own here, since the one shared badge already covers
  * whichever page just settled.
  */
+@Stable // see the note on HeroTitleFlight
 internal class HoistedIdentityFlight(
     val flight: HeroTitleFlight,
     // Runs the settled page's own "scroll back to top" -- invoked when the
