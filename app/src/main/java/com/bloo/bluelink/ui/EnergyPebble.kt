@@ -90,12 +90,23 @@ internal fun ChargePebble(v: Vehicle, status: VehicleStatus?, enabled: Boolean, 
     // Set would only ever send the 80/90 defaults, so the whole editable control is suppressed.
     var acSeeded by remember(v.vin) { mutableStateOf(false) }
     var dcSeeded by remember(v.vin) { mutableStateOf(false) }
-    // Only seed on first composition; ev?.reservChargeInfos changes frequently (during
-    // charging status updates) so depending on it would restart this effect constantly.
-    // Once seeded, we never need to run this again.
-    LaunchedEffect(v.vin) {
-        if (!acSeeded) ev?.reservChargeInfos?.level(1)?.let { acLimit = it; acSeeded = true }
-        if (!dcSeeded) ev?.reservChargeInfos?.level(0)?.let { dcLimit = it; dcSeeded = true }
+    // Keyed on the reported NUMBERS, not just the VIN. Keying on the VIN alone ran this exactly
+    // once, at first composition -- which is almost always before the car's status has arrived,
+    // since the pebble composes as soon as the garage does and the status fetch lands later. `ev`
+    // was therefore null on the only pass that could seed, neither latch ever closed, and both
+    // limits stayed pinned to the constants above for the rest of the session. That defeats the
+    // entire per-limit latch below it: tapping Set then pushed 80/90 to the car, the exact harm
+    // the comment above describes, on EVERY car rather than only ones that never report a target.
+    //
+    // Keying on the two Ints instead of on reservChargeInfos answers the original worry, which
+    // was that the object churns on every charging-status poll: these restart only when a
+    // reported target actually CHANGES value, and the latches then no-op. So the effect settles
+    // after the first real payload and stops competing with the user's slider.
+    val acReported = ev?.reservChargeInfos?.level(1)
+    val dcReported = ev?.reservChargeInfos?.level(0)
+    LaunchedEffect(v.vin, acReported, dcReported) {
+        if (!acSeeded) acReported?.let { acLimit = it; acSeeded = true }
+        if (!dcSeeded) dcReported?.let { dcLimit = it; dcSeeded = true }
     }
 
     Pebble(
