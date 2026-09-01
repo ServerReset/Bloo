@@ -465,7 +465,12 @@ object ExpressiveButtonGroupScope {
                 .then(ExpressiveGroupData { press }),
             propagateMinConstraints = true,
         ) {
-            content()
+            // FALSE inside, exactly as SafeExpansiveButton's own group branch does it: this
+            // slot has already joined the group on the child's behalf, and without this the
+            // MorphButton inside would join a second time (it does that itself now), adding a
+            // redundant layout node and a second press spring per half whose parent data the
+            // group would never read.
+            CompositionLocalProvider(LocalExpressiveGroup provides false) { content() }
         }
     }
 }
