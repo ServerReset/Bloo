@@ -179,37 +179,52 @@ fun MorphButton(
         // against light cards and made disabled buttons look backgroundless.
         disabledContentColor ?: resolvedContent.copy(alpha = 0.38f)
     }
-    CompositionLocalProvider(LocalContentColor provides providedContent) {
-        MorphButtonCore(
-            onClick = { clickHaptic(); onClick() },
-            modifier = modifier
-                // `active` is otherwise a colour-only change -- most call sites also
-                // swap their label text (Lock/Unlock, Start/Stop), which is why this
-                // mostly "worked" for TalkBack by accident, but that's caller
-                // discipline, not something the shared button guarantees. Setting
-                // `selected` here makes every MorphButton correct by construction:
-                // the app's one button framework, so this is the single highest-
-                // leverage place to fix it.
-                .semantics { selected = active }
-                .animateContentSize(
-                    spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium),
-                )
-                .then(if (minHeight > 0.dp) Modifier.heightIn(min = minHeight) else Modifier),
-            enabled = enabled,
-            active = active,
-            containerColor = containerColor,
-            contentColor = contentColor,
-            activeContainerColor = activeContainerColor,
-            activeContentColor = activeContentColor,
-            contentPadding = contentPadding,
-            border = if (active) null else border,
-            interactionSource = interactionSource,
-            onLongClick = onLongClick,
-            pillCornerPercent = pillCornerPercent,
-            morphedCornerPercent = morphedCornerPercent,
-            shapeForCorner = shapeForCorner,
-            content = content,
-        )
+    val body: @Composable () -> Unit = {
+        CompositionLocalProvider(LocalContentColor provides providedContent) {
+            MorphButtonCore(
+                onClick = { clickHaptic(); onClick() },
+                modifier = modifier
+                    // `active` is otherwise a colour-only change -- most call sites also
+                    // swap their label text (Lock/Unlock, Start/Stop), which is why this
+                    // mostly "worked" for TalkBack by accident, but that's caller
+                    // discipline, not something the shared button guarantees. Setting
+                    // `selected` here makes every MorphButton correct by construction:
+                    // the app's one button framework, so this is the single highest-
+                    // leverage place to fix it.
+                    .semantics { selected = active }
+                    .animateContentSize(
+                        spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium),
+                    )
+                    .then(if (minHeight > 0.dp) Modifier.heightIn(min = minHeight) else Modifier),
+                enabled = enabled,
+                active = active,
+                containerColor = containerColor,
+                contentColor = contentColor,
+                activeContainerColor = activeContainerColor,
+                activeContentColor = activeContentColor,
+                contentPadding = contentPadding,
+                border = if (active) null else border,
+                interactionSource = interactionSource,
+                onLongClick = onLongClick,
+                pillCornerPercent = pillCornerPercent,
+                morphedCornerPercent = morphedCornerPercent,
+                shapeForCorner = shapeForCorner,
+                content = content,
+            )
+        }
+    }
+    // Join the group WITHOUT the call site having to know. A button in an ExpressiveButtonGroup
+    // only takes part in the press redistribution if it carries the group's parent data, and
+    // that data comes from SafeExpansiveButton -- which only MorphChip and the expand chevron
+    // wrapped themselves in. Every other button dropped into a group was silently a non-member:
+    // it kept its natural width, took no part, and its neighbours had nothing to give up. That
+    // is the "it just pushes them and they don't shrink" behaviour, and it could reappear with
+    // any new call site, so the button joins itself rather than relying on the call site to
+    // remember. Wrapping is idempotent -- see SafeExpansiveButton's group branch.
+    if (LocalExpressiveGroup.current) {
+        SafeExpansiveButton(interactionSource = interactionSource, enabled = enabled) { body() }
+    } else {
+        body()
     }
 }
 

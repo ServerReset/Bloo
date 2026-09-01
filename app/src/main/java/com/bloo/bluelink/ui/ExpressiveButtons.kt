@@ -107,7 +107,13 @@ fun SafeExpansiveButton(
     // takes the extra width off its NEIGHBOURS so the row's own footprint never changes.
     if (LocalExpressiveGroup.current) {
         Box(modifier.then(ExpressiveGroupData { press }), propagateMinConstraints = true) {
-            content()
+            // Providing FALSE inside makes joining a group idempotent. MorphButton now joins on
+            // its own when it finds itself in one (that is what stopped whole rows of buttons
+            // from ever animating), and without this every call site that already wraps its
+            // button explicitly would wrap it a second time -- a redundant layout node and a
+            // second press spring per button, whose parent data the group would not even read,
+            // since it belongs to a Box inside this one rather than to the group itself.
+            CompositionLocalProvider(LocalExpressiveGroup provides false) { content() }
         }
         return
     }
