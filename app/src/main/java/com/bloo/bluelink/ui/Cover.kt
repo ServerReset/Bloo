@@ -21,7 +21,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.only
@@ -271,7 +270,7 @@ internal fun CoverTile(
     subtitleColor: Color? = null,
     containerColor: Color = MaterialTheme.colorScheme.surfaceVariant,
     scrollState: ScrollState? = null,
-    actions: (@Composable RowScope.() -> Unit)? = null,
+    actions: (@Composable () -> Unit)? = null,
     // Drawn BEHIND the title/body/actions, inside the card's own clip -- the same
     // slot PebbleShell's own `background` is for the phone hero, and for the same
     // reason: CoverMainTile uses this for a full-bleed car photo. Whatever's here
@@ -363,9 +362,14 @@ internal fun CoverTile(
                 }
             }
             if (actions != null) {
-                Row(
-                    Modifier.fillMaxWidth().padding(bottom = coverTileEdgeGap()),
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                // ExpressiveButtonRow with equal shares: these are several buttons in one
+                // space, so pressing one should widen it and squeeze its neighbours, exactly as
+                // the lock pebble's connected group does on the phone. equalWidths is what the
+                // dead weight(1f) below was reaching for -- see ExpressiveButtonGroup.
+                ExpressiveButtonRow(
+                    modifier = Modifier.fillMaxWidth().padding(bottom = coverTileEdgeGap()),
+                    spacing = 6.dp,
+                    equalWidths = true,
                     content = actions,
                 )
             } else {
@@ -475,7 +479,7 @@ internal fun CoverMainTile(v: Vehicle, state: UiState, vm: AppViewModel) {
  * narrow ones with a hole where the fourth was.
  */
 @Composable
-internal fun RowScope.CoverActionBar(v: Vehicle, state: UiState, vm: AppViewModel) {
+internal fun CoverActionBar(v: Vehicle, state: UiState, vm: AppViewModel) {
     val status = state.statusFor(v)
     val ev = status?.evStatus
     val locked = status?.doorLock
@@ -540,7 +544,7 @@ internal fun RowScope.CoverActionBar(v: Vehicle, state: UiState, vm: AppViewMode
  *  of the row. Colour carries state -- [active] for a running command's target
  *  state, [attention] for a state the user probably wants to change. */
 @Composable
-internal fun RowScope.CoverActionButton(
+internal fun CoverActionButton(
     icon: ImageVector,
     label: String,
     onClick: () -> Unit,
@@ -587,8 +591,9 @@ internal fun RowScope.CoverActionButton(
             morphedCornerPercent = squarePct,
             contentPadding = PaddingValues(horizontal = 2.dp, vertical = 4.dp),
             minHeight = 0.dp,
+            // No weight(1f): its parent here is SafeExpansiveButton's own layout, not the row,
+            // so it was silently doing nothing. The equal share now comes from the group.
             modifier = Modifier
-                .weight(1f)
                 .height(56.dp)
                 .alpha(if (enabled) 1f else 0.45f),
         ) {

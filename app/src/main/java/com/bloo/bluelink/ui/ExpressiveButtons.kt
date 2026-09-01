@@ -159,9 +159,15 @@ fun ExpressiveButtonRow(
     modifier: Modifier = Modifier,
     spacing: Dp = 8.dp,
     verticalAlignment: Alignment.Vertical = Alignment.CenterVertically,
+    equalWidths: Boolean = false,
     content: @Composable () -> Unit,
 ) {
-    ExpressiveButtonGroup(modifier = modifier, spacing = spacing, verticalAlignment = verticalAlignment) {
+    ExpressiveButtonGroup(
+        modifier = modifier,
+        spacing = spacing,
+        verticalAlignment = verticalAlignment,
+        equalWidths = equalWidths,
+    ) {
         content()
     }
 }
@@ -182,6 +188,17 @@ fun ExpressiveButtonGroup(
     modifier: Modifier = Modifier,
     spacing: Dp = 3.dp,
     verticalAlignment: Alignment.Vertical = Alignment.CenterVertically,
+    /**
+     * Give every member an equal share of the row instead of its natural width -- the Material 3
+     * connected-group look, and what a `Row` of weighted children used to be asked for.
+     *
+     * It belongs here rather than at the call site because `Modifier.weight` cannot reach this
+     * layout: weight is RowScope parent data, and a child of this group is not a child of a Row.
+     * That is not hypothetical -- the cover action bar carried a `weight(1f)`, applied inside the
+     * button's own content where the parent is the wrapper rather than the row, so it did nothing
+     * at all and those buttons never filled the equal shares their own doc claimed.
+     */
+    equalWidths: Boolean = false,
     content: @Composable ExpressiveButtonGroupScope.() -> Unit,
 ) {
     // Natural (unpressed) child widths, cached from the last resting measure pass. A plain
@@ -221,7 +238,39 @@ fun ExpressiveButtonGroup(
             val usable = cached != null && cached.size == n &&
                 (0 until n).all { !member[it] || cached[it] > 0 }
 
-            val placeables: List<Placeable> = if (resting || !usable) {
+            // Equal shares are computed from the row itself, so there is nothing to cache and
+            // no first-pass-at-rest requirement: the base width is the same on every pass and a
+            // press redistributes from it exactly as it would from natural widths.
+            val equalBase: IntArray? = if (equalWidths && constraints.hasBoundedWidth) {
+                val members = (0 until n).count { member[it] }
+                if (members > 0) {
+                    val room = (constraints.maxWidth - gaps).coerceAtLeast(0)
+                    val each = room / members
+                    // The remainder goes to the first member rather than being dropped, so the
+                    // group fills its row exactly instead of leaving up to n-1 pixels bare.
+                    var extra = room - each * members
+                    IntArray(n) { i ->
+                        if (!member[i]) 0 else each + (if (extra > 0) { extra--; 1 } else 0)
+                    }
+                } else null
+            } else null
+
+            val placeables: List<Placeable> = if (equalBase != null) {
+                val desired = FloatArray(n) {
+                    if (member[it]) equalBase[it] * (1f + ExpressivePressGrowth * press[it]) else 0f
+                }
+                val total = equalBase.sum()
+                val desiredTotal = desired.sum()
+                val norm = if (desiredTotal > 0f) total / desiredTotal else 1f
+                measurables.mapIndexed { i, m ->
+                    if (!member[i]) {
+                        m.measure(childConstraints)
+                    } else {
+                        val w = (desired[i] * norm).roundToInt().coerceAtLeast(0)
+                        m.measure(childConstraints.copy(minWidth = w, maxWidth = w))
+                    }
+                }
+            } else if (resting || !usable) {
                 // At rest (and on the very first pass, which is always at rest since nothing
                 // can be pressed before it exists): measure naturally and record those widths
                 // as the budget every later pressed pass redistributes.
