@@ -58,17 +58,27 @@ import kotlin.math.roundToInt
 internal const val ExpressivePressGrowth = 0.15f
 
 /** The least of its resting width a squeezed neighbour keeps, so it compresses rather than
- *  collapsing -- a button that shrank to nothing would read as the group losing a member. */
+ *  collapsing -- a button that shrank to nothing would read as the group losing a member. It is
+ *  also the cap on how much a pressed button can actually take: growth is limited by what the
+ *  others can spare, never by letting the row grow. */
 private const val MinDonorFraction = 0.72f
+
+/** Damping for the press spring. High enough not to ring: see expressivePressFraction. */
+private const val PressDamping = 0.88f
 
 @Composable
 private fun expressivePressFraction(interactionSource: InteractionSource, enabled: Boolean): State<Float> {
     val pressed by interactionSource.collectIsPressedAsState()
     return animateFloatAsState(
         targetValue = if (pressed && enabled) 1f else 0f,
+        // Barely-bouncy and quick, because this fraction drives real WIDTH. A bouncy, slow
+        // spring is the right feel for something that only paints -- it was the original
+        // graphicsLayer scale -- but on width every overshoot frame re-measures the row and
+        // drags the neighbours back and forth with it, which reads as wobble rather than as
+        // life. The press still springs; it just does not ring.
         animationSpec = spring(
-            dampingRatio = Spring.DampingRatioMediumBouncy,
-            stiffness = Spring.StiffnessLow,
+            dampingRatio = PressDamping,
+            stiffness = Spring.StiffnessMedium,
         ),
         label = "expressivePress",
     )
@@ -303,63 +313,56 @@ fun ExpressiveButtonGroup(
                     naturals.widths = IntArray(n) { measured[it].width }
                 }
             } else {
-                // Constant total, full growth, neighbours compress. This is the whole effect:
-                // press one button and it takes 15% more width, the others give up exactly that
-                // much between them, and the group's own footprint does not move by a pixel.
+                // ONE invariant: the members' total width never changes. Everything else is
+                // a redistribution inside that fixed budget -- a pressed button takes width,
+                // the unpressed ones give exactly that much back, and the group's own footprint
+                // is identical on every frame of the press and the release.
                 //
-                // Two earlier versions each got half of it. The first normalised the pressed
-                // button DOWN along with everyone else to hold the total, which turned +15% into
-                // about +7% and split it with the neighbour -- present, but too small to read.
-                // The second took the growth out of the row's slack first, which gave the full
-                // 15% but left the neighbours untouched whenever there was room, so nothing
-                // compressed. Neither is what the effect is: one thing grows BECAUSE the others
-                // yield to it.
+                // Held as floats until the very last step. The previous version rounded each
+                // button as it went and then patched the leftover onto whichever one happened
+                // to be last, so a single pixel could hop between neighbours from frame to
+                // frame while the spring ran -- which is the jank on the collapse: not the
+                // motion, the rounding underneath it.
                 val total = (0 until n).sumOf { if (member[it]) cached[it] else 0 }
-                val target = IntArray(n) { cached[it] }
+                val growers = (0 until n).filter { member[it] && press[it] > 0.001f }
                 val donors = (0 until n).filter { member[it] && press[it] <= 0.001f }
-                val donorTotal = donors.sumOf { cached[it] }
-                if (donors.isEmpty()) {
-                    // Nothing to yield: a lone button in the row, or every one of them held at
-                    // once. It grows into whatever space the row already has rather than not
-                    // moving at all -- the row is a fixed width either way, so its footprint is
-                    // still unchanged.
-                    val room = if (constraints.hasBoundedWidth) constraints.maxWidth - gaps else Int.MAX_VALUE
-                    var spare = (room - total).coerceAtLeast(0)
-                    for (i in 0 until n) {
-                        if (!member[i]) continue
-                        val want = (cached[i] * ExpressivePressGrowth * press[i]).roundToInt()
-                        val take = minOf(want, spare)
-                        target[i] = cached[i] + take
-                        spare -= take
+
+                // What the pressed buttons are asking for, and what the others can actually
+                // spare above their floor. Whichever is smaller is what moves -- so with
+                // nothing to take from (a lone button in the row) NOTHING moves, rather than
+                // the row quietly growing to accommodate it.
+                val want = growers.sumOf { (cached[it] * ExpressivePressGrowth * press[it]).toDouble() }
+                val capacity = donors.sumOf { (cached[it] * (1f - MinDonorFraction)).toDouble() }
+                val give = minOf(want, capacity)
+
+                val exact = DoubleArray(n) { cached[it].toDouble() }
+                if (give > 0.0) {
+                    for (i in growers) {
+                        val share = (cached[i] * ExpressivePressGrowth * press[i]).toDouble() / want
+                        exact[i] = cached[i] + give * share
                     }
-                } else {
-                    // Grow the pressed ones fully, then take exactly that back from the others
-                    // in proportion to their size, so a wide neighbour yields more than a narrow
-                    // one and the last donor absorbs the rounding.
-                    var owed = 0
-                    for (i in 0 until n) {
-                        if (!member[i] || press[i] <= 0.001f) continue
-                        val grown = (cached[i] * (1f + ExpressivePressGrowth * press[i])).roundToInt()
-                        owed += grown - cached[i]
-                        target[i] = grown
+                    for (i in donors) {
+                        val share = (cached[i] * (1f - MinDonorFraction)).toDouble() / capacity
+                        exact[i] = cached[i] - give * share
                     }
-                    var left = owed
-                    for ((k, i) in donors.withIndex()) {
-                        val share = if (k == donors.lastIndex) left
-                                    else (owed.toLong() * cached[i] / donorTotal).toInt()
-                        // Never below a sliver: a donor squeezed to nothing would vanish and the
-                        // group would look like it lost a button rather than made room for one.
-                        val floor = (cached[i] * MinDonorFraction).roundToInt()
-                        val taken = share.coerceAtMost((cached[i] - floor).coerceAtLeast(0))
-                        target[i] = cached[i] - taken
-                        left -= taken
-                    }
-                    // Anything the donors could not absorb comes back off the growth, so the
-                    // total is exact rather than merely close.
-                    if (left > 0) {
-                        val growers = (0 until n).filter { member[it] && press[it] > 0.001f }
-                        val each = left / growers.size.coerceAtLeast(1)
-                        for (i in growers) target[i] = (target[i] - each).coerceAtLeast(0)
+                }
+
+                // Largest-remainder rounding across the members, so the integer widths sum to
+                // `total` EXACTLY rather than approximately. Without this the group breathes by
+                // a pixel or two as the spring runs, which on a connected pill is visible as a
+                // seam that will not sit still.
+                val target = IntArray(n) { if (member[it]) exact[it].toInt() else cached[it] }
+                var slack = total - (0 until n).sumOf { if (member[it]) target[it] else 0 }
+                if (slack != 0) {
+                    val order = (0 until n).filter { member[it] }
+                        .sortedByDescending { exact[it] - exact[it].toInt() }
+                    // Bounded by construction, not by trusting the arithmetic: truncation can
+                    // only ever leave slack >= 0 and smaller than the member count, but this
+                    // runs inside a measure pass, and a measure pass that can spin is a frozen
+                    // app rather than a wrong pixel.
+                    var k = 0
+                    while (slack > 0 && k < order.size) {
+                        target[order[k]]++; slack--; k++
                     }
                 }
                 measurables.mapIndexed { i, m ->
