@@ -584,8 +584,15 @@ internal fun HeroHeader(
                 // could fit for part of the transition -- "mi" briefly shrank to "m..."
                 // before width caught up and it reflowed back. A plain lerp keeps width
                 // and type size moving together in lockstep, which is what avoids that.
-                val from = collapsedNumbers.value
-                val to = expandedNumbers.value
+                // Each anchor falls back to the other. Requiring BOTH meant that on a card
+                // which has never been expanded -- the normal state of every card in the garage
+                // -- the expanded anchor had never composed, so `to` was null, this whole block
+                // was skipped, and the in-card copy is alpha 0 while hoisted. The percentage and
+                // range simply were not drawn anywhere. With one anchor known the lerp is
+                // between a point and itself, which is exactly right: hold at the collapsed
+                // position until the expanded one reports.
+                val from = collapsedNumbers.value ?: expandedNumbers.value
+                val to = expandedNumbers.value ?: collapsedNumbers.value
                 if (hoisted && from != null && to != null) {
                     val x = androidx.compose.ui.util.lerp(from.left, to.left, heroT)
                     val y = androidx.compose.ui.util.lerp(from.top, to.top, heroT)

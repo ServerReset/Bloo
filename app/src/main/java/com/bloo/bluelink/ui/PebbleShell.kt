@@ -547,7 +547,14 @@ internal fun PebbleShell(
                             Text(
                                 title,
                                 modifier = Modifier
-                                    .weight(1f, fill = false)
+                                    // fill = true when the trailing slot is pinned to the end,
+                                    // so the title claims ALL the remaining width and pushes the
+                                    // control there. The weighted Spacer that used to do that job
+                                    // was a second weighted child, so the row split the remainder
+                                    // 50/50 and capped the title at half the card -- which is why
+                                    // "Sounds & vibration" ellipsized to "Sounds & ..." with the
+                                    // switch adrift in the middle instead of sitting hard right.
+                                    .weight(1f, fill = titleTrailingAtEnd)
                                     // Reports the DRAWN size. graphicsLayer scales the drawing and
                                     // leaves the measured size alone, so without this the title's
                                     // box stayed headline-TALL while its glyphs were title-sized --
@@ -617,12 +624,10 @@ internal fun PebbleShell(
                             // the slot owns both. The hero shows this only while collapsed,
                             // and a 10dp gap left behind when it goes would squeeze the
                             // expanded title for a node that is no longer in the row.
-                            if (titleTrailingAtEnd) {
-                                // Weighted spacer, plus a hard minimum, so a long title
-                                // ellipsizes rather than ever touching the control.
-                                Spacer(Modifier.width(12.dp))
-                                Spacer(Modifier.weight(1f))
-                            }
+                            // A hard minimum gap so a long title ellipsizes rather than ever
+                            // touching the control. No weighted spacer -- the title's own fill
+                            // above is what pushes the control to the end.
+                            if (titleTrailingAtEnd) Spacer(Modifier.width(12.dp))
                             titleTrailing?.invoke()
                             }
                             if (summary != null) {

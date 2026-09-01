@@ -57,6 +57,10 @@ import kotlin.math.roundToInt
 /** 1.0 -> 1.15: the pressed button claims 15% more, per Material 3 Expressive. */
 internal const val ExpressivePressGrowth = 0.15f
 
+/** The least of its resting width a squeezed neighbour keeps, so it compresses rather than
+ *  collapsing -- a button that shrank to nothing would read as the group losing a member. */
+private const val MinDonorFraction = 0.72f
+
 @Composable
 private fun expressivePressFraction(interactionSource: InteractionSource, enabled: Boolean): State<Float> {
     val pressed by interactionSource.collectIsPressedAsState()
@@ -299,48 +303,65 @@ fun ExpressiveButtonGroup(
                     naturals.widths = IntArray(n) { measured[it].width }
                 }
             } else {
-                // The pressed button gets the FULL growth. It used to be normalised down along
-                // with everyone else -- pressed asks for 1.15x, then the whole row is scaled by
-                // total/desiredTotal to keep the width constant -- which on a two-button row
-                // handed the pressed one about +7% instead of +15%, and split the difference
-                // with its neighbour. Correct arithmetic, wrong effect: the press was there but
-                // too small to read, which is what "the buttons still don't animate" was.
+                // Constant total, full growth, neighbours compress. This is the whole effect:
+                // press one button and it takes 15% more width, the others give up exactly that
+                // much between them, and the group's own footprint does not move by a pixel.
                 //
-                // Now the growth is taken from SLACK first. Only when the row has none do the
-                // other members give it up, and even then the pressed one keeps its full size --
-                // it pushes, rather than politely shrinking along with what it pushes.
+                // Two earlier versions each got half of it. The first normalised the pressed
+                // button DOWN along with everyone else to hold the total, which turned +15% into
+                // about +7% and split it with the neighbour -- present, but too small to read.
+                // The second took the growth out of the row's slack first, which gave the full
+                // 15% but left the neighbours untouched whenever there was room, so nothing
+                // compressed. Neither is what the effect is: one thing grows BECAUSE the others
+                // yield to it.
+                val total = (0 until n).sumOf { if (member[it]) cached[it] else 0 }
                 val target = IntArray(n) { cached[it] }
-                val room = if (constraints.hasBoundedWidth) constraints.maxWidth - gaps else Int.MAX_VALUE
-                val restTotal = (0 until n).sumOf { cached[it] }
-                var wanted = 0
-                for (i in 0 until n) {
-                    if (!member[i]) continue
-                    val grown = (cached[i] * (1f + ExpressivePressGrowth * press[i])).roundToInt()
-                    wanted += grown - cached[i]
-                    target[i] = grown
-                }
-                val overflow = (restTotal + wanted - room).coerceAtLeast(0)
-                if (overflow > 0) {
-                    // Take it back from the members that are NOT growing, in proportion to their
-                    // size, so a wide neighbour yields more than a narrow one.
-                    val donors = (0 until n).filter { member[it] && press[it] <= 0.001f }
-                    val donorTotal = donors.sumOf { cached[it] }
-                    if (donorTotal > 0) {
-                        var left = overflow
-                        for ((k, i) in donors.withIndex()) {
-                            val share = if (k == donors.lastIndex) left
-                                        else (overflow.toLong() * cached[i] / donorTotal).toInt()
-                            target[i] = (cached[i] - share).coerceAtLeast(0)
-                            left -= share
-                        }
-                    } else {
-                        // Nothing to take from (every member is pressed, or there is one of
-                        // them): fall back to fitting inside the row rather than overflowing it.
-                        val scale = if (restTotal + wanted > 0) room.toFloat() / (restTotal + wanted) else 1f
-                        for (i in 0 until n) if (member[i]) target[i] = (target[i] * scale).roundToInt()
+                val donors = (0 until n).filter { member[it] && press[it] <= 0.001f }
+                val donorTotal = donors.sumOf { cached[it] }
+                if (donors.isEmpty()) {
+                    // Nothing to yield: a lone button in the row, or every one of them held at
+                    // once. It grows into whatever space the row already has rather than not
+                    // moving at all -- the row is a fixed width either way, so its footprint is
+                    // still unchanged.
+                    val room = if (constraints.hasBoundedWidth) constraints.maxWidth - gaps else Int.MAX_VALUE
+                    var spare = (room - total).coerceAtLeast(0)
+                    for (i in 0 until n) {
+                        if (!member[i]) continue
+                        val want = (cached[i] * ExpressivePressGrowth * press[i]).roundToInt()
+                        val take = minOf(want, spare)
+                        target[i] = cached[i] + take
+                        spare -= take
+                    }
+                } else {
+                    // Grow the pressed ones fully, then take exactly that back from the others
+                    // in proportion to their size, so a wide neighbour yields more than a narrow
+                    // one and the last donor absorbs the rounding.
+                    var owed = 0
+                    for (i in 0 until n) {
+                        if (!member[i] || press[i] <= 0.001f) continue
+                        val grown = (cached[i] * (1f + ExpressivePressGrowth * press[i])).roundToInt()
+                        owed += grown - cached[i]
+                        target[i] = grown
+                    }
+                    var left = owed
+                    for ((k, i) in donors.withIndex()) {
+                        val share = if (k == donors.lastIndex) left
+                                    else (owed.toLong() * cached[i] / donorTotal).toInt()
+                        // Never below a sliver: a donor squeezed to nothing would vanish and the
+                        // group would look like it lost a button rather than made room for one.
+                        val floor = (cached[i] * MinDonorFraction).roundToInt()
+                        val taken = share.coerceAtMost((cached[i] - floor).coerceAtLeast(0))
+                        target[i] = cached[i] - taken
+                        left -= taken
+                    }
+                    // Anything the donors could not absorb comes back off the growth, so the
+                    // total is exact rather than merely close.
+                    if (left > 0) {
+                        val growers = (0 until n).filter { member[it] && press[it] > 0.001f }
+                        val each = left / growers.size.coerceAtLeast(1)
+                        for (i in growers) target[i] = (target[i] - each).coerceAtLeast(0)
                     }
                 }
-
                 measurables.mapIndexed { i, m ->
                     val w = target[i].coerceAtMost(
                         if (constraints.hasBoundedWidth) constraints.maxWidth else target[i],
