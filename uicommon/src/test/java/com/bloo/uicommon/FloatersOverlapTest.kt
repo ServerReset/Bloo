@@ -17,7 +17,7 @@ import kotlin.test.assertTrue
  * behaviour -- the vertical gate, the padding, the decimal-precision frame --
  * gets pinned instead of retuned next time the chrome moves a few dp.
  */
-class PagerDotsOverlapTest {
+class FloatersOverlapTest {
 
     private val dots = Rect(100f, 10f, 180f, 30f)   // the pill itself
     private val name = Rect(110f, 100f, 170f, 120f) // the hero-card inline name, far below

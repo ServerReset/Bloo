@@ -47,7 +47,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
@@ -70,23 +69,6 @@ import androidx.compose.ui.graphics.StrokeCap
  *  component stays Material-free and renders identically under
  *  compose.material3 and wear.compose.material3. */
 
-/** Whether two pieces of floating chrome overlap, with [marginPx] of slop around [b] -- so a
- *  name ellipsizing right up against the page dots' edge still counts as being in the way,
- *  without literal pixel overlap. Pure and non-composable, so a caller can run it every frame
- *  (from a draw block, or a derivedStateOf) without touching composition. A null rect means
- *  "not on screen / nothing measured yet", which never collides.
- *
- *  Lives here rather than beside its one-time only caller because the app's floating registry
- *  (FloatingSystem.kt) now runs every floater-vs-floater test through it, and this module is
- *  where the JVM tests that pin its boundary behaviour can reach it. */
-fun floatersOverlap(a: Rect?, b: Rect?, marginPx: Float): Boolean {
-    if (a == null || b == null) return false
-    // Vertical gate first -- floating elements usually sit on different rows (an inline name
-    // sits well below the dots' fixed top row; only a DOCKED pill, or one mid-flight toward
-    // it, climbs high enough to matter), so most calls bail out here.
-    if (b.bottom < a.top || b.top > a.bottom) return false
-    return b.right + marginPx >= a.left && b.left - marginPx <= a.right
-}
 /** Material-free color spec for [PagerDots]: the one theme coupling a
  *  cross-surface call site must supply. Defaults are neutral grayscale so a
  *  caller that has no theme (e.g. tests) still gets a visible control.

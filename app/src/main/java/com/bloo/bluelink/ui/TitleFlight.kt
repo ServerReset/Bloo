@@ -239,7 +239,7 @@ internal class HeroTitleFlight(topInsetPx: Float, private val hysteresisPx: Floa
         // used to be mutated INSIDE that lambda as a side effect, so a
         // discarded/speculative run could still permanently advance the
         // hysteresis baseline a real, committed run never asked for.
-        dockedNow = if (dockedNow) offset.y < topInsetPx + hysteresisPx else offset.y < topInsetPx
+        dockedNow = com.bloo.uicommon.shouldDock(offset.y, topInsetPx, dockedNow, hysteresisPx)
         reportGen++
     }
 
@@ -264,7 +264,9 @@ internal class HeroTitleFlight(topInsetPx: Float, private val hysteresisPx: Floa
             inlineSizeState.value = size
         }
         baselineScrollPx = scrollValuePx()
-        dockedNow = offset.y < topInsetPx
+        // hysteresis 0: a first/settled report has no previous state to be sticky about -- see
+        // this function's own doc above, and shouldDock's.
+        dockedNow = com.bloo.uicommon.shouldDock(offset.y, topInsetPx, currentlyDocked = false, hysteresisPx = 0f)
         reportGen++
     }
 
