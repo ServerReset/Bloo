@@ -125,36 +125,90 @@ data class PinLockout(
     val failures: Int = 0,
     /** Wall-clock epoch ms until which the next attempt may not proceed. */
     val lockedUntilEpochMs: Long = 0L,
+    /**
+     * The same deadline on the MONOTONIC clock (`SystemClock.elapsedRealtime`), which no
+     * setting can move.
+     *
+     * The wall-clock deadline alone was the whole check, and the threat model for an app-lock
+     * PIN is someone holding the device -- who can open Settings and move the clock forward,
+     * which retires every rejection window instantly. That defeats the control this class's own
+     * doc calls the primary defence, chosen over more PBKDF2 iterations precisely because the
+     * escalation was doing the work.
+     *
+     * 0 means "no monotonic anchor": state written by an older build, or a value the reboot
+     * check below has discarded. Then the wall clock is all there is, which is exactly where
+     * this started -- never worse.
+     */
+    val lockedUntilElapsedMs: Long = 0L,
 ) {
-    fun isLocked(nowEpochMs: Long): Boolean = lockedUntilEpochMs > nowEpochMs
+    /**
+     * Locked if EITHER clock says so, so beating it requires moving both -- and one of them
+     * cannot be moved.
+     */
+    fun isLocked(nowEpochMs: Long, nowElapsedMs: Long = 0L): Boolean =
+        lockedUntilEpochMs > nowEpochMs || elapsedRemainingMs(nowElapsedMs) > 0L
 
-    fun remainingMs(nowEpochMs: Long): Long = (lockedUntilEpochMs - nowEpochMs).coerceAtLeast(0L)
+    fun remainingMs(nowEpochMs: Long, nowElapsedMs: Long = 0L): Long =
+        maxOf((lockedUntilEpochMs - nowEpochMs), elapsedRemainingMs(nowElapsedMs))
+            .coerceAtLeast(0L)
+
+    /**
+     * What the monotonic anchor still has to run, or 0 if it cannot be trusted.
+     *
+     * elapsedRealtime resets to ~0 on reboot, so a persisted anchor from a previous boot would
+     * otherwise read as a deadline far in the future and lock the user out for its whole
+     * remaining length. A remainder longer than the largest window we ever issue can only mean
+     * the clock it was measured against no longer exists, so it is discarded rather than
+     * trusted -- failing back to the wall clock instead of failing the user out.
+     */
+    private fun elapsedRemainingMs(nowElapsedMs: Long): Long {
+        if (lockedUntilElapsedMs <= 0L || nowElapsedMs <= 0L) return 0L
+        val remaining = lockedUntilElapsedMs - nowElapsedMs
+        if (remaining <= 0L) return 0L
+        return if (remaining > MAX_WINDOW_MS) 0L else remaining
+    }
 
     /** How many attempts remain in the current batch before the next window
      *  starts, or null while rejected. */
-    fun attemptsRemainingInBatch(nowEpochMs: Long): Int? =
-        if (isLocked(nowEpochMs)) null
+    fun attemptsRemainingInBatch(nowEpochMs: Long, nowElapsedMs: Long = 0L): Int? =
+        if (isLocked(nowEpochMs, nowElapsedMs)) null
         else STRIKES_PER_BATCH - (failures % STRIKES_PER_BATCH)
 
-    fun onFailure(nowEpochMs: Long): PinLockout {
+    fun onFailure(nowEpochMs: Long, nowElapsedMs: Long = 0L): PinLockout {
         val nextFailures = failures + 1
         return if (nextFailures % STRIKES_PER_BATCH == 0) {
             val batch = nextFailures / STRIKES_PER_BATCH
-            val durationMs = BASE_WINDOW_MS * (1L shl (batch - 1))
-            PinLockout(nextFailures, nowEpochMs + durationMs)
+            val durationMs = windowMs(batch)
+            PinLockout(
+                nextFailures,
+                nowEpochMs + durationMs,
+                // Only anchored when a real monotonic reading was supplied; 0 stays 0 so a
+                // caller that has none does not manufacture a deadline at the epoch.
+                if (nowElapsedMs > 0L) nowElapsedMs + durationMs else 0L,
+            )
         } else {
-            PinLockout(nextFailures, lockedUntilEpochMs)
+            PinLockout(nextFailures, lockedUntilEpochMs, lockedUntilElapsedMs)
         }
     }
 
-    fun onSuccess(): PinLockout = PinLockout(0, 0L)
+    fun onSuccess(): PinLockout = PinLockout(0, 0L, 0L)
 
     companion object {
         const val STRIKES_PER_BATCH = 5
         const val BASE_WINDOW_MS = 30_000L
 
+        /**
+         * The escalation is capped. Doubling forever overflows into nonsense (batch 60 is
+         * longer than the age of the universe), and a window nobody can outlast is a bricked
+         * app rather than a deterrent. It also gives [elapsedRemainingMs] a bound to sanity
+         * check a restored anchor against.
+         */
+        const val MAX_WINDOW_MS = 60L * 60_000L
+
         /** The window length for batch number [batch] (1-based). */
-        fun windowMs(batch: Int): Long = BASE_WINDOW_MS * (1L shl (batch - 1))
+        fun windowMs(batch: Int): Long =
+            if (batch >= 32) MAX_WINDOW_MS
+            else (BASE_WINDOW_MS * (1L shl (batch - 1))).coerceAtMost(MAX_WINDOW_MS)
     }
 }
 /** "0:23" formatting for the lockout countdown line, shared by every surface

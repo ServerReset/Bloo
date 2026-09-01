@@ -119,6 +119,7 @@ class CredentialStore(context: Context) {
                 .remove(KEY_PIN_RECORD)
                 .remove(KEY_PIN_FAILURES)
                 .remove(KEY_PIN_LOCKED_UNTIL)
+                .remove(KEY_PIN_LOCKED_UNTIL_ELAPSED)
                 .apply()
         } else {
             prefs.edit().putString(KEY_PIN_RECORD, record).apply()
@@ -132,11 +133,16 @@ class CredentialStore(context: Context) {
      *  long -- wall-clock epoch ms until the next attempt may proceed. */
     fun getPinLockedUntil(): Long = prefs.getLong(KEY_PIN_LOCKED_UNTIL, 0L)
 
+    /** The same deadline on the monotonic clock -- see [PinLockout.lockedUntilElapsedMs].
+     *  0 for state written before this existed, which reads as "no anchor". */
+    fun getPinLockedUntilElapsed(): Long = prefs.getLong(KEY_PIN_LOCKED_UNTIL_ELAPSED, 0L)
+
     /** Persists the whole [PinLockout] state atomically. */
     fun setPinLockout(lockout: PinLockout) {
         prefs.edit()
             .putInt(KEY_PIN_FAILURES, lockout.failures)
             .putLong(KEY_PIN_LOCKED_UNTIL, lockout.lockedUntilEpochMs)
+            .putLong(KEY_PIN_LOCKED_UNTIL_ELAPSED, lockout.lockedUntilElapsedMs)
             .apply()
     }
 
@@ -178,5 +184,6 @@ class CredentialStore(context: Context) {
         const val KEY_PIN_RECORD = "app_pin_record"
         const val KEY_PIN_FAILURES = "app_pin_failures"
         const val KEY_PIN_LOCKED_UNTIL = "app_pin_locked_until"
+        const val KEY_PIN_LOCKED_UNTIL_ELAPSED = "app_pin_locked_until_elapsed"
     }
 }

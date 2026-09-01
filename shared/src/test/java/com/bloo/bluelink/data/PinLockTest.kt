@@ -207,4 +207,72 @@ class PinLockBoundaryTest {
         assertEquals(0L, reset.lockedUntilEpochMs)
         assertEquals(false, reset.isLocked(1_000_000L))
     }
+
+    // --- Lockout: the monotonic anchor -------------------------------------
+    //
+    // The threat these pin down is the one the lockout exists for: somebody holding the phone.
+    // That person can open Settings and move the wall clock, and before the anchor existed
+    // that retired every rejection window instantly.
+
+    @Test
+    fun lockout_survivesWallClockJumpForward() {
+        val e0 = 5_000_000L
+        var s = PinLockout()
+        repeat(5) { s = s.onFailure(t0, e0) }
+        assertTrue("five failures must lock", s.isLocked(t0, e0))
+
+        // A year of wall clock, no monotonic time at all -- the attacker's move.
+        val jumped = t0 + 365L * 24 * 60 * 60 * 1000
+        assertTrue("a wall-clock jump must not unlock", s.isLocked(jumped, e0))
+        assertEquals(PinLockout.BASE_WINDOW_MS, s.remainingMs(jumped, e0))
+        assertNull(s.attemptsRemainingInBatch(jumped, e0))
+    }
+
+    @Test
+    fun lockout_releasesWhenBothClocksHaveRun() {
+        val e0 = 5_000_000L
+        var s = PinLockout()
+        repeat(5) { s = s.onFailure(t0, e0) }
+        val w = PinLockout.BASE_WINDOW_MS
+        assertTrue(s.isLocked(t0 + w - 1, e0 + w - 1))
+        assertFalse("real elapsed time must release it", s.isLocked(t0 + w, e0 + w))
+    }
+
+    @Test
+    fun lockout_rebootDiscardsTheAnchorRatherThanLockingOut() {
+        // elapsedRealtime resets to ~0 on reboot, so a persisted anchor from a previous boot
+        // would read as a deadline hours away. Trusting it would lock the user out for its
+        // whole remaining length; it is discarded instead, leaving the wall clock in charge.
+        val s = PinLockout(
+            failures = 5,
+            lockedUntilEpochMs = t0 + PinLockout.BASE_WINDOW_MS,
+            lockedUntilElapsedMs = 9_000_000L,
+        )
+        val afterReboot = 1_000L
+        assertFalse(
+            "an anchor further out than any window we issue must be discarded",
+            s.isLocked(t0 + PinLockout.BASE_WINDOW_MS, afterReboot),
+        )
+        // ...and the wall clock still holds it inside the window.
+        assertTrue(s.isLocked(t0, afterReboot))
+    }
+
+    @Test
+    fun lockout_withoutAnchorBehavesExactlyAsBefore() {
+        // State written by an older build has no anchor. That must degrade to the previous
+        // behaviour, never to something stricter that could strand someone.
+        var s = PinLockout()
+        repeat(5) { s = s.onFailure(t0) }
+        assertEquals(0L, s.lockedUntilElapsedMs)
+        assertTrue(s.isLocked(t0))
+        assertFalse(s.isLocked(t0 + PinLockout.BASE_WINDOW_MS))
+    }
+
+    @Test
+    fun lockout_windowIsCapped() {
+        // Doubling forever overflows into nonsense, and a window nobody can outlast is a
+        // bricked app rather than a deterrent.
+        assertEquals(PinLockout.MAX_WINDOW_MS, PinLockout.windowMs(40))
+        assertTrue(PinLockout.windowMs(12) <= PinLockout.MAX_WINDOW_MS)
+    }
 }

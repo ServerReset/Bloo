@@ -883,6 +883,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 pinLockout = PinLockout(
                     credentialStore.getPinFailures(),
                     credentialStore.getPinLockedUntil(),
+                    credentialStore.getPinLockedUntilElapsed(),
                 ),
             )
         }
@@ -929,8 +930,15 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             val record = PinRecord.decode(credentialStore.getPinRecord()) ?: return@launch
             val now = System.currentTimeMillis()
-            var lockout = PinLockout(credentialStore.getPinFailures(), credentialStore.getPinLockedUntil())
-            if (lockout.isLocked(now)) {
+            // The monotonic reading alongside the wall clock: the wall clock is what someone
+            // holding the device can move, and moving it used to retire the rejection window.
+            val nowElapsed = android.os.SystemClock.elapsedRealtime()
+            var lockout = PinLockout(
+                credentialStore.getPinFailures(),
+                credentialStore.getPinLockedUntil(),
+                credentialStore.getPinLockedUntilElapsed(),
+            )
+            if (lockout.isLocked(now, nowElapsed)) {
                 _state.update { it.copy(pinAttemptRejected = true) }
                 return@launch
             }
@@ -941,7 +949,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 _state.update { it.copy(pinAcceptedTick = it.pinAcceptedTick + 1) }
                 unlocked()
             } else {
-                lockout = lockout.onFailure(now)
+                lockout = lockout.onFailure(now, nowElapsed)
                 credentialStore.setPinLockout(lockout)
                 _state.update { it.copy(pinLockout = lockout, pinAttemptRejected = true) }
             }

@@ -158,9 +158,13 @@ internal fun LockOverlay(vm: AppViewModel) {
     // the countdown line needs a fresh "seconds left" each second, and
     // nothing else here wants a 1s recomposition loop.
     var nowTick by remember { mutableStateOf(System.currentTimeMillis()) }
+    // The monotonic reading is ticked alongside the wall clock, so the countdown this screen
+    // SHOWS agrees with the one verifyAppPin enforces. Reading only the wall clock here would
+    // have the UI cheerfully offer a keypad while the attempt was still being rejected.
+    var elapsedTick by remember { mutableStateOf(android.os.SystemClock.elapsedRealtime()) }
     val lockout = appState.pinLockout
-    val rejected = lockout.isLocked(nowTick)
-    val remainingMs = lockout.remainingMs(nowTick)
+    val rejected = lockout.isLocked(nowTick, elapsedTick)
+    val remainingMs = lockout.remainingMs(nowTick, elapsedTick)
 
     fun authenticateBiometric() {
         context.findFragmentActivity()?.let { activity ->
@@ -186,6 +190,7 @@ internal fun LockOverlay(vm: AppViewModel) {
         while (true) {
             delay(250)
             nowTick = System.currentTimeMillis()
+            elapsedTick = android.os.SystemClock.elapsedRealtime()
         }
     }
     // Pattern for "pick the PIN route": tapping "Use PIN" once; a failed
@@ -339,7 +344,7 @@ internal fun LockOverlay(vm: AppViewModel) {
                                         color = MaterialTheme.colorScheme.error,
                                     )
                                     else -> Text(
-                                        lockout.attemptsRemainingInBatch(nowTick)?.let { left ->
+                                        lockout.attemptsRemainingInBatch(nowTick, elapsedTick)?.let { left ->
                                             if (left <= 2) "Careful — $left ${if (left == 1) "attempt" else "attempts"} before a lockout"
                                             else "${PinLockout.STRIKES_PER_BATCH} wrong attempts lock the app for 30 seconds — the wait doubles each time"
                                         } ?: "",
