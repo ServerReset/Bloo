@@ -7,6 +7,13 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Stable
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.foundation.layout.offset
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateMapOf
@@ -53,6 +60,12 @@ object FloatingIds {
     val Title = FloatingId("title")
     /** The centered page-dot indicator. */
     val PagerDots = FloatingId("pagerDots")
+    /** The Settings cog in the top-right corner. */
+    val SettingsIcon = FloatingId("settingsIcon")
+    /** The flip-columns button, beside the cog while a car is expanded. */
+    val FlipIcon = FloatingId("flipIcon")
+    /** The back arrow in the top-left corner while a car is expanded. */
+    val BackIcon = FloatingId("backIcon")
 }
 
 @Stable
@@ -60,6 +73,23 @@ class FloatingRegistry {
     // Snapshot-backed so a dodger recomposes/redraws when a neighbour moves. Writes come from
     // onGloballyPositioned (layout phase is finished by then, so this is a safe place to write).
     private val bounds = mutableStateMapOf<FloatingId, Rect>()
+
+    /**
+     * Shared chrome state, applied by [Modifier.floatingOverlay] rather than by each element.
+     *
+     * Two behaviours belong to floating chrome as a class, not to any one piece of it: it slides
+     * down while the user pulls to refresh, and the transient parts of it fade out while a
+     * refresh is actually running. Both used to be hand-applied at each site, which is exactly
+     * why they disagreed -- the page dots took the fade but not the shift (though the comment
+     * driving it named the dots first), and the corner buttons took the shift but not the fade.
+     * Holding them here means a new floating element gets the same behaviour by declaring one
+     * modifier, and cannot quietly get half of it.
+     *
+     * Targets, not animated values: the modifier owns the springs, so a screen publishing these
+     * does not recompose on every frame of them.
+     */
+    var chromeShiftTarget by mutableStateOf(0.dp)
+    var chromeHidden by mutableStateOf(false)
 
     /** Publish (or with null, withdraw) this element's live bounds. */
     fun report(id: FloatingId, rect: Rect?) {
@@ -88,6 +118,43 @@ class FloatingRegistry {
         fun overlaps(a: Rect, b: Rect, marginPx: Float): Boolean =
             com.bloo.uicommon.floatersOverlap(a, b, marginPx)
     }
+}
+
+/**
+ * Everything a floating element needs, in one modifier: it publishes its bounds so others can
+ * avoid it, rides the pull-to-refresh shift, and fades while a refresh runs.
+ *
+ * [fade] is off for chrome that is *about* the refresh (the loading indicator, which must stay
+ * visible precisely when everything else goes) and for persistent navigation that should not
+ * blink. [shift] is off for anything anchored to the screen rather than to the page beneath it --
+ * the Settings cog is a nav target, not page chrome, so it stays put while the page slides.
+ */
+fun Modifier.floatingOverlay(
+    id: FloatingId,
+    active: Boolean = true,
+    fade: Boolean = true,
+    shift: Boolean = true,
+): Modifier = composed {
+    val registry = LocalFloatingRegistry.current
+    val shiftDp by animateDpAsState(
+        targetValue = if (shift) registry.chromeShiftTarget else 0.dp,
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioNoBouncy,
+            stiffness = if (registry.chromeHidden) Spring.StiffnessLow else Spring.StiffnessMedium,
+        ),
+        label = "floatingShift",
+    )
+    val alpha by animateFloatAsState(
+        targetValue = if (fade && registry.chromeHidden) 0f else 1f,
+        animationSpec = tween(durationMillis = 200),
+        label = "floatingFade",
+    )
+    this
+        // Layout phase and draw phase respectively -- neither re-runs composition per frame,
+        // which is the whole reason these are read inside lambdas.
+        .offset { IntOffset(0, shiftDp.roundToPx()) }
+        .graphicsLayer { this.alpha = alpha }
+        .floatingElement(id, active)
 }
 
 /** Provided once for the whole app in `BlooApp` (Screens.kt). The default instance exists so a

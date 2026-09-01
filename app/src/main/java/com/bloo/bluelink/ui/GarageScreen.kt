@@ -24,8 +24,6 @@ import androidx.compose.animation.togetherWith
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.MutableTransitionState
 import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.animateDpAsState
-import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -93,7 +91,6 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.composed
-import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.round
 import androidx.compose.ui.unit.dp
 import com.bloo.bluelink.data.STALE_STATUS_MS
@@ -117,7 +114,7 @@ import com.bloo.uicommon.LocalReorderActive
  *  - Otherwise, the default single-column swipe-between-cars view.
  *
  * State plumbing specific to this screen:
- *  - `pullFractionState`/`dotsAlphaState`/`refreshShift` together drive how the
+ *  - `pullFractionState` plus the floating registry's chrome targets drive how the
  *    floating page-indicator dots and other overlays react live as the user
  *    pulls to refresh -- fading/sliding out of the way during the pull and
  *    springing back once it resolves -- rather than only reacting once
@@ -191,11 +188,12 @@ internal fun GarageScreen(state: State<UiState>, vm: AppViewModel) {
     // on every one of those pixels, for a target value that's already saturated
     // the moment the pull passes 1%.
     val pulling by remember { derivedStateOf { pullFractionState.value > 0.01f } }
-    val dotsAlphaState = animateFloatAsState(
-        targetValue = if (state.value.refreshing || pulling) 0f else 1f,
-        animationSpec = tween(durationMillis = 200),
-        label = "dotsFade",
-    )
+    // Published to the floating registry instead of animated here. The fade and the pull shift
+    // are behaviours of floating CHROME, not of the dots or the corner buttons individually --
+    // holding them per-site is what let them disagree (dots faded but never shifted; the corner
+    // icons shifted but never faded). Modifier.floatingOverlay owns both springs now, so this
+    // screen publishes targets and never recomposes on their frames.
+    val floatingRegistry = LocalFloatingRegistry.current
     // Slide the floating overlays (dots, settings, back/flip) down: in real time as
     // the user pulls, then settle/spring back up once the refresh completes.
     // overlayShiftTarget genuinely needs the continuous fraction (the shift is
@@ -208,14 +206,13 @@ internal fun GarageScreen(state: State<UiState>, vm: AppViewModel) {
     // offset { } at its two use sites.
     val overlayShiftTarget = if (state.value.refreshing) RefreshPullShift
         else (RefreshPullShift * pullFraction).coerceIn(0.dp, RefreshPullShift)
-    val refreshShiftState = animateDpAsState(
-        targetValue = overlayShiftTarget,
-        animationSpec = spring(
-            dampingRatio = Spring.DampingRatioNoBouncy,
-            stiffness = if (state.value.refreshing) Spring.StiffnessLow else Spring.StiffnessMedium,
-        ),
-        label = "refreshShift",
-    )
+    val chromeHidden = state.value.refreshing || pulling
+    // SideEffect, not a bare assignment: these are snapshot writes, and writing state during
+    // composition invalidates the composition that is running.
+    SideEffect {
+        floatingRegistry.chromeShiftTarget = overlayShiftTarget
+        floatingRegistry.chromeHidden = chromeHidden
+    }
 
     val count = vehicles.size
     val cfg = LocalConfiguration.current
@@ -371,7 +368,7 @@ internal fun GarageScreen(state: State<UiState>, vm: AppViewModel) {
                             real = { exWrap.real(it) },
                             count = count,
                             modifier = Modifier.align(Alignment.TopCenter).statusBarsPadding().padding(top = HeaderCornerGap)
-                                .graphicsLayer { alpha = dotsAlphaState.value },
+                                .floatingOverlay(FloatingIds.PagerDots),
                             onRefresh = { vm.refreshStatus(vehicles[exWrap.settledReal]) },
                         )
                     }
@@ -983,7 +980,7 @@ internal fun GarageScreen(state: State<UiState>, vm: AppViewModel) {
                             real = { realBlock(it) },
                             count = totalBlocks,
                             modifier = Modifier.align(Alignment.TopCenter).statusBarsPadding().padding(top = HeaderCornerGap)
-                                .graphicsLayer { alpha = dotsAlphaState.value },
+                                .floatingOverlay(FloatingIds.PagerDots),
                             // Guarded like every other currentIndex read in this
                             // function (currentVehicle above, etc.) -- currentIndex
                             // is its own StateFlow, independent of `vehicles`, so a
@@ -1229,7 +1226,9 @@ internal fun GarageScreen(state: State<UiState>, vm: AppViewModel) {
                 description = "Back to all cars",
                 onClick = { vm.collapse() },
                 modifier = Modifier.align(Alignment.TopStart).statusBarsPadding()
-                    .offset { IntOffset(0, refreshShiftState.value.roundToPx()) },
+                    // No fade: a nav affordance that vanishes mid-refresh is a trap, and unlike
+                    // the dots it is not re-drawn by anything else while it is gone.
+                    .floatingOverlay(FloatingIds.BackIcon, fade = false),
             )
         }
         if (expandedIdx != null) {
@@ -1238,7 +1237,7 @@ internal fun GarageScreen(state: State<UiState>, vm: AppViewModel) {
                 description = "Flip columns",
                 onClick = { vm.setColumnsFlipped(!appearance.columnsFlipped) },
                 modifier = Modifier.align(Alignment.TopEnd).statusBarsPadding().padding(end = 52.dp)
-                    .offset { IntOffset(0, refreshShiftState.value.roundToPx()) },
+                    .floatingOverlay(FloatingIds.FlipIcon, fade = false),
             )
         }
         // Hidden when Settings is reached by swiping instead (Appearance.settingsAsPage)
@@ -1253,7 +1252,12 @@ internal fun GarageScreen(state: State<UiState>, vm: AppViewModel) {
                 icon = Icons.Filled.Settings,
                 description = "Settings",
                 onClick = { vm.openSettings() },
-                modifier = Modifier.align(Alignment.TopEnd).statusBarsPadding(),
+                // shift = false: the cog is a persistent nav target anchored to the SCREEN, not
+                // page-local chrome, so it should not wander while the page is pulled. That was
+                // already the intent at this site; it is now stated rather than implied by the
+                // absence of a modifier.
+                modifier = Modifier.align(Alignment.TopEnd).statusBarsPadding()
+                    .floatingOverlay(FloatingIds.SettingsIcon, fade = false, shift = false),
             )
         }
     }

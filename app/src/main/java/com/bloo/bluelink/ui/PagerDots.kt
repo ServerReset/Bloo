@@ -293,11 +293,15 @@ internal fun PagerDotsFor(
     modifier: Modifier = Modifier,
     onRefresh: (() -> Unit)? = null,
 ) {
-    // The collision dodge now goes through the floating registry rather than a State
-    // hand-threaded down from GarageScreen (which had to be forwarded through
-    // TitleFlightOverlay -> FloatingNamePill -> FullDetail to get there in the first place):
-    // .floatingElement publishes where the dots are, .dodgeFloating fades them out whenever
-    // anything else floating -- today the flying car name -- is in that spot.
+    // The collision dodge goes through the floating registry rather than a State hand-threaded
+    // down from GarageScreen (which had to be forwarded through TitleFlightOverlay ->
+    // FloatingNamePill -> FullDetail to get there in the first place): .dodgeFloating fades
+    // these out whenever anything else floating -- today the flying car name -- is in that spot.
+    //
+    // Publishing the bounds is the CALLER's job, via Modifier.floatingOverlay on the `modifier`
+    // passed in, and deliberately not done here as well: that modifier carries the status-bar
+    // inset and the pull-to-refresh shift, so the caller's node is the one whose rect is where
+    // the dots really are. Registering here too would just have two writers racing on one id.
     // Theme-only choices stay in the app: this wrapper is the one place that
     // translates Material colors + app chrome into the uicommon core's
     // parameterized [PagerDotColors], so the core never imports material3.
@@ -312,9 +316,7 @@ internal fun PagerDotsFor(
     com.bloo.uicommon.PagerDots(
         current = real(pager.currentPage),
         count = count,
-        modifier = modifier
-            .floatingElement(FloatingIds.PagerDots)
-            .dodgeFloating(FloatingIds.PagerDots),
+        modifier = modifier.dodgeFloating(FloatingIds.PagerDots),
         onRefresh = onRefresh,
         haptics = haptics?.let { { it.tick() } },
         colors = colors,
