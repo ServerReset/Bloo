@@ -96,7 +96,15 @@ internal fun LockBlurLayer(locked: Boolean, content: @Composable () -> Unit) {
         animationSpec = tween(durationMillis = 450),
         label = "lockBlur",
     )
-    Box(Modifier.fillMaxSize().blur(lockBlur)) {
+    // The blur modifier is applied only while there IS one. Modifier.blur(0.dp) installs no
+    // RenderEffect, but it still forces the whole app tree into its own graphicsLayer on every
+    // frame -- for the entire life of the process, to serve a lock screen that is almost never
+    // up. This wraps every screen in the app, so it was the most expensive no-op in the tree.
+    Box(
+        Modifier
+            .fillMaxSize()
+            .then(if (lockBlur > 0.dp) Modifier.blur(lockBlur) else Modifier),
+    ) {
         content()
     }
 }

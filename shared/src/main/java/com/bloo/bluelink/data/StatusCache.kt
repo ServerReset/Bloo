@@ -7,6 +7,8 @@ import androidx.datastore.preferences.core.emptyPreferences
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.Dispatchers
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 
@@ -58,11 +60,16 @@ class StatusCache(private val context: Context) {
      * back to an all-empty [CachePayload] via `runCatching { }.getOrNull() ?: CachePayload()`
      * rather than throwing, so a bad cache never blocks app startup.
      */
-    suspend fun load(): Cached {
+    suspend fun load(): Cached = withContext(Dispatchers.IO) {
+        // withContext, because the caller is a viewModelScope.launch on Main.immediate: the
+        // .first() suspends and RESUMES on the main thread, so the decode of every cached
+        // vehicle status, location and place name -- which grows with the number of cars and is
+        // the largest single piece of CPU in the startup path -- ran while the first frame was
+        // being composed.
         val raw = context.statusCacheStore.data.first()[key]
         val p = raw?.let { runCatching { json.decodeFromString(CachePayload.serializer(), it) }.getOrNull() }
             ?: CachePayload()
-        return Cached(p.statuses, p.locations, p.placeNames, p.fetched)
+        Cached(p.statuses, p.locations, p.placeNames, p.fetched)
     }
 
     /**

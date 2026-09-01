@@ -152,7 +152,13 @@ internal fun LoadingScreen(modifier: Modifier = Modifier) {
         label = "loadingWordmarkFade",
     )
     Box(modifier.fillMaxSize()) {
-        AuroraBackground(Modifier.matchParentSize())
+        // Gated on the user's own setting, like the garage already gates it. This is the FIRST
+        // screen of every cold start, and it was painting a full-screen 44dp blur -- an offscreen
+        // buffer for the whole window, a blur shader compiled on first use, and a 12.5fps drift
+        // loop invalidating it -- unconditionally, including for people who had turned the aurora
+        // background off. The most expensive frames in the app were the ones before it had drawn
+        // anything, doing work that was switched off.
+        if (LocalAppearance.current.auroraBackground) AuroraBackground(Modifier.matchParentSize())
         Text(
             "Bloo",
             style = MaterialTheme.typography.displayLarge,
@@ -234,7 +240,8 @@ internal fun LoginScreen(
     if (onCancel != null) BackHandler { onCancel() }
 
     Box(Modifier.fillMaxSize()) {
-        AuroraBackground(Modifier.matchParentSize())
+        // Same gate as LoadingScreen -- see its comment.
+        if (LocalAppearance.current.auroraBackground) AuroraBackground(Modifier.matchParentSize())
         Column(
             Modifier
                 .fillMaxSize()

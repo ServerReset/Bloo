@@ -115,6 +115,15 @@ class MainActivity : FragmentActivity() {
             handleShortcutIntent(intent)
             setIntent(Intent())
         }
+        // Touched HERE, before setContent, and deliberately not for its value. `by viewModels()`
+        // is lazy, and the first dereference used to be inside the composition lambda below --
+        // so AppViewModel's constructor and its whole init block ran synchronously in the middle
+        // of composing the first frame. Six stores, five DataStore collectors and the auto-login
+        // kick-off all landed on the first-frame critical path. Constructing it here does not
+        // make that work cheaper, but it stops it happening between "begin composition" and
+        // "first pixel", which is the part the user sees as a stutter.
+        @Suppress("UNUSED_EXPRESSION")
+        viewModel
         setContent {
             val appearance by viewModel.appearance.collectAsState()
             // Memoize palette lookup to avoid repeated linear search through custom palettes

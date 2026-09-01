@@ -18,6 +18,7 @@ import com.bloo.bluelink.ui.CustomPaletteData
 import com.bloo.bluelink.ui.FontChoice
 import com.bloo.bluelink.ui.ThemeMode
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
@@ -362,6 +363,12 @@ class SettingsStore(private val context: Context) {
             settingsAsPage = prefs[Keys.SETTINGS_AS_PAGE]?.toBooleanStrictOrNull() ?: false,
         )
     }
+        // Off the main thread. This is a ~40-field decode including two JSON parses (custom
+        // palettes and per-car palette ids), and DataStore only guarantees the FILE read is off
+        // main -- a map{} transform runs in the collector's context. Three separate collectors
+        // subscribe to this on cold start, so it ran three times on the main thread while the
+        // first frame was trying to draw.
+        .flowOn(Dispatchers.Default)
 
     // Simple appearance setters below: each just writes one Keys.* string value
     // through editTracked() (which persists it to DataStore and marks the key
