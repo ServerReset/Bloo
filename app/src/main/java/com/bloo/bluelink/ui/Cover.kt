@@ -380,10 +380,10 @@ internal fun CoverTile(
             //
             // Both centre a short body instead of letting it collapse to the top, and both let a
             // tall one scroll -- but BoxWithConstraints is a SubcomposeLayout, and this one sat
-            // inside every cover tile. The cover pager keeps neighbouring pages composed, and
-            // each page has its own tile pager doing the same, so that was a handful of live
-            // subcompositions at once on the weakest display in the app, to obtain a number the
-            // layout already knows.
+            // inside every cover tile. The car pager keeps its neighbours composed
+            // (beyondViewportPageCount = 1), so three of these were live at once on the weakest
+            // display in the app, to obtain a number the layout already knows. (The per-car TILE
+            // pager sets no beyondViewportPageCount, so it is one tile per car page, not more.)
             //
             // weight(1f) is what makes the plain Box work: it fixes this Box's height to the
             // band, so its own size is the viewport no matter how short the content is, and
