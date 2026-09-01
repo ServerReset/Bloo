@@ -335,7 +335,12 @@ internal fun CoverTile(
                         fontWeight = FontWeight.Bold,
                         color = titleColor,
                     ),
-                    modifier = Modifier.weight(1f),
+                    // 2f against the trailing label's 1f, and both WEIGHTED on purpose. An
+                    // unweighted trailing child is measured first and takes whatever it wants,
+                    // so a long car name would have squeezed the section title -- backwards,
+                    // since the section is what the tile is about and the car is context. This
+                    // caps the name at a third of the row on a narrow cover.
+                    modifier = Modifier.weight(2f),
                 )
                 if (!trailingLabel.isNullOrBlank()) {
                     Text(
@@ -347,6 +352,9 @@ internal fun CoverTile(
                         color = (subtitleColor ?: LocalContentColor.current).copy(alpha = 0.92f),
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
+                        // fill = false so a short name takes only what it needs and gives the
+                        // rest back to the title, rather than always claiming its full third.
+                        modifier = Modifier.weight(1f, fill = false),
                     )
                 }
             }
