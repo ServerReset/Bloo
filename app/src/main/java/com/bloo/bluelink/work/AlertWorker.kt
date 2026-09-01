@@ -199,11 +199,14 @@ class AlertWorker(context: Context, params: WorkerParameters) : CoroutineWorker(
          * suppressing those on a low phone battery would trade the user's car for a
          * few minutes of screen time.
          *
-         * `enqueueUniquePeriodicWork` with [ExistingPeriodicWorkPolicy.KEEP]
-         * means calling `schedule` again (e.g. every app start) leaves an
-         * already-registered job alone rather than resetting its timer. Note that this
-         * also means an install already carrying the unconstrained job keeps it until
-         * the work is cancelled or the app's data is cleared.
+         * [ExistingPeriodicWorkPolicy.UPDATE], not KEEP. KEEP leaves an already-registered
+         * job completely alone -- which preserved its timer, but also preserved its REQUEST:
+         * an install carrying the old unconstrained version kept running it forever, so the
+         * network constraint added here never reached a single existing user. Every fix to
+         * this worker's definition was landing only for fresh installs.
+         *
+         * UPDATE refreshes the request in place while keeping the existing schedule, which is
+         * what KEEP was actually chosen for -- not resetting the timer on every app start.
          */
         fun schedule(context: Context) {
             val request = PeriodicWorkRequestBuilder<AlertWorker>(30, TimeUnit.MINUTES)
@@ -213,7 +216,7 @@ class AlertWorker(context: Context, params: WorkerParameters) : CoroutineWorker(
                 .build()
             WorkManagerInit.of(context).enqueueUniquePeriodicWork(
                 "bloo_alerts",
-                ExistingPeriodicWorkPolicy.KEEP,
+                ExistingPeriodicWorkPolicy.UPDATE,
                 request,
             )
         }

@@ -76,7 +76,7 @@ class MainActivity : FragmentActivity() {
             window.isNavigationBarContrastEnforced = false
         }
         // Each schedule() call does a synchronous Room round-trip inside WorkManager's
-        // enqueueUniquePeriodicWork (regardless of ExistingPeriodicWorkPolicy.KEEP), so
+        // enqueueUniquePeriodicWork (regardless of the ExistingPeriodicWorkPolicy), so
         // running these on the main thread ahead of setContent() delays the first
         // Compose frame on every cold start. Dispatched off-thread instead; the
         // schedules are idempotent/unique-work-keyed so ordering relative to the UI

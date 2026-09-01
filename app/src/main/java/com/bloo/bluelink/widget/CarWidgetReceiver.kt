@@ -109,7 +109,7 @@ class WidgetRefreshWorker(ctx: Context, params: WorkerParameters) : CoroutineWor
                 )
                 .build()
             WorkManagerInit.of(context)
-                .enqueueUniquePeriodicWork(WORK, ExistingPeriodicWorkPolicy.KEEP, req)
+                .enqueueUniquePeriodicWork(WORK, ExistingPeriodicWorkPolicy.UPDATE, req)
         }
 
         fun cancel(context: Context) {

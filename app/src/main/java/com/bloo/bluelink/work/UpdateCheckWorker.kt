@@ -103,7 +103,7 @@ class UpdateCheckWorker(context: Context, params: WorkerParameters) : CoroutineW
                 .build()
             WorkManagerInit.of(context).enqueueUniquePeriodicWork(
                 NAME,
-                ExistingPeriodicWorkPolicy.KEEP,
+                ExistingPeriodicWorkPolicy.UPDATE,
                 request,
             )
         }

@@ -155,7 +155,7 @@ class DriveSyncWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(
             // launch) doesn't reset the periodic timer or cancel an in-flight run.
             WorkManagerInit.of(context).enqueueUniquePeriodicWork(
                 NAME,
-                ExistingPeriodicWorkPolicy.KEEP,
+                ExistingPeriodicWorkPolicy.UPDATE,
                 request,
             )
         }
