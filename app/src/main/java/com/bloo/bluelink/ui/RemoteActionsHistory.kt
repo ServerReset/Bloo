@@ -164,7 +164,19 @@ private fun shortTime(iso: String, use24Hour: Boolean): String = runCatching {
  */
 @Composable
 internal fun RemoteActionsInline(actions: List<RemoteAction>, max: Int = 6) {
-    if (actions.isEmpty()) return
+    // NOT an early return on empty. This panel is revealed by pressing the lock pebble's
+    // background -- a gesture with no chrome to announce it -- so rendering nothing for a car
+    // that has not been commanded yet made a working gesture indistinguishable from an
+    // unimplemented one. An empty state is the only feedback that the press did something.
+    if (actions.isEmpty()) {
+        Text(
+            text = "No remote actions yet",
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp),
+        )
+        return
+    }
     // Resolved once here, not per row: is24HourFormat reads a system setting, and every row in
     // the list would otherwise ask the same question again.
     val use24Hour = android.text.format.DateFormat.is24HourFormat(LocalContext.current)

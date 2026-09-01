@@ -324,6 +324,10 @@ internal fun SettingsCard(
             vm = vm,
             canToggle = !inline,
             titleTrailing = inlineSetting,
+            // Hard right, like every other settings control -- see titleTrailingAtEnd. Without
+            // it the switch sat flush against the end of the label text, mid-row, which is what
+            // made the single-setting cards read as broken rather than compact.
+            titleTrailingAtEnd = true,
             content = { content() },
         )
     }

@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -238,9 +239,18 @@ fun DebugSettingsPanel(
         }
 
         // Content - organized by section
+        //
+        // heightIn is NOT optional here. This panel is rendered inside the Settings screen's
+        // LazyVerticalStaggeredGrid item{}, which measures its content with an UNBOUNDED max
+        // height, and a vertically scrollable component measured with an infinite max height
+        // throws outright -- so entering Advanced mode, which is the only way this card is
+        // composed, crashed the screen every time. The Logs card and AnnouncementHistory both
+        // already cap themselves at 300.dp against this exact failure; this panel was the one
+        // that did not.
         LazyColumn(
             modifier = Modifier
                 .fillMaxWidth()
+                .heightIn(max = 300.dp)
                 .background(
                     color = MaterialTheme.colorScheme.surface,
                     shape = RoundedCornerShape(bottomStart = 12.dp, bottomEnd = 12.dp)

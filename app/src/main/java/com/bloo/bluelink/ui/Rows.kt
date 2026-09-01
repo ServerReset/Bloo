@@ -204,7 +204,7 @@ internal fun CropScreen(vin: String, uriString: String, onCancel: () -> Unit, on
                     else -> LoadingIndicator()
                 }
             }
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            ExpressiveButtonRow(spacing = 12.dp) {
                 val cancelSource = remember { MutableInteractionSource() }
                 SafeExpansiveButton(
                     interactionSource = cancelSource,
@@ -214,7 +214,6 @@ internal fun CropScreen(vin: String, uriString: String, onCancel: () -> Unit, on
                         "Cancel",
                         onClick = onCancel,
                         interactionSource = cancelSource,
-                        modifier = Modifier.weight(1f),
                     )
                 }
                 val confirmSource = remember { MutableInteractionSource() }
@@ -265,7 +264,6 @@ internal fun CropScreen(vin: String, uriString: String, onCancel: () -> Unit, on
                     },
                     enabled = bmp != null,
                     interactionSource = confirmSource,
-                    modifier = Modifier.weight(1f),
                     contentPadding = PaddingValues(horizontal = 18.dp, vertical = 10.dp),
                 ) { Text("Use photo", fontWeight = FontWeight.SemiBold) }
                 }

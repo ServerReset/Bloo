@@ -7,6 +7,8 @@ import androidx.compose.foundation.interaction.InteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Box
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.staticCompositionLocalOf
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
@@ -91,6 +93,17 @@ fun SafeExpansiveButton(
     content: @Composable () -> Unit,
 ) {
     val press by expressivePressFraction(interactionSource, enabled)
+    // Inside an [ExpressiveButtonRow]/[ExpressiveButtonGroup] this button joins the group and
+    // takes REAL width from its neighbours, which is the effect that was asked for; on its own it
+    // falls back to the paint-only scale, which is safe anywhere. Self-registering is what makes
+    // adopting the real effect a one-line change at a call site (swap the `Row` for an
+    // `ExpressiveButtonRow`) instead of rewriting every button inside it.
+    if (LocalExpressiveGroup.current) {
+        Box(modifier.then(ExpressiveGroupData { press }), propagateMinConstraints = true) {
+            content()
+        }
+        return
+    }
     Box(
         modifier.graphicsLayer {
             val s = 1f + ExpressivePressGrowth * press
@@ -99,6 +112,32 @@ fun SafeExpansiveButton(
             transformOrigin = TransformOrigin.Center
         },
     ) {
+        content()
+    }
+}
+
+/**
+ * True inside an [ExpressiveButtonGroup], which is how [SafeExpansiveButton] knows to hand its
+ * press fraction to the group's layout instead of scaling itself.
+ */
+internal val LocalExpressiveGroup = staticCompositionLocalOf { false }
+
+/**
+ * A drop-in replacement for `Row(horizontalArrangement = Arrangement.spacedBy(spacing))` whose
+ * [SafeExpansiveButton] children shove each other aside on press, with the row's own width
+ * unchanged.
+ *
+ * Children that are not buttons (a Spacer, a label) are left at their natural width and take no
+ * part in the redistribution, so this is safe to drop onto a mixed row.
+ */
+@Composable
+fun ExpressiveButtonRow(
+    modifier: Modifier = Modifier,
+    spacing: Dp = 8.dp,
+    verticalAlignment: Alignment.Vertical = Alignment.CenterVertically,
+    content: @Composable () -> Unit,
+) {
+    ExpressiveButtonGroup(modifier = modifier, spacing = spacing, verticalAlignment = verticalAlignment) {
         content()
     }
 }
@@ -128,7 +167,11 @@ fun ExpressiveButtonGroup(
     // next measure pass reads it directly.
     val naturals = remember { NaturalWidths() }
     Layout(
-        content = { ExpressiveButtonGroupScope.content() },
+        content = {
+            CompositionLocalProvider(LocalExpressiveGroup provides true) {
+                ExpressiveButtonGroupScope.content()
+            }
+        },
         modifier = modifier,
         measurePolicy = { measurables, constraints ->
             val n = measurables.size
@@ -139,12 +182,20 @@ fun ExpressiveButtonGroup(
 
             // Press fractions come from parent data and are READ HERE, at layout time, so a
             // press invalidates layout only -- composition never re-runs for the animation.
+            // Only children that carry ExpressiveGroupData are group MEMBERS. Anything else in
+            // the row -- a Spacer, a label, a plain icon -- keeps its natural width and is left
+            // out of the redistribution entirely, so dropping this in place of a Row cannot
+            // squash the non-button content that happens to share it.
+            val member = BooleanArray(n) { measurables[it].parentData is ExpressiveGroupData }
             val press = FloatArray(n) { i ->
                 (measurables[i].parentData as? ExpressiveGroupData)?.pressFraction?.invoke() ?: 0f
             }
             val resting = press.all { it <= 0.001f }
             val cached = naturals.widths
-            val usable = cached != null && cached.size == n && cached.all { it > 0 }
+            // Only MEMBER widths have to be sane: a legitimately zero-width non-member (an
+            // empty Spacer, a label that renders nothing) must not disable the whole effect.
+            val usable = cached != null && cached.size == n &&
+                (0 until n).all { !member[it] || cached[it] > 0 }
 
             val placeables: List<Placeable> = if (resting || !usable) {
                 // At rest (and on the very first pass, which is always at rest since nothing
@@ -158,16 +209,22 @@ fun ExpressiveButtonGroup(
                 // pressed children ask for `growth` more, everyone is then normalised back down
                 // to the original total, so the growth comes out of the neighbours and the
                 // group's own width is bit-for-bit unchanged.
-                val total = cached.sum()
-                val desired = FloatArray(n) { cached[it] * (1f + ExpressivePressGrowth * press[it]) }
+                // The budget is the MEMBERS' resting total; non-members are held at natural
+                // width and neither give nor take.
+                val total = (0 until n).sumOf { if (member[it]) cached[it] else 0 }
+                val desired = FloatArray(n) {
+                    if (member[it]) cached[it] * (1f + ExpressivePressGrowth * press[it]) else 0f
+                }
                 val desiredTotal = desired.sum()
                 val norm = if (desiredTotal > 0f) total / desiredTotal else 1f
-                val target = IntArray(n) { (desired[it] * norm).roundToInt().coerceAtLeast(0) }
-                // Rounding drift lands on the widest child, where a pixel cannot be seen.
-                val drift = total - target.sum()
+                val target = IntArray(n) {
+                    if (member[it]) (desired[it] * norm).roundToInt().coerceAtLeast(0) else cached[it]
+                }
+                // Rounding drift lands on the widest MEMBER, where a pixel cannot be seen.
+                val drift = total - (0 until n).sumOf { if (member[it]) target[it] else 0 }
                 if (drift != 0) {
-                    val widest = target.indices.maxByOrNull { target[it] } ?: 0
-                    target[widest] = (target[widest] + drift).coerceAtLeast(0)
+                    val widest = (0 until n).filter { member[it] }.maxByOrNull { target[it] }
+                    if (widest != null) target[widest] = (target[widest] + drift).coerceAtLeast(0)
                 }
                 measurables.mapIndexed { i, m ->
                     val w = target[i].coerceAtMost(

@@ -384,7 +384,7 @@ internal fun UpdateAvailableTile(state: UiState, vm: AppViewModel, dragHandle: M
                     }
                 }
             } else {
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                ExpressiveButtonRow(modifier = Modifier.fillMaxWidth(), spacing = 8.dp) {
                     val remindSource = remember { MutableInteractionSource() }
                     SafeExpansiveButton(
                         interactionSource = remindSource,
@@ -392,7 +392,6 @@ internal fun UpdateAvailableTile(state: UiState, vm: AppViewModel, dragHandle: M
                     ) {
                         MorphButton(
                             onClick = { vm.snoozeUpdate() },
-                            modifier = Modifier.weight(1f),
                             enabled = !state.updateDownloading,
                             interactionSource = remindSource,
                         ) { Text("Remind me") }
@@ -407,7 +406,6 @@ internal fun UpdateAvailableTile(state: UiState, vm: AppViewModel, dragHandle: M
                             onClick = vm::dismissUpdate,
                             enabled = !state.updateDownloading,
                             interactionSource = notNowSource,
-                            modifier = Modifier.weight(1f),
                         )
                     }
                 }

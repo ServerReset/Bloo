@@ -370,17 +370,13 @@ internal fun ControlsPebble(v: Vehicle, state: UiState, vm: AppViewModel, dragHa
             // right shape for that: it adds nothing on screen and no extra focus stop, but the
             // gesture is announced and invokable through the actions menu. Guarded on there
             // being history to show, so it isn't offered when it would do nothing.
-            .then(
-                if (history.isNotEmpty()) {
-                    Modifier.semantics {
-                        customActions = listOf(
-                            CustomAccessibilityAction(
-                                if (showHistory) "Hide recent remote actions" else "Show recent remote actions",
-                            ) { showHistory = !showHistory; true },
-                        )
-                    }
-                } else Modifier,
-            )
+            .semantics {
+                customActions = listOf(
+                    CustomAccessibilityAction(
+                        if (showHistory) "Hide recent remote actions" else "Show recent remote actions",
+                    ) { showHistory = !showHistory; true },
+                )
+            }
             .dropShadow(shape, blurRadius = 12.dp, offsetY = 4.dp)
             .then(
                 if (pebbleOutline) {
@@ -403,8 +399,11 @@ internal fun ControlsPebble(v: Vehicle, state: UiState, vm: AppViewModel, dragHa
                 // the two icons up (4 + 12 = 16, matching Pebble's inset).
                 PrimaryActions(v, state, vm, contentPadding = PaddingValues(start = 4.dp, end = 8.dp))
             }
+            // Gated on the toggle ALONE, not on there being history. RemoteActionsInline draws
+            // its own empty state, and a reveal that silently stays shut on a car with no
+            // history yet is indistinguishable from the gesture not existing.
             AnimatedVisibility(
-                visible = showHistory && history.isNotEmpty(),
+                visible = showHistory,
                 enter = collapseEnter(Alignment.Top),
                 exit = collapseExit(Alignment.Top),
             ) {

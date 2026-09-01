@@ -190,6 +190,7 @@ internal fun Pebble(
         forceExpanded = forceExpanded,
         canToggle = canToggle,
         titleTrailing = if (inlineSimple) inlineSettingInSimpleMode else null,
+        titleTrailingAtEnd = inlineSimple,
         background = background,
         content = content,
     )
@@ -221,6 +222,13 @@ internal fun PebbleShell(
      * the expanded hero's title isn't squeezed by a gap left behind an absent node.
      */
     titleTrailing: (@Composable () -> Unit)? = null,
+    /**
+     * Push [titleTrailing] to the FAR END of the title row instead of letting it sit against the
+     * name. A headline stat (the hero's percentage) belongs beside the name; an inline CONTROL --
+     * the switch a single-setting card shows instead of an expand chevron -- belongs where every
+     * other row's control is, hard right, or it reads as jammed into the label.
+     */
+    titleTrailingAtEnd: Boolean = false,
     /**
      * Overrides the colour of [title] and [summary]. [Color.Unspecified] (the default)
      * inherits, which is what every pebble but the hero wants.
@@ -517,7 +525,13 @@ internal fun PebbleShell(
                             } else {
                                 collapsedTitleScale + (1f - collapsedTitleScale) * headerT
                             }
-                            Row(verticalAlignment = Alignment.CenterVertically) {
+                            Row(
+                                // Only stretched when the trailing slot is being pushed to the
+                                // end -- a row that merely holds a name and a stat must stay
+                                // shrink-wrapped, or the stat drifts away from the name.
+                                modifier = if (titleTrailingAtEnd) Modifier.fillMaxWidth() else Modifier,
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
                             Text(
                                 title,
                                 modifier = Modifier
@@ -573,6 +587,12 @@ internal fun PebbleShell(
                             // the slot owns both. The hero shows this only while collapsed,
                             // and a 10dp gap left behind when it goes would squeeze the
                             // expanded title for a node that is no longer in the row.
+                            if (titleTrailingAtEnd) {
+                                // Weighted spacer, plus a hard minimum, so a long title
+                                // ellipsizes rather than ever touching the control.
+                                Spacer(Modifier.width(12.dp))
+                                Spacer(Modifier.weight(1f))
+                            }
                             titleTrailing?.invoke()
                             }
                             if (summary != null) {

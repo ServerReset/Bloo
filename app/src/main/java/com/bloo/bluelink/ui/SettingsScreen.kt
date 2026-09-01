@@ -488,7 +488,7 @@ internal fun SettingsScreen(
                                 modifier = Modifier.fillMaxWidth(),
                             )
                         }
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        ExpressiveButtonRow(spacing = 8.dp) {
                             if (creds.brand.requiresPin) {
                                 val pinSource = remember { MutableInteractionSource() }
                                 SafeExpansiveButton(
@@ -828,7 +828,7 @@ internal fun SettingsScreen(
                         onSelect = { vm.setSyncWifiOnly(it == "wifi") },
                     )
                     Spacer(Modifier.height(8.dp))
-                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    ExpressiveButtonRow(modifier = Modifier.fillMaxWidth(), spacing = 8.dp) {
                         val changeFileSource = remember { MutableInteractionSource() }
                         SafeExpansiveButton(
                             interactionSource = changeFileSource,
@@ -836,7 +836,6 @@ internal fun SettingsScreen(
                         ) {
                             MorphTextButton(
                                 "Change Drive file",
-                                modifier = Modifier.weight(1f),
                                 interactionSource = changeFileSource,
                                 onClick = { showDriveDialog = true },
                             )
@@ -848,7 +847,6 @@ internal fun SettingsScreen(
                         ) {
                             MorphTextButton(
                                 "Disable",
-                                modifier = Modifier.weight(1f),
                                 interactionSource = disableSource,
                                 onClick = { vm.clearSyncUri() },
                             )
@@ -898,7 +896,7 @@ internal fun SettingsScreen(
                                 }
                             }
                             Spacer(Modifier.height(8.dp))
-                            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            ExpressiveButtonRow(modifier = Modifier.fillMaxWidth(), spacing = 8.dp) {
                                 // Non-destructive real-provider round-trip so the user can confirm
                                 // sync actually works.
                                 val testSyncSource = remember { MutableInteractionSource() }
@@ -908,7 +906,6 @@ internal fun SettingsScreen(
                                 ) {
                                     MorphTextButton(
                                         "Test sync",
-                                        modifier = Modifier.weight(1f),
                                         interactionSource = testSyncSource,
                                         onClick = { vm.testSync() }
                                     )
@@ -925,7 +922,6 @@ internal fun SettingsScreen(
                                     ) {
                                         MorphTextButton(
                                             "Pull from primary",
-                                            modifier = Modifier.weight(1f),
                                             interactionSource = pullSource,
                                             onClick = { vm.pullFromPrimary() }
                                         )
@@ -957,7 +953,7 @@ internal fun SettingsScreen(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                     Spacer(Modifier.height(10.dp))
-                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    ExpressiveButtonRow(modifier = Modifier.fillMaxWidth(), spacing = 8.dp) {
                         val exportSource = remember { MutableInteractionSource() }
                         SafeExpansiveButton(
                             interactionSource = exportSource,
@@ -965,7 +961,6 @@ internal fun SettingsScreen(
                         ) {
                             MorphTextButton(
                                 "Export",
-                                modifier = Modifier.weight(1f),
                                 interactionSource = exportSource,
                                 onClick = { vm.exportSettings(context) },
                             )
@@ -977,7 +972,6 @@ internal fun SettingsScreen(
                         ) {
                             MorphTextButton(
                                 "Restore",
-                                modifier = Modifier.weight(1f),
                                 interactionSource = restoreSource,
                                 onClick = { settingsImportLauncher.launch("application/json") },
                             )
@@ -1569,7 +1563,7 @@ internal fun SettingsScreen(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 Spacer(Modifier.height(12.dp))
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                ExpressiveButtonRow(spacing = 8.dp) {
                     val pinSource = remember { MutableInteractionSource() }
                     SafeExpansiveButton(
                         interactionSource = pinSource,
@@ -1578,7 +1572,6 @@ internal fun SettingsScreen(
                         MorphButton(
                             onClick = { pinDialog = "set" },
                             interactionSource = pinSource,
-                            modifier = Modifier.weight(1f),
                         ) {
                             Icon(
                                 if (pinSet) Icons.Filled.LockReset else Icons.Filled.Lock,
@@ -1598,7 +1591,6 @@ internal fun SettingsScreen(
                             MorphTextButton(
                                 "Remove",
                                 onClick = { pinDialog = "remove" },
-                                modifier = Modifier.weight(1f),
                                 interactionSource = removeSource,
                                 containerColor = MaterialTheme.colorScheme.errorContainer,
                                 contentColor = MaterialTheme.colorScheme.onErrorContainer,
@@ -1871,7 +1863,7 @@ internal fun SettingsScreen(
                 // full-width pills: the in-app checker (primary) and the GitHub
                 // Releases page (a second source that still works when the
                 // checker says up-to-date or GitHub's API is flaky).
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                ExpressiveButtonRow(modifier = Modifier.fillMaxWidth(), spacing = 8.dp) {
                     val checkSource = remember { MutableInteractionSource() }
                     SafeExpansiveButton(
                         interactionSource = checkSource,
@@ -1879,7 +1871,6 @@ internal fun SettingsScreen(
                     ) {
                         MorphButton(
                             onClick = { vm.checkForUpdateManually() },
-                            modifier = Modifier.weight(1f),
                             interactionSource = checkSource,
                             enabled = !state.updateChecking,
                             active = true,
@@ -1907,7 +1898,6 @@ internal fun SettingsScreen(
                                     )
                                 }
                             },
-                            modifier = Modifier.weight(1f),
                         )
                     }
                 }
