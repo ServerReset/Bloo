@@ -1147,17 +1147,25 @@ internal fun SettingsScreen(
 
             // Links
             AnimatedVisibility(visibleState = rememberAppearedState(), enter = collapseEnter(), exit = collapseExit()) {
-            SettingsCard("Links", Icons.Filled.OpenInNew, vm) {
-                SettingsSegmentedRow(
-                    label = "Open links",
-                    options = listOf(
-                        SegmentOption("app", "In app", null),
-                        SegmentOption("browser", "Browser", null),
-                    ),
-                    selectedKey = if (appearance.linksInApp) "app" else "browser",
-                    onSelect = { vm.setLinksInApp(it == "app") },
-                )
-            }
+            // One control, so it renders on the title row with no chevron -- the same treatment
+            // Sounds & vibration gets. The row's own "Open links" label went with it: inside a
+            // card already titled "Links" it restated the card, and the choice reads fine as
+            // "Links: In app / Browser".
+            SettingsCard(
+                "Links",
+                Icons.Filled.OpenInNew,
+                vm,
+                inlineSetting = {
+                    MorphSegmented(
+                        options = listOf(
+                            SegmentOption("app", "In app", null),
+                            SegmentOption("browser", "Browser", null),
+                        ),
+                        selectedKey = if (appearance.linksInApp) "app" else "browser",
+                        onSelect = { vm.setLinksInApp(it == "app") },
+                    )
+                },
+            ) {}
             }
             }
             if (advVisible[4]) item {
