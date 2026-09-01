@@ -290,32 +290,52 @@ internal fun WeatherPebble(v: Vehicle, state: UiState, vm: AppViewModel, dragHan
                 // tile reads as a weather face; the phone keeps the left-aligned
                 // icon+column layout. Gated on LocalForceExpanded.
                 val coverGlance = LocalForceExpanded.current
-                // Only up-size the temp when the user's font scale is modest — at a
-                // large display/font size (the mom's setup) displayMedium + the fixed
-                // 64dp icon can exceed the narrow cover width and ellipsize the temp
-                // to "72…". Above ~1.15x, keep displaySmall so the value stays whole.
-                val bigTemp = coverGlance && LocalDensity.current.fontScale <= 1.15f
-                Row(
-                    modifier = if (coverGlance) Modifier.fillMaxWidth() else Modifier,
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = if (coverGlance) Arrangement.spacedBy(12.dp, Alignment.CenterHorizontally)
-                                            else Arrangement.spacedBy(16.dp),
-                ) {
-                    Icon(
-                        weatherIcon(w.condition, w.isDay),
-                        contentDescription = w.condition.label,
-                        tint = tint,
-                        modifier = Modifier.size(64.dp),
-                    )
-                    Column(if (coverGlance) Modifier else Modifier.weight(1f)) {
-                        RollingNumber(
-                            text = w.tempLabel(fahrenheit),
-                            style = if (bigTemp) MaterialTheme.typography.displayMedium else MaterialTheme.typography.displaySmall,
-                            fontWeight = FontWeight.Bold,
+                if (coverGlance) {
+                    // The COVER's headline is already this pebble's summary -- "72° · Partly
+                    // cloudy" -- so the temperature and the condition word are both spoken for
+                    // before the body starts. What was here repeated them at display size beside
+                    // a 64dp icon, which is why this tile alone needed a font-scale guard
+                    // against ellipsizing its own temperature: it was fighting for width it did
+                    // not need to spend.
+                    //
+                    // The picture is the one thing the header cannot carry (its icon is a fixed
+                    // sun, not the live condition), so the icon stays and the words go.
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
+                        Icon(
+                            weatherIcon(w.condition, w.isDay),
+                            contentDescription = w.condition.label,
+                            tint = tint,
+                            modifier = Modifier.size(44.dp),
                         )
-                        Text(w.condition.label, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-                        appearance.weatherLabel?.let {
-                            Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    appearance.weatherLabel?.let {
+                        Text(
+                            it,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                } else {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(16.dp),
+                    ) {
+                        Icon(
+                            weatherIcon(w.condition, w.isDay),
+                            contentDescription = w.condition.label,
+                            tint = tint,
+                            modifier = Modifier.size(64.dp),
+                        )
+                        Column(Modifier.weight(1f)) {
+                            RollingNumber(
+                                text = w.tempLabel(fahrenheit),
+                                style = MaterialTheme.typography.displaySmall,
+                                fontWeight = FontWeight.Bold,
+                            )
+                            Text(w.condition.label, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                            appearance.weatherLabel?.let {
+                                Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
                         }
                     }
                 }

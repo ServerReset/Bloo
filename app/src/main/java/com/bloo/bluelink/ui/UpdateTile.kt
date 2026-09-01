@@ -196,7 +196,10 @@ internal fun UpdateAvailableTile(state: UiState, vm: AppViewModel, dragHandle: M
             // the static word was animating right along with the number that actually changed.
             // Only the percent itself is a moving target now (rendered with its own
             // AnimatedValue below), and the sentence around it stays put.
-        UpdateStatusLine(deltaLabel, seamless, state, vm)
+        UpdateStatusLine(
+            deltaLabel, seamless, state, vm,
+            showDelta = info.run.displayTitle?.isNotBlank() == true,
+        )
             // Release notes ("What's new"), capped, with a "Full notes" link to the
             // release page when there's more than we show.
             PopVisible(visible = info.run.releaseNotes != null) {
@@ -433,6 +436,15 @@ internal fun UpdateStatusLine(
     seamless: Boolean,
     state: UiState,
     vm: AppViewModel,
+    /**
+     * False when the tile's own summary is already [deltaLabel], which happens whenever the
+     * release has no display title -- the summary is `displayTitle ?: deltaLabel`. The idle
+     * branch below then said the same "build 812 → build 828" a second time, directly under the
+     * first, which on the cover is the tile's headline and on the phone is the collapsed summary
+     * of the very pebble you just expanded. The other branches all report live progress the
+     * summary cannot know, so they are unaffected.
+     */
+    showDelta: Boolean = true,
 ) {
     val scheme = MaterialTheme.colorScheme
     val downloadProgress by vm.updateDownloadProgress.collectAsState()
@@ -517,7 +529,7 @@ internal fun UpdateStatusLine(
                 "ready_seamless" -> Text("Downloaded · installs silently via Shizuku", style = textStyle)
                 "ready" -> Text("Downloaded · tap Install", style = textStyle)
                 "seamless" -> Text("Installs silently via Shizuku, no prompts", style = textStyle)
-                else -> Text(deltaLabel, style = textStyle)
+                else -> if (showDelta) Text(deltaLabel, style = textStyle) else Unit
             }
         }
     }
