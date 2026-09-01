@@ -641,7 +641,16 @@ internal fun AiPebble(v: Vehicle, state: UiState, vm: AppViewModel, dragHandle: 
     val summary = state.aiSummaries[v.vin]
     Pebble(
         v, "ai", "AI summary", Icons.Filled.AutoAwesome, state, vm, dragHandle,
-        summary = "On-device Gemini Nano",
+        // What the tile can tell you, not what engine it runs on. This was the constant string
+        // "On-device Gemini Nano", which as a collapsed summary -- and, on the cover, as the
+        // tile's whole headline -- spent the most prominent line saying something that is true
+        // of this pebble forever and answers nothing. The engine is still named in the body copy
+        // ("generated privately on your device"), where a fact you read once belongs.
+        summary = when {
+            busy -> "Summarizing…"
+            summary != null -> "Summary ready"
+            else -> "Not summarized yet"
+        },
         containerColor = MaterialTheme.colorScheme.tertiaryContainer,
         // The one pebble whose subject is not a part of the car, so it is the one
         // that earns a different surface: a gradient marks "this was generated"

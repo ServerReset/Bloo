@@ -225,7 +225,16 @@ internal fun CoverTile(
     // is responsible for its own legibility (see titleColor/iconTint below); null
     // for every other tile, so nothing else pays for the extra Box.
     background: (@Composable BoxScope.() -> Unit)? = null,
-    titleColor: Color = MaterialTheme.colorScheme.onSurface,
+    /**
+     * Defaults to the tone that PAIRS with [containerColor], not to onSurface.
+     *
+     * onSurface is the right colour only for a tile on the default surfaceVariant. The AI tile
+     * sets containerColor = tertiaryContainer, so its header was drawing near-white text on a
+     * pale lavender card -- legible in the sense that the pixels were there, and unreadable in
+     * every sense that matters. The Card below already resolves contentColorFor(containerColor)
+     * for everything else in the tile; the header was the one part opting out of it.
+     */
+    titleColor: Color = contentColorFor(containerColor),
     iconTint: Color = MaterialTheme.colorScheme.primary,
     body: @Composable ColumnScope.() -> Unit,
 ) {

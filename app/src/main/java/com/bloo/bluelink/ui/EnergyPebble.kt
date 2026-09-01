@@ -149,7 +149,13 @@ internal fun ChargePebble(v: Vehicle, status: VehicleStatus?, enabled: Boolean, 
         // sit on the 80/90 display defaults and "Set" would push a value the user never
         // chose to the car -- so we hide them entirely there. Start/Stop and the charging
         // hero above stay; only the editable limits go. See Brand.supportsChargeLimits.
-        if (v.brand.supportsChargeLimits) {
+        // Not on the cover. Two labelled pills, each with its own slider and Set button, are
+        // configuration -- you set a charge limit once and then never think about it -- and on a
+        // one-inch panel they pushed the readout and the Start button off the bottom of the tile
+        // entirely (reported from a real cover screenshot: the DC row and the action clipped).
+        // The cover's job is the glance and the one command; the limits stay a phone control,
+        // where there is room to see what you are dragging.
+        if (v.brand.supportsChargeLimits && !LocalForceExpanded.current) {
             ChargeLimitPill(
                 label = "AC (home) limit",
                 icon = Icons.Filled.Power,
