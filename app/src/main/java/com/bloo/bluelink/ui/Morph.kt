@@ -392,16 +392,25 @@ fun MorphIconButton(
         animationSpec = spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessMedium),
         label = "morphIconPress",
     )
-    IconButton(
-        onClick = { haptics?.click(); onClick() },
-        // On the button, not the icon: scaling the icon alone shrinks the glyph
-        // inside a target that stays put, which reads as a glitch rather than a
-        // press.
-        modifier = modifier.graphicsLayer { scaleX = scale; scaleY = scale },
-        enabled = enabled,
-        interactionSource = interactionSource,
-        content = content,
-    )
+    val body: @Composable () -> Unit = {
+        IconButton(
+            onClick = { haptics?.click(); onClick() },
+            // On the button, not the icon: scaling the icon alone shrinks the glyph
+            // inside a target that stays put, which reads as a glitch rather than a
+            // press.
+            modifier = modifier.graphicsLayer { scaleX = scale; scaleY = scale },
+            enabled = enabled,
+            interactionSource = interactionSource,
+            content = content,
+        )
+    }
+    // Joins a group when it is in one -- see MorphButton's own note. An icon button is just as
+    // likely to sit in a row of peers (the snackbar's copy/dismiss pair) as a labelled one.
+    if (LocalExpressiveGroup.current) {
+        SafeExpansiveButton(interactionSource = interactionSource, enabled = enabled) { body() }
+    } else {
+        body()
+    }
 }
 
 /**

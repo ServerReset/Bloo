@@ -580,15 +580,20 @@ internal fun PinDialogs(
         },
         buttons = {
             when (stage) {
-                "current" -> Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    MorphTextButton("Cancel", onDismiss, modifier = Modifier.weight(1f))
+                "current" -> ExpressiveButtonRow(
+                    // Same conversion as the "finish" pair below, and for the same reason:
+                    // Modifier.weight is a Row's parent data and means nothing to this group.
+                    modifier = Modifier.fillMaxWidth(),
+                    spacing = 8.dp,
+                    equalWidths = true,
+                ) {
+                    MorphTextButton("Cancel", onDismiss)
                     MorphButton(
                         onClick = {
                             haptics?.click()
                             vm.verifyAppPin(currentPin)
                         },
                         enabled = currentPin.length >= 4,
-                        modifier = Modifier.weight(1f),
                     ) { Text("Continue", fontWeight = FontWeight.SemiBold) }
                 }
                 "finish" -> {

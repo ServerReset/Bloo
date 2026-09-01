@@ -288,16 +288,21 @@ fun BlooApp(vm: AppViewModel) {
                         SelectionContainer(Modifier.weight(1f)) {
                             Text(data.visuals.message, style = MaterialTheme.typography.bodyMedium)
                         }
-                        MorphIconButton(onClick = { clipboard.setText(AnnotatedString(data.visuals.message)) }) {
-                            Icon(Icons.Filled.ContentCopy, contentDescription = "Copy")
-                        }
-                        // Swipe-to-dismiss is a raw drag gesture with no
-                        // TalkBack equivalent (a single-finger swipe here is
-                        // captured by TalkBack's own navigation instead), so a
-                        // screen-reader user previously had no way to dismiss
-                        // early and had to wait out the auto-hide timeout.
-                        MorphIconButton(onClick = { data.dismiss() }) {
-                            Icon(Icons.Filled.Close, contentDescription = "Dismiss")
+                        // A group: two icon buttons hard against each other at the end of a
+                        // snackbar is exactly the case where pressing one should take its width
+                        // from the other instead of shoving it toward the edge.
+                        ExpressiveButtonRow(spacing = 0.dp) {
+                            MorphIconButton(onClick = { clipboard.setText(AnnotatedString(data.visuals.message)) }) {
+                                Icon(Icons.Filled.ContentCopy, contentDescription = "Copy")
+                            }
+                            // Swipe-to-dismiss is a raw drag gesture with no
+                            // TalkBack equivalent (a single-finger swipe here is
+                            // captured by TalkBack's own navigation instead), so a
+                            // screen-reader user previously had no way to dismiss
+                            // early and had to wait out the auto-hide timeout.
+                            MorphIconButton(onClick = { data.dismiss() }) {
+                                Icon(Icons.Filled.Close, contentDescription = "Dismiss")
+                            }
                         }
                     }
                 }
