@@ -292,16 +292,21 @@ internal fun PagerDotsFor(
     real: (Int) -> Int,
     modifier: Modifier = Modifier,
     onRefresh: (() -> Unit)? = null,
+    /** False when the caller publishes these bounds itself -- see the note below. */
+    registerBounds: Boolean = true,
 ) {
     // The collision dodge goes through the floating registry rather than a State hand-threaded
     // down from GarageScreen (which had to be forwarded through TitleFlightOverlay ->
     // FloatingNamePill -> FullDetail to get there in the first place): .dodgeFloating fades
     // these out whenever anything else floating -- today the flying car name -- is in that spot.
     //
-    // Publishing the bounds is the CALLER's job, via Modifier.floatingOverlay on the `modifier`
-    // passed in, and deliberately not done here as well: that modifier carries the status-bar
-    // inset and the pull-to-refresh shift, so the caller's node is the one whose rect is where
-    // the dots really are. Registering here too would just have two writers racing on one id.
+    // [registerBounds] decides who publishes. A caller that floats these itself -- the garage,
+    // whose modifier carries the status-bar inset and the pull-to-refresh shift -- registers via
+    // Modifier.floatingOverlay, because ITS node is the one that knows where the dots really
+    // ended up; this then stays out of the way rather than racing a second writer on one id. A
+    // caller that just drops the dots into a column (the cover screen) has no such node, so this
+    // publishes for it. Either way something must, since dodgeFloating asks the registry where
+    // `self` is and silently never dodges if the answer is nothing.
     // Theme-only choices stay in the app: this wrapper is the one place that
     // translates Material colors + app chrome into the uicommon core's
     // parameterized [PagerDotColors], so the core never imports material3.
@@ -316,7 +321,9 @@ internal fun PagerDotsFor(
     com.bloo.uicommon.PagerDots(
         current = real(pager.currentPage),
         count = count,
-        modifier = modifier.dodgeFloating(FloatingIds.PagerDots),
+        modifier = modifier
+            .then(if (registerBounds) Modifier.floatingElement(FloatingIds.PagerDots) else Modifier)
+            .dodgeFloating(FloatingIds.PagerDots),
         onRefresh = onRefresh,
         haptics = haptics?.let { { it.tick() } },
         colors = colors,

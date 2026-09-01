@@ -369,6 +369,9 @@ internal fun GarageScreen(state: State<UiState>, vm: AppViewModel) {
                             count = count,
                             modifier = Modifier.align(Alignment.TopCenter).statusBarsPadding().padding(top = HeaderCornerGap)
                                 .floatingOverlay(FloatingIds.PagerDots),
+                            // Published by the modifier above -- the node that carries the inset and the
+                            // refresh shift -- so the dots must not also publish under the same id.
+                            registerBounds = false,
                             onRefresh = { vm.refreshStatus(vehicles[exWrap.settledReal]) },
                         )
                     }
@@ -981,6 +984,9 @@ internal fun GarageScreen(state: State<UiState>, vm: AppViewModel) {
                             count = totalBlocks,
                             modifier = Modifier.align(Alignment.TopCenter).statusBarsPadding().padding(top = HeaderCornerGap)
                                 .floatingOverlay(FloatingIds.PagerDots),
+                            // Published by the modifier above -- the node that carries the inset and the
+                            // refresh shift -- so the dots must not also publish under the same id.
+                            registerBounds = false,
                             // Guarded like every other currentIndex read in this
                             // function (currentVehicle above, etc.) -- currentIndex
                             // is its own StateFlow, independent of `vehicles`, so a
