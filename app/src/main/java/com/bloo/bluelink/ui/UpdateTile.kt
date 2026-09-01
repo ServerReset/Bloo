@@ -78,6 +78,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -201,58 +202,10 @@ internal fun UpdateAvailableTile(state: UiState, vm: AppViewModel, dragHandle: M
             showDelta = info.run.displayTitle?.isNotBlank() == true,
         )
             // Release notes ("What's new"), capped, with a "Full notes" link to the
-            // release page when there's more than we show.
+            // release page when there's more than we show. One shared block -- see
+            // UpdateReleaseNotes for why the Settings card no longer keeps its own copy.
             PopVisible(visible = info.run.releaseNotes != null) {
-                val notes = info.run.releaseNotes.orEmpty()
-                // Its own tonal card, matching the install-help disclosure just below it --
-                // bare text here made the release notes read as an unstyled afterthought
-                // next to that block's Surface treatment.
-                // fillMaxWidth() required: this Surface is a PopVisible/AnimatedVisibility
-                // descendant with a weight()-bearing Text further down ("What's new" row) --
-                // without an explicit fillMaxWidth somewhere in this chain, that Text
-                // collapses to a near-zero width and wraps one character per line. See
-                // SettingsScreen.kt's Weather-card place-name Row for the confirmed case.
-                Surface(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(12.dp),
-                    color = scheme.surfaceContainerHighest,
-                    contentColor = scheme.onSurface,
-                ) {
-                    Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        // "Full notes" rides in the section header rather than taking a
-                        // whole row of its own below the excerpt — one less stacked block
-                        // in a tile that already carries status, notes and two dismissals.
-                        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                            Text(
-                                "What's new",
-                                style = MaterialTheme.typography.labelSmall,
-                                fontWeight = FontWeight.Bold,
-                                color = scheme.onSurfaceVariant,
-                                modifier = Modifier.weight(1f),
-                            )
-                            val notesSource = remember { MutableInteractionSource() }
-                            SafeExpansiveButton(
-                                interactionSource = notesSource,
-                                enabled = true,
-                            ) {
-                                MorphTextButton(
-                                    "Full notes",
-                                    onClick = {
-                                        runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(info.run.htmlUrl))) }
-                                    },
-                                    interactionSource = notesSource,
-                                )
-                            }
-                        }
-                        Text(
-                            notes.trim(),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = scheme.onSurfaceVariant,
-                            maxLines = 5,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                    }
-                }
+                UpdateReleaseNotes(info, maxLines = 5)
             }
             // Progressive install help: only in the tap-through (non-seamless) path, and
             // only as an opt-in disclosure — the Play-Protect steps are scaffolding, not
@@ -413,6 +366,122 @@ internal fun UpdateAvailableTile(state: UiState, vm: AppViewModel, dragHandle: M
                     }
                 }
             }
+        }
+    }
+}
+
+/**
+ * The release notes block: "What's new", an excerpt, and a link to the full notes.
+ *
+ * Shared by the update pebble and the Settings Updates card, which had a copy each -- same
+ * Surface, same header row, same "Full notes" button, differing only in how many lines of the
+ * excerpt they showed and in one of them forgetting FLAG_ACTIVITY_NEW_TASK on the intent. That
+ * is the shape of drift this exists to stop: two blocks that are the same idea, kept in step by
+ * hand until one of them quietly is not.
+ *
+ * fillMaxWidth() is load-bearing, not decoration: this can sit inside a PopVisible, and with a
+ * weight()-bearing Text in the header row and no explicit width anywhere in the chain, that Text
+ * collapses to near-zero and wraps one character per line.
+ */
+@Composable
+internal fun UpdateReleaseNotes(
+    info: UpdateInfo,
+    /** 5 in the pebble, which has the room; 3 in the Settings card, which does not. */
+    maxLines: Int = 5,
+) {
+    val notes = info.run.releaseNotes?.trim().orEmpty()
+    if (notes.isBlank()) return
+    val context = LocalContext.current
+    val scheme = MaterialTheme.colorScheme
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(12.dp),
+        color = scheme.surfaceContainerHighest,
+        contentColor = scheme.onSurface,
+    ) {
+        Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            // "Full notes" rides in the section header rather than taking a whole row of its
+            // own below the excerpt -- one less stacked block in a tile that already carries
+            // status, notes and two dismissals.
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    "What's new",
+                    style = MaterialTheme.typography.labelSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = scheme.onSurfaceVariant,
+                    modifier = Modifier.weight(1f),
+                )
+                val notesSource = remember { MutableInteractionSource() }
+                SafeExpansiveButton(interactionSource = notesSource, enabled = true) {
+                    MorphTextButton(
+                        "Full notes",
+                        onClick = {
+                            runCatching {
+                                context.startActivity(
+                                    Intent(Intent.ACTION_VIEW, Uri.parse(info.run.htmlUrl))
+                                        .apply { addFlags(Intent.FLAG_ACTIVITY_NEW_TASK) },
+                                )
+                            }
+                        },
+                        interactionSource = notesSource,
+                    )
+                }
+            }
+            Text(
+                notes,
+                style = MaterialTheme.typography.bodySmall,
+                color = scheme.onSurfaceVariant,
+                maxLines = maxLines,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+    }
+}
+
+/**
+ * What the update's primary action says and does, in one place.
+ *
+ * The pebble surfaces it as its header action and the Settings card as a full-width button, so
+ * the CHROME differs -- but the label, the glyph and the branch it takes must not, and they had
+ * a copy each. Both now read from here.
+ */
+internal data class UpdateAction(val label: String, val icon: ImageVector, val ready: Boolean)
+
+@Composable
+internal fun updateAction(state: UiState, info: UpdateInfo, seamless: Boolean): UpdateAction = UpdateAction(
+    label = when {
+        state.updateInstalling -> "Installing…"
+        state.updateApkReady -> if (seamless) "Install now" else "Install"
+        state.updateDownloading -> "Downloading…"
+        info.run.phoneApkUrl != null -> "Download"
+        else -> "Open release page"
+    },
+    icon = when {
+        state.updateApkReady -> Icons.Filled.CheckCircle
+        state.updateDownloading -> Icons.Filled.Download
+        else -> Icons.Filled.SystemUpdate
+    },
+    ready = state.updateApkReady,
+)
+
+/** Runs the update's primary action -- download, install, or open the release page. */
+internal fun runUpdateAction(
+    state: UiState,
+    vm: AppViewModel,
+    info: UpdateInfo,
+    context: android.content.Context,
+) {
+    when {
+        state.updateApkReady -> vm.installDownloadedUpdate()
+        info.run.phoneApkUrl != null -> vm.downloadUpdateInBackground()
+        else -> {
+            val opened = runCatching {
+                context.startActivity(
+                    Intent(Intent.ACTION_VIEW, Uri.parse(info.run.htmlUrl))
+                        .apply { addFlags(Intent.FLAG_ACTIVITY_NEW_TASK) },
+                )
+            }.isSuccess
+            if (opened) vm.dismissUpdate() else vm.reportError("Couldn't open the release page.")
         }
     }
 }

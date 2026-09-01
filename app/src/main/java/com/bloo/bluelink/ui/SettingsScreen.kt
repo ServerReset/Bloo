@@ -65,8 +65,6 @@ import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AutoAwesome
-import androidx.compose.material.icons.filled.Download
-import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Pin
 import androidx.compose.material.icons.filled.LockReset
 import androidx.compose.material.icons.filled.ArrowBack
@@ -1920,104 +1918,40 @@ internal fun SettingsScreen(
                     } else newLabel
                     val seamless = appearance.seamlessInstallShizuku && state.shizukuAvailable
                     Spacer(Modifier.height(SettingsGapHairline))
-                    UpdateStatusLine(deltaLabel, seamless, state, vm)
+                    UpdateStatusLine(
+                        deltaLabel, seamless, state, vm,
+                        // The card's own heading two rows up is "Update available", not the
+                        // delta, so unlike the pebble this surface always has room for it.
+                        showDelta = true,
+                    )
                     Spacer(Modifier.height(SettingsGapGroup))
+                    // Label, glyph and branch all come from the shared updateAction /
+                    // runUpdateAction, so this button and the pebble's header action cannot
+                    // disagree about what the update flow is currently offering. Only the
+                    // chrome differs: full width here, a header pill there.
+                    val act = updateAction(state, updateInfo, seamless)
                     val updateSource = remember { MutableInteractionSource() }
                     SafeExpansiveButton(
                         interactionSource = updateSource,
                         enabled = !state.updateInstalling && !state.updateDownloading,
                     ) {
                         MorphButton(
-                            onClick = {
-                                when {
-                                    state.updateApkReady -> vm.installDownloadedUpdate()
-                                    updateInfo.run.phoneApkUrl != null -> vm.downloadUpdateInBackground()
-                                    else -> {
-                                        val opened = runCatching {
-                                            context.startActivity(
-                                                Intent(Intent.ACTION_VIEW, Uri.parse(updateInfo.run.htmlUrl))
-                                                    .apply { addFlags(Intent.FLAG_ACTIVITY_NEW_TASK) },
-                                            )
-                                        }.isSuccess
-                                        if (opened) vm.dismissUpdate() else vm.reportError("Couldn't open the release page.")
-                                    }
-                                }
-                            },
-                            active = state.updateApkReady,
+                            onClick = { runUpdateAction(state, vm, updateInfo, context) },
+                            active = act.ready,
                             activeContainerColor = com.bloo.bluelink.ui.ChargeGreen,
                             activeContentColor = Color.White,
                             enabled = !state.updateInstalling && !state.updateDownloading,
                             interactionSource = updateSource,
                             modifier = Modifier.fillMaxWidth(),
                         ) {
-                            Icon(
-                                when {
-                                    state.updateApkReady -> Icons.Filled.CheckCircle
-                                    state.updateDownloading -> Icons.Filled.Download
-                                    else -> Icons.Filled.SystemUpdate
-                                },
-                                contentDescription = null,
-                                modifier = Modifier.size(18.dp),
-                            )
-                            Spacer(Modifier.width(8.dp))
-                            Text(
-                                when {
-                                    state.updateInstalling -> "Installing…"
-                                    state.updateApkReady -> if (seamless) "Install now" else "Install"
-                                    updateInfo.run.phoneApkUrl != null -> "Download"
-                                    else -> "Open release page"
-                                },
-                                fontWeight = FontWeight.SemiBold,
-                            )
+                            MorphButtonLabel(act.icon, act.label, pending = false)
                         }
                     }
-                    val notes = updateInfo.run.releaseNotes
-                    if (notes != null) {
-                        Spacer(Modifier.height(SettingsGapRow))
-                        Surface(
-                            shape = RoundedCornerShape(12.dp),
-                            color = MaterialTheme.colorScheme.surfaceContainerHighest,
-                            contentColor = MaterialTheme.colorScheme.onSurface,
-                            modifier = Modifier.fillMaxWidth(),
-                        ) {
-                            Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Text(
-                                        "What's new",
-                                        style = MaterialTheme.typography.labelSmall,
-                                        fontWeight = FontWeight.Bold,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        modifier = Modifier.weight(1f),
-                                    )
-                                    val notesSource = remember { MutableInteractionSource() }
-                                    SafeExpansiveButton(
-                                        interactionSource = notesSource,
-                                        enabled = true,
-                                    ) {
-                                        MorphTextButton(
-                                            "Full notes",
-                                            interactionSource = notesSource,
-                                            onClick = {
-                                                runCatching {
-                                                    context.startActivity(
-                                                        Intent(Intent.ACTION_VIEW, Uri.parse(updateInfo.run.htmlUrl))
-                                                            .apply { addFlags(Intent.FLAG_ACTIVITY_NEW_TASK) },
-                                                    )
-                                                }
-                                            }
-                                        )
-                                    }
-                                }
-                                Text(
-                                    notes.trim(),
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    maxLines = 3,
-                                    overflow = TextOverflow.Ellipsis,
-                                )
-                            }
-                        }
-                    }
+                    // Shared with the update pebble -- see UpdateReleaseNotes. The two used
+                    // to keep a copy each, identical but for the excerpt length and one of them
+                    // forgetting FLAG_ACTIVITY_NEW_TASK on the intent.
+                    Spacer(Modifier.height(SettingsGapRow))
+                    UpdateReleaseNotes(updateInfo, maxLines = 3)
                     Spacer(Modifier.height(SettingsGapRow))
                     Row(Modifier.fillMaxWidth()) {
                         Spacer(Modifier.weight(1f))
