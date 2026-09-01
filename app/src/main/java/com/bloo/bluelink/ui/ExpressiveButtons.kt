@@ -15,8 +15,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.TransformOrigin
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.layout.ParentDataModifier
 import androidx.compose.ui.layout.Placeable
@@ -73,17 +71,15 @@ private fun expressivePressFraction(interactionSource: InteractionSource, enable
 }
 
 /**
- * Press feedback for a button with no neighbour to push: the drawn button swells 15% and springs
- * back, via a draw-phase `graphicsLayer {}` lambda.
+ * Press feedback for a standalone button: it is re-measured ~15% wider and springs back, so the
+ * pill genuinely grows and anything beside it in a Row is pushed along.
  *
- * The lambda form matters and is not a style preference. The non-lambda
- * `graphicsLayer(scaleX = value)` overload reads the animation in COMPOSITION, so every one of
- * these recomposed on every frame of every press -- ~80 buttons' worth of composition churn for
- * an effect that only ever needed to redraw. Read inside the lambda, the animation invalidates
- * draw and nothing else.
+ * The press fraction is read inside the measure block, so a press invalidates LAYOUT only --
+ * composition never re-runs for the animation, which is what keeps this affordable at the ~80
+ * call sites that use it.
  *
- * Layout is untouched, so this is safe in a lazy item, inside `AnimatedVisibility`, anywhere.
- * If you want the press to actually displace a neighbour, that is [ExpressiveButtonGroup].
+ * For a row of buttons that should share a fixed footprint and shove each other instead of
+ * pushing the row wider, use [ExpressiveButtonRow]; these buttons detect it and join in.
  */
 @Composable
 fun SafeExpansiveButton(
@@ -93,27 +89,49 @@ fun SafeExpansiveButton(
     content: @Composable () -> Unit,
 ) {
     val press by expressivePressFraction(interactionSource, enabled)
-    // Inside an [ExpressiveButtonRow]/[ExpressiveButtonGroup] this button joins the group and
-    // takes REAL width from its neighbours, which is the effect that was asked for; on its own it
-    // falls back to the paint-only scale, which is safe anywhere. Self-registering is what makes
-    // adopting the real effect a one-line change at a call site (swap the `Row` for an
-    // `ExpressiveButtonRow`) instead of rewriting every button inside it.
+    // Inside an [ExpressiveButtonRow]/[ExpressiveButtonGroup] this button joins the group, which
+    // takes the extra width off its NEIGHBOURS so the row's own footprint never changes.
     if (LocalExpressiveGroup.current) {
         Box(modifier.then(ExpressiveGroupData { press }), propagateMinConstraints = true) {
             content()
         }
         return
     }
-    Box(
-        modifier.graphicsLayer {
-            val s = 1f + ExpressivePressGrowth * press
-            scaleX = s
-            scaleY = s
-            transformOrigin = TransformOrigin.Center
+    // On its own, it grows for real: the button is re-measured at a wider width, so the pill
+    // itself gets wider and whatever sits next to it in a Row is pushed aside. That IS the
+    // requested effect, and it is what a graphicsLayer scale could never deliver -- a scale
+    // stretches the pixels of a button whose measured size never changed, so nothing moves and
+    // the label distorts. MorphButtonCore already applies its own press scale internally, so the
+    // old wrapper was in any case only ever adding a second scale on top of one.
+    //
+    // The earlier objection to real growth was that a size change inside a Settings lazy item
+    // crashes the grid. That reasoning came from the reported Logs-card crash -- which turns out
+    // to be DebugSettingsPanel's unbounded LazyColumn one card further down, not a size change at
+    // all. Lazy layouts remeasure on content size changes constantly (every AnimatedVisibility in
+    // these same cards does it); there was never anything here to be afraid of.
+    val naturals = remember { NaturalWidths() }
+    Layout(
+        content = { content() },
+        modifier = modifier,
+        measurePolicy = { measurables, constraints ->
+            val m = measurables.firstOrNull() ?: return@Layout layout(0, 0) {}
+            // Read at LAYOUT time, so a press invalidates layout only and never composition.
+            val p = press
+            val cached = naturals.widths?.firstOrNull() ?: 0
+            // One measure per pass, never two: measuring the same Measurable twice in a single
+            // pass throws, so the resting width is CACHED on the resting passes and the pressed
+            // passes size themselves from that cache.
+            val placeable = if (p <= 0.001f || cached <= 0) {
+                m.measure(constraints).also { naturals.widths = intArrayOf(it.width) }
+            } else {
+                val target = (cached * (1f + ExpressivePressGrowth * p)).roundToInt()
+                    .coerceAtMost(if (constraints.hasBoundedWidth) constraints.maxWidth else Int.MAX_VALUE)
+                    .coerceAtLeast(0)
+                m.measure(constraints.copy(minWidth = target, maxWidth = target))
+            }
+            layout(placeable.width, placeable.height) { placeable.place(0, 0) }
         },
-    ) {
-        content()
-    }
+    )
 }
 
 /**

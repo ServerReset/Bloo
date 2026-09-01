@@ -1103,7 +1103,11 @@ internal fun SettingsScreen(
             // Logs
             AnimatedVisibility(visibleState = rememberAppearedState(), enter = collapseEnter(), exit = collapseExit()) {
             SettingsCard("Logs", Icons.Filled.Info, vm) {
-                var logsExpanded by remember { mutableStateOf(false) }
+                // No local expand state any more. The card's OWN chevron (PebbleShell's, via
+                // SettingsCard) already governs this body -- nothing inside a collapsed card is
+                // composed at all -- so the "Show"/"Hide" button that used to live on this row
+                // was a second disclosure for the same content: open the card, then open the log
+                // again. One control, the outer one.
                 val lineCount = logs.size
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(Icons.Filled.Info, contentDescription = null, modifier = Modifier.size(18.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -1113,12 +1117,10 @@ internal fun SettingsScreen(
                         Modifier.weight(1f),
                         style = MaterialTheme.typography.bodyMedium,
                     )
-                    // PopVisible, not a bare AnimatedVisibility -- this is a small row-level
-                    // element popping in next to the header, independent of the (much
-                    // larger) disclosure body right below it, which is what PopVisible
-                    // exists for rather than the whole-block collapseEnter/collapseExit pair.
-                    PopVisible(logsExpanded) {
-                        ExpressiveButtonRow(spacing = 0.dp) {
+                    // Always present now: they used to appear only once the inner disclosure
+                    // was opened, which is exactly the second step that made this card feel
+                    // like it opened twice.
+                    ExpressiveButtonRow(spacing = 0.dp) {
                             val copySource = remember { MutableInteractionSource() }
                             SafeExpansiveButton(
                                 interactionSource = copySource,
@@ -1144,36 +1146,11 @@ internal fun SettingsScreen(
                                     interactionSource = clearSource,
                                 )
                             }
-                            Spacer(Modifier.width(4.dp))
-                        }
-                    }
-                    // A labelled text button, not a second MorphExpandButton chevron --
-                    // this card's own PebbleShell header already has one of those, and
-                    // a lookalike chevron right underneath it read as two stacked
-                    // controls for the same thing. This one still guards something the
-                    // outer chevron doesn't: a potentially long, monospace raw log dump
-                    // that shouldn't blast into view every time the card itself opens,
-                    // so it keeps its own disclosure -- just spelled out in words
-                    // instead of an icon that mimics the outer one.
-                    val logsExpandSource = remember { MutableInteractionSource() }
-                    SafeExpansiveButton(
-                        interactionSource = logsExpandSource,
-                        enabled = true,
-                    ) {
-                        MorphTextButton(
-                            if (logsExpanded) "Hide" else "Show",
-                            interactionSource = logsExpandSource,
-                            onClick = { logsExpanded = !logsExpanded },
-                        )
+                        Spacer(Modifier.width(4.dp))
                     }
                 }
-                AnimatedVisibility(
-                    visible = logsExpanded,
-                    enter = collapseEnter(Alignment.Bottom),
-                    exit = collapseExit(Alignment.Bottom),
-                ) {
-                    Column {
-                        Spacer(Modifier.height(6.dp))
+                Column {
+                    Spacer(Modifier.height(6.dp))
                         HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
                         Spacer(Modifier.height(4.dp))
                         val logScroll = rememberScrollState()
@@ -1199,7 +1176,6 @@ internal fun SettingsScreen(
                         }
                     }
                 }
-            }
             }
             }
             if (advVisible[7]) item {

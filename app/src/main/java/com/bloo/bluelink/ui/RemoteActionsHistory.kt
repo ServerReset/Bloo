@@ -3,17 +3,16 @@
 package com.bloo.bluelink.ui
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -21,10 +20,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.font.FontFamily
-import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 
 /**
  * Represents a single remote action taken on a vehicle.
@@ -57,78 +54,57 @@ private fun statusColor(status: String) = when (status.lowercase()) {
 }
 
 /**
- * Compact badge showing action status.
- * Used in action history items for quick status recognition.
- */
-@Composable
-private fun StatusBadge(status: String) {
-    Box(
-        modifier = Modifier
-            .background(
-                color = statusColor(status).copy(alpha = 0.2f),
-                shape = RoundedCornerShape(4.dp)
-            )
-            .padding(horizontal = 6.dp, vertical = 2.dp),
-        contentAlignment = Alignment.Center
-    ) {
-        Text(
-            text = status,
-            style = MaterialTheme.typography.labelSmall,
-            color = statusColor(status),
-            fontSize = 10.sp,
-        )
-    }
-}
-
-/**
- * Single row representing one remote action in history.
- * Shows action name, timestamp, status, and optional details.
+ * One action, on one line: a status dot, the action's name, and when it happened.
+ *
+ * Deliberately flat -- no badge chrome, no card, no second type size for the timestamp. This
+ * list is revealed INSIDE the lock pebble, so every box drawn here is a box inside a box, and
+ * the earlier version (a filled status pill, a monospace time on its own line, and details in a
+ * third) turned six entries into a wall three times taller than the pebble it hangs off. Status
+ * is the one thing worth colour, so it is the dot and nothing else.
  */
 @Composable
 private fun RemoteActionItem(action: RemoteAction, use24Hour: Boolean) {
-    Column(
+    Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 12.dp, vertical = 8.dp)
+            .padding(horizontal = 12.dp, vertical = 5.dp),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(IntrinsicSize.Max),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            // Action name and timestamp
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = action.action,
-                    style = MaterialTheme.typography.labelLarge,
-                    fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.onSurface,
-                )
-                Text(
-                    text = shortTime(action.timestamp, use24Hour),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    fontSize = 11.sp,
-                    fontFamily = FontFamily.Monospace,
-                )
-            }
-
-            // Status badge
-            StatusBadge(action.status)
-        }
-
-        // Optional details (e.g., "Set to 72°F", "16 kWh")
+        Box(
+            Modifier
+                .size(6.dp)
+                .background(statusColor(action.status), CircleShape),
+        )
+        Spacer(Modifier.width(8.dp))
+        Text(
+            text = action.action,
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurface,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f, fill = false),
+        )
+        // Details ride on the SAME line, muted, and give up their space first -- a failure
+        // reason is worth showing but never worth a row of its own here.
         if (action.details != null) {
+            Spacer(Modifier.width(6.dp))
             Text(
                 text = action.details,
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(top = 4.dp),
-                fontSize = 10.sp,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f),
             )
+        } else {
+            Spacer(Modifier.weight(1f))
         }
+        Spacer(Modifier.width(8.dp))
+        Text(
+            text = shortTime(action.timestamp, use24Hour),
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
     }
 }
 
@@ -184,11 +160,10 @@ internal fun RemoteActionsInline(actions: List<RemoteAction>, max: Int = 6) {
         actions.take(max).forEach { RemoteActionItem(it, use24Hour) }
         if (actions.size > max) {
             Text(
-                text = "+${actions.size - max} older",
+                text = "+${actions.size - max} more in the last $REMOTE_ACTION_HISTORY_DAYS days",
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
-                fontSize = 10.sp,
             )
         }
     }

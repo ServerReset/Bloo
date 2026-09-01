@@ -36,5 +36,17 @@ internal const val SHIZUKU_INSTALL_REQUEST_CODE = 4711
 /** Minimum time a command control stays locked after firing, to block double-taps. */
 internal const val MIN_COMMAND_LOCK_MS = 3000L
 
-/** Max entries kept per car in [UiState.remoteActionHistory] -- oldest trimmed first. */
-internal const val REMOTE_ACTION_HISTORY_LIMIT = 20
+/**
+ * How far back the per-car remote-action history reaches: a rolling 30 days, pruned on every
+ * write. A window, not a count -- a car commanded twice a week and one commanded twenty times a
+ * day should both answer "what did I do to this car recently", and a fixed 20-entry cap gave the
+ * busy car about a day of history while the quiet one kept months.
+ */
+internal const val REMOTE_ACTION_HISTORY_DAYS = 30L
+
+/**
+ * A hard ceiling on entries per car, well above what 30 days of ordinary use produces. Purely a
+ * backstop so a command loop or a wrong clock cannot grow this without bound; the 30-day window
+ * above is what normally decides what is kept.
+ */
+internal const val REMOTE_ACTION_HISTORY_MAX = 200

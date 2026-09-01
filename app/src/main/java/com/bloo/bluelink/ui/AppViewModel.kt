@@ -2913,7 +2913,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     /** Appends one entry to [UiState.remoteActionHistory] for [vin], newest
-     *  first, trimmed to [REMOTE_ACTION_HISTORY_LIMIT]. Called from the two
+     *  first, keeping a rolling [REMOTE_ACTION_HISTORY_DAYS]-day window. Called from the two
      *  places [runCommand] resolves (success/catch) -- every remote command
      *  the app issues passes through there, so this one hook covers all of
      *  them without touching each individual call site. */
@@ -2925,12 +2925,23 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             status = status,
             details = details,
         )
+        // Pruned by AGE on every write, which is also what retires entries for a car that is
+        // simply not being used any more -- there is no other sweep, so if this did not do it
+        // nothing would. An unparseable timestamp is KEPT rather than dropped: it can only come
+        // from an entry this app wrote, and silently deleting history because a string did not
+        // parse is worse than carrying one stale row until the count backstop takes it.
+        val cutoff = java.time.Instant.now().minus(
+            java.time.Duration.ofDays(REMOTE_ACTION_HISTORY_DAYS),
+        )
         _state.update { st ->
             val existing = st.remoteActionHistory[vin].orEmpty()
-            st.copy(
-                remoteActionHistory = st.remoteActionHistory +
-                    (vin to (listOf(entry) + existing).take(REMOTE_ACTION_HISTORY_LIMIT)),
-            )
+            val kept = (listOf(entry) + existing)
+                .filter { a ->
+                    runCatching { java.time.Instant.parse(a.timestamp).isAfter(cutoff) }
+                        .getOrDefault(true)
+                }
+                .take(REMOTE_ACTION_HISTORY_MAX)
+            st.copy(remoteActionHistory = st.remoteActionHistory + (vin to kept))
         }
     }
 

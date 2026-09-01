@@ -152,7 +152,7 @@ data class UiState(
     /** In-flight commands, keyed "vin:action", so each control can show its own spinner. */
     val pending: Set<String> = emptySet(),
     /** Recent remote commands (Lock/Unlock/Climate/etc.) by VIN, newest first,
-     *  capped at [REMOTE_ACTION_HISTORY_LIMIT] entries per car -- written by
+     *  kept as a rolling [REMOTE_ACTION_HISTORY_DAYS]-day window per car -- written by
      *  [AppViewModel.runCommand] as the single choke point every remote
      *  command already passes through. Surfaced by RemoteActionsInline, revealed by pressing the lock pebble background. */
     val remoteActionHistory: Map<String, List<RemoteAction>> = emptyMap(),
