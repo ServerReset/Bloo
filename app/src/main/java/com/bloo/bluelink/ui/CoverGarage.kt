@@ -408,7 +408,15 @@ internal fun CompactCar(
     // car page (status ticks, pending flags, messages) -- the per-tile memo
     // below keeps that cost proportional to what changed.
     val hasBattery = state.hasBattery(v)
-    val tiles = remember(state.sectionOrders[v.vin], hasBattery, state.aiEnabled, isGen5W, state.hiddenPebbles) {
+    // updateAvailable and updateTileDismissed are in the key because isSectionAvailable reads
+    // them for the "update" tile. Without them this memo kept a stale tile list: the update tile
+    // could arrive late, or survive being dismissed, until some unrelated key happened to change.
+    // The phone's equivalent memo in PebbleList already lists both for exactly this reason -- the
+    // cover's copy had drifted from it.
+    val tiles = remember(
+        state.sectionOrders[v.vin], hasBattery, state.aiEnabled, isGen5W, state.hiddenPebbles,
+        state.updateAvailable, state.updateTileDismissed,
+    ) {
         state.sectionsFor(v).mapNotNull { section ->
             when (section) {
                 "summary" -> "main"
