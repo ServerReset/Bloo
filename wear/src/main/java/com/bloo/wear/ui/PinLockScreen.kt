@@ -43,6 +43,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.wear.compose.material3.MaterialTheme
 import androidx.wear.compose.material3.ScreenScaffold
@@ -264,7 +265,13 @@ fun PinEntryScreen(
             )
         }
         Spacer(Modifier.height(4.dp))
-        Box(Modifier.offset(x = shakeX.value.dp)) {
+        // offset { } (layout phase), not offset(x = ...dp) (composition phase). The dp overload
+        // reads shakeX in COMPOSITION, and this read sits in PinLockScreen's own body -- so every
+        // frame of the reject shake recomposed the entire screen, twelve keypad buttons included,
+        // to move one row of dots a few pixels. entranceAlpha thirty lines up already avoids
+        // exactly this with a graphicsLayer lambda; this was the one that got missed, on the
+        // slowest CPU in the project, during the one animation the user is watching closely.
+        Box(Modifier.offset { IntOffset(shakeX.value.dp.roundToPx(), 0) }) {
             PinDots(buffer.length, showErrorTint)
         }
         Spacer(Modifier.height(4.dp))
