@@ -1118,7 +1118,7 @@ internal fun SettingsScreen(
                     // larger) disclosure body right below it, which is what PopVisible
                     // exists for rather than the whole-block collapseEnter/collapseExit pair.
                     PopVisible(logsExpanded) {
-                        Row {
+                        ExpressiveButtonRow(spacing = 0.dp) {
                             val copySource = remember { MutableInteractionSource() }
                             SafeExpansiveButton(
                                 interactionSource = copySource,
