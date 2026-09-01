@@ -36,10 +36,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.animation.core.Animatable
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.BlurEffect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
-import androidx.compose.ui.graphics.TileMode
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
@@ -257,30 +255,6 @@ fun MorphSegmented(
             // not dragging), so no label falsely bolds via the index-0 fallback.
             val visualIndex = dragXPx?.let { indexFor(it) } ?: if (indicatorVisible) selectedIndex else -1
 
-// Motion blur on the indicator ONLY after the finger lifts, on the
-            // spring-back: while the finger is actually dragging, the highlight
-            // stays perfectly crisp. Blurring it for the whole ride read as a
-            // "low-resolution preview" (the highlight smearing at every position
-            // the finger passed) -- the blur's job is to soften the RETURN
-            // wobble, not the drag itself, which is exactly the split
-            // AnimatedSlider already makes (crisp while tracking, blurred only
-            // while settling).
-            var settling by remember { mutableStateOf(false) }
-            LaunchedEffect(settling) {
-                if (settling) {
-                    delay(300)
-                    settling = false
-                }
-            }
-            // snap() jumps motionBlurX straight to 6f the instant the release
-            // lands (no ramp-up lag behind the spring); the spring only governs
-            // the fade back to 0f, so the blur relaxes smoothly instead of
-            // vanishing abruptly.
-            val motionBlurX by animateFloatAsState(
-                targetValue = if (settling) 6f else 0f,
-                animationSpec = if (settling) snap() else spring(dampingRatio = 0.6f, stiffness = Spring.StiffnessMediumLow),
-                label = "segMotionBlur",
-            )
             // The sliding highlight pill. Declared before the Row of segment labels
             // below, so it draws underneath them in z-order -- the labels' text stays
             // legible on top of the highlight as it passes beneath. Its horizontal
@@ -303,14 +277,13 @@ fun MorphSegmented(
                     // one of those frames instead of just redrawing it, unlike
                     // translationX/alpha right above which were already correctly
                     // deferred.
+                    // No renderEffect blur here either -- see AnimatedSlider. The selection
+                    // indicator travels one segment; blurring it made the whole group look
+                    // low-resolution for the length of the animation, which is what was
+                    // reported, rather than making it look fast.
                     .graphicsLayer {
                         translationX = indicatorXPx.value
                         alpha = indicatorAlpha
-                        renderEffect = if (motionBlurX > 0.5f) {
-                            BlurEffect(motionBlurX, motionBlurX, TileMode.Clamp)
-                        } else {
-                            null
-                        }
                     }
                     .background(indicatorColor, RoundedCornerShape(14.dp)),
             )
@@ -391,8 +364,6 @@ fun MorphSegmented(
                                 // visibly snap back before the caller's prop round-trips (see
                                 // the comment on pendingIndex above).
                                 if (claimed) {
-                                    // Arm the settle blur now that the finger is up.
-                                    settling = true
                                     val x = dragXPx ?: offsetFor(down.position.x)
                                     val idx = indexFor(x)
                                     pendingIndex = idx

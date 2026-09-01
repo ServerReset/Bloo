@@ -4,7 +4,6 @@ import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.spring
-import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
@@ -26,8 +25,6 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.BlurEffect
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.TileMode
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.positionChanged
 import androidx.compose.ui.layout.onSizeChanged
@@ -160,8 +157,8 @@ fun AnimatedSlider(
             // finally (not a trailing statement) so `settling` is reset even when a
             // new drag's snapTo cancels this settle via the shared MutatorMutex --
             // animateTo/snapTo then throws CancellationException, and without the
-            // finally the control would stay stuck at settling=true (blurred, value
-            // sync blocked) for the whole interrupting drag.
+            // finally the control would stay stuck at settling=true, with value sync
+            // blocked, for the whole interrupting drag.
             try {
                 if (reduceMotion) {
                     anim.snapTo(target)
@@ -177,34 +174,16 @@ fun AnimatedSlider(
         }
     }
 
-    // Mirrors MorphSegmented's motion-blur trick: jumps to a blur amount instantly
-    // (snap()) the moment a settle bounce begins, then eases back to zero via a
-    // spring as the bounce finishes, giving the thumb's post-release wobble a soft
-    // motion-blur look instead of a hard-edged bounce.
-    val settleBlur by animateFloatAsState(
-        targetValue = if (settling) 4f else 0f,
-        animationSpec = if (settling) snap() else spring(dampingRatio = 0.6f, stiffness = Spring.StiffnessMediumLow),
-        label = "settleBlur",
-    )
     Box(
         Modifier
             .fillMaxWidth()
             .height(thumbH)
-            // A deferred graphicsLayer read, not the previous body-level
-            // `.then(if (settleBlur > 0.5f) Modifier.blur(...) else Modifier)` --
-            // that read settleBlur (an animateFloatAsState value ticking every
-            // frame of the post-release settle bounce) directly in the
-            // composable body, recomposing this whole Box every one of those
-            // frames instead of just redrawing it -- the exact anti-pattern
-            // this file's own Canvas draw below (which reads anim.value inside
-            // its DrawScope) exists specifically to avoid.
-            .graphicsLayer {
-                renderEffect = if (settleBlur > 0.5f) {
-                    BlurEffect(settleBlur, settleBlur, TileMode.Clamp)
-                } else {
-                    null
-                }
-            }
+            // No motion blur. A BlurEffect over the whole control during the post-release
+            // settle was meant to read as speed; what it actually reads as is the slider going
+            // low-resolution the moment you touch it -- reported that way repeatedly, and it is
+            // the correct reading, because a blurred render target IS lower resolution. Motion
+            // blur belongs on something travelling far enough for the eye to lose it, not on a
+            // thumb settling a few pixels under a finger that is still there.
             // Captures the control's actual laid-out pixel width once it's known,
             // feeding widthPx (used by rawForX above to convert touch x-coordinates
             // into slider values).

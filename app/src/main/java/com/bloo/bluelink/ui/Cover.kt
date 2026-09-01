@@ -23,6 +23,7 @@ import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.only
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -617,7 +618,13 @@ internal fun CoverActionButton(
         }
         if (compact) {
             Row(
-                Modifier.fillMaxSize().padding(horizontal = 10.dp),
+                // fillMaxHEIGHT, not fillMaxSize. MorphButtonCore sizes itself from its content,
+                // and its own doc spells out the consequence of a content child that fills:
+                // "the button had no intrinsic size of its own and simply took whatever the
+                // incoming constraints allowed". In a full-width action row that is the whole
+                // panel -- which is the enormous button, and no amount of guarding equalWidths
+                // above could have helped, because the stretch was coming from inside.
+                Modifier.fillMaxHeight().padding(horizontal = 14.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
@@ -626,7 +633,9 @@ internal fun CoverActionButton(
             }
         } else {
             Column(
-                Modifier.fillMaxSize(),
+                // fillMaxHeight for the same reason. The stacked form is only ever used where
+                // the group hands out an exact width anyway, so it never depended on filling.
+                Modifier.fillMaxHeight(),
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.Center,
             ) {

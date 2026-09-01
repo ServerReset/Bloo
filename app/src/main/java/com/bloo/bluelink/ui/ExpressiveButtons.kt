@@ -121,8 +121,17 @@ fun SafeExpansiveButton(
             // One measure per child per pass, never two: measuring the same Measurable twice in
             // a single pass throws, so the resting width is CACHED on the resting passes and the
             // pressed passes size themselves from that cache.
+            // minWidth ZEROED for the resting measure. Measuring with the incoming constraints
+            // meant that in any parent that forces a width -- a fillMaxWidth row, most of them --
+            // the button was recorded at that forced width, and the pressed pass then computed
+            // `cached * 1.15` and coerced it straight back down to maxWidth. Target == cached,
+            // so the button never moved. That is why these still did not animate. A child that
+            // genuinely wants the full width still gets it from its own fillMaxWidth; one that
+            // does not now records its real natural size, which is what there is room to grow
+            // from.
+            val naturalConstraints = constraints.copy(minWidth = 0)
             val placeables = if (p <= 0.001f || cached <= 0) {
-                measurables.map { it.measure(constraints) }
+                measurables.map { it.measure(naturalConstraints) }
                     .also { naturals.widths = intArrayOf(it.maxOf { pl -> pl.width }) }
             } else {
                 val target = (cached * (1f + ExpressivePressGrowth * p)).roundToInt()
@@ -290,27 +299,48 @@ fun ExpressiveButtonGroup(
                     naturals.widths = IntArray(n) { measured[it].width }
                 }
             } else {
-                // Pressed: hand out the SAME total width as at rest, just shared differently --
-                // pressed children ask for `growth` more, everyone is then normalised back down
-                // to the original total, so the growth comes out of the neighbours and the
-                // group's own width is bit-for-bit unchanged.
-                // The budget is the MEMBERS' resting total; non-members are held at natural
-                // width and neither give nor take.
-                val total = (0 until n).sumOf { if (member[it]) cached[it] else 0 }
-                val desired = FloatArray(n) {
-                    if (member[it]) cached[it] * (1f + ExpressivePressGrowth * press[it]) else 0f
+                // The pressed button gets the FULL growth. It used to be normalised down along
+                // with everyone else -- pressed asks for 1.15x, then the whole row is scaled by
+                // total/desiredTotal to keep the width constant -- which on a two-button row
+                // handed the pressed one about +7% instead of +15%, and split the difference
+                // with its neighbour. Correct arithmetic, wrong effect: the press was there but
+                // too small to read, which is what "the buttons still don't animate" was.
+                //
+                // Now the growth is taken from SLACK first. Only when the row has none do the
+                // other members give it up, and even then the pressed one keeps its full size --
+                // it pushes, rather than politely shrinking along with what it pushes.
+                val target = IntArray(n) { cached[it] }
+                val room = if (constraints.hasBoundedWidth) constraints.maxWidth - gaps else Int.MAX_VALUE
+                val restTotal = (0 until n).sumOf { cached[it] }
+                var wanted = 0
+                for (i in 0 until n) {
+                    if (!member[i]) continue
+                    val grown = (cached[i] * (1f + ExpressivePressGrowth * press[i])).roundToInt()
+                    wanted += grown - cached[i]
+                    target[i] = grown
                 }
-                val desiredTotal = desired.sum()
-                val norm = if (desiredTotal > 0f) total / desiredTotal else 1f
-                val target = IntArray(n) {
-                    if (member[it]) (desired[it] * norm).roundToInt().coerceAtLeast(0) else cached[it]
+                val overflow = (restTotal + wanted - room).coerceAtLeast(0)
+                if (overflow > 0) {
+                    // Take it back from the members that are NOT growing, in proportion to their
+                    // size, so a wide neighbour yields more than a narrow one.
+                    val donors = (0 until n).filter { member[it] && press[it] <= 0.001f }
+                    val donorTotal = donors.sumOf { cached[it] }
+                    if (donorTotal > 0) {
+                        var left = overflow
+                        for ((k, i) in donors.withIndex()) {
+                            val share = if (k == donors.lastIndex) left
+                                        else (overflow.toLong() * cached[i] / donorTotal).toInt()
+                            target[i] = (cached[i] - share).coerceAtLeast(0)
+                            left -= share
+                        }
+                    } else {
+                        // Nothing to take from (every member is pressed, or there is one of
+                        // them): fall back to fitting inside the row rather than overflowing it.
+                        val scale = if (restTotal + wanted > 0) room.toFloat() / (restTotal + wanted) else 1f
+                        for (i in 0 until n) if (member[i]) target[i] = (target[i] * scale).roundToInt()
+                    }
                 }
-                // Rounding drift lands on the widest MEMBER, where a pixel cannot be seen.
-                val drift = total - (0 until n).sumOf { if (member[it]) target[it] else 0 }
-                if (drift != 0) {
-                    val widest = (0 until n).filter { member[it] }.maxByOrNull { target[it] }
-                    if (widest != null) target[widest] = (target[widest] + drift).coerceAtLeast(0)
-                }
+
                 measurables.mapIndexed { i, m ->
                     val w = target[i].coerceAtMost(
                         if (constraints.hasBoundedWidth) constraints.maxWidth else target[i],

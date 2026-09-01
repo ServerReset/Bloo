@@ -679,7 +679,9 @@ internal fun AiPebble(v: Vehicle, state: UiState, vm: AppViewModel, dragHandle: 
             onClick = { vm.summarizeCar(v) },
             pending = busy,
         ),
-        alwaysExpandedInSimpleMode = true,
+        // NOT alwaysExpandedInSimpleMode -- see the note on LocationPebble. This tile has a
+        // summary paragraph and a footnote, not a single setting, and the flag costs it its
+        // chevron entirely.
     ) {
         // On the flip cover this tile fills the screen; two short text lines centred
         // in it read as a big empty purple void. Lead with a proper glance hero (big

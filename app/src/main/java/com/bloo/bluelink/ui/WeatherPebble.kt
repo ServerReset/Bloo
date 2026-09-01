@@ -103,7 +103,12 @@ internal fun LocationPebble(v: Vehicle, state: UiState, vm: AppViewModel, dragHa
             pending = locating,
             bounceIcon = true,
         ),
-        alwaysExpandedInSimpleMode = true,
+        // NOT alwaysExpandedInSimpleMode. That flag is for a pebble whose entire body is one
+        // setting, where a chevron guarding a single switch is worse than no chevron at all --
+        // and it removes the chevron, so a card that has it CANNOT be collapsed in simple mode.
+        // This one renders a map, a weather stripe and a button; locking it permanently open was
+        // the reported "can no longer collapse the location card". Five other pebbles carried
+        // the same mistake and were fixed earlier; these were the two that were missed.
     ) {
         val coverGlance = LocalForceExpanded.current
         AnimatedVisibility(
