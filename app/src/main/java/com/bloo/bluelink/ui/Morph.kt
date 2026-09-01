@@ -35,8 +35,29 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.HelpOutline
+import androidx.compose.material.icons.automirrored.filled.Logout
+import androidx.compose.material.icons.automirrored.filled.OpenInNew
+import androidx.compose.material.icons.filled.Block
+import androidx.compose.material.icons.filled.BookmarkAdd
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.CloudSync
+import androidx.compose.material.icons.filled.ContentCopy
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Download
+import androidx.compose.material.icons.filled.ExpandLess
+import androidx.compose.material.icons.filled.ExpandMore
+import androidx.compose.material.icons.filled.Fingerprint
+import androidx.compose.material.icons.filled.FormatPaint
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.Pin
+import androidx.compose.material.icons.filled.PlaceOutlined
+import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.PushPin
+import androidx.compose.material.icons.filled.Restore
+import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.ui.semantics.contentDescription
@@ -211,6 +232,12 @@ fun MorphTextButton(
     containerColor: Color = buttonContainer(),
     contentColor: Color = MaterialTheme.colorScheme.onSurface,
     interactionSource: MutableInteractionSource = remember { MutableInteractionSource() },
+    /**
+     * The glyph to lead with. Defaults to [standardButtonIcon]'s choice for [text], so an
+     * existing call site gets one without being touched; pass explicitly to override, and pass
+     * [NoButtonIcon] for the rare button that genuinely should not have one.
+     */
+    icon: ImageVector? = standardButtonIcon(text),
 ) {
     MorphButton(
         onClick = onClick,
@@ -220,9 +247,71 @@ fun MorphTextButton(
         containerColor = containerColor,
         contentColor = contentColor,
         contentPadding = PaddingValues(horizontal = 18.dp, vertical = 10.dp),
+        minHeight = ButtonTargetHeight,
     ) {
-        Text(text, fontWeight = FontWeight.SemiBold)
+        if (icon != null && icon !== NoButtonIcon) {
+            MorphButtonLabel(icon, text, pending = false)
+        } else {
+            Text(text, style = ButtonLabelStyle, fontWeight = FontWeight.SemiBold)
+        }
     }
+}
+
+/** Sentinel for "deliberately no icon" -- distinguishable from "use the default". */
+val NoButtonIcon: ImageVector = Icons.Filled.Block
+
+/** Every button in the app is this tall, so a row of them lines up whatever it contains. */
+val ButtonTargetHeight = 48.dp
+
+/** The one label style every button uses. Bigger and heavier than the ambient body default the
+ *  buttons used to inherit, which is what made them read as text that happened to be tappable. */
+val ButtonLabelStyle: TextStyle
+    @Composable get() = MaterialTheme.typography.titleMedium
+
+/**
+ * The standard glyph for a button label.
+ *
+ * Keyed on the user-facing string, which is unusual and worth justifying: the alternative was
+ * editing 45 call sites across a dozen files and adding an icon import to each, for a decision
+ * ("Copy takes the copy glyph") that is the same everywhere and belongs in one place. Keeping it
+ * central means the app cannot drift into three different icons for Clear, and a new button gets
+ * the right one for free.
+ *
+ * It fails safe: an unrecognised label simply has no icon, and any call site can pass its own.
+ * The cost is that renaming a label silently drops its glyph, which is why the map is grouped by
+ * meaning rather than alphabetised -- a rename lands next to its neighbours.
+ */
+fun standardButtonIcon(label: String): ImageVector? = when (label) {
+    // Destructive / dismissive
+    "Cancel", "Not now", "Dismiss" -> Icons.Filled.Close
+    "Clear", "Remove", "Delete" -> Icons.Filled.Delete
+    "Sign out" -> Icons.AutoMirrored.Filled.Logout
+    "Unpin" -> Icons.Filled.PushPin
+    // Confirmation -- these are the second tap of a two-step action, so they take the
+    // affirmative glyph rather than the destructive one they are confirming.
+    "Tap again to confirm", "Tap again to reset", "Keep it", "Keep PIN" -> Icons.Filled.Check
+    // Content
+    "Copy" -> Icons.Filled.ContentCopy
+    "Export" -> Icons.Filled.Download
+    "Restore" -> Icons.Filled.Restore
+    "Save as preset" -> Icons.Filled.BookmarkAdd
+    // Disclosure
+    "Show", "Full notes", "Trouble installing?" -> Icons.Filled.ExpandMore
+    "Hide", "Hide install help", "Hide diagnostics" -> Icons.Filled.ExpandLess
+    // Navigation / external
+    "GitHub", "Open release page" -> Icons.AutoMirrored.Filled.OpenInNew
+    "Forgot password?" -> Icons.AutoMirrored.Filled.HelpOutline
+    // Sync / run
+    "Test sync", "Pull from primary" -> Icons.Filled.CloudSync
+    "Run it", "Working…" -> Icons.Filled.PlayArrow
+    "Remind me" -> Icons.Filled.Schedule
+    // Security
+    "Use fingerprint" -> Icons.Filled.Fingerprint
+    "Use PIN", "Update PIN", "Change PIN", "Set up PIN" -> Icons.Filled.Pin
+    // Places
+    "Set place" -> Icons.Filled.PlaceOutlined
+    "Reset appearance" -> Icons.Filled.FormatPaint
+    else -> null
 }
 
 /**
@@ -340,7 +429,10 @@ fun MorphButtonLabel(
         )
     }
     Spacer(Modifier.width(8.dp))
-    Text(label, fontWeight = FontWeight.SemiBold)
+    // The one button label style, shared with MorphTextButton -- this pair is the reference the
+    // rest of the app standardises on, so the size lives in a token rather than being whatever
+    // each button happened to inherit.
+    Text(label, style = ButtonLabelStyle, fontWeight = FontWeight.SemiBold)
 }
 
 /**
