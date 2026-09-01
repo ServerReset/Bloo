@@ -101,8 +101,21 @@ data class VehicleSnapshot(
  *  out-of-process command runners that only ever see a [VehicleSnapshot]. */
 val VehicleSnapshot.isDriving: Boolean get() = (speedMph ?: 0.0) > 0.0
 
-/** Fold a freshly fetched status into an existing snapshot. */
-fun VehicleSnapshot.merged(status: VehicleStatus): VehicleSnapshot {
+/**
+ * Fold a freshly fetched status into an existing snapshot.
+ *
+ * [location] is a separately-fetched position for the brands whose STATUS carries none.
+ * Canada and Europe both expose GPS only through a dedicated find-my-car endpoint, so their
+ * parsed VehicleStatus has no vehicleLocation at all -- which meant every background path
+ * through this function (the alert worker, the live-charge poller, the watch's refresh) left
+ * lat/lon/speed exactly as they were, however far the car had driven. The phone worked around
+ * it in its own layer years ago (see Snapshots.kt's note on locate()); the shared fold that
+ * every out-of-process surface uses never got the equivalent, so the fix only existed while
+ * the app was open.
+ *
+ * The status still wins when it has a coordinate -- it is same-fetch fresh.
+ */
+fun VehicleSnapshot.merged(status: VehicleStatus, location: GeoLocation? = null): VehicleSnapshot {
     // Use hasBattery (the user's manual powertrain override), not the raw
     // isEv flag -- this reimplemented percentFor/rangeMiFor's own logic with
     // the wrong flag, so a PHEV the API misreports as gas would have every
@@ -123,9 +136,12 @@ fun VehicleSnapshot.merged(status: VehicleStatus): VehicleSnapshot {
         charging = status.evStatus?.batteryCharge ?: charging,
         climateOn = status.airCtrlOn ?: climateOn,
         engineOn = status.engine ?: engineOn,
-        lat = status.vehicleLocation?.coord?.lat ?: lat,
-        lon = status.vehicleLocation?.coord?.lon ?: lon,
-        speedMph = status.vehicleLocation?.speed?.value ?: speedMph,
+        // GeoLocation is flat (latitude/longitude/speed); VehicleLocation nests them under
+        // coord/speed.value. Two different shapes for the same idea, so they are spelled out
+        // separately rather than looking interchangeable.
+        lat = status.vehicleLocation?.coord?.lat ?: location?.latitude ?: lat,
+        lon = status.vehicleLocation?.coord?.lon ?: location?.longitude ?: lon,
+        speedMph = status.vehicleLocation?.speed?.value ?: location?.speed ?: speedMph,
         updated = status.dateTime ?: updated,
         // The charge limit, which this function never carried -- so the only
         // path that set it was the phone app's own snapshotOf(). Every OTHER

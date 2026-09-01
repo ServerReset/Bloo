@@ -266,7 +266,17 @@ object WearCommandRunner {
                         repositoryFor(brand, SessionStore(context), CredentialStore(context))
                     }
                     repo.status(v, refresh = force)?.let {
-                        merged += snap.merged(it)
+                        // Only when the status carried no GPS. US brands report it inline, so
+                        // they pay nothing here; Canada and Europe expose position only through
+                        // a separate find-my-car call, and without it their snapshots never move
+                        // -- which also pins isDriving at false, so the "can't start climate
+                        // while driving" guard below can never fire on those cars.
+                        val fix = if (it.vehicleLocation == null) {
+                            runCatching { repo.location(v) }.getOrNull()
+                        } else {
+                            null
+                        }
+                        merged += snap.merged(it, fix)
                         fetched[v.vin] = it
                     }
                 }
