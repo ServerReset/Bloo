@@ -416,7 +416,11 @@ internal fun CoverTile(
                 ExpressiveButtonRow(
                     modifier = Modifier.fillMaxWidth().padding(bottom = coverTileEdgeGap()),
                     spacing = 6.dp,
+                    // Equal shares once there are two or more; a lone action keeps its natural
+                    // size and centres, rather than being stretched across the whole panel
+                    // because "its share" of a one-button row is all of it.
                     equalWidths = true,
+                    horizontalAlignment = Alignment.CenterHorizontally,
                     content = actions,
                 )
             } else {

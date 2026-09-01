@@ -160,6 +160,7 @@ fun ExpressiveButtonRow(
     spacing: Dp = 8.dp,
     verticalAlignment: Alignment.Vertical = Alignment.CenterVertically,
     equalWidths: Boolean = false,
+    horizontalAlignment: Alignment.Horizontal = Alignment.Start,
     content: @Composable () -> Unit,
 ) {
     ExpressiveButtonGroup(
@@ -167,6 +168,7 @@ fun ExpressiveButtonRow(
         spacing = spacing,
         verticalAlignment = verticalAlignment,
         equalWidths = equalWidths,
+        horizontalAlignment = horizontalAlignment,
     ) {
         content()
     }
@@ -199,6 +201,12 @@ fun ExpressiveButtonGroup(
      * at all and those buttons never filled the equal shares their own doc claimed.
      */
     equalWidths: Boolean = false,
+    /**
+     * Where the group sits when its content is narrower than the space it was given -- which
+     * happens whenever it is asked to fill a width it does not need (a single button in a
+     * full-width action bar).
+     */
+    horizontalAlignment: Alignment.Horizontal = Alignment.Start,
     content: @Composable ExpressiveButtonGroupScope.() -> Unit,
 ) {
     // Natural (unpressed) child widths, cached from the last resting measure pass. A plain
@@ -243,7 +251,11 @@ fun ExpressiveButtonGroup(
             // press redistributes from it exactly as it would from natural widths.
             val equalBase: IntArray? = if (equalWidths && constraints.hasBoundedWidth) {
                 val members = (0 until n).count { member[it] }
-                if (members > 0) {
+                // TWO or more. "An equal share" of a row is meaningless for a single button, and
+                // taking it literally is what turned a lone action into a pill spanning the whole
+                // panel. One member falls through to its natural width instead, and
+                // horizontalAlignment decides where it sits in the space left over.
+                if (members > 1) {
                     val room = (constraints.maxWidth - gaps).coerceAtLeast(0)
                     val each = room / members
                     // The remainder goes to the first member rather than being dropped, so the
@@ -312,7 +324,8 @@ fun ExpressiveButtonGroup(
             val height = (placeables.maxOfOrNull { it.height } ?: 0)
                 .coerceIn(constraints.minHeight, constraints.maxHeight)
             layout(width, height) {
-                var x = 0
+                val content = placeables.sumOf { it.width } + gaps
+                var x = horizontalAlignment.align(content, width, layoutDirection)
                 placeables.forEach { p ->
                     p.placeRelative(x, verticalAlignment.align(p.height, height))
                     x += p.width + gapPx
