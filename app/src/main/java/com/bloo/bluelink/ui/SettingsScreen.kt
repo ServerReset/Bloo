@@ -447,7 +447,7 @@ internal fun SettingsScreen(
                     title = "Signed in",
                     status = if (state.accounts.isEmpty()) "No accounts" else "${state.accounts.size} account${if (state.accounts.size == 1) "" else "s"}",
                 )
-                Spacer(Modifier.height(14.dp))
+                Spacer(Modifier.height(SettingsGapGroup))
                 if (state.accounts.isEmpty()) {
                     Text(
                         "Not signed in",
@@ -456,7 +456,7 @@ internal fun SettingsScreen(
                     )
                 }
                 state.accounts.forEachIndexed { i, creds ->
-                    if (i > 0) Spacer(Modifier.height(16.dp))
+                    if (i > 0) Spacer(Modifier.height(SettingsGapSection))
                     var pin by remember(creds.brand, creds.pin) { mutableStateOf(creds.pin) }
                     // Was a single un-confirmed tap that signed the account out
                     // immediately -- same "tap again to confirm" + 4s
@@ -522,7 +522,7 @@ internal fun SettingsScreen(
                         }
                     }
                 }
-                Spacer(Modifier.height(12.dp))
+                Spacer(Modifier.height(SettingsGapGroup))
                 val addAccountSource = remember { MutableInteractionSource() }
                 SafeExpansiveButton(
                     interactionSource = addAccountSource,
@@ -633,7 +633,7 @@ internal fun SettingsScreen(
                             else -> "On"
                         },
                     )
-                    Spacer(Modifier.height(14.dp))
+                    Spacer(Modifier.height(SettingsGapGroup))
                     ToggleRow("On-device AI (Gemini Nano)", state.aiEnabled) { vm.setAiEnabled(it) }
                     Text(
                         "Adds an AI summary pebble to each car and lets you ask the search " +
@@ -732,9 +732,9 @@ internal fun SettingsScreen(
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
-                    Spacer(Modifier.height(8.dp))
+                    Spacer(Modifier.height(SettingsGapRow))
                     state.vehicles.forEach { v ->
-                        Spacer(Modifier.height(4.dp))
+                        Spacer(Modifier.height(SettingsGapHairline))
                         Text(v.name, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
                         com.bloo.bluelink.Shortcuts.ACTIONS.forEach { cmd ->
                             ToggleRow(
@@ -791,7 +791,7 @@ internal fun SettingsScreen(
                         else -> com.bloo.bluelink.data.relativeLabel(state.lastSyncMs).takeIf { it.isNotBlank() }?.let { "Synced $it" } ?: "Active"
                     },
                 )
-                Spacer(Modifier.height(14.dp))
+                Spacer(Modifier.height(SettingsGapGroup))
                 if (showDriveDialog) {
                     DriveSyncSetupDialog(
                         onDismissRequest = { showDriveDialog = false },
@@ -838,7 +838,7 @@ internal fun SettingsScreen(
                     // A live failure is the one fact that never hides behind the
                     // diagnostics disclosure below — if sync is broken, say so here.
                     state.syncError?.let { err ->
-                        Spacer(Modifier.height(10.dp))
+                        Spacer(Modifier.height(SettingsGapRow))
                         Row(
                             Modifier
                                 .fillMaxWidth()
@@ -865,7 +865,7 @@ internal fun SettingsScreen(
                     // The synced-devices registry: a drag-to-reorder list where the
                     // TOP device is primary (source of truth). See SyncDevicesSection.
                     SyncDevicesSection(state = state, vm = vm)
-                    Spacer(Modifier.height(12.dp))
+                    Spacer(Modifier.height(SettingsGapGroup))
                     MorphSegmented(
                         options = listOf(
                             SegmentOption("wifi", "Wi-Fi only", null),
@@ -874,7 +874,7 @@ internal fun SettingsScreen(
                         selectedKey = if (state.syncWifiOnly) "wifi" else "any",
                         onSelect = { vm.setSyncWifiOnly(it == "wifi") },
                     )
-                    Spacer(Modifier.height(8.dp))
+                    Spacer(Modifier.height(SettingsGapRow))
                     ExpressiveButtonRow(modifier = Modifier.fillMaxWidth(), spacing = 8.dp) {
                         val changeFileSource = remember { MutableInteractionSource() }
                         SafeExpansiveButton(
@@ -903,7 +903,7 @@ internal fun SettingsScreen(
                     // stamp (already summarised in the header above), the file
                     // fingerprint, and the two repair actions all fold away by
                     // default so the card stops reading as a wall of equal pills.
-                    Spacer(Modifier.height(8.dp))
+                    Spacer(Modifier.height(SettingsGapRow))
                     var showSyncDiagnostics by rememberSaveable { mutableStateOf(false) }
                     val diagnosticsSource = remember { MutableInteractionSource() }
                     SafeExpansiveButton(
@@ -923,7 +923,7 @@ internal fun SettingsScreen(
                         exit = collapseExit(Alignment.Bottom),
                     ) {
                         Column {
-                            Spacer(Modifier.height(8.dp))
+                            Spacer(Modifier.height(SettingsGapRow))
                             Column(
                                 Modifier
                                     .fillMaxWidth()
@@ -942,7 +942,7 @@ internal fun SettingsScreen(
                                     SyncInfoRow("File ID", fp, valueMono = true)
                                 }
                             }
-                            Spacer(Modifier.height(8.dp))
+                            Spacer(Modifier.height(SettingsGapRow))
                             ExpressiveButtonRow(modifier = Modifier.fillMaxWidth(), spacing = 8.dp) {
                                 // Non-destructive real-provider round-trip so the user can confirm
                                 // sync actually works.
@@ -985,21 +985,21 @@ internal fun SettingsScreen(
                 // what most people actually want and shouldn't be buried.
                 AnimatedVisibility(visible = staggeredAdvancedVisible(advanced, 1), enter = collapseEnter(), exit = collapseExit()) {
                   Column {
-                    Spacer(Modifier.height(14.dp))
+                    Spacer(Modifier.height(SettingsGapGroup))
                     HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
-                    Spacer(Modifier.height(14.dp))
+                    Spacer(Modifier.height(SettingsGapGroup))
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Icon(Icons.Filled.Description, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(20.dp))
                         Spacer(Modifier.width(8.dp))
                         Text("Manual backup", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
                     }
-                    Spacer(Modifier.height(8.dp))
+                    Spacer(Modifier.height(SettingsGapRow))
                     Text(
                         "A one-time snapshot file. Credentials are never included.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
-                    Spacer(Modifier.height(10.dp))
+                    Spacer(Modifier.height(SettingsGapRow))
                     ExpressiveButtonRow(modifier = Modifier.fillMaxWidth(), spacing = 8.dp) {
                         val exportSource = remember { MutableInteractionSource() }
                         SafeExpansiveButton(
@@ -1061,7 +1061,7 @@ internal fun SettingsScreen(
                         steps = 4,
                         onValueSettled = { uiScaleDraft = (it * 10).roundToInt() / 10f; vm.setUiScaleSoon(uiScaleDraft) },
                     )
-                    Spacer(Modifier.height(12.dp))
+                    Spacer(Modifier.height(SettingsGapGroup))
                   }
                 }
                 // SIMPLE, not advanced: this changes what is on the car screen
@@ -1220,9 +1220,9 @@ internal fun SettingsScreen(
                     }
                 }
                 Column {
-                    Spacer(Modifier.height(6.dp))
+                    Spacer(Modifier.height(SettingsGapHairline))
                         HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
-                        Spacer(Modifier.height(4.dp))
+                        Spacer(Modifier.height(SettingsGapHairline))
                         val logScroll = rememberScrollState()
                         SelectionContainer {
                             Text(
@@ -1236,7 +1236,7 @@ internal fun SettingsScreen(
                                     .verticalScroll(logScroll),
                             )
                         }
-                        Spacer(Modifier.height(4.dp))
+                        Spacer(Modifier.height(SettingsGapHairline))
                         if (lineCount > 0) {
                             Text(
                                 "Earliest entries at the top. The newest $lineCount lines are shown.",
@@ -1268,7 +1268,7 @@ internal fun SettingsScreen(
                     title = "Alerts",
                     status = if (alertsOn == 0) "All off" else "$alertsOn of ${alertToggles.size} on",
                 )
-                Spacer(Modifier.height(14.dp))
+                Spacer(Modifier.height(SettingsGapGroup))
                 // First, not last: every other switch in this card is an
                 // ALERT the user hopes never fires. This is a live surface
                 // they watch on purpose while the car charges.
@@ -1345,7 +1345,7 @@ internal fun SettingsScreen(
                     }
                 }
                 HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
-                Spacer(Modifier.height(10.dp))
+                Spacer(Modifier.height(SettingsGapRow))
 
                 ToggleRow("Service due alerts", notif.service) { vm.setNotifyService(it) }
                 ToggleRow("Door-left-open alerts", notif.doorOpen) { vm.setNotifyDoor(it) }
@@ -1390,7 +1390,7 @@ internal fun SettingsScreen(
                         modifier = Modifier.weight(1f),
                     )
                 }
-                Spacer(Modifier.height(12.dp))
+                Spacer(Modifier.height(SettingsGapGroup))
 
                 InlineSegmentedRow(
                     label = "On tap:",
@@ -1404,7 +1404,7 @@ internal fun SettingsScreen(
                     onSelect = { vm.setTileBackground(it == "background") },
                 )
 
-                Spacer(Modifier.height(12.dp))
+                Spacer(Modifier.height(SettingsGapGroup))
                 InlineSegmentedRow(
                     label = "Refresh:",
                     caption = "Pulls the car's latest state when the tile appears (throttled to once a minute per car).",
@@ -1415,7 +1415,7 @@ internal fun SettingsScreen(
                     selectedKey = if (state.tileLiveRefresh) "on" else "off",
                     onSelect = { vm.setTileLiveRefresh(it == "on") },
                 )
-                Spacer(Modifier.height(12.dp))
+                Spacer(Modifier.height(SettingsGapGroup))
                 QuickTilesManager(state, vm)
             }
             }
@@ -1440,7 +1440,7 @@ internal fun SettingsScreen(
                     title = "App lock",
                     status = securityStatus,
                 )
-                Spacer(Modifier.height(14.dp))
+                Spacer(Modifier.height(SettingsGapGroup))
                 if (canBio) {
                     SettingsSegmentedRow(
                         label = "Require fingerprint to open",
@@ -1505,7 +1505,7 @@ internal fun SettingsScreen(
                     // Notifications card's minute fields right above this one.
                     PopVisible(visible = appearance.biometricLock) {
                         Column {
-                            Spacer(Modifier.height(6.dp))
+                            Spacer(Modifier.height(SettingsGapHairline))
                             SettingsSegmentedRow(
                                 label = "Lock the app",
                                 options = LockTiming.entries.map { t -> SegmentOption(t.name, t.label, null) },
@@ -1526,9 +1526,9 @@ internal fun SettingsScreen(
                 // no biometrics, an optional backup on those that have them.
                 // Separate from the biometric rows above because it is a second,
                 // independent mechanism, not a mode of the first one.
-                Spacer(Modifier.height(14.dp))
+                Spacer(Modifier.height(SettingsGapGroup))
                 HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
-                Spacer(Modifier.height(6.dp))
+                Spacer(Modifier.height(SettingsGapHairline))
                 var pinDialog by remember { mutableStateOf<String?>(null) }
                 val pinSet = state.appPinSet
                 StatusHeaderRow(
@@ -1537,7 +1537,7 @@ internal fun SettingsScreen(
                     title = "App PIN",
                     status = if (pinSet) "On · 4-8 digits" else "Off",
                 )
-                Spacer(Modifier.height(6.dp))
+                Spacer(Modifier.height(SettingsGapHairline))
                 Text(
                     if (canBio)
                         "A 4-8 digit PIN that works as a backup when fingerprints aren't available."
@@ -1546,7 +1546,7 @@ internal fun SettingsScreen(
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-                Spacer(Modifier.height(12.dp))
+                Spacer(Modifier.height(SettingsGapGroup))
                 ExpressiveButtonRow(spacing = 8.dp) {
                     val pinSource = remember { MutableInteractionSource() }
                     SafeExpansiveButton(
@@ -1628,7 +1628,7 @@ internal fun SettingsScreen(
                     title = "Display mode",
                     status = if (appearance.auroraBackground) "$themeLabel · Aurora" else themeLabel,
                 )
-                Spacer(Modifier.height(14.dp))
+                Spacer(Modifier.height(SettingsGapGroup))
                 // Short segment labels; AMOLED is "pure black" for OLED screens.
                 // "+AMOLED" follows the system light/dark switch exactly like
                 // System does, but swaps in AMOLED's true-black surfaces for its
@@ -1655,7 +1655,7 @@ internal fun SettingsScreen(
                 // (the built-in solid-surface background covers everyone else).
                 AnimatedVisibility(visible = staggeredAdvancedVisible(advanced, 5), enter = collapseEnter(), exit = collapseExit()) {
                   Column {
-                    Spacer(Modifier.height(10.dp))
+                    Spacer(Modifier.height(SettingsGapRow))
                     ToggleRow("Aurora background", appearance.auroraBackground) { vm.setAuroraBackground(it) }
                     Text(
                         "Show a gradient aurora behind the content instead of a solid surface.",
@@ -1672,9 +1672,9 @@ internal fun SettingsScreen(
                         exit = collapseExit(),
                     ) {
                         Column {
-                            Spacer(Modifier.height(8.dp))
+                            Spacer(Modifier.height(SettingsGapRow))
                             Text("Motion", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.primary)
-                            Spacer(Modifier.height(6.dp))
+                            Spacer(Modifier.height(SettingsGapHairline))
                             MorphSegmented(
                                 options = listOf(
                                     SegmentOption("static", "Static", null),
@@ -1683,9 +1683,9 @@ internal fun SettingsScreen(
                                 selectedKey = appearance.auroraMotion,
                                 onSelect = { vm.setAuroraMotion(it) },
                             )
-                            Spacer(Modifier.height(10.dp))
+                            Spacer(Modifier.height(SettingsGapRow))
                             Text("Colour", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.primary)
-                            Spacer(Modifier.height(6.dp))
+                            Spacer(Modifier.height(SettingsGapHairline))
                             MorphSegmented(
                                 options = listOf(
                                     SegmentOption("complementary", "Complementary", null),
@@ -1701,7 +1701,7 @@ internal fun SettingsScreen(
                                 exit = collapseExit(),
                             ) {
                                 Column {
-                                    Spacer(Modifier.height(8.dp))
+                                    Spacer(Modifier.height(SettingsGapRow))
                                     OutlinedTextField(
                                         value = appearance.auroraCustomColor ?: "",
                                         onValueChange = { vm.setAuroraCustomColor(it.take(7).takeIf { it.matches(RxHexColorDraft) } ?: appearance.auroraCustomColor) },
@@ -1721,9 +1721,9 @@ internal fun SettingsScreen(
                   // wrapper the Spacer/Divider/Toggle/Slider siblings below would
                   // all stack on top of each other instead of flowing vertically.
                   Column {
-                    Spacer(Modifier.height(14.dp))
+                    Spacer(Modifier.height(SettingsGapGroup))
                     HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
-                    Spacer(Modifier.height(10.dp))
+                    Spacer(Modifier.height(SettingsGapRow))
                     ToggleRow("Dynamic color (Material You)", appearance.dynamicColor) { vm.setDynamicColor(it) }
                     Text(
                         "Uses your wallpaper palette on Android 12+. Turn off to choose a built-in palette below.",
@@ -1736,9 +1736,9 @@ internal fun SettingsScreen(
                         exit = collapseExit(),
                     ) {
                         Column {
-                            Spacer(Modifier.height(8.dp))
+                            Spacer(Modifier.height(SettingsGapRow))
                             Text("Built-in palettes", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            Spacer(Modifier.height(6.dp))
+                            Spacer(Modifier.height(SettingsGapHairline))
                             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                                 ColorPalette.entries.forEach { palette ->
                                     PaletteSwatch(
@@ -1752,9 +1752,9 @@ internal fun SettingsScreen(
                             // selection existed (SettingsStore + AppViewModel) but had
                             // no entry point anywhere in the UI after the old Color
                             // card was merged into this Theme card -- restore it here.
-                            Spacer(Modifier.height(10.dp))
+                            Spacer(Modifier.height(SettingsGapRow))
                             Text("Custom palettes", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            Spacer(Modifier.height(6.dp))
+                            Spacer(Modifier.height(SettingsGapHairline))
                             var editingPalette by remember { mutableStateOf<CustomPaletteData?>(null) }
                             var showPaletteEditor by remember { mutableStateOf(false) }
                             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -1777,7 +1777,7 @@ internal fun SettingsScreen(
                                     ) {
                                         Icon(Icons.Filled.Add, contentDescription = "New custom palette")
                                     }
-                                    Spacer(Modifier.height(4.dp))
+                                    Spacer(Modifier.height(SettingsGapHairline))
                                     Text("New", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                 }
                             }
@@ -1791,9 +1791,9 @@ internal fun SettingsScreen(
                             }
                         }
                     }
-                    Spacer(Modifier.height(10.dp))
+                    Spacer(Modifier.height(SettingsGapRow))
                     VibrancySlider(appearance, vm)
-                    Spacer(Modifier.height(10.dp))
+                    Spacer(Modifier.height(SettingsGapRow))
                     ToggleRow("Pebble outline", appearance.pebbleOutline) { vm.setPebbleOutline(it) }
                   }
                 }
@@ -1842,7 +1842,7 @@ internal fun SettingsScreen(
                         UpdateStatusChip(state)
                     }
                 }
-                Spacer(Modifier.height(14.dp))
+                Spacer(Modifier.height(SettingsGapGroup))
                 // Both update sources share one row instead of two stacked
                 // full-width pills: the in-app checker (primary) and the GitHub
                 // Releases page (a second source that still works when the
@@ -1888,7 +1888,7 @@ internal fun SettingsScreen(
                 // Shizuku silent-install: the ROW is gated on Shizuku being present, but
                 // the card is not — so the update controls above always show.
                 if (state.shizukuAvailable) {
-                    Spacer(Modifier.height(4.dp))
+                    Spacer(Modifier.height(SettingsGapHairline))
                     ToggleRow("Install updates seamlessly (Shizuku)", appearance.seamlessInstallShizuku) {
                         vm.setSeamlessInstallShizuku(it)
                     }
@@ -1900,7 +1900,7 @@ internal fun SettingsScreen(
                 // through the shared UpdateStatusLine so neither surface can drift.
                 val updateInfo = state.updateAvailable
                 if (updateInfo != null && !state.updateTileDismissed) {
-                    Spacer(Modifier.height(14.dp))
+                    Spacer(Modifier.height(SettingsGapGroup))
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                         Text(
                             "Update available",
@@ -1916,9 +1916,9 @@ internal fun SettingsScreen(
                         "${com.bloo.bluelink.data.buildLabel(vm.currentBuildNumber)} → $newLabel"
                     } else newLabel
                     val seamless = appearance.seamlessInstallShizuku && state.shizukuAvailable
-                    Spacer(Modifier.height(6.dp))
+                    Spacer(Modifier.height(SettingsGapHairline))
                     UpdateStatusLine(deltaLabel, seamless, state, vm)
-                    Spacer(Modifier.height(12.dp))
+                    Spacer(Modifier.height(SettingsGapGroup))
                     val updateSource = remember { MutableInteractionSource() }
                     SafeExpansiveButton(
                         interactionSource = updateSource,
@@ -1970,7 +1970,7 @@ internal fun SettingsScreen(
                     }
                     val notes = updateInfo.run.releaseNotes
                     if (notes != null) {
-                        Spacer(Modifier.height(10.dp))
+                        Spacer(Modifier.height(SettingsGapRow))
                         Surface(
                             shape = RoundedCornerShape(12.dp),
                             color = MaterialTheme.colorScheme.surfaceContainerHighest,
@@ -2015,7 +2015,7 @@ internal fun SettingsScreen(
                             }
                         }
                     }
-                    Spacer(Modifier.height(8.dp))
+                    Spacer(Modifier.height(SettingsGapRow))
                     Row(Modifier.fillMaxWidth()) {
                         Spacer(Modifier.weight(1f))
                         val notNowSource = remember { MutableInteractionSource() }
@@ -2078,7 +2078,7 @@ internal fun SettingsScreen(
                             )
                         }
                     }
-                    Spacer(Modifier.height(10.dp))
+                    Spacer(Modifier.height(SettingsGapRow))
                   }
                 }
                 OutlinedTextField(
@@ -2090,7 +2090,7 @@ internal fun SettingsScreen(
                     modifier = Modifier.fillMaxWidth(),
                     keyboardOptions = KeyboardOptions(imeAction = androidx.compose.ui.text.input.ImeAction.Search),
                 )
-                Spacer(Modifier.height(8.dp))
+                Spacer(Modifier.height(SettingsGapRow))
                 // FlowRow, not a fixed 50/50 Row: at a large display/font size each
                 // half was too narrow for "Set place" / "My location", clipping them
                 // to "Set a…". FlowRow keeps them side-by-side when they fit and wraps
@@ -2143,7 +2143,7 @@ internal fun SettingsScreen(
           // one). Based on the GitHub Actions run number baked in at CI build time;
           // "dev build" for a local build. buildLabel is the canonical formatter shared
           // with the watch About footer and the update tile's delta.
-          Spacer(Modifier.height(8.dp))
+          Spacer(Modifier.height(SettingsGapRow))
           Text(
               "Bloo · " + com.bloo.bluelink.data.buildLabel(vm.currentBuildNumber, com.bloo.bluelink.BuildConfig.BUILD_BRANCH),
               style = MaterialTheme.typography.labelSmall,

@@ -627,7 +627,13 @@ internal fun SearchPill(
             val k = pressScale * entrance
             scaleX = k
             scaleY = k
-        },
+        }
+            // Publishes wherever this ended up -- dragged to an edge, docked in a camera band,
+            // or spanning the screen as a bar -- so other floating chrome can avoid it. Bounds
+            // only: this deliberately does NOT use floatingOverlay, because the pull shift and
+            // refresh fade are for chrome the page owns, and this one is placed by the person
+            // using it. Attached after .size so the rect is the pill's real one.
+            .floatingElement(FloatingIds.Search),
     ) {
         Surface(
             onClick = { if (!expanded) onFocusChange(true) },

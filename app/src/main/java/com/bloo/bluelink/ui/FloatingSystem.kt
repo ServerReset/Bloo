@@ -66,6 +66,16 @@ object FloatingIds {
     val FlipIcon = FloatingId("flipIcon")
     /** The back arrow in the top-left corner while a car is expanded. */
     val BackIcon = FloatingId("backIcon")
+    /**
+     * The search bubble/bar. The one floater a PERSON positions: on a cover screen it can be
+     * dragged and parked anywhere along an edge, and where the device reports a camera island it
+     * docks into that band instead. Registering it publishes wherever it ended up, so the rest of
+     * the chrome can avoid it -- which is the whole point of it being in here, and is why nothing
+     * about how it is placed belongs in this system. See SearchLayer.
+     */
+    val Search = FloatingId("search")
+    /** The pull-to-refresh spinner, which takes the page dots' place while a refresh runs. */
+    val RefreshIndicator = FloatingId("refreshIndicator")
 }
 
 @Stable

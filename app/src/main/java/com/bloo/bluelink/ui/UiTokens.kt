@@ -135,6 +135,22 @@ internal val HeroReadoutBottomInset = 14.dp
  */
 internal val PebbleContentInset = 16.dp
 
+/**
+ * The Settings screen's vertical rhythm, as four steps instead of the seven raw values that had
+ * accumulated (4, 6, 8, 10, 12, 14 and 16dp, with 6/10/14 sitting exactly between the steps
+ * around them). Material 3's spacing system is built on 8 with 4dp sub-steps, and a screen of
+ * seventeen cards is precisely where an ad-hoc gap is invisible on its own and obvious in
+ * aggregate -- the stray values are why the spacing read as uneven from card to card even when
+ * each individual gap looked deliberate.
+ *
+ * The strays snap DOWN rather than up, so the screen tightens slightly instead of growing by
+ * ~2dp in thirty places.
+ */
+internal val SettingsGapHairline = 4.dp
+internal val SettingsGapRow = 8.dp
+internal val SettingsGapGroup = 12.dp
+internal val SettingsGapSection = 16.dp
+
 internal val SettingsCardGap = 10.dp
 
 // ---- Motion -------------------------------------------------------------------

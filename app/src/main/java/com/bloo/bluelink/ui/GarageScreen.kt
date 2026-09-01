@@ -1005,7 +1005,10 @@ internal fun GarageScreen(state: State<UiState>, vm: AppViewModel) {
                             visible = state.value.refreshing,
                             enter = fadeIn(tween(150)),
                             exit = fadeOut(tween(200)),
-                            modifier = Modifier.align(Alignment.TopCenter).statusBarsPadding().padding(top = HeaderCornerGap),
+                            // fade = false: this is the one piece of chrome that must stay visible exactly
+                            // when the rest of it fades out -- it IS the refresh.
+                            modifier = Modifier.align(Alignment.TopCenter).statusBarsPadding().padding(top = HeaderCornerGap)
+                                .floatingOverlay(FloatingIds.RefreshIndicator, fade = false),
                         ) {
                             LoadingIndicator()
                         }
