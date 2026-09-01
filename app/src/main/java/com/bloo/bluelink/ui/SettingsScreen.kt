@@ -544,12 +544,17 @@ internal fun SettingsScreen(
                 )
             }
             }
-            item {
+            // The support check gates the ITEM, not just its contents. A grid item that
+            // composes nothing is not free: it still takes a slot and the grid's
+            // verticalItemSpacing with it, so a device without Gemini Nano got a phantom gap
+            // where the AI card would be. Same mechanism, same fix as the advanced-only cards
+            // (see rememberAdvancedVisibility); this condition had simply been missed.
+            if (state.aiSupported) item {
 
             // On-device AI - only when the device supports Gemini Nano. Always
             // shown (not advanced-only): it's a headline feature, not a power-
             // user knob, and hiding it behind Advanced made it easy to miss.
-            if (state.aiSupported) {
+            run { // scope kept so the gate above is the only edit; the check now lives on `item`
                 SettingsCard("AI", Icons.Filled.AutoAwesome, vm) {
                     // Same icon-badge + status-line header as the rest of this pass.
                     val aiTint = if (state.aiEnabled) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.onSurfaceVariant
@@ -629,7 +634,10 @@ internal fun SettingsScreen(
                 }
             }
             }
-            item {
+            // Gates the ITEM for the same reason the AI card above does: with no cars yet
+            // (fresh install, before the first sign-in) this composed nothing but still held a
+            // slot and a gap open at the top of Settings.
+            if (state.vehicles.isNotEmpty()) item {
 
             // Cars: drag to reorder, tap a car to expand its setup + photo. With a
             // single car there's nothing to order, so it's just shown expanded.
@@ -642,7 +650,7 @@ internal fun SettingsScreen(
             // override) already have their own `state.settingsMode ==
             // "advanced"` checks, so gating the section as a whole here was
             // redundant with those AND too broad.
-            if (state.vehicles.isNotEmpty()) {
+            run { // scope kept so the gate above is the only edit; the check now lives on `item`
                 var expandedCar by remember { mutableStateOf<String?>(null) }
                 val single = state.vehicles.size == 1
                 val pick: (String) -> Unit = { vin ->
