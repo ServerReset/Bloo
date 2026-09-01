@@ -463,7 +463,10 @@ internal fun CompactCar(
     // makes the panel feel like it is wobbling.
     val vWrap = rememberWrapPager(tiles.size)
     val vPager = vWrap.pager
-    val current = vWrap.currentReal
+    // NOT read here. Passing the live index as a lambda keeps the pager's mid-swipe position
+    // out of CompactCar's own scope -- reading it here recomposed the VerticalPager and every
+    // composed tile on the drag's critical path, to move a dot on the right edge.
+    val currentTile = { vWrap.currentReal }
     // Per-tile scroll states, keyed by tile name so position persists across
     // pager recycling AND reordering. Tall tiles scroll their own content; the
     // VerticalPager then nested-scrolls to the next/previous tile once a tile is
@@ -721,7 +724,7 @@ internal fun CompactCar(
         // (Car-switching dots are hoisted up to CompactGarage -- see there.)
         if (tiles.size > 1 && !LocalReorderActive.current) {
             VerticalPagerDots(
-                current = current,
+                current = currentTile,
                 count = tiles.size,
                 tiles = tiles,
                 onPageJump = { targetTile ->

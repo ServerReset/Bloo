@@ -77,7 +77,17 @@ import com.bloo.uicommon.PagerDotColors
  */
 @Composable
 internal fun VerticalPagerDots(
-    current: Int,
+    /**
+     * The live index, as a LAMBDA read inside this composable rather than an Int read by the
+     * caller.
+     *
+     * The horizontal dots already work this way and say why (see the note further down on
+     * reading pager.currentPage inside its own restartable scope); this one was still taking a
+     * plain Int, so CompactCar read the pager's position in its own body and every mid-swipe
+     * flip recomposed the VerticalPager and every composed tile -- on the drag's critical path,
+     * to move a dot.
+     */
+    current: () -> Int,
     count: Int,
     tiles: List<String>,
     onPageJump: suspend (Int) -> Unit,
@@ -155,7 +165,7 @@ internal fun VerticalPagerDots(
                     longPress.consume()
                     scrubbing = true
                     coverScrubbing?.value = true
-                    scrubStartPage = currentState.value
+                    scrubStartPage = currentState.value()
                     scrubAccumY = 0f
                     try {
                         verticalDrag(longPress.id) { change ->
@@ -180,9 +190,10 @@ internal fun VerticalPagerDots(
             // gesture already calls, so this is the exact same code path, not
             // a parallel one that could drift out of sync).
             .semantics {
-                contentDescription = "Showing ${tileName(tiles.getOrElse(current) { "" })} tile, ${current + 1} of $count"
+                val now = current()
+                contentDescription = "Showing ${tileName(tiles.getOrElse(now) { "" })} tile, ${now + 1} of $count"
                 customActions = tiles.mapIndexedNotNull { i, t ->
-                    if (i == current) return@mapIndexedNotNull null
+                    if (i == now) return@mapIndexedNotNull null
                     CustomAccessibilityAction("Go to ${tileName(t)}") {
                         jumpScope.launch { onPageJump(i) }
                         true
@@ -207,8 +218,11 @@ internal fun VerticalPagerDots(
                 verticalArrangement = Arrangement.spacedBy(itemSpacing),
                 horizontalAlignment = Alignment.End,
             ) {
+                // Derived, so the dots recompose when the SELECTED INDEX changes rather than
+                // whenever the pager's continuous position does.
+                val selectedIndex by remember { derivedStateOf { current() } }
                 repeat(count) { i ->
-                    val selected = i == current
+                    val selected = i == selectedIndex
                     val scrubSelected = scrubbing && i == scrubTargetPage
                     val highlight = selected || scrubSelected
                     val dotH by animateDpAsState(

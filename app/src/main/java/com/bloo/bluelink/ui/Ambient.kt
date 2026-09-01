@@ -947,10 +947,13 @@ internal fun AuroraBackground(
         }
         explosion.animateTo(0f, spring(dampingRatio = 0.7f, stiffness = Spring.StiffnessMediumLow))
     }
-    val explosionValue = explosion.value
-    val explodeAlpha = 1f + explosionValue * 2.5f
-    val explodeSize = 1f + explosionValue * 0.8f
-    val explodeSpread = 1f + explosionValue * 0.3f
+    // Read inside drawBehind, not here. p1/p2/p3 and the tilt were already moved into draw
+    // scope; this one stayed in composition AND fed the blur radius argument, so every frame of
+    // the refresh spring recomposed AuroraBackground and rebuilt the full-screen RenderEffect --
+    // the most expensive draw in the app, by this file's own account.
+    val explodeAlpha = { 1f + explosion.value * 2.5f }
+    val explodeSize = { 1f + explosion.value * 0.8f }
+    val explodeSpread = { 1f + explosion.value * 0.3f }
     // Both modes now run the same ambient drift below; Motion mode adds tilt
     // on top of it instead of replacing it entirely, so a phone that isn't
     // being actively tilted (sitting on a desk, in a stand, or just being
@@ -1002,17 +1005,20 @@ internal fun AuroraBackground(
             // as a soft wash over three large circles and costs a fraction
             // (and the pause hook above means it isn't redrawing at all
             // while the search panel is up with the keyboard animating).
-            .blur((44.dp * (1f + explosionValue * 0.5f)), edgeTreatment = BlurredEdgeTreatment.Unbounded)
+            // A CONSTANT radius. Animating it meant rebuilding the window's RenderEffect on
+            // every frame of the spring; the pulse is carried by the blobs' own alpha, size and
+            // spread below, which are draw-phase and cost nothing to animate.
+            .blur(44.dp, edgeTreatment = BlurredEdgeTreatment.Unbounded)
             .drawBehind {
                 drawRect(scheme.surface)
                 fun blob(c: Color, fx: Float, fy: Float, r: Float) =
                     drawCircle(c, radius = size.minDimension * r, center = Offset(size.width * fx, size.height * fy))
-                blob(basePrimary.copy(alpha = (0.30f * explodeAlpha).coerceIn(0f, 1f)), (mix(0.26f, 0.74f, p1) + tiltX) * explodeSpread, (mix(0.30f, 0.65f, p2) + tiltY) * explodeSpread, 0.45f * explodeSize)
-                blob(baseTertiary.copy(alpha = (0.25f * explodeAlpha).coerceIn(0f, 1f)), (mix(0.32f, 0.68f, p2) - tiltX) * explodeSpread, (mix(0.35f, 0.70f, p3) - tiltY) * explodeSpread, 0.40f * explodeSize)
+                blob(basePrimary.copy(alpha = (0.30f * explodeAlpha()).coerceIn(0f, 1f)), (mix(0.26f, 0.74f, p1) + tiltX) * explodeSpread(), (mix(0.30f, 0.65f, p2) + tiltY) * explodeSpread(), 0.45f * explodeSize())
+                blob(baseTertiary.copy(alpha = (0.25f * explodeAlpha()).coerceIn(0f, 1f)), (mix(0.32f, 0.68f, p2) - tiltX) * explodeSpread(), (mix(0.35f, 0.70f, p3) - tiltY) * explodeSpread(), 0.40f * explodeSize())
                 // fx range was 0.22-0.58 (centred at 0.40, visibly left of the
                 // other two blobs' 0.50) -- the whole composite wash read as
                 // biased toward one side even before any tilt was applied.
-                blob(baseSecondary.copy(alpha = (0.20f * explodeAlpha).coerceIn(0f, 1f)), (mix(0.32f, 0.68f, p3) + tiltX) * explodeSpread, (mix(0.28f, 0.62f, p1) + tiltY) * explodeSpread, 0.38f * explodeSize)
+                blob(baseSecondary.copy(alpha = (0.20f * explodeAlpha()).coerceIn(0f, 1f)), (mix(0.32f, 0.68f, p3) + tiltX) * explodeSpread(), (mix(0.28f, 0.62f, p1) + tiltY) * explodeSpread(), 0.38f * explodeSize())
             },
     )
 }

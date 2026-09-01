@@ -497,7 +497,13 @@ internal fun PebbleShell(
                             // rest the target is a constant 0, so the spring never leaves its
                             // resting value, titleStyle stays titleMedium, and the per-frame
                             // font-size relayout never happens at all.
-                            val headerT by animateFloatAsState(
+                            // The STATE, not its value. This is a StiffnessVeryLow spring, so it
+                            // runs for a second or more, and reading it here put every one of
+                            // those frames on the composition path for this whole header -- the
+                            // Row, the title, the trailing slot, the split button -- when its
+                            // only consumers are the .layout{} and graphicsLayer lambdas below,
+                            // which invalidate layout and draw respectively and nothing else.
+                            val headerTState = animateFloatAsState(
                                 targetValue = if (expanded && growTitleOnExpand) 1f else 0f,
                                 animationSpec = spring(
                                     dampingRatio = 0.62f,
@@ -532,10 +538,13 @@ internal fun PebbleShell(
                             // is exactly how the first attempt at this broke the build. Spelling
                             // out the interpolation removes the dependency on which overload
                             // happens to be in scope.
-                            val titleScale = if (!growTitleOnExpand) {
-                                collapsedTitleScale
+                            // A lambda, so each reader pulls the current value at ITS phase.
+                            // growTitleOnExpand is false for every pebble but the hero, and then
+                            // this is a constant that never reads the spring at all.
+                            val titleScale: () -> Float = if (!growTitleOnExpand) {
+                                { collapsedTitleScale }
                             } else {
-                                collapsedTitleScale + (1f - collapsedTitleScale) * headerT
+                                { collapsedTitleScale + (1f - collapsedTitleScale) * headerTState.value }
                             }
                             Row(
                                 // Only stretched when the trailing slot is being pushed to the
@@ -577,9 +586,10 @@ internal fun PebbleShell(
                                         // Widening first means it ellipsizes on the width it is
                                         // actually drawn at, and the scaled-down report below
                                         // still lands inside the real constraint.
-                                        val room = if (constraints.hasBoundedWidth && titleScale > 0f) {
+                                        val scale = titleScale()
+                                        val room = if (constraints.hasBoundedWidth && scale > 0f) {
                                             constraints.copy(
-                                                maxWidth = (constraints.maxWidth / titleScale)
+                                                maxWidth = (constraints.maxWidth / scale)
                                                     .roundToInt()
                                                     .coerceAtLeast(constraints.maxWidth),
                                             )
@@ -587,15 +597,16 @@ internal fun PebbleShell(
                                             constraints
                                         }
                                         val placeable = measurable.measure(room)
-                                        val w = (placeable.width * titleScale).roundToInt()
-                                        val h = (placeable.height * titleScale).roundToInt()
+                                        val w = (placeable.width * scale).roundToInt()
+                                        val h = (placeable.height * scale).roundToInt()
                                         layout(w, h) {
                                             placeable.place(0, (h - placeable.height) / 2)
                                         }
                                     }
                                     .graphicsLayer {
-                                        scaleX = titleScale
-                                        scaleY = titleScale
+                                        val s = titleScale()
+                                        scaleX = s
+                                        scaleY = s
                                         transformOrigin = TransformOrigin(0f, 0.5f)
                                     }
                                     // Appended LAST -- after the .layout{} above, so a
