@@ -257,6 +257,9 @@ internal fun GarageScreen(state: State<UiState>, vm: AppViewModel) {
     // drag frame to move some chrome. The modifier reads it in its offset lambda instead.
     SideEffect {
         floatingRegistry.chromePull = { pullFractionState.value }
+        // Two separate flags on purpose -- see chromeHolding's own doc. The HOLD is only while
+        // a refresh is in flight; the FADE covers the pull as well.
+        floatingRegistry.chromeHolding = state.value.refreshing
         floatingRegistry.chromeHidden = chromeHidden
     }
     // Cleared when this screen goes away. Nothing else resets these, so leaving mid-pull or

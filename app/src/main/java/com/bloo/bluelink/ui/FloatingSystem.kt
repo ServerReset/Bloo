@@ -112,6 +112,18 @@ class FloatingRegistry {
      * instead, so the follow happens in the layout phase and composition never runs for it.
      */
     var chromePull: () -> Float = { 0f }
+
+    /**
+     * A refresh is actually IN FLIGHT -- the finger is gone and the shift has to hold itself
+     * open until the refresh resolves.
+     *
+     * Deliberately narrower than [chromeHidden], which is also true during the pull itself.
+     * Driving the hold off chromeHidden would spring the chrome to its full offset the instant
+     * a drag began, instead of letting it track the finger the way [chromePull] describes.
+     */
+    var chromeHolding by mutableStateOf(false)
+
+    /** Chrome should fade: true through the pull AND the refresh, unlike [chromeHolding]. */
     var chromeHidden by mutableStateOf(false)
 
     /**
@@ -121,6 +133,7 @@ class FloatingRegistry {
      */
     fun resetChrome() {
         chromePull = { 0f }
+        chromeHolding = false
         chromeHidden = false
     }
 
@@ -213,7 +226,7 @@ fun Modifier.floatingOverlay(
     // DRAG is not, because a pull should track the finger exactly rather than lag a spring
     // behind it. Both are read inside the offset lambda below, so neither recomposes anything.
     val holdState = animateFloatAsState(
-        targetValue = if (registry.chromeHidden) 1f else 0f,
+        targetValue = if (registry.chromeHolding) 1f else 0f,
         animationSpec = spring(
             dampingRatio = Spring.DampingRatioNoBouncy,
             stiffness = Spring.StiffnessMedium,
