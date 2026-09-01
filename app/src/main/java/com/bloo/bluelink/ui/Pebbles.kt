@@ -24,6 +24,7 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
@@ -395,9 +396,12 @@ internal fun ControlsPebble(v: Vehicle, state: UiState, vm: AppViewModel, dragHa
                 // PrimaryActions' own default start padding (26.dp) plus this
                 // Box's 12.dp put the lock icon noticeably further right than
                 // every other pebble's header icon (Charge, Climate, ...), which
-                // only ever get Pebble's flat 16.dp row padding. 4.dp here lines
-                // the two icons up (4 + 12 = 16, matching Pebble's inset).
-                PrimaryActions(v, state, vm, contentPadding = PaddingValues(start = 4.dp, end = 8.dp))
+                // only ever get Pebble's flat PebbleContentInset row padding. The 4.dp here
+                // lines the two icons up: 4 + this Box's own 12 == PebbleContentInset.
+                PrimaryActions(
+                    v, state, vm,
+                    contentPadding = PaddingValues(start = PebbleContentInset - 12.dp, end = 8.dp),
+                )
             }
             // Gated on the toggle ALONE, not on there being history. RemoteActionsInline draws
             // its own empty state, and a reveal that silently stays shut on a car with no
@@ -908,40 +912,57 @@ internal fun StateControl(
         val actionIconSize = if (coverTargets) 26.dp else 22.dp
         // Standard gap between connected button elements (matches SplitExpandButton's
         // own 3dp gap for visual consistency across all grouped controls).
-        Row(horizontalArrangement = Arrangement.spacedBy(3.dp), verticalAlignment = Alignment.CenterVertically) {
+        // ExpressiveButtonRow, not a plain Row. THIS is the app's clearest "several buttons
+        // sharing one space" -- a connected group whose silhouette is one pill -- so it is
+        // exactly where pressing one segment should widen it and squeeze the others, with the
+        // group's own outer width never changing. Every segment was a bare MorphButton with no
+        // press wrapper at all, which is why no amount of work on SafeExpansiveButton ever made
+        // this cluster move: there was nothing here to animate.
+        //
+        // Modifier.size on a segment is not in the way: fixed-size constraints are still
+        // coerced into the ones the parent hands down, so the width the group assigns wins.
+        ExpressiveButtonRow(spacing = 3.dp, verticalAlignment = Alignment.CenterVertically) {
             groupActions.forEachIndexed { i, action ->
-                MorphButton(
-                    onClick = action.onClick,
-                    enabled = action.enabled,
-                    contentPadding = PaddingValues(0.dp),
-                    shapeForCorner = { _, cp -> connectedGroupShape(i, segmentCount, cp) },
-                    modifier = Modifier.size(groupBtnSize),
-                ) { Icon(action.icon, contentDescription = action.contentDescription, modifier = Modifier.size(actionIconSize)) }
+                val actionSource = remember { MutableInteractionSource() }
+                SafeExpansiveButton(interactionSource = actionSource, enabled = action.enabled) {
+                    MorphButton(
+                        onClick = action.onClick,
+                        enabled = action.enabled,
+                        interactionSource = actionSource,
+                        contentPadding = PaddingValues(0.dp),
+                        shapeForCorner = { _, cp -> connectedGroupShape(i, segmentCount, cp) },
+                        modifier = Modifier.size(groupBtnSize),
+                    ) { Icon(action.icon, contentDescription = action.contentDescription, modifier = Modifier.size(actionIconSize)) }
+                }
             }
             // Pill when off, rounded rectangle + highlight colour when on - same
             // as the climate/charge controls -- except when it's part of a
             // group, where the connected shape takes over (see MorphButton's
             // shape param doc): a connected group's silhouette is static, not
             // something one segment morphs independently of the others.
-            MorphButton(
-                onClick = { if (isOn == true) onDeactivate() else onActivate() },
-                onClickHaptic = { haptics?.heavy() },
-                enabled = enabled && !pending,
-                active = highlighted,
-                activeContainerColor = highlightColor,
-                activeContentColor = highlightContentColor,
-                shapeForCorner = if (groupActions.isNotEmpty()) {
-                    { _, cp -> connectedGroupShape(segmentCount - 1, segmentCount, cp) }
-                } else {
-                    null
-                },
-                // Same pill height as the pebble header actions (the row stays
-                // ControlHeight tall, so the button is vertically centred in it);
-                // taller on the cover for a thumb.
-                modifier = Modifier.heightIn(min = groupBtnSize),
-            ) {
-                val buttonIcon = if (isOn == true) (deactivateIcon ?: icon) else icon
-                MorphButtonLabel(buttonIcon, if (isOn == true) turnOff else turnOn, pending, iconSize = actionIconSize)
+            val mainSource = remember { MutableInteractionSource() }
+            SafeExpansiveButton(interactionSource = mainSource, enabled = enabled && !pending) {
+                MorphButton(
+                    onClick = { if (isOn == true) onDeactivate() else onActivate() },
+                    onClickHaptic = { haptics?.heavy() },
+                    enabled = enabled && !pending,
+                    interactionSource = mainSource,
+                    active = highlighted,
+                    activeContainerColor = highlightColor,
+                    activeContentColor = highlightContentColor,
+                    shapeForCorner = if (groupActions.isNotEmpty()) {
+                        { _, cp -> connectedGroupShape(segmentCount - 1, segmentCount, cp) }
+                    } else {
+                        null
+                    },
+                    // Same pill height as the pebble header actions (the row stays
+                    // ControlHeight tall, so the button is vertically centred in it);
+                    // taller on the cover for a thumb.
+                    modifier = Modifier.heightIn(min = groupBtnSize),
+                ) {
+                    val buttonIcon = if (isOn == true) (deactivateIcon ?: icon) else icon
+                    MorphButtonLabel(buttonIcon, if (isOn == true) turnOff else turnOn, pending, iconSize = actionIconSize)
+                }
             }
         }
     }

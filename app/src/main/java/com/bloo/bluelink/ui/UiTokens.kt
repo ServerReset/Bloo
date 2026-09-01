@@ -126,6 +126,15 @@ internal val HeroReadoutBottomInset = 14.dp
 /** Gap between settings cards. Lives inside SettingsCard as bottom padding rather than in
  *  the parent's arrangement, so a card collapsing to zero height takes its gap with it --
  *  see the comment at that padding for what went wrong when the parent owned it. */
+/**
+ * The horizontal inset every pebble's own content sits at -- the header icon, the summary line,
+ * and anything a pebble reveals inside itself. Named because it is a shared alignment, not a
+ * local choice: the lock pebble reaches it as 4 + 12 through a nested Box, and its revealed
+ * remote-action history has to land on the same line or it reads as misaligned against the row
+ * directly above it.
+ */
+internal val PebbleContentInset = 16.dp
+
 internal val SettingsCardGap = 10.dp
 
 // ---- Motion -------------------------------------------------------------------

@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -67,7 +68,7 @@ private fun RemoteActionItem(action: RemoteAction, use24Hour: Boolean) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 12.dp, vertical = 5.dp),
+            .padding(vertical = 5.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Box(
@@ -140,30 +141,45 @@ private fun shortTime(iso: String, use24Hour: Boolean): String = runCatching {
  */
 @Composable
 internal fun RemoteActionsInline(actions: List<RemoteAction>, max: Int = 6) {
-    // NOT an early return on empty. This panel is revealed by pressing the lock pebble's
-    // background -- a gesture with no chrome to announce it -- so rendering nothing for a car
-    // that has not been commanded yet made a working gesture indistinguishable from an
-    // unimplemented one. An empty state is the only feedback that the press did something.
-    if (actions.isEmpty()) {
-        Text(
-            text = "No remote actions yet",
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp),
+    // The panel owns ALL of its own insets, and they are the PEBBLE's insets, not arbitrary
+    // ones. It is revealed inside the lock pebble's rounded Surface, directly beneath a row
+    // whose content starts at 16dp, so anything narrower than that reads as misaligned -- and
+    // the bottom needs real clearance or the last row runs into the corner radius, which is
+    // exactly how it looked: text flush to the left edge and touching the bottom curve.
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .padding(start = PebbleContentInset, end = PebbleContentInset, bottom = 14.dp),
+    ) {
+        // A hairline between the controls and the history, so the revealed panel reads as a
+        // second section of the same pebble rather than loose text under the buttons.
+        HorizontalDivider(
+            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f),
+            modifier = Modifier.padding(bottom = 6.dp),
         )
-        return
-    }
-    // Resolved once here, not per row: is24HourFormat reads a system setting, and every row in
-    // the list would otherwise ask the same question again.
-    val use24Hour = android.text.format.DateFormat.is24HourFormat(LocalContext.current)
-    Column(Modifier.fillMaxWidth().padding(bottom = 6.dp)) {
+        if (actions.isEmpty()) {
+            // NOT nothing. This panel is revealed by pressing the pebble's background -- a
+            // gesture with no chrome to announce it -- so drawing nothing for a car that has
+            // not been commanded yet made a working gesture indistinguishable from a missing
+            // one. The empty state is the only feedback that the press did something.
+            Text(
+                text = "No remote actions yet",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(vertical = 4.dp),
+            )
+            return@Column
+        }
+        // Resolved once here, not per row: is24HourFormat reads a system setting, and every row
+        // in the list would otherwise ask the same question again.
+        val use24Hour = android.text.format.DateFormat.is24HourFormat(LocalContext.current)
         actions.take(max).forEach { RemoteActionItem(it, use24Hour) }
         if (actions.size > max) {
             Text(
                 text = "+${actions.size - max} more in the last $REMOTE_ACTION_HISTORY_DAYS days",
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
+                modifier = Modifier.padding(top = 2.dp),
             )
         }
     }

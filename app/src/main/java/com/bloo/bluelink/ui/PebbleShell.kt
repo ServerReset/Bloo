@@ -549,7 +549,25 @@ internal fun PebbleShell(
                                     // says they are. This is what lets `titleTrailing` sit against
                                     // the name's real edge rather than a headline-sized box.
                                     .layout { measurable, constraints ->
-                                        val placeable = measurable.measure(constraints)
+                                        // Measured against constraints widened by 1/titleScale.
+                                        // The Text is measured at headlineSmall and DRAWN scaled
+                                        // down to titleScale (~0.7), so measuring it against the
+                                        // raw width made it ellipsize on headline-sized glyphs
+                                        // and then shrink the result -- "Announcements" became
+                                        // "Announce..." with a third of the row still empty.
+                                        // Widening first means it ellipsizes on the width it is
+                                        // actually drawn at, and the scaled-down report below
+                                        // still lands inside the real constraint.
+                                        val room = if (constraints.hasBoundedWidth && titleScale > 0f) {
+                                            constraints.copy(
+                                                maxWidth = (constraints.maxWidth / titleScale)
+                                                    .roundToInt()
+                                                    .coerceAtLeast(constraints.maxWidth),
+                                            )
+                                        } else {
+                                            constraints
+                                        }
+                                        val placeable = measurable.measure(room)
                                         val w = (placeable.width * titleScale).roundToInt()
                                         val h = (placeable.height * titleScale).roundToInt()
                                         layout(w, h) {
