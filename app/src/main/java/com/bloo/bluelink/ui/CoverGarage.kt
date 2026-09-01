@@ -442,9 +442,10 @@ internal fun CompactCar(
         }.let { ordered -> if ("main" in ordered) ordered else listOf("main") + ordered }
     }
     // Infinite wrap-around: start in the middle of a huge virtual range and map
-    // each virtual page back onto a real tile with modulo. FLAT tiles -- unlike
-    // the three horizontal car pagers this VerticalPager gets NO pagerDepth and
-    // NO beyondViewportPageCount.
+    // each virtual page back onto a real tile with modulo. FLAT tiles -- unlike the three
+    // horizontal car pagers this VerticalPager gets NO pagerDepth: a full-bleed page that
+    // shrinks as it leaves reads as depth between CARS, but between sections of one car it just
+    // makes the panel feel like it is wobbling.
     val vWrap = rememberWrapPager(tiles.size)
     val vPager = vWrap.pager
     val current = vWrap.currentReal
@@ -564,6 +565,17 @@ internal fun CompactCar(
             state = vPager,
             modifier = Modifier.fillMaxSize(),
             userScrollEnabled = coverScrubbing?.value != true,
+            // Pre-compose the neighbouring tile. This is the gesture people actually make on a
+            // cover screen -- you flip the phone to check ONE car and then swipe through its
+            // sections -- and it was the only pager in the app composing its incoming page
+            // mid-swipe, which is exactly when there is no frame budget to spare. The car pager
+            // beside it has had this since the beginning.
+            //
+            // The cost is fine here in a way it would not be on the watch: a flip phone's cover
+            // is a small DISPLAY, not a small device. It runs the same flagship SoC as the main
+            // screen. And a tile is cheaper than it was -- no per-tile SubcomposeLayout and no
+            // hero block any more.
+            beyondViewportPageCount = 1,
         ) { page ->
             val i = vWrap.real(page)
             val tileScroll = tileScrollStates.getOrPut(tiles[i]) { ScrollState(0) }
