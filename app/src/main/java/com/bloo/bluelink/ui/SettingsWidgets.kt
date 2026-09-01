@@ -186,7 +186,7 @@ fun SettingsSegmentedRow(
             style = MaterialTheme.typography.labelMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-        Spacer(Modifier.height(6.dp))
+        Spacer(Modifier.height(SettingsGapRow))
         MorphSegmented(options = options, selectedKey = selectedKey, onSelect = onSelect)
         if (description != null) SettingsCaption(description)
     }
@@ -217,7 +217,7 @@ internal fun InlineSegmentedRow(
             onSelect = onSelect,
         )
     }
-    Spacer(Modifier.height(4.dp))
+    Spacer(Modifier.height(SettingsGapHairline))
     Text(
         caption,
         style = MaterialTheme.typography.bodySmall,
@@ -520,7 +520,7 @@ internal fun PinDialogs(
                         style = MaterialTheme.typography.bodyMedium,
                         color = scheme.onSurfaceVariant,
                     )
-                    Spacer(Modifier.height(12.dp))
+                    Spacer(Modifier.height(SettingsGapGroup))
                     OutlinedTextField(
                         value = currentPin,
                         onValueChange = { currentPin = sanitize(it); rejected = false },
@@ -557,7 +557,7 @@ internal fun PinDialogs(
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = scheme.onSurfaceVariant,
                             )
-                            Spacer(Modifier.height(12.dp))
+                            Spacer(Modifier.height(SettingsGapGroup))
                             OnboardingPinForm(
                                 existing = state.appPinSet,
                                 onSet = { pin -> vm.setAppPin(pin) },
@@ -572,7 +572,7 @@ internal fun PinDialogs(
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = scheme.onSurfaceVariant,
                             )
-                            Spacer(Modifier.height(14.dp))
+                            Spacer(Modifier.height(SettingsGapSection))
                         }
                     }
                 }
@@ -611,7 +611,7 @@ internal fun PinDialogs(
                             ) { Text("Remove PIN", fontWeight = FontWeight.SemiBold) }
                         }
                     }
-                    Spacer(Modifier.height(6.dp))
+                    Spacer(Modifier.height(SettingsGapRow))
                     MorphTextButton(
                         "Done",
                         onClick = { haptics?.click(); onDismiss() },

@@ -112,7 +112,7 @@ internal fun LiveUpdateTroubleshootDialog(onDismiss: () -> Unit) {
         title = "Live update not showing?",
         text = {
             Text("A few things to check, in order:", style = MaterialTheme.typography.bodyMedium)
-            Spacer(Modifier.height(10.dp))
+            Spacer(Modifier.height(SettingsGapGroup))
             TroubleshootStep(
                 1,
                 "Not appearing or updating reliably at all -- especially if it takes a while after charging starts? Use the \"Tap to fix\" link above if it's showing: that's Android's battery-optimization exemption, needed for the background check that posts and updates the bar to run on schedule while the app isn't open." +
@@ -248,7 +248,7 @@ internal fun CarSettingsCard(
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-                Spacer(Modifier.height(4.dp))
+                Spacer(Modifier.height(SettingsGapHairline))
                 PlatformPicker(current = state.platformOf(v)) { pt -> vm.setPlatform(v, pt) }
             }
         }
@@ -276,7 +276,7 @@ internal fun CarSettingsCard(
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-            Spacer(Modifier.height(4.dp))
+            Spacer(Modifier.height(SettingsGapHairline))
             MorphSegmented(
                 options = buildList {
                     add(SegmentOption("smart", "Smart", null))
@@ -298,7 +298,7 @@ internal fun CarSettingsCard(
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-                Spacer(Modifier.height(4.dp))
+                Spacer(Modifier.height(SettingsGapHairline))
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     appearance.customPalettes.forEach { palette ->
                         val selected = appearance.carCustomPaletteIds[v.vin] == palette.id
