@@ -375,6 +375,10 @@ internal fun PebbleShell(
                         active = act.active,
                         pending = act.pending,
                         enabled = act.enabled,
+                        // A section tile has exactly one action and the whole row to put it in,
+                        // so it takes the shorter side-by-side pill rather than the stacked form
+                        // that exists for fitting four into one row. 12dp back on every tile.
+                        compact = true,
                     )
                 }
             },

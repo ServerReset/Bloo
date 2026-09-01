@@ -422,7 +422,12 @@ internal fun CoverMainTile(v: Vehicle, state: UiState, vm: AppViewModel) {
     CoverTile(
         title = v.name,
         icon = Icons.Filled.DirectionsCar,
-        subtitle = bits.joinToString(" · ").ifBlank { null },
+        // Lock/climate state rides the END of the header row rather than a second line beneath
+        // it -- the same slot a section tile uses for the car's name, which the home tile does
+        // not need because its headline IS the car. One line instead of two, and the state a
+        // person opens a shut phone to check sits on the same line as the name rather than in
+        // muted text under it. subtitleColor still turns it red on an unlocked car.
+        trailingLabel = bits.joinToString(" · ").ifBlank { null },
         subtitleColor = subtitleColor,
         iconTint = if (hasPhoto) HeroOnPhoto else MaterialTheme.colorScheme.primary,
         titleColor = titleColor,
@@ -532,6 +537,16 @@ internal fun CoverActionButton(
     icon: ImageVector,
     label: String,
     onClick: () -> Unit,
+    /**
+     * Lay the icon and label side by side in a shorter pill, instead of stacking them.
+     *
+     * Stacking exists so four buttons can share one row on a one-inch panel -- each column is
+     * too narrow for an icon and a word side by side. A tile with a SINGLE action has no such
+     * constraint: it has the whole row, so stacking spends 56dp of height to put a word under a
+     * glyph that could sit beside it. The compact form is the shape the phone's own header
+     * action already uses, so it also reads as the same control in both places.
+     */
+    compact: Boolean = false,
     active: Boolean = false,
     attention: Boolean = false,
     pending: Boolean = false,
@@ -578,14 +593,10 @@ internal fun CoverActionButton(
             // No weight(1f): its parent here is SafeExpansiveButton's own layout, not the row,
             // so it was silently doing nothing. The equal share now comes from the group.
             modifier = Modifier
-                .height(56.dp)
+                .height(if (compact) 44.dp else 56.dp)
                 .alpha(if (enabled) 1f else 0.45f),
         ) {
-        Column(
-            Modifier.fillMaxSize(),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center,
-        ) {
+        val glyph: @Composable () -> Unit = {
             if (pending) {
                 CircularProgressIndicator(
                     modifier = Modifier.size(20.dp),
@@ -595,7 +606,8 @@ internal fun CoverActionButton(
             } else {
                 Icon(icon, contentDescription = null, modifier = Modifier.size(22.dp))
             }
-            Spacer(Modifier.height(3.dp))
+        }
+        val text: @Composable () -> Unit = {
             com.bloo.uicommon.FittedText(
                 text = label,
                 style = MaterialTheme.typography.labelSmall.copy(
@@ -603,6 +615,26 @@ internal fun CoverActionButton(
                     color = LocalContentColor.current,
                 ),
             )
+        }
+        if (compact) {
+            Row(
+                Modifier.fillMaxSize().padding(horizontal = 10.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                glyph()
+                text()
+            }
+        } else {
+            Column(
+                Modifier.fillMaxSize(),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center,
+            ) {
+                glyph()
+                Spacer(Modifier.height(3.dp))
+                text()
+            }
         }
     }
     }
