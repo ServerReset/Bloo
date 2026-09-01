@@ -269,7 +269,9 @@ fun ExpressiveButtonGroup(
             val cached = naturals.widths
             // Only MEMBER widths have to be sane: a legitimately zero-width non-member (an
             // empty Spacer, a label that renders nothing) must not disable the whole effect.
+            val cachedFloors = naturals.floors
             val usable = cached != null && cached.size == n &&
+                cachedFloors != null && cachedFloors.size == n &&
                 (0 until n).all { !member[it] || cached[it] > 0 }
 
             // Equal shares are computed from the row itself, so there is nothing to cache and
@@ -314,6 +316,9 @@ fun ExpressiveButtonGroup(
                 // as the budget every later pressed pass redistributes.
                 measurables.map { it.measure(childConstraints) }.also { measured ->
                     naturals.widths = IntArray(n) { measured[it].width }
+                    naturals.floors = IntArray(n) { i ->
+                        if (member[i]) measurables[i].minIntrinsicWidth(intrinsicHeight) else 0
+                    }
                 }
             } else {
                 // ONE invariant: the members' total width never changes. Everything else is
@@ -345,7 +350,7 @@ fun ExpressiveButtonGroup(
                     if (!member[i]) cached[i]
                     else maxOf(
                         (cached[i] * MinDonorFraction).roundToInt(),
-                        measurables[i].minIntrinsicWidth(intrinsicHeight),
+                        cachedFloors[i],
                     ).coerceAtMost(cached[i])
                 }
                 val want = growers.sumOf { (cached[it] * ExpressivePressGrowth * press[it]).toDouble() }
@@ -410,6 +415,17 @@ fun ExpressiveButtonGroup(
  *  this is a plain object and not snapshot state. */
 private class NaturalWidths {
     var widths: IntArray? = null
+
+    /**
+     * The per-child intrinsic floor, recorded on the same resting pass as [widths].
+     *
+     * Cached for cost, not for correctness: minIntrinsicWidth measures the child's subtree, and
+     * asking for it inside the measure block meant paying for every member on every frame of
+     * the press spring. It depends only on the child's content -- the same thing [widths]
+     * already assumes holds still between resting passes -- so the resting pass is the right
+     * and only place to ask.
+     */
+    var floors: IntArray? = null
 }
 
 /** Carries a child's live press fraction to [ExpressiveButtonGroup]'s measure policy. The
