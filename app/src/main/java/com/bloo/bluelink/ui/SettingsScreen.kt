@@ -1334,7 +1334,7 @@ internal fun SettingsScreen(
                         if (!LiveCharge.isPromotable(ctx)) {
                             SettingsCaption("Not showing in the status bar?", bottomGap = SettingsGapHairline)
                             MorphTextButton(
-                                text = "Open live update settings",
+                                text = "Open system settings",
                                 onClick = { LiveCharge.openLiveUpdateSettings(ctx) },
                                 contentColor = MaterialTheme.colorScheme.primary,
                                 icon = Icons.Filled.Warning,
