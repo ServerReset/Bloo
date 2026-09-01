@@ -15,6 +15,8 @@ import com.bloo.bluelink.data.WearSettingsPayload
 import com.bloo.bluelink.data.WearSync
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.Dispatchers
 
 // ─────────────────────────────────────────────────────────────────────────────
 //  Phone-synced mirror
@@ -69,8 +71,17 @@ class WearSyncedStore<T> private constructor(
 ) {
     private val key = stringPreferencesKey("payload")
 
-    /** Reactive decoded view; emits a fresh [T] on every [save] to this store. */
-    val flow: Flow<T> = store.data.map { decode(it[key]) }
+    /**
+     * Reactive decoded view; emits a fresh [T] on every [save] to this store.
+     *
+     * flowOn, because [decode] is a JSON deserialization and DataStore only guarantees that the
+     * FILE read is off the main thread -- a map{} transform runs in the collector's context.
+     * Every collector here is a viewModelScope.launch, which is Main.immediate, so the whole
+     * settings/presets/climate/extras payload was being parsed on the UI thread of a watch.
+     * That is the same defect the phone's SettingsStore had, on the one device in this project
+     * that genuinely cannot absorb it.
+     */
+    val flow: Flow<T> = store.data.map { decode(it[key]) }.flowOn(Dispatchers.Default)
 
     /** Persist the raw JSON [raw] as produced by the phone / a WearSync encoder. */
     suspend fun save(raw: String) {

@@ -15,6 +15,8 @@ import java.security.SecureRandom
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.Dispatchers
 
 // ─────────────────────────────────────────────────────────────────────────────
 //  Watch-local persistence
@@ -294,6 +296,11 @@ class WearLocalStore(private val context: Context) {
             hasPin = prefs[keyPinHash] != null,
         )
     }
+        // Off the UI thread. This decode splits a stored CSV, filters it, and loops the tile
+        // pool per slot -- and it is read with .first() from a dozen viewModelScope.launch
+        // blocks, all of which resume on Main.immediate. Cheap per call, on a watch, a dozen
+        // times, on the thread drawing the frame.
+        .flowOn(Dispatchers.Default)
 
     // ── Appearance ────────────────────────────────────────────────────────────
 
