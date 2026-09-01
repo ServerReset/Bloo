@@ -156,6 +156,12 @@ internal fun coverBodyPad(): Dp = if (coverIsTiny()) 4.dp else 6.dp
 @Composable
 internal fun coverBodyGap(): Dp = if (coverIsTiny()) 6.dp else 8.dp
 
+/**
+ * The car the current cover page belongs to, provided by CompactCar so a tile deep inside it can
+ * name its car without every tile composable having to take a Vehicle it otherwise never reads.
+ */
+internal val LocalCoverCarName = staticCompositionLocalOf<String?> { null }
+
 /** True inside a [CoverTile]'s body, i.e. below a title band that already
  *  shows the page's icon and name. [CoverHero] reads it to avoid drawing that
  *  same glyph a second time, a few dp lower and larger. */
@@ -270,6 +276,17 @@ internal fun CoverTile(
     subtitleColor: Color? = null,
     containerColor: Color = MaterialTheme.colorScheme.surfaceVariant,
     scrollState: ScrollState? = null,
+    /**
+     * A short secondary label pinned to the END of the title row -- in practice the car's name on
+     * a section tile ("Charge          Kona").
+     *
+     * It lives on the title ROW rather than in an overlay because the cover screen previously had
+     * both: a floating car-name overlay drawn over the pager, reserving no space, sitting in
+     * exactly the band where each tile draws its own title. Two titles, one band. On the title
+     * row it costs no extra height at all, cannot collide with anything, and the tile finally
+     * says both what it is and whose car it belongs to in one line.
+     */
+    trailingLabel: String? = null,
     actions: (@Composable () -> Unit)? = null,
     // Drawn BEHIND the title/body/actions, inside the card's own clip -- the same
     // slot PebbleShell's own `background` is for the phone hero, and for the same
@@ -320,6 +337,18 @@ internal fun CoverTile(
                     ),
                     modifier = Modifier.weight(1f),
                 )
+                if (!trailingLabel.isNullOrBlank()) {
+                    Text(
+                        trailingLabel,
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        // Muted against the title it shares a line with: the section is what the
+                        // tile is ABOUT, the car is context. Same tone the subtitle uses.
+                        color = (subtitleColor ?: LocalContentColor.current).copy(alpha = 0.92f),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
             }
             if (!subtitle.isNullOrBlank()) {
                 Text(

@@ -354,6 +354,11 @@ internal fun PebbleShell(
             title = title,
             icon = icon,
             subtitle = summary,
+            // Which car this section belongs to. Cover pebbles are header-less, so a section
+            // tile ("Charge", "Climate") named the section and nothing else -- which is what the
+            // floating car-name overlay was added to fix, by drawing a second title over the
+            // one this tile already has. On the title row it costs no height and cannot collide.
+            trailingLabel = LocalCoverCarName.current,
             containerColor = containerColor,
             scrollState = LocalCoverScrollState.current,
             actions = if (act == null) {

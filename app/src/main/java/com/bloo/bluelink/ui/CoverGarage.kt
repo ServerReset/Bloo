@@ -51,8 +51,6 @@ import androidx.compose.material.icons.filled.Smartphone
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.ui.semantics.onClick
-import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.MaterialTheme
@@ -220,12 +218,6 @@ internal fun CompactGarage(state: UiState, vm: AppViewModel, appearance: Setting
     val coverChromeHidden = state.refreshing
     SideEffect { coverFloatingRegistry.chromeHidden = coverChromeHidden }
     Box(Modifier.fillMaxSize()) {
-        // Which cover tile is showing. The home tile titles ITSELF with the
-        // car's name (see CoverMainTile), so the shared overlay saying it too
-        // put the same words twice on a one-inch screen -- which is what the
-        // overlay was added to fix in the first place, for the OTHER tiles,
-        // whose titles name a section rather than a car.
-        var visibleTile by remember { mutableStateOf("main") }
         HorizontalPager(
             state = pager,
             modifier = Modifier.fillMaxSize(),
@@ -246,8 +238,14 @@ internal fun CompactGarage(state: UiState, vm: AppViewModel, appearance: Setting
                     themeMode = appearance.themeMode,
                     vibrancy = appearance.vibrancy,
                 ) {
-                    CompositionLocalProvider(LocalCoverScrubbing provides scrubbing) {
-                        CompactCar(v, state, vm, onTileChange = { visibleTile = it })
+                    CompositionLocalProvider(
+                        LocalCoverScrubbing provides scrubbing,
+                        // So each section tile can put the car's name on its own title row --
+                        // see CoverTile.trailingLabel. Provided here, where the page's vehicle
+                        // is known, rather than threaded through every tile composable.
+                        LocalCoverCarName provides v.name,
+                    ) {
+                        CompactCar(v, state, vm)
                     }
                 }
             }
@@ -262,51 +260,32 @@ internal fun CompactGarage(state: UiState, vm: AppViewModel, appearance: Setting
         // shrink along with the outgoing/incoming car during a swipe, exactly
         // like every other car pager's PagerDots already stays put outside
         // the per-page transform.
-        // Car name + switching dots, in one TopCenter overlay.
+        // The car-switching dots.
         //
-        // The name is here rather than in the tiles because cover pebbles
-        // render header-less by design, so nothing on the cover screen said
-        // which car you were looking at -- fine on the main tile, genuinely
-        // confusing on Charge or Climate after swiping between cars.
-        // Reported from a real device.
+        // This overlay used to carry the car's NAME above the dots as well, because cover
+        // pebbles render header-less and nothing on a section tile said which car you were
+        // looking at. That was true when a pebble page was a bare body; it stopped being true
+        // once every page went through CoverTile, which draws its own title at the top of the
+        // tile -- in exactly the band this overlay occupies. Two titles, one band, and this one
+        // reserves no space because it is a sibling drawn OVER the pager.
         //
-        // It rides the same overlay the dots already occupied, so it claims
-        // no vertical space that wasn't already spoken for, and fades with
-        // the same refresh alpha so the loading indicator still owns the
-        // screen during a refresh.
+        // The name now rides each tile's own title row instead (CoverTile.trailingLabel), where
+        // it costs no height and cannot collide with anything. What is left here is the dots,
+        // which are chrome about the pager rather than about the page.
         Column(
             modifier = Modifier
                 .align(Alignment.TopCenter)
                 .statusBarsPadding()
                 .padding(top = HeaderCornerGap, start = HeaderCornerGap, end = HeaderCornerGap)
-                // shift = false: the cover has no pull-to-refresh shift of its own -- its refresh
-                // is the edge-trace gesture -- so only the fade applies here.
-                .floatingOverlay(FloatingIds.Title, shift = false),
+                // PagerDots, not Title: with the name gone this overlay IS the dots, and this
+                // is the node that carries their real position (status-bar inset and corner
+                // gap), so it publishes and PagerDotsFor below opts out.
+                // shift = false: the cover has no pull-to-refresh shift of its own -- its
+                // refresh is the edge-trace gesture -- so only the fade applies here.
+                .floatingOverlay(FloatingIds.PagerDots, shift = false),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            // Skipped when the camera band is showing the name instead -- see
-            // below. Saying it twice on a screen this size is worse than the
-            // problem the overlay was added to solve.
-            vehicles.getOrNull(currentIndex.coerceIn(0, count - 1))
-                ?.takeIf { band == null && visibleTile != "main" }
-                ?.let { current ->
-                Text(
-                    current.name,
-                    // Was labelMedium/onSurfaceVariant -- the smallest, dimmest
-                    // text on a screen whose whole job is telling you which car
-                    // you are looking at. The home tile now says it at headline
-                    // size itself; this overlay is what the OTHER tiles have, so
-                    // it reads as a title rather than a caption.
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    textAlign = TextAlign.Center,
-                )
-            }
             if (count > 1 && !LocalReorderActive.current) {
-                Spacer(Modifier.height(4.dp))
                 PagerDotsFor(
                     pager = pager,
                     real = { realCar(it) },
@@ -316,6 +295,7 @@ internal fun CompactGarage(state: UiState, vm: AppViewModel, appearance: Setting
                     // already the refresh affordance in this mode; the dots
                     // are display-only.
                     onRefresh = null,
+                    registerBounds = false,
                 )
             }
         }
@@ -413,9 +393,6 @@ internal fun CompactCar(
     v: Vehicle,
     state: UiState,
     vm: AppViewModel,
-    /** Which tile is centred, reported up so the shared top overlay knows
-     *  whether the page below it is already showing the car's name. */
-    onTileChange: (String) -> Unit = {},
 ) {
     // Live source passed to SinglePebble (which takes State<UiState> now).
     val stateSource = rememberUpdatedState(state)
@@ -454,7 +431,6 @@ internal fun CompactCar(
     val vWrap = rememberWrapPager(tiles.size)
     val vPager = vWrap.pager
     val current = vWrap.currentReal
-    LaunchedEffect(current, tiles) { onTileChange(tiles.getOrElse(current) { "main" }) }
     // Per-tile scroll states, keyed by tile name so position persists across
     // pager recycling AND reordering. Tall tiles scroll their own content; the
     // VerticalPager then nested-scrolls to the next/previous tile once a tile is
