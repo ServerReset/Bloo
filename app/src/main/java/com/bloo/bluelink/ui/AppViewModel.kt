@@ -446,7 +446,14 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             // per-brand error handling -- see loadGarageInner) must not leave
             // the user stuck looking at it forever.
             try {
-                brands.forEach { repoFor(it) }
+                // Off the main thread for the same reason loadAll() below is. repoFor()
+                // constructs a brand's API object, and each of those companion objects builds a
+                // shared OkHttpClient -- a Dispatcher, an ExecutorService, a ConnectionPool and
+                // a route database, plus loading the whole OkHttp class graph. That is one of
+                // the heaviest class-load chains in the app and it was running on Main.immediate
+                // during cold start, once per signed-in brand, three lines above a call that was
+                // already moved off for being cheaper than this one.
+                withContext(Dispatchers.IO) { brands.forEach { repoFor(it) } }
                 // Off the main thread: loadAll() touches CredentialStore's lazy
                 // `prefs`, which on first access does real work (MasterKey
                 // generation/lookup + EncryptedSharedPreferences setup) --

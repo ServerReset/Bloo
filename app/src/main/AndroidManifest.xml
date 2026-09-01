@@ -141,6 +141,13 @@
                 android:name="androidx.emoji2.text.EmojiCompatInitializer"
                 android:value="androidx.startup"
                 tools:node="remove" />
+            <!-- The provider itself STAYS, even though the two initializers above are
+                 removed and it looks like dead weight on the pre-Application path.
+                 androidx.profileinstaller registers ProfileInstallerInitializer through
+                 this same provider, and that is what installs the merged AndroidX and
+                 Compose baseline profiles. Removing the provider would silently take the
+                 app's only AOT-compilation delivery mechanism with it, which is the
+                 opposite of the startup win it looks like. -->
         </provider>
 
         <!-- Wear OS Data Layer: receives the watch's remote commands and sync

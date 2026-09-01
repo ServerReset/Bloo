@@ -438,6 +438,14 @@ fun blooColorScheme(
  * [LocalReduceMotion] for composables that should skip animation when it's off.
  */
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
+/** Process-wide cache for the animator-duration-scale probe -- see its use in BlooTheme. */
+private var reduceMotionCache: Boolean? = null
+
+private fun reduceMotionCached(context: android.content.Context): Boolean =
+    reduceMotionCache ?: runCatching {
+        Settings.Global.getFloat(context.contentResolver, Settings.Global.ANIMATOR_DURATION_SCALE, 1f) == 0f
+    }.getOrDefault(false).also { reduceMotionCache = it }
+
 @Composable
 fun BlooTheme(
     themeMode: ThemeMode = ThemeMode.SYSTEM,
@@ -486,9 +494,12 @@ fun BlooTheme(
     val density = LocalDensity.current
     val scaledDensity = Density(density.density, uiScale)
 
-    val reduceMotion = remember {
-        Settings.Global.getFloat(context.contentResolver, Settings.Global.ANIMATOR_DURATION_SCALE, 1f) == 0f
-    }
+    // Keyed on the resolver rather than un-keyed, and read through a process-wide cache: this
+    // is a synchronous binder IPC to the settings provider, and it sat on the first-frame path
+    // inside composition. remember{} alone still pays it once per BlooTheme instance -- and the
+    // theme is applied on every screen -- so the answer is cached for the process instead. It
+    // cannot change without a configuration change that recreates everything anyway.
+    val reduceMotion = remember(context.contentResolver) { reduceMotionCached(context) }
     // Memoize typography and motion computations to avoid recomputing on every recomposition
     val typography = remember(fontChoice) { expressiveTypography(fontChoice) }
     val motionScheme = remember { MotionScheme.expressive() }
