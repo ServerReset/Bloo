@@ -122,6 +122,11 @@ fun Modifier.floatingElement(id: FloatingId, active: Boolean = true): Modifier =
  * effect that drives the animation is keyed on the collision BOOLEAN, never on the bounds
  * themselves -- keying on bounds restarts (and so cancels) the animation on every frame the
  * neighbour moves, which is precisely how the dots ended up frozen half-visible under the name.
+ *
+ * MUST be paired with [floatingElement] using the same [self] id, because the collision test
+ * asks the registry where `self` is. Alone, this modifier finds no bounds for itself, reports
+ * no collision, and simply never dodges -- a silent no-op with nothing to notice, which is why
+ * it is stated here rather than left to be discovered.
  */
 fun Modifier.dodgeFloating(
     self: FloatingId,
