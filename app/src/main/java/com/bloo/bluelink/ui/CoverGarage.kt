@@ -218,6 +218,10 @@ internal fun CompactGarage(state: UiState, vm: AppViewModel, appearance: Setting
     val coverChromeHidden = state.refreshing
     SideEffect { coverFloatingRegistry.chromeHidden = coverChromeHidden }
     Box(Modifier.fillMaxSize()) {
+        // Measured once and shared by every reader below: the tiles' car-name label, the band
+        // itself, and the search dock. Hoisted ABOVE the pager because the tiles need to know
+        // whether the band is already naming the car -- see LocalCoverCarName below.
+        val band = coverCutoutBand()
         HorizontalPager(
             state = pager,
             modifier = Modifier.fillMaxSize(),
@@ -243,7 +247,12 @@ internal fun CompactGarage(state: UiState, vm: AppViewModel, appearance: Setting
                         // So each section tile can put the car's name on its own title row --
                         // see CoverTile.trailingLabel. Provided here, where the page's vehicle
                         // is known, rather than threaded through every tile composable.
-                        LocalCoverCarName provides v.name,
+                        // Null when the camera band is already showing the name. The band is
+                        // free real estate beside the island; the tile's trailing label costs a
+                        // share of its header row. So where a band exists it owns the name and
+                        // the tiles get their full width back -- and the name is never drawn
+                        // twice, which it was.
+                        LocalCoverCarName provides v.name.takeIf { band == null },
                     ) {
                         CompactCar(v, state, vm)
                     }
@@ -253,7 +262,7 @@ internal fun CompactGarage(state: UiState, vm: AppViewModel, appearance: Setting
         // Measured once and shared by both readers below (the top-overlay name
         // and the band itself), so they can never disagree about whether the
         // band exists and end up showing the name twice or not at all.
-        val band = coverCutoutBand()
+        // (band is computed above the pager -- see its hoist there.)
         // Car-switching dots, hoisted out of CompactCar (a per-page composable)
         // and up to here -- a sibling of the whole pager, not inside any one
         // page's fade/scale graphicsLayer -- so it doesn't itself fade and
