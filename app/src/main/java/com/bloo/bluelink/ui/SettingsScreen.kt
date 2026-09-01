@@ -544,96 +544,6 @@ internal fun SettingsScreen(
                 )
             }
             }
-            // The support check gates the ITEM, not just its contents. A grid item that
-            // composes nothing is not free: it still takes a slot and the grid's
-            // verticalItemSpacing with it, so a device without Gemini Nano got a phantom gap
-            // where the AI card would be. Same mechanism, same fix as the advanced-only cards
-            // (see rememberAdvancedVisibility); this condition had simply been missed.
-            if (state.aiSupported) item {
-
-            // On-device AI - only when the device supports Gemini Nano. Always
-            // shown (not advanced-only): it's a headline feature, not a power-
-            // user knob, and hiding it behind Advanced made it easy to miss.
-            run { // scope kept so the gate above is the only edit; the check now lives on `item`
-                SettingsCard("AI", Icons.Filled.AutoAwesome, vm) {
-                    // Same icon-badge + status-line header as the rest of this pass.
-                    val aiTint = if (state.aiEnabled) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.onSurfaceVariant
-                    StatusHeaderRow(
-                        icon = Icons.Filled.AutoAwesome,
-                        tint = aiTint,
-                        title = "On-device AI",
-                        status = when {
-                            !state.aiEnabled -> "Off"
-                            state.aiAuto -> "On · auto-summarize"
-                            else -> "On"
-                        },
-                    )
-                    Spacer(Modifier.height(14.dp))
-                    ToggleRow("On-device AI (Gemini Nano)", state.aiEnabled) { vm.setAiEnabled(it) }
-                    Text(
-                        "Adds an AI summary pebble to each car and lets you ask the search " +
-                            "box plain questions like \"what's the odometer\". Everything runs " +
-                            "privately on your device.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    // Advanced-only: a power-user nuance on top of the basic
-                    // AI toggle above, not something a novice needs to see. PopVisible,
-                    // not a bare `if` -- was snapping in/out with the toggle above with
-                    // no animation at all.
-                    PopVisible(visible = state.aiEnabled && advanced) {
-                      Column {
-                        ToggleRow("Summarize automatically", state.aiAuto) { vm.setAiAuto(it) }
-                        Text(
-                            if (state.aiAuto) {
-                                "Summaries refresh on their own when you open a car, refresh its " +
-                                    "status, or send a command. You can still tap Summarize anytime."
-                            } else {
-                                "Summaries only run when you tap Summarize on a car."
-                            },
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                      }
-                    }
-                }
-            }
-            }
-            if (advVisible[0]) item {
-
-            // (The "Updates" card now lives after Notifications — its natural home —
-            // ungated so its controls show with or without Shizuku. See below.)
-
-            // App-icon shortcuts (long-press the launcher icon)
-            AnimatedVisibility(visibleState = rememberAppearedState(), enter = collapseEnter(), exit = collapseExit()) {
-                SettingsCard("App shortcuts", Icons.Filled.Bolt, vm) {
-                    // No inner MorphExpandButton any more -- this used to have its
-                    // own second chevron gating the per-vehicle toggles below,
-                    // stacked directly under the card's own PebbleShell chevron
-                    // (which didn't exist yet when this was written; SettingsCard
-                    // was a static, always-open Card back then, and the inner
-                    // toggle was the ONLY way to fold this away). Now that the
-                    // card itself opens and closes, a second tap just to see the
-                    // toggles it opened FOR was two controls doing one job.
-                    Text(
-                        "Quick-access shortcuts from the launcher icon",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    Spacer(Modifier.height(8.dp))
-                    state.vehicles.forEach { v ->
-                        Spacer(Modifier.height(4.dp))
-                        Text(v.name, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
-                        com.bloo.bluelink.Shortcuts.ACTIONS.forEach { cmd ->
-                            ToggleRow(
-                                com.bloo.bluelink.Shortcuts.actionLabel(cmd),
-                                state.isShortcutEnabled(v.vin, cmd),
-                            ) { vm.setShortcutEnabled(v.vin, cmd, it) }
-                        }
-                    }
-                }
-            }
-            }
             // Gates the ITEM for the same reason the AI card above does: with no cars yet
             // (fresh install, before the first sign-in) this composed nothing but still held a
             // slot and a gap open at the top of Settings.
@@ -694,6 +604,143 @@ internal fun SettingsScreen(
                                 onToggle = { expandedCar = if (expandedCar == v.vin) null else v.vin },
                                 onPickPhoto = { pick(v.vin) },
                             )
+                        }
+                    }
+                }
+            }
+            }
+            // The support check gates the ITEM, not just its contents. A grid item that
+            // composes nothing is not free: it still takes a slot and the grid's
+            // verticalItemSpacing with it, so a device without Gemini Nano got a phantom gap
+            // where the AI card would be. Same mechanism, same fix as the advanced-only cards
+            // (see rememberAdvancedVisibility); this condition had simply been missed.
+            if (state.aiSupported) item {
+
+            // On-device AI - only when the device supports Gemini Nano. Always
+            // shown (not advanced-only): it's a headline feature, not a power-
+            // user knob, and hiding it behind Advanced made it easy to miss.
+            run { // scope kept so the gate above is the only edit; the check now lives on `item`
+                SettingsCard("AI", Icons.Filled.AutoAwesome, vm) {
+                    // Same icon-badge + status-line header as the rest of this pass.
+                    val aiTint = if (state.aiEnabled) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.onSurfaceVariant
+                    StatusHeaderRow(
+                        icon = Icons.Filled.AutoAwesome,
+                        tint = aiTint,
+                        title = "On-device AI",
+                        status = when {
+                            !state.aiEnabled -> "Off"
+                            state.aiAuto -> "On · auto-summarize"
+                            else -> "On"
+                        },
+                    )
+                    Spacer(Modifier.height(14.dp))
+                    ToggleRow("On-device AI (Gemini Nano)", state.aiEnabled) { vm.setAiEnabled(it) }
+                    Text(
+                        "Adds an AI summary pebble to each car and lets you ask the search " +
+                            "box plain questions like \"what's the odometer\". Everything runs " +
+                            "privately on your device.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    // Advanced-only: a power-user nuance on top of the basic
+                    // AI toggle above, not something a novice needs to see. PopVisible,
+                    // not a bare `if` -- was snapping in/out with the toggle above with
+                    // no animation at all.
+                    PopVisible(visible = state.aiEnabled && advanced) {
+                      Column {
+                        ToggleRow("Summarize automatically", state.aiAuto) { vm.setAiAuto(it) }
+                        Text(
+                            if (state.aiAuto) {
+                                "Summaries refresh on their own when you open a car, refresh its " +
+                                    "status, or send a command. You can still tap Summarize anytime."
+                            } else {
+                                "Summaries only run when you tap Summarize on a car."
+                            },
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                      }
+                    }
+                }
+            }
+            }
+            if (advVisible[0]) item {
+
+            // Announcements -- currently sourced from the one real signal this
+            // app has for it (an available build, same state.updateAvailable
+            // the Updates card above renders) rather than a synthetic feed.
+            // AnnouncementHistory's LazyColumn needs an explicit height cap:
+            // it's placed inside this screen's own LazyVerticalStaggeredGrid
+            // item{}, an unbounded-height vertical container, and a nested
+            // LazyColumn with no height constraint crashes there (same class
+            // of bug the Logs card's heightIn(max = 300.dp) above guards
+            // against, just via Modifier.verticalScroll there instead of a
+            // second lazy layout).
+            AnimatedVisibility(visibleState = rememberAppearedState(), enter = collapseEnter(), exit = collapseExit()) {
+            SettingsCard("Announcements", Icons.Filled.Campaign, vm) {
+                val update = state.updateAvailable
+                val announcements = remember(update) {
+                    if (update == null) {
+                        emptyList()
+                    } else {
+                        listOf(
+                            Announcement(
+                                id = "update-${update.run.runNumber}",
+                                title = "Build #${update.run.runNumber} available",
+                                message = update.run.releaseNotes?.trim().takeUnless { it.isNullOrBlank() }
+                                    ?: "A new build is ready to view.",
+                                severity = if (state.updateApkReady) AnnouncementSeverity.WARNING else AnnouncementSeverity.INFO,
+                                timestamp = java.time.Instant.now().toString(),
+                                actionLabel = "View",
+                                onAction = {
+                                    runCatching {
+                                        context.startActivity(
+                                            Intent(Intent.ACTION_VIEW, Uri.parse(update.run.htmlUrl))
+                                                .apply { addFlags(Intent.FLAG_ACTIVITY_NEW_TASK) },
+                                        )
+                                    }
+                                },
+                            ),
+                        )
+                    }
+                }
+                AnnouncementHistory(
+                    announcements = announcements,
+                    modifier = Modifier.heightIn(max = 300.dp),
+                )
+            }
+            }
+            }
+            if (advVisible[1]) item {
+
+            // (The "Updates" card now lives after Notifications — its natural home —
+            // ungated so its controls show with or without Shizuku. See below.)
+
+            // App-icon shortcuts (long-press the launcher icon)
+            AnimatedVisibility(visibleState = rememberAppearedState(), enter = collapseEnter(), exit = collapseExit()) {
+                SettingsCard("App shortcuts", Icons.Filled.Bolt, vm) {
+                    // No inner MorphExpandButton any more -- this used to have its
+                    // own second chevron gating the per-vehicle toggles below,
+                    // stacked directly under the card's own PebbleShell chevron
+                    // (which didn't exist yet when this was written; SettingsCard
+                    // was a static, always-open Card back then, and the inner
+                    // toggle was the ONLY way to fold this away). Now that the
+                    // card itself opens and closes, a second tap just to see the
+                    // toggles it opened FOR was two controls doing one job.
+                    Text(
+                        "Quick-access shortcuts from the launcher icon",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    state.vehicles.forEach { v ->
+                        Spacer(Modifier.height(4.dp))
+                        Text(v.name, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                        com.bloo.bluelink.Shortcuts.ACTIONS.forEach { cmd ->
+                            ToggleRow(
+                                com.bloo.bluelink.Shortcuts.actionLabel(cmd),
+                                state.isShortcutEnabled(v.vin, cmd),
+                            ) { vm.setShortcutEnabled(v.vin, cmd, it) }
                         }
                     }
                 }
@@ -981,6 +1028,21 @@ internal fun SettingsScreen(
                 }
             }
             }
+            if (advVisible[2]) item {
+
+            // Debug -- app/device diagnostics for support troubleshooting.
+            // Placed right after Logs, both power-user diagnostic cards --
+            // shares this screen's stagger sequence (index 7, the next
+            // unused slot) rather than reusing Logs' index 3, since the two
+            // cards animate independently.
+            AnimatedVisibility(visibleState = rememberAppearedState(), enter = collapseEnter(), exit = collapseExit()) {
+            SettingsCard("Debug", Icons.Filled.BugReport, vm) {
+                DebugSettingsPanel(
+                    onCopyToClipboard = { text -> clipboard.setText(AnnotatedString(text)) },
+                )
+            }
+            }
+            }
             item {
 
             // Display scale
@@ -1081,7 +1143,7 @@ internal fun SettingsScreen(
                 }
             }
             }
-            if (advVisible[2]) item {
+            if (advVisible[3]) item {
 
             // Links
             AnimatedVisibility(visibleState = rememberAppearedState(), enter = collapseEnter(), exit = collapseExit()) {
@@ -1098,7 +1160,7 @@ internal fun SettingsScreen(
             }
             }
             }
-            if (advVisible[3]) item {
+            if (advVisible[4]) item {
 
             // Logs
             AnimatedVisibility(visibleState = rememberAppearedState(), enter = collapseEnter(), exit = collapseExit()) {
@@ -1176,68 +1238,6 @@ internal fun SettingsScreen(
                         }
                     }
                 }
-            }
-            }
-            if (advVisible[7]) item {
-
-            // Debug -- app/device diagnostics for support troubleshooting.
-            // Placed right after Logs, both power-user diagnostic cards --
-            // shares this screen's stagger sequence (index 7, the next
-            // unused slot) rather than reusing Logs' index 3, since the two
-            // cards animate independently.
-            AnimatedVisibility(visibleState = rememberAppearedState(), enter = collapseEnter(), exit = collapseExit()) {
-            SettingsCard("Debug", Icons.Filled.BugReport, vm) {
-                DebugSettingsPanel(
-                    onCopyToClipboard = { text -> clipboard.setText(AnnotatedString(text)) },
-                )
-            }
-            }
-            }
-            if (advVisible[8]) item {
-
-            // Announcements -- currently sourced from the one real signal this
-            // app has for it (an available build, same state.updateAvailable
-            // the Updates card above renders) rather than a synthetic feed.
-            // AnnouncementHistory's LazyColumn needs an explicit height cap:
-            // it's placed inside this screen's own LazyVerticalStaggeredGrid
-            // item{}, an unbounded-height vertical container, and a nested
-            // LazyColumn with no height constraint crashes there (same class
-            // of bug the Logs card's heightIn(max = 300.dp) above guards
-            // against, just via Modifier.verticalScroll there instead of a
-            // second lazy layout).
-            AnimatedVisibility(visibleState = rememberAppearedState(), enter = collapseEnter(), exit = collapseExit()) {
-            SettingsCard("Announcements", Icons.Filled.Campaign, vm) {
-                val update = state.updateAvailable
-                val announcements = remember(update) {
-                    if (update == null) {
-                        emptyList()
-                    } else {
-                        listOf(
-                            Announcement(
-                                id = "update-${update.run.runNumber}",
-                                title = "Build #${update.run.runNumber} available",
-                                message = update.run.releaseNotes?.trim().takeUnless { it.isNullOrBlank() }
-                                    ?: "A new build is ready to view.",
-                                severity = if (state.updateApkReady) AnnouncementSeverity.WARNING else AnnouncementSeverity.INFO,
-                                timestamp = java.time.Instant.now().toString(),
-                                actionLabel = "View",
-                                onAction = {
-                                    runCatching {
-                                        context.startActivity(
-                                            Intent(Intent.ACTION_VIEW, Uri.parse(update.run.htmlUrl))
-                                                .apply { addFlags(Intent.FLAG_ACTIVITY_NEW_TASK) },
-                                        )
-                                    }
-                                },
-                            ),
-                        )
-                    }
-                }
-                AnnouncementHistory(
-                    announcements = announcements,
-                    modifier = Modifier.heightIn(max = 300.dp),
-                )
-            }
             }
             }
             item {
@@ -1365,7 +1365,7 @@ internal fun SettingsScreen(
                 )
             }
             }
-            if (advVisible[4]) item {
+            if (advVisible[5]) item {
 
             // Quick Settings tiles -- per-tile config is power-user territory,
             // same tier as App shortcuts/Cars above.

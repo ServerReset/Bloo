@@ -94,9 +94,13 @@ import kotlinx.coroutines.delay
  */
 internal const val STAGGER_STEP_MS = 45L
 
-/** How many advanced-only cards Settings staggers in. Kept beside the stagger itself so the
- *  count and the sequence cannot drift apart when a card is added. */
-internal const val ADVANCED_CARD_COUNT = 9
+/** How many advanced-only cards Settings staggers in as whole grid items. Kept beside the
+ *  stagger itself so the count and the sequence cannot drift apart when a card is added.
+ *
+ *  Six, not nine: three further advanced blocks are nested INSIDE other cards and drive
+ *  themselves through [staggeredAdvancedVisible], which takes its own index and never touches
+ *  this list. The count only ever covers the cards this screen gates as items. */
+internal const val ADVANCED_CARD_COUNT = 6
 
 /**
  * The same staggered reveal as [staggeredAdvancedVisible], but for ALL advanced cards at once,
