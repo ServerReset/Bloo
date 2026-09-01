@@ -271,6 +271,16 @@ internal fun SettingsCard(
      * so a chevron there is never right.
      */
     inlineSetting: (@Composable () -> Unit)? = null,
+    /**
+     * A short piece of state for the title row -- "2 accounts", "On · auto", "Atkinson".
+     *
+     * This is the pebble treatment brought across: a car pebble tells you what it knows while
+     * collapsed, and a Settings card had no way to, so the only method of finding out what a
+     * setting was currently set to was to open the card and read the control. Ignored when the
+     * card has an [inlineSetting], because then the control itself is already on that row and
+     * says it better than a word could.
+     */
+    status: String? = null,
     content: @Composable () -> Unit,
 ) {
     // Open/closed now lives where a car pebble's does -- the same collapse set, persisted to the
@@ -323,7 +333,17 @@ internal fun SettingsCard(
             title = title,
             vm = vm,
             canToggle = !inline,
-            titleTrailing = inlineSetting,
+            titleTrailing = inlineSetting ?: status?.takeIf { it.isNotBlank() }?.let {
+                {
+                    Text(
+                        it,
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+            },
             // Hard right, like every other settings control -- see titleTrailingAtEnd. Without
             // it the switch sat flush against the end of the label text, mid-row, which is what
             // made the single-setting cards read as broken rather than compact.

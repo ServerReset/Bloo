@@ -1045,7 +1045,12 @@ internal fun SettingsScreen(
             item {
 
             // Display scale
-            SettingsCard("Display", Icons.Filled.Straighten, vm) {
+            SettingsCard(
+                "Display",
+                Icons.Filled.Straighten,
+                vm,
+                status = if (appearance.unitSystem == "metric") "Metric" else "Imperial",
+            ) {
                 // Advanced-only: a power-user knob, unlike the Units picker
                 // below it which every user needs regardless of mode. PopVisible,
                 // not a bare `if` -- was snapping in/out with the mode switch.
@@ -1129,7 +1134,19 @@ internal fun SettingsScreen(
             // accessibility choice behind a mode called "advanced" is a
             // choice the people who need it are least likely to find. The
             // rest of the card costs nothing to show alongside it.
-            SettingsCard("Font", Icons.Filled.TextFields, vm) {
+            SettingsCard(
+                "Font",
+                Icons.Filled.TextFields,
+                vm,
+                // Only cards WITHOUT a StatusHeaderRow of their own get a title-row status --
+                // on the ones that have one it would be the same fact twice, ten dp apart,
+                // which is exactly the duplication the cover tiles were just cured of.
+                status = when (appearance.fontChoice) {
+                    FontChoice.ATKINSON -> "Atkinson"
+                    FontChoice.GOOGLE_SANS -> "Google Sans"
+                    else -> "System"
+                },
+            ) {
                 val labels = mapOf(
                     FontChoice.SYSTEM to "System default",
                     FontChoice.ATKINSON to "Atkinson Hyperlegible",
