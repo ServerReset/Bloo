@@ -9,6 +9,9 @@ import androidx.datastore.preferences.preferencesDataStore
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.Dispatchers
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 
@@ -246,11 +249,23 @@ class SnapshotStore(private val context: Context) {
     val payload: Flow<SnapshotData> = context.snapshotDataStore.data.map { prefs ->
         decode(prefs[Keys.PAYLOAD])
     }
+        // decode() is a full Json parse of every vehicle, and DataStore only guarantees the FILE
+        // read is off the main thread -- a map{} transform runs in the collector's context.
+        // The widget collects this, and Glance's provideGlance is suspend but NOT guaranteed an
+        // IO dispatcher (Google's own guidance, and the reason WidgetPhoto/WidgetMap already
+        // wrap their loads). So this parsed the whole blob on the main thread on every widget
+        // repaint -- and a command tap deliberately emits twice, optimistic then settled.
+        .flowOn(Dispatchers.IO)
 
     /** One-shot read of the current snapshot data (first() takes just the
      *  latest emission and then stops collecting), for callers that don't
      *  need to keep observing. */
-    suspend fun current(): SnapshotData = decode(context.snapshotDataStore.data.first()[Keys.PAYLOAD])
+    suspend fun current(): SnapshotData = withContext(Dispatchers.IO) {
+        // withContext for the same reason as `payload` above: .first() resumes on the CALLER's
+        // dispatcher, and the widget's caller is the main thread. StatusCache.load already does
+        // exactly this; this store -- the one every module reads -- had been missed.
+        decode(context.snapshotDataStore.data.first()[Keys.PAYLOAD])
+    }
 
     /**
      * Replace the vehicle LIST while keeping each surviving car's last-known status.

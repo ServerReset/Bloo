@@ -66,12 +66,21 @@ object WidgetPhoto {
         val file = java.io.File(path)
         val key = "blur:$path:${file.lastModified()}"
         cache.get(key)?.let { return@withContext it }
-        runCatching {
+        // Only a SUCCESSFUL blur is cached. runCatching catches Throwable, so an
+        // OutOfMemoryError from source.copy on a large photo in the widget process used to put
+        // the UNBLURRED bitmap into the cache under the blur key -- and every later render hit
+        // that cache and returned the sharp image, leaving white text over a bright photo until
+        // the user re-picked it or the process died. A transient failure latched into a
+        // permanent wrong state. On failure it now returns the source uncached, so the next
+        // render tries again.
+        val blurred = runCatching {
             val mutable = source.copy(Bitmap.Config.ARGB_8888, true)
             val radius = (maxOf(mutable.width, mutable.height) / 70).coerceIn(2, 6)
             repeat(2) { boxBlurInPlace(mutable, radius) }
             mutable
-        }.getOrDefault(source).also { cache.put(key, it) }
+        }.getOrNull()
+        if (blurred != null) cache.put(key, blurred)
+        blurred ?: source
     }
 
     /** One box-blur pass (horizontal then vertical, each an O(w*h) sliding

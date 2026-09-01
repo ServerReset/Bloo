@@ -2,6 +2,8 @@ package com.bloo.bluelink.work
 
 import android.content.Context
 import androidx.work.CoroutineWorker
+import androidx.work.Constraints
+import androidx.work.NetworkType
 import androidx.work.ExistingWorkPolicy
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkerParameters
@@ -31,11 +33,19 @@ class UpdateReminderWorker(context: Context, params: WorkerParameters) : Corouti
 
     override suspend fun doWork(): Result {
         val ctx = applicationContext
-        // Clear the snooze first so the check below (and every later check) can
-        // surface the tile again — this is the "bring the update thing back" half.
+        // Clear the snooze first so the check below (and every later check) can surface the
+        // tile again -- this is the "bring the update thing back" half, and an active snooze
+        // short-circuits checkPhone even when forced, so clearing it is also what lets this
+        // check reach the network at all.
         UpdateStore(ctx).setSnoozeUntil(0L)
-        // Force past the 1-minute debounce; snooze is already cleared above.
+        // Force past the 1-minute debounce.
         val result = UpdateChecker.checkPhone(ctx, force = true)
+        if (result is UpdateCheckResult.Failed) {
+            // Retry rather than report success. This is a ONE-SHOT request, so succeeding here
+            // consumed the user's "Remind me" and nothing re-armed it -- a phone in airplane
+            // mode or behind a captive portal at the 24h mark simply never got reminded again.
+            return if (runAttemptCount < MAX_ATTEMPTS) Result.retry() else Result.success()
+        }
         if (result is UpdateCheckResult.Available) {
             val run = result.info.run
             Notifications.post(
@@ -57,9 +67,18 @@ class UpdateReminderWorker(context: Context, params: WorkerParameters) : Corouti
 
         /** Schedule the 1-day "Remind me" follow-up. REPLACE so re-tapping resets
          *  the timer rather than queuing a second reminder. */
+        /** Bounded retries, so a persistently offline phone stops rather than retrying forever. */
+        private const val MAX_ATTEMPTS = 5
+
         fun schedule(context: Context) {
             val request = OneTimeWorkRequestBuilder<UpdateReminderWorker>()
                 .setInitialDelay(1, TimeUnit.DAYS)
+                // The only network worker in this package that lacked the constraint every
+                // other one carries -- so it was the only one that could fire with no
+                // connection, fail, and burn a one-shot reminder doing it.
+                .setConstraints(
+                    Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build(),
+                )
                 .build()
             WorkManagerInit.of(context).enqueueUniqueWork(
                 NAME,
