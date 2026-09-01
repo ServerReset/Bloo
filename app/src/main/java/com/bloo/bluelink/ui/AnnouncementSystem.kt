@@ -8,7 +8,6 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -16,6 +15,7 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -26,7 +26,6 @@ import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -158,9 +157,12 @@ fun AnnouncementToast(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(16.dp)
+                // PebbleCornerExpanded, not a one-off 8dp: this banner floats over the same
+                // screens as the pebbles and was the only surface in the app still drawing a
+                // near-square corner.
                 .background(
                     color = backgroundColor(announcement.severity),
-                    shape = RoundedCornerShape(8.dp)
+                    shape = RoundedCornerShape(PebbleCornerExpanded),
                 )
                 .padding(12.dp)
         ) {
@@ -189,27 +191,28 @@ fun AnnouncementToast(
                         color = foregroundColor(announcement.severity),
                         modifier = Modifier.padding(top = 4.dp),
                     )
+                    // A real button, not a clickable Text. This was a bare label with no
+                    // container, no press feedback and a ~16dp tall touch target, sitting on
+                    // the one surface most likely to be tapped in a hurry.
                     if (announcement.actionLabel != null) {
-                        Text(
+                        MorphTextButton(
                             text = announcement.actionLabel,
-                            style = MaterialTheme.typography.labelSmall,
-                            fontWeight = FontWeight.SemiBold,
-                            color = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier
-                                .padding(top = 8.dp)
-                                .clickable { announcement.onAction?.invoke() },
+                            onClick = { announcement.onAction?.invoke() },
+                            modifier = Modifier.padding(top = 8.dp),
+                            contentColor = MaterialTheme.colorScheme.primary,
                         )
                     }
                 }
 
                 if (announcement.dismissible) {
-                    IconButton(
-                        onClick = onDismiss,
-                        modifier = Modifier.padding(0.dp)
-                    ) {
+                    // MorphIconButton: the app's standard icon target (press spring, haptic,
+                    // 48dp frame) rather than a stock IconButton, and the glyph sized from the
+                    // shared token instead of Material's own default.
+                    MorphIconButton(onClick = onDismiss) {
                         Icon(
                             imageVector = Icons.Filled.Close,
                             contentDescription = "Dismiss",
+                            modifier = Modifier.size(ButtonIconOnlySize),
                             tint = foregroundColor(announcement.severity),
                         )
                     }
@@ -230,7 +233,7 @@ private fun AnnouncementHistoryItem(announcement: Announcement) {
             .fillMaxWidth()
             .background(
                 color = backgroundColor(announcement.severity).copy(alpha = 0.5f),
-                shape = RoundedCornerShape(8.dp)
+                shape = RoundedCornerShape(PebbleCornerExpanded),
             )
             .padding(12.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp)
@@ -275,13 +278,13 @@ private fun AnnouncementHistoryItem(announcement: Announcement) {
             )
         }
 
+        // The history list's copy of the same action -- a real button here too, for the same
+        // reason as the banner's above.
         if (announcement.actionLabel != null) {
-            Text(
+            MorphTextButton(
                 text = announcement.actionLabel,
-                style = MaterialTheme.typography.labelSmall,
-                fontWeight = FontWeight.SemiBold,
-                color = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.clickable { announcement.onAction?.invoke() },
+                onClick = { announcement.onAction?.invoke() },
+                contentColor = MaterialTheme.colorScheme.primary,
             )
         }
     }
