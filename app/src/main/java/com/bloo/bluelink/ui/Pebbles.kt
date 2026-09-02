@@ -724,7 +724,30 @@ internal fun AiPebble(v: Vehicle, state: UiState, vm: AppViewModel, dragHandle: 
             // covers it; what follows is the summary itself, which is the point of the tile.
         }
         if (summary != null) {
-            Text(summary, style = MaterialTheme.typography.bodyMedium)
+            // Bulleted, not one raw string: the model's own prompt asks for a "* " bullet per
+            // fact, and drawing that straight through showed the literal asterisk as text --
+            // "* Daisy (2025) is charging..." -- confirmed from a real screenshot. Any line
+            // that IS a bullet gets a real one; anything else (a stray lead-in sentence, if
+            // the model ever writes one) prints as plain text, so this degrades safely rather
+            // than assuming every summary is bulleted.
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                summary.lineSequence().map { it.trim() }.filter { it.isNotEmpty() }.forEach { line ->
+                    val bulleted = line.startsWith("* ") || line.startsWith("- ")
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        if (bulleted) {
+                            Text(
+                                "•",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = LocalContentColor.current.copy(alpha = MutedContentAlpha),
+                            )
+                        }
+                        Text(
+                            if (bulleted) line.substring(2) else line,
+                            style = MaterialTheme.typography.bodyMedium,
+                        )
+                    }
+                }
+            }
         } else {
             Text(
                 "Summarize this car's last-refreshed status, generated privately on your device.",
