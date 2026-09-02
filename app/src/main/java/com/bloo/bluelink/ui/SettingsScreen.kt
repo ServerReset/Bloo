@@ -826,6 +826,12 @@ internal fun SettingsScreen(
                     // Not configured: one unmissable primary CTA, nothing else to
                     // read past. The old layout led with a paragraph explaining
                     // Drive sync and put setup in a quiet text button beside it.
+                    //
+                    // Sized like every other button in the app -- content width, standard
+                    // padding -- not stretched to the card's own width. `active` still marks
+                    // it as the primary action (same colour language "Stop" and "Install"
+                    // use); fillMaxWidth on TOP of that was the oversized, one-off treatment
+                    // reported from a real screenshot, not a second thing this control needs.
                     val setupSource = remember { MutableInteractionSource() }
                     SafeExpansiveButton(
                         interactionSource = setupSource,
@@ -834,7 +840,6 @@ internal fun SettingsScreen(
                         MorphButton(
                             onClick = { showDriveDialog = true },
                             interactionSource = setupSource,
-                            modifier = Modifier.fillMaxWidth(),
                             active = true,
                         ) { MorphButtonLabel(icon = Icons.Filled.CloudSync, label = "Set up auto-sync", pending = false) }
                     }
@@ -847,10 +852,11 @@ internal fun SettingsScreen(
                         interactionSource = syncSource,
                         enabled = true,
                     ) {
+                        // Same fix as "Set up auto-sync" a few lines up: content width, not
+                        // stretched to the card.
                         MorphButton(
                             onClick = { vm.syncNow() },
                             interactionSource = syncSource,
-                            modifier = Modifier.fillMaxWidth(),
                             active = true,
                         ) { MorphButtonLabel(icon = Icons.Filled.CloudSync, label = "Sync now", pending = false) }
                     }
@@ -1961,6 +1967,9 @@ internal fun SettingsScreen(
                         interactionSource = updateSource,
                         enabled = !state.updateInstalling && !state.updateDownloading,
                     ) {
+                        // Content width, standard padding -- same fix as Backup & sync's own
+                        // setup button just above. `active` still marks it as the ready-to-go
+                        // state; fillMaxWidth was the oversized, one-off treatment.
                         MorphButton(
                             onClick = { runUpdateAction(state, vm, updateInfo, context) },
                             active = act.ready,
@@ -1968,7 +1977,6 @@ internal fun SettingsScreen(
                             activeContentColor = Color.White,
                             enabled = !state.updateInstalling && !state.updateDownloading,
                             interactionSource = updateSource,
-                            modifier = Modifier.fillMaxWidth(),
                         ) {
                             MorphButtonLabel(act.icon, act.label, pending = false)
                         }

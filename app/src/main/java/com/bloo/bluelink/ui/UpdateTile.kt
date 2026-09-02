@@ -249,67 +249,28 @@ internal fun UpdateAvailableTile(state: UiState, vm: AppViewModel, dragHandle: M
                     }
                 }
             }
-            // A body-level action for the two moments the header button alone can
-            // be missed -- the idle "Download" state (the header just says
-            // "Update") and the ready "Install" state. Same state logic as the
-            // header action, spelled out here so the body reads as one complete
-            // flow whether or not the pill is spotted.
-            if (!state.updateDownloading && !state.updateInstalling) {
-                // A group: these two share one space, so pressing one takes width from the
-                // other instead of shoving it.
-                ExpressiveButtonRow(modifier = Modifier.fillMaxWidth(), spacing = 8.dp) {
-                    val tileUpdateSource = remember { MutableInteractionSource() }
-                    SafeExpansiveButton(
-                        interactionSource = tileUpdateSource,
-                        enabled = true,
-                    ) {
-                        MorphButton(
-                            onClick = {
-                                when {
-                                    state.updateApkReady -> vm.installDownloadedUpdate()
-                                    hasDirectDownload -> vm.downloadUpdateInBackground()
-                                    else -> {
-                                        val opened = runCatching {
-                                            context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(info.run.htmlUrl)))
-                                        }.isSuccess
-                                        if (opened) vm.dismissUpdate() else vm.reportError("Couldn't open the release page.")
-                                    }
-                                }
-                            },
-                            active = state.updateApkReady,
-                            activeContainerColor = ChargeGreen,
-                            activeContentColor = Color.White,
-                            interactionSource = tileUpdateSource,
-                            // No weight(1f): its parent is SafeExpansiveButton's own layout, not
-                            // the row, so it never did anything -- and now that the row is a
-                            // group it would not compile either. The group hands out the width.
-                        ) {
-                            // Hand-assembled Icon + Spacer + Text before, which is how this
-                            // button ended up a size off from its neighbours.
-                            MorphButtonLabel(
-                                if (state.updateApkReady) Icons.Filled.CheckCircle else Icons.Filled.Download,
-                                when {
-                                    state.updateApkReady -> if (seamless) "Install now" else "Install"
-                                    hasDirectDownload -> "Download now"
-                                    else -> "Open release page"
-                                },
-                                pending = false,
-                            )
-                        }
-                    }
-                    if (state.updatePendingDismiss) {
-                        val keepSource = remember { MutableInteractionSource() }
-                        SafeExpansiveButton(
-                            interactionSource = keepSource,
-                            enabled = true,
-                        ) {
-                            MorphTextButton(
-                                "Keep it",
-                                onClick = vm::undoDismissUpdate,
-                                interactionSource = keepSource,
-                            )
-                        }
-                    }
+            // The header pill is this exact control -- same onClick, same
+            // download/install/open branch -- and it is visible whether the card is
+            // collapsed or open, which a body-level copy underneath an already-open
+            // card can never be more discoverable than. Repeating it down here used
+            // to be the "two moments the header button can be missed" argument, but
+            // once the card is open there is no such moment: the header is right
+            // there. That duplicate control -- plus everything already stacked below
+            // it (status line, release notes, install-help) -- was the reported
+            // "too much content/too busy". Only "Keep it" has no other home: it
+            // exists purely for the pending-dismiss undo window, so it is the one
+            // piece that stays.
+            if (state.updatePendingDismiss) {
+                val keepSource = remember { MutableInteractionSource() }
+                SafeExpansiveButton(
+                    interactionSource = keepSource,
+                    enabled = true,
+                ) {
+                    MorphTextButton(
+                        "Keep it",
+                        onClick = vm::undoDismissUpdate,
+                        interactionSource = keepSource,
+                    )
                 }
                 Spacer(Modifier.height(4.dp))
             }
