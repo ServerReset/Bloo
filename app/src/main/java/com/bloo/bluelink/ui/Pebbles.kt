@@ -946,7 +946,14 @@ internal fun StateControl(
         //
         // Modifier.size on a segment is not in the way: fixed-size constraints are still
         // coerced into the ones the parent hands down, so the width the group assigns wins.
-        ExpressiveButtonRow(spacing = 3.dp, verticalAlignment = Alignment.CenterVertically) {
+        // wrap = false: this is a CONNECTED group -- one silhouette with seams in it -- so a
+        // seam appearing on the next line down would not be a control at all. Too narrow, and
+        // the segments compact instead.
+        ExpressiveButtonRow(
+            spacing = 3.dp,
+            verticalAlignment = Alignment.CenterVertically,
+            wrap = false,
+        ) {
             groupActions.forEachIndexed { i, action ->
                 val actionSource = remember { MutableInteractionSource() }
                 SafeExpansiveButton(interactionSource = actionSource, enabled = action.enabled) {

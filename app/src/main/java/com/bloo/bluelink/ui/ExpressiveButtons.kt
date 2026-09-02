@@ -237,6 +237,8 @@ fun ExpressiveButtonRow(
     horizontalAlignment: Alignment.Horizontal = Alignment.Start,
     /** See [ExpressiveButtonGroup]'s own `lineSpacing` -- this wraps like a FlowRow. */
     lineSpacing: Dp = spacing,
+    /** See [ExpressiveButtonGroup]'s own `wrap`. */
+    wrap: Boolean = true,
     content: @Composable () -> Unit,
 ) {
     ExpressiveButtonGroup(
@@ -246,6 +248,7 @@ fun ExpressiveButtonRow(
         equalWidths = equalWidths,
         horizontalAlignment = horizontalAlignment,
         lineSpacing = lineSpacing,
+        wrap = wrap,
     ) {
         content()
     }
@@ -295,6 +298,16 @@ fun ExpressiveButtonGroup(
      * same path with a single line and behaves exactly as it did.
      */
     lineSpacing: Dp = spacing,
+    /**
+     * Whether this group may break onto more than one line.
+     *
+     * True suits a set of independent buttons: when they cannot all fit, wrapping is kinder
+     * than shrinking them. It is FALSE for anything that is visually one object -- a connected
+     * segment group, a split pill, an action-plus-chevron header. Those read as a single
+     * control with seams in it, and a seam that appears on the next line down is not a control
+     * at all. They compact to their glyphs instead, which is what the fit rule is for.
+     */
+    wrap: Boolean = true,
     content: @Composable ExpressiveButtonGroupScope.() -> Unit,
 ) {
     // Natural (unpressed) child widths, cached from the last resting measure pass. A plain
@@ -372,7 +385,9 @@ fun ExpressiveButtonGroup(
             // exactly as before.
             val maxW = if (constraints.hasBoundedWidth) constraints.maxWidth else Int.MAX_VALUE
             val lines = ArrayList<IntArray>()
-            run {
+            if (!wrap) {
+                lines.add(IntArray(n) { it })
+            } else {
                 var cur = ArrayList<Int>()
                 var used = 0
                 for (i in 0 until n) {

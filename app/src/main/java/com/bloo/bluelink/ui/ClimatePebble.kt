@@ -778,6 +778,8 @@ internal fun PresetPill(
         modifier = dragHandle.fillMaxWidth().height(IntrinsicSize.Min),
         spacing = 3.dp,
         verticalAlignment = Alignment.CenterVertically,
+        // One split pill, not two buttons that happen to be adjacent -- see `wrap`.
+        wrap = false,
     ) {
         // Apply half — snowflake icon plus the preset name. The shared
         // MorphButton: pill when idle, rounded rectangle + primary fill when
@@ -878,6 +880,7 @@ internal fun ChargeLimitPill(
         ExpressiveButtonRow(
             modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Min),
             spacing = 3.dp,
+            wrap = false,
         ) {
             // Left half — label. Tapping bumps the limit up by one step, wrapping
             // back to 50% after 100%, for quick keyboard-free adjustment. With expansion.

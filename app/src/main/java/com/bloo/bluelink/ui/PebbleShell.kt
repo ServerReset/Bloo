@@ -879,6 +879,10 @@ internal fun SplitExpandButton(
             .onSizeChanged { rowHeightDp = with(density) { it.height.toDp() } },
         spacing = 3.dp,
         verticalAlignment = Alignment.CenterVertically,
+        // An action half joined to a chevron half is one control with a seam, so it must not
+        // break onto two lines however narrow the header gets -- see `wrap`. It compacts to
+        // glyphs instead, which is exactly right for a header running out of room.
+        wrap = false,
     ) {
         // Left half — the action (label + icon) button with expansion animation.
         val actionSource = remember { MutableInteractionSource() }
