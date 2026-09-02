@@ -220,8 +220,25 @@ private fun BoxScope.MorphChrome(
     onLongClick: (() -> Unit)?,
     onClick: () -> Unit,
 ) {
+    // `active` drives the morph for a STANDALONE button (shapeForCorner == null) -- the
+    // lock/unlock body, the lone expand chevron -- where "pill calm, rounded-square
+    // highlighted" is the whole point (see StateControl's own doc). It must NOT also drive
+    // the morph for a connected pair (a split action+chevron, a segmented group): those
+    // halves each run their OWN independent morph, so the moment one half sits in a
+    // standing `active` state (Charge's "Stop" while charging, an expanded pebble's own
+    // chevron) while its neighbour does not, the two only ever agree by coincidence. Two
+    // symptoms, same cause, both reported from real screenshots: the active half's OUTER
+    // corner -- the free end that is supposed to stay a stable pill cap matching its
+    // neighbour's -- morphed toward the squarish shape instead, and the two halves' SEAM
+    // corners (10dp idle -> 16dp "morphed") drifted apart because only the active half's
+    // seam had opened, leaving a visible step where the pill was supposed to read as one
+    // connected piece. Gating on shapeForCorner == null keeps a connected half's shape
+    // reacting to a real PRESS (still tactile, still transient, still per-segment) while
+    // leaving its standing active/expanded state to do what it already does elsewhere --
+    // change the FILL colour -- without also warping the one corner that has to keep
+    // matching its neighbour's.
     val morph by animateFloatAsState(
-        targetValue = if (active || pressed) 1f else 0f,
+        targetValue = if ((active && shapeForCorner == null) || pressed) 1f else 0f,
         animationSpec = morphSpring,
         label = "morphProgress",
     )
