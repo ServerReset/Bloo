@@ -4,7 +4,7 @@ import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.interaction.InteractionSource
-import androidx.compose.foundation.interaction.PressInteraction
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Box
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -95,8 +95,9 @@ private const val PressDamping = 0.88f
  */
 @Composable
 private fun expressivePressFraction(interactionSource: InteractionSource, enabled: Boolean): State<Float> {
+    val pressed by interactionSource.collectIsPressedAsState()
     val anim = remember { Animatable(0f) }
-    LaunchedEffect(interactionSource, enabled) {
+    LaunchedEffect(pressed, enabled) {
         if (!enabled) {
             anim.snapTo(0f)
             return@LaunchedEffect
@@ -107,18 +108,18 @@ private fun expressivePressFraction(interactionSource: InteractionSource, enable
         // drags the neighbours back and forth with it, which reads as wobble rather than as
         // life. The push still springs; it just does not ring.
         val spec = spring<Float>(dampingRatio = PressDamping, stiffness = Spring.StiffnessMedium)
-        // A press can be released before its own Release event is even collected (that is the
-        // whole point above), so held-ness is tracked by identity rather than by a count that
-        // a cancelled gesture could leave unbalanced.
-        val held = mutableSetOf<PressInteraction.Press>()
-        interactionSource.interactions.collect { interaction ->
-            when (interaction) {
-                is PressInteraction.Press -> held.add(interaction)
-                is PressInteraction.Release -> held.remove(interaction.press)
-                is PressInteraction.Cancel -> held.remove(interaction.press)
-                else -> return@collect
+        if (pressed) {
+            anim.animateTo(1f, spec)
+        } else {
+            // Finish the push before returning. THIS is what makes a tap feel like a push: a
+            // press and its release can be milliseconds apart, and simply springing toward
+            // whatever the current state is would send the animation home before it had
+            // travelled anywhere -- press a button, watch nothing happen. Tap and hold now
+            // differ only in how long the button dwells at full push, like a physical one.
+            if (anim.value < 1f) {
+                anim.animateTo(1f, spring(dampingRatio = PressDamping, stiffness = Spring.StiffnessHigh))
             }
-            if (held.isNotEmpty()) anim.animateTo(1f, spec) else anim.animateTo(0f, spec)
+            anim.animateTo(0f, spec)
         }
     }
     return anim.asState()
