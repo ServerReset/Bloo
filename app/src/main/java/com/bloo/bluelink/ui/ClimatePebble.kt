@@ -384,12 +384,12 @@ internal fun ClimatePebble(
                             },
                             enabled = !pending && !climateOn,
                             interactionSource = smartSource,
-                            modifier = Modifier.fillMaxWidth(),
-                            contentPadding = PaddingValues(vertical = 12.dp),
+                            contentPadding = PaddingValues(horizontal = 18.dp, vertical = 12.dp),
                         ) {
-                            Icon(Icons.Filled.AcUnit, contentDescription = null, modifier = Modifier.size(18.dp))
-                            Spacer(Modifier.width(8.dp))
-                            Text(smartLabel, fontWeight = FontWeight.SemiBold)
+                            // MorphButtonLabel, not a hand-rolled Icon+Spacer+Text -- that Text had
+                            // no `style`, so it rendered at ambient size instead of ButtonLabelStyle.
+                            // Content-width, matching every other standalone CTA in the app.
+                            MorphButtonLabel(Icons.Filled.AcUnit, smartLabel, pending = false)
                         }
                     }
                     Text(
@@ -569,7 +569,12 @@ internal fun ClimatePebble(
                         interactionSource = saveSource,
                         enabled = presetName.isNotBlank(),
                     ) {
-                        MorphButton(
+                        // MorphTextButton, not a hand-rolled MorphButton{Text(...)} -- that Text
+                        // had no `style`, so it rendered at ambient size instead of
+                        // ButtonLabelStyle. Primary colours stand in for the old `active = true`,
+                        // which MorphTextButton has no direct param for.
+                        MorphTextButton(
+                            "Save",
                             onClick = {
                                 if (presetName.isNotBlank()) {
                                     vm.saveClimatePreset(v, presetName.trim(), currentReq)
@@ -577,10 +582,11 @@ internal fun ClimatePebble(
                                 }
                             },
                             enabled = presetName.isNotBlank(),
-                            active = true,
                             interactionSource = saveSource,
+                            containerColor = MaterialTheme.colorScheme.primary,
+                            contentColor = MaterialTheme.colorScheme.onPrimary,
                             modifier = Modifier.fillMaxWidth(),
-                        ) { Text("Save", fontWeight = FontWeight.SemiBold) }
+                        )
                     }
                     val cancelSource = remember { MutableInteractionSource() }
                     SafeExpansiveButton(
@@ -799,8 +805,8 @@ internal fun PresetPill(
             modifier = Modifier.fillMaxHeight(),
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(Icons.Filled.AcUnit, contentDescription = null, modifier = Modifier.size(18.dp))
-                Spacer(Modifier.width(10.dp))
+                Icon(Icons.Filled.AcUnit, contentDescription = null, modifier = Modifier.size(ButtonIconSize))
+                Spacer(Modifier.width(ButtonIconGap))
                 Column {
                     Text(
                         name,
@@ -910,8 +916,8 @@ internal fun ChargeLimitPill(
                     },
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(icon, contentDescription = null, modifier = Modifier.size(16.dp))
-                    Spacer(Modifier.width(8.dp))
+                    Icon(icon, contentDescription = null, modifier = Modifier.size(ButtonIconSize))
+                    Spacer(Modifier.width(ButtonIconGap))
                     Text(
                         label,
                         style = MaterialTheme.typography.labelLarge,

@@ -228,9 +228,10 @@ internal fun HotspotSlot(
                 activeContentColor = MaterialTheme.colorScheme.onPrimaryContainer,
                 contentPadding = PaddingValues(16.dp),
             ) {
-                Icon(Icons.Filled.PushPin, contentDescription = null, modifier = Modifier.size(18.dp))
-                Spacer(Modifier.width(10.dp))
-                Text(if (hovered) "Release to pin" else "Pin a pebble here", style = MaterialTheme.typography.bodyMedium)
+                // MorphButtonLabel, not a hand-rolled Icon+Spacer+Text -- that Text used
+                // bodyMedium, not ButtonLabelStyle, so this button read visibly smaller/lighter
+                // than every other MorphButton label in the app.
+                MorphButtonLabel(Icons.Filled.PushPin, if (hovered) "Release to pin" else "Pin a pebble here", pending = false)
             }
             DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
                 options.forEach { sec ->

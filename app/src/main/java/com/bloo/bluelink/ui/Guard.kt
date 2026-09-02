@@ -264,9 +264,10 @@ internal fun LockOverlay(vm: AppViewModel) {
                         contentColor = Color.Black,
                         contentPadding = PaddingValues(horizontal = 40.dp, vertical = 18.dp),
                     ) {
-                        Icon(Icons.Filled.Fingerprint, contentDescription = null, modifier = Modifier.size(24.dp))
-                        Spacer(Modifier.width(10.dp))
-                        Text("Unlock", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                        // MorphButtonLabel, not a hand-rolled Icon+Spacer+Text -- the icon stays
+                        // larger (24dp) than the standard 18dp, an intentional emphasis for the
+                        // screen's one primary CTA.
+                        MorphButtonLabel(Icons.Filled.Fingerprint, "Unlock", pending = false, iconSize = 24.dp)
                     }
                 }
                 if (appState.appPinSet) {
@@ -366,9 +367,7 @@ internal fun LockOverlay(vm: AppViewModel) {
                                 interactionSource = pinUnlockSource,
                                 enabled = !rejected && pin.length in PinCrypto.PIN_MIN_DIGITS..PinCrypto.PIN_MAX_DIGITS,
                             ) {
-                                Icon(Icons.Filled.LockOpen, contentDescription = null, modifier = Modifier.size(18.dp))
-                                Spacer(Modifier.width(8.dp))
-                                Text("Unlock", fontWeight = FontWeight.SemiBold)
+                                MorphButtonLabel(Icons.Filled.LockOpen, "Unlock", pending = false)
                             }
                         }
                         if (bioAvailable) {
@@ -558,9 +557,7 @@ internal fun EmptyScreen(vm: AppViewModel) {
                                 interactionSource = settingsSource,
                                 modifier = Modifier.fillMaxWidth()
                             ) {
-                                Icon(Icons.Filled.Settings, contentDescription = null, modifier = Modifier.size(18.dp))
-                                Spacer(Modifier.width(8.dp))
-                                Text("Open Settings", fontWeight = FontWeight.SemiBold)
+                                MorphButtonLabel(Icons.Filled.Settings, "Open Settings", pending = false)
                             }
                         }
                     } else {
@@ -574,9 +571,7 @@ internal fun EmptyScreen(vm: AppViewModel) {
                                 interactionSource = reloadSource,
                                 modifier = Modifier.fillMaxWidth()
                             ) {
-                                Icon(Icons.Filled.Refresh, contentDescription = null, modifier = Modifier.size(18.dp))
-                                Spacer(Modifier.width(8.dp))
-                                Text(if (loadFailed) "Try again" else "Reload", fontWeight = FontWeight.SemiBold)
+                                MorphButtonLabel(Icons.Filled.Refresh, if (loadFailed) "Try again" else "Reload", pending = false)
                             }
                         }
                     }

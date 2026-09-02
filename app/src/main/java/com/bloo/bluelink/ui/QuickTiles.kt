@@ -335,14 +335,13 @@ internal fun QuickTileCard(index: Int, vin: String, state: UiState, vm: AppViewM
         Spacer(Modifier.height(4.dp))
         MorphButton(
             onClick = { vm.setTileAssignment(index, null, null) },
-            modifier = Modifier.fillMaxWidth(),
             containerColor = MaterialTheme.colorScheme.errorContainer,
             contentColor = MaterialTheme.colorScheme.onErrorContainer,
             contentPadding = PaddingValues(horizontal = 18.dp, vertical = 10.dp),
         ) {
-            Icon(Icons.Filled.Close, contentDescription = null, modifier = Modifier.size(18.dp))
-            Spacer(Modifier.width(8.dp))
-            Text("Remove tile", fontWeight = FontWeight.SemiBold)
+            // MorphButtonLabel, not a hand-rolled Icon+Spacer+Text -- that Text had no `style`.
+            // Content-width, matching every other standalone CTA in the app.
+            MorphButtonLabel(Icons.Filled.Close, "Remove tile", pending = false)
         }
     }
 }
@@ -365,9 +364,8 @@ internal fun AddTilePill(label: String, onClick: () -> Unit) {
             border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
             contentPadding = PaddingValues(horizontal = 18.dp, vertical = 12.dp),
         ) {
-            Icon(Icons.Filled.Add, contentDescription = null, modifier = Modifier.size(18.dp))
-            Spacer(Modifier.width(8.dp))
-            Text(label, fontWeight = FontWeight.SemiBold)
+            // MorphButtonLabel, not a hand-rolled Icon+Spacer+Text -- that Text had no `style`.
+            MorphButtonLabel(Icons.Filled.Add, label, pending = false)
         }
     }
 }
