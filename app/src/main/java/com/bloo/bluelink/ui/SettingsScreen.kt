@@ -2069,13 +2069,17 @@ internal fun SettingsScreen(
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     val setPlaceSource = remember { MutableInteractionSource() }
+                    // weight on the WRAPPER: it is the FlowRow's child, and the button inside
+                    // it is not, so the weight there was read by nobody and these two never
+                    // split the line evenly the way the FlowRow note above assumes.
                     SafeExpansiveButton(
                         interactionSource = setPlaceSource,
                         enabled = weatherQuery.isNotBlank(),
+                        modifier = Modifier.weight(1f),
                     ) {
                         MorphTextButton(
                             "Set place",
-                            modifier = Modifier.weight(1f),
+                            modifier = Modifier.fillMaxWidth(),
                             interactionSource = setPlaceSource,
                             enabled = weatherQuery.isNotBlank(),
                             onClick = { vm.setWeatherPlace(weatherQuery); weatherQuery = "" },
@@ -2085,10 +2089,11 @@ internal fun SettingsScreen(
                     SafeExpansiveButton(
                         interactionSource = myLocationSource,
                         enabled = true,
+                        modifier = Modifier.weight(1f),
                     ) {
                         MorphButton(
                             onClick = { locationPermission.launch(android.Manifest.permission.ACCESS_COARSE_LOCATION) },
-                            modifier = Modifier.weight(1f),
+                            modifier = Modifier.fillMaxWidth(),
                             interactionSource = myLocationSource,
                             contentPadding = PaddingValues(horizontal = 14.dp, vertical = 10.dp),
                         ) {

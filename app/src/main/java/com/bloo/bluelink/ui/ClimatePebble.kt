@@ -37,6 +37,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -776,9 +777,15 @@ internal fun PresetPill(
         // MorphButton: pill when idle, rounded rectangle + primary fill when
         // this preset is the applied one. With expansion animation.
         val applySource = remember { MutableInteractionSource() }
+        // weight + fillMaxHeight on the WRAPPER, which is the Row's actual child. They were on
+        // the MorphButton inside, whose parent is the wrapper's own layout and never reads
+        // them -- so this split pill hugged its label and left the rest of the row empty
+        // instead of spanning it. Pressing the delete nub still compresses this half, because
+        // a Row measures its weighted children from whatever the fixed ones leave over.
         SafeExpansiveButton(
             interactionSource = applySource,
             enabled = true,
+            modifier = Modifier.weight(1f).fillMaxHeight(),
         ) {
             MorphButton(
                 onClick = { onStart() },
@@ -790,7 +797,7 @@ internal fun PresetPill(
                 pillCornerPercent = 50f,
                 morphedCornerPercent = morphedPct,
                 minHeight = 0.dp,
-                modifier = Modifier.weight(1f).fillMaxHeight(),
+                modifier = Modifier.fillMaxSize(),
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(Icons.Filled.AcUnit, contentDescription = null, modifier = Modifier.size(18.dp))
@@ -887,9 +894,11 @@ internal fun ChargeLimitPill(
             // Left half — label. Tapping bumps the limit up by one step, wrapping
             // back to 50% after 100%, for quick keyboard-free adjustment. With expansion.
             val incrementSource = remember { MutableInteractionSource() }
+            // Same wrapper/child weight fix as the preset row above.
             SafeExpansiveButton(
                 interactionSource = incrementSource,
                 enabled = enabled,
+                modifier = Modifier.weight(1f).fillMaxHeight(),
             ) {
                 MorphButton(
                     onClick = { onValueChange(if (limit >= 100) 50 else limit + 10) },
@@ -905,7 +914,7 @@ internal fun ChargeLimitPill(
                     // by 10%, wrapping at 100%) were purely visual -- TalkBack
                     // announced only the label text with no indication this half
                     // was itself a stepper, distinct from "Set" on the right.
-                    modifier = Modifier.weight(1f).fillMaxHeight()
+                    modifier = Modifier.fillMaxSize()
                         .semantics(mergeDescendants = true) {
                             contentDescription = "$label, $limit percent"
                             onClick(label = "Increase by 10 percent") {
