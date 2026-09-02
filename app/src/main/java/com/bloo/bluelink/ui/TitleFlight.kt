@@ -867,7 +867,13 @@ internal fun BoxScope.TitleFlightOverlay(
                 val flyH = flyingSize.height.toFloat()
                 val inlineYc = flight.inlineYOverride()?.let { it - flyH / 2f }
                     ?: (inline.y + (anchorH - flyH) / 2f)
-                val targetYc = target.y + (dockedSize.value?.height ?: 0) / 2f - flyH / 2f
+                // Same fallback the chrome Box's own graphicsLayer above uses (flyH, not a bare
+                // 0) for the window before dockedSize has reported -- a plain `?: 0` here meant
+                // the visible Text and the chrome it's supposed to sit inside disagreed on the
+                // target Y for that window, the text landing somewhere the pill wasn't yet, which
+                // is exactly the kind of one-frame divergence that reads as the name glitching or
+                // going missing right as it docks.
+                val targetYc = target.y + (dockedSize.value?.height ?: if (flyH > 0f) flyH.toInt() else 0) / 2f - flyH / 2f
                 IntOffset(
                     (inline.x + (target.x - inline.x) * p).roundToInt(),
                     (inlineYc + (targetYc - inlineYc) * p).roundToInt(),
