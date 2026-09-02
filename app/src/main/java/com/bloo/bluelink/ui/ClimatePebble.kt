@@ -72,11 +72,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
-import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.text.lerp
@@ -754,22 +752,23 @@ internal fun PresetPill(
     // "tap again to confirm" pattern (with the same 4s auto-reset) used for
     // Sign out and the watch's own preset-delete confirm.
     val confirm = rememberConfirmArm()
-    // Real measured row height, so the split-pill corners' "16dp"/"10dp" stay
-    // exact dp in the shared percent language (see splitPillShapes).
-    var rowHeightDp by remember { mutableStateOf(44.dp) }
-    val density = LocalDensity.current
-    val morphedPct = 100f * 16.dp.value / rowHeightDp.value
+    // No measured row height any more. These shapes used to be derived from one -- the row was
+    // measured with onSizeChanged, the height written to state, and the whole row recomposed to
+    // rebuild the shapes, a measure -> state -> recompose loop that ran whenever the height
+    // changed. All it was computing was "16dp, expressed as a percent of this row", which
+    // CornerSize(Dp) states directly. The morphed OUTER corner goes back to the app-wide
+    // MorphedCornerPercent every other button uses, which is one less thing these two pills do
+    // differently from everything around them.
     val leftShapeForCorner: (Float, Int) -> Shape = { morph, cp ->
-        splitPillShapes(morph, cp, rowHeightDp).first
+        splitPillShapes(morph, cp).first
     }
     val rightShapeForCorner: (Float, Int) -> Shape = { morph, cp ->
-        splitPillShapes(morph, cp, rowHeightDp).second
+        splitPillShapes(morph, cp).second
     }
 
     // The drag handle wraps the whole pill so long-press anywhere reorders.
     Row(
-        modifier = dragHandle.fillMaxWidth().height(IntrinsicSize.Min)
-            .onSizeChanged { rowHeightDp = with(density) { it.height.toDp() } },
+        modifier = dragHandle.fillMaxWidth().height(IntrinsicSize.Min),
         horizontalArrangement = Arrangement.spacedBy(3.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -795,7 +794,7 @@ internal fun PresetPill(
                 contentPadding = PaddingValues(horizontal = 16.dp, vertical = 11.dp),
                 shapeForCorner = leftShapeForCorner,
                 pillCornerPercent = 50f,
-                morphedCornerPercent = morphedPct,
+                morphedCornerPercent = MorphedCornerPercent,
                 minHeight = 0.dp,
                 modifier = Modifier.fillMaxSize(),
             ) {
@@ -840,7 +839,7 @@ internal fun PresetPill(
                 contentPadding = PaddingValues(horizontal = 14.dp),
                 shapeForCorner = rightShapeForCorner,
                 pillCornerPercent = 50f,
-                morphedCornerPercent = morphedPct,
+                morphedCornerPercent = MorphedCornerPercent,
                 minHeight = 0.dp,
                 modifier = Modifier.fillMaxHeight(),
             ) {
@@ -873,22 +872,18 @@ internal fun ChargeLimitPill(
     onApply: () -> Unit,
 ) {
     val haptics = LocalHaptics.current
-    // Real measured row height, so splitPillShapes' corners stay exact dp (the
-    // charge-limit pill is the same split-pill geometry as the preset pill).
-    var rowHeightDp by remember { mutableStateOf(44.dp) }
-    val density = LocalDensity.current
-    val morphedPct = 100f * 16.dp.value / rowHeightDp.value
+    // Same split-pill geometry as the preset pill above, and the same reason there is no
+    // measured row height here any more -- see that one's note.
     val leftShapeForCorner: (Float, Int) -> Shape = { morph, cp ->
-        splitPillShapes(morph, cp, rowHeightDp).first
+        splitPillShapes(morph, cp).first
     }
     val rightShapeForCorner: (Float, Int) -> Shape = { morph, cp ->
-        splitPillShapes(morph, cp, rowHeightDp).second
+        splitPillShapes(morph, cp).second
     }
 
     Column(Modifier.fillMaxWidth()) {
         Row(
-            modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Min)
-                .onSizeChanged { rowHeightDp = with(density) { it.height.toDp() } },
+            modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Min),
             horizontalArrangement = Arrangement.spacedBy(3.dp),
         ) {
             // Left half — label. Tapping bumps the limit up by one step, wrapping
@@ -908,7 +903,7 @@ internal fun ChargeLimitPill(
                     contentPadding = PaddingValues(horizontal = 16.dp, vertical = 11.dp),
                     shapeForCorner = leftShapeForCorner,
                     pillCornerPercent = 50f,
-                    morphedCornerPercent = morphedPct,
+                    morphedCornerPercent = MorphedCornerPercent,
                     minHeight = 0.dp,
                     // Both the current value and what tapping actually does (bump
                     // by 10%, wrapping at 100%) were purely visual -- TalkBack
@@ -957,7 +952,7 @@ internal fun ChargeLimitPill(
                     contentPadding = PaddingValues(horizontal = 18.dp),
                     shapeForCorner = rightShapeForCorner,
                     pillCornerPercent = 50f,
-                    morphedCornerPercent = morphedPct,
+                    morphedCornerPercent = MorphedCornerPercent,
                     minHeight = 0.dp,
                     // The pending spinner must not fade with the disabled content
                     // (Surface didn't dim it before), so pin the full tone.

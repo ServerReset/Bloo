@@ -5,7 +5,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import kotlin.math.roundToInt
 
 /**
  * The shared button-geometry helpers, pulled out of the app(s) so the pill
@@ -50,19 +49,22 @@ fun connectedGroupShape(index: Int, count: Int, cornerPercent: Int, smallCorner:
 fun splitPillShapes(
     morph: Float,
     cornerPercent: Int,
-    rowHeight: Dp,
+    innerIdle: Dp = 10.dp,
+    innerMorphed: Dp = 16.dp,
 ): Pair<Shape, Shape> {
-    val base = rowHeight.value.coerceAtLeast(1f)
-    // The 16dp morphed radius and 10dp idle seam nub, in the shared percent-
-    // of-short-side language.
-    val morphedPct = 100f * 16.dp.value / base
-    val innerIdlePct = 100f * 10.dp.value / base
-    val innerPct = innerIdlePct + (morphedPct - innerIdlePct) * morph
+    // The seam nub is stated in Dp and handed to CornerSize(Dp) directly, rather than converted
+    // into a percent-of-short-side. It used to take the row's measured height and divide, which
+    // is a roundabout way of writing an absolute radius -- and an expensive one: the caller had
+    // to measure the row with onSizeChanged, write that height to state, and recompose the whole
+    // row to rebuild these shapes, every time the height changed. Two absolute radii also
+    // interpolate cleanly, which a percent and a Dp cannot.
+    val inner = CornerSize(innerIdle + (innerMorphed - innerIdle) * morph)
+    val outer = CornerSize(percent = cornerPercent)
     fun corners(outerOnStart: Boolean) = RoundedCornerShape(
-        topStart = CornerSize(percent = if (outerOnStart) cornerPercent else innerPct.roundToInt()),
-        bottomStart = CornerSize(percent = if (outerOnStart) cornerPercent else innerPct.roundToInt()),
-        topEnd = CornerSize(percent = if (outerOnStart) innerPct.roundToInt() else cornerPercent),
-        bottomEnd = CornerSize(percent = if (outerOnStart) innerPct.roundToInt() else cornerPercent),
+        topStart = if (outerOnStart) outer else inner,
+        bottomStart = if (outerOnStart) outer else inner,
+        topEnd = if (outerOnStart) inner else outer,
+        bottomEnd = if (outerOnStart) inner else outer,
     )
     return corners(true) to corners(false)
 }
