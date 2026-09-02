@@ -625,7 +625,13 @@ internal fun PebbleShell(
                                         // with no separate positioning math duplicated at either
                                         // call site.
                                         val baseline = placeable[FirstBaseline]
-                                        val alignmentLines = if (baseline != AlignmentLine.Unspecified) {
+                                        // Explicitly typed as Map<AlignmentLine, Int>: Kotlin's Map
+                                        // is invariant in its key type, so the inferred
+                                        // Map<HorizontalAlignmentLine, Int> from a bare mapOf(...)
+                                        // does NOT satisfy layout()'s Map<AlignmentLine, Int>
+                                        // parameter even though HorizontalAlignmentLine IS-A
+                                        // AlignmentLine -- confirmed by CI, which rejected it.
+                                        val alignmentLines: Map<AlignmentLine, Int> = if (baseline != AlignmentLine.Unspecified) {
                                             val unscaledY = yOffset + baseline
                                             val pivot = h / 2f
                                             mapOf(FirstBaseline to (pivot + (unscaledY - pivot) * scale).roundToInt())
