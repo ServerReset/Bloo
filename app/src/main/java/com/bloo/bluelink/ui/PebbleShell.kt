@@ -563,7 +563,18 @@ internal fun PebbleShell(
                                     // 50/50 and capped the title at half the card -- which is why
                                     // "Sounds & vibration" ellipsized to "Sounds & ..." with the
                                     // switch adrift in the middle instead of sitting hard right.
-                                    .weight(1f, fill = titleTrailingAtEnd)
+                                    //
+                                    // AND titleTrailing != null: a single-setting card
+                                    // (SettingsCard with no `status` and no inline control --
+                                    // "Updates") sets titleTrailingAtEnd but has nothing to push
+                                    // to the end. Filling anyway forced this Text's minWidth up to
+                                    // the whole row -- and the `.layout{}` below measures against
+                                    // THAT forced width before scaling it down, so the reported box
+                                    // came out far wider than "Updates" itself, with the word
+                                    // adrift somewhere inside it instead of hugging the icon,
+                                    // confirmed from a real screenshot. Nothing to push means
+                                    // nothing to fill for.
+                                    .weight(1f, fill = titleTrailingAtEnd && titleTrailing != null)
                                     // Reports the DRAWN size. graphicsLayer scales the drawing and
                                     // leaves the measured size alone, so without this the title's
                                     // box stayed headline-TALL while its glyphs were title-sized --
