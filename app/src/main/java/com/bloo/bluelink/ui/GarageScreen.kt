@@ -625,6 +625,14 @@ internal fun GarageScreen(state: State<UiState>, vm: AppViewModel) {
                     )
                 }
                 SideEffect { hoistedFlight.flight.topInsetPx = hoistedTopInsetPx }
+                // Lets the page dots (and anything else that dodges the Title id) hide the
+                // instant a name is docked, without needing their bounds to actually overlap --
+                // see FloatingRegistry.nameDocked's own doc for why real overlap is the wrong
+                // test here. `hoistedFlight` is remember{}'d once for this whole screen's life
+                // (see its own doc just above), so this lambda's captured reference never goes
+                // stale; the SideEffect just needs to run once; re-running it every recomposition
+                // is a harmless identical assignment.
+                SideEffect { floatingRegistry.nameDocked = { hoistedFlight.flight.docked.value } }
                 // Per-page (keyed by pager page index, which every block --
                 // car or the embedded Settings slot -- has exactly one of)
                 // live "is THIS page's own title currently docked" flag,
