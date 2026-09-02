@@ -470,18 +470,23 @@ fun ExpressiveButtonGroup(
 
                 // Per-seam reserve for a given content basis (full or compact) -- see
                 // ExpressivePressGrowth's own doc for why this replaced a flat per-member
-                // allowance. One entry per INTERNAL boundary between two adjacent members;
-                // capacity is [ExpressivePressGrowth] of the larger side, so either side's own
-                // full press-growth can come entirely from that one seam. Used twice below: once
-                // (against `full`) to estimate an unbounded line's own room, and once (against
-                // whichever `basis` the fit rule below actually picks) for the real layout.
+                // allowance. Each member's OWN half of a seam is sized off ITS OWN content, not
+                // the bigger of the two sides -- a small icon-only chevron next to a wide labelled
+                // action was inheriting the action's own (much bigger) growth need as ITS OWN
+                // resting padding under a shared-max formula, which read as exactly the "too much
+                // padding" a small button has no business carrying just because a big neighbour
+                // sits beside it (confirmed from a real screenshot). One member's total reserve is
+                // the sum of its own halves across every seam it actually borders, so a member
+                // with two neighbours carries two (smaller) halves rather than one padded to match
+                // whichever neighbour happens to be bigger. Used twice below: once (against
+                // `full`) to estimate an unbounded line's own room, and once (against whichever
+                // `basis` the fit rule below actually picks) for the real layout.
                 fun seamReserve(basis: IntArray): IntArray {
                     val out = IntArray(n)
                     for (k in 0 until memberIdx.size - 1) {
                         val a = memberIdx[k]; val b = memberIdx[k + 1]
-                        val cap = (ExpressivePressGrowth * maxOf(basis[a], basis[b])) / 2f
-                        out[a] += cap.roundToInt()
-                        out[b] += cap.roundToInt()
+                        out[a] += ((ExpressivePressGrowth * basis[a]) / 2f).roundToInt()
+                        out[b] += ((ExpressivePressGrowth * basis[b]) / 2f).roundToInt()
                     }
                     return out
                 }
@@ -585,15 +590,16 @@ fun ExpressiveButtonGroup(
                 for (i in memberIdx) exact[i] = base[i]
                 for (k in 0 until memberIdx.size - 1) {
                     val a = memberIdx[k]; val b = memberIdx[k + 1]
-                    val cap = (ExpressivePressGrowth * maxOf(basis[a], basis[b])).toDouble()
-                    // 0.5 at rest (the seam's capacity split evenly, already folded into each
-                    // side's own reserve above) sliding toward 1.0 as `a` presses relative to
-                    // `b`, and symmetrically toward 0.0 the other way -- so a lone press on
-                    // either side draws the WHOLE seam its own way, and two simultaneous presses
-                    // (rare, but not impossible mid-release) partially cancel instead of both
-                    // claiming the full seam.
-                    val shareA = (0.5 + 0.5 * (press[a] - press[b])).toDouble().coerceIn(0.0, 1.0)
-                    val delta = cap * (shareA - 0.5)
+                    // Bilateral, not a shared pooled seam: each side can only ever GIVE what it
+                    // holds as its OWN half of this seam's reserve (see seamReserve's own doc for
+                    // why that half is sized off its own content, not its neighbour's). `a`
+                    // pressing draws on `b`'s own half, up to all of it at full press; `b`
+                    // pressing draws on `a`'s own half the other way. At rest (both 0) neither
+                    // side has taken anything from the other yet, so nothing here moves -- each
+                    // side is still just sitting on the half it already reserved for itself.
+                    val bHalf = (ExpressivePressGrowth * basis[b]) / 2.0
+                    val aHalf = (ExpressivePressGrowth * basis[a]) / 2.0
+                    val delta = press[a] * bHalf - press[b] * aHalf
                     exact[a] += delta
                     exact[b] -= delta
                 }
