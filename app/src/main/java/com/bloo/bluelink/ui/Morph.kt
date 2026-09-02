@@ -530,6 +530,15 @@ fun MorphButtonLabel(
      */
     iconTint: Color = Color.Unspecified,
 ) {
+    // Icon only, genuinely -- not icon-plus-an-empty-label. Skipping the whole Layout below
+    // when there is no label to place avoids reserving ButtonIconGap for a gap with nothing on
+    // the other side of it, which is a real, visible difference: an icon-only header action
+    // (DiagnosticsPebble's warning glyph, say) would otherwise sit a gap's width off-centre in
+    // its own button.
+    if (label.isEmpty()) {
+        MorphButtonGlyph(icon, pending, iconSize, spinning, iconTint)
+        return
+    }
     val gap = ButtonIconGap
     Layout(
         content = {

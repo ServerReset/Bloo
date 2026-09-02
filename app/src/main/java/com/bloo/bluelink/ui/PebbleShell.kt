@@ -30,9 +30,6 @@ import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.FastOutLinearInEasing
-import androidx.compose.animation.core.LinearOutSlowInEasing
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -81,7 +78,6 @@ import androidx.compose.material3.contentColorFor
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
-import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -118,6 +114,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.bloo.bluelink.data.Vehicle
 import com.bloo.uicommon.dropShadow
+import com.bloo.uicommon.seamCorner
 import com.bloo.bluelink.data.Weather
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
@@ -801,12 +798,16 @@ internal fun SplitExpandButton(
     var rowHeightDp by remember { mutableStateOf(52.dp) }
     val density = LocalDensity.current
     val morphedPercent = 100f * 10.dp.value / rowHeightDp.value
-    val inner = 6.dp
-    // Each half gets its own shape: the OUTER corner morphs (pill when idle,
-    // 10dp rounded square when that half's own state says morphed), the INNER
-    // corner stays a small fixed seam nub -- meant to seam against the chevron
-    // half immediately to its right. Both halves are the same MorphButton
-    // component; each one's active/pressed state drives only ITS morph.
+    // Each half gets its own shape: the OUTER corner morphs (pill when idle, rounded square
+    // when that half's own state says morphed), the INNER corner is the shared seamCorner() --
+    // the SAME idle/morphed nub the lock/horn/lights connected group and the split pills draw,
+    // rather than a bespoke static 6dp this header was still carrying on its own. That
+    // mismatch was real: every OTHER seamed pair in the app opens up as it presses (10dp ->
+    // 16dp), and this one -- used by literally every card's own header -- did not, which is
+    // what made a card's action+chevron read as a slightly different kind of control from the
+    // connected lock group right below it on the same screen. Both halves are the same
+    // MorphButton component; each one's own active/pressed state drives its OWN morph, forwarded
+    // here as `morph` and fed straight into the shared helper.
     //
     // That seam nub is wrong when canToggle is false: the chevron half is never
     // rendered then (see the `if (canToggle)` below), so the action button sits
@@ -815,16 +816,17 @@ internal fun SplitExpandButton(
     // real screenshot: the Summarize action, whose pebble is permanently
     // expanded in simple mode and so never shows a chevron). Full pill on both
     // sides in that case instead.
-    val leftShapeForCorner: (Float, Int) -> Shape = { _, cp ->
-        val end = if (canToggle) CornerSize(inner) else CornerSize(percent = cp)
+    val leftShapeForCorner: (Float, Int) -> Shape = { morph, cp ->
+        val end = if (canToggle) seamCorner(morph) else CornerSize(percent = cp)
         RoundedCornerShape(
             topStart = CornerSize(percent = cp), bottomStart = CornerSize(percent = cp),
             topEnd = end, bottomEnd = end,
         )
     }
-    val rightShapeForCorner: (Float, Int) -> Shape = { _, cp ->
+    val rightShapeForCorner: (Float, Int) -> Shape = { morph, cp ->
+        val start = seamCorner(morph)
         RoundedCornerShape(
-            topStart = CornerSize(inner), bottomStart = CornerSize(inner),
+            topStart = start, bottomStart = start,
             topEnd = CornerSize(percent = cp), bottomEnd = CornerSize(percent = cp),
         )
     }
@@ -842,26 +844,9 @@ internal fun SplitExpandButton(
     val bounceScope = rememberCoroutineScope()
     var bouncing by remember { mutableStateOf(false) }
 
-    // Spinning animation for the climate button's icon.
-    val spinAngle = remember { Animatable(0f) }
-    LaunchedEffect(action.spinning) {
-        if (action.spinning) {
-            spinAngle.animateTo(
-                targetValue = spinAngle.value + 360f,
-                animationSpec = tween(durationMillis = 850, easing = FastOutLinearInEasing),
-            )
-            while (true) {
-                spinAngle.animateTo(
-                    targetValue = spinAngle.value + 360f,
-                    animationSpec = tween(durationMillis = 600, easing = LinearEasing),
-                )
-            }
-        } else if (spinAngle.value != 0f) {
-            val target = kotlin.math.ceil(spinAngle.value / 360f) * 360f
-            spinAngle.animateTo(target, tween(durationMillis = 700, easing = LinearOutSlowInEasing))
-            spinAngle.snapTo(0f)
-        }
-    }
+    // The climate icon's own spin now comes from MorphButtonLabel's `spinning` param below --
+    // it already carries this exact ramp-up/hold/decelerate shape internally, so a second,
+    // external copy of the same animation had nothing left to drive.
 
     // ExpressiveButtonGroup, not a plain Row: these two halves are the app's clearest case of
     // buttons that should physically shove each other on press (they are a single connected
@@ -930,38 +915,29 @@ internal fun SplitExpandButton(
                     },
                 ),
             ) {
-                Row(
-                    modifier = Modifier.graphicsLayer { translationY = bounceY.value },
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                ) {
-                    if (action.pending && !bouncing) {
-                        LoadingIndicator(Modifier.size(16.dp))
-                    } else {
-                        Icon(
-                            action.icon,
-                            contentDescription = null,
-                            // graphicsLayer lambda, not rotate(): rotate() reads the
-                            // Animatable in composition, and the spin runs for as long
-                            // as climate is on - recomposing this button every frame
-                            // indefinitely. The lambda defers the read to the draw phase.
-                            modifier = Modifier.size(16.dp).graphicsLayer { rotationZ = spinAngle.value },
-                        )
-                    }
-                    if (action.label.isNotEmpty()) {
-                        Text(
-                            action.label,
-                            style = MaterialTheme.typography.labelLarge,
-                            fontWeight = FontWeight.SemiBold,
-                            maxLines = 1,
-                            // Cap the label width so a long action ("Summarize",
-                            // "Downloading…") at a large font size can't grow this button
-                            // unbounded and squeeze the pebble title into wrapping/overlap.
-                            // The label ellipsizes past the cap; the icon still identifies it.
-                            overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier.widthIn(max = 110.dp),
-                        )
-                    }
+                // The shared label -- same icon size, gap and type as every other button in
+                // the app, including PrimaryActions' lock/horn/lights row, which this one
+                // still drew nothing like: a bespoke 16dp icon, labelLarge text and a 6dp gap
+                // that predated MorphButtonLabel entirely. Every card's own header action goes
+                // through this one call site, so that mismatch was "the control pebble looks
+                // different from the rest of the app" for literally every OTHER pebble at once.
+                //
+                // `spinning` replaces the hand-rolled `spinAngle` Animatable above -- the exact
+                // same ramp-up/hold/decelerate shape already lives inside MorphButtonLabel's own
+                // glyph, so driving a second, external copy of it here was duplicated animation
+                // state for the same visual effect.
+                //
+                // widthIn still caps the label so a long action ("Downloading…") at a large font
+                // size cannot grow this button unbounded and squeeze the pebble title -- but past
+                // the cap this now compacts to the icon alone (the app's one fit rule) instead of
+                // ellipsizing a half-cut word.
+                Box(Modifier.widthIn(max = 110.dp).graphicsLayer { translationY = bounceY.value }) {
+                    MorphButtonLabel(
+                        action.icon,
+                        action.label,
+                        pending = action.pending && !bouncing,
+                        spinning = action.spinning,
+                    )
                 }
             }
         }
@@ -1009,7 +985,7 @@ internal fun SplitExpandButton(
                         // takes the angle as an argument, so the spring is read in COMPOSITION
                         // and this Icon recomposes on every frame of every expand/collapse, on
                         // every pebble header in the app. Read in the lambda it is draw-phase.
-                        modifier = Modifier.size(24.dp).graphicsLayer {
+                        modifier = Modifier.size(ButtonIconOnlySize).graphicsLayer {
                             rotationZ = rotation + easterEggSpin
                         },
                     )
