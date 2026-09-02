@@ -394,20 +394,17 @@ internal fun OnboardingScreen(vm: AppViewModel) {
                         modifier = Modifier.fillMaxWidth(),
                         contentPadding = PaddingValues(vertical = 16.dp),
                     ) {
-                        Icon(
+                        // MorphButtonLabel, not a hand-rolled Icon+Spacer+Text -- that Text used
+                        // FontWeight.Bold, where every other button label in the app (including
+                        // this one's own "Back" neighbour) uses SemiBold.
+                        MorphButtonLabel(
                             if (isLast) Icons.Filled.CheckCircle else Icons.Filled.Check,
-                            contentDescription = null,
-                            modifier = Modifier.size(ButtonIconSize),
-                        )
-                        Spacer(Modifier.width(8.dp))
-                        Text(
                             when {
                                 isLast -> "Enter Bloo"
                                 pageIndex == 0 -> "Get started"
                                 else -> "Next"
                             },
-                            style = ButtonLabelStyle,
-                            fontWeight = FontWeight.Bold,
+                            pending = false,
                         )
                     }
                 }
@@ -508,13 +505,11 @@ internal fun OnboardingSetupPage(vm: AppViewModel, state: UiState, context: andr
                 modifier = Modifier.fillMaxWidth(),
                 contentPadding = PaddingValues(vertical = 12.dp),
             ) {
-                Icon(
+                MorphButtonLabel(
                     if (notifGranted) Icons.Filled.CheckCircle else Icons.Filled.Notifications,
-                    contentDescription = null,
-                    modifier = Modifier.size(18.dp),
+                    if (notifGranted) "Enabled" else "Enable notifications",
+                    pending = false,
                 )
-                Spacer(Modifier.width(8.dp))
-                Text(if (notifGranted) "Enabled" else "Enable notifications", fontWeight = FontWeight.SemiBold)
             }
         }
     }
@@ -545,13 +540,11 @@ internal fun OnboardingSetupPage(vm: AppViewModel, state: UiState, context: andr
                 modifier = Modifier.fillMaxWidth(),
                 contentPadding = PaddingValues(vertical = 12.dp),
             ) {
-                Icon(
+                MorphButtonLabel(
                     if (bioEnabled) Icons.Filled.CheckCircle else Icons.Filled.Fingerprint,
-                    contentDescription = null,
-                    modifier = Modifier.size(18.dp),
+                    if (bioEnabled) "Enabled" else "Enable fingerprint lock",
+                    pending = false,
                 )
-                Spacer(Modifier.width(8.dp))
-                Text(if (bioEnabled) "Enabled" else "Enable fingerprint lock", fontWeight = FontWeight.SemiBold)
             }
         }
     }
@@ -635,9 +628,7 @@ internal fun OnboardingSetupPage(vm: AppViewModel, state: UiState, context: andr
                     modifier = Modifier.fillMaxWidth(),
                     contentPadding = PaddingValues(vertical = 12.dp),
                 ) {
-                    Icon(Icons.Filled.Cloud, contentDescription = null, modifier = Modifier.size(18.dp))
-                    Spacer(Modifier.width(8.dp))
-                    Text("Set up Drive sync", fontWeight = FontWeight.SemiBold)
+                    MorphButtonLabel(Icons.Filled.Cloud, "Set up Drive sync", pending = false)
                 }
             }
         }
@@ -721,9 +712,7 @@ internal fun OnboardingPinForm(
             contentPadding = PaddingValues(vertical = 12.dp),
             enabled = pin.isNotEmpty() && confirm.isNotEmpty(),
         ) {
-            Icon(Icons.Filled.Lock, contentDescription = null, modifier = Modifier.size(18.dp))
-            Spacer(Modifier.width(8.dp))
-            Text(if (existing) "Replace PIN" else "Save PIN", fontWeight = FontWeight.SemiBold)
+            MorphButtonLabel(Icons.Filled.Lock, if (existing) "Replace PIN" else "Save PIN", pending = false)
         }
     }
 }
@@ -1046,34 +1035,44 @@ internal fun CarFeatureWizard(
                     // own haptic click for free too, which this Back button
                     // was missing outright -- unlike goNext below, whose
                     // MorphButton already had it.
-                    MorphButton(
-                        onClick = ::goBack,
-                        modifier = Modifier.fillMaxWidth(),
-                        contentPadding = PaddingValues(vertical = 14.dp),
-                        border = BorderStroke(1.dp, scheme.outlineVariant),
-                    ) {
-                        Text("Back", style = ButtonLabelStyle)
+                    //
+                    // Wrapped in SafeExpansiveButton, matching goNext beside it and the main
+                    // OnboardingScreen's own Back/Next -- it was missing the press-growth
+                    // affordance every other button pair in the app gets.
+                    val backSource = remember { MutableInteractionSource() }
+                    SafeExpansiveButton(interactionSource = backSource, enabled = true) {
+                        MorphButton(
+                            onClick = ::goBack,
+                            interactionSource = backSource,
+                            modifier = Modifier.fillMaxWidth(),
+                            contentPadding = PaddingValues(vertical = 14.dp),
+                            border = BorderStroke(1.dp, scheme.outlineVariant),
+                        ) {
+                            Text("Back", style = ButtonLabelStyle)
+                        }
                     }
                 }
-                MorphButton(
-                    onClick = ::goNext,
-                    active = true,
+                val nextSource = remember { MutableInteractionSource() }
+                SafeExpansiveButton(
+                    interactionSource = nextSource,
+                    enabled = true,
                     modifier = Modifier.weight(if (pageIndex > 0) 2f else 1f),
-                    contentPadding = PaddingValues(vertical = 14.dp),
                 ) {
-                    val isLast = pageIndex == pages.lastIndex
-                    val lastLabel = "Done"
-                    Icon(
-                        if (isLast) Icons.Filled.CheckCircle else Icons.Filled.Check,
-                        contentDescription = null,
-                        modifier = Modifier.size(ButtonIconSize),
-                    )
-                    Spacer(Modifier.width(8.dp))
-                    Text(
-                        if (isLast) lastLabel else "Next",
-                        style = ButtonLabelStyle,
-                        fontWeight = FontWeight.SemiBold,
-                    )
+                    MorphButton(
+                        onClick = ::goNext,
+                        active = true,
+                        interactionSource = nextSource,
+                        modifier = Modifier.fillMaxWidth(),
+                        contentPadding = PaddingValues(vertical = 14.dp),
+                    ) {
+                        val isLast = pageIndex == pages.lastIndex
+                        // MorphButtonLabel, not a hand-rolled Icon+Spacer+Text.
+                        MorphButtonLabel(
+                            if (isLast) Icons.Filled.CheckCircle else Icons.Filled.Check,
+                            if (isLast) "Done" else "Next",
+                            pending = false,
+                        )
+                    }
                 }
             }
         }

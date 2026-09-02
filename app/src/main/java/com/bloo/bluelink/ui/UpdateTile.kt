@@ -294,12 +294,16 @@ internal fun UpdateAvailableTile(state: UiState, vm: AppViewModel, dragHandle: M
                         interactionSource = undoSource,
                         enabled = !state.updateDownloading,
                     ) {
-                        MorphButton(
+                        // MorphTextButton, not a hand-rolled MorphButton{Text(...)} -- that Text
+                        // had no `style`. Primary colours stand in for the old `active = true`.
+                        MorphTextButton(
+                            "Keep it",
                             onClick = { vm.undoDismissUpdate() },
                             enabled = !state.updateDownloading,
-                            active = true,
                             interactionSource = undoSource,
-                        ) { Text("Keep it", fontWeight = FontWeight.SemiBold) }
+                            containerColor = MaterialTheme.colorScheme.primary,
+                            contentColor = MaterialTheme.colorScheme.onPrimary,
+                        )
                     }
                 }
             } else {
@@ -309,11 +313,14 @@ internal fun UpdateAvailableTile(state: UiState, vm: AppViewModel, dragHandle: M
                         interactionSource = remindSource,
                         enabled = !state.updateDownloading,
                     ) {
-                        MorphButton(
+                        // MorphTextButton, not a hand-rolled MorphButton{Text(...)} -- that Text
+                        // had neither `style` nor `fontWeight`, unlike "Not now" beside it.
+                        MorphTextButton(
+                            "Remind me",
                             onClick = { vm.snoozeUpdate() },
                             enabled = !state.updateDownloading,
                             interactionSource = remindSource,
-                        ) { Text("Remind me") }
+                        )
                     }
                     val notNowSource = remember { MutableInteractionSource() }
                     SafeExpansiveButton(
