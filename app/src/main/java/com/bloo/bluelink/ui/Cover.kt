@@ -284,18 +284,35 @@ internal fun CoverTile(
         ).joinToString("  \u00b7  ")
         Column(Modifier.fillMaxSize().padding(horizontal = coverContentInset())) {
             Spacer(Modifier.height(coverTileEdgeGap()))
-            // A scrolling Box that CENTERS its content, rather than a BoxWithConstraints whose
-            // only job was to read maxHeight and feed it back as heightIn(min = ...).
+            // Extra top clearance whenever the search bubble is DOCKED into the camera-cutout
+            // band (see coverCutoutBand's own doc) -- it parks right at the top edge, in the
+            // same corner this Column's own content starts drawing from. Without this, a tile
+            // whose content leads with a flush-left heading or a full-width image (Climate's
+            // "Smart climate", the location map) had its own first few dp sitting directly
+            // under the bubble, visually cut by it -- confirmed from a real screenshot.
+            // CoverBandSearchDock is the bubble's own fixed docked size, the same constant
+            // CoverGarage's band Row already reserves for it elsewhere; reserving it again here
+            // is that same rule applied to a tile's own content, not a new one.
+            if (coverCutoutBand() != null) {
+                Spacer(Modifier.height(CoverBandSearchDock))
+            }
+            // A scrolling Box that anchors its content to the TOP, rather than a
+            // BoxWithConstraints whose only job was to read maxHeight and feed it back as
+            // heightIn(min = ...).
             //
-            // Both centre a short body instead of letting it collapse to the top, and both let a
-            // tall one scroll -- but BoxWithConstraints is a SubcomposeLayout, and this one sat
-            // inside every cover tile. The car pager keeps its neighbours composed
-            // (beyondViewportPageCount = 1), so three of these were live at once on the weakest
-            // display in the app, to obtain a number the layout already knows.
+            // TopCenter, not Center: this box used to sit right under a header that ate the
+            // top third of the tile, so a short body barely had room to look centred OR
+            // top-anchored -- they read almost the same. Since the identity/actions moved to
+            // the bottom band (this box is now most of the tile's own height), centering
+            // floated short content in a sea of empty space above and below it -- confirmed
+            // from a real screenshot (Weather's few lines adrift in the middle of a mostly
+            // empty tile). Anchoring to the top instead reads as "the content that's here",
+            // not "whatever fits, wherever it lands" -- and a tall body still scrolls exactly
+            // as before, since TopCenter only matters once content is SHORTER than the box.
             //
             // weight(1f) is what makes the plain Box work: it fixes this Box's height to the
             // band, so its own size is the viewport no matter how short the content is, and
-            // contentAlignment can centre against it. The scroll then only engages once the
+            // contentAlignment can anchor against it. The scroll then only engages once the
             // content is taller than that.
             val scroll = scrollState ?: rememberScrollState()
             Box(
@@ -304,7 +321,7 @@ internal fun CoverTile(
                     .fillMaxWidth()
                     .fadingEdges(scroll, length = coverFadeLength())
                     .verticalScroll(scroll),
-                contentAlignment = Alignment.Center,
+                contentAlignment = Alignment.TopCenter,
             ) {
                 Column(
                     Modifier
