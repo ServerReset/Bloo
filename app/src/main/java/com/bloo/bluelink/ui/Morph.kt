@@ -54,6 +54,13 @@ import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.ui.layout.IntrinsicMeasurable
+import androidx.compose.ui.layout.IntrinsicMeasureScope
+import androidx.compose.ui.layout.Layout
+import androidx.compose.ui.layout.Measurable
+import androidx.compose.ui.layout.MeasurePolicy
+import androidx.compose.ui.layout.MeasureResult
+import androidx.compose.ui.layout.MeasureScope
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.onClick
 import androidx.compose.ui.semantics.onLongClick
@@ -86,6 +93,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.composed
 import androidx.compose.ui.unit.dp
@@ -434,12 +442,11 @@ fun MorphIconButton(
  * spinner while [pending], so the button width never changes just from loading.
  */
 @Composable
-fun MorphButtonLabel(
+private fun MorphButtonGlyph(
     icon: ImageVector,
-    label: String,
     pending: Boolean,
-    iconSize: Dp = ButtonIconSize,
-    spinning: Boolean = false,
+    iconSize: Dp,
+    spinning: Boolean,
 ) {
     if (pending) {
         LoadingIndicator(Modifier.size(iconSize))
@@ -479,23 +486,99 @@ fun MorphButtonLabel(
             modifier = Modifier.size(iconSize).graphicsLayer { rotationZ = angle.value },
         )
     }
-    Spacer(Modifier.width(8.dp))
-    // The one button label style, shared with MorphTextButton -- this pair is the reference the
-    // rest of the app standardises on, so the size lives in a token rather than being whatever
-    // each button happened to inherit.
-    //
-    // softWrap = false is a guarantee, not a nicety: these buttons are squeezed by their
-    // neighbours in a group, and a label that wraps turns a one-line button into a two-line one
-    // mid-press, which shoves the whole row's height around. The group will not squeeze below a
-    // child's intrinsic width, so this should never trigger -- it is the backstop for the case
-    // where a button is narrow for some other reason.
-    Text(
-        label,
-        style = ButtonLabelStyle,
-        fontWeight = FontWeight.SemiBold,
-        maxLines = 1,
-        softWrap = false,
-        overflow = TextOverflow.Ellipsis,
+}
+
+/** The gap between a button's glyph and its label. */
+val ButtonIconGap = 8.dp
+
+/**
+ * A button's glyph and label as ONE layout that can drop the label when it is not given the room
+ * for it -- the app's fit rule, in the one place every button's content already goes through.
+ *
+ * The contract is stated through intrinsics, which is what lets the button group act on it
+ * without knowing anything about labels: maxIntrinsicWidth is the full glyph + gap + label, and
+ * minIntrinsicWidth is the glyph alone. So "how small can this button get and still make sense"
+ * is a question the layout above can simply ask, and the answer is icon-only rather than a
+ * truncated word.
+ *
+ * A label is never ellipsized and never wrapped on the way down. It is shown whole or not at
+ * all: half a word in a button is worse than a glyph, and a wrapped one turns a one-line button
+ * into a two-line one mid-press, which shoves the whole row's height around.
+ */
+@Composable
+fun MorphButtonLabel(
+    icon: ImageVector,
+    label: String,
+    pending: Boolean,
+    iconSize: Dp = ButtonIconSize,
+    spinning: Boolean = false,
+) {
+    val gap = ButtonIconGap
+    Layout(
+        content = {
+            MorphButtonGlyph(icon, pending, iconSize, spinning)
+            // The one button label style, shared with MorphTextButton -- this pair is the
+            // reference the rest of the app standardises on, so the size lives in a token
+            // rather than being whatever each button happened to inherit.
+            Text(
+                label,
+                style = ButtonLabelStyle,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 1,
+                softWrap = false,
+                overflow = TextOverflow.Clip,
+            )
+        },
+        measurePolicy = remember(gap) {
+            object : MeasurePolicy {
+                override fun MeasureScope.measure(
+                    measurables: List<Measurable>,
+                    constraints: Constraints,
+                ): MeasureResult {
+                    val gapPx = gap.roundToPx()
+                    val free = constraints.copy(minWidth = 0, maxWidth = Constraints.Infinity, minHeight = 0)
+                    val glyph = measurables[0].measure(free)
+                    val labelWidth = measurables[1].maxIntrinsicWidth(constraints.maxHeight)
+                    // Whole label or no label. Anything in between is a truncated word.
+                    if (constraints.maxWidth < glyph.width + gapPx + labelWidth) {
+                        val w = glyph.width.coerceAtMost(constraints.maxWidth)
+                        return layout(w, glyph.height) {
+                            glyph.place((w - glyph.width) / 2, 0)
+                        }
+                    }
+                    val text = measurables[1].measure(free)
+                    val w = glyph.width + gapPx + text.width
+                    val h = maxOf(glyph.height, text.height)
+                    return layout(w, h) {
+                        glyph.place(0, (h - glyph.height) / 2)
+                        text.place(glyph.width + gapPx, (h - text.height) / 2)
+                    }
+                }
+
+                /** Glyph only: the smallest this content can be and still say something. */
+                override fun IntrinsicMeasureScope.minIntrinsicWidth(
+                    measurables: List<IntrinsicMeasurable>,
+                    height: Int,
+                ): Int = measurables[0].maxIntrinsicWidth(height)
+
+                override fun IntrinsicMeasureScope.maxIntrinsicWidth(
+                    measurables: List<IntrinsicMeasurable>,
+                    height: Int,
+                ): Int = measurables[0].maxIntrinsicWidth(height) +
+                    gap.roundToPx() +
+                    measurables[1].maxIntrinsicWidth(height)
+
+                override fun IntrinsicMeasureScope.minIntrinsicHeight(
+                    measurables: List<IntrinsicMeasurable>,
+                    width: Int,
+                ): Int = measurables.maxOf { it.minIntrinsicHeight(width) }
+
+                override fun IntrinsicMeasureScope.maxIntrinsicHeight(
+                    measurables: List<IntrinsicMeasurable>,
+                    width: Int,
+                ): Int = measurables.maxOf { it.maxIntrinsicHeight(width) }
+            }
+        },
     )
 }
 

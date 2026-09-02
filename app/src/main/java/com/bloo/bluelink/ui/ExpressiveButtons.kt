@@ -2,7 +2,6 @@ package com.bloo.bluelink.ui
 
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.interaction.InteractionSource
 import androidx.compose.foundation.interaction.PressInteraction
@@ -344,9 +343,17 @@ fun ExpressiveButtonGroup(
             val h = if (constraints.hasBoundedHeight) constraints.maxHeight else 0
             val cached = naturals.widths
             // Both arrays are written together and read together, so both are checked.
-            if (resting || cached == null || cached.size != n || naturals.content?.size != n) {
+            if (resting || cached == null || cached.size != n ||
+                naturals.content?.size != n || naturals.compact?.size != n
+            ) {
                 val c = IntArray(n) { measurables[it].maxIntrinsicWidth(h).coerceAtLeast(0) }
                 naturals.content = c
+                // The smallest each member can be and still say something -- for a standard
+                // button, its glyph alone. See MorphButtonLabel, which states that through its
+                // own intrinsics so the group never has to know what a label is.
+                naturals.compact = IntArray(n) {
+                    if (member[it]) measurables[it].minIntrinsicWidth(h).coerceIn(0, c[it]) else c[it]
+                }
                 // The reserve: a MEMBER rests one growth-step wider than its content needs, so
                 // that being squeezed returns it to exactly `content` and never below. A
                 // non-member is not part of the redistribution and keeps its own width.
@@ -357,7 +364,8 @@ fun ExpressiveButtonGroup(
             val nat = naturals.widths!!
             // What each member's content actually asked for -- its floor, and the width it lands
             // on when a neighbour takes everything it has to give.
-            val content = naturals.content!!
+            val full = naturals.content!!
+            val compact = naturals.compact!!
 
             // Break into lines exactly as a FlowRow would, so this is a drop-in for one. A
             // group that fits on one line takes this path with a single line and behaves
@@ -399,12 +407,33 @@ fun ExpressiveButtonGroup(
                     continue
                 }
 
-                val naturalTotal = memberIdx.sumOf { nat[it] }
                 val room = if (constraints.hasBoundedWidth) {
                     (constraints.maxWidth - gapsHere - nonMemberWidth).coerceAtLeast(0)
                 } else {
-                    naturalTotal
+                    memberIdx.sumOf { nat[it] }
                 }
+
+                // THE FIT RULE, all-or-nothing. If this line cannot give every member the room
+                // its label needs, every member on it drops to its glyph -- not the ones that
+                // happen to be longest. A row where some buttons carry words and others do not
+                // reads as a mistake, and which ones lost their words would change with the
+                // text, the font size and the language.
+                //
+                // Decided here rather than by each button, because only the line knows what the
+                // line has. Each button then finds itself measured below its own full width and
+                // shows its glyph alone -- see MorphButtonLabel.
+                val basis = if (
+                    constraints.hasBoundedWidth &&
+                    memberIdx.sumOf { (full[it] * ExpressiveRestingScale).roundToInt() } > room &&
+                    memberIdx.any { compact[it] < full[it] }
+                ) {
+                    compact
+                } else {
+                    full
+                }
+                // Resting width for whichever basis won: content (or glyph) plus the reserve.
+                val natLine = IntArray(n) { if (member[it]) (basis[it] * ExpressiveRestingScale).roundToInt() else nat[it] }
+                val naturalTotal = memberIdx.sumOf { natLine[it] }
 
                 // Equal shares: the Material 3 connected-group look. TWO or more members --
                 // "an equal share" of a line is meaningless for a single button, and taking it
@@ -424,7 +453,7 @@ fun ExpressiveButtonGroup(
                     val wSum = memberIdx.sumOf { weight[it].toDouble() }
                     val leftover = (room - naturalTotal).coerceAtLeast(0)
                     val stretching = leftover > 0 && wSum > 0.0
-                    for (i in memberIdx) base[i] = nat[i].toDouble()
+                    for (i in memberIdx) base[i] = natLine[i].toDouble()
                     if (stretching) {
                         for (i in memberIdx) {
                             if (weight[i] > 0f) base[i] += leftover * (weight[i] / wSum)
@@ -445,7 +474,7 @@ fun ExpressiveButtonGroup(
                 // effect at all, and nothing can truncate or wrap to a second line.
                 val floorOf = DoubleArray(n)
                 for (i in memberIdx) {
-                    floorOf[i] = content[i].toDouble().coerceAtMost(base[i])
+                    floorOf[i] = basis[i].toDouble().coerceAtMost(base[i])
                 }
                 // What the pressed buttons ask for, and what the others can actually spare.
                 // Both sides are the same fraction of CONTENT, which is what makes the two
@@ -454,7 +483,7 @@ fun ExpressiveButtonGroup(
                 // line) NOTHING moves, rather than the line quietly growing.
                 // toDouble() explicitly: content is an IntArray, so Int * Float * Float is a
                 // Float, and sumOf has no Float overload to resolve to.
-                val want = growers.sumOf { content[it].toDouble() * ExpressivePressGrowth * press[it] }
+                val want = growers.sumOf { basis[it].toDouble() * ExpressivePressGrowth * press[it] }
                 val capacity = donors.sumOf { base[it] - floorOf[it] }
                 val give = minOf(want, capacity)
 
@@ -463,7 +492,7 @@ fun ExpressiveButtonGroup(
                 if (give > 0.0) {
                     for (i in growers) {
                         exact[i] = base[i] +
-                            give * (content[i].toDouble() * ExpressivePressGrowth * press[i]) / want
+                            give * (basis[i].toDouble() * ExpressivePressGrowth * press[i]) / want
                     }
                     for (i in donors) {
                         exact[i] = base[i] - give * (base[i] - floorOf[i]) / capacity
@@ -524,6 +553,9 @@ private class NaturalWidths {
 
     /** What each child's content asked for, before the reserve -- the floor a donor stops at. */
     var content: IntArray? = null
+
+    /** The icon-only width each member falls back to when the line cannot fit the labels. */
+    var compact: IntArray? = null
 }
 
 /** Carries a child's live press fraction to [ExpressiveButtonGroup]'s measure policy. The
