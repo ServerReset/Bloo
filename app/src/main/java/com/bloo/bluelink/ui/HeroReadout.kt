@@ -70,12 +70,16 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.text.lerp
 import androidx.compose.ui.unit.lerp
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.composed
 import androidx.compose.ui.unit.dp
+import kotlin.math.roundToInt
 import com.bloo.bluelink.data.VehicleStatus
 import com.bloo.bluelink.data.percentFor
 import com.bloo.bluelink.data.rangeMiFor
@@ -292,6 +296,41 @@ internal fun HeroCollapsedNumbers(
     // life as the collapsed ANCHOR and simply never paints.
     val fade = (1f - t / 0.35f).coerceIn(0f, 1f)
     if (fade <= 0f && !hoisted) return
+    // A SEVENTH attempt at the name/numbers alignment -- CenterVertically alone (attempt six,
+    // and the one this row's own doc still describes) is not quite it either, confirmed from a
+    // real screenshot: the digits still sit a few px off the name's own baseline.
+    //
+    // The car NAME beside this row is not drawn at a native titleMedium -- it is headlineSmall,
+    // measured at full size and then scaled down (see PebbleShell's title `.layout{}`), because
+    // the hero's name grows continuously as the card expands and a discrete style swap cannot
+    // animate that smoothly. A style scaled down by its FONT SIZE ratio does not necessarily
+    // reproduce a native style's own baseline-to-box-centre ratio -- lineHeight is not always a
+    // fixed fraction of fontSize across type steps -- so centring two BOXES of the same height,
+    // which is all CenterVertically can do, still leaves the GLYPHS inside them a few px apart
+    // whenever those two ratios differ. That gap is exactly what six earlier, purely
+    // Row-alignment attempts (baseline lines through this row, RollingNumber's own Row and
+    // AnimatedContent -- none of which forward one without an explicit per-child opt-in) kept
+    // landing "slightly off" on.
+    //
+    // So this measures both font's real metrics directly instead of asking Compose's layout
+    // machinery to infer them: a fixed, deterministic px correction, independent of the digit
+    // roll, of which car or value is showing, and of every Row in between.
+    val type = MaterialTheme.typography
+    val textMeasurer = rememberTextMeasurer()
+    val correctionPx = remember(type, textMeasurer) {
+        val nameScale = type.titleMedium.fontSize.value / type.headlineSmall.fontSize.value
+        // Baseline position relative to the MIDDLE of the text's own box -- the same axis
+        // CenterVertically aligns on, so this is exactly the residual CenterVertically leaves
+        // behind. Any non-empty string measures the same font metrics; "0" matches what is
+        // actually on screen for the numbers.
+        fun baselineFromCenter(style: TextStyle): Float {
+            val result = textMeasurer.measure("0", style.copy(fontWeight = FontWeight.Bold))
+            return result.firstBaseline - result.size.height / 2f
+        }
+        val namePx = baselineFromCenter(type.headlineSmall) * nameScale
+        val numbersPx = baselineFromCenter(type.titleMedium)
+        namePx - numbersPx
+    }
     Row(
         // The leading gap off the car name. PebbleShell deliberately puts no Spacer
         // before `titleTrailing` -- a gap left behind an absent node would squeeze the
@@ -303,6 +342,7 @@ internal fun HeroCollapsedNumbers(
         Modifier
             .graphicsLayer { alpha = if (hoisted) 0f else fade }
             .padding(start = 10.dp)
+            .offset { IntOffset(0, correctionPx.roundToInt()) }
             .onGloballyPositioned(onPositioned),
         verticalAlignment = Alignment.CenterVertically,
     ) {
