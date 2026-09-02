@@ -57,8 +57,15 @@ import kotlinx.coroutines.launch
  * spring, so the two read as one effect.
  */
 
-/** 1.0 -> 1.15: the pressed button claims 15% more, per Material 3 Expressive. */
-internal const val ExpressivePressGrowth = 0.15f
+/** 1.0 -> 1.3: the pressed button claims 30% more.
+ *
+ *  Doubled from the Material 3 Expressive baseline (15%) -- the stretch read as barely there on
+ *  a real device, especially on the squeezing side: a neighbour giving back 15% of its own width
+ *  is a couple of dp, easy to miss entirely next to the button doing the growing. This is the
+ *  ONE constant behind the whole effect (both a standalone button's own growth and a group's
+ *  push-and-squeeze), so turning it up here turns it up everywhere at once, the button and the
+ *  neighbour it shoves both reading as a clearly bigger push. */
+internal const val ExpressivePressGrowth = 0.30f
 
 /**
  * A group member's resting width is its content plus [ExpressivePressGrowth] again.
@@ -232,8 +239,9 @@ fun SafeExpansiveButton(
             // minWidth ZEROED for the resting measure. Measuring with the incoming constraints
             // meant that in any parent that forces a width -- a fillMaxWidth row, most of them --
             // the button was recorded at that forced width, and the pressed pass then computed
-            // `cached * 1.15` and coerced it straight back down to maxWidth. Target == cached,
-            // so the button never moved. That is why these still did not animate. A child that
+            // `cached * (1 + ExpressivePressGrowth)` and coerced it straight back down to
+            // maxWidth. Target == cached, so the button never moved. That is why these still did
+            // not animate. A child that
             // genuinely wants the full width still gets it from its own fillMaxWidth; one that
             // does not now records its real natural size, which is what there is room to grow
             // from.
