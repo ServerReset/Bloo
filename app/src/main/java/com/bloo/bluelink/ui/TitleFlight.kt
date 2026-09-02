@@ -509,7 +509,16 @@ internal fun BoxScope.TitleFlightOverlay(
     // chrome's own size and position, so none of them can visibly outrun
     // each other; see this function's own doc for why a spring (not a
     // scroll-tied fraction) is deliberate here.
-    val progress = remember { Animatable(0f) }
+    // Keyed on `flight`, not plain `remember`: this Animatable used to survive a flight
+    // identity swap holding whatever progress the PREVIOUS instance had reached (mid-spring,
+    // say 0.4), and the fresh instance's own "first composition, don't animate" handling below
+    // only corrects that asynchronously, inside a LaunchedEffect -- which runs strictly after
+    // this same recomposition has already used the stale 0.4 to position the flying text against
+    // the NEW flight's anchors for at least one frame. That is a real, visible jump: exactly the
+    // "glitches during the flight" symptom. Starting a brand-new Animatable already AT the
+    // correct resting value the instant the identity changes removes the stale frame entirely --
+    // there is no wrong value for anything to read, not even for one frame.
+    val progress = remember(flight) { Animatable(if (docked) 1f else 0f) }
     // Set true only while a spring is actually running -- see `active` below,
     // which uses it to skip composing the expensive glass chrome (shadow,
     // ring, frosted rim) for the vast majority of the time nothing is
@@ -518,7 +527,15 @@ internal fun BoxScope.TitleFlightOverlay(
     // cheap for any ONE of them, but real cost stacked up across a grid of
     // simultaneously-visible cards, which is what was reading as the whole
     // app dragging.
-    var transitioning by remember { mutableStateOf(false) }
+    //
+    // Keyed on `flight` for the same reason `progress` now is: unkeyed, this (and `lastDocked`
+    // below) carried a PREVIOUS flight instance's leftover transition bookkeeping across a swap,
+    // so the synchronous `lastDocked != docked` check just below could compare the old instance's
+    // stale docked flag to the new instance's real one and latch a spurious `transitioning = true`
+    // on the very frame that should have snapped cleanly -- which also means `onSettledChanged`
+    // (gated on `!transitioning`) silently skipped firing for that swap, exactly the sort of gap
+    // that reads as "sometimes fails to dock/undock".
+    var transitioning by remember(flight) { mutableStateOf(false) }
     // Page-switch handling (the hoisted badge's own car-to-car swipe) used
     // to live one level up, wrapping this whole function in its own
     // `AnimatedContent` -- several rounds of that never actually converged
@@ -546,16 +563,18 @@ internal fun BoxScope.TitleFlightOverlay(
     // instant docking STARTED, not once it finished -- firing the hand-off
     // before the spring had moved at all, reading as no transition playing
     // whatsoever rather than a mid-flight snap.
-    var lastDocked by remember { mutableStateOf(docked) }
+    var lastDocked by remember(flight) { mutableStateOf(docked) }
     if (lastDocked != docked) {
         transitioning = true
         lastDocked = docked
     }
     LaunchedEffect(docked, flight) {
         if (!mounted) {
+            // No snapTo needed any more -- `progress` above is already constructed at the
+            // correct resting value for a freshly-identified flight, synchronously, before this
+            // coroutine ever runs.
             mounted = true
             transitioning = false
-            progress.snapTo(if (docked) 1f else 0f)
             return@LaunchedEffect
         }
         transitioning = true
