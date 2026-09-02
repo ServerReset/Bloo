@@ -469,7 +469,7 @@ internal fun SettingsScreen(
                             confirmSignOut = false
                         }
                     }
-                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Column(verticalArrangement = Arrangement.spacedBy(SettingsGapRow)) {
                         Text(creds.brand.label, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
                         StatusRow("Email", creds.email)
                         SecretRow("Password", creds.password)
@@ -526,11 +526,13 @@ internal fun SettingsScreen(
                     interactionSource = addAccountSource,
                     enabled = true,
                 ) {
+                    // Content-width, not fillMaxWidth() -- a single CTA reads as oversized
+                    // stretched edge-to-edge, the same fix already made for Backup & sync's and
+                    // Updates' own primary buttons this session; this one was missed then.
                     MorphTextButton(
                         "Add another account",
                         onClick = { vm.beginAddAccount() },
                         interactionSource = addAccountSource,
-                        modifier = Modifier.fillMaxWidth(),
                     )
                 }
                 Text(
@@ -935,9 +937,10 @@ internal fun SettingsScreen(
                         interactionSource = diagnosticsSource,
                         enabled = true,
                     ) {
+                        // Content-width, matching the equivalent "Troubleshooting steps" toggle
+                        // in the Notifications card -- this one was still stretched full width.
                         MorphTextButton(
                             if (showSyncDiagnostics) "Hide diagnostics" else "Diagnostics",
-                            modifier = Modifier.fillMaxWidth(),
                             interactionSource = diagnosticsSource,
                             onClick = { showSyncDiagnostics = !showSyncDiagnostics },
                         )
@@ -1172,7 +1175,7 @@ internal fun SettingsScreen(
                     FontChoice.ATKINSON to "Atkinson Hyperlegible",
                     FontChoice.GOOGLE_SANS to "Google Sans",
                 )
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Column(verticalArrangement = Arrangement.spacedBy(SettingsGapRow)) {
                     FontChoice.entries.forEach { choice ->
                         ChoiceRow(labels.getValue(choice), appearance.fontChoice == choice) { vm.setFontChoice(choice) }
                     }
@@ -1593,13 +1596,15 @@ internal fun SettingsScreen(
                             onClick = { pinDialog = "set" },
                             interactionSource = pinSource,
                         ) {
-                            Icon(
+                            // MorphButtonLabel, not a hand-rolled Icon+Spacer+Text: that pair had
+                            // no `style`, so it rendered at the ambient default size instead of
+                            // ButtonLabelStyle -- visibly smaller than "Remove" right beside it in
+                            // this same row, confirmed by audit.
+                            MorphButtonLabel(
                                 if (pinSet) Icons.Filled.LockReset else Icons.Filled.Lock,
-                                contentDescription = null,
-                                modifier = Modifier.size(18.dp),
+                                if (pinSet) "Change PIN" else "Set up PIN",
+                                pending = false,
                             )
-                            Spacer(Modifier.width(8.dp))
-                            Text(if (pinSet) "Change PIN" else "Set up PIN", fontWeight = FontWeight.SemiBold)
                         }
                     }
                     if (pinSet) {
@@ -1738,6 +1743,7 @@ internal fun SettingsScreen(
                                         onValueChange = { vm.setAuroraCustomColor(it.take(7).takeIf { it.matches(RxHexColorDraft) } ?: appearance.auroraCustomColor) },
                                         label = { Text("Hex colour") },
                                         singleLine = true,
+                                        shape = FieldShape,
                                         modifier = Modifier.fillMaxWidth(),
                                     )
                                 }
@@ -2101,9 +2107,10 @@ internal fun SettingsScreen(
                             interactionSource = myLocationSource,
                             contentPadding = PaddingValues(horizontal = 14.dp, vertical = 10.dp),
                         ) {
-                            Icon(Icons.Filled.MyLocation, null, modifier = Modifier.size(18.dp))
-                            Spacer(Modifier.width(8.dp))
-                            Text("My location", fontWeight = FontWeight.SemiBold, maxLines = 1)
+                            // MorphButtonLabel, not a hand-rolled Icon+Spacer+Text -- that pair had
+                            // no `style`, so it rendered at a different size than "Set place" right
+                            // beside it in this same row, confirmed by audit.
+                            MorphButtonLabel(Icons.Filled.MyLocation, "My location", pending = false)
                         }
                     }
                 }

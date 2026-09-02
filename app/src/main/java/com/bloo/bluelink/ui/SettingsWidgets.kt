@@ -536,7 +536,7 @@ internal fun PinDialogs(
                         onValueChange = { currentPin = sanitize(it); rejected = false },
                         placeholder = { Text("Current PIN") },
                         singleLine = true,
-                        shape = androidx.compose.foundation.shape.RoundedCornerShape(18.dp),
+                        shape = FieldShape,
                         colors = androidx.compose.material3.TextFieldDefaults.colors(),
                         visualTransformation = PasswordVisualTransformation(),
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword, imeAction = ImeAction.Done),
@@ -598,13 +598,17 @@ internal fun PinDialogs(
                     equalWidths = true,
                 ) {
                     MorphTextButton("Cancel", onDismiss)
-                    MorphButton(
+                    // MorphTextButton, not a hand-rolled MorphButton{Text(...)} -- that Text had no
+                    // `style`, so it rendered at a different size than "Cancel" right beside it in
+                    // this same row, confirmed by audit.
+                    MorphTextButton(
+                        "Continue",
                         onClick = {
                             haptics?.click()
                             vm.verifyAppPin(currentPin)
                         },
                         enabled = currentPin.length >= 4,
-                    ) { Text("Continue", fontWeight = FontWeight.SemiBold) }
+                    )
                 }
                 "finish" -> {
                     if (mode == "remove") {
@@ -619,11 +623,14 @@ internal fun PinDialogs(
                             equalWidths = true,
                         ) {
                             MorphTextButton("Keep PIN", onDismiss)
-                            MorphButton(
+                            // MorphTextButton, not a hand-rolled MorphButton{Text(...)} -- same
+                            // missing-style issue as "Continue" above.
+                            MorphTextButton(
+                                "Remove PIN",
                                 onClick = { haptics?.heavy(); vm.removeAppPin(); onDismiss() },
                                 containerColor = scheme.error,
                                 contentColor = scheme.onError,
-                            ) { Text("Remove PIN", fontWeight = FontWeight.SemiBold) }
+                            )
                         }
                     }
                     Spacer(Modifier.height(SettingsGapRow))
