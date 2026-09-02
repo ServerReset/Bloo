@@ -220,6 +220,8 @@ fun ExpressiveButtonRow(
     verticalAlignment: Alignment.Vertical = Alignment.CenterVertically,
     equalWidths: Boolean = false,
     horizontalAlignment: Alignment.Horizontal = Alignment.Start,
+    /** See [ExpressiveButtonGroup]'s own `lineSpacing` -- this wraps like a FlowRow. */
+    lineSpacing: Dp = spacing,
     content: @Composable () -> Unit,
 ) {
     ExpressiveButtonGroup(
@@ -228,6 +230,7 @@ fun ExpressiveButtonRow(
         verticalAlignment = verticalAlignment,
         equalWidths = equalWidths,
         horizontalAlignment = horizontalAlignment,
+        lineSpacing = lineSpacing,
     ) {
         content()
     }
@@ -266,6 +269,17 @@ fun ExpressiveButtonGroup(
      * full-width action bar).
      */
     horizontalAlignment: Alignment.Horizontal = Alignment.Start,
+    /**
+     * Gap between wrapped lines.
+     *
+     * The group lays out in lines like a FlowRow, and redistributes within each line
+     * independently, so it is a drop-in wherever a row of buttons might not fit on one line --
+     * the car-info pebble's link buttons, the Weather card's pair. Those were FlowRows, which
+     * meant a pressed button grew for real and simply shoved its neighbours along, since a
+     * FlowRow has no notion of a shared budget. A group that does fit on one line takes the
+     * same path with a single line and behaves exactly as it did.
+     */
+    lineSpacing: Dp = spacing,
     content: @Composable ExpressiveButtonGroupScope.() -> Unit,
 ) {
     // Natural (unpressed) child widths, cached from the last resting measure pass. A plain
@@ -285,7 +299,7 @@ fun ExpressiveButtonGroup(
             val n = measurables.size
             if (n == 0) return@Layout layout(0, 0) {}
             val gapPx = spacing.roundToPx()
-            val gaps = gapPx * (n - 1)
+            val lineGapPx = lineSpacing.roundToPx()
             val childConstraints = constraints.copy(minWidth = 0, minHeight = 0)
 
             // Press fractions come from parent data and are READ HERE, at layout time, so a
@@ -298,127 +312,126 @@ fun ExpressiveButtonGroup(
             val press = FloatArray(n) { i ->
                 (measurables[i].parentData as? ExpressiveGroupData)?.pressFraction?.invoke() ?: 0f
             }
-            // Spare padding each member is willing to give up. Read from parent data, so it
-            // costs nothing per frame -- unlike the intrinsic measurement it replaces.
+            // Spare padding each member is willing to give up, and which members absorb the
+            // line's leftover space. Parent data, so both cost nothing per frame.
             val slack = IntArray(n) { i ->
                 (measurables[i].parentData as? ExpressiveGroupData)?.compressiblePx ?: 0
             }
-            // Which members absorb the row's leftover space. Parent data rather than
-            // RowScope.weight, which is read by a Row's measure policy and means nothing here.
             val weight = FloatArray(n) { i ->
                 (measurables[i].parentData as? ExpressiveGroupData)?.weight ?: 0f
             }
             val resting = press.all { it <= 0.001f }
+
+            // Natural widths come from maxIntrinsicWidth rather than from a trial measure.
+            // That is not a micro-optimisation, it is what makes filling possible at all: a
+            // child may only be measured once per pass, so measuring to learn the natural width
+            // leaves nothing with which to place the child at a different one. It also fixes a
+            // bug the trial measure had -- inside a parent that forces a width, the "natural"
+            // width recorded WAS that forced width, so the button had nothing to grow from.
+            val h = if (constraints.hasBoundedHeight) constraints.maxHeight else 0
             val cached = naturals.widths
-            // Only MEMBER widths have to be sane: a legitimately zero-width non-member (an
-            // empty Spacer, a label that renders nothing) must not disable the whole effect.
-            val usable = cached != null && cached.size == n &&
-                (0 until n).all { !member[it] || cached[it] > 0 }
+            if (resting || cached == null || cached.size != n) {
+                naturals.widths = IntArray(n) { measurables[it].maxIntrinsicWidth(h).coerceAtLeast(0) }
+            }
+            val nat = naturals.widths!!
 
-            // Equal shares are computed from the row itself, so there is nothing to cache and
-            // no first-pass-at-rest requirement: the base width is the same on every pass and a
-            // press redistributes from it exactly as it would from natural widths.
-            val equalBase: IntArray? = if (equalWidths && constraints.hasBoundedWidth) {
-                val members = (0 until n).count { member[it] }
-                // TWO or more. "An equal share" of a row is meaningless for a single button, and
-                // taking it literally is what turned a lone action into a pill spanning the whole
-                // panel. One member falls through to its natural width instead, and
-                // horizontalAlignment decides where it sits in the space left over.
-                if (members > 1) {
-                    val room = (constraints.maxWidth - gaps).coerceAtLeast(0)
-                    val each = room / members
-                    // The remainder goes to the first member rather than being dropped, so the
-                    // group fills its row exactly instead of leaving up to n-1 pixels bare.
-                    var extra = room - each * members
-                    IntArray(n) { i ->
-                        if (!member[i]) 0 else each + (if (extra > 0) { extra--; 1 } else 0)
+            // Break into lines exactly as a FlowRow would, so this is a drop-in for one. A
+            // group that fits on one line takes this path with a single line and behaves
+            // exactly as before.
+            val maxW = if (constraints.hasBoundedWidth) constraints.maxWidth else Int.MAX_VALUE
+            val lines = ArrayList<IntArray>()
+            run {
+                var cur = ArrayList<Int>()
+                var used = 0
+                for (i in 0 until n) {
+                    val add = nat[i] + if (cur.isEmpty()) 0 else gapPx
+                    if (cur.isNotEmpty() && used + add > maxW) {
+                        lines.add(cur.toIntArray()); cur = ArrayList(); used = 0
                     }
-                } else null
-            } else null
+                    cur.add(i)
+                    used += if (cur.size == 1) nat[i] else add
+                }
+                if (cur.isNotEmpty()) lines.add(cur.toIntArray())
+            }
 
-            val placeables: List<Placeable> = if (equalBase != null) {
-                val desired = FloatArray(n) {
-                    if (member[it]) equalBase[it] * (1f + ExpressivePressGrowth * press[it]) else 0f
-                }
-                val total = equalBase.sum()
-                val desiredTotal = desired.sum()
-                val norm = if (desiredTotal > 0f) total / desiredTotal else 1f
-                measurables.mapIndexed { i, m ->
-                    if (!member[i]) {
-                        m.measure(childConstraints)
-                    } else {
-                        val w = (desired[i] * norm).roundToInt().coerceAtLeast(0)
-                        m.measure(childConstraints.copy(minWidth = w, maxWidth = w))
-                    }
-                }
-            } else {
-                // ONE budget, filled once, then only ever redistributed inside itself.
-                //
-                // Natural widths come from maxIntrinsicWidth rather than from a trial measure.
-                // That is not a micro-optimisation, it is what makes filling possible at all:
-                // a child may only be measured once per pass, so the old code had to spend its
-                // one measure learning the natural width and could never then place the child
-                // at a different one. It also fixes a bug the trial measure had -- inside a
-                // parent that forces a width, the "natural" width recorded was that forced
-                // width, so the button had nothing to grow from and never moved.
-                val h = if (constraints.hasBoundedHeight) constraints.maxHeight else 0
-                if (resting || !usable) {
-                    naturals.widths = IntArray(n) { i ->
-                        if (member[i]) measurables[i].maxIntrinsicWidth(h).coerceAtLeast(0) else 0
-                    }
-                }
-                val nat = naturals.widths!!
+            val out = arrayOfNulls<Placeable>(n)
+            val lineWidth = IntArray(lines.size)
+            val lineHeight = IntArray(lines.size)
 
-                // Non-members (a Spacer, a label sharing the row) keep their natural size and
-                // are measured first, so what remains is the members' budget.
-                val out = arrayOfNulls<Placeable>(n)
+            for ((li, idx) in lines.withIndex()) {
+                val gapsHere = gapPx * (idx.size - 1)
+                // Non-members on this line keep their natural size and are measured first, so
+                // what remains is the members' budget.
                 var nonMemberWidth = 0
-                for (i in 0 until n) if (!member[i]) {
+                for (i in idx) if (!member[i]) {
                     val p = measurables[i].measure(childConstraints)
                     out[i] = p
                     nonMemberWidth += p.width
                 }
+                val memberIdx = idx.filter { member[it] }
+                if (memberIdx.isEmpty()) {
+                    lineWidth[li] = nonMemberWidth + gapsHere
+                    lineHeight[li] = idx.maxOf { out[it]?.height ?: 0 }
+                    continue
+                }
 
-                // Members that declare a weight stretch to fill whatever the row leaves over.
-                // This is what lets a split pill span its row AND still redistribute on press:
-                // the label half carries the weight, the nub keeps its natural size, and the
-                // stretch is part of the budget rather than something a Row does outside it.
-                val naturalTotal = (0 until n).sumOf { if (member[it]) nat[it] else 0 }
+                val naturalTotal = memberIdx.sumOf { nat[it] }
                 val room = if (constraints.hasBoundedWidth) {
-                    (constraints.maxWidth - gaps - nonMemberWidth).coerceAtLeast(0)
+                    (constraints.maxWidth - gapsHere - nonMemberWidth).coerceAtLeast(0)
                 } else {
                     naturalTotal
                 }
-                val wSum = (0 until n).sumOf { if (member[it]) weight[it].toDouble() else 0.0 }
-                val leftover = (room - naturalTotal).coerceAtLeast(0)
-                val stretching = leftover > 0 && wSum > 0.0
-                val total = if (stretching) naturalTotal + leftover else naturalTotal
 
-                val base = DoubleArray(n) { if (member[it]) nat[it].toDouble() else 0.0 }
-                if (stretching) {
-                    for (i in 0 until n) {
-                        if (member[i] && weight[i] > 0f) base[i] += leftover * (weight[i] / wSum)
+                // Equal shares: the Material 3 connected-group look. TWO or more members --
+                // "an equal share" of a line is meaningless for a single button, and taking it
+                // literally is what turned a lone action into a pill spanning a whole panel.
+                val base = DoubleArray(n)
+                val total: Int
+                if (equalWidths && constraints.hasBoundedWidth && memberIdx.size > 1) {
+                    val each = room.toDouble() / memberIdx.size
+                    for (i in memberIdx) base[i] = each
+                    total = room
+                } else {
+                    // Members that declare a weight stretch to fill whatever the line leaves
+                    // over. This is what lets a split pill span its row AND still redistribute
+                    // on press: the label half carries the weight, the nub keeps its natural
+                    // size, and the stretch is part of the budget rather than something a Row
+                    // does outside it.
+                    val wSum = memberIdx.sumOf { weight[it].toDouble() }
+                    val leftover = (room - naturalTotal).coerceAtLeast(0)
+                    val stretching = leftover > 0 && wSum > 0.0
+                    for (i in memberIdx) base[i] = nat[i].toDouble()
+                    if (stretching) {
+                        for (i in memberIdx) {
+                            if (weight[i] > 0f) base[i] += leftover * (weight[i] / wSum)
+                        }
                     }
+                    total = if (stretching) naturalTotal + leftover else naturalTotal
                 }
 
-                val growers = (0 until n).filter { member[it] && press[it] > 0.001f }
-                val donors = (0 until n).filter { member[it] && press[it] <= 0.001f }
-
+                // ONE invariant: the members' total width on a line never changes. Everything
+                // else is redistribution inside that budget -- a pressed button takes width,
+                // the unpressed ones give exactly that much back, and the line's own footprint
+                // is identical on every frame of the press and the release.
+                val growers = memberIdx.filter { press[it] > 0.001f }
+                val donors = memberIdx.filter { press[it] <= 0.001f }
                 // A donor gives up its own spare padding and nothing else, so no label ever
                 // ellipsizes and no icon ever loses its target (see ButtonMinSidePadding) --
-                // plus any stretch it was handed above its natural width, which by definition
-                // is not content either.
-                val floorOf = DoubleArray(n) { i ->
-                    if (!member[i]) 0.0 else (nat[i] - slack[i]).coerceAtLeast(0).toDouble().coerceAtMost(base[i])
+                // plus any stretch it was handed above its natural width, which is not content
+                // either.
+                val floorOf = DoubleArray(n)
+                for (i in memberIdx) {
+                    floorOf[i] = (nat[i] - slack[i]).coerceAtLeast(0).toDouble().coerceAtMost(base[i])
                 }
                 // What the pressed buttons ask for, and what the others can actually spare.
                 // Whichever is smaller is what moves -- so with nothing to take from (a lone
-                // button in the row) NOTHING moves, rather than the row quietly growing.
+                // button on the line) NOTHING moves, rather than the line quietly growing.
                 val want = growers.sumOf { base[it] * ExpressivePressGrowth * press[it] }
                 val capacity = donors.sumOf { base[it] - floorOf[it] }
                 val give = minOf(want, capacity)
 
-                val exact = DoubleArray(n) { base[it] }
+                val exact = DoubleArray(n)
+                for (i in memberIdx) exact[i] = base[i]
                 if (give > 0.0) {
                     for (i in growers) {
                         exact[i] = base[i] + give * (base[i] * ExpressivePressGrowth * press[i]) / want
@@ -428,44 +441,46 @@ fun ExpressiveButtonGroup(
                     }
                 }
 
-                // Largest-remainder rounding across the members, so the integer widths sum to
-                // `total` EXACTLY rather than approximately. Without this the group breathes by
-                // a pixel or two as the spring runs, which on a connected pill is visible as a
-                // seam that will not sit still.
-                val target = IntArray(n) { if (member[it]) exact[it].toInt() else 0 }
-                var remainder = total - (0 until n).sumOf { if (member[it]) target[it] else 0 }
+                // Largest-remainder rounding, so the integer widths sum to `total` EXACTLY
+                // rather than approximately. Without this the group breathes by a pixel or two
+                // as the spring runs, which on a connected pill is a seam that will not sit
+                // still.
+                val target = IntArray(n)
+                for (i in memberIdx) target[i] = exact[i].toInt()
+                var remainder = total - memberIdx.sumOf { target[it] }
                 if (remainder > 0) {
-                    val order = (0 until n).filter { member[it] }
-                        .sortedByDescending { exact[it] - exact[it].toInt() }
+                    val order = memberIdx.sortedByDescending { exact[it] - exact[it].toInt() }
                     // Bounded by construction, not by trusting the arithmetic: truncation can
-                    // only ever leave a remainder >= 0 and smaller than the member count, but
-                    // this runs inside a measure pass, and a measure pass that can spin is a
-                    // frozen app rather than a wrong pixel.
+                    // only leave a remainder >= 0 smaller than the member count. But this runs
+                    // inside a measure pass, and a measure pass that can spin is a frozen app
+                    // rather than a wrong pixel.
                     var k = 0
                     while (remainder > 0 && k < order.size) {
                         target[order[k]]++; remainder--; k++
                     }
                 }
-                for (i in 0 until n) if (member[i]) {
-                    val w = target[i].coerceIn(
-                        0,
-                        if (constraints.hasBoundedWidth) constraints.maxWidth else target[i],
-                    )
+                for (i in memberIdx) {
+                    val w = target[i].coerceIn(0, maxW)
                     out[i] = measurables[i].measure(childConstraints.copy(minWidth = w, maxWidth = w))
                 }
-                out.map { it!! }
+                lineWidth[li] = idx.sumOf { out[it]!!.width } + gapsHere
+                lineHeight[li] = idx.maxOf { out[it]!!.height }
             }
 
-            val width = (placeables.sumOf { it.width } + gaps)
+            val width = (lineWidth.maxOrNull() ?: 0)
                 .coerceIn(constraints.minWidth, constraints.maxWidth)
-            val height = (placeables.maxOfOrNull { it.height } ?: 0)
+            val height = (lineHeight.sum() + lineGapPx * (lines.size - 1).coerceAtLeast(0))
                 .coerceIn(constraints.minHeight, constraints.maxHeight)
             layout(width, height) {
-                val content = placeables.sumOf { it.width } + gaps
-                var x = horizontalAlignment.align(content, width, layoutDirection)
-                placeables.forEach { p ->
-                    p.placeRelative(x, verticalAlignment.align(p.height, height))
-                    x += p.width + gapPx
+                var y = 0
+                for ((li, idx) in lines.withIndex()) {
+                    var x = horizontalAlignment.align(lineWidth[li], width, layoutDirection)
+                    for (i in idx) {
+                        val p = out[i]!!
+                        p.placeRelative(x, y + verticalAlignment.align(p.height, lineHeight[li]))
+                        x += p.width + gapPx
+                    }
+                    y += lineHeight[li] + lineGapPx
                 }
             }
         },

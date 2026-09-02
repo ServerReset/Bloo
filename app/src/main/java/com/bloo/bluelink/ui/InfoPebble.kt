@@ -19,8 +19,6 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
-import androidx.compose.foundation.layout.FlowRowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.only
@@ -211,13 +209,17 @@ internal fun InfoPebble(v: Vehicle, status: VehicleStatus?, state: UiState, vm: 
 internal fun OwnerLinks(v: Vehicle, state: UiState, context: Context, inApp: Boolean) {
     val links = v.brand.links
 
+    // ExpressiveButtonRow, not FlowRow: it wraps the same way, but a FlowRow has no notion of a
+    // shared budget, so a pressed link button grew for real and simply shoved its neighbours
+    // along -- the reported "they expand but just push the other buttons away". As a group the
+    // line's total is fixed and the neighbours give the width back.
     @Composable
-    fun group(title: String, content: @Composable FlowRowScope.() -> Unit) {
+    fun group(title: String, content: @Composable () -> Unit) {
         SectionLabel(title)
-        FlowRow(
-            Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ExpressiveButtonRow(
+            modifier = Modifier.fillMaxWidth(),
+            spacing = 8.dp,
+            lineSpacing = 8.dp,
             content = content,
         )
     }
@@ -295,20 +297,19 @@ internal fun LinkButton(label: String, icon: ImageVector, onClick: () -> Unit) {
     // Same morphing pill framework as every other button, with a tonal fill that
     // reads clearly on the car-info pebble.
     val linkSource = remember { MutableInteractionSource() }
-    SafeExpansiveButton(
+    MorphButton(
+        onClick = onClick,
         interactionSource = linkSource,
-        enabled = true,
+        containerColor = MaterialTheme.colorScheme.secondaryContainer,
+        contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+        // 18dp, up from 14dp: the padding IS the give. A button that hugs its label at 14dp
+        // could spare 2dp a side above ButtonMinSidePadding, which is not enough movement to
+        // read as anything; at 18dp it can hand a pressed neighbour a visible 20dp and still
+        // never touch its own label. See ButtonMinSidePadding.
+        contentPadding = PaddingValues(horizontal = 18.dp, vertical = 8.dp),
     ) {
-        MorphButton(
-            onClick = onClick,
-            interactionSource = linkSource,
-            containerColor = MaterialTheme.colorScheme.secondaryContainer,
-            contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
-            contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp),
-        ) {
-            Icon(icon, contentDescription = null, modifier = Modifier.size(16.dp))
-            Spacer(Modifier.width(6.dp))
-            Text(label, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold)
-        }
+        Icon(icon, contentDescription = null, modifier = Modifier.size(ButtonIconSize))
+        Spacer(Modifier.width(6.dp))
+        Text(label, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold)
     }
 }
