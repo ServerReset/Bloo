@@ -957,11 +957,6 @@ internal fun StateControl(
                         contentPadding = PaddingValues(0.dp),
                         shapeForCorner = { morph, cp -> connectedGroupShape(i, segmentCount, cp, morph) },
                         modifier = Modifier.size(groupBtnSize),
-                        // Stated, not derived: contentPadding is zero here, so the padding rule
-                        // would say this segment has nothing to give -- which is precisely why
-                        // the horn/lights segments never moved. The room is around the glyph
-                        // inside the fixed box, not in contentPadding.
-                        compressible = IconButtonCompressible,
                     ) { Icon(action.icon, contentDescription = action.contentDescription, modifier = Modifier.size(actionIconSize)) }
                 }
             }

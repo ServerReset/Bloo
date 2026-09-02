@@ -18,7 +18,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.layout.ParentDataModifier
 import androidx.compose.ui.layout.Placeable
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -59,26 +58,24 @@ import kotlin.math.roundToInt
 internal const val ExpressivePressGrowth = 0.15f
 
 /**
- * The horizontal padding a button keeps no matter how hard it is squeezed.
+ * A group member's resting width is its content plus [ExpressivePressGrowth] again.
  *
  * This is the whole basis of the effect, so it is worth stating plainly: a button that hugs its
- * content has NO slack. Its natural width IS its label plus its padding, so a neighbour pressing
- * beside it has nothing to take. The previous rule let a donor shrink to its minimum INTRINSIC
- * width -- which for text is the longest single word -- so donors did compress, and then
- * ellipsized, because a button label is deliberately one line that never wraps. That is the
- * reported "Update PIN truncates".
+ * content has NO slack. Its width IS its label plus its padding, so a neighbour pressing beside
+ * it has nothing to give. Earlier rules tried to find slack inside that width -- shrink to the
+ * minimum intrinsic width (the longest word, so labels ellipsized, since a button label is one
+ * line that never wraps), or shrink into the padding (nothing at all for a button with tight
+ * padding, and nothing for a fixed-size icon).
  *
- * So a donor now gives up only its own spare padding, and never a pixel of its content. Every
- * button publishes how much that is (see [ExpressiveGroupData.compressiblePx]), measured from
- * its own contentPadding down to this floor.
+ * So the slack is not found, it is RESERVED: a member rests one growth-step wider than it needs,
+ * and squeezing it returns it to exactly the width its content asked for. Nothing can truncate,
+ * nothing can wrap to a second line, and every button has capacity regardless of what it holds.
+ *
+ * Deliberately expressed as the growth constant rather than a number of its own -- the reserve
+ * and the growth are the same quantity seen from either end, and they can only stay in step if
+ * there is one of them.
  */
-val ButtonMinSidePadding = 8.dp
-
-/** What an icon-only button can spare: a 48dp target around a 24dp glyph has room either side. */
-val IconButtonCompressible = 12.dp
-
-/** Fallback slack for a group member that does not state its own. */
-val DefaultButtonCompressible = 16.dp
+internal const val ExpressiveRestingScale = 1f + ExpressivePressGrowth
 
 /** Damping for the press spring. High enough not to ring: see expressivePressFraction. */
 private const val PressDamping = 0.88f
@@ -117,24 +114,16 @@ fun SafeExpansiveButton(
     interactionSource: InteractionSource,
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
-    /**
-     * How much width this button can give up to a pressed neighbour without its content
-     * changing -- its spare padding. See [ButtonMinSidePadding]. MorphButton works this out
-     * from its own contentPadding and passes it in; anything wrapping a button by hand gets a
-     * sensible default rather than nothing, because nothing means it cannot take part.
-     */
-    compressible: Dp = DefaultButtonCompressible,
     /** See [ExpressiveGroupData.weight]. Ignored outside a group. */
     groupWeight: Float = 0f,
     content: @Composable () -> Unit,
 ) {
     val press by expressivePressFraction(interactionSource, enabled)
-    val compressiblePx = with(LocalDensity.current) { compressible.roundToPx() }
     // Inside an [ExpressiveButtonRow]/[ExpressiveButtonGroup] this button joins the group, which
     // takes the extra width off its NEIGHBOURS so the row's own footprint never changes.
     if (LocalExpressiveGroup.current) {
         Box(
-            modifier.then(ExpressiveGroupData({ press }, compressiblePx, groupWeight)),
+            modifier.then(ExpressiveGroupData({ press }, groupWeight)),
             propagateMinConstraints = true,
         ) {
             // Providing FALSE inside makes joining a group idempotent. MorphButton now joins on
@@ -312,11 +301,8 @@ fun ExpressiveButtonGroup(
             val press = FloatArray(n) { i ->
                 (measurables[i].parentData as? ExpressiveGroupData)?.pressFraction?.invoke() ?: 0f
             }
-            // Spare padding each member is willing to give up, and which members absorb the
-            // line's leftover space. Parent data, so both cost nothing per frame.
-            val slack = IntArray(n) { i ->
-                (measurables[i].parentData as? ExpressiveGroupData)?.compressiblePx ?: 0
-            }
+            // Which members absorb the line's leftover space. Parent data, so it costs nothing
+            // per frame.
             val weight = FloatArray(n) { i ->
                 (measurables[i].parentData as? ExpressiveGroupData)?.weight ?: 0f
             }
@@ -330,10 +316,21 @@ fun ExpressiveButtonGroup(
             // width recorded WAS that forced width, so the button had nothing to grow from.
             val h = if (constraints.hasBoundedHeight) constraints.maxHeight else 0
             val cached = naturals.widths
-            if (resting || cached == null || cached.size != n) {
-                naturals.widths = IntArray(n) { measurables[it].maxIntrinsicWidth(h).coerceAtLeast(0) }
+            // Both arrays are written together and read together, so both are checked.
+            if (resting || cached == null || cached.size != n || naturals.content?.size != n) {
+                val c = IntArray(n) { measurables[it].maxIntrinsicWidth(h).coerceAtLeast(0) }
+                naturals.content = c
+                // The reserve: a MEMBER rests one growth-step wider than its content needs, so
+                // that being squeezed returns it to exactly `content` and never below. A
+                // non-member is not part of the redistribution and keeps its own width.
+                naturals.widths = IntArray(n) {
+                    if (member[it]) (c[it] * ExpressiveRestingScale).roundToInt() else c[it]
+                }
             }
             val nat = naturals.widths!!
+            // What each member's content actually asked for -- its floor, and the width it lands
+            // on when a neighbour takes everything it has to give.
+            val content = naturals.content!!
 
             // Break into lines exactly as a FlowRow would, so this is a drop-in for one. A
             // group that fits on one line takes this path with a single line and behaves
@@ -415,18 +412,20 @@ fun ExpressiveButtonGroup(
                 // is identical on every frame of the press and the release.
                 val growers = memberIdx.filter { press[it] > 0.001f }
                 val donors = memberIdx.filter { press[it] <= 0.001f }
-                // A donor gives up its own spare padding and nothing else, so no label ever
-                // ellipsizes and no icon ever loses its target (see ButtonMinSidePadding) --
-                // plus any stretch it was handed above its natural width, which is not content
-                // either.
+                // A donor bottoms out at its own content width -- the reserve, and any stretch
+                // it was handed above that, but never a pixel of the label or the glyph. So a
+                // fully squeezed button is exactly the button you would have drawn with no
+                // effect at all, and nothing can truncate or wrap to a second line.
                 val floorOf = DoubleArray(n)
                 for (i in memberIdx) {
-                    floorOf[i] = (nat[i] - slack[i]).coerceAtLeast(0).toDouble().coerceAtMost(base[i])
+                    floorOf[i] = content[i].toDouble().coerceAtMost(base[i])
                 }
                 // What the pressed buttons ask for, and what the others can actually spare.
-                // Whichever is smaller is what moves -- so with nothing to take from (a lone
-                // button on the line) NOTHING moves, rather than the line quietly growing.
-                val want = growers.sumOf { base[it] * ExpressivePressGrowth * press[it] }
+                // Both sides are the same fraction of CONTENT, which is what makes the two
+                // balance: a lone donor's reserve is exactly one grower's growth. Whichever is
+                // smaller is what moves -- so with nothing to take from (a lone button on the
+                // line) NOTHING moves, rather than the line quietly growing.
+                val want = growers.sumOf { content[it] * ExpressivePressGrowth * press[it] }
                 val capacity = donors.sumOf { base[it] - floorOf[it] }
                 val give = minOf(want, capacity)
 
@@ -434,7 +433,7 @@ fun ExpressiveButtonGroup(
                 for (i in memberIdx) exact[i] = base[i]
                 if (give > 0.0) {
                     for (i in growers) {
-                        exact[i] = base[i] + give * (base[i] * ExpressivePressGrowth * press[i]) / want
+                        exact[i] = base[i] + give * (content[i] * ExpressivePressGrowth * press[i]) / want
                     }
                     for (i in donors) {
                         exact[i] = base[i] - give * (base[i] - floorOf[i]) / capacity
@@ -490,7 +489,11 @@ fun ExpressiveButtonGroup(
 /** Cache of resting child widths for one [ExpressiveButtonGroup]. See its own comment for why
  *  this is a plain object and not snapshot state. */
 private class NaturalWidths {
+    /** Resting widths: a member's content plus the reserve. See [ExpressiveRestingScale]. */
     var widths: IntArray? = null
+
+    /** What each child's content asked for, before the reserve -- the floor a donor stops at. */
+    var content: IntArray? = null
 }
 
 /** Carries a child's live press fraction to [ExpressiveButtonGroup]'s measure policy. The
@@ -498,18 +501,6 @@ private class NaturalWidths {
  *  having to recompose to report it. */
 private data class ExpressiveGroupData(
     val pressFraction: () -> Float,
-    /**
-     * How many pixels this child can give up without its content changing shape -- its spare
-     * padding, above [ButtonMinSidePadding] a side.
-     *
-     * Published by the child rather than derived by the group, because only the child knows what
-     * is padding and what is content. The group used to ask minIntrinsicWidth instead, which is
-     * both expensive (it measures the child's subtree, once per member per frame of the spring)
-     * and wrong twice over: for a label it returns the longest word, so donors truncated; for a
-     * fixed-size icon button it returns the full width, so capacity was zero and the chevron and
-     * the lock/horn/lights segments never moved at all.
-     */
-    val compressiblePx: Int,
     /**
      * Share of the row's leftover space this member takes, 0 to opt out.
      *
@@ -537,20 +528,17 @@ object ExpressiveButtonGroupScope {
         interactionSource: InteractionSource,
         modifier: Modifier = Modifier,
         enabled: Boolean = true,
-        /** See SafeExpansiveButton's own `compressible`. */
-        compressible: Dp = DefaultButtonCompressible,
         /** See [ExpressiveGroupData.weight]. */
         groupWeight: Float = 0f,
         content: @Composable () -> Unit,
     ) {
         val press by expressivePressFraction(interactionSource, enabled)
-        val compressiblePx = with(LocalDensity.current) { compressible.roundToPx() }
         Box(
             modifier
                 // propagateMinConstraints (below) so the button itself fills the width the
                 // group hands it -- otherwise it would sit at its own natural width inside a
                 // slot growing and shrinking around it, and nothing would appear to move.
-                .then(ExpressiveGroupData({ press }, compressiblePx, groupWeight)),
+                .then(ExpressiveGroupData({ press }, groupWeight)),
             propagateMinConstraints = true,
         ) {
             // FALSE inside, exactly as SafeExpansiveButton's own group branch does it: this
