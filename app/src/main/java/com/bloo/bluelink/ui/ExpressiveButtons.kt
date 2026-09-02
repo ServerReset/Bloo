@@ -68,24 +68,24 @@ import kotlinx.coroutines.launch
 internal const val ExpressivePressGrowth = 0.30f
 
 /**
- * A group member's resting width is its content plus [ExpressivePressGrowth] again.
+ * A group member's resting width is its content plus one reserve PER NEIGHBOUR it actually
+ * shares a seam with -- not a flat allowance every member carries regardless of what's beside
+ * it. A button that hugs its content has NO slack: its width IS its label plus its padding, so
+ * a neighbour pressing beside it has nothing to give. Earlier rules tried to find slack inside
+ * that width -- shrink to the minimum intrinsic width (the longest word, so labels ellipsized,
+ * since a button label is one line that never wraps), or shrink into the padding (nothing at
+ * all for a button with tight padding, and nothing for a fixed-size icon).
  *
- * This is the whole basis of the effect, so it is worth stating plainly: a button that hugs its
- * content has NO slack. Its width IS its label plus its padding, so a neighbour pressing beside
- * it has nothing to give. Earlier rules tried to find slack inside that width -- shrink to the
- * minimum intrinsic width (the longest word, so labels ellipsized, since a button label is one
- * line that never wraps), or shrink into the padding (nothing at all for a button with tight
- * padding, and nothing for a fixed-size icon).
- *
- * So the slack is not found, it is RESERVED: a member rests one growth-step wider than it needs,
- * and squeezing it returns it to exactly the width its content asked for. Nothing can truncate,
- * nothing can wrap to a second line, and every button has capacity regardless of what it holds.
- *
- * Deliberately expressed as the growth constant rather than a number of its own -- the reserve
- * and the growth are the same quantity seen from either end, and they can only stay in step if
- * there is one of them.
+ * So the slack is not found, it is RESERVED, and it is reserved PER SEAM: each internal boundary
+ * between two adjacent members gets its own capacity ([ExpressivePressGrowth] of the larger of
+ * the two members either side of it), split evenly between them at rest. A member with one
+ * neighbour (the end of a line) carries one seam's worth; a member with two (the middle of a
+ * three-plus segment group) carries two; a member with none carries nothing to reserve for. See
+ * the per-line measure block for where this is actually built and spent -- growing a member only
+ * ever draws on the seam(s) it shares with a real neighbour, never from a member two seats away
+ * it was never touching, and squeezing a member only ever moves the shared seam edge, never its
+ * own free outer edge.
  */
-internal const val ExpressiveRestingScale = 1f + ExpressivePressGrowth
 
 /** Damping for the press spring. High enough not to ring: see expressivePressFraction. */
 private const val PressDamping = 0.88f
@@ -468,10 +468,29 @@ fun ExpressiveButtonGroup(
                     continue
                 }
 
+                // Per-seam reserve for a given content basis (full or compact) -- see
+                // ExpressivePressGrowth's own doc for why this replaced a flat per-member
+                // allowance. One entry per INTERNAL boundary between two adjacent members;
+                // capacity is [ExpressivePressGrowth] of the larger side, so either side's own
+                // full press-growth can come entirely from that one seam. Used twice below: once
+                // (against `full`) to estimate an unbounded line's own room, and once (against
+                // whichever `basis` the fit rule below actually picks) for the real layout.
+                fun seamReserve(basis: IntArray): IntArray {
+                    val out = IntArray(n)
+                    for (k in 0 until memberIdx.size - 1) {
+                        val a = memberIdx[k]; val b = memberIdx[k + 1]
+                        val cap = (ExpressivePressGrowth * maxOf(basis[a], basis[b])) / 2f
+                        out[a] += cap.roundToInt()
+                        out[b] += cap.roundToInt()
+                    }
+                    return out
+                }
+
                 val room = if (constraints.hasBoundedWidth) {
                     (constraints.maxWidth - gapsHere - nonMemberWidth).coerceAtLeast(0)
                 } else {
-                    memberIdx.sumOf { (full[it] * ExpressiveRestingScale).roundToInt() }
+                    val r = seamReserve(full)
+                    memberIdx.sumOf { full[it] + r[it] }
                 }
 
                 // THE FIT RULE, all-or-nothing. If this line cannot give every member the room
@@ -495,10 +514,13 @@ fun ExpressiveButtonGroup(
                 } else {
                     full
                 }
-                // Resting width for whichever basis won: content (or glyph) plus the reserve.
-                val natLine = IntArray(n) {
-                    if (member[it]) (basis[it] * ExpressiveRestingScale).roundToInt() else full[it]
-                }
+                // Resting width for whichever basis won: content (or glyph) plus its own seams'
+                // share of reserve. Named distinctly from the `reserve` local a few lines down
+                // (the spare < 0 trim branch) -- Kotlin would silently let that one shadow this,
+                // which is exactly the kind of same-name-different-thing mixup worth a distinct
+                // name for.
+                val memberReserve = seamReserve(basis)
+                val natLine = IntArray(n) { if (member[it]) basis[it] + memberReserve[it] else full[it] }
                 val naturalTotal = memberIdx.sumOf { natLine[it] }
 
                 // Equal shares: the Material 3 connected-group look. TWO or more members --
@@ -549,40 +571,38 @@ fun ExpressiveButtonGroup(
                 }
 
                 // ONE invariant: the members' total width on a line never changes. Everything
-                // else is redistribution inside that budget -- a pressed button takes width,
-                // the unpressed ones give exactly that much back, and the line's own footprint
-                // is identical on every frame of the press and the release.
-                val growers = memberIdx.filter { press[it] > 0.001f }
-                val donors = memberIdx.filter { press[it] <= 0.001f }
-                // A donor bottoms out at its own content width -- the reserve, and any stretch
-                // it was handed above that, but never a pixel of the label or the glyph. So a
-                // fully squeezed button is exactly the button you would have drawn with no
-                // effect at all, and nothing can truncate or wrap to a second line.
-                val floorOf = DoubleArray(n)
-                for (i in memberIdx) {
-                    floorOf[i] = basis[i].toDouble().coerceAtMost(base[i])
-                }
-                // What the pressed buttons ask for, and what the others can actually spare.
-                // Both sides are the same fraction of CONTENT, which is what makes the two
-                // balance: a lone donor's reserve is exactly one grower's growth. Whichever is
-                // smaller is what moves -- so with nothing to take from (a lone button on the
-                // line) NOTHING moves, rather than the line quietly growing.
-                // toDouble() explicitly: content is an IntArray, so Int * Float * Float is a
-                // Float, and sumOf has no Float overload to resolve to.
-                val want = growers.sumOf { basis[it].toDouble() * ExpressivePressGrowth * press[it] }
-                val capacity = donors.sumOf { base[it] - floorOf[it] }
-                val give = minOf(want, capacity)
-
+                // else is redistribution inside that budget. But WHERE a pressed member's growth
+                // comes from is now LOCAL, not a global pool: it draws only on the seam(s) it
+                // shares with a real neighbour, exactly like the reserve those seams hold was
+                // built. Each seam's own delta is zero-sum between its two members by
+                // construction (whatever one side gains, the other loses, exactly), so summing
+                // local seam deltas on top of `base` -- whatever the equalWidths/stretch/trim
+                // step above already put there -- can never change the line's own total, without
+                // needing a separate global want/capacity accounting. This is also what makes a
+                // squeezed member's FAR edge stay put: only the shared seam moves, because only
+                // the shared seam's own delta touches that member at all.
                 val exact = DoubleArray(n)
                 for (i in memberIdx) exact[i] = base[i]
-                if (give > 0.0) {
-                    for (i in growers) {
-                        exact[i] = base[i] +
-                            give * (basis[i].toDouble() * ExpressivePressGrowth * press[i]) / want
-                    }
-                    for (i in donors) {
-                        exact[i] = base[i] - give * (base[i] - floorOf[i]) / capacity
-                    }
+                for (k in 0 until memberIdx.size - 1) {
+                    val a = memberIdx[k]; val b = memberIdx[k + 1]
+                    val cap = (ExpressivePressGrowth * maxOf(basis[a], basis[b])).toDouble()
+                    // 0.5 at rest (the seam's capacity split evenly, already folded into each
+                    // side's own reserve above) sliding toward 1.0 as `a` presses relative to
+                    // `b`, and symmetrically toward 0.0 the other way -- so a lone press on
+                    // either side draws the WHOLE seam its own way, and two simultaneous presses
+                    // (rare, but not impossible mid-release) partially cancel instead of both
+                    // claiming the full seam.
+                    val shareA = (0.5 + 0.5 * (press[a] - press[b])).toDouble().coerceIn(0.0, 1.0)
+                    val delta = cap * (shareA - 0.5)
+                    exact[a] += delta
+                    exact[b] -= delta
+                }
+                // Defensive floor only -- content itself never shrinks below what it needs, even
+                // in the two-sided-press edge case above. Left uncorrected on the other side of
+                // that same rare case; a pixel of slack in the line's own total there is a far
+                // smaller cost than a truncated label.
+                for (i in memberIdx) {
+                    exact[i] = exact[i].coerceAtLeast(basis[i].toDouble())
                 }
 
                 // Largest-remainder rounding, so the integer widths sum to `total` EXACTLY

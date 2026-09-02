@@ -300,9 +300,9 @@ internal fun LinkButton(label: String, icon: ImageVector, onClick: () -> Unit) {
         containerColor = MaterialTheme.colorScheme.secondaryContainer,
         contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
         // 18dp, up from 14dp, to match every other labelled button. The give no longer comes
-        // from padding at all -- a group member rests one growth-step wider than its content
-        // and squeezes back to it (see ExpressiveRestingScale) -- so this is purely about
-        // these links looking like the buttons they sit among.
+        // from padding at all -- a group member rests with a per-seam reserve and squeezes back
+        // to its own content when a neighbour presses (see ExpressivePressGrowth) -- so this is
+        // purely about these links looking like the buttons they sit among.
         contentPadding = PaddingValues(horizontal = 18.dp, vertical = 8.dp),
     ) {
         // The shared label: standard gap, standard type, and -- the reason it matters here --
