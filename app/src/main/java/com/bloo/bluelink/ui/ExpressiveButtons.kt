@@ -4,7 +4,7 @@ import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.interaction.InteractionSource
-import androidx.compose.foundation.interaction.collectIsPressedAsState
+import androidx.compose.foundation.interaction.PressInteraction
 import androidx.compose.foundation.layout.Box
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -23,6 +23,8 @@ import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import kotlin.math.roundToInt
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.launch
 
 /**
  * Material 3 Expressive press feedback, in two flavours that exist for one reason: a press
@@ -95,9 +97,8 @@ private const val PressDamping = 0.88f
  */
 @Composable
 private fun expressivePressFraction(interactionSource: InteractionSource, enabled: Boolean): State<Float> {
-    val pressed by interactionSource.collectIsPressedAsState()
     val anim = remember { Animatable(0f) }
-    LaunchedEffect(pressed, enabled) {
+    LaunchedEffect(interactionSource, enabled) {
         if (!enabled) {
             anim.snapTo(0f)
             return@LaunchedEffect
@@ -108,18 +109,59 @@ private fun expressivePressFraction(interactionSource: InteractionSource, enable
         // drags the neighbours back and forth with it, which reads as wobble rather than as
         // life. The push still springs; it just does not ring.
         val spec = spring<Float>(dampingRatio = PressDamping, stiffness = Spring.StiffnessMedium)
-        if (pressed) {
-            anim.animateTo(1f, spec)
-        } else {
-            // Finish the push before returning. THIS is what makes a tap feel like a push: a
-            // press and its release can be milliseconds apart, and simply springing toward
-            // whatever the current state is would send the animation home before it had
-            // travelled anywhere -- press a button, watch nothing happen. Tap and hold now
-            // differ only in how long the button dwells at full push, like a physical one.
-            if (anim.value < 1f) {
-                anim.animateTo(1f, spring(dampingRatio = PressDamping, stiffness = Spring.StiffnessHigh))
+        // Held by press IDENTITY, not a count: a press can legitimately be released before
+        // this collector even gets to react to it (see below), and a cancelled gesture would
+        // otherwise leave a plain counter unbalanced and the button stuck "held" forever.
+        val held = mutableSetOf<PressInteraction.Press>()
+        // The one animation leg currently running, so a new interaction can cancel it and
+        // start the next leg immediately rather than queuing behind it.
+        var leg: Job? = null
+        fun runTo(target: Float, finishPushFirst: Boolean) {
+            leg?.cancel()
+            leg = launch {
+                // Finish the push before returning. THIS is what makes a tap feel like a
+                // push: a press and its release can be milliseconds apart, and simply
+                // springing toward whatever the current state is would send the animation
+                // home before it had travelled anywhere -- press a button, watch nothing
+                // happen. Tap and hold differ only in how long the button dwells at full
+                // push, like a physical one.
+                if (finishPushFirst && anim.value < 1f) {
+                    anim.animateTo(1f, spring(dampingRatio = PressDamping, stiffness = Spring.StiffnessHigh))
+                }
+                anim.animateTo(target, spec)
             }
-            anim.animateTo(0f, spec)
+        }
+        // Collecting the raw interaction FLOW, not a derived `pressed` boolean, and reacting
+        // to each event directly inside collect -- not via a separate LaunchedEffect keyed on
+        // that boolean. A fast tap's Press and Release can both be written before Compose ever
+        // runs the recomposition that would read an intermediate value: composition only ever
+        // reflects the LATEST value of a piece of state, so a boolean that goes true-then-false
+        // between two recompositions can read as having stayed false throughout, and a
+        // LaunchedEffect keyed on it never restarts at all -- the animation silently never
+        // runs. That was "quick tap barely moves, hold is fine": a hold has enough dwell time
+        // to always be observed; a tap does not. collect() has no such gap -- every emitted
+        // Press and Release is processed in order regardless of composition/frame timing.
+        //
+        // The collector itself never suspends on the animation (each leg runs in its own
+        // launched child, cancelled and replaced rather than awaited) -- interactionSource's
+        // flow drops OLDEST on overflow, so a collector blocked for a whole animateTo across a
+        // burst of rapid presses could lose one and leave a button stuck open.
+        interactionSource.interactions.collect { interaction ->
+            when (interaction) {
+                is PressInteraction.Press -> {
+                    held += interaction
+                    runTo(1f, finishPushFirst = false)
+                }
+                is PressInteraction.Release -> {
+                    held -= interaction.press
+                    if (held.isEmpty()) runTo(0f, finishPushFirst = true)
+                }
+                is PressInteraction.Cancel -> {
+                    held -= interaction.press
+                    if (held.isEmpty()) runTo(0f, finishPushFirst = true)
+                }
+                else -> {}
+            }
         }
     }
     return anim.asState()
