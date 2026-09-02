@@ -160,6 +160,7 @@ internal fun coverBodyGap(): Dp = if (coverIsTiny()) 6.dp else 8.dp
  * washed out the moment the tile scrolled at all. Here the fade only has to say "there is more
  * above", not dissolve the content saying it.
  */
+@Composable
 internal fun coverFadeLength(): Dp = if (coverIsTiny()) 10.dp else 14.dp
 
 /**
