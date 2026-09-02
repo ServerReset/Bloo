@@ -268,8 +268,13 @@ internal fun CoverTile(
     ) {
       Box(Modifier.fillMaxSize()) {
         background?.invoke(this)
-        Column(Modifier.fillMaxSize().padding(horizontal = coverContentInset())) {
-            Spacer(Modifier.height(coverTileEdgeGap()))
+        // The identity band -- glyph, state word, car name, and the subtitle under it.
+        //
+        // Declared here and rendered at the BOTTOM of the tile, next to the actions, rather
+        // than at the top. At the top it took the first fifth of a cover screen before any
+        // content had a chance to appear, on a display where a fifth is most of what there is.
+        // Down here it sits with the controls it describes, and everything above it is content.
+        val identity: @Composable ColumnScope.() -> Unit = {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -331,6 +336,9 @@ internal fun CoverTile(
                     overflow = TextOverflow.Ellipsis,
                 )
             }
+        }
+        Column(Modifier.fillMaxSize().padding(horizontal = coverContentInset())) {
+            Spacer(Modifier.height(coverTileEdgeGap()))
             // A scrolling Box that CENTERS its content, rather than a BoxWithConstraints whose
             // only job was to read maxHeight and feed it back as heightIn(min = ...).
             //
@@ -361,7 +369,10 @@ internal fun CoverTile(
                     content = body,
                 )
             }
+            Spacer(Modifier.height(coverBodyGap()))
+            identity()
             if (actions != null) {
+                Spacer(Modifier.height(coverBodyPad()))
                 // ExpressiveButtonRow with equal shares: these are several buttons in one
                 // space, so pressing one should widen it and squeeze its neighbours, exactly as
                 // the lock pebble's connected group does on the phone. equalWidths is what the
