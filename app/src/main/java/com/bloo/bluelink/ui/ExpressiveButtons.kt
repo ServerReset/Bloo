@@ -397,23 +397,23 @@ fun ExpressiveButtonGroup(
             // bug the trial measure had -- inside a parent that forces a width, the "natural"
             // width recorded WAS that forced width, so the button had nothing to grow from.
             val h = if (constraints.hasBoundedHeight) constraints.maxHeight else 0
-            // Both arrays are written together and read together, so both are checked.
-            if (resting || naturals.content?.size != n || naturals.compact?.size != n) {
-                val c = IntArray(n) { measurables[it].maxIntrinsicWidth(h).coerceAtLeast(0) }
-                naturals.content = c
-                // The smallest each member can be and still say something -- for a standard
-                // button, its glyph alone. See MorphButtonLabel, which states that through its
-                // own intrinsics so the group never has to know what a label is.
-                naturals.compact = IntArray(n) {
-                    if (member[it]) measurables[it].minIntrinsicWidth(h).coerceIn(0, c[it]) else c[it]
-                }
+            if (resting || naturals.content?.size != n) {
+                naturals.content = IntArray(n) { measurables[it].maxIntrinsicWidth(h).coerceAtLeast(0) }
+                // Invalidated, not recomputed here -- see the lazy read below for why.
+                naturals.compact = null
             }
-            // What each child's content asked for, and the least a member can be. The RESTING
-            // width -- content plus the reserve -- is derived per line rather than cached,
-            // because which of these two a line builds on is a per-line decision (see the fit
-            // rule below) and caching one answer would have pinned it.
+            // What each child's content actually asked for -- the only intrinsic width this
+            // group pays for by default.
             val full = naturals.content!!
-            val compact = naturals.compact!!
+            // The icon-only fallback is genuinely lazy, not just cached: minIntrinsicWidth asks
+            // a full intrinsic pass down each member's own subtree, and querying it for EVERY
+            // member on EVERY resting pass -- which the first version of the fit rule did
+            // unconditionally -- meant every group in the app paid that cost on first layout
+            // whether or not any line was ever going to be tight enough to need it. On a normal-
+            // width phone almost none are. It is computed at most once per resting generation,
+            // the first time some line actually fails the full-width test below, and reused by
+            // every later line and frame until the members themselves change.
+            var compact: IntArray? = naturals.compact
 
             // Break into lines exactly as a FlowRow would, so this is a drop-in for one. A
             // group that fits on one line takes this path with a single line and behaves
@@ -479,12 +479,11 @@ fun ExpressiveButtonGroup(
                 // headroom for the press, not something that has to fit -- compacting a row
                 // whose labels fit perfectly well, purely because their squash allowance did
                 // not, would be a much worse trade than a row that simply cannot squash.
-                val basis = if (
-                    constraints.hasBoundedWidth &&
-                    memberIdx.sumOf { full[it] } > room &&
-                    memberIdx.any { compact[it] < full[it] }
-                ) {
-                    compact
+                val basis = if (constraints.hasBoundedWidth && memberIdx.sumOf { full[it] } > room) {
+                    val c = compact ?: IntArray(n) { i ->
+                        if (member[i]) measurables[i].minIntrinsicWidth(h).coerceIn(0, full[i]) else full[i]
+                    }.also { compact = it; naturals.compact = it }
+                    if (memberIdx.any { c[it] < full[it] }) c else full
                 } else {
                     full
                 }
