@@ -242,7 +242,7 @@ internal fun PebbleShell(
      * transform -- so a caller reading its position (e.g. via
      * `onGloballyPositioned`) gets the real, final on-screen bounds, not the
      * pre-scale layout size. Only the hero ever supplies one (see
-     * [LocalHeroTitleFlight]); every other pebble takes the default no-op.
+     * [LocalFloatingTitle]); every other pebble takes the default no-op.
      */
     titleModifier: Modifier = Modifier,
     // onTitleWidth was deleted here. It reported the title's measured width so the hero could

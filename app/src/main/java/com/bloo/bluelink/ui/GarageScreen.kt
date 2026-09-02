@@ -11,18 +11,12 @@ import android.os.Build
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.EnterTransition
-import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
-import androidx.compose.animation.slideInHorizontally
-import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.SizeTransform
 import androidx.compose.animation.togetherWith
-import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.MutableTransitionState
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
@@ -33,11 +27,8 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.only
-import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.displayCutout
-import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
@@ -76,7 +67,6 @@ import androidx.compose.runtime.State
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
@@ -589,101 +579,21 @@ internal fun GarageScreen(state: State<UiState>, vm: AppViewModel) {
                     val targetBlock = currentIndex.coerceIn(0, count - 1) / perPage
                     wrap.snapToReal(targetBlock)
                 }
-                // Hoisted identity badge state for the single-car-per-page
-                // pager (perPage == 1) -- one shared TitleFlightOverlay, driven
-                // by whichever page is currently SETTLED (car or the
-                // embedded Settings slot), rather than each page keeping its
-                // own. See HoistedIdentityFlight's own doc. The position is
-                // deliberately NOT reset on page switches: a stale value
-                // holds the badge steady for the single frame it takes the
-                // newly settled page's own report to arrive (guaranteed
-                // next layout pass -- onPositioned only ever fires from the
-                // page currently holding the hoisted flight), and if the new
-                // page's answer differs the badge just fades -- its only
-                // move -- rather than flashing through a wrong state.value.
-                val density = LocalDensity.current
-                val hoistedTopInset = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
-                val hoistedTopInsetPx = with(density) { hoistedTopInset.toPx() }
-                val hoistedScrollToTop = remember { mutableStateOf<(suspend () -> Unit)?>(null) }
-                val pillScope = rememberCoroutineScope()
-                // remember(Unit), not remember(hoistedTopInsetPx): the old
-                // keyed remember threw this whole object away -- accumulated
-                // dock state, colour, titleScale, everything -- and rebuilt
-                // it from scratch every time the status-bar inset itself
-                // changed (rotation, fold/unfold, multi-window resize), even
-                // though nothing about WHICH page is hoisted or what it's
-                // doing changed at all. The freshly-built replacement then
-                // had to re-earn its position from a genuine sentinel-free
-                // "nothing reported yet" state (see HeroTitleFlight's own
-                // doc) before the badge was visible again. topInsetPx is
-                // pushed into the persistent object via a plain field write
-                // below instead -- see HeroTitleFlight.topInsetPx's own doc.
-                val hoistedFlight = remember {
-                    HoistedIdentityFlight(
-                        flight = HeroTitleFlight(hoistedTopInsetPx, with(density) { TitleDockHysteresis.toPx() }),
-                        scrollToTop = hoistedScrollToTop,
-                    )
-                }
-                SideEffect { hoistedFlight.flight.topInsetPx = hoistedTopInsetPx }
-                // Lets the page dots (and anything else that dodges the Title id) hide the
-                // instant a name is docked, without needing their bounds to actually overlap --
-                // see FloatingRegistry.nameDocked's own doc for why real overlap is the wrong
-                // test here. `hoistedFlight` is remember{}'d once for this whole screen's life
-                // (see its own doc just above), so this lambda's captured reference never goes
-                // stale; the SideEffect just needs to run once; re-running it every recomposition
-                // is a harmless identical assignment.
-                SideEffect { floatingRegistry.nameDocked = { hoistedFlight.flight.docked.value } }
-                // Per-page (keyed by pager page index, which every block --
-                // car or the embedded Settings slot -- has exactly one of)
-                // live "is THIS page's own title currently docked" flag,
-                // reported up by whichever page is currently live (settled
-                // or not -- see VehicleDetailContent/SettingsScreen's own
-                // `onDockedChanged`). This used to be inferred purely from
-                // `page == pager.settledPage`, which conflated two different
-                // questions: "which page is settled" and "should the shared
-                // corner badge take over from this page's own inline title".
-                // A page can be settled for a long time while fully
-                // undocked (the ordinary hero-card state) -- hoisting it
-                // regardless meant its name was ALWAYS routed through the
-                // shared floating overlay instead of ordinary page content,
-                // even mid-drag, which is what let the badge visibly detach
-                // from the card it names. Gating `hoisted` on this map
-                // instead means only a page that has ACTUALLY scrolled its
-                // title past the status bar ever claims the shared flight;
-                // every other page (settled-but-undocked, or the
-                // pre-composed neighbour) renders its own name as plain
-                // page content that moves 1:1 with the pager's own drag.
-                // Keyed by stable identity (a VIN, or "settings"), NOT by raw
-                // page index -- an index's real-world meaning isn't stable:
-                // deleting a car shifts every later one down a slot,
-                // resizing a foldable/tablet window changes perPage and so
-                // pageCount, and reordering cars (drag-to-reorder, reachable
-                // from the embedded Settings page without ever leaving this
-                // same composition) reassigns which car sits at which index
-                // directly. An earlier, index-keyed version of this exact
-                // idea (lastKnownDocked, since removed) had precisely this
-                // bug: after a reorder, a page's dockedPages entry could
-                // describe a DIFFERENT car than the one now sitting at that
-                // index, hoisting the wrong page's badge or leaving the
-                // right one stuck un-hoisted.
+                // Per-page (keyed by stable identity -- a VIN, or "settings", NOT raw page
+                // index: an index's real-world meaning isn't stable across a delete, a
+                // perPage-changing resize, or a drag-to-reorder) live "is THIS page's own title
+                // currently docked" flag, reported up by whichever page is currently live --
+                // see VehicleDetailContent/SettingsScreen's own `onDockedChanged`. Every page now
+                // renders its OWN docked pill directly (see TitleFlight.kt's redesign) -- this
+                // map exists purely so the page-dots collision check below can ask "is the
+                // SETTLED page's own name currently docked" without needing a shared badge to
+                // ask it of.
                 val dockedPages = remember { mutableStateMapOf<Any, Boolean>() }
-                // Cleared the instant `perPage` is observed to have actually
-                // changed (grid <-> single-car, a live foldable/multi-window
-                // resize) -- synchronously, during composition, NOT via a
-                // LaunchedEffect(perPage): a coroutine-based clear only runs
-                // after THIS recomposition (the one that first sees the new
-                // perPage value, and that ALSO swaps in the freshly-built
-                // single-car pager composables below) has already committed,
-                // leaving those fresh composables' own first `hoisted`/
-                // `hoistedVisible` reads (further down) still seeing whatever
-                // stale `true` a car left behind before the resize -- one
-                // whole recomposition too late to prevent hoisting a
-                // genuinely-undocked, just-recomposed page for a frame.
-                // dockedPages only ever gets written `if (perPage == 1)` (see
-                // onDockedChanged's own gate below), so any entries left
-                // over from a prior perPage==1 stint are unconditionally
-                // stale once perPage has changed at all -- clearing the
-                // whole map, not just one key, is correct here.
+                // Cleared the instant `perPage` is observed to have actually changed (grid <->
+                // single-car, a live foldable/multi-window resize) -- synchronously, during
+                // composition. dockedPages only ever gets written `if (perPage == 1)` (see
+                // onDockedChanged's own gate below), so any entries left over from a prior
+                // perPage==1 stint are unconditionally stale once perPage has changed at all.
                 var lastPerPage by remember { mutableStateOf(perPage) }
                 if (lastPerPage != perPage) {
                     dockedPages.clear()
@@ -691,46 +601,11 @@ internal fun GarageScreen(state: State<UiState>, vm: AppViewModel) {
                 }
                 fun dockedPageKey(page: Int): Any =
                     if (settingsAsPage && page == pageCount) "settings" else vehicles.getOrNull(page)?.vin ?: page
-                // Whether the shared hoisted badge SHOULD be showing right
-                // now, and which page it's showing/fading for -- computed
-                // HERE (not beside the AnimatedVisibility call site that
-                // actually renders it, further below) so the per-page pager
-                // content below can also read them; see `isSettledAndDocked`
-                // and `hoistedFullyGone`'s own docs for why both matter.
-                val hoistedVisible = perPage == 1 && dockedPages[dockedPageKey(pager.settledPage)] == true
-                // Frozen at the last page seen while `hoistedVisible` was
-                // actually true. AnimatedVisibility (further below) keeps
-                // its content composed for the duration of its own exit
-                // fade, and `pager.settledPage` may have ALREADY moved on to
-                // a DIFFERENT, never-docked page by the time that fade
-                // starts (a fast swipe straight off a still-docked car) --
-                // reading `pager.settledPage` straight, at either use site,
-                // would relabel the still-fading badge with the new page's
-                // identity, or (see `isSettledAndDocked` below) incorrectly
-                // extend the new page's own hoisted grace period using the
-                // OLD page's fade state.value. Written plainly here in
-                // composition, not inside an effect/coroutine -- every
-                // reader in this same pass sees the just-written value
-                // immediately.
-                var frozenBlock by remember { mutableStateOf(realBlock(pager.settledPage)) }
-                if (hoistedVisible) frozenBlock = realBlock(pager.settledPage)
-                // Backs the AnimatedVisibility call site further below
-                // instead of a bare Boolean, so its own idle/target
-                // bookkeeping can answer "has the exit fade actually
-                // FINISHED", not just "has the dock flag flipped false" --
-                // see `hoistedFullyGone`'s own doc for why the two are
-                // different questions.
-                val hoistedVisibleState = remember { MutableTransitionState(false) }
-                // True only once the shared badge's own exit fade has
-                // genuinely finished playing (isIdle) settled on "gone"
-                // (!targetState) -- NOT the instant dockedPages flips false,
-                // which only means the SPRING settled, one phase before the
-                // 160ms crossfade even starts. Read synchronously here (a
-                // plain property read on a Compose-owned object, not a
-                // remembered duration or a coroutine delay), so using it
-                // below to gate the undock hand-off can't race the fade the
-                // way a `LaunchedEffect(...) { delay(160) }` guess could.
-                val hoistedFullyGone = hoistedVisibleState.isIdle && !hoistedVisibleState.targetState
+                // Lets the page dots (and anything else that dodges the Title id) hide the
+                // instant the settled page's name is docked, without needing bounds to actually
+                // overlap -- see FloatingRegistry.nameDocked's own doc for why real overlap is
+                // the wrong test here.
+                SideEffect { floatingRegistry.nameDocked = { dockedPages[dockedPageKey(pager.settledPage)] == true } }
                 Box(Modifier.fillMaxSize()) {
                     HorizontalPager(
                         state = pager,
@@ -845,44 +720,6 @@ internal fun GarageScreen(state: State<UiState>, vm: AppViewModel) {
                         // The transition this was meant to improve is not worth
                         // the gesture it happens during: a swipe that tracks the
                         // finger exactly IS the effect.
-                        // Computed once per page body and reused below, instead of
-                        // repeating the full expression (and its dockedPageKey()
-                        // call + map lookup) at each call-site argument -- the
-                        // "resolve once, don't re-derive per argument" rule this
-                        // file already applies elsewhere (see TitleFlightOverlay's
-                        // own textColorOverride doc).
-                        //
-                        // `|| (!hoistedFullyGone && page == frozenBlock)`, not
-                        // just the raw dockedPages flag: dockedPages flips
-                        // false the instant the shared badge's own SPRING
-                        // settles back undocked, one phase before its 160ms
-                        // crossfade (AnimatedVisibility, further above/below)
-                        // even starts. Handing `hoisted` back to null the
-                        // instant the flag flips used to switch this page's
-                        // ambient LocalHeroTitleFlight back to its own local
-                        // flight immediately -- cutting the shared flight off
-                        // from any further live position reports while it was
-                        // STILL VISIBLE, fading out for another 160ms. If the
-                        // user was still actively scrolling during that window
-                        // (a slow, deliberate scroll past the undock threshold,
-                        // as opposed to a fling that's already stopped by the
-                        // time the spring settles), the exiting badge kept
-                        // animating toward a now-frozen stale target while the
-                        // freshly-live local badge tracked real, still-moving
-                        // coordinates -- the two visibly diverging, reading as
-                        // the name flickering/partly vanishing rather than
-                        // gliding. Keeping `hoisted` (and therefore the shared
-                        // flight's own live position feed) alive for the FULL
-                        // fade, not just the spring phase, closes that gap.
-                        // Gated on `page == frozenBlock`, not just "any
-                        // currently-settled page": without it, swiping straight
-                        // from a still-docked car to a DIFFERENT, never-docked
-                        // one would incorrectly extend the NEW page's own
-                        // hoisted grace period off the OLD page's still-fading
-                        // badge -- frozenBlock is specifically which page that
-                        // badge belongs to.
-                        val isSettledAndDocked = perPage == 1 && page == pager.settledPage &&
-                            (dockedPages[dockedPageKey(page)] == true || (!hoistedFullyGone && page == frozenBlock))
                         // remember(page), not a fresh lambda literal per
                         // recomposition -- this whole per-page content block
                         // recomposes for reasons unrelated to docking (any
@@ -896,18 +733,11 @@ internal fun GarageScreen(state: State<UiState>, vm: AppViewModel) {
                         if (settingsAsPage && block == pageCount) {
                             // The extra slot: Settings itself, embedded rather than
                             // navigated to -- see SettingsScreen's own `embedded` doc.
-                            // hoisted only for the SETTLED page, AND only once that
-                            // page's own title has actually scrolled into the docked
-                            // (pill) state -- see dockedPages' own doc above for why
-                            // "settled" alone isn't the right gate any more.
+                            // Renders its own docked pill directly now -- no more
+                            // shared/hoisted hand-off, see TitleFlight.kt's own doc.
                             SettingsScreen(
                                 vm, embedded = true,
-                                hoisted = if (isSettledAndDocked) hoistedFlight else null,
                                 onDockedChanged = onPageDockedChanged,
-                                // See VehicleDetailContent's identical `pageLabel`
-                                // doc -- matches the shared hoisted badge's own
-                                // label so the hand-off between the two instances
-                                // has no width to pop.
                                 pageLabel = if (perPage == 1 && totalBlocks > 1) "${block + 1} / $totalBlocks" else null,
                             )
                         } else {
@@ -948,48 +778,10 @@ internal fun GarageScreen(state: State<UiState>, vm: AppViewModel) {
                                             // unconditionally, silently killing the single-
                                             // car view's refresh feedback too.
                                             hideIndicator = perPage > 1,
-                                            // hoisted only for the SETTLED page in
-                                            // single-car-per-page mode, AND only once
-                                            // that page's own title has actually
-                                            // scrolled into the docked (pill) state --
-                                            // see dockedPages' own doc above. perPage >
-                                            // 1 shows several cars at once, so there is
-                                            // no single "the settled car" to hoist.
-                                            hoisted = if (isSettledAndDocked) hoistedFlight else null,
-                                            // Every page in the single-car-per-page
-                                            // pager (settled or the pre-composed
-                                            // neighbour alike) reports its own live
-                                            // docked state up into dockedPages -- see
-                                            // that map's own doc for why this can no
-                                            // longer be conditioned on being settled.
+                                            // Every page (settled or the pre-composed neighbour
+                                            // alike) reports its own live docked state up into
+                                            // dockedPages -- see that map's own doc above.
                                             onDockedChanged = onPageDockedChanged,
-                                            // Feeds PagerDotsFor's own collision
-                                            // dodge -- was missing from this call
-                                            // site entirely, which is why the dots
-                                            // never actually dodged: this page's
-                                            // own (non-hoisted) badge is the one
-                                            // that's live and flying near the top
-                                            // for the whole undocked/pre-dock
-                                            // phase, in BOTH single-car and grid
-                                            // mode, and nothing here was reporting
-                                            // its bounds at all.
-                                                    // Only a grid column's container is
-                                            // genuinely offset from the
-                                            // composition root -- see
-                                            // TitleFlightOverlay's own
-                                            // `containerRelative` doc for why this
-                                            // must stay scoped to exactly that
-                                            // case.
-                                            gridColumn = perPage > 1,
-                                            // See VehicleDetailContent's own
-                                            // `pageLabel` doc -- matches the
-                                            // shared hoisted badge's own label so
-                                            // the hand-off between the two
-                                            // instances has no width to pop.
-                                            // Only meaningful for the pager this
-                                            // page's badge can actually hand off
-                                            // into (perPage == 1); grid columns
-                                            // never hoist at all.
                                             pageLabel = if (perPage == 1 && totalBlocks > 1) "${block + 1} / $totalBlocks" else null,
                                         )
                                     }
@@ -1045,210 +837,8 @@ internal fun GarageScreen(state: State<UiState>, vm: AppViewModel) {
                             LoadingIndicator()
                         }
                     }
-                    // Hoisted identity badge -- one shared TitleFlightOverlay for
-                    // single-car-per-page mode, following whichever page is
-                    // currently SETTLED (car or the embedded Settings slot).
-                    // See hoistedFlight's own doc above.
-                    // Mounted ONLY once the settled page has actually reported
-                    // itself docked (dockedPages, above) -- NOT unconditionally
-                    // for every perPage==1 frame the way this used to read. Two
-                    // reasons this can no longer stay unconditional now that
-                    // `hoisted` itself is gated the same way (see the call
-                    // sites' own doc): first, an undocked settled page renders
-                    // its OWN plain title as ordinary content now (VehicleDetail
-                    // Content/SettingsScreen's own `local` path), so an always-
-                    // mounted copy here would draw a SECOND, stale copy of
-                    // whatever name this shared flight last carried right on
-                    // top of it. Second, nothing is writing fresh reports into
-                    // hoistedFlight.flight while no page currently owns it, so
-                    // that stale copy wouldn't even be showing the RIGHT car --
-                    // exactly last fix's bug 2 (wrong name at a stale position),
-                    // just relocated here instead of at the settle boundary.
-                    // The one tradeoff: mounting/unmounting this composable
-                    // resets TitleFlightOverlay's own internal dock/undock
-                    // spring each time, instead of that spring free-running
-                    // continuously the way a truly permanent instance would --
-                    // acceptable because by the time this mounts, the page's
-                    // own `local` flight has already been reporting the exact
-                    // corner-adjacent position for a while (see
-                    // VehicleDetailContent's `onDockedChanged`/hoisted hand-off
-                    // doc), so there's no visible snap.
-                    //
-                    // Wrapped in AnimatedVisibility, not a plain `if`, so
-                    // mounting/unmounting fades rather than pops -- a bare
-                    // `if` used to tear this composable down (and stand it
-                    // back up) INSTANTLY the moment the settled page's own
-                    // docked state differs from the page swiped away from
-                    // (e.g. settling on an undocked car right after a docked
-                    // one), which read as the corner pill just vanishing/
-                    // appearing with no transition at all.
-                    //
-                    // `hoistedVisible`/`frozenBlock` are computed once,
-                    // higher up (right after `dockedPageKey`), not here --
-                    // the per-page pager content above needs to read them
-                    // too (see `isSettledAndDocked`'s own doc). Backed by
-                    // `hoistedVisibleState`, a MutableTransitionState, not a
-                    // bare `visible: Boolean` -- see `hoistedFullyGone`'s own
-                    // doc for why knowing exactly when this fade FINISHES,
-                    // not just when it starts, matters.
-                    hoistedVisibleState.targetState = hoistedVisible
-                    AnimatedVisibility(
-                        visibleState = hoistedVisibleState,
-                        enter = fadeIn(tween(160)),
-                        exit = fadeOut(tween(160)),
-                    ) {
-                        // Settled, not current: matches every other "which page is
-                        // this" read in this pager (the settle effect above), so
-                        // the badge's own identity only updates mid-swipe once a
-                        // page actually wins, not on every frame of the drag.
-                        val settledBlock = frozenBlock
-                        val screenWidth = LocalConfiguration.current.screenWidthDp.dp
-                        val onSettingsSlot = settingsAsPage && settledBlock == pageCount
-                        val title = if (onSettingsSlot) "Settings" else vehicles.getOrNull(settledBlock)?.name ?: ""
-                        // ONE persistent TitleFlightOverlay, bound directly to the
-                        // single shared hoistedFlight.flight -- never torn down and
-                        // rebuilt per page (an AnimatedContent-per-block design used
-                        // to live here; see git history for the full saga of bugs
-                        // that came from swapping the underlying flight object on
-                        // every switch: stale-geometry windows, readiness races, a
-                        // duplicate badge on the pre-composed neighbour, and a
-                        // dock-state cache that could itself go stale). Since the
-                        // object is never swapped, TitleFlightOverlay's OWN existing
-                        // spring (mounted/LaunchedEffect(docked, flight), already
-                        // used and proven for a real SCROLL-driven dock/undock
-                        // crossing) is what carries a page switch that changes dock
-                        // state too -- no separate "hop" machinery needed, because
-                        // it is not a structurally different event to this function
-                        // any more. inlinePos/dockedAnchor are also structurally the
-                        // SAME position for every car (same corner offsets, same
-                        // hero-card layout), so hero-hero and pill-pill switches
-                        // don't visibly move at all -- only the TEXT changes, via
-                        // the inner AnimatedContent in `content` below.
-                        TitleFlightOverlay(
-                            flight = hoistedFlight.flight,
-                            cornerX = 16.dp,
-                            cornerY = hoistedTopInset + HeaderCornerGap,
-                            // Car slots clear the top-right gear/expand chrome, same
-                            // as VehicleDetailContent's own badge (72dp). The embedded
-                            // Settings slot instead needs to clear the always-visible
-                            // 172dp Simple/Advanced toggle in the corner (192dp, same
-                            // value SettingsScreen's own standalone route already
-                            // reserves for it -- see SettingsHeaderRow) -- without
-                            // this, a docked "Settings" pill could grow wide enough to
-                            // run under that toggle, something only the standalone
-                            // route was guarding against.
-                            reserveEnd = if (onSettingsSlot) 192.dp else 72.dp,
-                            maxWidth = screenWidth - 16.dp - (if (onSettingsSlot) 192.dp else 72.dp) - 32.dp,
-                            // The Settings slot has no hero photo to morph its own
-                            // colour against, so it's forced to plain onSurface;
-                            // every car slot instead reads its own flight's live
-                            // colour, resolved INSIDE TitleFlightOverlay (see
-                            // textColorOverride's own doc for why reading it
-                            // there instead of here as a call-site argument
-                            // matters).
-                            textColorOverride = if (onSettingsSlot) MaterialTheme.colorScheme.onSurface else null,
-                            onClick = { pillScope.launch { hoistedScrollToTop.value?.invoke() } },
-                            // Keeps dockedPages in sync with THIS shared
-                            // badge's own resting state, in both directions
-                            // -- see onSettledChanged's own doc for why
-                            // undocking used to be reported off the raw
-                            // scroll-threshold flag instead (from
-                            // VehicleDetailContent/SettingsScreen), which cut
-                            // this exact instance off from further position
-                            // updates while its own exit spring was often
-                            // still mid-flight, reading as a stutter back
-                            // toward the pebble. Keyed off `frozenBlock`, not
-                            // `pager.settledPage` -- this can still fire
-                            // during the AnimatedVisibility exit fade, by
-                            // which point the pager may have already settled
-                            // onto a different page; `frozenBlock` is the
-                            // page this instance was actually mounted for.
-                            onSettledChanged = { atRest -> dockedPages[dockedPageKey(frozenBlock)] = atRest },
-                            measureContent = {
-                                Text(
-                                    title,
-                                    // headlineSmall, not titleLarge -- matches the
-                                    // base PebbleShell actually scales its own
-                                    // (invisible) title anchor from (see that
-                                    // Text's own `titleStyle` comment). The flying
-                                    // Text used to be styled a whole different type
-                                    // step (titleLarge, 22sp default) than the base
-                                    // its shared titleScale ratio was computed
-                                    // against (titleMedium/headlineSmall, 16/24sp) --
-                                    // so even when titleScale genuinely varied with
-                                    // the hero photo pebble's own expand/collapse, the
-                                    // rendered size never actually reached either of
-                                    // the two type steps it was supposed to land on.
-                                    style = MaterialTheme.typography.headlineSmall,
-                                    fontWeight = FontWeight.Bold,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis,
-                                )
-                            },
-                            extraContent = {
-                                // totalBlocks, not vehicles.size -- the Settings slot is
-                                // one more page in the same sequence, so it counts too
-                                // (see PagerDotsFor above, which already does the same
-                                // swap).
-                                if (totalBlocks > 1) {
-                                    Text(
-                                        "${settledBlock + 1} / $totalBlocks",
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    )
-                                }
-                            },
-                        ) {
-                            // A LITERAL masked wipe, not an approximation: `content`
-                            // is invoked from inside TitleFlightOverlay's own visible
-                            // Text Box, which is already positioned exactly where the
-                            // pill/hero-card sits -- so this AnimatedContent's local
-                            // bounds genuinely ARE the text's on-screen bounds, and
-                            // its default (clipping) SizeTransform genuinely clips to
-                            // them, unlike the old outer-AnimatedContent attempt whose
-                            // content was offset far outside its own measured box.
-                            //
-                            // docked read HERE, not hoisted out as a val above --
-                            // same reasoning as flight.color's own doc: keeps the
-                            // recompose scope this causes down to just this small
-                            // inner composable, not the whole hoisted-badge block.
-                            val docked by hoistedFlight.flight.docked
-                            AnimatedContent(
-                                targetState = title,
-                                transitionSpec = {
-                                    if (docked) {
-                                        // A real, local wipe: the outgoing name
-                                        // slides out one side while the incoming
-                                        // one slides in from the other, both
-                                        // clipped to their own (here, genuinely
-                                        // local) bounds -- the "morph and change
-                                        // the text with a wipe" this whole
-                                        // redesign exists for.
-                                        (slideInHorizontally(tween(220, easing = FastOutSlowInEasing)) { it } + fadeIn(tween(180)))
-                                            .togetherWith(
-                                                slideOutHorizontally(tween(220, easing = FastOutSlowInEasing)) { -it } + fadeOut(tween(180)),
-                                            )
-                                    } else {
-                                        // Plain hero-card text -- already moving
-                                        // with the pager's own drag underneath it;
-                                        // no separate transition of its own.
-                                        EnterTransition.None togetherWith ExitTransition.None
-                                    }
-                                },
-                                label = "hoistedTitleWipe",
-                            ) { t ->
-                                Text(
-                                    t,
-                                    // headlineSmall -- see measureContent's
-                                    // identical fix just above for why.
-                                    style = MaterialTheme.typography.headlineSmall,
-                                    fontWeight = FontWeight.Bold,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis,
-                                )
-                            }
-                        }
-                    }
+                    // No more shared/hoisted badge here -- each page renders its own
+                    // docked pill directly now (see TitleFlight.kt's own doc on the redesign).
                 }
             }
         }

@@ -15,7 +15,6 @@ package com.bloo.bluelink.ui
  */
 
 import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
@@ -93,10 +92,9 @@ import kotlin.math.max
  * scrolls together in one [Column] inside [Refreshable] (header row, then
  * the reorderable [PebbleList]).
  *
- * The car's name is drawn exactly ONCE, but not here -- the hero card's own
- * title slot is permanently invisible (space/position only); the one Text
- * that actually paints the name lives in [TitleFlightOverlay], which flies
- * it between that slot and the corner pill. See that function's own doc.
+ * The car's name is real, visible content inside the hero card's own title slot -- it just
+ * fades itself out as it scrolls above the status bar, handing off to [FloatingTitlePill]'s own
+ * corner badge. See that function's own doc.
  */
 @Composable
 internal fun VehicleDetailContent(
@@ -121,52 +119,13 @@ internal fun VehicleDetailContent(
     // dodging the Settings gear; this reserves the analogous clearance at
     // the top instead of the end.
     reserveTopForDots: Boolean = false,
-    // Non-null ONLY for GarageScreen's single-car-per-page pager's currently
-    // SETTLED page, AND only once that page has reported itself DOCKED (see
-    // `onDockedChanged` below and the call site's `dockedPages` doc) -- see
-    // HoistedIdentityFlight's own doc. A settled-but-undocked page (the
-    // ordinary hero-card state, and the common case for a plain hero-to-hero
-    // swipe) now gets `hoisted == null` here just like the pre-composed
-    // neighbour does, and renders its OWN name as ordinary page content
-    // (`local`, below) instead -- see this param's git history for the two
-    // bugs that came from routing that case through the shared flight
-    // anyway: the badge visibly detaching from its card mid-drag (only the
-    // ORIGIN page owned the shared flight for the whole gesture, since
-    // `pager.settledPage` doesn't change until the drag fully settles), and
-    // a one-frame flash of the new car's name at the old car's stale
-    // position right at the settle boundary. When `hoisted` IS non-null,
-    // this page's own scroll-to-top is reported into the CALLER's shared
-    // flight, and this composable renders NO badge of its own at all -- the
-    // caller renders ONE shared badge instead, covering every page
-    // including this one.
-    hoisted: HoistedIdentityFlight? = null,
     // Reports this page's own live docked state (with hysteresis -- see
-    // HeroTitleFlight.docked's own doc) up to the caller on every change,
-    // regardless of whether `hoisted` is currently null or not. Called for
-    // EVERY page in the single-car-per-page pager -- settled or the
-    // pre-composed neighbour alike -- because the caller needs to know the
-    // instant a settled-but-undocked page BECOMES docked in order to start
-    // passing `hoisted` for it; there's no other signal it could use. Null
-    // for every page outside that pager (perPage > 1 grid mode), which has
-    // no single "the settled car" for a caller-level flag to mean anything.
+    // FloatingTitle.docked's own doc) up to the caller on every change. GarageScreen uses this
+    // to know which page's pill is currently docked, for the page-dots collision check -- see
+    // that call site's own doc.
     onDockedChanged: ((Boolean) -> Unit)? = null,
-    // Forwarded to this page's own (non-hoisted) TitleFlightOverlay call
-    // below -- see that parameter's own doc (Screens.kt). Was missing
-    // True ONLY when this is a perPage>1 grid column -- forwarded to this
-    // page's own TitleFlightOverlay call as `containerRelative`. See that
-    // parameter's own doc for why this must stay opt-in and default false.
-    gridColumn: Boolean = false,
-    // "N / M" page-count label, non-null under the exact same condition the
-    // shared hoisted badge shows one (perPage == 1, more than one page) --
-    // see this page's own TitleFlightOverlay call below for why passing it
-    // here too, not just on the hoisted badge, is load-bearing rather than
-    // decorative: without it, the local badge's chrome Row measures
-    // narrower (name only) than the hoisted badge's chrome Row (name +
-    // label) it gets swapped for the instant this page finishes docking,
-    // and Modifier.size(dockedSize...) has no width animation of its own --
-    // so the pill visibly popped wider the moment the hand-off happened.
-    // Passing the identical label here means both instances measure to the
-    // same width, so there's nothing left to jump.
+    // "N / M" page-count label, shown on this page's own docked pill when set (perPage == 1,
+    // more than one page).
     pageLabel: String? = null,
 ) {
     val topInset = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
@@ -174,70 +133,18 @@ internal fun VehicleDetailContent(
     val scroll = rememberScrollState()
     val scope = rememberCoroutineScope()
     val density = LocalDensity.current
-    // Built UNCONDITIONALLY now, for every page -- settled, pre-composed
-    // neighbour, or a plain standalone grid column alike. This used to be
-    // skipped entirely whenever `hoisted != null` or `hoistedPending`, on
-    // the theory that a page in either state reports into (or will report
-    // into) the caller's shared flight instead and so has no use for one of
-    // its own. That left the pre-composed neighbour with NOTHING tracking
-    // its own dock state or position until the moment it became settled --
-    // exactly the gap that let a stale, previous-page position leak through
-    // for a frame right at the settle boundary (see `hoisted`'s own doc).
-    // Building this always means every page has a live, continuously
-    // up-to-date local flight from the moment it exists, so there's always
-    // something real to read from (`onDockedChanged`, below) and always
-    // something real to hand off FROM the instant this page's own name
-    // needs to take over the shared corner badge.
     val topInsetPx = with(density) { topInset.toPx() }
-    // remember(Unit) + SideEffect, not remember(topInsetPx) -- see the
-    // hoisted flight's identical construction in GarageScreen for why a
-    // keyed remember here silently discarded all accumulated dock/
-    // position state on every inset change instead of just picking up
-    // the new inset value.
-    val heroFlight = remember { HeroTitleFlight(topInsetPx, with(density) { TitleDockHysteresis.toPx() }) }
-    SideEffect { heroFlight.topInsetPx = topInsetPx }
-    // Same live-scroll-correction wiring as topInsetPx just above -- see
-    // `HeroTitleFlight.inlinePos`'s own doc for why this closes the
-    // "name feels a frame behind the card" gap. `scroll` is the exact
-    // ScrollState the real hero card's own Column (below) places itself
-    // against, so both read the identical, same-frame-fresh offset.
-    SideEffect { heroFlight.scrollValuePx = { scroll.value.toFloat() } }
-    val local = LocalNamePillState(flight = heroFlight)
-    // Whichever flight is actually LIVE for this page right now: the
-    // caller's shared one while genuinely hoisted, this page's own
-    // otherwise. Both `docked` reporting and the ambient
-    // LocalHeroTitleFlight below key off this SAME value, so there is never
-    // a moment where the two disagree about which object HeroHeader should
-    // be writing its real position/colour/scale into.
-    val liveFlight = hoisted?.flight ?: local.flight
-    // dockedPages is now driven ENTIRELY by whichever TitleFlightOverlay is
-    // actually live's own `onSettledChanged` -- this page's own local badge
-    // below while `hoisted == null`, or GarageScreen's shared hoisted badge
-    // (its own call site) while `hoisted != null`. Used to also report the
-    // undocking direction immediately off the raw `liveFlight.docked` flag
-    // here -- reasoned at the time to have "no hand-off-timing hazard on the
-    // way out", which was wrong: the instant that raw report flipped
-    // `dockedPages` false, the shared hoisted badge got torn down as the
-    // live one (this page's local flight took back over), which cut the
-    // SHARED flight off from any further position updates while its own
-    // exit spring was often still mid-flight -- it kept animating toward a
-    // now-frozen stale target while the freshly-visible local badge tracked
-    // live coordinates, the two visibly diverging for the crossfade window.
-    // onSettledChanged (fired only once a spring genuinely finishes, see its
-    // own doc) doesn't have that hazard in either direction.
-    if (hoisted != null) {
-        // Register this page as the one actually driving the hoisted badge.
-        // Idempotent, so re-running it every recomposition while hoisted is
-        // harmless -- the caller only ever passes non-null here for the
-        // currently SETTLED, currently DOCKED page, so there's no risk of
-        // two pages fighting over the same hoisted state.
-        hoisted.scrollToTop.value = { scroll.animateScrollTo(0) }
-    }
+    // remember(Unit) + SideEffect, not remember(topInsetPx) -- a keyed remember here would
+    // discard all accumulated docked state on every inset change instead of just picking up the
+    // new inset value.
+    val floatingTitle = remember { FloatingTitle(with(density) { TitleDockHysteresis.toPx() }) }
+    SideEffect { floatingTitle.topInsetPx = topInsetPx }
+    LaunchedEffect(floatingTitle.docked.value) { onDockedChanged?.invoke(floatingTitle.docked.value) }
     // Narrowed, not `state.value.refreshing`: a bare read here would subscribe this whole page
     // -- all three of them live at once in the pager -- to every UiState emission.
     val refreshing by remember { derivedStateOf { state.value.refreshing } }
     Refreshable(v, refreshing, vm, hideIndicator = hideIndicator) {
-        CompositionLocalProvider(LocalHeroTitleFlight provides liveFlight) {
+        CompositionLocalProvider(LocalFloatingTitle provides floatingTitle) {
             Column(
                 Modifier
                     .fillMaxSize()
@@ -269,75 +176,38 @@ internal fun VehicleDetailContent(
                 Spacer(Modifier.height(bottomInset + 132.dp))
             }
         }
-        // Hoisted mode (this page is settled AND docked) renders NO badge of
-        // its own here at all -- the caller (GarageScreen) renders ONE
-        // shared badge covering every page, including this one. Every OTHER
-        // state -- perPage > 1 grid mode, this pager's pre-composed
-        // neighbour, or this same page before it's scrolled into the docked
-        // state -- renders its own name here, as ordinary page content that
-        // simply moves with the pager/scroll like everything else on the
-        // page. See `hoisted`'s own doc.
-        // AnimatedVisibility, not a bare `if`, with the SAME fade duration
-        // GarageScreen's shared hoisted badge uses for its own enter/exit
-        // (see that AnimatedVisibility's own doc) -- a real, reproducible
-        // bug traced one side of this hand-off cutting out/in instantly
-        // while the other ramped over 160ms, leaving a ~160ms window where
-        // the name was dimmer than it should be (or, on the reverse
-        // direction, two overlapping copies at mismatched alphas). Fading
-        // both sides in lockstep removes that dip entirely.
-        AnimatedVisibility(
-            visible = hoisted == null,
-            enter = fadeIn(tween(160)),
-            exit = fadeOut(tween(160)),
+        // Every page now owns its own docked pill -- no more shared/hoisted badge handed
+        // between pages (see TitleFlight.kt's own doc on the redesign). This is safe to leave
+        // composed for every page, settled or pre-composed neighbour alike: FloatingTitlePill's
+        // own AnimatedVisibility only pays for the glass chrome while actually docked or
+        // transitioning.
+        val screenWidth = LocalConfiguration.current.screenWidthDp.dp
+        FloatingTitlePill(
+            title = floatingTitle,
+            cornerX = 16.dp,
+            cornerY = topInset + HeaderCornerGap,
+            // Clears the top-right FloatingIcon slot (the expand button in grid columns, the
+            // gear on the standalone route) -- 12dp outer padding + 48dp icon + a little air.
+            reserveEnd = 72.dp,
+            maxWidth = screenWidth - 16.dp - 72.dp - 32.dp,
+            onClick = { scope.launch { scroll.animateScrollTo(0) } },
+            extraContent = pageLabel?.let { label ->
+                {
+                    Text(
+                        label,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            },
         ) {
-            val screenWidth = LocalConfiguration.current.screenWidthDp.dp
-            TitleFlightOverlay(
-                flight = local.flight,
-                cornerX = 16.dp,
-                cornerY = topInset + HeaderCornerGap,
-                // Clears the top-right FloatingIcon slot (the expand button
-                // in grid columns, the gear on the standalone route) -- 12dp
-                // outer padding + 48dp icon + a little air.
-                reserveEnd = 72.dp,
-                maxWidth = screenWidth - 16.dp - 72.dp - 32.dp,
-                // Falls back to onSurface before HeroHeader has reported a real
-                // colour yet (this composable's own first frame) -- Unspecified would
-                // otherwise resolve through LocalContentColor's own default instead.
-                // textColorOverride omitted: `flight` here IS local.flight, so
-                // TitleFlightOverlay reads its live colour itself -- see that
-                // parameter's own doc for why resolving it there instead of
-                // here is load-bearing, not stylistic.
-                onClick = { scope.launch { scroll.animateScrollTo(0) } },
-                containerRelative = gridColumn,
-                // See `liveFlight`'s own doc just above -- dockedPages is
-                // driven entirely off this, in both directions, rather than
-                // the raw scroll-threshold flag.
-                onSettledChanged = { atRest -> onDockedChanged?.invoke(atRest) },
-                // See `pageLabel`'s own doc -- matches the shared hoisted
-                // badge's own extraContent (Screens.kt, GarageScreen) so
-                // the two instances' chrome measures to the same width and
-                // the hand-off between them has nothing left to pop.
-                extraContent = pageLabel?.let { label ->
-                    {
-                        Text(
-                            label,
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                },
-            ) {
-                Text(
-                    v.name,
-                    // headlineSmall -- matches PebbleShell's own real title
-                    // base; see the hoisted badge's identical fix for the
-                    // full reasoning.
-                    style = MaterialTheme.typography.headlineSmall,
-                    fontWeight = FontWeight.Bold,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            }
+            Text(
+                v.name,
+                style = MaterialTheme.typography.headlineSmall,
+                fontWeight = FontWeight.Bold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
         }
     }
 }
@@ -358,7 +228,7 @@ internal fun VehicleDetailContent(
  * state that lets a pebble be dragged from the scrolling list directly onto
  * that slot to pin it.
  *
- * A [TitleFlightOverlay] (built inline near the bottom, alongside the
+ * A [FloatingTitlePill] (built inline near the bottom, alongside the
  * flip-columns transition) fades in once CriticalContent's own HeroHeader --
  * the real hero photo card, shared with [VehicleDetailContent] -- has
  * scrolled out of view, same as every other surface. Tapping it scrolls
@@ -401,26 +271,17 @@ internal fun ExpandedCar(
     val density = LocalDensity.current
     val scope = rememberCoroutineScope()
     val topInsetPx = with(density) { topInset.toPx() }
-    // remember(Unit) + SideEffect, not remember(topInsetPx) -- same
-    // reasoning as VehicleDetailContent's and GarageScreen's identical
-    // construction sites: an inset change alone shouldn't discard this
-    // flight's accumulated dock/position state.
-    val titleFlight = remember { HeroTitleFlight(topInsetPx, with(density) { TitleDockHysteresis.toPx() }) }
+    // remember(Unit) + SideEffect, not remember(topInsetPx) -- an inset change alone shouldn't
+    // discard this title's accumulated docked state.
+    val titleFlight = remember { FloatingTitle(with(density) { TitleDockHysteresis.toPx() }) }
     SideEffect { titleFlight.topInsetPx = topInsetPx }
-    // Same live-scroll-correction wiring as VehicleDetailContent's identical
-    // construction site -- see HeroTitleFlight.inlinePos's own doc.
-    // `controlsScroll`, not `pebblesScroll`: per this composable's own doc
-    // just above, controlsScroll is always the ScrollState paired with
-    // whichever column currently hosts CriticalContent's HeroHeader,
-    // regardless of which physical side a flip has it on.
-    SideEffect { titleFlight.scrollValuePx = { controlsScroll.value.toFloat() } }
     // CriticalContent's own HeroHeader is the real hero photo card here --
     // this view was NOT missing one the way the doc above used to claim;
     // CarHeaderRow's plain-text name and HeroHeader's own (on the photo)
     // were simply both visible at once, the exact duplicate-name bug fixed
     // everywhere else in the app. hideName = true here, matching
     // VehicleDetailContent's own CarHeaderRow call exactly: the floating
-    // name is sourced from HeroHeader (via the ambient LocalHeroTitleFlight
+    // name is sourced from HeroHeader (via the ambient LocalFloatingTitle
     // below, which HeroHeader already knows how to use -- no changes needed
     // there), not from this plain header.
     val controls: @Composable ColumnScope.() -> Unit = {
@@ -431,7 +292,7 @@ internal fun ExpandedCar(
     val pebbles: @Composable ColumnScope.() -> Unit = {
         PebbleList(v, state, vm, exclude = setOfNotNull("summary", "controls", hotspot))
     }
-    CompositionLocalProvider(LocalHotSeatDrag provides hotDrag, LocalHeroTitleFlight provides titleFlight) {
+    CompositionLocalProvider(LocalHotSeatDrag provides hotDrag, LocalFloatingTitle provides titleFlight) {
     // Was hardcoded hideIndicator = true -- the same "grid-only" flag that
     // hid the pull-to-refresh spinner in the single-car view (fixed in
     // a944a91) also hid it here, in the expanded/wide dual-column detail
@@ -500,10 +361,10 @@ internal fun ExpandedCar(
         }
         // The floating name badge, once CriticalContent's own HeroHeader has
         // scrolled out of view (same hero-card source as VehicleDetailContent,
-        // via the same ambient LocalHeroTitleFlight above).
+        // via the same ambient LocalFloatingTitle above).
         val screenWidth = LocalConfiguration.current.screenWidthDp.dp
-        TitleFlightOverlay(
-            flight = titleFlight,
+        FloatingTitlePill(
+            title = titleFlight,
             // Clears GarageScreen's own back arrow (top-left, 12dp/48dp) --
             // it's always present whenever ExpandedCar is on screen.
             cornerX = 60.dp,
@@ -511,17 +372,10 @@ internal fun ExpandedCar(
             // Clears the flip-columns + gear buttons in the top-right.
             reserveEnd = 120.dp,
             maxWidth = screenWidth - 60.dp - 120.dp - 32.dp,
-            // Same Unspecified-before-first-report fallback as VehicleDetailContent's own call site.
-            // textColorOverride omitted -- same reasoning as VehicleDetailContent's
-            // own call site: flight IS titleFlight, so TitleFlightOverlay reads
-            // its live colour itself.
             onClick = { scope.launch { controlsScroll.animateScrollTo(0) } },
         ) {
             Text(
                 v.name,
-                // headlineSmall -- matches PebbleShell's own real title
-                // base; see the hoisted badge's identical fix for the full
-                // reasoning.
                 style = MaterialTheme.typography.headlineSmall,
                 fontWeight = FontWeight.Bold,
                 maxLines = 1,

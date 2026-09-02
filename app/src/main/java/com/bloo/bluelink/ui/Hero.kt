@@ -41,7 +41,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Call
 import androidx.compose.material.icons.filled.DirectionsCar
-import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
 import androidx.compose.material3.Card
@@ -62,7 +61,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
@@ -282,89 +280,21 @@ internal fun HeroHeader(
                 }
             }
 
-        // Reports this title's own real, measured position (and colour) to a
-        // VehicleDetailContent ancestor's TitleFlightOverlay, if one is
-        // providing it (null everywhere else -- ExpandedCar's own pebble
-        // list excludes "summary" entirely, so this only ever applies
-        // here). This slot is drawn permanently invisible below -- see
-        // TitleFlightOverlay's own doc for why: it's a position anchor only,
-        // the actual visible Text lives entirely in that overlay now.
-        val heroTitleFlight = LocalHeroTitleFlight.current
-        // The ambient flight instance itself changes the moment this page
-        // becomes the hoisted/settled one (GarageScreen switches which
-        // HeroTitleFlight it hands down) -- but onGloballyPositioned below
-        // only fires on an actual RELAYOUT of this node, not merely because
-        // the target it reports to changed. If this page's title happened
-        // not to move on screen at that exact moment (the ordinary case: it
-        // was already laid out as the pre-composed pager neighbour), nothing
-        // would ever re-trigger a report to the NEW flight, leaving its
-        // reportGeneration stuck and its caller's "ready" gate unresolved --
-        // not just for a frame, but indefinitely, until some unrelated
-        // relayout (a scroll) happened to occur. Caching the last known
-        // coordinates and re-pushing them the instant the flight identity
-        // changes closes that gap: the new flight gets a real report in the
-        // very same frame it becomes current, with no dependency on layout
-        // happening to be dirty at that moment.
-        val lastHeroCoords = remember { mutableStateOf<LayoutCoordinates?>(null) }
-        // Runs SYNCHRONOUSLY, during composition -- NOT inside a
-        // LaunchedEffect, which is what this was until a real bug traced it
-        // here. A coroutine only starts running after this composition pass
-        // COMMITS, which is strictly AFTER TitleFlightOverlay's own
-        // synchronous `val docked by flight.docked` read (and its cold-mount
-        // `progress.snapTo()` branch, and its `settled`/onSettledChanged
-        // computation) have already consumed whatever STALE docked/position
-        // state the newly-adopted flight was left holding by whichever page
-        // or moment last drove it -- one whole recomposition too late to
-        // prevent a visible pop-to-corner/pop-to-hero flash (and, since a
-        // stale-true `docked` can make `settled` spuriously true on that
-        // same first frame, potentially a spurious re-hoist/re-unhoist
-        // oscillation right after). A remembered "last corrected identity"
-        // guard -- mirroring TitleFlightOverlay's own `lastDocked` latch
-        // just below -- fires this exactly once per real identity change,
-        // synchronously, before any sibling composable in this SAME pass
-        // (including TitleFlightOverlay) gets a chance to read the flight.
-        var lastCorrectedFlight by remember { mutableStateOf<HeroTitleFlight?>(null) }
-        if (lastCorrectedFlight !== heroTitleFlight) {
-            // onSettled, not onPositioned -- this is the FIRST report the
-            // (possibly newly-current) flight gets from this page becoming
-            // settled, not a continuous scroll update. The shared hoisted
-            // flight is reused across every page switch now (see its own
-            // doc), so its hysteresis baseline can be left over from
-            // whichever DIFFERENT page was settled before this one -- biasing
-            // this page's own first read through the wrong branch of that
-            // hysteresis and rendering it docked (or undocked) purely
-            // because of where the previous, unrelated page happened to
-            // leave the flag. onSettled bypasses that bias for this one
-            // report; onPositioned (below) still carries it correctly for
-            // this page's OWN later, continuous scroll updates.
-            lastHeroCoords.value?.let { heroTitleFlight?.onSettled(it.positionInRoot(), it.size) }
-            lastCorrectedFlight = heroTitleFlight
-        }
+        // Reports this title's own real, measured position to a VehicleDetailContent ancestor's
+        // FloatingTitle, if one is providing it (null everywhere else -- ExpandedCar's own pebble
+        // list excludes "summary" entirely, so this only ever applies here). Unlike the earlier
+        // fly-between-two-anchors design, this title is the ONLY thing that ever paints the car's
+        // name here -- it just fades itself out as it docks, handing off to FloatingTitlePill's
+        // own corner badge (see TitleFlight.kt's own doc for the whole redesign). No more shared
+        // instance handed between pager pages, so no more synchronous "did the ambient identity
+        // change under me" latch either -- this page owns its own FloatingTitle for its own
+        // lifetime, full stop.
+        val floatingTitle = LocalFloatingTitle.current
         // Follows the morph rather than switching: the photo fades in over the same
         // t, so the name has to travel from the surface's own colour to the light one
         // the scrim is built for. Snapping at a threshold would flash a white name
         // onto a still-white card for the frames before the photo arrives.
         val heroTitleColorNow = lerp(MaterialTheme.colorScheme.onSurface, HeroOnPhoto, heroT)
-        if (heroTitleFlight != null) heroTitleFlight.color = heroTitleColorNow
-        // Mirrors PebbleShell's own hero title grow/shrink spring EXACTLY
-        // (same damping/stiffness, same collapsed/expanded type-step ratio)
-        // -- see that spring's own doc for why these particular numbers.
-        // PebbleShell's copy of this spring only ever drives the invisible
-        // anchor Text underneath; without a second copy here, the one Text
-        // that's actually PAINTED (TitleFlightOverlay's) never grew or
-        // shrank with the pebble at all.
-        val headerT by animateFloatAsState(
-            targetValue = if (photoExpanded) 1f else 0f,
-            animationSpec = spring(dampingRatio = 0.62f, stiffness = Spring.StiffnessVeryLow),
-            label = "heroTitleFlightScale",
-        )
-        val collapsedTitleScale = with(LocalDensity.current) {
-            MaterialTheme.typography.titleMedium.fontSize.toPx() /
-                MaterialTheme.typography.headlineSmall.fontSize.toPx()
-        }
-        if (heroTitleFlight != null) {
-            heroTitleFlight.titleScale = collapsedTitleScale + (1f - collapsedTitleScale) * headerT
-        }
         PebbleShell(
             expanded = photoExpanded,
             onToggle = { vm.togglePebble(v, com.bloo.bluelink.data.HERO_PHOTO_SECTION) },
@@ -373,25 +303,7 @@ internal fun HeroHeader(
             vm = vm,
             dragHandle = dragHandle,
             titleColor = heroTitleColorNow,
-            titleModifier = if (heroTitleFlight != null) {
-                // Permanently invisible -- this slot exists to hold the real,
-                // measured layout position for TitleFlightOverlay's flying
-                // Text to land on; that Text is the only thing that actually
-                // PAINTS the name any more. See TitleFlightOverlay's own doc.
-                Modifier
-                    .onGloballyPositioned {
-                        lastHeroCoords.value = it
-                        heroTitleFlight.onPositioned(it.positionInRoot(), it.size)
-                    }
-                    .alpha(0f)
-                    // Position anchor only -- see TitleFlightOverlay's matching
-                    // measuring-copy comment for why this can't stay in the
-                    // accessibility tree: it would announce the car's name a
-                    // second time, on top of the one real flying Text.
-                    .clearAndSetSemantics {}
-            } else {
-                Modifier
-            },
+            titleModifier = Modifier.reportsToFloatingTitle(floatingTitle),
             // The ONLY pebble that grows its title. Here the title is the car's NAME and the
             // card becomes a photo of that car, so the name scaling up reads as the card taking
             // over. On "Location" or "Diagnostics" it is a heading resizing for no reason.

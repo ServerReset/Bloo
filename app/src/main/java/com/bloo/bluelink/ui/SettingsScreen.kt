@@ -232,19 +232,10 @@ import com.bloo.uicommon.ReorderColumn
 internal fun SettingsScreen(
     vm: AppViewModel,
     embedded: Boolean = false,
-    // Non-null ONLY for GarageScreen's single-car-per-page pager's embedded
-    // Settings slot, when it's the currently SETTLED page AND that page has
-    // reported itself DOCKED -- mirrors VehicleDetailContent's own `hoisted`
-    // param exactly, including why "settled" alone is no longer enough. See
-    // HoistedIdentityFlight's own doc.
-    hoisted: HoistedIdentityFlight? = null,
-    // Mirrors VehicleDetailContent's own `onDockedChanged` exactly -- reports
-    // this slot's own live docked state up to GarageScreen on every change,
-    // regardless of whether `hoisted` is currently null.
+    // Mirrors VehicleDetailContent's own `onDockedChanged` exactly -- reports this slot's own
+    // live docked state up to GarageScreen on every change.
     onDockedChanged: ((Boolean) -> Unit)? = null,
-    // Mirrors VehicleDetailContent's own `pageLabel` exactly -- see that
-    // parameter's own doc (Screens.kt) for why this local badge needs the
-    // identical "N / M" label the shared hoisted badge shows.
+    // "N / M" page-count label, shown on this slot's own docked pill when set.
     pageLabel: String? = null,
     /** True on the flip cover, where every dimension is precious: tighter
      *  gutters, a slimmer header, closer card spacing. The grid still
@@ -325,37 +316,12 @@ internal fun SettingsScreen(
           }
       }
   }
-  // Built UNCONDITIONALLY now -- mirrors VehicleDetailContent's identical
-  // `local` exactly, including why: this slot needs a live, continuously
-  // up-to-date flight of its OWN even before (or without ever) becoming the
-  // hoisted one, both so `onDockedChanged` below has something real to read
-  // and so there's no stale-position gap at the moment it DOES take over
-  // the shared corner badge.
   val topInsetPx = with(density) { topInset.toPx() }
-  // remember(Unit) + SideEffect, not remember(topInsetPx) -- see
-  // Screens.kt's VehicleDetailContent/GarageScreen/ExpandedCar
-  // construction sites for the full reasoning: a keyed remember here
-  // discarded all of this flight's accumulated dock/position state on
-  // every inset change (rotation, fold/unfold, multi-window resize)
-  // instead of just picking up the new inset value.
-  val flight = remember { HeroTitleFlight(topInsetPx, with(density) { TitleDockHysteresis.toPx() }) }
-  SideEffect { flight.topInsetPx = topInsetPx }
-  val local = LocalSettingsPillState(flight)
-  // Mirrors VehicleDetailContent's identical `liveFlight` -- see that
-  // composable's own doc for the full reasoning. dockedPages is driven
-  // entirely off whichever TitleFlightOverlay is actually live's own
-  // `onSettledChanged` now, in BOTH directions -- used to also report
-  // undocking immediately off the raw `liveFlight.docked` flag here, which
-  // cut the shared hoisted badge off from further position updates while
-  // its own exit spring was often still mid-flight (see onSettledChanged's
-  // own doc, Screens.kt, for the full reasoning).
-  val liveFlight = hoisted?.flight ?: local.flight
-  if (hoisted != null) {
-      // Register this page as the one actually driving the hoisted badge.
-      // Idempotent -- see VehicleDetailContent's own identical guard for
-      // why re-running it every recomposition is harmless.
-      hoisted.scrollToTop.value = { settingsGridState.animateScrollToItem(0) }
-  }
+  // remember(Unit) + SideEffect, not remember(topInsetPx) -- an inset change alone shouldn't
+  // discard this title's accumulated docked state.
+  val floatingTitle = remember { FloatingTitle(with(density) { TitleDockHysteresis.toPx() }) }
+  SideEffect { floatingTitle.topInsetPx = topInsetPx }
+  LaunchedEffect(floatingTitle.docked.value) { onDockedChanged?.invoke(floatingTitle.docked.value) }
   BackdropHost {
         // A real multi-column grid on wide screens (tablets, landscape, foldables
         // unfolded) instead of one narrow centred column with empty space on
@@ -373,7 +339,7 @@ internal fun SettingsScreen(
                 .fillMaxSize(),
             contentAlignment = Alignment.TopCenter
         ) {
-        CompositionLocalProvider(LocalHeroTitleFlight provides liveFlight) {
+        CompositionLocalProvider(LocalFloatingTitle provides floatingTitle) {
         // Hoisted OUT of the grid's item content, which is not a composable scope and so could
         // never have called this. That hoist is what lets an advanced-only card be skipped as a
         // grid ITEM rather than merely rendered empty -- see rememberAdvancedVisibility for why
@@ -2141,7 +2107,7 @@ internal fun SettingsScreen(
           }
           }
         }
-        } // CompositionLocalProvider(LocalHeroTitleFlight)
+        } // CompositionLocalProvider(LocalFloatingTitle)
         } // Box (wide-screen centering)
         // Same blurred scrim GarageScreen uses behind the system clock/battery
         // icons -- this content scrolls behind the status bar too (see the
@@ -2154,42 +2120,23 @@ internal fun SettingsScreen(
         // the same scrim twice for exactly this one page, reading as a subtly
         // darker/hazier status-bar band than every car page beside it.
         if (!isCompactCoverScreen() && !embedded) StatusBarScrim()
-        // The floating "Settings" badge, once its own header has scrolled
-        // out of view -- same TitleFlightOverlay every car page uses, sourced
-        // from SettingsHeaderRow's title instead of a hero photo card's.
-        // Hoisted mode (this slot is settled AND docked) renders NO badge of
-        // its own here at all -- GarageScreen renders ONE shared badge
-        // covering every page, including this one. Every other state --
-        // standalone route, or this slot before it's scrolled into the
-        // docked state -- renders its own "Settings" title here instead.
-        // See `hoisted`'s own doc.
-        // AnimatedVisibility, not a bare `if` -- mirrors VehicleDetailContent's
-        // identical wrapping (same 160ms fade GarageScreen's shared hoisted
-        // badge uses) for the same reason: without it, this side of the
-        // hand-off cut out/in instantly while the hoisted badge ramped over
-        // 160ms, leaving a dip/flash right at the dock/undock threshold.
-        AnimatedVisibility(
-            visible = hoisted == null,
-            enter = fadeIn(tween(160)),
-            exit = fadeOut(tween(160)),
-        ) {
+        // The floating "Settings" badge, once its own header has scrolled out of view -- same
+        // FloatingTitlePill every car page uses, sourced from SettingsHeaderRow's title instead
+        // of a hero photo card's. Renders directly (no more hoisted hand-off, see
+        // TitleFlight.kt's own doc) -- cheap at rest regardless of embedding, since the glass
+        // chrome only composes while actually docked or transitioning.
+        run {
             val screenWidth = LocalConfiguration.current.screenWidthDp.dp
-            // FloatingNamePill resolves cornerX/reserveEnd/maxWidth/textColor
-            // from the context enum -- SETTINGS_EMBEDDED and SETTINGS map to
-            // the exact same values this call site used to hand-compute
-            // (16dp/60dp cornerX, 192dp reserveEnd, onSurface text). See
-            // FloatingNameContext.config for the single source of truth.
-            FloatingNamePill(
-                context = if (embedded) FloatingNameContext.SETTINGS_EMBEDDED else FloatingNameContext.SETTINGS,
-                flight = local.flight,
-                screenWidth = screenWidth,
-                topInset = topInset,
-                onScrollToTop = { settingsScope.launch { settingsGridState.animateScrollToItem(0) } },
-                // See `liveFlight`'s own doc just above -- mirrors
-                // VehicleDetailContent's identical wiring.
-                onSettledChanged = { atRest -> onDockedChanged?.invoke(atRest) },
-                // See `pageLabel`'s own doc -- matches the shared hoisted
-                // badge's own extraContent so the hand-off has no width to pop.
+            // Standalone route clears the back arrow (60dp); embedded (inside GarageScreen's own
+            // pager) has none to clear (16dp, matching every car page's own pill).
+            val cornerX = if (embedded) 16.dp else 60.dp
+            FloatingTitlePill(
+                title = floatingTitle,
+                cornerX = cornerX,
+                cornerY = topInset + HeaderCornerGap,
+                reserveEnd = 192.dp,
+                maxWidth = screenWidth - cornerX - 192.dp - 32.dp,
+                onClick = { settingsScope.launch { settingsGridState.animateScrollToItem(0) } },
                 extraContent = pageLabel?.let { label ->
                     {
                         Text(
@@ -2202,15 +2149,6 @@ internal fun SettingsScreen(
             ) {
                 Text(
                     "Settings",
-                    // headlineSmall -- matches every other TitleFlightOverlay
-                    // content Text (see Screens.kt's identical fixes on the
-                    // hoisted/VehicleDetailContent/ExpandedCar badges) for
-                    // consistency across every surface this overlay covers.
-                    // Settings' own titleScale never actually varies (only
-                    // HeroHeader's hero-photo pebble writes titleScale), so
-                    // this alone doesn't fix a visible grow/shrink bug here
-                    // the way it does on a car page -- it's a font-weight-
-                    // consistency fix, not a scale-correctness one.
                     style = MaterialTheme.typography.headlineSmall,
                     fontWeight = FontWeight.Bold,
                     maxLines = 1,

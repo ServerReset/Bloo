@@ -10,9 +10,8 @@ package com.bloo.bluelink.ui
 /**
  * Settings' screen-header cluster, peeled out of SettingsScreen.kt (which still owns
  * the big `SettingsScreen` composable): the mode-stagger constant and
- * staggeredAdvancedVisible helper, the tonal StatusHeaderRow badge, the non-hoisted
- * LocalSettingsPillState badge state, and the floating SettingsHeaderRow title row
- * with its position-flight latch.
+ * staggeredAdvancedVisible helper, the tonal StatusHeaderRow badge, and the floating
+ * SettingsHeaderRow title row.
  */
 
 import androidx.compose.animation.AnimatedContent
@@ -61,15 +60,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.layout.LayoutCoordinates
-import androidx.compose.ui.layout.onGloballyPositioned
-import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.composed
 import androidx.compose.ui.unit.dp
@@ -198,58 +192,21 @@ internal fun StatusHeaderRow(icon: ImageVector, tint: Color, title: String, stat
 }
 
 /**
- * `SettingsScreen`'s own (non-hoisted) badge state, bundled so it can be
- * built inside an `if (hoisted == null)` branch as one value -- see
- * `VehicleDetailContent`'s identical `LocalNamePillState` for the full
- * reasoning.
- */
-internal class LocalSettingsPillState(
-    val flight: HeroTitleFlight,
-)
-
-/**
  * Settings' own in-content header: title + a short context line, using
  * headlineSmall/Bold for the name (bodySmall/onSurfaceVariant subtitle) --
- * matching the base [PebbleShell] scales its own hero title from (see
- * TitleFlightOverlay's content Text sites in Screens.kt for the same fix),
- * not [CarHeaderRow][com.bloo.bluelink.ui]'s own titleLarge name text.
+ * matching the base [PebbleShell] scales its own hero title from, not
+ * [CarHeaderRow][com.bloo.bluelink.ui]'s own titleLarge name text.
  *
- * Reports its own real, measured position via [LocalHeroTitleFlight] (the
- * same mechanism [HeroHeader]'s car-page title uses) whenever a flight
- * controller is present, and stays permanently INVISIBLE while it does --
- * see `TitleFlightOverlay`'s own doc (Screens.kt) for why: this slot's only
- * job is to report where the real, single, visible Text should sit when
- * undocked.
+ * Reports its own real, measured position via [LocalFloatingTitle] (the same
+ * mechanism [HeroHeader]'s car-page title uses) whenever a controller is
+ * present. Unlike the old fly-between-two-anchors design, this Text is the
+ * only thing that ever paints "Settings" here -- it just fades itself out as
+ * it docks, handing off to FloatingTitlePill's own corner badge (see
+ * TitleFlight.kt's own doc for the whole redesign).
  */
 @Composable
 internal fun SettingsHeaderRow(state: UiState, compact: Boolean = false) {
-    val titleFlight = LocalHeroTitleFlight.current
-    // Same fix as HeroHeader's own identical block (Screens.kt) -- force a
-    // fresh report the instant the ambient flight identity changes (this
-    // slot becoming/ceasing to be the hoisted one), instead of waiting on
-    // an incidental relayout that might not come. Uses onSettled, not
-    // onPositioned, so it doesn't inherit hysteresis left over from
-    // whichever DIFFERENT page (a car) was settled on the shared flight
-    // before this one -- see HeroTitleFlight.onSettled's own doc.
-    //
-    // Runs SYNCHRONOUSLY, during composition -- NOT inside a LaunchedEffect.
-    // This WAS a LaunchedEffect(titleFlight) until an audit caught that it
-    // never actually got the fix its own comment claimed: a coroutine only
-    // starts running after the composition pass that adopts the new flight
-    // has already committed, which is strictly AFTER TitleFlightOverlay's
-    // own synchronous `val docked by flight.docked` read (and its cold-mount
-    // snapTo) has already consumed whatever STALE state the newly-adopted
-    // flight was left holding by whichever car page drove it last -- one
-    // whole recomposition too late, reading as a visible pop/flash right on
-    // the Settings-slot hand-off. See HeroHeader's identical
-    // `lastCorrectedFlight` latch (Screens.kt) for the proven fix this
-    // mirrors.
-    val lastCoords = remember { mutableStateOf<LayoutCoordinates?>(null) }
-    var lastCorrectedFlight by remember { mutableStateOf<HeroTitleFlight?>(null) }
-    if (lastCorrectedFlight !== titleFlight) {
-        lastCoords.value?.let { titleFlight?.onSettled(it.positionInRoot()) }
-        lastCorrectedFlight = titleFlight
-    }
+    val titleFlight = LocalFloatingTitle.current
     // Entrance animation: the page header slides up and fades in (same motion
     // the empty screen and hero use) instead of appearing with no motion --
     // "the settings header is not animated" -- while the invisible title
@@ -289,20 +246,7 @@ internal fun SettingsHeaderRow(state: UiState, compact: Boolean = false) {
                 style = if (compact) MaterialTheme.typography.titleLarge else MaterialTheme.typography.headlineSmall,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.onSurface,
-                modifier = if (titleFlight != null) {
-                    Modifier
-                        .onGloballyPositioned {
-                            lastCoords.value = it
-                            titleFlight.onPositioned(it.positionInRoot())
-                        }
-                        .alpha(0f)
-                        // Position anchor only -- see TitleFlightOverlay's matching
-                        // measuring-copy comment (Screens.kt) for why this can't stay
-                        // in the accessibility tree.
-                        .clearAndSetSemantics {}
-                } else {
-                    Modifier
-                },
+                modifier = Modifier.reportsToFloatingTitle(titleFlight),
             )
             val carCount = state.vehicles.size
             val modeLabel = if (state.settingsMode == "advanced") "Advanced" else "Simple"
