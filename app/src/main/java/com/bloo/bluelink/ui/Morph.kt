@@ -648,15 +648,26 @@ fun MorphChip(
         // not this composable's `selected` parameter of the same name.
         modifier = modifier.semantics { this.selected = chipSelected },
     ) {
-        if (icon != null) Icon(icon, contentDescription = null, modifier = Modifier.size(ButtonIconSize))
-        Text(
-            label,
-            style = ButtonLabelStyle,
-            fontWeight = if (chipSelected) FontWeight.Bold else FontWeight.SemiBold,
-            maxLines = 1,
-            softWrap = false,
-            overflow = TextOverflow.Ellipsis,
-        )
+        // The shared label, like every other button, rather than a hand-assembled icon and
+        // text. Two things follow from that: the glyph gets the standard gap beside it (these
+        // two were emitted with NO spacer between them at all), and a row of chips can compact
+        // to glyphs when it runs out of room, which a hand-assembled pair cannot.
+        //
+        // A selected chip is SemiBold like every other button label now, not Bold. Its
+        // selection already reads from the filled container and the rounded-square morph; a
+        // third signal was the sort of per-control exception this pass exists to remove.
+        if (icon != null) {
+            MorphButtonLabel(icon, label, pending = false)
+        } else {
+            Text(
+                label,
+                style = ButtonLabelStyle,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 1,
+                softWrap = false,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
     }
     }
 }
