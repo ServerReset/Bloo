@@ -19,12 +19,10 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccountBalanceWallet
@@ -43,7 +41,6 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.onClick
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -304,12 +301,13 @@ internal fun LinkButton(label: String, icon: ImageVector, onClick: () -> Unit) {
         contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
         // 18dp, up from 14dp: the padding IS the give. A button that hugs its label at 14dp
         // could spare 2dp a side above ButtonMinSidePadding, which is not enough movement to
-        // read as anything; at 18dp it can hand a pressed neighbour a visible 20dp and still
-        // never touch its own label. See ButtonMinSidePadding.
+        // read as anything; at 18dp there is room to give and the label never moves.
         contentPadding = PaddingValues(horizontal = 18.dp, vertical = 8.dp),
     ) {
-        Icon(icon, contentDescription = null, modifier = Modifier.size(ButtonIconSize))
-        Spacer(Modifier.width(6.dp))
-        Text(label, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold)
+        // The shared label: standard gap, standard type, and -- the reason it matters here --
+        // the fit rule. These links are the row that reported as "they expand but just push
+        // the other buttons away", and hand-assembled content is exactly what cannot tell the
+        // group how small it is willing to get.
+        MorphButtonLabel(icon, label, pending = false)
     }
 }

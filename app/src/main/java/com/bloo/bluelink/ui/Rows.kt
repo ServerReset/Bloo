@@ -626,9 +626,10 @@ internal fun CommandButton(
         modifier = modifier.height(64.dp),
         contentPadding = PaddingValues(horizontal = 18.dp),
     ) {
-        Icon(icon, contentDescription = null, modifier = Modifier.size(ButtonIconOnlySize))
-        Spacer(Modifier.width(8.dp))
-        Text(label, style = ButtonLabelStyle, fontWeight = FontWeight.SemiBold)
+        // The shared label, at this variant's larger glyph size. Hand-assembling it was the
+        // same three pieces in the same order, minus the fit rule -- so a command button in a
+        // narrow pebble had no way to fall back to its glyph.
+        MorphButtonLabel(icon, label, pending = false, iconSize = ButtonIconOnlySize)
     }
 }
 
