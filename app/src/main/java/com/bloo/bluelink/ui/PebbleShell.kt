@@ -552,29 +552,40 @@ internal fun PebbleShell(
                                 // shrink-wrapped, or the stat drifts away from the name.
                                 modifier = if (titleTrailingAtEnd) Modifier.fillMaxWidth() else Modifier,
                                 verticalAlignment = Alignment.CenterVertically,
+                                // SpaceBetween, not a filled/weighted title, pushes titleTrailing to
+                                // the row's far end. `weight(1f, fill = true)` did that job before by
+                                // forcing this Text's own MEASURE constraints (minWidth == maxWidth ==
+                                // the whole remaining row) regardless of how short the title actually
+                                // was -- and the scaled-title `.layout{}` below measures against
+                                // whatever width it is handed before shrinking it back down, so a
+                                // short title ("Updates", "AI") in a wide forced box came out
+                                // reporting -- and drawing -- a box far wider than its own glyphs,
+                                // with the word adrift inside it rather than hugging the icon.
+                                // Confirmed from two separate real screenshots. SpaceBetween reaches
+                                // the same "trailing sits hard right" result from the OUTSIDE, off two
+                                // children's natural widths, so the title is never measured wider than
+                                // its own (possibly ellipsized) content.
+                                horizontalArrangement = if (titleTrailingAtEnd) {
+                                    Arrangement.SpaceBetween
+                                } else {
+                                    Arrangement.Start
+                                },
                             ) {
                             Text(
                                 title,
                                 modifier = Modifier
-                                    // fill = true when the trailing slot is pinned to the end,
-                                    // so the title claims ALL the remaining width and pushes the
-                                    // control there. The weighted Spacer that used to do that job
-                                    // was a second weighted child, so the row split the remainder
-                                    // 50/50 and capped the title at half the card -- which is why
-                                    // "Sounds & vibration" ellipsized to "Sounds & ..." with the
-                                    // switch adrift in the middle instead of sitting hard right.
-                                    //
-                                    // AND titleTrailing != null: a single-setting card
-                                    // (SettingsCard with no `status` and no inline control --
-                                    // "Updates") sets titleTrailingAtEnd but has nothing to push
-                                    // to the end. Filling anyway forced this Text's minWidth up to
-                                    // the whole row -- and the `.layout{}` below measures against
-                                    // THAT forced width before scaling it down, so the reported box
-                                    // came out far wider than "Updates" itself, with the word
-                                    // adrift somewhere inside it instead of hugging the icon,
-                                    // confirmed from a real screenshot. Nothing to push means
-                                    // nothing to fill for.
-                                    .weight(1f, fill = titleTrailingAtEnd && titleTrailing != null)
+                                    // fill = false always now (see the Row's own doc above) -- weight
+                                    // still caps the title's MAX width to its fair share so a long
+                                    // title ellipsizes instead of pushing titleTrailing off the row,
+                                    // it just no longer forces the title to measure wider than its
+                                    // own content.
+                                    .weight(1f, fill = false)
+                                    // The hard minimum gap "Sounds & vibration" needed -- previously a
+                                    // Spacer sitting between title and titleTrailing as a third row
+                                    // child, moved onto the title itself so SpaceBetween above still
+                                    // sees exactly two children and gives the whole remaining width
+                                    // to one gap rather than splitting it around a spacer.
+                                    .then(if (titleTrailingAtEnd) Modifier.padding(end = 12.dp) else Modifier)
                                     // Reports the DRAWN size. graphicsLayer scales the drawing and
                                     // leaves the measured size alone, so without this the title's
                                     // box stayed headline-TALL while its glyphs were title-sized --
@@ -646,11 +657,10 @@ internal fun PebbleShell(
                             // No Spacer before it any more, and no styling applied here:
                             // the slot owns both. The hero shows this only while collapsed,
                             // and a 10dp gap left behind when it goes would squeeze the
-                            // expanded title for a node that is no longer in the row.
-                            // A hard minimum gap so a long title ellipsizes rather than ever
-                            // touching the control. No weighted spacer -- the title's own fill
-                            // above is what pushes the control to the end.
-                            if (titleTrailingAtEnd) Spacer(Modifier.width(12.dp))
+                            // expanded title for a node that is no longer in the row. The hard
+                            // minimum gap for titleTrailingAtEnd now lives on the title's own
+                            // trailing padding above, not as a separate Spacer here -- see that
+                            // Text modifier's own doc.
                             // Plain Box, no forced baseline alignment: a `Modifier.alignByBaseline()`
                             // here once tried to line titleTrailing's glyphs up with the title's own
                             // baseline, reasoning that a Box (like Row/Column) forwards a single
