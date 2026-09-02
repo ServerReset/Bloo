@@ -546,6 +546,35 @@ internal fun PebbleShell(
                             } else {
                                 { collapsedTitleScale + (1f - collapsedTitleScale) * headerTState.value }
                             }
+                            // True whenever the title is sitting at its collapsed rest size rather
+                            // than mid-grow -- which is EVERY pebble but the hero (growTitleOnExpand
+                            // is false for the rest, so titleScale() is permanently
+                            // collapsedTitleScale), and the hero itself whenever headerTState has
+                            // actually settled at 0f rather than mid-spring.
+                            //
+                            // At rest, render the title in a NATIVE titleMedium Text instead of a
+                            // scaled-down headlineSmall one. The scale trick above exists so the
+                            // hero's name can grow smoothly through every intermediate size as the
+                            // card expands -- a discrete style swap mid-animation would relayout
+                            // and jank every frame (see the scale block's own doc). But scaling a
+                            // BIGGER style down by its font-size ratio does not necessarily
+                            // reproduce a native SMALLER style's own baseline-to-box-centre ratio --
+                            // lineHeight is not always a fixed fraction of fontSize across type
+                            // steps -- so a scaled headlineSmall sitting beside the hero's own
+                            // titleMedium-styled numbers left their glyphs a few px off each
+                            // other's baseline no matter how precisely CenterVertically (or a
+                            // computed correction) tried to reconcile two DIFFERENT styles' boxes.
+                            // Confirmed after two earlier attempts at exactly that, both from real
+                            // screenshots.
+                            //
+                            // At true rest there is no animation to protect, so this renders the
+                            // SAME font size through the SAME style object the numbers already use
+                            // (HeroNumbers' pctStyle is titleMedium at t=0) -- identical metrics,
+                            // so CenterVertically genuinely cannot land them apart. Every other
+                            // pebble's title was already reading fine here (nothing beside it needs
+                            // a text baseline), and this only swaps which style produces the same
+                            // on-screen font size for them too.
+                            val atRestScale = !growTitleOnExpand || headerTState.value == 0f
                             Row(
                                 // Only stretched when the trailing slot is being pushed to the
                                 // end -- a row that merely holds a name and a stat must stay
@@ -586,57 +615,73 @@ internal fun PebbleShell(
                                     // sees exactly two children and gives the whole remaining width
                                     // to one gap rather than splitting it around a spacer.
                                     .then(if (titleTrailingAtEnd) Modifier.padding(end = 12.dp) else Modifier)
-                                    // Reports the DRAWN size. graphicsLayer scales the drawing and
-                                    // leaves the measured size alone, so without this the title's
-                                    // box stayed headline-TALL while its glyphs were title-sized --
-                                    // which made the row taller than the text in it and pushed
-                                    // everything beside the name out of line.
-                                    //
-                                    // Measure once at headlineSmall, then report width and height
-                                    // multiplied by the same scale the layer draws with, and place
-                                    // the (still full-size) content centred on that smaller box so
-                                    // scaling about its left-centre keeps the glyphs where the box
-                                    // says they are. This is what lets `titleTrailing` sit against
-                                    // the name's real edge rather than a headline-sized box.
-                                    .layout { measurable, constraints ->
-                                        // Measured against constraints widened by 1/titleScale.
-                                        // The Text is measured at headlineSmall and DRAWN scaled
-                                        // down to titleScale (~0.7), so measuring it against the
-                                        // raw width made it ellipsize on headline-sized glyphs
-                                        // and then shrink the result -- "Announcements" became
-                                        // "Announce..." with a third of the row still empty.
-                                        // Widening first means it ellipsizes on the width it is
-                                        // actually drawn at, and the scaled-down report below
-                                        // still lands inside the real constraint.
-                                        val scale = titleScale()
-                                        val room = if (constraints.hasBoundedWidth && scale > 0f) {
-                                            constraints.copy(
-                                                maxWidth = (constraints.maxWidth / scale)
-                                                    .roundToInt()
-                                                    .coerceAtLeast(constraints.maxWidth),
-                                            )
+                                    // Only the mid-grow case needs the scale machinery at all -- see
+                                    // atRestScale's own doc. At rest this Text is already native
+                                    // titleMedium, measured and drawn at its own real size with
+                                    // nothing to correct for.
+                                    .then(
+                                        if (atRestScale) {
+                                            Modifier
                                         } else {
-                                            constraints
-                                        }
-                                        val placeable = measurable.measure(room)
-                                        val w = (placeable.width * scale).roundToInt()
-                                        val h = (placeable.height * scale).roundToInt()
-                                        val yOffset = (h - placeable.height) / 2
-                                        layout(w, h) {
-                                            placeable.place(0, yOffset)
-                                        }
-                                    }
-                                    .graphicsLayer {
-                                        val s = titleScale()
-                                        scaleX = s
-                                        scaleY = s
-                                        transformOrigin = TransformOrigin(0f, 0.5f)
-                                    }
-                                    // Appended LAST -- after the .layout{} above, so a
+                                            Modifier
+                                                // Reports the DRAWN size. graphicsLayer scales the
+                                                // drawing and leaves the measured size alone, so
+                                                // without this the title's box stayed headline-TALL
+                                                // while its glyphs were title-sized -- which made the
+                                                // row taller than the text in it and pushed
+                                                // everything beside the name out of line.
+                                                //
+                                                // Measure once at headlineSmall, then report width and
+                                                // height multiplied by the same scale the layer draws
+                                                // with, and place the (still full-size) content
+                                                // centred on that smaller box so scaling about its
+                                                // left-centre keeps the glyphs where the box says they
+                                                // are. This is what lets `titleTrailing` sit against
+                                                // the name's real edge rather than a headline-sized
+                                                // box.
+                                                .layout { measurable, constraints ->
+                                                    // Measured against constraints widened by
+                                                    // 1/titleScale. The Text is measured at
+                                                    // headlineSmall and DRAWN scaled down to
+                                                    // titleScale (~0.7), so measuring it against the
+                                                    // raw width made it ellipsize on headline-sized
+                                                    // glyphs and then shrink the result --
+                                                    // "Announcements" became "Announce..." with a
+                                                    // third of the row still empty. Widening first
+                                                    // means it ellipsizes on the width it is actually
+                                                    // drawn at, and the scaled-down report below still
+                                                    // lands inside the real constraint.
+                                                    val scale = titleScale()
+                                                    val room = if (constraints.hasBoundedWidth && scale > 0f) {
+                                                        constraints.copy(
+                                                            maxWidth = (constraints.maxWidth / scale)
+                                                                .roundToInt()
+                                                                .coerceAtLeast(constraints.maxWidth),
+                                                        )
+                                                    } else {
+                                                        constraints
+                                                    }
+                                                    val placeable = measurable.measure(room)
+                                                    val w = (placeable.width * scale).roundToInt()
+                                                    val h = (placeable.height * scale).roundToInt()
+                                                    val yOffset = (h - placeable.height) / 2
+                                                    layout(w, h) {
+                                                        placeable.place(0, yOffset)
+                                                    }
+                                                }
+                                                .graphicsLayer {
+                                                    val s = titleScale()
+                                                    scaleX = s
+                                                    scaleY = s
+                                                    transformOrigin = TransformOrigin(0f, 0.5f)
+                                                }
+                                        },
+                                    )
+                                    // Appended LAST -- after the scale machinery above, so a
                                     // caller reading this via onGloballyPositioned gets
                                     // the real, final (already-scaled) on-screen bounds.
                                     .then(titleModifier),
-                                style = titleStyle,
+                                style = if (atRestScale) MaterialTheme.typography.titleMedium else titleStyle,
                                 color = titleColor,
                                 fontWeight = FontWeight.Bold,
                                 // Cap at one line: at a large display/font size the
