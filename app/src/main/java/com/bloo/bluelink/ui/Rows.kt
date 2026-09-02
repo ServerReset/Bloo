@@ -457,6 +457,33 @@ internal fun SettingsCaption(
     )
 }
 
+/**
+ * A bare toggle, with no row and no label around it -- what a card puts on its own title row
+ * when the whole card IS one setting.
+ *
+ * The same MorphToggleTrack every ToggleRow draws, with the same toggleable semantics, so an
+ * inline card and an expanded one are the same control in two places rather than two controls
+ * that happen to look alike.
+ */
+@Composable
+internal fun InlineToggle(checked: Boolean, onChange: (Boolean) -> Unit) {
+    val haptics = LocalHaptics.current
+    Box(
+        Modifier.toggleable(
+            value = checked,
+            interactionSource = remember { MutableInteractionSource() },
+            indication = null,
+            role = Role.Switch,
+        ) {
+            val next = !checked
+            if (next) haptics?.toggleOn() else haptics?.toggleOff()
+            onChange(next)
+        },
+    ) {
+        MorphToggleTrack(checked)
+    }
+}
+
 @Composable
 private fun ToggleRowControl(label: String, checked: Boolean, onChange: (Boolean) -> Unit) {
     val haptics = LocalHaptics.current

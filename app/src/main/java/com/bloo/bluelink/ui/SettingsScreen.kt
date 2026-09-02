@@ -620,7 +620,25 @@ internal fun SettingsScreen(
             // shown (not advanced-only): it's a headline feature, not a power-
             // user knob, and hiding it behind Advanced made it easy to miss.
             run { // scope kept so the gate above is the only edit; the check now lives on `item`
-                SettingsCard("AI", Icons.Filled.AutoAwesome, vm) {
+                SettingsCard(
+                    "AI",
+                    Icons.Filled.AutoAwesome,
+                    vm,
+                    // The card is inline whenever the CURRENT mode leaves it holding one
+                    // setting. In simple mode the auto-summarize toggle below is hidden, so
+                    // everything this card can do is the one switch -- and a chevron that opens
+                    // a card to reveal a single switch is the disclosure this treatment exists
+                    // to remove. Advanced mode has two, so it stays a real card there.
+                    //
+                    // Gated on what is VISIBLE, not on what the card contains. That distinction
+                    // is the bug: counting everything the card could ever show says "two
+                    // settings" in both modes, and the card never collapses in either.
+                    inlineSetting = if (advanced) {
+                        null
+                    } else {
+                        { InlineToggle(state.aiEnabled) { vm.setAiEnabled(it) } }
+                    },
+                ) {
                     // Same icon-badge + status-line header as the rest of this pass.
                     val aiTint = if (state.aiEnabled) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.onSurfaceVariant
                     StatusHeaderRow(
@@ -1615,27 +1633,7 @@ internal fun SettingsScreen(
                 "Sounds & vibration",
                 Icons.Filled.Vibration,
                 vm,
-                // MorphToggleTrack inside a toggleable, NOT a stock Material Switch: this was
-                // the one switch in the whole app still drawing Material's own track, sitting
-                // in Settings among a dozen ToggleRows that all draw the spring-timed Morph
-                // one. Same control, visibly different shape and thumb, on the same screen.
-                inlineSetting = {
-                    val haptics = LocalHaptics.current
-                    Box(
-                        Modifier.toggleable(
-                            value = appearance.hapticsEnabled,
-                            interactionSource = remember { MutableInteractionSource() },
-                            indication = null,
-                            role = Role.Switch,
-                        ) {
-                            val next = !appearance.hapticsEnabled
-                            if (next) haptics?.toggleOn() else haptics?.toggleOff()
-                            vm.setHapticsEnabled(next)
-                        },
-                    ) {
-                        MorphToggleTrack(appearance.hapticsEnabled)
-                    }
-                },
+                inlineSetting = { InlineToggle(appearance.hapticsEnabled) { vm.setHapticsEnabled(it) } },
             ) {}
             }
             item {

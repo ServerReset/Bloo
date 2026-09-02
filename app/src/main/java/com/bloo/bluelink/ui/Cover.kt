@@ -22,6 +22,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
@@ -32,6 +33,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -45,6 +47,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.onClick
 import androidx.compose.ui.semantics.onLongClick
 import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -268,75 +271,17 @@ internal fun CoverTile(
     ) {
       Box(Modifier.fillMaxSize()) {
         background?.invoke(this)
-        // The identity band -- glyph, state word, car name, and the subtitle under it.
+        // The identity, as ONE pill that rides in the action row.
         //
-        // Declared here and rendered at the BOTTOM of the tile, next to the actions, rather
-        // than at the top. At the top it took the first fifth of a cover screen before any
-        // content had a chance to appear, on a display where a fifth is most of what there is.
-        // Down here it sits with the controls it describes, and everything above it is content.
-        val identity: @Composable ColumnScope.() -> Unit = {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                Icon(
-                    icon,
-                    contentDescription = null,
-                    tint = iconTint,
-                    modifier = Modifier.size(20.dp),
-                )
-                com.bloo.uicommon.FittedText(
-                    text = headline?.takeIf { it.isNotBlank() } ?: title,
-                    style = MaterialTheme.typography.titleLarge.copy(
-                        fontWeight = FontWeight.Bold,
-                        color = titleColor,
-                    ),
-                    // 2f against the trailing label's 1f, and both WEIGHTED on purpose. An
-                    // unweighted trailing child is measured first and takes whatever it wants,
-                    // so a long car name would have squeezed the section title -- backwards,
-                    // since the section is what the tile is about and the car is context. This
-                    // caps the name at a third of the row on a narrow cover.
-                    modifier = Modifier.weight(2f),
-                )
-                if (!trailingLabel.isNullOrBlank()) {
-                    Text(
-                        trailingLabel,
-                        style = MaterialTheme.typography.labelMedium,
-                        fontWeight = FontWeight.SemiBold,
-                        // Muted against the title it shares a line with: the section is what the
-                        // tile is ABOUT, the car is context. Same tone the subtitle uses.
-                        color = (subtitleColor ?: LocalContentColor.current).copy(alpha = 0.92f),
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        // fill = false so a short name takes only what it needs and gives the
-                        // rest back to the title, rather than always claiming its full third.
-                        modifier = Modifier.weight(1f, fill = false),
-                    )
-                }
-            }
-            // Only when it is not already the headline. Passing the summary as both was the
-            // duplication this merge exists to remove, and a caller that hands over the same
-            // string twice should get one line, not two.
-            if (!subtitle.isNullOrBlank() && subtitle != (headline ?: title)) {
-                Text(
-                    subtitle,
-                    style = MaterialTheme.typography.bodyMedium,
-                    // Not MutedContentAlpha (0.7) atop the Card's own contentColor: that
-                    // color is contentColorFor(containerColor), and the default
-                    // containerColor is surfaceVariant, whose paired content tone is
-                    // onSurfaceVariant -- already a lower-contrast MD3 role before any
-                    // alpha is applied. Muting it further compounds two dimming steps
-                    // into text that reported as "overly gray" on several cover pages,
-                    // where this subtitle is a full line right under the title (not a
-                    // small list-row label, the case MutedContentAlpha was tuned for).
-                    // 0.92 keeps it visually secondary to the title without reading as
-                    // washed out on a small, quick-glance screen.
-                    color = subtitleColor ?: LocalContentColor.current.copy(alpha = 0.92f),
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            }
-        }
+        // At the top this was a full-width row of its own: it took the first fifth of a cover
+        // screen before any content appeared, on a display where a fifth is most of what there
+        // is. As a pill it costs whatever is left over beside the buttons -- and when nothing
+        // is left over, the group's own wrapping puts it on the line above them. Neither
+        // outcome is coded for; both fall out of the row it now lives in.
+        val identityText = listOfNotNull(
+            (headline?.takeIf { it.isNotBlank() } ?: title).takeIf { it.isNotBlank() },
+            trailingLabel?.takeIf { it.isNotBlank() },
+        ).joinToString("  \u00b7  ")
         Column(Modifier.fillMaxSize().padding(horizontal = coverContentInset())) {
             Spacer(Modifier.height(coverTileEdgeGap()))
             // A scrolling Box that CENTERS its content, rather than a BoxWithConstraints whose
@@ -370,25 +315,43 @@ internal fun CoverTile(
                 )
             }
             Spacer(Modifier.height(coverBodyGap()))
-            identity()
-            if (actions != null) {
-                Spacer(Modifier.height(coverBodyPad()))
-                // ExpressiveButtonRow with equal shares: these are several buttons in one
-                // space, so pressing one should widen it and squeeze its neighbours, exactly as
-                // the lock pebble's connected group does on the phone. equalWidths is what the
-                // dead weight(1f) below was reaching for -- see ExpressiveButtonGroup.
-                ExpressiveButtonRow(
-                    modifier = Modifier.fillMaxWidth().padding(bottom = coverTileEdgeGap()),
-                    spacing = 6.dp,
-                    // Equal shares once there are two or more; a lone action keeps its natural
-                    // size and centres, rather than being stretched across the whole panel
-                    // because "its share" of a one-button row is all of it.
-                    equalWidths = true,
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    content = actions,
+            // The one thing that cannot be a pill: a sentence. It keeps its own muted line,
+            // still in the bottom band, still above the row rather than at the top of the tile.
+            // Only when it is not already the identity -- a caller that hands over the same
+            // string twice should get one line, not two.
+            if (!subtitle.isNullOrBlank() && subtitle != (headline ?: title)) {
+                Text(
+                    subtitle,
+                    style = MaterialTheme.typography.bodySmall,
+                    // Not MutedContentAlpha atop the Card's own contentColor: that colour is
+                    // already a lower-contrast MD3 role, and muting it again compounds two
+                    // dimming steps into text reported as "overly gray" on a small screen.
+                    color = subtitleColor ?: LocalContentColor.current.copy(alpha = 0.92f),
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.padding(bottom = coverBodyPad()),
                 )
-            } else {
-                Spacer(Modifier.height(coverTileEdgeGap()))
+            }
+            // ONE row holds the identity and the actions, and the group decides how they
+            // share it. No equalWidths: the identity pill must keep its natural size, so the
+            // ACTIONS carry the weight and split whatever the pill leaves. That is also what
+            // equalWidths used to be reaching for, minus the assumption that every member
+            // deserves the same share.
+            ExpressiveButtonRow(
+                modifier = Modifier.fillMaxWidth().padding(bottom = coverTileEdgeGap()),
+                spacing = 6.dp,
+                lineSpacing = coverBodyPad(),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                if (identityText.isNotBlank()) {
+                    CoverIdentityPill(
+                        icon = icon,
+                        text = identityText,
+                        iconTint = iconTint,
+                        contentColor = titleColor,
+                    )
+                }
+                actions?.invoke()
             }
         }
       }
@@ -621,6 +584,9 @@ internal fun CoverActionButton(
             morphedCornerPercent = squarePct,
             contentPadding = PaddingValues(horizontal = 2.dp, vertical = 4.dp),
             minHeight = 0.dp,
+            // The actions carry the row's weight, so they split whatever the identity pill
+            // leaves rather than every member claiming an equal share. See the bottom band.
+            groupWeight = 1f,
             // No weight(1f): its parent here is SafeExpansiveButton's own layout, not the row,
             // so it was silently doing nothing. The equal share now comes from the group.
             modifier = Modifier
@@ -676,5 +642,43 @@ internal fun CoverActionButton(
             }
         }
     }
+    }
+}
+
+/**
+ * The tile's identity, wearing a button's shape but holding still: glyph, state word and car
+ * name in a pill the same height and radius as the actions beside it.
+ *
+ * It is a group MEMBER, so it takes part in the row's sizing and gives width up when a real
+ * button beside it is pressed -- but nothing ever presses it, so it never takes any. That is
+ * what makes "info sitting in the action row" work as a layout rather than as a special case:
+ * when it and the buttons fit on one line, it sits beside them; when they do not, the group's
+ * own wrapping puts it on the line above. Neither outcome is coded for.
+ *
+ * Not clickable, and marked so: it looks like a button because it shares the row's shape
+ * language, not because there is anything to press.
+ */
+@Composable
+private fun CoverIdentityPill(
+    icon: ImageVector,
+    text: String,
+    iconTint: Color,
+    contentColor: Color,
+) {
+    val idle = remember { MutableInteractionSource() }
+    SafeExpansiveButton(interactionSource = idle, enabled = false) {
+        Box(
+            Modifier
+                .heightIn(min = ButtonTargetHeight)
+                .clip(CircleShape)
+                .background(buttonContainer())
+                .padding(horizontal = 14.dp)
+                .semantics(mergeDescendants = true) { contentDescription = text },
+            contentAlignment = Alignment.Center,
+        ) {
+            CompositionLocalProvider(LocalContentColor provides contentColor) {
+                MorphButtonLabel(icon, text, pending = false)
+            }
+        }
     }
 }
