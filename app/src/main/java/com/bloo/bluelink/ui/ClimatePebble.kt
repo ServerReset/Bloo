@@ -656,7 +656,6 @@ internal fun ClimatePresetSection(
     onDelete: (String) -> Unit,
     onReorder: (List<ClimatePreset>) -> Unit,
 ) {
-    SectionLabel("Presets")
     // Track IDs mid-exit so the item stays visible until its shrink animation ends.
     var deletingIds by remember { mutableStateOf(setOf<String>()) }
     val scope = rememberCoroutineScope()
@@ -667,6 +666,11 @@ internal fun ClimatePresetSection(
         exit = collapseExit(Alignment.Bottom),
     ) {
         Column(modifier = Modifier.fillMaxWidth()) {
+            // The heading lives INSIDE the visibility gate. Outside it, a user with no saved
+            // presets got a "Presets" heading over nothing at all -- a whole line of a cover
+            // screen spent announcing an empty section. It also means the label animates away
+            // with the last preset instead of being left behind.
+            SectionLabel("Presets")
             Spacer(Modifier.height(4.dp))
             // Full-width reorderable rows: drag handle to re-rank, tap to apply.
             ReorderColumn(

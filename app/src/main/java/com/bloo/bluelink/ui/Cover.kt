@@ -153,6 +153,16 @@ internal fun coverBodyPad(): Dp = if (coverIsTiny()) 4.dp else 6.dp
 internal fun coverBodyGap(): Dp = if (coverIsTiny()) 6.dp else 8.dp
 
 /**
+ * How far the scroll fade reaches into a cover tile's body.
+ *
+ * Much shorter than the 28dp the phone uses, and deliberately so: 28dp is a small fraction of a
+ * phone pebble and most of a line of text on a cover screen, so the top of the body sat visibly
+ * washed out the moment the tile scrolled at all. Here the fade only has to say "there is more
+ * above", not dissolve the content saying it.
+ */
+internal fun coverFadeLength(): Dp = if (coverIsTiny()) 10.dp else 14.dp
+
+/**
  * The car the current cover page belongs to, provided by CompactCar so a tile deep inside it can
  * name its car without every tile composable having to take a Vehicle it otherwise never reads.
  */
@@ -338,7 +348,7 @@ internal fun CoverTile(
                 Modifier
                     .weight(1f)
                     .fillMaxWidth()
-                    .fadingEdges(scroll)
+                    .fadingEdges(scroll, length = coverFadeLength())
                     .verticalScroll(scroll),
                 contentAlignment = Alignment.Center,
             ) {
