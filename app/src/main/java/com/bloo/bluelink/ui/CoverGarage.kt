@@ -340,7 +340,10 @@ internal fun CompactGarage(state: UiState, vm: AppViewModel, appearance: Setting
             // sized to the band's own height, gives it the same guaranteed
             // contrast every other piece of floating chrome already has, and
             // reads as one more piece of that chrome rather than loose text.
-            val bandShape = RoundedCornerShape((band.heightDp / 2f).dp)
+            // percent = 50, not a hand-derived half-height radius: RoundedCornerShape's percent
+            // basis is already the shorter side of the actual box, the same "true pill" language
+            // MorphButton's own pillCornerPercent speaks everywhere else in the app.
+            val bandShape = RoundedCornerShape(percent = 50)
             Row(
                 Modifier
                     .align(Alignment.TopStart)

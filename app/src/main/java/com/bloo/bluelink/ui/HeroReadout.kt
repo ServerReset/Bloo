@@ -566,10 +566,10 @@ internal fun HeroMorphReadout(
                 Icon(
                     Icons.Filled.LocalGasStation,
                     contentDescription = null,
-                    modifier = Modifier.size(16.dp),
+                    modifier = Modifier.size(ButtonIconSize),
                     tint = fuelColor,
                 )
-                Spacer(Modifier.width(6.dp))
+                Spacer(Modifier.width(ButtonIconGap))
                 Text("Fuel $fuelPct%", style = type.bodyMedium, color = fuelColor, maxLines = 1)
             }
         }
