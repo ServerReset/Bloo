@@ -590,12 +590,18 @@ internal fun CommandButton(
     MorphButton(
         onClick = onClick,
         enabled = enabled,
+        // 64dp, not ButtonTargetHeight: this is the app's LARGE command button (Open in maps,
+        // the pebble command rows), deliberately taller than a settings button. Its type and
+        // glyph come from the shared tokens even so, so it stays a size variant of the one
+        // button rather than a second look -- ButtonLabelStyle is already what it was hand-
+        // writing as titleMedium, and the glyph matches the icon-only token for the same
+        // reason that one exists: at this size an 18dp icon reads as a speck.
         modifier = modifier.height(64.dp),
         contentPadding = PaddingValues(horizontal = 18.dp),
     ) {
-        Icon(icon, contentDescription = null, modifier = Modifier.size(24.dp))
+        Icon(icon, contentDescription = null, modifier = Modifier.size(ButtonIconOnlySize))
         Spacer(Modifier.width(8.dp))
-        Text(label, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+        Text(label, style = ButtonLabelStyle, fontWeight = FontWeight.SemiBold)
     }
 }
 

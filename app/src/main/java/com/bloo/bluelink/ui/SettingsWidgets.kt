@@ -423,10 +423,20 @@ internal fun ChoiceRow(label: String, selected: Boolean, onSelect: () -> Unit) {
             activeContainerColor = MaterialTheme.colorScheme.primaryContainer,
             activeContentColor = MaterialTheme.colorScheme.onPrimaryContainer,
             contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
-            minHeight = 0.dp,
+            // The standard target height and the standard button label, like everything else
+            // tappable. A choice row IS a button; it was the last one still setting its own
+            // height (none) and its own type (bodyLarge, a body style rather than the button
+            // one), which is why a list of them sat visibly shorter and lighter than the
+            // buttons directly above them in the same card.
+            minHeight = ButtonTargetHeight,
             modifier = Modifier.fillMaxWidth(),
         ) {
-        Text(label, Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge)
+        Text(
+            label,
+            Modifier.weight(1f),
+            style = ButtonLabelStyle,
+            fontWeight = FontWeight.SemiBold,
+        )
         AnimatedVisibility(
             visible = selected,
             enter = scaleIn(spring(dampingRatio = Spring.DampingRatioMediumBouncy)) + fadeIn(),
@@ -435,7 +445,7 @@ internal fun ChoiceRow(label: String, selected: Boolean, onSelect: () -> Unit) {
             Icon(
                 Icons.Filled.Check,
                 contentDescription = null,
-                modifier = Modifier.size(18.dp),
+                modifier = Modifier.size(ButtonIconSize),
             )
         }
     }
