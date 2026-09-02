@@ -550,7 +550,21 @@ internal fun PebbleShell(
                             // than mid-grow -- which is EVERY pebble but the hero (growTitleOnExpand
                             // is false for the rest, so titleScale() is permanently
                             // collapsedTitleScale), and the hero itself whenever headerTState has
-                            // actually settled at 0f rather than mid-spring.
+                            // settled BACK DOWN near 0f rather than mid-spring.
+                            //
+                            // A THRESHOLD, not `== 0f`: a StiffnessVeryLow spring is exactly the
+                            // one this session already flagged as running "for a second or more",
+                            // and collapsing the hero once and never expanding it again was the
+                            // one path that could leave headerTState sitting at some very-nearly-
+                            // but-not-bit-for-bit-zero value indefinitely -- which pinned this
+                            // Text on the SCALED path forever afterward, permanently reproducing
+                            // the very baseline mismatch this whole mechanism exists to avoid.
+                            // Confirmed from a real report: expand the hero once, collapse it, and
+                            // the name stayed misaligned from then on -- until swiping to another
+                            // car and back gave it a fresh composition (headerTState starting
+                            // exactly at its target, since there is no previous value to animate
+                            // from on first composition) which "corrected itself" for exactly that
+                            // reason.
                             //
                             // At rest, render the title in a NATIVE titleMedium Text instead of a
                             // scaled-down headlineSmall one. The scale trick above exists so the
@@ -574,7 +588,7 @@ internal fun PebbleShell(
                             // pebble's title was already reading fine here (nothing beside it needs
                             // a text baseline), and this only swaps which style produces the same
                             // on-screen font size for them too.
-                            val atRestScale = !growTitleOnExpand || headerTState.value == 0f
+                            val atRestScale = !growTitleOnExpand || headerTState.value < 0.001f
                             Row(
                                 // Only stretched when the trailing slot is being pushed to the
                                 // end -- a row that merely holds a name and a stat must stay
