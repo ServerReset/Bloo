@@ -24,12 +24,12 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.CompositionLocalProvider
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.State
 import androidx.compose.runtime.compositionLocalOf
@@ -171,9 +171,9 @@ internal fun BoxScope.FloatingTitlePill(
         // Grown from the leading edge, matching the inline title's own left-anchored grow/shrink
         // (see PebbleShell's identical transformOrigin) so nothing appears to drift sideways.
         enter = fadeIn(tween(220)) +
-            scaleIn(0.7f, transformOrigin = TransformOrigin(0f, 0.5f)) +
+            scaleIn(initialScale = 0.7f, transformOrigin = TransformOrigin(0f, 0.5f)) +
             slideInVertically(tween(220)) { -it / 4 },
-        exit = fadeOut(tween(160)) + scaleOut(0.85f, transformOrigin = TransformOrigin(0f, 0.5f)),
+        exit = fadeOut(tween(160)) + scaleOut(targetScale = 0.85f, transformOrigin = TransformOrigin(0f, 0.5f)),
     ) {
         Row(
             Modifier
