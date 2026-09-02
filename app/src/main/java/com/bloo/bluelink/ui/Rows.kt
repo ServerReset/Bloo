@@ -266,7 +266,7 @@ internal fun CropScreen(vin: String, uriString: String, onCancel: () -> Unit, on
                     enabled = bmp != null,
                     interactionSource = confirmSource,
                     contentPadding = PaddingValues(horizontal = 18.dp, vertical = 10.dp),
-                ) { Text("Use photo", fontWeight = FontWeight.SemiBold) }
+                ) { Text("Use photo", style = ButtonLabelStyle, fontWeight = FontWeight.SemiBold) }
                 }
             }
         }
@@ -789,16 +789,20 @@ internal fun SyncDevicesSection(state: UiState, vm: AppViewModel) {
                     interactionSource = saveRenameSource,
                     enabled = draft.isNotBlank(),
                 ) {
-                    MorphButton(
+                    // MorphTextButton, not a hand-rolled MorphButton{Text(...)} -- that Text had
+                    // no `style`. Primary colours stand in for the old `active = true`.
+                    MorphTextButton(
+                        "Save",
                         onClick = {
                             if (draft.isNotBlank()) vm.renameThisDevice(draft)
                             renaming = false
                         },
-                        active = true,
                         interactionSource = saveRenameSource,
                         enabled = draft.isNotBlank(),
+                        containerColor = MaterialTheme.colorScheme.primary,
+                        contentColor = MaterialTheme.colorScheme.onPrimary,
                         modifier = Modifier.fillMaxWidth(),
-                    ) { Text("Save", fontWeight = FontWeight.SemiBold) }
+                    )
                 }
                 val cancelRenameSource = remember { MutableInteractionSource() }
                 SafeExpansiveButton(
@@ -970,7 +974,7 @@ internal fun DriveSyncSetupDialog(
                         onClick = onSaveToDrive,
                         modifier = Modifier.fillMaxWidth(),
                         contentPadding = PaddingValues(12.dp),
-                    ) { Text("Create a new file anyway", color = scheme.error) }
+                    ) { Text("Create a new file anyway", style = ButtonLabelStyle, color = scheme.error) }
                 }
             } else {
                 DriveSyncChoiceRow(
@@ -1005,8 +1009,8 @@ internal fun DriveSyncChoiceRow(
         modifier = Modifier.fillMaxWidth(),
         contentPadding = PaddingValues(14.dp),
     ) {
-        Icon(icon, contentDescription = null)
-        Spacer(Modifier.width(12.dp))
+        Icon(icon, contentDescription = null, modifier = Modifier.size(ButtonIconSize))
+        Spacer(Modifier.width(ButtonIconGap))
         Column(horizontalAlignment = Alignment.Start) {
             Text(title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
             Text(subtitle, style = MaterialTheme.typography.bodySmall)

@@ -692,7 +692,7 @@ internal fun BoxScope.TitleFlightOverlay(
             .padding(start = cornerX, top = cornerY, end = reserveEnd),
     ) {
         Row(
-            Modifier.heightIn(min = 48.dp).padding(horizontal = 16.dp),
+            Modifier.heightIn(min = ButtonTargetHeight).padding(horizontal = 16.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
@@ -802,7 +802,7 @@ internal fun BoxScope.TitleFlightOverlay(
     ) {
         Row(
             Modifier
-                .heightIn(min = 48.dp)
+                .heightIn(min = ButtonTargetHeight)
                 .background(MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = glassContainerAlpha()), shape)
                 .ambientRing(shape)
                 .dropShadow(shape)
