@@ -29,13 +29,31 @@ val FieldShape: RoundedCornerShape = RoundedCornerShape(18.dp)
  * MorphButton so a segment still visibly squeezes on press instead of being
  * frozen into a static silhouette just because it's part of a group.
  */
-fun connectedGroupShape(index: Int, count: Int, cornerPercent: Int, smallCorner: Dp = 12.dp): RoundedCornerShape {
+fun connectedGroupShape(
+    index: Int,
+    count: Int,
+    cornerPercent: Int,
+    /**
+     * The same 0..1 morph the segment's own MorphButton is running.
+     *
+     * The seam used to be a flat 12dp that ignored the morph entirely, while the split pill
+     * next to it interpolated 10dp -> 16dp through exactly this value. Two different seams in
+     * one app, and the static one read as a sharp corner beside pill-round neighbours. Both now
+     * come from [seamCorner], so a connected group and a split pill are the same geometry.
+     */
+    morph: Float = 0f,
+): RoundedCornerShape {
     val outer = CornerSize(percent = cornerPercent)
-    val inner = CornerSize(smallCorner)
+    val inner = seamCorner(morph)
     val startCorner = if (index == 0) outer else inner
     val endCorner = if (index == count - 1) outer else inner
     return RoundedCornerShape(topStart = startCorner, bottomStart = startCorner, topEnd = endCorner, bottomEnd = endCorner)
 }
+
+/** The shared inner (seam) corner: a soft nub at rest that opens toward the morphed radius as
+ *  the segment is pressed. Stated in Dp, so it is the same physical corner at any row height. */
+fun seamCorner(morph: Float, idle: Dp = 10.dp, morphed: Dp = 16.dp): CornerSize =
+    CornerSize(idle + (morphed - idle) * morph)
 
 /**
  * Corner shapes for the two-segment "split pill" family (the preset pill and
@@ -58,7 +76,7 @@ fun splitPillShapes(
     // to measure the row with onSizeChanged, write that height to state, and recompose the whole
     // row to rebuild these shapes, every time the height changed. Two absolute radii also
     // interpolate cleanly, which a percent and a Dp cannot.
-    val inner = CornerSize(innerIdle + (innerMorphed - innerIdle) * morph)
+    val inner = seamCorner(morph, innerIdle, innerMorphed)
     val outer = CornerSize(percent = cornerPercent)
     fun corners(outerOnStart: Boolean) = RoundedCornerShape(
         topStart = if (outerOnStart) outer else inner,

@@ -68,6 +68,9 @@ import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.foundation.layout.calculateStartPadding
+import androidx.compose.foundation.layout.calculateEndPadding
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
@@ -163,6 +166,16 @@ fun MorphButton(
     /** 48dp is the minimum touch-target height M3 `Button` enforced implicitly;
      *  pass 0.dp to let a short pill keep its natural height. */
     minHeight: Dp = 48.dp,
+    /**
+     * How much width this button may hand a pressed neighbour inside a button group.
+     *
+     * Null derives it from [contentPadding], which is right for a labelled button: the spare
+     * padding is exactly what can go without touching the label. State it explicitly for a
+     * button whose slack is NOT its contentPadding -- an icon-only segment with zero padding
+     * inside a fixed-size box has room either side of the glyph that contentPadding knows
+     * nothing about, and deriving from padding would say zero and leave it unable to take part.
+     */
+    compressible: Dp? = null,
     content: @Composable RowScope.() -> Unit,
 ) {
     val haptics = LocalHaptics.current
@@ -222,7 +235,20 @@ fun MorphButton(
     // any new call site, so the button joins itself rather than relying on the call site to
     // remember. Wrapping is idempotent -- see SafeExpansiveButton's group branch.
     if (LocalExpressiveGroup.current) {
-        SafeExpansiveButton(interactionSource = interactionSource, enabled = enabled) { body() }
+        // The slack this button can hand a pressed neighbour: whatever its own horizontal
+        // padding carries above ButtonMinSidePadding, on both sides. Computed here because only
+        // the button knows which of its width is padding and which is label -- and a label
+        // never wraps, so anything taken out of the label would ellipsize instead of compress.
+        val dir = LocalLayoutDirection.current
+        val spare = compressible ?: (
+            (contentPadding.calculateStartPadding(dir) - ButtonMinSidePadding).coerceAtLeast(0.dp) +
+                (contentPadding.calculateEndPadding(dir) - ButtonMinSidePadding).coerceAtLeast(0.dp)
+            )
+        SafeExpansiveButton(
+            interactionSource = interactionSource,
+            enabled = enabled,
+            compressible = spare,
+        ) { body() }
     } else {
         body()
     }
@@ -407,7 +433,12 @@ fun MorphIconButton(
     // Joins a group when it is in one -- see MorphButton's own note. An icon button is just as
     // likely to sit in a row of peers (the snackbar's copy/dismiss pair) as a labelled one.
     if (LocalExpressiveGroup.current) {
-        SafeExpansiveButton(interactionSource = interactionSource, enabled = enabled) { body() }
+        SafeExpansiveButton(
+            interactionSource = interactionSource,
+            enabled = enabled,
+            // A fixed 48dp target around a 24dp glyph has room either side to give.
+            compressible = IconButtonCompressible,
+        ) { body() }
     } else {
         body()
     }
@@ -596,6 +627,11 @@ internal fun MorphExpandButton(
             pillCornerPercent = 50f,
             morphedCornerPercent = 20f,
             minHeight = 0.dp,
+            // See the note on the lock group's segments: zero contentPadding, but real room
+            // around the glyph. Without this the chevron half of every split header was a
+            // group member that could never give anything up, so pressing the action half
+            // beside it did nothing at all.
+            compressible = IconButtonCompressible,
             // Same as SplitExpandButton's chevron: the icon's contentDescription is
             // the next action, this is the current state -- both together instead
             // of only announcing what tapping does. Tap toggles; holding spins the
