@@ -1,12 +1,14 @@
 package com.bloo.bluelink.ui
 
 import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.interaction.InteractionSource
-import androidx.compose.foundation.interaction.collectIsPressedAsState
+import androidx.compose.foundation.interaction.PressInteraction
 import androidx.compose.foundation.layout.Box
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.Stable
@@ -80,22 +82,47 @@ internal const val ExpressiveRestingScale = 1f + ExpressivePressGrowth
 /** Damping for the press spring. High enough not to ring: see expressivePressFraction. */
 private const val PressDamping = 0.88f
 
+/**
+ * 0 at rest, 1 fully pushed. Driven by the interaction stream rather than by a held/not-held
+ * boolean, because a TAP is the common case and a boolean cannot express one.
+ *
+ * With `targetValue = if (pressed) 1 else 0`, a quick tap flips the target to 1 and back within
+ * a few milliseconds, so the spring is already heading home before it has travelled anywhere:
+ * you press a button and almost nothing happens, which is the reported "it only does it when I
+ * hold it". Here a press runs the push to completion FIRST and only then lets the release run
+ * it back -- the collector suspends while each leg animates, so the interactions queue behind
+ * it. Tap and hold therefore differ only in how long the button dwells at full push, which is
+ * what a physical button does.
+ */
 @Composable
 private fun expressivePressFraction(interactionSource: InteractionSource, enabled: Boolean): State<Float> {
-    val pressed by interactionSource.collectIsPressedAsState()
-    return animateFloatAsState(
-        targetValue = if (pressed && enabled) 1f else 0f,
+    val anim = remember { Animatable(0f) }
+    LaunchedEffect(interactionSource, enabled) {
+        if (!enabled) {
+            anim.snapTo(0f)
+            return@LaunchedEffect
+        }
         // Barely-bouncy and quick, because this fraction drives real WIDTH. A bouncy, slow
         // spring is the right feel for something that only paints -- it was the original
         // graphicsLayer scale -- but on width every overshoot frame re-measures the row and
         // drags the neighbours back and forth with it, which reads as wobble rather than as
-        // life. The press still springs; it just does not ring.
-        animationSpec = spring(
-            dampingRatio = PressDamping,
-            stiffness = Spring.StiffnessMedium,
-        ),
-        label = "expressivePress",
-    )
+        // life. The push still springs; it just does not ring.
+        val spec = spring<Float>(dampingRatio = PressDamping, stiffness = Spring.StiffnessMedium)
+        // A press can be released before its own Release event is even collected (that is the
+        // whole point above), so held-ness is tracked by identity rather than by a count that
+        // a cancelled gesture could leave unbalanced.
+        val held = mutableSetOf<PressInteraction.Press>()
+        interactionSource.interactions.collect { interaction ->
+            when (interaction) {
+                is PressInteraction.Press -> held.add(interaction)
+                is PressInteraction.Release -> held.remove(interaction.press)
+                is PressInteraction.Cancel -> held.remove(interaction.press)
+                else -> return@collect
+            }
+            if (held.isNotEmpty()) anim.animateTo(1f, spec) else anim.animateTo(0f, spec)
+        }
+    }
+    return anim.asState()
 }
 
 /**
@@ -425,7 +452,9 @@ fun ExpressiveButtonGroup(
                 // balance: a lone donor's reserve is exactly one grower's growth. Whichever is
                 // smaller is what moves -- so with nothing to take from (a lone button on the
                 // line) NOTHING moves, rather than the line quietly growing.
-                val want = growers.sumOf { content[it] * ExpressivePressGrowth * press[it] }
+                // toDouble() explicitly: content is an IntArray, so Int * Float * Float is a
+                // Float, and sumOf has no Float overload to resolve to.
+                val want = growers.sumOf { content[it].toDouble() * ExpressivePressGrowth * press[it] }
                 val capacity = donors.sumOf { base[it] - floorOf[it] }
                 val give = minOf(want, capacity)
 
@@ -433,7 +462,8 @@ fun ExpressiveButtonGroup(
                 for (i in memberIdx) exact[i] = base[i]
                 if (give > 0.0) {
                     for (i in growers) {
-                        exact[i] = base[i] + give * (content[i] * ExpressivePressGrowth * press[i]) / want
+                        exact[i] = base[i] +
+                            give * (content[i].toDouble() * ExpressivePressGrowth * press[i]) / want
                     }
                     for (i in donors) {
                         exact[i] = base[i] - give * (base[i] - floorOf[i]) / capacity
