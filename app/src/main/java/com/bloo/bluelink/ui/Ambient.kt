@@ -430,7 +430,7 @@ internal fun LoginScreen(
                                     transitionSpec = { fadeIn(tween(220)) togetherWith fadeOut(tween(160)) },
                                     label = "signInLabel",
                                 ) { label ->
-                                    Text("Sign in to $label", fontWeight = FontWeight.SemiBold)
+                                    Text("Sign in to $label", style = ButtonLabelStyle, fontWeight = FontWeight.SemiBold)
                                 }
                             }
                         }
@@ -448,7 +448,7 @@ internal fun LoginScreen(
                                 interactionSource = cancelSource,
                                 containerColor = scheme.secondaryContainer,
                                 contentColor = scheme.onSecondaryContainer,
-                            ) { Text("Cancel", fontWeight = FontWeight.SemiBold) }
+                            ) { Text("Cancel", style = ButtonLabelStyle, fontWeight = FontWeight.SemiBold) }
                         }
                     }
 
@@ -526,7 +526,7 @@ internal fun KiaOtpDialog(otp: KiaOtpUi, loading: Boolean, vm: AppViewModel) {
                             interactionSource = emailSource,
                             enabled = !loading,
                             modifier = Modifier.fillMaxWidth(),
-                        ) { Text("Email" + (otp.challenge.email?.let { " · $it" } ?: "")) }
+                        ) { Text("Email" + (otp.challenge.email?.let { " · $it" } ?: ""), style = ButtonLabelStyle, fontWeight = FontWeight.SemiBold) }
                     }
                 }
                 if (otp.challenge.hasSms) {
@@ -540,7 +540,7 @@ internal fun KiaOtpDialog(otp: KiaOtpUi, loading: Boolean, vm: AppViewModel) {
                             interactionSource = smsSource,
                             enabled = !loading,
                             modifier = Modifier.fillMaxWidth(),
-                        ) { Text("Text message" + (otp.challenge.sms?.let { " · $it" } ?: "")) }
+                        ) { Text("Text message" + (otp.challenge.sms?.let { " · $it" } ?: ""), style = ButtonLabelStyle, fontWeight = FontWeight.SemiBold) }
                     }
                 }
             } else {
@@ -566,7 +566,7 @@ internal fun KiaOtpDialog(otp: KiaOtpUi, loading: Boolean, vm: AppViewModel) {
                         enabled = !loading && code.isNotBlank(),
                         modifier = Modifier.fillMaxWidth(),
                     ) {
-                        if (loading) LoadingIndicator() else Text("Verify", fontWeight = FontWeight.SemiBold)
+                        if (loading) LoadingIndicator() else Text("Verify", style = ButtonLabelStyle, fontWeight = FontWeight.SemiBold)
                     }
                 }
             }
@@ -618,7 +618,7 @@ internal fun CanadaOtpDialog(otp: CanadaOtpUi, loading: Boolean, vm: AppViewMode
                     enabled = !loading && code.isNotBlank(),
                     modifier = Modifier.fillMaxWidth(),
                 ) {
-                    if (loading) LoadingIndicator() else Text("Verify", fontWeight = FontWeight.SemiBold)
+                    if (loading) LoadingIndicator() else Text("Verify", style = ButtonLabelStyle, fontWeight = FontWeight.SemiBold)
                 }
             }
             val canadaCancelSource = remember { MutableInteractionSource() }
