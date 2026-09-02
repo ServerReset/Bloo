@@ -354,11 +354,8 @@ fun ExpressiveButtonGroup(
             // bug the trial measure had -- inside a parent that forces a width, the "natural"
             // width recorded WAS that forced width, so the button had nothing to grow from.
             val h = if (constraints.hasBoundedHeight) constraints.maxHeight else 0
-            val cached = naturals.widths
             // Both arrays are written together and read together, so both are checked.
-            if (resting || cached == null || cached.size != n ||
-                naturals.content?.size != n || naturals.compact?.size != n
-            ) {
+            if (resting || naturals.content?.size != n || naturals.compact?.size != n) {
                 val c = IntArray(n) { measurables[it].maxIntrinsicWidth(h).coerceAtLeast(0) }
                 naturals.content = c
                 // The smallest each member can be and still say something -- for a standard
@@ -367,16 +364,11 @@ fun ExpressiveButtonGroup(
                 naturals.compact = IntArray(n) {
                     if (member[it]) measurables[it].minIntrinsicWidth(h).coerceIn(0, c[it]) else c[it]
                 }
-                // The reserve: a MEMBER rests one growth-step wider than its content needs, so
-                // that being squeezed returns it to exactly `content` and never below. A
-                // non-member is not part of the redistribution and keeps its own width.
-                naturals.widths = IntArray(n) {
-                    if (member[it]) (c[it] * ExpressiveRestingScale).roundToInt() else c[it]
-                }
             }
-            val nat = naturals.widths!!
-            // What each member's content actually asked for -- its floor, and the width it lands
-            // on when a neighbour takes everything it has to give.
+            // What each child's content asked for, and the least a member can be. The RESTING
+            // width -- content plus the reserve -- is derived per line rather than cached,
+            // because which of these two a line builds on is a per-line decision (see the fit
+            // rule below) and caching one answer would have pinned it.
             val full = naturals.content!!
             val compact = naturals.compact!!
 
@@ -390,13 +382,16 @@ fun ExpressiveButtonGroup(
             } else {
                 var cur = ArrayList<Int>()
                 var used = 0
+                // Content, not content-plus-reserve: a line breaks when what it holds does not
+                // fit, not when its squash allowance does not. The reserve is trimmed below
+                // instead, which is a far smaller change than moving a button to another line.
                 for (i in 0 until n) {
-                    val add = nat[i] + if (cur.isEmpty()) 0 else gapPx
+                    val add = full[i] + if (cur.isEmpty()) 0 else gapPx
                     if (cur.isNotEmpty() && used + add > maxW) {
                         lines.add(cur.toIntArray()); cur = ArrayList(); used = 0
                     }
                     cur.add(i)
-                    used += if (cur.size == 1) nat[i] else add
+                    used += if (cur.size == 1) full[i] else add
                 }
                 if (cur.isNotEmpty()) lines.add(cur.toIntArray())
             }
@@ -425,7 +420,7 @@ fun ExpressiveButtonGroup(
                 val room = if (constraints.hasBoundedWidth) {
                     (constraints.maxWidth - gapsHere - nonMemberWidth).coerceAtLeast(0)
                 } else {
-                    memberIdx.sumOf { nat[it] }
+                    memberIdx.sumOf { (full[it] * ExpressiveRestingScale).roundToInt() }
                 }
 
                 // THE FIT RULE, all-or-nothing. If this line cannot give every member the room
@@ -437,9 +432,13 @@ fun ExpressiveButtonGroup(
                 // Decided here rather than by each button, because only the line knows what the
                 // line has. Each button then finds itself measured below its own full width and
                 // shows its glyph alone -- see MorphButtonLabel.
+                // The test is against CONTENT, not content-plus-reserve. The reserve is
+                // headroom for the press, not something that has to fit -- compacting a row
+                // whose labels fit perfectly well, purely because their squash allowance did
+                // not, would be a much worse trade than a row that simply cannot squash.
                 val basis = if (
                     constraints.hasBoundedWidth &&
-                    memberIdx.sumOf { (full[it] * ExpressiveRestingScale).roundToInt() } > room &&
+                    memberIdx.sumOf { full[it] } > room &&
                     memberIdx.any { compact[it] < full[it] }
                 ) {
                     compact
@@ -447,7 +446,9 @@ fun ExpressiveButtonGroup(
                     full
                 }
                 // Resting width for whichever basis won: content (or glyph) plus the reserve.
-                val natLine = IntArray(n) { if (member[it]) (basis[it] * ExpressiveRestingScale).roundToInt() else nat[it] }
+                val natLine = IntArray(n) {
+                    if (member[it]) (basis[it] * ExpressiveRestingScale).roundToInt() else full[it]
+                }
                 val naturalTotal = memberIdx.sumOf { natLine[it] }
 
                 // Equal shares: the Material 3 connected-group look. TWO or more members --
@@ -466,15 +467,35 @@ fun ExpressiveButtonGroup(
                     // size, and the stretch is part of the budget rather than something a Row
                     // does outside it.
                     val wSum = memberIdx.sumOf { weight[it].toDouble() }
-                    val leftover = (room - naturalTotal).coerceAtLeast(0)
-                    val stretching = leftover > 0 && wSum > 0.0
                     for (i in memberIdx) base[i] = natLine[i].toDouble()
-                    if (stretching) {
-                        for (i in memberIdx) {
-                            if (weight[i] > 0f) base[i] += leftover * (weight[i] / wSum)
+                    val spare = room - naturalTotal
+                    total = when {
+                        // Room to spare, and someone to take it: the weighted members stretch.
+                        spare > 0 && wSum > 0.0 -> {
+                            for (i in memberIdx) {
+                                if (weight[i] > 0f) base[i] += spare * (weight[i] / wSum)
+                            }
+                            naturalTotal + spare
                         }
+                        // Not enough room even for the resting widths. Give up the RESERVE
+                        // first, proportionally, and never a pixel of the basis -- so a tight
+                        // line loses its squash allowance before it loses anything you can see.
+                        // Only if the basis itself does not fit does the line overflow, and by
+                        // then the fit rule above has already traded the labels away.
+                        spare < 0 -> {
+                            val reserve = memberIdx.sumOf { (natLine[it] - basis[it]).toDouble() }
+                            if (reserve > 0.0) {
+                                val trim = minOf(-spare.toDouble(), reserve)
+                                for (i in memberIdx) {
+                                    base[i] = natLine[i] - trim * (natLine[i] - basis[i]) / reserve
+                                }
+                                (naturalTotal - trim).roundToInt()
+                            } else {
+                                naturalTotal
+                            }
+                        }
+                        else -> naturalTotal
                     }
-                    total = if (stretching) naturalTotal + leftover else naturalTotal
                 }
 
                 // ONE invariant: the members' total width on a line never changes. Everything
@@ -563,10 +584,15 @@ fun ExpressiveButtonGroup(
 /** Cache of resting child widths for one [ExpressiveButtonGroup]. See its own comment for why
  *  this is a plain object and not snapshot state. */
 private class NaturalWidths {
-    /** Resting widths: a member's content plus the reserve. See [ExpressiveRestingScale]. */
+    /**
+     * The standalone button's own single resting width, cached from its last resting measure.
+     *
+     * Only [SafeExpansiveButton]'s non-group path uses this; the group derives its widths from
+     * intrinsics instead ([content]/[compact]) and needs no measured cache at all.
+     */
     var widths: IntArray? = null
 
-    /** What each child's content asked for, before the reserve -- the floor a donor stops at. */
+    /** What each child's content asked for -- the floor a donor stops at. */
     var content: IntArray? = null
 
     /** The icon-only width each member falls back to when the line cannot fit the labels. */

@@ -547,8 +547,14 @@ fun MorphButtonLabel(
                     // Whole label or no label. Anything in between is a truncated word.
                     if (constraints.maxWidth < glyph.width + gapPx + labelWidth) {
                         val w = glyph.width.coerceAtMost(constraints.maxWidth)
-                        return layout(w, glyph.height) {
-                            glyph.place((w - glyph.width) / 2, 0)
+                        // Height still accounts for the label that is NOT being drawn. A line
+                        // of text is taller than an 18dp glyph, so reporting the glyph alone
+                        // would make every button lose height at the moment it compacts, and
+                        // the row jump with them. The label's intrinsic height is asked for
+                        // rather than measured, because it is not being placed.
+                        val h = maxOf(glyph.height, measurables[1].minIntrinsicHeight(w))
+                        return layout(w, h) {
+                            glyph.place((w - glyph.width) / 2, (h - glyph.height) / 2)
                         }
                     }
                     val text = measurables[1].measure(free)
