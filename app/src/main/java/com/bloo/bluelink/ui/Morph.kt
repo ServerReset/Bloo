@@ -44,6 +44,7 @@ import androidx.compose.material.icons.filled.CloudDone
 import androidx.compose.material.icons.filled.CloudSync
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Download
+import androidx.compose.material.icons.filled.FileOpen
 import androidx.compose.material.icons.filled.Fingerprint
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.Palette
@@ -336,7 +337,12 @@ fun standardButtonIcon(label: String): ImageVector? = when (label) {
     // Confirmation -- the second tap of a two-step action, so it takes the affirmative glyph
     // rather than the destructive one it is confirming.
     "Tap again to confirm", "Tap again to reset", "Keep it", "Keep PIN" -> Icons.Filled.Check
-    // Content
+    // Content. "Choose photo" takes FileOpen rather than a camera or gallery glyph: it opens the
+    // system picker, and every icon in this map is one the codebase already uses -- see the note
+    // above on why that constraint exists. It was the one button label left with no glyph, which
+    // matters more now than it did: a button with no glyph cannot fall back to one, so it is the
+    // one thing that can stop a whole row from compacting.
+    "Choose photo" -> Icons.Filled.FileOpen
     "Copy" -> Icons.Filled.ContentCopy
     "Export" -> Icons.Filled.Download
     "Restore" -> Icons.Filled.CloudDone
