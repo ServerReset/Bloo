@@ -598,9 +598,19 @@ internal fun HeroHeader(
                     val y = androidx.compose.ui.util.lerp(from.top, to.top, heroT)
                     val w = androidx.compose.ui.util.lerp(from.width, to.width, heroT)
                     Box(
-                        Modifier
-                            .offset { IntOffset(x.roundToInt(), y.roundToInt()) }
-                            .graphicsLayer { alpha = statusAlpha },
+                        // NOT alpha = statusAlpha. That is the STATUS LINE's own delayed fade
+                        // (0 until heroT passes 0.15, ramping in over the following 0.5) --
+                        // right for the "Charging..." text HeroNumbers gates internally with
+                        // this same value, wrong for the percentage/range themselves, which
+                        // this Box is the ONLY thing that still paints once a card has been
+                        // expanded even once (both anchors go permanently invisible the moment
+                        // `hoisted` turns true -- see their own alpha`s doc). Wrapping the whole
+                        // overlay in statusAlpha meant the numbers vanished for the entire time
+                        // heroT sat at or near 0 -- i.e. whenever that card was COLLAPSED. That
+                        // is the reported "the collapsed hero pebble doesn't have the charge
+                        // percent any more" -- it did, right up until the card was expanded
+                        // once, and then never again while collapsed.
+                        Modifier.offset { IntOffset(x.roundToInt(), y.roundToInt()) },
                     ) {
                         CompositionLocalProvider(
                             LocalContentColor provides
