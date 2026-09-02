@@ -54,6 +54,7 @@ import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.ui.graphics.isSpecified
 import androidx.compose.ui.layout.IntrinsicMeasurable
 import androidx.compose.ui.layout.IntrinsicMeasureScope
 import androidx.compose.ui.layout.Layout
@@ -452,6 +453,7 @@ private fun MorphButtonGlyph(
     pending: Boolean,
     iconSize: Dp,
     spinning: Boolean,
+    tint: Color,
 ) {
     if (pending) {
         LoadingIndicator(Modifier.size(iconSize))
@@ -484,6 +486,10 @@ private fun MorphButtonGlyph(
         Icon(
             icon,
             contentDescription = null,
+            // Unspecified means "whatever the content colour is", which is Icon's own default.
+            // It cannot simply be passed through: Icon treats Unspecified as "draw the vector's
+            // own colours", which is a different thing entirely.
+            tint = if (tint.isSpecified) tint else LocalContentColor.current,
             // Draw-phase read. This one matters most of the three: `angle` is a
             // continuously-running spin (the pending/refresh indicator loops
             // `while (true)`), so reading it through Modifier.rotate()'s argument
@@ -517,11 +523,17 @@ fun MorphButtonLabel(
     pending: Boolean,
     iconSize: Dp = ButtonIconSize,
     spinning: Boolean = false,
+    /**
+     * An accent for the glyph alone, where it carries state the label does not -- a charging
+     * bolt, a snowflake for climate. Unspecified (the default) keeps every button's glyph on
+     * the same content colour as its text, which is what almost all of them want.
+     */
+    iconTint: Color = Color.Unspecified,
 ) {
     val gap = ButtonIconGap
     Layout(
         content = {
-            MorphButtonGlyph(icon, pending, iconSize, spinning)
+            MorphButtonGlyph(icon, pending, iconSize, spinning, iconTint)
             // The one button label style, shared with MorphTextButton -- this pair is the
             // reference the rest of the app standardises on, so the size lives in a token
             // rather than being whatever each button happened to inherit.

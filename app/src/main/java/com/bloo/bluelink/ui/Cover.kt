@@ -677,7 +677,9 @@ private fun CoverIdentityPill(
             contentAlignment = Alignment.Center,
         ) {
             CompositionLocalProvider(LocalContentColor provides contentColor) {
-                MorphButtonLabel(icon, text, pending = false)
+                // The glyph keeps its accent -- it is carrying state the words are not (a
+                // charging bolt, a snowflake) -- while the text takes the pill's content tone.
+                MorphButtonLabel(icon, text, pending = false, iconTint = iconTint)
             }
         }
     }
