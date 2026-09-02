@@ -465,7 +465,10 @@ internal fun PebbleShell(
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Icon(icon, contentDescription = null, modifier = Modifier.size(20.dp))
-                        Spacer(Modifier.width(10.dp))
+                        // ButtonIconGap, not a bespoke 10dp: this is the exact same "icon, then
+                        // label" pair MorphButtonLabel standardises everywhere else in the app,
+                        // and it was the one place still stating that gap by hand.
+                        Spacer(Modifier.width(ButtonIconGap))
                         Column(Modifier.weight(1f)) {
                             // Same heading fix as SettingsCard: with 8+ pebbles per
                             // car and no heading structure, TalkBack users could
