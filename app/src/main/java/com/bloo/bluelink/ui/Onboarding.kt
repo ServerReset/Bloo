@@ -371,27 +371,33 @@ internal fun OnboardingScreen(vm: AppViewModel) {
                             contentPadding = PaddingValues(vertical = 16.dp),
                             border = BorderStroke(1.dp, scheme.outlineVariant),
                         ) {
-                            Text("Back", style = MaterialTheme.typography.titleMedium)
+                            Text("Back", style = ButtonLabelStyle)
                         }
                     }
                 }
                 val nextSource = remember { MutableInteractionSource() }
+                // The weight goes on the SafeExpansiveButton, which is the Row's actual child,
+                // NOT on the MorphButton inside it -- whose parent is that wrapper's own layout
+                // and never reads it. The same dead-weight mistake the cover action bar had:
+                // this button was silently hugging its label instead of taking the 2:1 share
+                // over Back that the expression asks for.
                 SafeExpansiveButton(
                     interactionSource = nextSource,
                     enabled = !pinRequired,
+                    modifier = Modifier.weight(if (pageIndex > 0) 2f else 1f),
                 ) {
                     MorphButton(
                         onClick = ::goNext,
                         active = true,
                         enabled = !pinRequired,
                         interactionSource = nextSource,
-                        modifier = Modifier.weight(if (pageIndex > 0) 2f else 1f),
+                        modifier = Modifier.fillMaxWidth(),
                         contentPadding = PaddingValues(vertical = 16.dp),
                     ) {
                         Icon(
                             if (isLast) Icons.Filled.CheckCircle else Icons.Filled.Check,
                             contentDescription = null,
-                            modifier = Modifier.size(20.dp),
+                            modifier = Modifier.size(ButtonIconSize),
                         )
                         Spacer(Modifier.width(8.dp))
                         Text(
@@ -400,7 +406,7 @@ internal fun OnboardingScreen(vm: AppViewModel) {
                                 pageIndex == 0 -> "Get started"
                                 else -> "Next"
                             },
-                            style = MaterialTheme.typography.titleMedium,
+                            style = ButtonLabelStyle,
                             fontWeight = FontWeight.Bold,
                         )
                     }
@@ -1046,7 +1052,7 @@ internal fun CarFeatureWizard(
                         contentPadding = PaddingValues(vertical = 14.dp),
                         border = BorderStroke(1.dp, scheme.outlineVariant),
                     ) {
-                        Text("Back", style = MaterialTheme.typography.titleMedium)
+                        Text("Back", style = ButtonLabelStyle)
                     }
                 }
                 MorphButton(
@@ -1060,12 +1066,12 @@ internal fun CarFeatureWizard(
                     Icon(
                         if (isLast) Icons.Filled.CheckCircle else Icons.Filled.Check,
                         contentDescription = null,
-                        modifier = Modifier.size(20.dp),
+                        modifier = Modifier.size(ButtonIconSize),
                     )
                     Spacer(Modifier.width(8.dp))
                     Text(
                         if (isLast) lastLabel else "Next",
-                        style = MaterialTheme.typography.titleMedium,
+                        style = ButtonLabelStyle,
                         fontWeight = FontWeight.SemiBold,
                     )
                 }
