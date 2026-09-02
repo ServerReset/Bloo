@@ -176,6 +176,12 @@ fun MorphButton(
      * nothing about, and deriving from padding would say zero and leave it unable to take part.
      */
     compressible: Dp? = null,
+    /**
+     * Inside a button group, this button's share of the row's leftover space (0 = keep its
+     * natural width). This is the group's replacement for Modifier.weight, which cannot reach
+     * a group member -- see ExpressiveGroupData.weight.
+     */
+    groupWeight: Float = 0f,
     content: @Composable RowScope.() -> Unit,
 ) {
     val haptics = LocalHaptics.current
@@ -248,6 +254,7 @@ fun MorphButton(
             interactionSource = interactionSource,
             enabled = enabled,
             compressible = spare,
+            groupWeight = groupWeight,
         ) { body() }
     } else {
         body()
@@ -275,11 +282,14 @@ fun MorphTextButton(
      */
     icon: ImageVector? = null,
     showIcon: Boolean = true,
+    /** See [MorphButton]'s own `groupWeight`. */
+    groupWeight: Float = 0f,
 ) {
     MorphButton(
         onClick = onClick,
         modifier = modifier,
         enabled = enabled,
+        groupWeight = groupWeight,
         interactionSource = interactionSource,
         containerColor = containerColor,
         contentColor = contentColor,

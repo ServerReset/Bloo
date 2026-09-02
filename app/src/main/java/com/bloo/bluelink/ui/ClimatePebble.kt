@@ -37,7 +37,6 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.fillMaxHeight
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -767,55 +766,49 @@ internal fun PresetPill(
     }
 
     // The drag handle wraps the whole pill so long-press anywhere reorders.
-    Row(
+    // A real button group, not a Row of separately-wrapped buttons. groupWeight on the Apply
+    // half is what makes it span the row (Modifier.weight cannot reach a group member), and
+    // being members is what lets pressing either half take width from the other instead of
+    // shoving it.
+    ExpressiveButtonRow(
         modifier = dragHandle.fillMaxWidth().height(IntrinsicSize.Min),
-        horizontalArrangement = Arrangement.spacedBy(3.dp),
+        spacing = 3.dp,
         verticalAlignment = Alignment.CenterVertically,
     ) {
         // Apply half — snowflake icon plus the preset name. The shared
         // MorphButton: pill when idle, rounded rectangle + primary fill when
         // this preset is the applied one. With expansion animation.
         val applySource = remember { MutableInteractionSource() }
-        // weight + fillMaxHeight on the WRAPPER, which is the Row's actual child. They were on
-        // the MorphButton inside, whose parent is the wrapper's own layout and never reads
-        // them -- so this split pill hugged its label and left the rest of the row empty
-        // instead of spanning it. Pressing the delete nub still compresses this half, because
-        // a Row measures its weighted children from whatever the fixed ones leave over.
-        SafeExpansiveButton(
+        MorphButton(
+            onClick = { onStart() },
+            onClickHaptic = { haptics?.click() },
+            active = active,
             interactionSource = applySource,
-            enabled = true,
-            modifier = Modifier.weight(1f).fillMaxHeight(),
+            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 11.dp),
+            shapeForCorner = leftShapeForCorner,
+            pillCornerPercent = 50f,
+            morphedCornerPercent = MorphedCornerPercent,
+            minHeight = 0.dp,
+            groupWeight = 1f,
+            modifier = Modifier.fillMaxHeight(),
         ) {
-            MorphButton(
-                onClick = { onStart() },
-                onClickHaptic = { haptics?.click() },
-                active = active,
-                interactionSource = applySource,
-                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 11.dp),
-                shapeForCorner = leftShapeForCorner,
-                pillCornerPercent = 50f,
-                morphedCornerPercent = MorphedCornerPercent,
-                minHeight = 0.dp,
-                modifier = Modifier.fillMaxSize(),
-            ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Filled.AcUnit, contentDescription = null, modifier = Modifier.size(18.dp))
-                    Spacer(Modifier.width(10.dp))
-                    Column {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Filled.AcUnit, contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.width(10.dp))
+                Column {
+                    Text(
+                        name,
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = FontWeight.SemiBold,
+                        maxLines = 1,
+                    )
+                    if (detail.isNotBlank()) {
                         Text(
-                            name,
-                            style = MaterialTheme.typography.labelLarge,
-                            fontWeight = FontWeight.SemiBold,
+                            detail,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = LocalContentColor.current.copy(alpha = MutedContentAlpha),
                             maxLines = 1,
                         )
-                        if (detail.isNotBlank()) {
-                            Text(
-                                detail,
-                                style = MaterialTheme.typography.labelSmall,
-                                color = LocalContentColor.current.copy(alpha = MutedContentAlpha),
-                                maxLines = 1,
-                            )
-                        }
                     }
                 }
             }
@@ -824,31 +817,26 @@ internal fun PresetPill(
         // are pill-rounded; same MorphButton as the Apply half, just mirrored
         // corners and error colours while armed. With expansion animation.
         val deleteSource = remember { MutableInteractionSource() }
-        SafeExpansiveButton(
+        MorphButton(
+            onClick = {
+                haptics?.tick()
+                if (confirm.armed) onDelete() else confirm.arm()
+            },
             interactionSource = deleteSource,
-            enabled = true,
+            containerColor = if (confirm.armed) MaterialTheme.colorScheme.error else buttonContainer(),
+            contentColor = if (confirm.armed) MaterialTheme.colorScheme.onError else MaterialTheme.colorScheme.onSurface,
+            contentPadding = PaddingValues(horizontal = 14.dp),
+            shapeForCorner = rightShapeForCorner,
+            pillCornerPercent = 50f,
+            morphedCornerPercent = MorphedCornerPercent,
+            minHeight = 0.dp,
+            modifier = Modifier.fillMaxHeight(),
         ) {
-            MorphButton(
-                onClick = {
-                    haptics?.tick()
-                    if (confirm.armed) onDelete() else confirm.arm()
-                },
-                interactionSource = deleteSource,
-                containerColor = if (confirm.armed) MaterialTheme.colorScheme.error else buttonContainer(),
-                contentColor = if (confirm.armed) MaterialTheme.colorScheme.onError else MaterialTheme.colorScheme.onSurface,
-                contentPadding = PaddingValues(horizontal = 14.dp),
-                shapeForCorner = rightShapeForCorner,
-                pillCornerPercent = 50f,
-                morphedCornerPercent = MorphedCornerPercent,
-                minHeight = 0.dp,
-                modifier = Modifier.fillMaxHeight(),
-            ) {
-                Icon(
-                    Icons.Filled.Close,
-                    contentDescription = if (confirm.armed) "Confirm delete $name" else "Delete $name",
-                    modifier = Modifier.size(15.dp),
-                )
-            }
+            Icon(
+                Icons.Filled.Close,
+                contentDescription = if (confirm.armed) "Confirm delete $name" else "Delete $name",
+                modifier = Modifier.size(15.dp),
+            )
         }
     }
 }
@@ -882,88 +870,78 @@ internal fun ChargeLimitPill(
     }
 
     Column(Modifier.fillMaxWidth()) {
-        Row(
+        // Same group conversion as PresetPill above -- see its note.
+        ExpressiveButtonRow(
             modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Min),
-            horizontalArrangement = Arrangement.spacedBy(3.dp),
+            spacing = 3.dp,
         ) {
             // Left half — label. Tapping bumps the limit up by one step, wrapping
             // back to 50% after 100%, for quick keyboard-free adjustment. With expansion.
             val incrementSource = remember { MutableInteractionSource() }
-            // Same wrapper/child weight fix as the preset row above.
-            SafeExpansiveButton(
-                interactionSource = incrementSource,
+            MorphButton(
+                onClick = { onValueChange(if (limit >= 100) 50 else limit + 10) },
+                onClickHaptic = { haptics?.tick() },
                 enabled = enabled,
-                modifier = Modifier.weight(1f).fillMaxHeight(),
+                interactionSource = incrementSource,
+                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 11.dp),
+                shapeForCorner = leftShapeForCorner,
+                pillCornerPercent = 50f,
+                morphedCornerPercent = MorphedCornerPercent,
+                minHeight = 0.dp,
+                // Both the current value and what tapping actually does (bump
+                // by 10%, wrapping at 100%) were purely visual -- TalkBack
+                // announced only the label text with no indication this half
+                // was itself a stepper, distinct from "Set" on the right.
+                groupWeight = 1f,
+                modifier = Modifier.fillMaxHeight()
+                    .semantics(mergeDescendants = true) {
+                        contentDescription = "$label, $limit percent"
+                        onClick(label = "Increase by 10 percent") {
+                            onValueChange(if (limit >= 100) 50 else limit + 10)
+                            true
+                        }
+                    },
             ) {
-                MorphButton(
-                    onClick = { onValueChange(if (limit >= 100) 50 else limit + 10) },
-                    onClickHaptic = { haptics?.tick() },
-                    enabled = enabled,
-                    interactionSource = incrementSource,
-                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 11.dp),
-                    shapeForCorner = leftShapeForCorner,
-                    pillCornerPercent = 50f,
-                    morphedCornerPercent = MorphedCornerPercent,
-                    minHeight = 0.dp,
-                    // Both the current value and what tapping actually does (bump
-                    // by 10%, wrapping at 100%) were purely visual -- TalkBack
-                    // announced only the label text with no indication this half
-                    // was itself a stepper, distinct from "Set" on the right.
-                    modifier = Modifier.fillMaxSize()
-                        .semantics(mergeDescendants = true) {
-                            contentDescription = "$label, $limit percent"
-                            onClick(label = "Increase by 10 percent") {
-                                onValueChange(if (limit >= 100) 50 else limit + 10)
-                                true
-                            }
-                        },
-                ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(icon, contentDescription = null, modifier = Modifier.size(16.dp))
-                        Spacer(Modifier.width(8.dp))
-                        Text(
-                            label,
-                            style = MaterialTheme.typography.labelLarge,
-                            fontWeight = FontWeight.SemiBold,
-                            modifier = Modifier.weight(1f),
-                        )
-                        RollingNumber(
-                            text = "$limit%",
-                            style = MaterialTheme.typography.labelLarge,
-                            fontWeight = FontWeight.Bold,
-                        )
-                    }
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(icon, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        label,
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = FontWeight.SemiBold,
+                        modifier = Modifier.weight(1f),
+                    )
+                    RollingNumber(
+                        text = "$limit%",
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = FontWeight.Bold,
+                    )
                 }
             }
             // Right half — "Set" nub. Inner (left) corners match the gap; outer
             // (right) are pill-rounded. Active while the command is in flight.
             // With expansion animation.
             val applySource = remember { MutableInteractionSource() }
-            SafeExpansiveButton(
-                interactionSource = applySource,
+            MorphButton(
+                onClick = { onApply() },
+                onClickHaptic = { haptics?.heavy() },
                 enabled = enabled && !pending,
+                active = pending,
+                interactionSource = applySource,
+                contentPadding = PaddingValues(horizontal = 18.dp),
+                shapeForCorner = rightShapeForCorner,
+                pillCornerPercent = 50f,
+                morphedCornerPercent = MorphedCornerPercent,
+                minHeight = 0.dp,
+                // The pending spinner must not fade with the disabled content
+                // (Surface didn't dim it before), so pin the full tone.
+                disabledContentColor = MaterialTheme.colorScheme.onPrimary,
+                modifier = Modifier.fillMaxHeight(),
             ) {
-                MorphButton(
-                    onClick = { onApply() },
-                    onClickHaptic = { haptics?.heavy() },
-                    enabled = enabled && !pending,
-                    active = pending,
-                    interactionSource = applySource,
-                    contentPadding = PaddingValues(horizontal = 18.dp),
-                    shapeForCorner = rightShapeForCorner,
-                    pillCornerPercent = 50f,
-                    morphedCornerPercent = MorphedCornerPercent,
-                    minHeight = 0.dp,
-                    // The pending spinner must not fade with the disabled content
-                    // (Surface didn't dim it before), so pin the full tone.
-                    disabledContentColor = MaterialTheme.colorScheme.onPrimary,
-                    modifier = Modifier.fillMaxHeight(),
-                ) {
-                    if (pending) {
-                        LoadingIndicator(Modifier.size(18.dp))
-                    } else {
-                        Text("Set", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelLarge)
-                    }
+                if (pending) {
+                    LoadingIndicator(Modifier.size(18.dp))
+                } else {
+                    Text("Set", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelLarge)
                 }
             }
         }

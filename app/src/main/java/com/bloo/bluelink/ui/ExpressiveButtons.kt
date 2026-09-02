@@ -124,6 +124,8 @@ fun SafeExpansiveButton(
      * sensible default rather than nothing, because nothing means it cannot take part.
      */
     compressible: Dp = DefaultButtonCompressible,
+    /** See [ExpressiveGroupData.weight]. Ignored outside a group. */
+    groupWeight: Float = 0f,
     content: @Composable () -> Unit,
 ) {
     val press by expressivePressFraction(interactionSource, enabled)
@@ -131,7 +133,10 @@ fun SafeExpansiveButton(
     // Inside an [ExpressiveButtonRow]/[ExpressiveButtonGroup] this button joins the group, which
     // takes the extra width off its NEIGHBOURS so the row's own footprint never changes.
     if (LocalExpressiveGroup.current) {
-        Box(modifier.then(ExpressiveGroupData({ press }, compressiblePx)), propagateMinConstraints = true) {
+        Box(
+            modifier.then(ExpressiveGroupData({ press }, compressiblePx, groupWeight)),
+            propagateMinConstraints = true,
+        ) {
             // Providing FALSE inside makes joining a group idempotent. MorphButton now joins on
             // its own when it finds itself in one (that is what stopped whole rows of buttons
             // from ever animating), and without this every call site that already wraps its
@@ -298,6 +303,11 @@ fun ExpressiveButtonGroup(
             val slack = IntArray(n) { i ->
                 (measurables[i].parentData as? ExpressiveGroupData)?.compressiblePx ?: 0
             }
+            // Which members absorb the row's leftover space. Parent data rather than
+            // RowScope.weight, which is read by a Row's measure policy and means nothing here.
+            val weight = FloatArray(n) { i ->
+                (measurables[i].parentData as? ExpressiveGroupData)?.weight ?: 0f
+            }
             val resting = press.all { it <= 0.001f }
             val cached = naturals.widths
             // Only MEMBER widths have to be sane: a legitimately zero-width non-member (an
@@ -341,50 +351,80 @@ fun ExpressiveButtonGroup(
                         m.measure(childConstraints.copy(minWidth = w, maxWidth = w))
                     }
                 }
-            } else if (resting || !usable) {
-                // At rest (and on the very first pass, which is always at rest since nothing
-                // can be pressed before it exists): measure naturally and record those widths
-                // as the budget every later pressed pass redistributes.
-                measurables.map { it.measure(childConstraints) }.also { measured ->
-                    naturals.widths = IntArray(n) { measured[it].width }
-                }
             } else {
-                // ONE invariant: the members' total width never changes. Everything else is
-                // a redistribution inside that fixed budget -- a pressed button takes width,
-                // the unpressed ones give exactly that much back, and the group's own footprint
-                // is identical on every frame of the press and the release.
+                // ONE budget, filled once, then only ever redistributed inside itself.
                 //
-                // Held as floats until the very last step. The previous version rounded each
-                // button as it went and then patched the leftover onto whichever one happened
-                // to be last, so a single pixel could hop between neighbours from frame to
-                // frame while the spring ran -- which is the jank on the collapse: not the
-                // motion, the rounding underneath it.
-                val total = (0 until n).sumOf { if (member[it]) cached[it] else 0 }
+                // Natural widths come from maxIntrinsicWidth rather than from a trial measure.
+                // That is not a micro-optimisation, it is what makes filling possible at all:
+                // a child may only be measured once per pass, so the old code had to spend its
+                // one measure learning the natural width and could never then place the child
+                // at a different one. It also fixes a bug the trial measure had -- inside a
+                // parent that forces a width, the "natural" width recorded was that forced
+                // width, so the button had nothing to grow from and never moved.
+                val h = if (constraints.hasBoundedHeight) constraints.maxHeight else 0
+                if (resting || !usable) {
+                    naturals.widths = IntArray(n) { i ->
+                        if (member[i]) measurables[i].maxIntrinsicWidth(h).coerceAtLeast(0) else 0
+                    }
+                }
+                val nat = naturals.widths!!
+
+                // Non-members (a Spacer, a label sharing the row) keep their natural size and
+                // are measured first, so what remains is the members' budget.
+                val out = arrayOfNulls<Placeable>(n)
+                var nonMemberWidth = 0
+                for (i in 0 until n) if (!member[i]) {
+                    val p = measurables[i].measure(childConstraints)
+                    out[i] = p
+                    nonMemberWidth += p.width
+                }
+
+                // Members that declare a weight stretch to fill whatever the row leaves over.
+                // This is what lets a split pill span its row AND still redistribute on press:
+                // the label half carries the weight, the nub keeps its natural size, and the
+                // stretch is part of the budget rather than something a Row does outside it.
+                val naturalTotal = (0 until n).sumOf { if (member[it]) nat[it] else 0 }
+                val room = if (constraints.hasBoundedWidth) {
+                    (constraints.maxWidth - gaps - nonMemberWidth).coerceAtLeast(0)
+                } else {
+                    naturalTotal
+                }
+                val wSum = (0 until n).sumOf { if (member[it]) weight[it].toDouble() else 0.0 }
+                val leftover = (room - naturalTotal).coerceAtLeast(0)
+                val stretching = leftover > 0 && wSum > 0.0
+                val total = if (stretching) naturalTotal + leftover else naturalTotal
+
+                val base = DoubleArray(n) { if (member[it]) nat[it].toDouble() else 0.0 }
+                if (stretching) {
+                    for (i in 0 until n) {
+                        if (member[i] && weight[i] > 0f) base[i] += leftover * (weight[i] / wSum)
+                    }
+                }
+
                 val growers = (0 until n).filter { member[it] && press[it] > 0.001f }
                 val donors = (0 until n).filter { member[it] && press[it] <= 0.001f }
 
-                // What the pressed buttons are asking for, and what the others can actually
-                // spare above their floor. Whichever is smaller is what moves -- so with
-                // nothing to take from (a lone button in the row) NOTHING moves, rather than
-                // the row quietly growing to accommodate it.
                 // A donor gives up its own spare padding and nothing else, so no label ever
-                // ellipsizes and no icon ever loses its target. See ButtonMinSidePadding.
-                val floorOf = IntArray(n) { i ->
-                    if (!member[i]) cached[i] else (cached[i] - slack[i]).coerceIn(0, cached[i])
+                // ellipsizes and no icon ever loses its target (see ButtonMinSidePadding) --
+                // plus any stretch it was handed above its natural width, which by definition
+                // is not content either.
+                val floorOf = DoubleArray(n) { i ->
+                    if (!member[i]) 0.0 else (nat[i] - slack[i]).coerceAtLeast(0).toDouble().coerceAtMost(base[i])
                 }
-                val want = growers.sumOf { (cached[it] * ExpressivePressGrowth * press[it]).toDouble() }
-                val capacity = donors.sumOf { (cached[it] - floorOf[it]).toDouble() }
+                // What the pressed buttons ask for, and what the others can actually spare.
+                // Whichever is smaller is what moves -- so with nothing to take from (a lone
+                // button in the row) NOTHING moves, rather than the row quietly growing.
+                val want = growers.sumOf { base[it] * ExpressivePressGrowth * press[it] }
+                val capacity = donors.sumOf { base[it] - floorOf[it] }
                 val give = minOf(want, capacity)
 
-                val exact = DoubleArray(n) { cached[it].toDouble() }
+                val exact = DoubleArray(n) { base[it] }
                 if (give > 0.0) {
                     for (i in growers) {
-                        val share = (cached[i] * ExpressivePressGrowth * press[i]).toDouble() / want
-                        exact[i] = cached[i] + give * share
+                        exact[i] = base[i] + give * (base[i] * ExpressivePressGrowth * press[i]) / want
                     }
                     for (i in donors) {
-                        val share = (cached[i] - floorOf[i]).toDouble() / capacity
-                        exact[i] = cached[i] - give * share
+                        exact[i] = base[i] - give * (base[i] - floorOf[i]) / capacity
                     }
                 }
 
@@ -392,26 +432,28 @@ fun ExpressiveButtonGroup(
                 // `total` EXACTLY rather than approximately. Without this the group breathes by
                 // a pixel or two as the spring runs, which on a connected pill is visible as a
                 // seam that will not sit still.
-                val target = IntArray(n) { if (member[it]) exact[it].toInt() else cached[it] }
-                var slack = total - (0 until n).sumOf { if (member[it]) target[it] else 0 }
-                if (slack != 0) {
+                val target = IntArray(n) { if (member[it]) exact[it].toInt() else 0 }
+                var remainder = total - (0 until n).sumOf { if (member[it]) target[it] else 0 }
+                if (remainder > 0) {
                     val order = (0 until n).filter { member[it] }
                         .sortedByDescending { exact[it] - exact[it].toInt() }
                     // Bounded by construction, not by trusting the arithmetic: truncation can
-                    // only ever leave slack >= 0 and smaller than the member count, but this
-                    // runs inside a measure pass, and a measure pass that can spin is a frozen
-                    // app rather than a wrong pixel.
+                    // only ever leave a remainder >= 0 and smaller than the member count, but
+                    // this runs inside a measure pass, and a measure pass that can spin is a
+                    // frozen app rather than a wrong pixel.
                     var k = 0
-                    while (slack > 0 && k < order.size) {
-                        target[order[k]]++; slack--; k++
+                    while (remainder > 0 && k < order.size) {
+                        target[order[k]]++; remainder--; k++
                     }
                 }
-                measurables.mapIndexed { i, m ->
-                    val w = target[i].coerceAtMost(
+                for (i in 0 until n) if (member[i]) {
+                    val w = target[i].coerceIn(
+                        0,
                         if (constraints.hasBoundedWidth) constraints.maxWidth else target[i],
                     )
-                    m.measure(childConstraints.copy(minWidth = w, maxWidth = w))
+                    out[i] = measurables[i].measure(childConstraints.copy(minWidth = w, maxWidth = w))
                 }
+                out.map { it!! }
             }
 
             val width = (placeables.sumOf { it.width } + gaps)
@@ -453,6 +495,16 @@ private data class ExpressiveGroupData(
      * the lock/horn/lights segments never moved at all.
      */
     val compressiblePx: Int,
+    /**
+     * Share of the row's leftover space this member takes, 0 to opt out.
+     *
+     * The group's own answer to Modifier.weight, which cannot reach it: weight is RowScope
+     * parent data read by a Row's measure policy, and a child of this group is not a child of a
+     * Row. Every attempt to size a group member with Modifier.weight in this app was therefore
+     * silently dead. Declaring it here means filling the row and redistributing on press are
+     * the same calculation, instead of a Row doing one and the group doing the other.
+     */
+    val weight: Float,
 ) : ParentDataModifier {
     override fun Density.modifyParentData(parentData: Any?): Any = this@ExpressiveGroupData
 }
@@ -472,6 +524,8 @@ object ExpressiveButtonGroupScope {
         enabled: Boolean = true,
         /** See SafeExpansiveButton's own `compressible`. */
         compressible: Dp = DefaultButtonCompressible,
+        /** See [ExpressiveGroupData.weight]. */
+        groupWeight: Float = 0f,
         content: @Composable () -> Unit,
     ) {
         val press by expressivePressFraction(interactionSource, enabled)
@@ -481,7 +535,7 @@ object ExpressiveButtonGroupScope {
                 // propagateMinConstraints (below) so the button itself fills the width the
                 // group hands it -- otherwise it would sit at its own natural width inside a
                 // slot growing and shrinking around it, and nothing would appear to move.
-                .then(ExpressiveGroupData({ press }, compressiblePx)),
+                .then(ExpressiveGroupData({ press }, compressiblePx, groupWeight)),
             propagateMinConstraints = true,
         ) {
             // FALSE inside, exactly as SafeExpansiveButton's own group branch does it: this
