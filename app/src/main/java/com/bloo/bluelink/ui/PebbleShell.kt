@@ -99,6 +99,8 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.layout.AlignmentLine
+import androidx.compose.ui.layout.FirstBaseline
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.Shape
@@ -599,8 +601,39 @@ internal fun PebbleShell(
                                         val placeable = measurable.measure(room)
                                         val w = (placeable.width * scale).roundToInt()
                                         val h = (placeable.height * scale).roundToInt()
-                                        layout(w, h) {
-                                            placeable.place(0, (h - placeable.height) / 2)
+                                        val yOffset = (h - placeable.height) / 2
+                                        // Reports the FINAL, POST-SCALE baseline -- not the
+                                        // placeable's own, unscaled one -- because alignByBaseline
+                                        // reads this in LAYOUT space, which the graphicsLayer scale
+                                        // below never touches. A raw (unscaled) baseline value
+                                        // would tell the row where the glyphs sit BEFORE the visual
+                                        // shrink, which is not where they end up on screen -- that
+                                        // gap is exactly the "name and numbers aren't aligned"
+                                        // report, and it is why six earlier attempts at this (see
+                                        // the surrounding comments) always landed "slightly off":
+                                        // each one reasoned about the box, never about the scale
+                                        // applied on top of it.
+                                        //
+                                        // The graphicsLayer below scales around y = h/2 (the
+                                        // REPORTED box's own vertical centre, via
+                                        // transformOrigin(0f, 0.5f)), so a point at local Y
+                                        // "unscaledY" ends up, after that scale, at
+                                        // h/2 + (unscaledY - h/2) * scale. Working that out here
+                                        // and reporting it as this node's own alignment line is
+                                        // what lets a plain Modifier.alignByBaseline() on both this
+                                        // Text and titleTrailing line their glyphs up correctly,
+                                        // with no separate positioning math duplicated at either
+                                        // call site.
+                                        val baseline = placeable[FirstBaseline]
+                                        val alignmentLines = if (baseline != AlignmentLine.Unspecified) {
+                                            val unscaledY = yOffset + baseline
+                                            val pivot = h / 2f
+                                            mapOf(FirstBaseline to (pivot + (unscaledY - pivot) * scale).roundToInt())
+                                        } else {
+                                            emptyMap()
+                                        }
+                                        layout(w, h, alignmentLines) {
+                                            placeable.place(0, yOffset)
                                         }
                                     }
                                     .graphicsLayer {
@@ -612,7 +645,14 @@ internal fun PebbleShell(
                                     // Appended LAST -- after the .layout{} above, so a
                                     // caller reading this via onGloballyPositioned gets
                                     // the real, final (already-scaled) on-screen bounds.
-                                    .then(titleModifier),
+                                    .then(titleModifier)
+                                    // See the .layout{} block's own doc: this is the half of the
+                                    // baseline fix that opts the title INTO alignment, matching
+                                    // the Box wrapping titleTrailing below. Neither alone does
+                                    // anything -- Row only switches to baseline placement once
+                                    // at least one child asks for it, and only children that ALSO
+                                    // ask for it are aligned by it.
+                                    .alignByBaseline(),
                                 style = titleStyle,
                                 color = titleColor,
                                 fontWeight = FontWeight.Bold,
@@ -639,7 +679,18 @@ internal fun PebbleShell(
                             // touching the control. No weighted spacer -- the title's own fill
                             // above is what pushes the control to the end.
                             if (titleTrailingAtEnd) Spacer(Modifier.width(12.dp))
-                            titleTrailing?.invoke()
+                            // Wrapped so it can carry its own alignByBaseline(): titleTrailing is
+                            // a bare `@Composable () -> Unit`, with no call-site hook to attach a
+                            // modifier to whatever it emits. A Box (like Row/Column) forwards its
+                            // single child's own first baseline as its own, so the hero's numbers
+                            // -- two Row layers further in, inside HeroNumbers -- still reach this
+                            // Row's alignment the same way as if they sat here directly. A
+                            // trailing control with no text of its own (the settings toggle) has
+                            // no baseline to forward either way, and falls back to its bottom
+                            // edge exactly as it already did under plain CenterVertically.
+                            if (titleTrailing != null) {
+                                Box(Modifier.alignByBaseline()) { titleTrailing() }
+                            }
                             }
                             if (summary != null) {
                                 AnimatedContent(
