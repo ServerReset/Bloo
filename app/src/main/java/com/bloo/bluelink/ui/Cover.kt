@@ -365,7 +365,6 @@ internal fun CoverTile(
                         icon = icon,
                         text = identityText,
                         iconTint = iconTint,
-                        contentColor = titleColor,
                     )
                 }
                 actions?.invoke()
@@ -674,13 +673,21 @@ internal fun CoverActionButton(
  *
  * Not clickable, and marked so: it looks like a button because it shares the row's shape
  * language, not because there is anything to press.
+ *
+ * Its text tone is fixed to onSurface rather than threaded in from the tile's own titleColor.
+ * titleColor is calibrated for text painted directly over the tile's containerColor (or, on the
+ * home tile, over a car photo) -- exactly what CoverActionButton's own contentFor doc already
+ * flags as the wrong tone for a control that draws its OWN opaque buttonContainer() fill on top
+ * of whatever is behind it. This pill is that same case: on the AI tile titleColor resolved to
+ * onTertiaryContainer, a tone tuned for a pale lavender card, painted onto a neutral grey chip --
+ * legible in the sense the pixels were there, and visibly dimmer than every other tile's identity
+ * text. onSurface is what CoverActionButton already settled on for the same neutral fill.
  */
 @Composable
 private fun CoverIdentityPill(
     icon: ImageVector,
     text: String,
     iconTint: Color,
-    contentColor: Color,
 ) {
     val idle = remember { MutableInteractionSource() }
     SafeExpansiveButton(interactionSource = idle, enabled = false) {
@@ -693,7 +700,7 @@ private fun CoverIdentityPill(
                 .semantics(mergeDescendants = true) { contentDescription = text },
             contentAlignment = Alignment.Center,
         ) {
-            CompositionLocalProvider(LocalContentColor provides contentColor) {
+            CompositionLocalProvider(LocalContentColor provides MaterialTheme.colorScheme.onSurface) {
                 // The glyph keeps its accent -- it is carrying state the words are not (a
                 // charging bolt, a snowflake) -- while the text takes the pill's content tone.
                 MorphButtonLabel(icon, text, pending = false, iconTint = iconTint)
