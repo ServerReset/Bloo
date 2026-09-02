@@ -947,7 +947,19 @@ internal fun SplitExpandButton(
                 // size cannot grow this button unbounded and squeeze the pebble title -- but past
                 // the cap this now compacts to the icon alone (the app's one fit rule) instead of
                 // ellipsizing a half-cut word.
-                Box(Modifier.widthIn(max = 110.dp).graphicsLayer { translationY = bounceY.value }) {
+                //
+                // 132dp, not 110: at 110 a perfectly ordinary short label ("Summarize", nine
+                // letters and two wide 'm's at SemiBold) already landed past the cap and compacted
+                // to the bare glyph -- a WIDE dark pill with a lone sparkle floating in it, reported
+                // from a real screenshot. The group had already reserved this button its full,
+                // uncapped intrinsic width (it measures the same subtree, cap included, so the
+                // reservation and this box's own ceiling should describe the same content but did
+                // not once the label was long enough to graze the old cap) -- so the pill stayed
+                // wide while its content silently gave up the word inside it. 132dp comfortably
+                // clears every short action label in the app ("Summarize", "Lock", "Stop", "Start",
+                // "Install now") while still catching the genuinely long ones ("Downloading…",
+                // "Installing…"), which is what this cap exists for.
+                Box(Modifier.widthIn(max = 132.dp).graphicsLayer { translationY = bounceY.value }) {
                     MorphButtonLabel(
                         action.icon,
                         action.label,
