@@ -119,26 +119,39 @@ internal class FloatingTitle(private val hysteresisPx: Float) {
  *  position without threading a parameter through every intermediate composable. */
 internal val LocalFloatingTitle = compositionLocalOf<FloatingTitle?> { null }
 
+/** Shared duration for the dock/undock hand-off, used by both the inline title's own motion
+ *  and [FloatingTitlePill]'s enter/exit so the two independently-animated pieces read as one
+ *  continuous event instead of two out-of-step fades. */
+private const val TitleDockMillis = 220
+
 /**
  * Modifier for the INLINE title: reports its own position to [title] every layout pass, and
- * fades itself out as it docks (the corner pill is fading in over the same window -- see
- * [FloatingTitlePill]'s own animation spec, matched here so the hand-off reads as one continuous
- * cross-fade rather than two independently-timed ones). The fade itself is read in a
- * `graphicsLayer` lambda, draw-phase only, so the docked spring running doesn't recompose the
- * whole title -- only redraws this one node.
+ * animates itself up and out toward the corner as it docks -- not just a fade. The pill is doing
+ * the mirror-image motion (see [FloatingTitlePill]'s `slideInVertically`/`scaleIn`, same duration,
+ * same rise-and-shrink direction), so even though these are two independent elements with no
+ * shared anchor, the matched direction and timing reads as one object handing off rather than one
+ * thing vanishing and an unrelated thing appearing elsewhere. Entirely draw-phase (`graphicsLayer`
+ * only) so the docked spring running doesn't recompose the whole title -- only redraws this node.
  */
 @Composable
 internal fun Modifier.reportsToFloatingTitle(title: FloatingTitle?): Modifier {
     if (title == null) return this
     val docked by title.docked
-    val alpha by animateFloatAsState(
-        if (docked) 0f else 1f,
-        animationSpec = tween(if (docked) 160 else 220),
-        label = "inlineTitleFade",
+    val progress by animateFloatAsState(
+        if (docked) 1f else 0f,
+        animationSpec = tween(TitleDockMillis),
+        label = "inlineTitleDock",
     )
     return this
         .onGloballyPositioned { title.onPositioned(it.positionInRoot()) }
-        .graphicsLayer { this.alpha = alpha }
+        .graphicsLayer {
+            alpha = 1f - progress
+            translationY = -progress * 10.dp.toPx()
+            val scale = 1f - progress * 0.15f
+            scaleX = scale
+            scaleY = scale
+            transformOrigin = TransformOrigin(0f, 0.5f)
+        }
 }
 
 /**
@@ -170,10 +183,13 @@ internal fun BoxScope.FloatingTitlePill(
             .padding(start = cornerX, top = cornerY, end = reserveEnd),
         // Grown from the leading edge, matching the inline title's own left-anchored grow/shrink
         // (see PebbleShell's identical transformOrigin) so nothing appears to drift sideways.
-        enter = fadeIn(tween(220)) +
-            scaleIn(initialScale = 0.7f, transformOrigin = TransformOrigin(0f, 0.5f)) +
-            slideInVertically(tween(220)) { -it / 4 },
-        exit = fadeOut(tween(160)) + scaleOut(targetScale = 0.85f, transformOrigin = TransformOrigin(0f, 0.5f)),
+        // Same duration and the same rise-from-below direction as the inline title's own
+        // out-motion in [reportsToFloatingTitle] -- see that function's doc.
+        enter = fadeIn(tween(TitleDockMillis)) +
+            scaleIn(initialScale = 0.7f, animationSpec = tween(TitleDockMillis), transformOrigin = TransformOrigin(0f, 0.5f)) +
+            slideInVertically(tween(TitleDockMillis)) { it / 4 },
+        exit = fadeOut(tween(TitleDockMillis)) +
+            scaleOut(targetScale = 0.85f, animationSpec = tween(TitleDockMillis), transformOrigin = TransformOrigin(0f, 0.5f)),
     ) {
         Row(
             Modifier
