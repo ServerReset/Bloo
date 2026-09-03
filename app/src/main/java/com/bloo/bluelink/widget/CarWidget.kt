@@ -49,7 +49,9 @@ import com.bloo.bluelink.data.VehicleSnapshot
 import com.bloo.bluelink.ui.ThemeMode
 import com.bloo.bluelink.ui.resolveWidgetAccent
 import com.bloo.bluelink.ui.resolveWidgetIsDark
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
 
 /**
  * The adaptive Bloo home-screen widget.
@@ -236,12 +238,27 @@ class CarWidget : GlanceAppWidget() {
             // ~5s on a dozing device). The SECOND update was the one carrying the truth, and
             // it was the one dropped. Symptom: "I sent a command from the widget and it never
             // updated."
-            val live by snapshots.payload.collectAsState(initial = data)
-            val liveCar = if (config.vin != null) {
-                live.vehicles.firstOrNull { it.vin == config.vin }
-            } else {
-                live.selected
-            }
+            // Narrowed to just what THIS widget's own render actually needs -- not the raw
+            // whole-account flow. snapshots.payload holds every car; without this, a status
+            // poll, weather push, or AI-summary write for ANY OTHER car in the account still
+            // emitted here, and since Render carries two platform Bitmap fields (Compose-
+            // unstable, no equals/hashCode to skip on), that meant a full Content()
+            // recomposition -- including ChargeRing re-rendering its own bitmap arc from
+            // scratch -- for every widget on the home screen, on every unrelated car's update.
+            // distinctUntilChanged() on the narrowed (car, multiCar) pair means this widget
+            // only ever recomposes when ITS OWN displayed data actually changed.
+            val liveSlice by snapshots.payload
+                .map { live ->
+                    val liveCar = if (config.vin != null) {
+                        live.vehicles.firstOrNull { it.vin == config.vin }
+                    } else {
+                        live.selected
+                    }
+                    liveCar to (live.vehicles.size > 1)
+                }
+                .distinctUntilChanged()
+                .collectAsState(initial = car to (data.vehicles.size > 1))
+            val (liveCar, liveMultiCar) = liveSlice
             // Staleness is recomputed from the live fetchedAt, not carried over: the whole
             // point of a live update is that the age changed.
             val liveStale = liveCar?.fetchedAt?.takeIf { it > 0 }?.let {
@@ -258,7 +275,7 @@ class CarWidget : GlanceAppWidget() {
                     render.copy(
                         car = liveCar ?: render.car,
                         stale = liveStale,
-                        multiCar = live.vehicles.size > 1,
+                        multiCar = liveMultiCar,
                     ),
                 )
             }
