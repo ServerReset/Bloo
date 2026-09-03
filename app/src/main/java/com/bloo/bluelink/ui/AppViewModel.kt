@@ -1253,12 +1253,17 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         if (!driveSyncBootstrapped.compareAndSet(false, true)) return
         // Restore auto-sync Drive URI and last sync timestamp from preferences.
         viewModelScope.launch {
-            val uri = settingsStore.syncUri()
-            val lastSync = settingsStore.lastSyncMs()
+            // One DataStore round trip for the whole bootstrap instead of ~10
+            // sequential ones -- this runs on every cold start, so each extra
+            // suspend read here was a small, compounding hit to how fast the
+            // garage could show up.
+            val snap = settingsStore.snapshot()
+            val uri = settingsStore.syncUri(snap)
+            val lastSync = settingsStore.lastSyncMs(snap)
             // Restores a failure the background periodic worker hit while the
             // app was closed, so it's visible in Settings on next launch instead
             // of only ever surfacing if a foreground sync happens to fail too.
-            var lastError = settingsStore.lastSyncError()
+            var lastError = settingsStore.lastSyncError(snap)
             // Proactive check: don't wait for the next sync attempt to discover
             // the persisted grant is gone (revoked in system Settings, or the
             // picked Drive file/folder was deleted) -- surface it the moment
@@ -1274,16 +1279,18 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                     settingsStore.setLastSyncError(lastError)
                 }
             }
-            val wifiOnly = settingsStore.syncWifiOnly()
-            val settingsMode = settingsStore.settingsMode()
+            val wifiOnly = settingsStore.syncWifiOnly(snap)
+            val settingsMode = settingsStore.settingsMode(snap)
             // Restore the cached device registry + primary + this-device identity so
             // Settings shows "your devices" immediately on launch, before (and even
             // without) the first live sync of the session.
-            val cachedDevices = settingsStore.syncedDevices()
-            val cachedPrimary = settingsStore.syncPrimaryDeviceId()
-            val myDeviceId = settingsStore.syncDeviceId()
-            val myDeviceName = settingsStore.syncDeviceName()
-            val fileFingerprint = settingsStore.syncFileFingerprint()
+            val cachedDevices = settingsStore.syncedDevices(snap)
+            val cachedPrimary = settingsStore.syncPrimaryDeviceId(snap)
+            // Falls back to the suspend, id-minting overload only on the rare
+            // snapshot where no device id has ever been written yet.
+            val myDeviceId = settingsStore.syncDeviceId(snap) ?: settingsStore.syncDeviceId()
+            val myDeviceName = settingsStore.syncDeviceName(snap)
+            val fileFingerprint = settingsStore.syncFileFingerprint(snap)
             // Still seeded from here for the normal cold start (vehicles are already in state by
             // the time this coroutine runs), and now ALSO from loadGarage so a first load that
             // returned nothing cannot leave it empty for the process.

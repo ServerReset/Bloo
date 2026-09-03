@@ -645,8 +645,8 @@ class SettingsStore(private val context: Context) {
     }
 
     /** Settings view mode: "simple" or "advanced". */
-    suspend fun settingsMode(): String =
-        context.settingsDataStore.data.first()[Keys.SETTINGS_MODE] ?: "simple"
+    suspend fun settingsMode(): String = settingsMode(context.settingsDataStore.data.first())
+    fun settingsMode(p: Preferences): String = p[Keys.SETTINGS_MODE] ?: "simple"
 
     /** The chosen distance/temperature unit system ("imperial" default, or "metric"), for
      *  non-Compose callers that need it as a one-shot read rather than the [appearance] flow --
@@ -1067,8 +1067,9 @@ class SettingsStore(private val context: Context) {
     // separate from deleting unreachable code.
 
     /** Drive URI for auto-backup; null when not configured. */
-    suspend fun syncUri(): String? =
-        context.settingsDataStore.data.first()[stringPreferencesKey("sync_uri")]?.takeIf { it.isNotBlank() }
+    suspend fun syncUri(): String? = syncUri(context.settingsDataStore.data.first())
+    fun syncUri(p: Preferences): String? =
+        p[stringPreferencesKey("sync_uri")]?.takeIf { it.isNotBlank() }
 
     /** A short, stable fingerprint of the ACTUAL Drive file this device is synced
      *  to, derived from the persisted document URI's unique id. Shown in Settings
@@ -1076,8 +1077,9 @@ class SettingsStore(private val context: Context) {
      *  fingerprints differ, they picked different files (Google Drive allows two
      *  files with the same name), which is the #1 reason settings/devices don't
      *  converge. Null when sync isn't set up. */
-    suspend fun syncFileFingerprint(): String? {
-        if (syncUri() == null) return null
+    suspend fun syncFileFingerprint(): String? = syncFileFingerprint(context.settingsDataStore.data.first())
+    fun syncFileFingerprint(p: Preferences): String? {
+        if (syncUri(p) == null) return null
         // The CONTENT-based file id (stored inside the Drive file as `_fileId`,
         // cached here device-local). Every device on the same file reads the same
         // value → the same short code. This replaces the old URI hash, which was
@@ -1085,7 +1087,7 @@ class SettingsStore(private val context: Context) {
         // Drive file had different URIs (and different hashes) on two phones — the
         // exact "I picked the same file but the codes differ" bug. Null until the
         // first successful sync has read/minted the id.
-        val id = context.settingsDataStore.data.first()[stringPreferencesKey("sync_file_id")] ?: return null
+        val id = p[stringPreferencesKey("sync_file_id")] ?: return null
         // Short, human-comparable tag (first 6 hex of a SHA-256 of the full id) so
         // we never surface the raw UUID but two devices still match at a glance.
         val hash = java.security.MessageDigest.getInstance("SHA-256").digest(id.toByteArray())
@@ -1110,9 +1112,9 @@ class SettingsStore(private val context: Context) {
     }
 
     /** Timestamp (ms) of the last successful bidirectional sync. */
-    suspend fun lastSyncMs(): Long =
-        context.settingsDataStore.data.first()[stringPreferencesKey("sync_last_ms")]
-            ?.toLongOrNull() ?: 0L
+    suspend fun lastSyncMs(): Long = lastSyncMs(context.settingsDataStore.data.first())
+    fun lastSyncMs(p: Preferences): Long =
+        p[stringPreferencesKey("sync_last_ms")]?.toLongOrNull() ?: 0L
 
     suspend fun setLastSyncMs(ms: Long) {
         editTracked { it[stringPreferencesKey("sync_last_ms")] = ms.toString() }
@@ -1122,17 +1124,17 @@ class SettingsStore(private val context: Context) {
      *  ViewModel to update UiState.syncError) still shows up in Settings the
      *  next time the app is opened, instead of only being visible if a
      *  foreground sync happens to fail while the app is open. */
-    suspend fun lastSyncError(): String? =
-        context.settingsDataStore.data.first()[stringPreferencesKey("sync_last_error")]
+    suspend fun lastSyncError(): String? = lastSyncError(context.settingsDataStore.data.first())
+    fun lastSyncError(p: Preferences): String? = p[stringPreferencesKey("sync_last_error")]
 
     suspend fun setLastSyncError(error: String?) {
         editTracked { if (error == null) it.remove(stringPreferencesKey("sync_last_error")) else it[stringPreferencesKey("sync_last_error")] = error }
     }
 
     /** Wi-Fi only sync (true) or any network (false). */
-    suspend fun syncWifiOnly(): Boolean =
-        context.settingsDataStore.data.first()[stringPreferencesKey("sync_wifi")]
-            ?.toBooleanStrictOrNull() ?: true
+    suspend fun syncWifiOnly(): Boolean = syncWifiOnly(context.settingsDataStore.data.first())
+    fun syncWifiOnly(p: Preferences): Boolean =
+        p[stringPreferencesKey("sync_wifi")]?.toBooleanStrictOrNull() ?: true
 
     suspend fun setSyncWifiOnly(value: Boolean) {
         editTracked { it[stringPreferencesKey("sync_wifi")] = value.toString() }
@@ -1162,11 +1164,19 @@ class SettingsStore(private val context: Context) {
         return fresh
     }
 
+    /** Reads the id straight off an already-taken snapshot, without the
+     *  mint-if-missing side effect above -- null on a snapshot from before the id
+     *  was first minted. Callers on the cold-start path that just want "whatever
+     *  is there right now" (e.g. seeding UiState) should prefer this over the
+     *  suspend overload; it costs no DataStore round trip against a snapshot they
+     *  already hold. */
+    fun syncDeviceId(p: Preferences): String? = p[stringPreferencesKey("sync_device_id")]?.takeIf { it.isNotBlank() }
+
     /** Friendly name shown in the "your devices" list. Defaults to the hardware
      *  model until the user renames it. */
-    suspend fun syncDeviceName(): String =
-        context.settingsDataStore.data.first()[stringPreferencesKey("sync_device_name")]?.takeIf { it.isNotBlank() }
-            ?: Build.MODEL ?: "This device"
+    suspend fun syncDeviceName(): String = syncDeviceName(context.settingsDataStore.data.first())
+    fun syncDeviceName(p: Preferences): String =
+        p[stringPreferencesKey("sync_device_name")]?.takeIf { it.isNotBlank() } ?: Build.MODEL ?: "This device"
 
     suspend fun setSyncDeviceName(name: String) {
         context.settingsDataStore.edit {
@@ -1212,8 +1222,9 @@ class SettingsStore(private val context: Context) {
 
     /** Cached copy of the last-merged `devices` registry, for offline display in
      *  Settings (the file may not be reachable when Settings opens). */
-    suspend fun syncedDevices(): List<SyncMerge.SyncDevice> {
-        val raw = context.settingsDataStore.data.first()[stringPreferencesKey("sync_devices_cache")] ?: return emptyList()
+    suspend fun syncedDevices(): List<SyncMerge.SyncDevice> = syncedDevices(context.settingsDataStore.data.first())
+    fun syncedDevices(p: Preferences): List<SyncMerge.SyncDevice> {
+        val raw = p[stringPreferencesKey("sync_devices_cache")] ?: return emptyList()
         return runCatching { devicesJson.decodeFromString(deviceListSerializer, raw) }.getOrElse { emptyList() }
     }
 
@@ -1225,8 +1236,9 @@ class SettingsStore(private val context: Context) {
 
     /** The primary device id (source of truth), cached device-local for display and
      *  written into the file on the next upload. Null = no primary chosen. */
-    suspend fun syncPrimaryDeviceId(): String? =
-        context.settingsDataStore.data.first()[stringPreferencesKey("sync_primary_cache")]?.takeIf { it.isNotBlank() }
+    suspend fun syncPrimaryDeviceId(): String? = syncPrimaryDeviceId(context.settingsDataStore.data.first())
+    fun syncPrimaryDeviceId(p: Preferences): String? =
+        p[stringPreferencesKey("sync_primary_cache")]?.takeIf { it.isNotBlank() }
 
     private suspend fun setSyncPrimaryCache(id: String?) {
         context.settingsDataStore.edit {

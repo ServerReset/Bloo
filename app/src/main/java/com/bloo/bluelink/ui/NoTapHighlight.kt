@@ -1,6 +1,5 @@
 package com.bloo.bluelink.ui
 
-import androidx.compose.foundation.Indication
 import androidx.compose.foundation.IndicationNodeFactory
 import androidx.compose.foundation.interaction.InteractionSource
 import androidx.compose.ui.Modifier
@@ -33,6 +32,3 @@ internal object NoTapHighlight : IndicationNodeFactory {
     override fun equals(other: Any?): Boolean = other is NoTapHighlight
     override fun hashCode(): Int = System.identityHashCode(this)
 }
-
-/** Kept as a typed alias so call sites read as intent rather than as a type name. */
-internal val NoIndication: Indication = NoTapHighlight
