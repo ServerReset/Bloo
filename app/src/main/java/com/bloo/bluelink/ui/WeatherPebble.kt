@@ -89,7 +89,16 @@ internal fun LocationPebble(v: Vehicle, state: UiState, vm: AppViewModel, dragHa
     val context = LocalContext.current
     val fahrenheit = LocalAppearance.current.useFahrenheit
     val location = state.locations[v.vin]
-    val place = state.placeNames[v.vin]
+    // On the cover, this becomes the identity pill's own headline, riding beside the car name
+    // ("810 Devonshire Way, Sunnyvale  ·  Daisy") -- the long form there reliably wrapped
+    // that pill onto two lines, a real reported "looks bad" bug. The compact form (street +
+    // ZIP, not street + city) is shorter and has no internal space to wrap on. Phone keeps the
+    // long form in its own header, which has the room for it.
+    val place = if (LocalForceExpanded.current) {
+        state.placeZips[v.vin] ?: state.placeNames[v.vin]
+    } else {
+        state.placeNames[v.vin]
+    }
     val locating = state.isPending(v.vin, "locate")
     // Show the place name (or a hint) in the header so it's visible even collapsed.
     val summary = place ?: if (location != null) "Located" else "Not located yet"

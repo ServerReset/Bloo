@@ -1638,7 +1638,12 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                     autoSummarize(v)
                     statusLoc?.let { loc ->
                         reverseGeocode(loc)?.let { place ->
-                            _state.update { it.copy(placeNames = it.placeNames + (v.vin to place)) }
+                            _state.update {
+                                it.copy(
+                                    placeNames = it.placeNames + (v.vin to place.full),
+                                    placeZips = it.placeZips + (v.vin to place.compact),
+                                )
+                            }
                             // Re-persist. The persistCache() above ran BEFORE this geocode, and
                             // statusCache.save writes placeNames alongside locations -- so the
                             // cache had just paired the newest coordinates with the PREVIOUS
@@ -2627,7 +2632,12 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             loc != null -> {
                 _state.update { it.copy(locations = it.locations + (v.vin to loc)) }
                 reverseGeocode(loc)?.let { place ->
-                    _state.update { it.copy(placeNames = it.placeNames + (v.vin to place)) }
+                    _state.update {
+                        it.copy(
+                            placeNames = it.placeNames + (v.vin to place.full),
+                            placeZips = it.placeZips + (v.vin to place.compact),
+                        )
+                    }
                 }
                 loadCarWeather(v, force = true)
                 persistCache()

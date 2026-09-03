@@ -251,24 +251,33 @@ internal fun LockOverlay(vm: AppViewModel) {
                 )
                 Spacer(Modifier.height(if (compact) 16.dp else 28.dp))
                 // White pill for maximum contrast over the dimmed blur.
+                //
+                // Plain MorphButton, deliberately NOT wrapped in SafeExpansiveButton -- this
+                // screen's one primary CTA was the reported "janky on press" button, and the
+                // cause was two independent press animations fighting each other:
+                // SafeExpansiveButton REALLY re-measures the button wider on press (a genuine
+                // layout size change, meant for buttons sitting in a row that need to shove
+                // their neighbours aside), while MorphButtonCore separately, always, applies its
+                // OWN press feedback as a graphicsLayer scale on its content. Layered together,
+                // one press produced the box growing outward at the same time its own content
+                // was scaling inward (or vice versa) -- two different mechanisms disagreeing
+                // about what "pressed" looks like on the same button. This button is alone, not
+                // in a row with siblings to make room for, so it never needed the width-growth
+                // in the first place: MorphButton's own built-in scale is the entire, coherent
+                // press feedback here.
                 val unlockSource = remember { MutableInteractionSource() }
-                SafeExpansiveButton(
+                MorphButton(
+                    onClick = { authenticateBiometric() },
+                    modifier = Modifier.height(if (compact) 56.dp else ControlHeight),
                     interactionSource = unlockSource,
-                    enabled = true,
+                    containerColor = Color.White,
+                    contentColor = Color.Black,
+                    contentPadding = PaddingValues(horizontal = 40.dp, vertical = 18.dp),
                 ) {
-                    MorphButton(
-                        onClick = { authenticateBiometric() },
-                        modifier = Modifier.height(if (compact) 56.dp else ControlHeight),
-                        interactionSource = unlockSource,
-                        containerColor = Color.White,
-                        contentColor = Color.Black,
-                        contentPadding = PaddingValues(horizontal = 40.dp, vertical = 18.dp),
-                    ) {
-                        // MorphButtonLabel, not a hand-rolled Icon+Spacer+Text -- the icon stays
-                        // larger (24dp) than the standard 18dp, an intentional emphasis for the
-                        // screen's one primary CTA.
-                        MorphButtonLabel(Icons.Filled.Fingerprint, "Unlock", pending = false, iconSize = 24.dp)
-                    }
+                    // MorphButtonLabel, not a hand-rolled Icon+Spacer+Text -- the icon stays
+                    // larger (24dp) than the standard 18dp, an intentional emphasis for the
+                    // screen's one primary CTA.
+                    MorphButtonLabel(Icons.Filled.Fingerprint, "Unlock", pending = false, iconSize = 24.dp)
                 }
                 if (appState.appPinSet) {
                     Spacer(Modifier.height(12.dp))

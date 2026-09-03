@@ -142,6 +142,13 @@ data class UiState(
     val sectionOrders: Map<String, List<String>> = emptyMap(),
     val imageUrls: Map<String, String> = emptyMap(),
     val placeNames: Map<String, String> = emptyMap(),
+    /** The COMPACT form of [placeNames] -- street + ZIP instead of street + city -- for the
+     *  cover screen's own space-constrained surfaces, where the long form (especially with a
+     *  car-name suffix appended beside it) reliably wrapped onto two lines. See
+     *  GeocodedPlace's own doc. In-memory only (not written to statusCache alongside
+     *  placeNames): a cold start showing the long form until the next locate, rather than the
+     *  compact one, is an acceptable, self-correcting gap for a purely cosmetic value. */
+    val placeZips: Map<String, String> = emptyMap(),
     /** Current weather at the user's configured "home" location, if loaded. */
     val homeWeather: Weather? = null,
     /** Current weather at each car's last-known location, keyed by VIN. */

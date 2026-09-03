@@ -3,6 +3,18 @@ package com.bloo.bluelink.data
 import java.util.TimeZone
 import kotlin.math.roundToInt
 
+/**
+ * A resolved reverse-geocode result, in two lengths:
+ *  - [full] -- "123 Main St, San Jose", the existing human-readable form every phone/watch
+ *    surface already shows.
+ *  - [compact] -- "123 Main St, 95112" (street + ZIP instead of city), for the cover screen's
+ *    own space-constrained surfaces, where [full] (especially with a car-name suffix appended
+ *    beside it) reliably wrapped onto two lines inside a narrow pill -- a real reported "looks
+ *    bad, it's two layers" bug. A ZIP is usually shorter than a city name and never itself
+ *    contains a space, so it is far less likely to push the line over.
+ */
+data class GeocodedPlace(val full: String, val compact: String)
+
 /** "123 Main St, San Jose" -- a real street address, not just the city --
  *  built from a reverse-geocode result's house number + street name
  *  (subThoroughfare + thoroughfare) plus locality, falling back to
@@ -21,14 +33,20 @@ import kotlin.math.roundToInt
  *  Was also separately defined on phone and watch before that; the watch's
  *  copy was missing the `.distinct()` the phone's had, so it could render
  *  "Springfield, Springfield" when locality == adminArea. */
-fun formatPlaceName(a: android.location.Address): String? {
+fun formatPlaceName(a: android.location.Address): GeocodedPlace? {
     val street = listOfNotNull(
         a.subThoroughfare?.takeIf { it.isNotBlank() },
         a.thoroughfare?.takeIf { it.isNotBlank() },
     ).joinToString(" ").takeIf { it.isNotBlank() }
     val locality = a.locality ?: a.subAdminArea
     val parts = if (street != null) listOfNotNull(street, locality) else listOfNotNull(locality, a.adminArea)
-    return parts.distinct().joinToString(", ").ifBlank { a.getAddressLine(0) }
+    val full = parts.distinct().joinToString(", ").ifBlank { a.getAddressLine(0) } ?: return null
+    // Street + ZIP when both exist; otherwise just reuse `full` -- a geocode result with no
+    // street-level detail or no postal code has nothing more compact to offer than the long
+    // form already is.
+    val zip = a.postalCode?.takeIf { it.isNotBlank() }
+    val compact = if (street != null && zip != null) "$street, $zip" else full
+    return GeocodedPlace(full, compact)
 }
 
 /** "1h 20m" / "45 min" duration formatter, shared across phone and watch.

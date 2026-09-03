@@ -18,7 +18,8 @@ import kotlin.coroutines.resume
 const val GEOCODE_TIMEOUT_MS = 6_000L
 
 /**
- * Turn coordinates into a human place name, or null if that isn't possible.
+ * Turn coordinates into a human place name (long and compact forms -- see [GeocodedPlace]),
+ * or null if that isn't possible.
  *
  * One implementation, because there were two and they were not equivalent. The watch
  * used the non-blocking [Geocoder.GeocodeListener] API on 33+ with a legacy fallback
@@ -44,7 +45,7 @@ const val GEOCODE_TIMEOUT_MS = 6_000L
  * [Geocoder.isPresent] is checked up front: on a device with no geocoder backend the
  * call would otherwise be guaranteed to fail, which the phone had been paying for.
  */
-suspend fun reverseGeocode(context: Context, lat: Double, lon: Double): String? {
+suspend fun reverseGeocode(context: Context, lat: Double, lon: Double): GeocodedPlace? {
     if (!Geocoder.isPresent()) return null
     val geocoder = Geocoder(context, Locale.getDefault())
     return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {

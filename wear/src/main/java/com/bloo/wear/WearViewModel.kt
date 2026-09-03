@@ -1303,9 +1303,12 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     /** Delegates to the shared [com.bloo.bluelink.data.reverseGeocode], which is this
-     *  implementation moved into :shared so the phone stops carrying a worse one. */
+     *  implementation moved into :shared so the phone stops carrying a worse one. The watch's
+     *  Location card only ever showed the long form, so this keeps returning just that --
+     *  see [com.bloo.bluelink.data.GeocodedPlace] for the compact form the phone's cover
+     *  screen also uses now. */
     private suspend fun reverseGeocode(lat: Double, lon: Double): String? =
-        com.bloo.bluelink.data.reverseGeocode(ctx, lat, lon)
+        com.bloo.bluelink.data.reverseGeocode(ctx, lat, lon)?.full
 
     /**
      * Push the AC/DC charge-limit sliders to the car. Goes through [command]

@@ -144,7 +144,15 @@ internal fun InfoPebble(v: Vehicle, status: VehicleStatus?, state: UiState, vm: 
                 // ONLY as the fallback until it does, never as the steady state --
                 // this row used to show coordString() unconditionally, the one
                 // place in the app that never even tried to resolve an address.
-                location?.let { StatusRow("Location", state.placeNames[v.vin] ?: it.coordString()) }
+                //
+                // On the cover, the COMPACT form (street + ZIP, not street + city) -- this
+                // row's own value column is narrow enough that the long form reliably wrapped
+                // onto two lines, a real reported "looks bad" bug. Phone keeps the long form,
+                // which has the room for it.
+                location?.let {
+                    val place = if (coverGlance) state.placeZips[v.vin] ?: state.placeNames[v.vin] else state.placeNames[v.vin]
+                    StatusRow("Location", place ?: it.coordString())
+                }
                 rememberRelativeTime(state.fetchedAt(v))?.let { StatusRow("Last refreshed", it) }
 
                 if (plugged) {
