@@ -63,6 +63,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.runtime.setValue
@@ -72,6 +73,8 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -282,6 +285,23 @@ internal fun CoverTile(
             (headline?.takeIf { it.isNotBlank() } ?: title).takeIf { it.isNotBlank() },
             trailingLabel?.takeIf { it.isNotBlank() },
         ).joinToString("  \u00b7  ")
+        // The identity pill + action buttons are anchored to the tile's own bottom edge and
+        // NEVER move, no matter how much or little body content there is -- the scrolling
+        // content (below) runs the tile's FULL height behind them, the same "chrome floats,
+        // content flows behind it" relationship every other floating bar in this app already
+        // has with its own content (see searchBarClearance's own doc for the phone-side
+        // version of the same idea). This used to be the other way around: the identity/
+        // actions row was an ordinary Column sibling AFTER the scroll area, so it physically
+        // pushed the scroll area's own bottom edge up to make room for itself -- which is
+        // exactly what let short content leave a dead gap above it (already fixed once) and
+        // meant content could never be seen passing behind it, only stopping short of it.
+        //
+        // bottomBandHeightPx is that row's own LIVE measured height (read via
+        // onGloballyPositioned below), fed back as the scroll content's own bottom padding --
+        // not a guessed constant, since the row's real height depends on the tile's own state
+        // (a two-line subtitle vs. none, how many action buttons actually fit on one line).
+        var bottomBandHeightPx by remember { mutableIntStateOf(0) }
+        val density = LocalDensity.current
         Column(Modifier.fillMaxSize().padding(horizontal = coverContentInset())) {
             Spacer(Modifier.height(coverTileEdgeGap()))
             // Extra top clearance whenever the search bubble is DOCKED into the camera-cutout
@@ -307,29 +327,21 @@ internal fun CoverTile(
             //
             // TopCenter, not Center: this box used to sit right under a header that ate the
             // top third of the tile, so a short body barely had room to look centred OR
-            // top-anchored -- they read almost the same. Since the identity/actions moved to
-            // the bottom band (this box is now most of the tile's own height), centering
-            // floated short content in a sea of empty space above and below it -- confirmed
-            // from a real screenshot (Weather's few lines adrift in the middle of a mostly
-            // empty tile). Anchoring to the top instead reads as "the content that's here",
-            // not "whatever fits, wherever it lands" -- and a tall body still scrolls exactly
-            // as before, since TopCenter only matters once content is SHORTER than the box.
+            // top-anchored -- they read almost the same. Anchoring to the top instead reads
+            // as "the content that's here", not "whatever fits, wherever it lands" -- and a
+            // tall body still scrolls exactly as before, since TopCenter only matters once
+            // content is SHORTER than the box.
             //
-            // weight(1f, fill = false): a CAP, not a forced size -- this Box's height is bounded
-            // by the band (so tall content still scrolls exactly like before, once it exceeds
-            // that share), but it no longer forces itself to fill the WHOLE band when the content
-            // is shorter than that. `fill = true` (the old value) did force it, which meant short
-            // content (a handful of rows, a compact readout) sat top-anchored inside a box that
-            // was still claiming every remaining pixel of the tile -- so the identity pill/actions
-            // row right after this Box, unaffected by any of that, ended up sitting at the very
-            // bottom of the TILE rather than right under the real content, with a stretch of dead
-            // empty space in between. Confirmed from a real screenshot. TopCenter still matters
-            // for horizontally centering content narrower than the tile, and for tall content
-            // that genuinely does fill (and then scroll within) this Box's capped height.
+            // Plain weight(1f) now (not fill = false): this Box is the ONLY thing left in this
+            // Column below the two Spacers -- the identity/actions row moved out to its own
+            // bottom-anchored overlay below -- so there is no longer a following sibling for
+            // short content to leave a dead gap in front of. Filling the whole remaining tile
+            // height is exactly right now: it is what lets content keep scrolling behind the
+            // floating row rather than stopping at wherever the content itself happens to end.
             val scroll = scrollState ?: rememberScrollState()
             Box(
                 Modifier
-                    .weight(1f, fill = false)
+                    .weight(1f)
                     .fillMaxWidth()
                     .fadingEdges(scroll, length = coverFadeLength())
                     .verticalScroll(scroll),
@@ -338,12 +350,29 @@ internal fun CoverTile(
                 Column(
                     Modifier
                         .fillMaxWidth()
-                        .padding(vertical = coverBodyPad()),
+                        .padding(vertical = coverBodyPad())
+                        // The bottom row's own live height plus one more coverBodyGap() of
+                        // breathing room (the same gap that used to sit between the scroll
+                        // area and the row when it was an in-flow sibling) -- so the LAST real
+                        // content row can be scrolled fully clear of the band, with a little air
+                        // to spare, instead of ending up flush against it or hidden behind it.
+                        .padding(bottom = with(density) { bottomBandHeightPx.toDp() } + coverBodyGap()),
                     verticalArrangement = Arrangement.spacedBy(coverBodyGap()),
                     content = body,
                 )
             }
-            Spacer(Modifier.height(coverBodyGap()))
+        }
+        // The bottom band itself: subtitle (if any) + the identity/actions row, anchored to
+        // the tile's own bottom edge on top of the scrolling content above, reporting its own
+        // real height back into bottomBandHeightPx so that content always has enough reserved
+        // room to fully clear it.
+        Column(
+            Modifier
+                .align(Alignment.BottomCenter)
+                .fillMaxWidth()
+                .padding(horizontal = coverContentInset())
+                .onGloballyPositioned { bottomBandHeightPx = it.size.height },
+        ) {
             // The one thing that cannot be a pill: a sentence. It keeps its own muted line,
             // still in the bottom band, still above the row rather than at the top of the tile.
             // Only when it is not already the identity -- a caller that hands over the same
