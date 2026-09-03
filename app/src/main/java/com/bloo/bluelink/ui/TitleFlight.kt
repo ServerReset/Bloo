@@ -6,8 +6,10 @@
 package com.bloo.bluelink.ui
 
 import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.VectorConverter
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -243,12 +245,20 @@ internal fun BoxScope.FloatingTitlePill(
             composed = true
             flightOffset.snapTo(title.lastInlineRootPosition.value - restPx)
             flightScale.snapTo(PillFlightScale)
-            launch { flightOffset.animateTo(Offset.Zero, tween(TitleDockMillis)) }
-            launch { flightScale.animateTo(1f, tween(TitleDockMillis)) }
+            // Position and scale spring, like every other piece of motion in this app --
+            // SoftDamping is high enough that neither visibly overshoots, but a spring still
+            // settles with the same weight/acceleration curve as the button-press growth, the
+            // coach-mark entrance, every other bit of chrome that moves in Bloo. A flat tween
+            // here was correct in duration but a different MOTION LANGUAGE from everything
+            // around it -- part of why the flight still didn't read as native to the app.
+            // Alpha stays a tween: a springing alpha can dip visibly below 0/above 1 well before
+            // settling, unlike position/scale where that's just a normal, expected overshoot.
+            launch { flightOffset.animateTo(Offset.Zero, spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessMediumLow)) }
+            launch { flightScale.animateTo(1f, spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessMediumLow)) }
             flightAlpha.animateTo(1f, tween(TitleDockMillis))
         } else if (composed) {
-            launch { flightOffset.animateTo(title.lastInlineRootPosition.value - restPx, tween(TitleDockMillis)) }
-            launch { flightScale.animateTo(PillFlightScale, tween(TitleDockMillis)) }
+            launch { flightOffset.animateTo(title.lastInlineRootPosition.value - restPx, spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessMediumLow)) }
+            launch { flightScale.animateTo(PillFlightScale, spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessMediumLow)) }
             flightAlpha.animateTo(0f, tween(TitleDockMillis))
             composed = false
         }

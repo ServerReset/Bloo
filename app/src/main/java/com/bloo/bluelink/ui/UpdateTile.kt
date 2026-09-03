@@ -568,7 +568,10 @@ internal fun UpdateStatusLine(
                 "ready_seamless" -> Text("Downloaded · installs silently via Shizuku", style = textStyle)
                 "ready" -> Text("Downloaded · tap Install", style = textStyle)
                 "seamless" -> Text("Installs silently via Shizuku, no prompts", style = textStyle)
-                else -> if (showDelta) Text(deltaLabel, style = textStyle) else Unit
+                // Never blank: when showDelta is false the caller's own summary line already
+                // says the delta, but leaving this Unit left the icon badge floating in the row
+                // with nothing beside it -- a real empty gap, not just an unused word.
+                else -> Text(if (showDelta) deltaLabel else "Ready to download", style = textStyle)
             }
         }
     }

@@ -1909,16 +1909,16 @@ internal fun SettingsScreen(
                 val updateInfo = state.updateAvailable
                 if (updateInfo != null && !state.updateTileDismissed) {
                     Spacer(Modifier.height(SettingsGapGroup))
-                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                        Text(
-                            "Update available",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onSurface,
-                            modifier = Modifier.weight(1f),
-                        )
-                        UpdateStatusChip(state)
-                    }
+                    // Just the heading now -- no second UpdateStatusChip beside it. The hero
+                    // stat above already shows that exact chip ("Build N ready"), so this used
+                    // to put the SAME chip on screen twice at once, and UpdateStatusLine right
+                    // below already says the state a third way (build delta / live progress).
+                    Text(
+                        "Update available",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface,
+                    )
                     val newLabel = com.bloo.bluelink.data.buildLabel(updateInfo.run.runNumber)
                     val deltaLabel = if (vm.currentBuildNumber > 0) {
                         "${com.bloo.bluelink.data.buildLabel(vm.currentBuildNumber)} → $newLabel"
