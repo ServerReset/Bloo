@@ -280,16 +280,6 @@ internal fun HeroHeader(
                 }
             }
 
-        // Reports this title's own real, measured position to a VehicleDetailContent ancestor's
-        // FloatingTitle, if one is providing it (null everywhere else -- ExpandedCar's own pebble
-        // list excludes "summary" entirely, so this only ever applies here). Unlike the earlier
-        // fly-between-two-anchors design, this title is the ONLY thing that ever paints the car's
-        // name here -- it just fades itself out as it docks, handing off to FloatingTitlePill's
-        // own corner badge (see TitleFlight.kt's own doc for the whole redesign). No more shared
-        // instance handed between pager pages, so no more synchronous "did the ambient identity
-        // change under me" latch either -- this page owns its own FloatingTitle for its own
-        // lifetime, full stop.
-        val floatingTitle = LocalFloatingTitle.current
         // Follows the morph rather than switching: the photo fades in over the same
         // t, so the name has to travel from the surface's own colour to the light one
         // the scrim is built for. Snapping at a threshold would flash a white name
@@ -303,7 +293,6 @@ internal fun HeroHeader(
             vm = vm,
             dragHandle = dragHandle,
             titleColor = heroTitleColorNow,
-            titleModifier = Modifier.reportsToFloatingTitle(floatingTitle),
             // The ONLY pebble that grows its title. Here the title is the car's NAME and the
             // card becomes a photo of that car, so the name scaling up reads as the card taking
             // over. On "Location" or "Diagnostics" it is a heading resizing for no reason.

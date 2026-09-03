@@ -579,15 +579,16 @@ internal fun GarageScreen(state: State<UiState>, vm: AppViewModel) {
                     val targetBlock = currentIndex.coerceIn(0, count - 1) / perPage
                     wrap.snapToReal(targetBlock)
                 }
-                // Per-page (keyed by stable identity -- a VIN, or "settings", NOT raw page
-                // index: an index's real-world meaning isn't stable across a delete, a
-                // perPage-changing resize, or a drag-to-reorder) live "is THIS page's own title
-                // currently docked" flag, reported up by whichever page is currently live --
-                // see VehicleDetailContent/SettingsScreen's own `onDockedChanged`. Every page now
-                // renders its OWN docked pill directly (see TitleFlight.kt's redesign) -- this
-                // map exists purely so the page-dots collision check below can ask "is the
-                // SETTLED page's own name currently docked" without needing a shared badge to
-                // ask it of.
+                // Per-page (keyed by stable identity, NOT raw page index: an index's real-world
+                // meaning isn't stable across a delete, a perPage-changing resize, or a
+                // drag-to-reorder) live "is THIS page's own title currently docked" flag,
+                // reported up by whichever page is currently live -- see SettingsScreen's own
+                // `onDockedChanged`. Car pages no longer have a floating name pill at all (removed
+                // as unwanted UI -- see TitleFlight.kt's own doc), so in practice the only key
+                // this map ever actually holds now is "settings"; `dockedPageKey` still computes a
+                // VIN for a car page too, harmlessly, since nothing writes it. This map exists
+                // purely so the page-dots collision check below can ask "is the SETTLED page's own
+                // name currently docked" without needing a shared badge to ask it of.
                 val dockedPages = remember { mutableStateMapOf<Any, Boolean>() }
                 // Cleared the instant `perPage` is observed to have actually changed (grid <->
                 // single-car, a live foldable/multi-window resize) -- synchronously, during
@@ -786,14 +787,6 @@ internal fun GarageScreen(state: State<UiState>, vm: AppViewModel) {
                                             // unconditionally, silently killing the single-
                                             // car view's refresh feedback too.
                                             hideIndicator = perPage > 1,
-                                            // Every page (settled or the pre-composed neighbour
-                                            // alike) reports its own live docked state up into
-                                            // dockedPages -- see that map's own doc above.
-                                            onDockedChanged = onPageDockedChanged,
-                                            // See the settings-slot call above for why this is a
-                                            // State built with remember(page), not a bare
-                                            // `page == pager.settledPage` read here.
-                                            settled = remember(page) { derivedStateOf { page == pager.settledPage } },
                                         )
                                     }
                                 }

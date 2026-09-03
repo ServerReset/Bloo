@@ -68,21 +68,16 @@ import androidx.compose.runtime.key
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.State
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.SideEffect
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.shadow
-import androidx.compose.ui.platform.LocalConfiguration
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.composed
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import com.bloo.bluelink.data.Vehicle
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.launch
 import kotlin.math.max
 
 // --- Full detail ----------------------------------------------------------
@@ -93,9 +88,10 @@ import kotlin.math.max
  * scrolls together in one [Column] inside [Refreshable] (header row, then
  * the reorderable [PebbleList]).
  *
- * The car's name is real, visible content inside the hero card's own title slot -- it just
- * fades itself out as it scrolls above the status bar, handing off to [FloatingTitlePill]'s own
- * corner badge. See that function's own doc.
+ * The car's name is real, visible content inside the hero card's own title slot -- there is no
+ * floating corner badge that takes over once it scrolls out of view (there used to be; removed
+ * as unwanted UI, see TitleFlight.kt's own doc for what's left of that system and who still uses
+ * it -- just the Settings screen now).
  */
 @Composable
 internal fun VehicleDetailContent(
@@ -120,88 +116,43 @@ internal fun VehicleDetailContent(
     // dodging the Settings gear; this reserves the analogous clearance at
     // the top instead of the end.
     reserveTopForDots: Boolean = false,
-    // Reports this page's own live docked state (with hysteresis -- see
-    // FloatingTitle.docked's own doc) up to the caller on every change. GarageScreen uses this
-    // to know which page's pill is currently docked, for the page-dots collision check -- see
-    // that call site's own doc.
-    onDockedChanged: ((Boolean) -> Unit)? = null,
-    // True unless this page is a merely pre-composed pager neighbour, not the currently settled
-    // one -- see FloatingTitlePill's own `settled` doc (including why this is a `State<Boolean>`,
-    // not a plain `Boolean`). GarageScreen is the only caller that ever passes a non-default one.
-    settled: State<Boolean> = AlwaysSettled,
 ) {
     val topInset = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
     val bottomInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
     val scroll = rememberScrollState()
-    val scope = rememberCoroutineScope()
-    val density = LocalDensity.current
-    val topInsetPx = with(density) { topInset.toPx() }
-    // remember(Unit) + SideEffect, not remember(topInsetPx) -- a keyed remember here would
-    // discard all accumulated docked state on every inset change instead of just picking up the
-    // new inset value.
-    val floatingTitle = remember { FloatingTitle(with(density) { TitleDockHysteresis.toPx() }) }
-    SideEffect { floatingTitle.topInsetPx = topInsetPx }
-    LaunchedEffect(floatingTitle.docked.value) { onDockedChanged?.invoke(floatingTitle.docked.value) }
     // Narrowed, not `state.value.refreshing`: a bare read here would subscribe this whole page
     // -- all three of them live at once in the pager -- to every UiState emission.
     val refreshing by remember { derivedStateOf { state.value.refreshing } }
     Refreshable(v, refreshing, vm, hideIndicator = hideIndicator) {
-        CompositionLocalProvider(LocalFloatingTitle provides floatingTitle) {
-            Column(
-                Modifier
-                    .fillMaxSize()
-                    .verticalScroll(scroll)
-                    .padding(horizontal = 16.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-            ) {
-                // Inset spacer (not padding) so content scrolls *behind* the bars --
-                // topInset alone, no extra breathing room, so the name sits right at
-                // the status bar's own edge instead of noticeably below it. Plus
-                // PagerDotClearance when the dots are showing -- see
-                // reserveTopForDots's own doc.
-                Spacer(Modifier.height(topInset + if (reserveTopForDots) PagerDotClearance else 0.dp))
-                CarHeaderRow(v, state, onExpand, reserveHeaderEnd, hideName = true)
-                // summary (image+gauge) and controls are reorderable pebbles too. The full
-                // pebble column always renders while swiping; smoothness comes from
-                // PebbleList's own one-frame lazy-fill (filled/EAGER_PEBBLES) + the pager's
-                // beyondViewportPageCount=1 pre-compose, not from an in-transit skeleton.
-                PebbleList(v, state, vm)
-                // bottomInset + 132.dp, not +16.dp: this pager's own floating search
-                // bubble (SearchLayer, mounted globally for Screen.Garage -- see
-                // Screens.kt's `searchable` gate) sits fixed to the screen's bottom
-                // edge over this content, exactly like SettingsScreen's own trailing
-                // spacer already accounts for. The old +16dp only cleared the system
-                // nav bar, not the search bubble on top of it -- the last pebble's own
-                // trailing chevron sat directly under the bubble, visibly cut off by
-                // it (confirmed from a real screenshot: the "Diagnostics" row's own
-                // expand chevron overlapped by the floating search icon).
-                Spacer(Modifier.height(bottomInset + 132.dp))
-            }
-        }
-        // Every page now owns its own docked pill -- no more shared/hoisted badge handed
-        // between pages (see TitleFlight.kt's own doc on the redesign). This is safe to leave
-        // composed for every page, settled or pre-composed neighbour alike: FloatingTitlePill's
-        // own AnimatedVisibility only pays for the glass chrome while actually docked or
-        // transitioning.
-        val screenWidth = LocalConfiguration.current.screenWidthDp.dp
-        FloatingTitlePill(
-            title = floatingTitle,
-            cornerX = 16.dp,
-            cornerY = topInset + HeaderCornerGap,
-            // Clears the top-right FloatingIcon slot (the expand button in grid columns, the
-            // gear on the standalone route) -- 12dp outer padding + 48dp icon + a little air.
-            reserveEnd = 72.dp,
-            maxWidth = screenWidth - 16.dp - 72.dp - 32.dp,
-            onClick = { scope.launch { scroll.animateScrollTo(0) } },
-            settled = settled,
+        Column(
+            Modifier
+                .fillMaxSize()
+                .verticalScroll(scroll)
+                .padding(horizontal = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            Text(
-                v.name,
-                style = MaterialTheme.typography.headlineSmall,
-                fontWeight = FontWeight.Bold,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
+            // Inset spacer (not padding) so content scrolls *behind* the bars --
+            // topInset alone, no extra breathing room, so the name sits right at
+            // the status bar's own edge instead of noticeably below it. Plus
+            // PagerDotClearance when the dots are showing -- see
+            // reserveTopForDots's own doc.
+            Spacer(Modifier.height(topInset + if (reserveTopForDots) PagerDotClearance else 0.dp))
+            CarHeaderRow(v, state, onExpand, reserveHeaderEnd, hideName = true)
+            // summary (image+gauge) and controls are reorderable pebbles too. The full
+            // pebble column always renders while swiping; smoothness comes from
+            // PebbleList's own one-frame lazy-fill (filled/EAGER_PEBBLES) + the pager's
+            // beyondViewportPageCount=1 pre-compose, not from an in-transit skeleton.
+            PebbleList(v, state, vm)
+            // bottomInset + 132.dp, not +16.dp: this pager's own floating search
+            // bubble (SearchLayer, mounted globally for Screen.Garage -- see
+            // Screens.kt's `searchable` gate) sits fixed to the screen's bottom
+            // edge over this content, exactly like SettingsScreen's own trailing
+            // spacer already accounts for. The old +16dp only cleared the system
+            // nav bar, not the search bubble on top of it -- the last pebble's own
+            // trailing chevron sat directly under the bubble, visibly cut off by
+            // it (confirmed from a real screenshot: the "Diagnostics" row's own
+            // expand chevron overlapped by the floating search icon).
+            Spacer(Modifier.height(bottomInset + 132.dp))
         }
     }
 }
@@ -222,13 +173,10 @@ internal fun VehicleDetailContent(
  * state that lets a pebble be dragged from the scrolling list directly onto
  * that slot to pin it.
  *
- * A [FloatingTitlePill] (built inline near the bottom, alongside the
- * flip-columns transition) fades in once CriticalContent's own HeroHeader --
- * the real hero photo card, shared with [VehicleDetailContent] -- has
- * scrolled out of view, same as every other surface. Tapping it scrolls
- * `controlsScroll` back to top: whichever column currently renders
- * `controls` (and therefore HeroHeader), regardless of which physical side
- * that is after a flip.
+ * No floating corner name badge here any more -- removed as unwanted UI (see TitleFlight.kt's
+ * own doc). The car's name is real, visible content on CriticalContent's own HeroHeader, same as
+ * [VehicleDetailContent]; it simply scrolls off with the rest of that column once it's flipped
+ * out of view, like any other content.
  */
 @Composable
 internal fun ExpandedCar(
@@ -262,22 +210,12 @@ internal fun ExpandedCar(
     val pebblesScroll = rememberScrollState()
     val topInset = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
     val bottomInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
-    val density = LocalDensity.current
-    val scope = rememberCoroutineScope()
-    val topInsetPx = with(density) { topInset.toPx() }
-    // remember(Unit) + SideEffect, not remember(topInsetPx) -- an inset change alone shouldn't
-    // discard this title's accumulated docked state.
-    val titleFlight = remember { FloatingTitle(with(density) { TitleDockHysteresis.toPx() }) }
-    SideEffect { titleFlight.topInsetPx = topInsetPx }
     // CriticalContent's own HeroHeader is the real hero photo card here --
     // this view was NOT missing one the way the doc above used to claim;
     // CarHeaderRow's plain-text name and HeroHeader's own (on the photo)
     // were simply both visible at once, the exact duplicate-name bug fixed
     // everywhere else in the app. hideName = true here, matching
-    // VehicleDetailContent's own CarHeaderRow call exactly: the floating
-    // name is sourced from HeroHeader (via the ambient LocalFloatingTitle
-    // below, which HeroHeader already knows how to use -- no changes needed
-    // there), not from this plain header.
+    // VehicleDetailContent's own CarHeaderRow call exactly.
     val controls: @Composable ColumnScope.() -> Unit = {
         CarHeaderRow(v, state, onExpand = null, reserveEnd = false, hideName = true)
         CriticalContent(v, state, vm)
@@ -286,7 +224,7 @@ internal fun ExpandedCar(
     val pebbles: @Composable ColumnScope.() -> Unit = {
         PebbleList(v, state, vm, exclude = setOfNotNull("summary", "controls", hotspot))
     }
-    CompositionLocalProvider(LocalHotSeatDrag provides hotDrag, LocalFloatingTitle provides titleFlight) {
+    CompositionLocalProvider(LocalHotSeatDrag provides hotDrag) {
     // Was hardcoded hideIndicator = true -- the same "grid-only" flag that
     // hid the pull-to-refresh spinner in the single-car view (fixed in
     // a944a91) also hid it here, in the expanded/wide dual-column detail
@@ -352,29 +290,6 @@ internal fun ExpandedCar(
                     ) { lead(); rightCol(); trail() }
                 }
             }
-        }
-        // The floating name badge, once CriticalContent's own HeroHeader has
-        // scrolled out of view (same hero-card source as VehicleDetailContent,
-        // via the same ambient LocalFloatingTitle above).
-        val screenWidth = LocalConfiguration.current.screenWidthDp.dp
-        FloatingTitlePill(
-            title = titleFlight,
-            // Clears GarageScreen's own back arrow (top-left, 12dp/48dp) --
-            // it's always present whenever ExpandedCar is on screen.
-            cornerX = 60.dp,
-            cornerY = topInset + HeaderCornerGap,
-            // Clears the flip-columns + gear buttons in the top-right.
-            reserveEnd = 120.dp,
-            maxWidth = screenWidth - 60.dp - 120.dp - 32.dp,
-            onClick = { scope.launch { controlsScroll.animateScrollTo(0) } },
-        ) {
-            Text(
-                v.name,
-                style = MaterialTheme.typography.headlineSmall,
-                fontWeight = FontWeight.Bold,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
         }
         }
     }

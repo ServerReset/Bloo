@@ -143,11 +143,12 @@ internal val AlwaysSettled: State<Boolean> = object : State<Boolean> {
     override val value: Boolean get() = true
 }
 
-/** Null everywhere except inside a screen that hosts a floating title -- the garage screen's
- *  car pages, the Settings screen, and ExpandedCar. Each of those constructs its own
- *  [FloatingTitle] (no more shared/hoisted instance handed between pages -- see this file's own
- *  doc) and provides it here so the inline title composable, several layers down, can report its
- *  position without threading a parameter through every intermediate composable. */
+/** Null everywhere except inside a screen that hosts a floating title -- now just the Settings
+ *  screen (the car pages' own floating name badge was removed as unwanted UI; the car's name is
+ *  real, static content on the hero card only, with nothing tracking its scroll position any
+ *  more). Settings constructs its own [FloatingTitle] and provides it here so the inline title
+ *  composable, several layers down, can report its position without threading a parameter
+ *  through every intermediate composable. */
 internal val LocalFloatingTitle = compositionLocalOf<FloatingTitle?> { null }
 
 /** Shared duration for the dock/undock hand-off, used by both the inline title's own motion
