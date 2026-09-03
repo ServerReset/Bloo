@@ -251,50 +251,40 @@ internal fun LockOverlay(vm: AppViewModel) {
                 )
                 Spacer(Modifier.height(if (compact) 16.dp else 28.dp))
                 // White pill for maximum contrast over the dimmed blur.
-                //
-                // Plain MorphButton, deliberately NOT wrapped in SafeExpansiveButton -- this
-                // screen's one primary CTA was the reported "janky on press" button, and the
-                // cause was two independent press animations fighting each other:
-                // SafeExpansiveButton REALLY re-measures the button wider on press (a genuine
-                // layout size change, meant for buttons sitting in a row that need to shove
-                // their neighbours aside), while MorphButtonCore separately, always, applies its
-                // OWN press feedback as a graphicsLayer scale on its content. Layered together,
-                // one press produced the box growing outward at the same time its own content
-                // was scaling inward (or vice versa) -- two different mechanisms disagreeing
-                // about what "pressed" looks like on the same button. This button is alone, not
-                // in a row with siblings to make room for, so it never needed the width-growth
-                // in the first place: MorphButton's own built-in scale is the entire, coherent
-                // press feedback here.
                 val unlockSource = remember { MutableInteractionSource() }
-                MorphButton(
-                    onClick = { authenticateBiometric() },
-                    modifier = Modifier.height(if (compact) 56.dp else ControlHeight),
+                SafeExpansiveButton(
                     interactionSource = unlockSource,
-                    containerColor = Color.White,
-                    contentColor = Color.Black,
-                    contentPadding = PaddingValues(horizontal = 40.dp, vertical = 18.dp),
+                    enabled = true,
                 ) {
-                    // MorphButtonLabel, not a hand-rolled Icon+Spacer+Text -- the icon stays
-                    // larger (24dp) than the standard 18dp, an intentional emphasis for the
-                    // screen's one primary CTA.
-                    MorphButtonLabel(Icons.Filled.Fingerprint, "Unlock", pending = false, iconSize = 24.dp)
+                    MorphButton(
+                        onClick = { authenticateBiometric() },
+                        modifier = Modifier.height(if (compact) 56.dp else ControlHeight),
+                        interactionSource = unlockSource,
+                        containerColor = Color.White,
+                        contentColor = Color.Black,
+                        contentPadding = PaddingValues(horizontal = 40.dp, vertical = 18.dp),
+                    ) {
+                        // MorphButtonLabel, not a hand-rolled Icon+Spacer+Text -- the icon stays
+                        // larger (24dp) than the standard 18dp, an intentional emphasis for the
+                        // screen's one primary CTA.
+                        MorphButtonLabel(Icons.Filled.Fingerprint, "Unlock", pending = false, iconSize = 24.dp)
+                    }
                 }
                 if (appState.appPinSet) {
                     Spacer(Modifier.height(12.dp))
-                    // Bare MorphButton/MorphTextButton, not wrapped in SafeExpansiveButton --
-                    // this button is alone, not in a row with siblings to make room for, so
-                    // it never needed SafeExpansiveButton's real width-growth-on-press on top
-                    // of MorphButtonCore's own always-on press scale. The two layered together
-                    // is the exact "janky on press" bug already found and fixed on this same
-                    // screen's Unlock button, two lines up.
                     val pinSource = remember { MutableInteractionSource() }
-                    MorphTextButton(
-                        "Use PIN",
-                        onClick = { haptics?.click(); usePinMode = true },
+                    SafeExpansiveButton(
                         interactionSource = pinSource,
-                        containerColor = Color.White.copy(alpha = 0.10f),
-                        contentColor = Color.White,
-                    )
+                        enabled = true,
+                    ) {
+                        MorphTextButton(
+                            "Use PIN",
+                            onClick = { haptics?.click(); usePinMode = true },
+                            interactionSource = pinSource,
+                            containerColor = Color.White.copy(alpha = 0.10f),
+                            contentColor = Color.White,
+                        )
+                    }
                 }
             } else if (appState.appPinSet) {
                 // --- PIN prompt (device has no biometrics, or user chose PIN) --
@@ -366,26 +356,34 @@ internal fun LockOverlay(vm: AppViewModel) {
                             modifier = Modifier.fillMaxWidth(),
                         )
                         Spacer(Modifier.height(14.dp))
-                        // Bare MorphButton -- same "no SafeExpansiveButton wrapper on a
-                        // standalone button" fix as the biometric Unlock button above.
                         val pinUnlockSource = remember { MutableInteractionSource() }
-                        MorphButton(
-                            onClick = { attemptPin() },
-                            modifier = Modifier.fillMaxWidth().height(52.dp),
+                        SafeExpansiveButton(
                             interactionSource = pinUnlockSource,
                             enabled = !rejected && pin.length in PinCrypto.PIN_MIN_DIGITS..PinCrypto.PIN_MAX_DIGITS,
                         ) {
-                            MorphButtonLabel(Icons.Filled.LockOpen, "Unlock", pending = false)
+                            MorphButton(
+                                onClick = { attemptPin() },
+                                modifier = Modifier.fillMaxWidth().height(52.dp),
+                                interactionSource = pinUnlockSource,
+                                enabled = !rejected && pin.length in PinCrypto.PIN_MIN_DIGITS..PinCrypto.PIN_MAX_DIGITS,
+                            ) {
+                                MorphButtonLabel(Icons.Filled.LockOpen, "Unlock", pending = false)
+                            }
                         }
                         if (bioAvailable) {
                             Spacer(Modifier.height(8.dp))
                             val bioSource = remember { MutableInteractionSource() }
-                            MorphTextButton(
-                                "Use fingerprint",
-                                onClick = { haptics?.click(); usePinMode = false; authenticateBiometric() },
+                            SafeExpansiveButton(
                                 interactionSource = bioSource,
-                                modifier = Modifier.fillMaxWidth(),
-                            )
+                                enabled = true,
+                            ) {
+                                MorphTextButton(
+                                    "Use fingerprint",
+                                    onClick = { haptics?.click(); usePinMode = false; authenticateBiometric() },
+                                    interactionSource = bioSource,
+                                    modifier = Modifier.fillMaxWidth(),
+                                )
+                            }
                         }
                     }
                 }
@@ -548,34 +546,47 @@ internal fun EmptyScreen(vm: AppViewModel) {
                         textAlign = TextAlign.Center,
                     )
                     Spacer(Modifier.height(8.dp))
-                    // Bare MorphButton/MorphTextButton throughout this screen too -- same
-                    // standalone-button fix as the lock screen's own buttons.
                     if (state.accounts.isEmpty()) {
                         val settingsSource = remember { MutableInteractionSource() }
-                        MorphButton(
-                            onClick = { vm.openSettings() },
+                        SafeExpansiveButton(
                             interactionSource = settingsSource,
-                            modifier = Modifier.fillMaxWidth()
+                            enabled = true,
                         ) {
-                            MorphButtonLabel(Icons.Filled.Settings, "Open Settings", pending = false)
+                            MorphButton(
+                                onClick = { vm.openSettings() },
+                                interactionSource = settingsSource,
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                MorphButtonLabel(Icons.Filled.Settings, "Open Settings", pending = false)
+                            }
                         }
                     } else {
                         val reloadSource = remember { MutableInteractionSource() }
-                        MorphButton(
-                            onClick = { vm.loadGarage() },
+                        SafeExpansiveButton(
                             interactionSource = reloadSource,
-                            modifier = Modifier.fillMaxWidth()
+                            enabled = true,
                         ) {
-                            MorphButtonLabel(Icons.Filled.Refresh, if (loadFailed) "Try again" else "Reload", pending = false)
+                            MorphButton(
+                                onClick = { vm.loadGarage() },
+                                interactionSource = reloadSource,
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                MorphButtonLabel(Icons.Filled.Refresh, if (loadFailed) "Try again" else "Reload", pending = false)
+                            }
                         }
                     }
                     val accountSource = remember { MutableInteractionSource() }
-                    MorphTextButton(
-                        "Account Settings",
-                        onClick = { vm.openSettings() },
+                    SafeExpansiveButton(
                         interactionSource = accountSource,
-                        modifier = Modifier.fillMaxWidth()
-                    )
+                        enabled = true,
+                    ) {
+                        MorphTextButton(
+                            "Account Settings",
+                            onClick = { vm.openSettings() },
+                            interactionSource = accountSource,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
                 }
             }
         }

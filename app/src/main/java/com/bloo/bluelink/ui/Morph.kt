@@ -207,8 +207,22 @@ fun MorphButton(
                     // the app's one button framework, so this is the single highest-
                     // leverage place to fix it.
                     .semantics { selected = active }
-                    .animateContentSize(
-                        spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium),
+                    // Skipped while SafeExpansiveButton is already smoothly driving this
+                    // button's width on press (LocalExpressiveGrowth -- see its own doc):
+                    // animateContentSize exists for a genuine content change (a label
+                    // swapping to a longer one), but left unconditional it ALSO re-smoothed
+                    // a width the wrapper was already animating frame by frame with its own,
+                    // deliberately non-bouncy spring -- two springs chasing the same width at
+                    // once, which is what made a growing button wobble on press instead of
+                    // just growing. Still applies normally to a button with no such wrapper.
+                    .then(
+                        if (LocalExpressiveGrowth.current) {
+                            Modifier
+                        } else {
+                            Modifier.animateContentSize(
+                                spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium),
+                            )
+                        },
                     )
                     .then(if (minHeight > 0.dp) Modifier.heightIn(min = minHeight) else Modifier),
                 enabled = enabled,

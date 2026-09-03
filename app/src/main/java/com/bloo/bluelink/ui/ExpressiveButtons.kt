@@ -208,7 +208,11 @@ fun SafeExpansiveButton(
             // button explicitly would wrap it a second time -- a redundant layout node and a
             // second press spring per button, whose parent data the group would not even read,
             // since it belongs to a Box inside this one rather than to the group itself.
-            CompositionLocalProvider(LocalExpressiveGroup provides false) { content() }
+            // LocalExpressiveGrowth TRUE, though (unlike the group flag) -- a member's own width
+            // is still being smoothly driven, by the group's seam-reserve layout instead of this
+            // file's standalone one, so MorphButton's animateContentSize still needs to step
+            // aside for the same reason.
+            CompositionLocalProvider(LocalExpressiveGroup provides false, LocalExpressiveGrowth provides true) { content() }
         }
         return
     }
@@ -216,8 +220,7 @@ fun SafeExpansiveButton(
     // itself gets wider and whatever sits next to it in a Row is pushed aside. That IS the
     // requested effect, and it is what a graphicsLayer scale could never deliver -- a scale
     // stretches the pixels of a button whose measured size never changed, so nothing moves and
-    // the label distorts. MorphButtonCore already applies its own press scale internally, so the
-    // old wrapper was in any case only ever adding a second scale on top of one.
+    // the label distorts.
     //
     // The earlier objection to real growth was that a size change inside a Settings lazy item
     // crashes the grid. That reasoning came from the reported Logs-card crash -- which turns out
@@ -226,7 +229,7 @@ fun SafeExpansiveButton(
     // these same cards does it); there was never anything here to be afraid of.
     val naturals = remember { NaturalWidths() }
     Layout(
-        content = { content() },
+        content = { CompositionLocalProvider(LocalExpressiveGrowth provides true) { content() } },
         modifier = modifier,
         measurePolicy = { measurables, constraints ->
             if (measurables.isEmpty()) return@Layout layout(0, 0) {}
@@ -270,6 +273,21 @@ fun SafeExpansiveButton(
  * press fraction to the group's layout instead of scaling itself.
  */
 internal val LocalExpressiveGroup = staticCompositionLocalOf { false }
+
+/**
+ * True for content that [SafeExpansiveButton] is already smoothly resizing on press -- either
+ * because it joined a group (the seam-reserve layout) or because it is growing for real on its
+ * own (this file's own `Layout` above). [MorphButton] reads this to skip its own
+ * `animateContentSize`: that modifier exists for a genuine content change (a label swapping to a
+ * longer one, say), and left unconditional it ALSO tried to re-smooth a width SafeExpansiveButton
+ * was already smoothly driving frame by frame with its own, deliberately non-bouncy spring (see
+ * `expressivePressFraction`'s own doc on why that spring specifically does not ring) -- two
+ * different springs chasing the same width at once, which read as the button wobbling on press.
+ * Not folded into [LocalExpressiveGroup] itself: that flag also means "hand my width to the
+ * group's own layout instead of measuring for real," which is not true in the standalone-growth
+ * case, so the two needed to be readable independently.
+ */
+internal val LocalExpressiveGrowth = staticCompositionLocalOf { false }
 
 /**
  * A drop-in replacement for `Row(horizontalArrangement = Arrangement.spacedBy(spacing))` whose

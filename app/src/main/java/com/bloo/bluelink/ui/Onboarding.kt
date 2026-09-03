@@ -359,36 +359,41 @@ internal fun OnboardingScreen(vm: AppViewModel) {
                     // in the app already reaches for the same component rather
                     // than a bespoke look-alike for "the quieter one."
                     // With expansion animation.
-                    // Bare MorphButton, not wrapped in SafeExpansiveButton -- this Back/Next
-                    // pair sits in a plain Row (not an ExpressiveButtonRow/group), so
-                    // SafeExpansiveButton's own real width-growth-on-press Layout was active
-                    // here rather than stepping aside for a group -- layered on top of
-                    // MorphButtonCore's own always-on press scale, the same "two independent
-                    // press animations fighting" bug already found and fixed on the Guard
-                    // screen's buttons.
                     val backSource = remember { MutableInteractionSource() }
-                    MorphButton(
-                        onClick = ::goBack,
+                    SafeExpansiveButton(
                         interactionSource = backSource,
-                        modifier = Modifier.fillMaxWidth(),
-                        contentPadding = PaddingValues(vertical = 16.dp),
-                        border = BorderStroke(1.dp, scheme.outlineVariant),
+                        enabled = true,
                     ) {
-                        Text("Back", style = ButtonLabelStyle)
+                        MorphButton(
+                            onClick = ::goBack,
+                            interactionSource = backSource,
+                            modifier = Modifier.fillMaxWidth(),
+                            contentPadding = PaddingValues(vertical = 16.dp),
+                            border = BorderStroke(1.dp, scheme.outlineVariant),
+                        ) {
+                            Text("Back", style = ButtonLabelStyle)
+                        }
                     }
                 }
-                // weight(...) moved onto MorphButton's own modifier -- it used to sit on the
-                // now-removed SafeExpansiveButton wrapper because THAT was the Row's real
-                // child; MorphButton is that child now.
                 val nextSource = remember { MutableInteractionSource() }
-                MorphButton(
-                    onClick = ::goNext,
-                    active = true,
-                    enabled = !pinRequired,
+                // The weight goes on the SafeExpansiveButton, which is the Row's actual child,
+                // NOT on the MorphButton inside it -- whose parent is that wrapper's own layout
+                // and never reads it. The same dead-weight mistake the cover action bar had:
+                // this button was silently hugging its label instead of taking the 2:1 share
+                // over Back that the expression asks for.
+                SafeExpansiveButton(
                     interactionSource = nextSource,
+                    enabled = !pinRequired,
                     modifier = Modifier.weight(if (pageIndex > 0) 2f else 1f),
-                    contentPadding = PaddingValues(vertical = 16.dp),
                 ) {
+                    MorphButton(
+                        onClick = ::goNext,
+                        active = true,
+                        enabled = !pinRequired,
+                        interactionSource = nextSource,
+                        modifier = Modifier.fillMaxWidth(),
+                        contentPadding = PaddingValues(vertical = 16.dp),
+                    ) {
                         // MorphButtonLabel, not a hand-rolled Icon+Spacer+Text -- that Text used
                         // FontWeight.Bold, where every other button label in the app (including
                         // this one's own "Back" neighbour) uses SemiBold.
@@ -401,6 +406,7 @@ internal fun OnboardingScreen(vm: AppViewModel) {
                             },
                             pending = false,
                         )
+                    }
                 }
                 if (pinRequired) {
                     Spacer(Modifier.height(6.dp))

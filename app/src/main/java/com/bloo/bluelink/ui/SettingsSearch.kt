@@ -847,27 +847,27 @@ internal fun SearchSuggestions(state: UiState, compact: Boolean = false, onPick:
         examples.forEachIndexed { i, example ->
             PopVisible(visible = staggeredResultVisible(examplesKey, i)) {
                 // Same MorphButton every selector chip in the app uses, with
-                // the search screen's tonal fill kept as its standard colours. Bare, not
-                // wrapped in SafeExpansiveButton -- this FlowRow isn't an
-                // ExpressiveButtonRow/group, so each chip is a standalone button, and the
-                // wrapper's own real width-growth-on-press was layered on top of
-                // MorphButtonCore's own always-on press scale -- the same double-animation
-                // bug already found and fixed elsewhere in the app.
+                // the search screen's tonal fill kept as its standard colours.
                 val exampleSource = remember { MutableInteractionSource() }
-                MorphButton(
-                    onClick = { onPick(example) },
+                SafeExpansiveButton(
                     interactionSource = exampleSource,
-                    containerColor = MaterialTheme.colorScheme.secondaryContainer,
-                    contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
-                    contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp),
-                    minHeight = 0.dp,
-                    modifier = Modifier.dropShadow(RoundedCornerShape(50), blurRadius = 8.dp, offsetY = 3.dp),
+                    enabled = true,
                 ) {
-                    Text(
-                        example,
-                        style = MaterialTheme.typography.labelLarge,
-                        fontWeight = FontWeight.SemiBold,
-                    )
+                    MorphButton(
+                        onClick = { onPick(example) },
+                        interactionSource = exampleSource,
+                        containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                        contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                        contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp),
+                        minHeight = 0.dp,
+                        modifier = Modifier.dropShadow(RoundedCornerShape(50), blurRadius = 8.dp, offsetY = 3.dp),
+                    ) {
+                        Text(
+                            example,
+                            style = MaterialTheme.typography.labelLarge,
+                            fontWeight = FontWeight.SemiBold,
+                        )
+                    }
                 }
             }
         }
