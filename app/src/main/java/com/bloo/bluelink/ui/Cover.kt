@@ -290,11 +290,16 @@ internal fun CoverTile(
             // whose content leads with a flush-left heading or a full-width image (Climate's
             // "Smart climate", the location map) had its own first few dp sitting directly
             // under the bubble, visually cut by it -- confirmed from a real screenshot.
-            // CoverBandSearchDock is the bubble's own fixed docked size, the same constant
-            // CoverGarage's band Row already reserves for it elsewhere; reserving it again here
-            // is that same rule applied to a tile's own content, not a new one.
-            if (coverCutoutBand() != null) {
-                Spacer(Modifier.height(CoverBandSearchDock))
+            //
+            // The band's own real height, not just CoverBandSearchDock (the bubble's fixed
+            // docked SIZE) alone: a camera-island band can genuinely be taller than the bubble
+            // that sits inside it, and reserving only the bubble's own size under-cleared the
+            // rest of that band on those devices -- confirmed from a real screenshot (the
+            // tile's first content row still starting under the band). maxOf keeps
+            // CoverBandSearchDock as the floor for a band that reports smaller than the bubble
+            // itself, which would otherwise under-reserve the other direction.
+            coverCutoutBand()?.let { band ->
+                Spacer(Modifier.height(maxOf(band.heightDp.dp, CoverBandSearchDock)))
             }
             // A scrolling Box that anchors its content to the TOP, rather than a
             // BoxWithConstraints whose only job was to read maxHeight and feed it back as
@@ -310,14 +315,21 @@ internal fun CoverTile(
             // not "whatever fits, wherever it lands" -- and a tall body still scrolls exactly
             // as before, since TopCenter only matters once content is SHORTER than the box.
             //
-            // weight(1f) is what makes the plain Box work: it fixes this Box's height to the
-            // band, so its own size is the viewport no matter how short the content is, and
-            // contentAlignment can anchor against it. The scroll then only engages once the
-            // content is taller than that.
+            // weight(1f, fill = false): a CAP, not a forced size -- this Box's height is bounded
+            // by the band (so tall content still scrolls exactly like before, once it exceeds
+            // that share), but it no longer forces itself to fill the WHOLE band when the content
+            // is shorter than that. `fill = true` (the old value) did force it, which meant short
+            // content (a handful of rows, a compact readout) sat top-anchored inside a box that
+            // was still claiming every remaining pixel of the tile -- so the identity pill/actions
+            // row right after this Box, unaffected by any of that, ended up sitting at the very
+            // bottom of the TILE rather than right under the real content, with a stretch of dead
+            // empty space in between. Confirmed from a real screenshot. TopCenter still matters
+            // for horizontally centering content narrower than the tile, and for tall content
+            // that genuinely does fill (and then scroll within) this Box's capped height.
             val scroll = scrollState ?: rememberScrollState()
             Box(
                 Modifier
-                    .weight(1f)
+                    .weight(1f, fill = false)
                     .fillMaxWidth()
                     .fadingEdges(scroll, length = coverFadeLength())
                     .verticalScroll(scroll),
