@@ -25,6 +25,7 @@ import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -1909,10 +1910,20 @@ internal fun SettingsScreen(
                 val updateInfo = state.updateAvailable
                 if (updateInfo != null && !state.updateTileDismissed) {
                     Spacer(Modifier.height(SettingsGapGroup))
-                    // Just the heading now -- no second UpdateStatusChip beside it. The hero
-                    // stat above already shows that exact chip ("Build N ready"), so this used
-                    // to put the SAME chip on screen twice at once, and UpdateStatusLine right
-                    // below already says the state a third way (build delta / live progress).
+                    // The whole "there's something new" section now lives in its own outlined
+                    // container, separate from the "your current build" stat/buttons above --
+                    // it used to just keep stacking onto the same undifferentiated card
+                    // background, so nothing marked where "current state" ended and "here's
+                    // what's new" began. Outlined, not filled: UpdateReleaseNotes below already
+                    // fills with surfaceContainerHighest, and nesting two same-tone fills inside
+                    // each other would have read as flat padding rather than a real boundary.
+                    Surface(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(16.dp),
+                        color = Color.Transparent,
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+                    ) {
+                    Column(Modifier.padding(14.dp)) {
                     Text(
                         "Update available",
                         style = MaterialTheme.typography.titleMedium,
@@ -1976,6 +1987,8 @@ internal fun SettingsScreen(
                                 enabled = !state.updateDownloading && !state.updateInstalling,
                             )
                         }
+                    }
+                    }
                     }
                 }
             }

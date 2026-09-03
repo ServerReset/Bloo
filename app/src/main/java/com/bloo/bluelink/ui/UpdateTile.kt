@@ -198,10 +198,23 @@ internal fun UpdateAvailableTile(state: UiState, vm: AppViewModel, dragHandle: M
             // the static word was animating right along with the number that actually changed.
             // Only the percent itself is a moving target now (rendered with its own
             // AnimatedValue below), and the sentence around it stays put.
-        UpdateStatusLine(
-            deltaLabel, seamless, state, vm,
-            showDelta = info.run.displayTitle?.isNotBlank() == true,
-        )
+        // Own tonal Surface now, matching the release-notes/install-help panels right below it
+        // (same corner radius, same fill) -- it used to sit bare on the card's own background
+        // while everything else in the body was boxed, which made it read as an odd one out
+        // rather than the first of a consistent stack of sections.
+        Surface(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(12.dp),
+            color = scheme.surfaceContainerHighest,
+            contentColor = scheme.onSurface,
+        ) {
+            Box(Modifier.padding(12.dp)) {
+                UpdateStatusLine(
+                    deltaLabel, seamless, state, vm,
+                    showDelta = info.run.displayTitle?.isNotBlank() == true,
+                )
+            }
+        }
             // Release notes ("What's new"), capped, with a "Full notes" link to the
             // release page when there's more than we show. One shared block -- see
             // UpdateReleaseNotes for why the Settings card no longer keeps its own copy.

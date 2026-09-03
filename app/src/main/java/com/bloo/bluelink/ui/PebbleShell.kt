@@ -18,6 +18,7 @@ package com.bloo.bluelink.ui
 
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.Crossfade
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -617,27 +618,43 @@ internal fun PebbleShell(
                                     Arrangement.Start
                                 },
                             ) {
-                            Text(
-                                title,
-                                modifier = Modifier
-                                    // fill = false always now (see the Row's own doc above) -- weight
-                                    // still caps the title's MAX width to its fair share so a long
-                                    // title ellipsizes instead of pushing titleTrailing off the row,
-                                    // it just no longer forces the title to measure wider than its
-                                    // own content.
-                                    .weight(1f, fill = false)
-                                    // The hard minimum gap "Sounds & vibration" needed -- previously a
-                                    // Spacer sitting between title and titleTrailing as a third row
-                                    // child, moved onto the title itself so SpaceBetween above still
-                                    // sees exactly two children and gives the whole remaining width
-                                    // to one gap rather than splitting it around a spacer.
-                                    .then(if (titleTrailingAtEnd) Modifier.padding(end = 12.dp) else Modifier)
-                                    // Only the mid-grow case needs the scale machinery at all -- see
-                                    // atRestScale's own doc. At rest this Text is already native
-                                    // titleMedium, measured and drawn at its own real size with
-                                    // nothing to correct for.
-                                    .then(
-                                        if (atRestScale) {
+                            // The title Text's own modifier chain up to (not including) the scale
+                            // machinery -- shared by both branches below.
+                            val titleBaseModifier = Modifier
+                                // fill = false always now (see the Row's own doc above) -- weight
+                                // still caps the title's MAX width to its fair share so a long
+                                // title ellipsizes instead of pushing titleTrailing off the row,
+                                // it just no longer forces the title to measure wider than its
+                                // own content.
+                                .weight(1f, fill = false)
+                                // The hard minimum gap "Sounds & vibration" needed -- previously a
+                                // Spacer sitting between title and titleTrailing as a third row
+                                // child, moved onto the title itself so SpaceBetween above still
+                                // sees exactly two children and gives the whole remaining width
+                                // to one gap rather than splitting it around a spacer.
+                                .then(if (titleTrailingAtEnd) Modifier.padding(end = 12.dp) else Modifier)
+                            if (growTitleOnExpand) {
+                                // Only the hero ever actually flips atRestScale -- every other
+                                // pebble's is permanently true, so it takes the plain branch below
+                                // with no Crossfade at all. Wrapping this in Crossfade softens the
+                                // one moment the scaled-headlineSmall path and the native-titleMedium
+                                // path hand off to each other: their box geometry isn't pixel-
+                                // identical (see atRestScale's own doc -- scaling a bigger style down
+                                // doesn't reproduce a smaller style's own baseline-to-box-centre ratio
+                                // exactly), so swapping which one is drawn on a single frame was a
+                                // real, reported pop right at the tail of the collapse. A short
+                                // alpha cross-dissolve over the swap doesn't need either path to be
+                                // pixel-perfect against the other -- it just means the viewer's eye
+                                // is never asked to register a same-frame jump.
+                                Crossfade(
+                                    targetState = atRestScale,
+                                    animationSpec = tween(140),
+                                    modifier = titleBaseModifier,
+                                    label = "heroTitleRestSwap",
+                                ) { atRest ->
+                                    Text(
+                                        title,
+                                        modifier = if (atRest) {
                                             Modifier
                                         } else {
                                             Modifier
@@ -692,24 +709,33 @@ internal fun PebbleShell(
                                                     scaleY = s
                                                     transformOrigin = TransformOrigin(0f, 0.5f)
                                                 }
-                                        },
+                                        }.then(titleModifier),
+                                        style = if (atRest) MaterialTheme.typography.titleMedium else titleStyle,
+                                        color = titleColor,
+                                        fontWeight = FontWeight.Bold,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
                                     )
-                                    // Appended LAST -- after the scale machinery above, so a
-                                    // caller reading this via onGloballyPositioned gets
-                                    // the real, final (already-scaled) on-screen bounds.
-                                    .then(titleModifier),
-                                style = if (atRestScale) MaterialTheme.typography.titleMedium else titleStyle,
-                                color = titleColor,
-                                fontWeight = FontWeight.Bold,
-                                // Cap at one line: at a large display/font size the
-                                // header action button (SplitExpandButton, now width-
-                                // bounded below) used to squeeze this weighted Column
-                                // so a title like "Location"/"Weather"/"Diagnostics"
-                                // wrapped and visually collided with the button. One
-                                // line + ellipsis keeps the title on its own line.
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                            )
+                                }
+                            } else {
+                                // The common case: no grow/shrink, no rest-scale swap ever, so no
+                                // Crossfade wrapper either -- always native titleMedium.
+                                Text(
+                                    title,
+                                    modifier = titleBaseModifier.then(titleModifier),
+                                    style = MaterialTheme.typography.titleMedium,
+                                    color = titleColor,
+                                    fontWeight = FontWeight.Bold,
+                                    // Cap at one line: at a large display/font size the
+                                    // header action button (SplitExpandButton, now width-
+                                    // bounded below) used to squeeze this weighted Column
+                                    // so a title like "Location"/"Weather"/"Diagnostics"
+                                    // wrapped and visually collided with the button. One
+                                    // line + ellipsis keeps the title on its own line.
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+                            }
                             // Trailing content on the TITLE row, so a pebble that wants a
                             // headline stat does not need a third row for it. The hero puts
                             // its percentage and range here, which is what lets the collapsed
