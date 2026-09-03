@@ -738,7 +738,6 @@ internal fun GarageScreen(state: State<UiState>, vm: AppViewModel) {
                             SettingsScreen(
                                 vm, embedded = true,
                                 onDockedChanged = onPageDockedChanged,
-                                pageLabel = if (perPage == 1 && totalBlocks > 1) "${block + 1} / $totalBlocks" else null,
                                 // A State, not a bare `page == pager.settledPage` read right
                                 // here -- see FloatingTitlePill's own `settled` doc for why: this
                                 // whole page composable (and everything it renders) must not be
@@ -791,7 +790,6 @@ internal fun GarageScreen(state: State<UiState>, vm: AppViewModel) {
                                             // alike) reports its own live docked state up into
                                             // dockedPages -- see that map's own doc above.
                                             onDockedChanged = onPageDockedChanged,
-                                            pageLabel = if (perPage == 1 && totalBlocks > 1) "${block + 1} / $totalBlocks" else null,
                                             // See the settings-slot call above for why this is a
                                             // State built with remember(page), not a bare
                                             // `page == pager.settledPage` read here.

@@ -14,7 +14,6 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
@@ -71,13 +70,17 @@ import kotlin.math.roundToInt
  * whose identity has to hand off between pager pages. Instead:
  *  - The INLINE title is the real, visible title -- not a hidden clone something else flies
  *    from -- and reports its own live root position on every layout pass
- *    ([FloatingTitle.onPositioned]) while animating itself up and out as it docks.
+ *    ([FloatingTitle.onPositioned]) while doing nothing but a plain fade of its own as it docks.
+ *    Deliberately no motion here: see [reportsToFloatingTitle]'s own doc for why splitting the
+ *    motion across both elements made the position this reports drift from what the eye actually
+ *    saw, which was itself a seam.
  *  - The DOCKED PILL ([FloatingTitlePill]) is its own separate element with its own fixed
- *    position, its own fixed (non-photo-adaptive) colour, and its own copy of the name -- but it
- *    flies in from that live reported position to its own resting corner spot (and back out to
- *    it on undock), a real `Animatable<Offset>`, not a generic slide/scale guess. One pixel value
- *    (the inline title's last known position) is the only thing that has to be right for this to
- *    read as one continuous move; everything past that is an ordinary tween.
+ *    position, its own fixed (non-photo-adaptive) colour, and its own copy of the name -- and it
+ *    carries the ENTIRE visible motion: it flies in from that live reported position to its own
+ *    resting corner spot (and back out to it on undock), growing from a fraction of its own size
+ *    up to full size along the way, a real `Animatable<Offset>` + scale, not a generic slide/scale
+ *    guess. One pixel value (the inline title's last known position) is the only thing that has to
+ *    be right for this to read as one continuous move; everything past that is an ordinary tween.
  * Each page still owns its own [FloatingTitle] instance -- no shared/hoisted identity handed
  * between pager pages -- so the expensive glass chrome still only ever composes while that page's
  * own pill is actually visible or mid-flight. What differs from a plain "swipe past it" pager,
@@ -152,40 +155,46 @@ private const val TitleDockMillis = 220
 
 /**
  * Modifier for the INLINE title: reports its own live position to [title] every layout pass (the
- * one number [FloatingTitlePill] flies from/to), and gives itself a small rise-and-shrink of its
- * own as it docks -- not just a fade -- so it visibly starts the same motion the pill's own flight
- * continues. Entirely draw-phase (`graphicsLayer` only) so the docked spring running doesn't
- * recompose the whole title -- only redraws this node.
+ * one number [FloatingTitlePill] flies from/to) and fades itself out as it docks -- a PLAIN fade,
+ * deliberately no motion of its own. [FloatingTitlePill] is the thing that moves and grows now
+ * (see its own doc): giving this element its own independent rise/shrink used to fight that,
+ * two things visibly moving in similar-but-not-quite-matching ways. It also would have made the
+ * position this reports (the plain, untransformed layout position `onGloballyPositioned` sees --
+ * graphicsLayer transforms never affect it) drift away from where the eye actually saw the text,
+ * a real source of the seams this file exists to remove. One element fades in place; the other
+ * carries the entire visible motion; nothing here has to line up with the pill's own timing frame
+ * by frame, because there's nothing here to keep in sync in the first place. Entirely draw-phase
+ * (`graphicsLayer` only) so the docked spring running doesn't recompose the whole title -- only
+ * redraws this node.
  */
 @Composable
 internal fun Modifier.reportsToFloatingTitle(title: FloatingTitle?): Modifier {
     if (title == null) return this
     val docked by title.docked
-    val progress by animateFloatAsState(
-        if (docked) 1f else 0f,
+    val alpha by animateFloatAsState(
+        if (docked) 0f else 1f,
         animationSpec = tween(TitleDockMillis),
-        label = "inlineTitleDock",
+        label = "inlineTitleFade",
     )
     return this
         .onGloballyPositioned { title.onPositioned(it.positionInRoot()) }
-        .graphicsLayer {
-            alpha = 1f - progress
-            translationY = -progress * 10.dp.toPx()
-            val scale = 1f - progress * 0.15f
-            scaleX = scale
-            scaleY = scale
-            transformOrigin = TransformOrigin(0f, 0.5f)
-        }
+        .graphicsLayer { this.alpha = alpha }
 }
+
+/** How small the pill starts (and shrinks back to on undock) relative to its own full size --
+ *  small enough that its chrome (the rounded glass background, not just its text) reads as
+ *  emerging from roughly the inline title's own footprint instead of popping in at full size
+ *  and then sliding, which is what a flight with no scale at all looked like. */
+private const val PillFlightScale = 0.55f
 
 /**
  * The corner pill: flies into place the instant [title] docks, and back out the instant it
- * undocks -- a REAL position flight, from wherever the inline title last reported itself to this
- * pill's own resting corner spot, not a generic slide/scale guess. [FloatingTitle] already tracks
- * that live position (see its own doc); this is the only place that reads it. Composed only while
- * actually visible or mid-flight (`composed`, below) -- an undocked page's own pill still costs
- * nothing at rest, the same guarantee the old hoisted-badge machinery existed to provide, without
- * needing a shared instance handed between pages to get it.
+ * undocks -- a REAL position AND size flight, from wherever the inline title last reported itself
+ * to this pill's own resting corner spot, not a generic slide/scale guess. [FloatingTitle] already
+ * tracks that live position (see its own doc); this is the only place that reads it. Composed only
+ * while actually visible or mid-flight (`composed`, below) -- an undocked page's own pill still
+ * costs nothing at rest, the same guarantee the old hoisted-badge machinery existed to provide,
+ * without needing a shared instance handed between pages to get it.
  */
 @Composable
 internal fun BoxScope.FloatingTitlePill(
@@ -211,7 +220,6 @@ internal fun BoxScope.FloatingTitlePill(
     // the `State` object itself down unread, and reading `.value` only here, keeps that
     // recomposition scoped to just this pill.
     settled: State<Boolean> = AlwaysSettled,
-    extraContent: (@Composable RowScope.() -> Unit)? = null,
     content: @Composable () -> Unit,
 ) {
     val docked by title.docked
@@ -228,15 +236,19 @@ internal fun BoxScope.FloatingTitlePill(
     }
     val flightOffset = remember { Animatable(Offset.Zero, Offset.VectorConverter) }
     val flightAlpha = remember { Animatable(0f) }
+    val flightScale = remember { Animatable(PillFlightScale) }
     var composed by remember { mutableStateOf(false) }
     LaunchedEffect(wantsVisible) {
         if (wantsVisible) {
             composed = true
             flightOffset.snapTo(title.lastInlineRootPosition.value - restPx)
+            flightScale.snapTo(PillFlightScale)
             launch { flightOffset.animateTo(Offset.Zero, tween(TitleDockMillis)) }
+            launch { flightScale.animateTo(1f, tween(TitleDockMillis)) }
             flightAlpha.animateTo(1f, tween(TitleDockMillis))
         } else if (composed) {
             launch { flightOffset.animateTo(title.lastInlineRootPosition.value - restPx, tween(TitleDockMillis)) }
+            launch { flightScale.animateTo(PillFlightScale, tween(TitleDockMillis)) }
             flightAlpha.animateTo(0f, tween(TitleDockMillis))
             composed = false
         }
@@ -247,7 +259,16 @@ internal fun BoxScope.FloatingTitlePill(
                 .align(Alignment.TopStart)
                 .padding(start = cornerX, top = cornerY, end = reserveEnd)
                 .offset { IntOffset(flightOffset.value.x.roundToInt(), flightOffset.value.y.roundToInt()) }
-                .graphicsLayer { alpha = flightAlpha.value }
+                .graphicsLayer {
+                    alpha = flightAlpha.value
+                    // Top-start origin -- matches what the offset above means (a translation of
+                    // this element's own top-left corner), so scaling and translating together
+                    // read as one continuous grow-and-move instead of the scale visibly fighting
+                    // the position for a moment right at the start.
+                    scaleX = flightScale.value
+                    scaleY = flightScale.value
+                    transformOrigin = TransformOrigin(0f, 0f)
+                }
                 .heightIn(min = ButtonTargetHeight)
                 .widthIn(max = maxWidth)
                 .background(MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = glassContainerAlpha()), shape)
@@ -275,7 +296,6 @@ internal fun BoxScope.FloatingTitlePill(
             CompositionLocalProvider(LocalContentColor provides MaterialTheme.colorScheme.onSurface) {
                 content()
             }
-            extraContent?.invoke(this)
         }
     }
 }

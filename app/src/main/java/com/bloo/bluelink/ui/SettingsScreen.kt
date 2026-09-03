@@ -236,8 +236,6 @@ internal fun SettingsScreen(
     // Mirrors VehicleDetailContent's own `onDockedChanged` exactly -- reports this slot's own
     // live docked state up to GarageScreen on every change.
     onDockedChanged: ((Boolean) -> Unit)? = null,
-    // "N / M" page-count label, shown on this slot's own docked pill when set.
-    pageLabel: String? = null,
     // True unless this is a merely pre-composed pager neighbour, not the currently settled page
     // -- see FloatingTitlePill's own `settled` doc (including why this is a `State<Boolean>`, not
     // a plain `Boolean`). GarageScreen is the only caller that ever passes a non-default one.
@@ -2143,15 +2141,6 @@ internal fun SettingsScreen(
                 maxWidth = screenWidth - cornerX - 192.dp - 32.dp,
                 onClick = { settingsScope.launch { settingsGridState.animateScrollToItem(0) } },
                 settled = settled,
-                extraContent = pageLabel?.let { label ->
-                    {
-                        Text(
-                            label,
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                },
             ) {
                 Text(
                     "Settings",
