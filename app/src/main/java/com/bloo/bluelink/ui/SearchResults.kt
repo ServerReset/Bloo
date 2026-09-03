@@ -144,8 +144,12 @@ internal fun SettingsSearchResults(
     // step the real row enforces would be a genuine regression, not just a
     // visual inconsistency.
     if (canBio) {
-        val bioContext = LocalContext.current
         add("Require fingerprint to open", "biometric lock security app unlock") {
+            // LocalContext.current itself has to stay inside this entry's own @Composable
+            // content lambda, not hoisted above -- reading a CompositionLocal is a composable
+            // call, and the entries list above is built inside a plain (non-composable)
+            // remember calculation now.
+            val bioContext = LocalContext.current
             SettingsSegmentedRow(
                 label = "Require fingerprint to open",
                 options = listOf(
@@ -323,8 +327,15 @@ internal fun SettingsSearchResults(
                 add("Fuel · ${v.name}", "fuel gas tank percent ${v.name}") { StatusRow("Fuel", "$f%") }
             }
         }
-        rememberRelativeTime(state.fetchedAt(v))?.let { rel ->
-            add("Last refreshed · ${v.name}", "updated refreshed time ${v.name}") { StatusRow("Last refreshed", rel) }
+        // rememberRelativeTime itself (not its result) has to stay inside the entry's own
+        // @Composable content lambda -- it's a live, ticking value (its own LaunchedEffect
+        // re-labels it as it ages), not something this remember block can capture once and
+        // freeze. Gate on the raw timestamp instead of the old string result; identical
+        // nullability (rememberRelativeTime(null) is exactly what returned null before).
+        if (state.fetchedAt(v) != null) {
+            add("Last refreshed · ${v.name}", "updated refreshed time ${v.name}") {
+                rememberRelativeTime(state.fetchedAt(v))?.let { rel -> StatusRow("Last refreshed", rel) }
+            }
         }
         (state.placeNames[v.vin] ?: state.locations[v.vin]?.coordString(4))?.let { loc ->
             add("Location · ${v.name}", "location where place gps ${v.name}") { StatusRow("Location", loc) }
