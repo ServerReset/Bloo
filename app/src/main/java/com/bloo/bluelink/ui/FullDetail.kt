@@ -143,16 +143,15 @@ internal fun VehicleDetailContent(
             // PebbleList's own one-frame lazy-fill (filled/EAGER_PEBBLES) + the pager's
             // beyondViewportPageCount=1 pre-compose, not from an in-transit skeleton.
             PebbleList(v, state, vm)
-            // bottomInset + 132.dp, not +16.dp: this pager's own floating search
-            // bubble (SearchLayer, mounted globally for Screen.Garage -- see
-            // Screens.kt's `searchable` gate) sits fixed to the screen's bottom
-            // edge over this content, exactly like SettingsScreen's own trailing
-            // spacer already accounts for. The old +16dp only cleared the system
-            // nav bar, not the search bubble on top of it -- the last pebble's own
-            // trailing chevron sat directly under the bubble, visibly cut off by
-            // it (confirmed from a real screenshot: the "Diagnostics" row's own
-            // expand chevron overlapped by the floating search icon).
-            Spacer(Modifier.height(bottomInset + 132.dp))
+            // Reserves exactly as much room as the floating search bubble (SearchLayer, mounted
+            // globally for Screen.Garage -- see Screens.kt's `searchable` gate) actually needs,
+            // read live off its own reported bounds -- not a flat guessed height. A guess here
+            // (the old +132dp) is exactly what let the last pebble's own trailing chevron sit
+            // directly under the bubble, visibly cut off by it, once confirmed from a real
+            // screenshot; see searchBarClearance's own doc for why a fixed constant can't stay
+            // right. bottomInset itself is folded into the live value (the bar sits above it),
+            // so it is not added again here.
+            Spacer(Modifier.height(searchBarClearance(fallback = bottomInset + 132.dp)))
         }
     }
 }
@@ -266,11 +265,12 @@ internal fun ExpandedCar(
             // card shadow, and the two could visibly touch (e.g. the AI
             // summary pebble sitting right under the gear/flip buttons).
             val lead: @Composable ColumnScope.() -> Unit = { Spacer(Modifier.height(topInset + HeaderCornerGap + HeaderButtonSize + HeaderContentClearance)) }
-            // bottomInset + 132.dp, not +16.dp: same fix as VehicleDetailContent's
-            // identical trailing spacer just above -- this dual-column view sits
-            // under the same globally-floating search bubble (Screen.Garage), which
-            // the old +16dp never accounted for.
-            val trail: @Composable ColumnScope.() -> Unit = { Spacer(Modifier.height(bottomInset + 132.dp)) }
+            // Same live searchBarClearance as VehicleDetailContent's identical trailing
+            // spacer -- this dual-column view sits under the same globally-floating search
+            // bubble (Screen.Garage).
+            val trail: @Composable ColumnScope.() -> Unit = {
+                Spacer(Modifier.height(searchBarClearance(fallback = bottomInset + 132.dp)))
+            }
             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 Row(
                     Modifier

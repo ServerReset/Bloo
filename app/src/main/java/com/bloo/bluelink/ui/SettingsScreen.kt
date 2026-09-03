@@ -2095,9 +2095,9 @@ internal fun SettingsScreen(
               modifier = Modifier.fillMaxWidth(),
           )
           // The search bar itself now floats fixed to the screen's bottom
-          // edge (see below, outside this scrolling column) -- reserve space
-          // here so scrolled content never sits behind it.
-          Spacer(Modifier.height(bottomInset + 132.dp))
+          // edge (see below, outside this scrolling column) -- reserve exactly as much
+          // space as its own live reported bounds say it needs, not a flat guess.
+          Spacer(Modifier.height(searchBarClearance(fallback = bottomInset + 132.dp)))
           }
           }
         }

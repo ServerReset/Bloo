@@ -3,6 +3,7 @@ package com.bloo.bluelink.ui
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
+import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.LaunchedEffect
@@ -25,6 +26,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import kotlin.math.roundToInt
@@ -311,4 +313,36 @@ fun Modifier.dodgeFloating(
         )
     }
     graphicsLayer { this.alpha = alpha.value }
+}
+
+/**
+ * How much trailing space a scrolling screen needs to reserve at its own bottom so its last row
+ * never sits behind the floating search bubble/pill ([FloatingIds.Search]) -- computed from that
+ * element's OWN LIVE reported bounds, not a flat guessed height.
+ *
+ * Every scrolling screen under the search bar used to reserve a flat `bottomInset + 132.dp` --
+ * a guess at the bar's height, its own margin, AND the nav-bar inset all baked into one constant.
+ * That guess drifts the moment the bar's real footprint changes for a reason this constant can't
+ * see (a longer/shorter search bar state, a larger system font bumping its own text, a future
+ * redesign of the bar itself) -- silently under-reserving and letting real content sit behind it,
+ * or over-reserving and leaving dead space. The bar already publishes its own real bounds to
+ * [LocalFloatingRegistry] (every floater does); this reads them directly instead of guessing.
+ *
+ * [extraMargin] is the only guess left, and a deliberately small, honest one: breathing room
+ * between the bar and the content above it, not a stand-in for the bar's own size or position.
+ *
+ * Falls back to [fallback] for the handful of frames before the bar has reported itself at all
+ * (its own first layout pass hasn't run yet) -- never zero, so there's no single-frame flash of
+ * unreserved space while the real value is still arriving.
+ */
+@Composable
+internal fun searchBarClearance(fallback: Dp, extraMargin: Dp = 16.dp): Dp {
+    val registry = LocalFloatingRegistry.current
+    // A live, snapshot-backed read (FloatingRegistry.bounds is mutableStateMapOf) -- this
+    // recomposes exactly when the search bar's own reported bounds actually change, the same
+    // way any other floater's dodge does.
+    val searchTop = registry.boundsOf(FloatingIds.Search)?.top ?: return fallback
+    val windowHeightPx = LocalWindowInfo.current.containerSize.height
+    val density = LocalDensity.current
+    return with(density) { (windowHeightPx - searchTop).coerceAtLeast(0f).toDp() } + extraMargin
 }
