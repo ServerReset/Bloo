@@ -409,28 +409,29 @@ internal fun ChoiceRow(label: String, selected: Boolean, onSelect: () -> Unit) {
     // The same MorphButton every selectable option uses: pill at rest,
     // primaryContainer rounded square once chosen, pressed-state included.
     // With expansion animation.
+    // Bare MorphButton, not wrapped in SafeExpansiveButton -- ChoiceRow is instantiated
+    // repeatedly (multiple per settings list) and each one is standalone, not in a row/group,
+    // so the wrapper's own real width-growth-on-press was layered on top of MorphButtonCore's
+    // own always-on press scale on every single one -- the same double-animation bug already
+    // found and fixed elsewhere in the app.
     val choiceSource = remember { MutableInteractionSource() }
-    SafeExpansiveButton(
+    MorphButton(
+        onClick = { onSelect() },
+        active = selected,
         interactionSource = choiceSource,
-        enabled = true,
+        containerColor = buttonContainer(),
+        contentColor = MaterialTheme.colorScheme.onSurface,
+        activeContainerColor = MaterialTheme.colorScheme.primaryContainer,
+        activeContentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
+        // The standard target height and the standard button label, like everything else
+        // tappable. A choice row IS a button; it was the last one still setting its own
+        // height (none) and its own type (bodyLarge, a body style rather than the button
+        // one), which is why a list of them sat visibly shorter and lighter than the
+        // buttons directly above them in the same card.
+        minHeight = ButtonTargetHeight,
+        modifier = Modifier.fillMaxWidth(),
     ) {
-        MorphButton(
-            onClick = { onSelect() },
-            active = selected,
-            interactionSource = choiceSource,
-            containerColor = buttonContainer(),
-            contentColor = MaterialTheme.colorScheme.onSurface,
-            activeContainerColor = MaterialTheme.colorScheme.primaryContainer,
-            activeContentColor = MaterialTheme.colorScheme.onPrimaryContainer,
-            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
-            // The standard target height and the standard button label, like everything else
-            // tappable. A choice row IS a button; it was the last one still setting its own
-            // height (none) and its own type (bodyLarge, a body style rather than the button
-            // one), which is why a list of them sat visibly shorter and lighter than the
-            // buttons directly above them in the same card.
-            minHeight = ButtonTargetHeight,
-            modifier = Modifier.fillMaxWidth(),
-        ) {
         Text(
             label,
             Modifier.weight(1f),
@@ -448,7 +449,6 @@ internal fun ChoiceRow(label: String, selected: Boolean, onSelect: () -> Unit) {
                 modifier = Modifier.size(ButtonIconSize),
             )
         }
-    }
     }
 }
 

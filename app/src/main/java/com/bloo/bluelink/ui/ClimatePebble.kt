@@ -370,27 +370,26 @@ internal fun ClimatePebble(
                 val smartLabel = if (smartClimateIsCooling(ambientF)) "Cool to $targetLabel" else "Heat to $targetLabel"
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     SectionLabel("Smart climate")
+                    // Bare MorphButton, not wrapped in SafeExpansiveButton -- standalone,
+                    // so the wrapper's real width-growth-on-press was layered on top of
+                    // MorphButtonCore's own always-on press scale (the same double-animation
+                    // bug already found and fixed elsewhere in the app).
                     val smartSource = remember { MutableInteractionSource() }
-                    SafeExpansiveButton(
-                        interactionSource = smartSource,
+                    MorphButton(
+                        onClick = {
+                            tempF = smartTarget
+                            defrost = false
+                            activePresetId = null
+                            vm.startClimate(v, currentReq.copy(tempF = smartTarget, defrost = false))
+                        },
                         enabled = !pending && !climateOn,
+                        interactionSource = smartSource,
+                        contentPadding = PaddingValues(horizontal = 18.dp, vertical = 12.dp),
                     ) {
-                        MorphButton(
-                            onClick = {
-                                tempF = smartTarget
-                                defrost = false
-                                activePresetId = null
-                                vm.startClimate(v, currentReq.copy(tempF = smartTarget, defrost = false))
-                            },
-                            enabled = !pending && !climateOn,
-                            interactionSource = smartSource,
-                            contentPadding = PaddingValues(horizontal = 18.dp, vertical = 12.dp),
-                        ) {
-                            // MorphButtonLabel, not a hand-rolled Icon+Spacer+Text -- that Text had
-                            // no `style`, so it rendered at ambient size instead of ButtonLabelStyle.
-                            // Content-width, matching every other standalone CTA in the app.
-                            MorphButtonLabel(Icons.Filled.AcUnit, smartLabel, pending = false)
-                        }
+                        // MorphButtonLabel, not a hand-rolled Icon+Spacer+Text -- that Text had
+                        // no `style`, so it rendered at ambient size instead of ButtonLabelStyle.
+                        // Content-width, matching every other standalone CTA in the app.
+                        MorphButtonLabel(Icons.Filled.AcUnit, smartLabel, pending = false)
                     }
                     Text(
                         "It's $ambientLabel where your car is. Smart climate is targeting $targetLabel.",
@@ -535,17 +534,12 @@ internal fun ClimatePebble(
 
         SectionLabel("Save")
         val savePresetSource = remember { MutableInteractionSource() }
-        SafeExpansiveButton(
+        MorphTextButton(
+            text = "Save as preset",
             interactionSource = savePresetSource,
-            enabled = true,
-        ) {
-            MorphTextButton(
-                text = "Save as preset",
-                interactionSource = savePresetSource,
-                onClick = { presetName = ""; showAddPreset = true },
-                modifier = Modifier.fillMaxWidth(),
-            )
-        }
+            onClick = { presetName = ""; showAddPreset = true },
+            modifier = Modifier.fillMaxWidth(),
+        )
 
         if (showAddPreset) {
             // Standardized on the shared GlassAlertDialog shell (stacked buttons).
@@ -564,42 +558,33 @@ internal fun ClimatePebble(
                     )
                 },
                 buttons = {
+                    // MorphTextButton, not a hand-rolled MorphButton{Text(...)} -- that Text
+                    // had no `style`, so it rendered at ambient size instead of
+                    // ButtonLabelStyle. Primary colours stand in for the old `active = true`,
+                    // which MorphTextButton has no direct param for. Bare, not wrapped in
+                    // SafeExpansiveButton -- standalone dialog buttons, same fix as elsewhere.
                     val saveSource = remember { MutableInteractionSource() }
-                    SafeExpansiveButton(
-                        interactionSource = saveSource,
+                    MorphTextButton(
+                        "Save",
+                        onClick = {
+                            if (presetName.isNotBlank()) {
+                                vm.saveClimatePreset(v, presetName.trim(), currentReq)
+                                showAddPreset = false
+                            }
+                        },
                         enabled = presetName.isNotBlank(),
-                    ) {
-                        // MorphTextButton, not a hand-rolled MorphButton{Text(...)} -- that Text
-                        // had no `style`, so it rendered at ambient size instead of
-                        // ButtonLabelStyle. Primary colours stand in for the old `active = true`,
-                        // which MorphTextButton has no direct param for.
-                        MorphTextButton(
-                            "Save",
-                            onClick = {
-                                if (presetName.isNotBlank()) {
-                                    vm.saveClimatePreset(v, presetName.trim(), currentReq)
-                                    showAddPreset = false
-                                }
-                            },
-                            enabled = presetName.isNotBlank(),
-                            interactionSource = saveSource,
-                            containerColor = MaterialTheme.colorScheme.primary,
-                            contentColor = MaterialTheme.colorScheme.onPrimary,
-                            modifier = Modifier.fillMaxWidth(),
-                        )
-                    }
+                        interactionSource = saveSource,
+                        containerColor = MaterialTheme.colorScheme.primary,
+                        contentColor = MaterialTheme.colorScheme.onPrimary,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
                     val cancelSource = remember { MutableInteractionSource() }
-                    SafeExpansiveButton(
+                    MorphTextButton(
+                        "Cancel",
+                        onClick = { showAddPreset = false },
                         interactionSource = cancelSource,
-                        enabled = true,
-                    ) {
-                        MorphTextButton(
-                            "Cancel",
-                            onClick = { showAddPreset = false },
-                            interactionSource = cancelSource,
-                            modifier = Modifier.fillMaxWidth(),
-                        )
-                    }
+                        modifier = Modifier.fillMaxWidth(),
+                    )
                 },
             )
         }

@@ -782,34 +782,26 @@ internal fun SettingsScreen(
                     // it as the primary action (same colour language "Stop" and "Install"
                     // use); fillMaxWidth on TOP of that was the oversized, one-off treatment
                     // reported from a real screenshot, not a second thing this control needs.
+                    // Bare MorphButton, not wrapped in SafeExpansiveButton -- standalone (not
+                    // in a row/group), so the wrapper's own real width-growth-on-press was
+                    // layered on top of MorphButtonCore's own always-on press scale, the same
+                    // double-animation bug already found and fixed elsewhere in the app.
                     val setupSource = remember { MutableInteractionSource() }
-                    SafeExpansiveButton(
+                    MorphButton(
+                        onClick = { showDriveDialog = true },
                         interactionSource = setupSource,
-                        enabled = true,
-                    ) {
-                        MorphButton(
-                            onClick = { showDriveDialog = true },
-                            interactionSource = setupSource,
-                            active = true,
-                        ) { MorphButtonLabel(icon = Icons.Filled.CloudSync, label = "Set up auto-sync", pending = false) }
-                    }
+                        active = true,
+                    ) { MorphButtonLabel(icon = Icons.Filled.CloudSync, label = "Set up auto-sync", pending = false) }
                 } else {
                     // Configured: "Sync now" is THE daily control, so it leads —
                     // ahead of the device registry and the setup/teardown pair,
                     // which are both occasional by comparison.
                     val syncSource = remember { MutableInteractionSource() }
-                    SafeExpansiveButton(
+                    MorphButton(
+                        onClick = { vm.syncNow() },
                         interactionSource = syncSource,
-                        enabled = true,
-                    ) {
-                        // Same fix as "Set up auto-sync" a few lines up: content width, not
-                        // stretched to the card.
-                        MorphButton(
-                            onClick = { vm.syncNow() },
-                            interactionSource = syncSource,
-                            active = true,
-                        ) { MorphButtonLabel(icon = Icons.Filled.CloudSync, label = "Sync now", pending = false) }
-                    }
+                        active = true,
+                    ) { MorphButtonLabel(icon = Icons.Filled.CloudSync, label = "Sync now", pending = false) }
                     // A live failure is the one fact that never hides behind the
                     // diagnostics disclosure below — if sync is broken, say so here.
                     state.syncError?.let { err ->

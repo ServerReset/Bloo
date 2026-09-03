@@ -582,30 +582,29 @@ internal fun SettingsSearchResults(
                         // default is the calmer buttonContainer(), and this is the
                         // card's primary action -- the conversion should change the
                         // FEEL, not quietly demote the emphasis.
+                        // Bare MorphTextButton, not wrapped in SafeExpansiveButton --
+                        // standalone, so the wrapper's own real width-growth-on-press was
+                        // layered on top of MorphButtonCore's own always-on press scale, the
+                        // same double-animation bug already found and fixed elsewhere.
                         val runSource = remember { MutableInteractionSource() }
-                        SafeExpansiveButton(
+                        MorphTextButton(
+                            text = if (running) "Working…" else "Run it",
                             interactionSource = runSource,
+                            onClick = {
+                                running = true
+                                scope.launch {
+                                    val r = runCatching {
+                                        TileCommandRunner.run(ctx, car.vin, p.first, "default")
+                                    }.getOrNull()
+                                    ran = r?.message ?: "Command failed"
+                                    running = false
+                                    vm.refreshStatus(car)
+                                }
+                            },
                             enabled = !running,
-                        ) {
-                            MorphTextButton(
-                                text = if (running) "Working…" else "Run it",
-                                interactionSource = runSource,
-                                onClick = {
-                                    running = true
-                                    scope.launch {
-                                        val r = runCatching {
-                                            TileCommandRunner.run(ctx, car.vin, p.first, "default")
-                                        }.getOrNull()
-                                        ran = r?.message ?: "Command failed"
-                                        running = false
-                                        vm.refreshStatus(car)
-                                    }
-                                },
-                                enabled = !running,
-                                containerColor = MaterialTheme.colorScheme.primary,
-                                contentColor = MaterialTheme.colorScheme.onPrimary,
-                            )
-                        }
+                            containerColor = MaterialTheme.colorScheme.primary,
+                            contentColor = MaterialTheme.colorScheme.onPrimary,
+                        )
                     }
                 }
             }

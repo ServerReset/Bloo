@@ -349,24 +349,22 @@ internal fun QuickTileCard(index: Int, vin: String, state: UiState, vm: AppViewM
 /** An outlined "add" pill that morphs like the app's other buttons with expansion animation. */
 @Composable
 internal fun AddTilePill(label: String, onClick: () -> Unit) {
+    // Bare MorphButton, not wrapped in SafeExpansiveButton -- standalone, commonly-tapped
+    // while configuring quick-settings tiles, so the wrapper's own real width-growth-on-press
+    // was layered on top of MorphButtonCore's own always-on press scale -- the same
+    // double-animation bug already found and fixed elsewhere in the app.
     val interactionSource = remember { MutableInteractionSource() }
-
-    SafeExpansiveButton(
+    MorphButton(
+        onClick = onClick,
         interactionSource = interactionSource,
-        enabled = true,
+        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+        containerColor = MaterialTheme.colorScheme.surface,
+        contentColor = MaterialTheme.colorScheme.primary,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+        contentPadding = PaddingValues(horizontal = 18.dp, vertical = 12.dp),
     ) {
-        MorphButton(
-            onClick = onClick,
-            interactionSource = interactionSource,
-            modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
-            containerColor = MaterialTheme.colorScheme.surface,
-            contentColor = MaterialTheme.colorScheme.primary,
-            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-            contentPadding = PaddingValues(horizontal = 18.dp, vertical = 12.dp),
-        ) {
-            // MorphButtonLabel, not a hand-rolled Icon+Spacer+Text -- that Text had no `style`.
-            MorphButtonLabel(Icons.Filled.Add, label, pending = false)
-        }
+        // MorphButtonLabel, not a hand-rolled Icon+Spacer+Text -- that Text had no `style`.
+        MorphButtonLabel(Icons.Filled.Add, label, pending = false)
     }
 }
 
