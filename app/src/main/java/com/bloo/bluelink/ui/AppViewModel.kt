@@ -1037,9 +1037,15 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         // The 17 per-car/per-tile config fields, shared with refreshLocalCarConfig via
         // perCarConfig so the two can't drift. firstRun's empty-collapsed rule lives inside it.
         val cfg = perCarConfig(vehicles, prefs)
-        val firstRun = !settingsStore.onboardingSeen()
-        val unconfiguredVins = vehicles.filter { !settingsStore.isCarConfigured(it.vin) }.map { it.vin }
-        val lastVin = settingsStore.lastVehicleVin()
+        // All three read the SAME prefs snapshot taken just above (the Preferences-taking
+        // overloads), not their own suspend re-fetch of the DataStore -- isCarConfigured in
+        // particular used to be one full data.first() round trip PER VEHICLE, sequentially, on
+        // the cold-start critical path (every one of them returning fields off the identical
+        // snapshot). See snapshot()'s own doc for why this is the pattern every per-car/global
+        // getter here is meant to be paired with.
+        val firstRun = !settingsStore.onboardingSeen(prefs)
+        val unconfiguredVins = vehicles.filter { !settingsStore.isCarConfigured(it.vin, prefs) }.map { it.vin }
+        val lastVin = settingsStore.lastVehicleVin(prefs)
         val index = vehicles.indexOfFirst { it.vin == lastVin }.let { if (it < 0) 0 else it }
         val screen = when {
             firstRun -> Screen.Onboarding

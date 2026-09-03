@@ -707,8 +707,9 @@ class SettingsStore(private val context: Context) {
         }
     }
 
-    suspend fun lastVehicleVin(): String? =
-        context.settingsDataStore.data.first()[Keys.LAST_VIN]
+    suspend fun lastVehicleVin(): String? = lastVehicleVin(context.settingsDataStore.data.first())
+
+    fun lastVehicleVin(p: Preferences): String? = p[Keys.LAST_VIN]
 
     suspend fun setLastVehicleVin(vin: String) {
         editTracked { it[Keys.LAST_VIN] = vin }
@@ -813,7 +814,10 @@ class SettingsStore(private val context: Context) {
 
     /** True once a car has been through the feature-setup wizard. */
     suspend fun isCarConfigured(vin: String): Boolean =
-        context.settingsDataStore.data.first()[booleanPreferencesKey("car_configured_$vin")] ?: false
+        isCarConfigured(vin, context.settingsDataStore.data.first())
+
+    fun isCarConfigured(vin: String, p: Preferences): Boolean =
+        p[booleanPreferencesKey("car_configured_$vin")] ?: false
 
     suspend fun setCarConfigured(vin: String) {
         editTracked { it[booleanPreferencesKey("car_configured_$vin")] = true }
