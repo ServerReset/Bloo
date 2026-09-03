@@ -739,6 +739,15 @@ internal fun GarageScreen(state: State<UiState>, vm: AppViewModel) {
                                 vm, embedded = true,
                                 onDockedChanged = onPageDockedChanged,
                                 pageLabel = if (perPage == 1 && totalBlocks > 1) "${block + 1} / $totalBlocks" else null,
+                                // A State, not a bare `page == pager.settledPage` read right
+                                // here -- see FloatingTitlePill's own `settled` doc for why: this
+                                // whole page composable (and everything it renders) must not be
+                                // the recompose scope that observes settledPage, only the pill
+                                // deep inside it. remember(page), like onPageDockedChanged above:
+                                // this per-page content block recomposes for reasons unrelated to
+                                // paging, and `page` is the only real dependency of this State's
+                                // identity.
+                                settled = remember(page) { derivedStateOf { page == pager.settledPage } },
                             )
                         } else {
                         Row(Modifier.fillMaxSize()) {
@@ -783,6 +792,10 @@ internal fun GarageScreen(state: State<UiState>, vm: AppViewModel) {
                                             // dockedPages -- see that map's own doc above.
                                             onDockedChanged = onPageDockedChanged,
                                             pageLabel = if (perPage == 1 && totalBlocks > 1) "${block + 1} / $totalBlocks" else null,
+                                            // See the settings-slot call above for why this is a
+                                            // State built with remember(page), not a bare
+                                            // `page == pager.settledPage` read here.
+                                            settled = remember(page) { derivedStateOf { page == pager.settledPage } },
                                         )
                                     }
                                 }

@@ -123,6 +123,7 @@ import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.State
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
@@ -237,6 +238,10 @@ internal fun SettingsScreen(
     onDockedChanged: ((Boolean) -> Unit)? = null,
     // "N / M" page-count label, shown on this slot's own docked pill when set.
     pageLabel: String? = null,
+    // True unless this is a merely pre-composed pager neighbour, not the currently settled page
+    // -- see FloatingTitlePill's own `settled` doc (including why this is a `State<Boolean>`, not
+    // a plain `Boolean`). GarageScreen is the only caller that ever passes a non-default one.
+    settled: State<Boolean> = AlwaysSettled,
     /** True on the flip cover, where every dimension is precious: tighter
      *  gutters, a slimmer header, closer card spacing. The grid still
      *  scrolls exactly as it does on the phone -- compactness here is
@@ -2137,6 +2142,7 @@ internal fun SettingsScreen(
                 reserveEnd = 192.dp,
                 maxWidth = screenWidth - cornerX - 192.dp - 32.dp,
                 onClick = { settingsScope.launch { settingsGridState.animateScrollToItem(0) } },
+                settled = settled,
                 extraContent = pageLabel?.let { label ->
                     {
                         Text(

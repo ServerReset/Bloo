@@ -128,6 +128,10 @@ internal fun VehicleDetailContent(
     // "N / M" page-count label, shown on this page's own docked pill when set (perPage == 1,
     // more than one page).
     pageLabel: String? = null,
+    // True unless this page is a merely pre-composed pager neighbour, not the currently settled
+    // one -- see FloatingTitlePill's own `settled` doc (including why this is a `State<Boolean>`,
+    // not a plain `Boolean`). GarageScreen is the only caller that ever passes a non-default one.
+    settled: State<Boolean> = AlwaysSettled,
 ) {
     val topInset = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
     val bottomInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
@@ -192,6 +196,7 @@ internal fun VehicleDetailContent(
             reserveEnd = 72.dp,
             maxWidth = screenWidth - 16.dp - 72.dp - 32.dp,
             onClick = { scope.launch { scroll.animateScrollTo(0) } },
+            settled = settled,
             extraContent = pageLabel?.let { label ->
                 {
                     Text(
