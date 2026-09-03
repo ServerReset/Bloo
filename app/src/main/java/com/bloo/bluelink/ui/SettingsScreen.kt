@@ -115,7 +115,6 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -123,10 +122,7 @@ import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.SideEffect
-import androidx.compose.runtime.State
 import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -136,9 +132,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalClipboardManager
-import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -234,13 +228,6 @@ import com.bloo.uicommon.ReorderColumn
 internal fun SettingsScreen(
     vm: AppViewModel,
     embedded: Boolean = false,
-    // Mirrors VehicleDetailContent's own `onDockedChanged` exactly -- reports this slot's own
-    // live docked state up to GarageScreen on every change.
-    onDockedChanged: ((Boolean) -> Unit)? = null,
-    // True unless this is a merely pre-composed pager neighbour, not the currently settled page
-    // -- see FloatingTitlePill's own `settled` doc (including why this is a `State<Boolean>`, not
-    // a plain `Boolean`). GarageScreen is the only caller that ever passes a non-default one.
-    settled: State<Boolean> = AlwaysSettled,
     /** True on the flip cover, where every dimension is precious: tighter
      *  gutters, a slimmer header, closer card spacing. The grid still
      *  scrolls exactly as it does on the phone -- compactness here is
@@ -261,8 +248,6 @@ internal fun SettingsScreen(
     // there's genuinely room, so this one grid covers both instead of two
     // separate layouts to keep in sync.
     val settingsGridState = rememberLazyStaggeredGridState()
-    val settingsScope = rememberCoroutineScope()
-    val density = LocalDensity.current
     val haptics = LocalHaptics.current
     // === PULL-TO-REFRESH FOR SETTINGS ===
     // Settings uses Material 3's native PullToRefresh on the LazyVerticalStaggeredGrid.
@@ -320,12 +305,6 @@ internal fun SettingsScreen(
           }
       }
   }
-  val topInsetPx = with(density) { topInset.toPx() }
-  // remember(Unit) + SideEffect, not remember(topInsetPx) -- an inset change alone shouldn't
-  // discard this title's accumulated docked state.
-  val floatingTitle = remember { FloatingTitle(with(density) { TitleDockHysteresis.toPx() }) }
-  SideEffect { floatingTitle.topInsetPx = topInsetPx }
-  LaunchedEffect(floatingTitle.docked.value) { onDockedChanged?.invoke(floatingTitle.docked.value) }
   BackdropHost {
         // A real multi-column grid on wide screens (tablets, landscape, foldables
         // unfolded) instead of one narrow centred column with empty space on
@@ -343,7 +322,6 @@ internal fun SettingsScreen(
                 .fillMaxSize(),
             contentAlignment = Alignment.TopCenter
         ) {
-        CompositionLocalProvider(LocalFloatingTitle provides floatingTitle) {
         // Hoisted OUT of the grid's item content, which is not a composable scope and so could
         // never have called this. That hoist is what lets an advanced-only card be skipped as a
         // grid ITEM rather than merely rendered empty -- see rememberAdvancedVisibility for why
@@ -2123,7 +2101,6 @@ internal fun SettingsScreen(
           }
           }
         }
-        } // CompositionLocalProvider(LocalFloatingTitle)
         } // Box (wide-screen centering)
         // Same blurred scrim GarageScreen uses behind the system clock/battery
         // icons -- this content scrolls behind the status bar too (see the
@@ -2136,34 +2113,9 @@ internal fun SettingsScreen(
         // the same scrim twice for exactly this one page, reading as a subtly
         // darker/hazier status-bar band than every car page beside it.
         if (!isCompactCoverScreen() && !embedded) StatusBarScrim()
-        // The floating "Settings" badge, once its own header has scrolled out of view -- same
-        // FloatingTitlePill every car page uses, sourced from SettingsHeaderRow's title instead
-        // of a hero photo card's. Renders directly (no more hoisted hand-off, see
-        // TitleFlight.kt's own doc) -- cheap at rest regardless of embedding, since the glass
-        // chrome only composes while actually docked or transitioning.
-        run {
-            val screenWidth = LocalConfiguration.current.screenWidthDp.dp
-            // Standalone route clears the back arrow (60dp); embedded (inside GarageScreen's own
-            // pager) has none to clear (16dp, matching every car page's own pill).
-            val cornerX = if (embedded) 16.dp else 60.dp
-            FloatingTitlePill(
-                title = floatingTitle,
-                cornerX = cornerX,
-                cornerY = topInset + HeaderCornerGap,
-                reserveEnd = 192.dp,
-                maxWidth = screenWidth - cornerX - 192.dp - 32.dp,
-                onClick = { settingsScope.launch { settingsGridState.animateScrollToItem(0) } },
-                settled = settled,
-            ) {
-                Text(
-                    "Settings",
-                    style = MaterialTheme.typography.headlineSmall,
-                    fontWeight = FontWeight.Bold,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            }
-        }
+        // No more floating "Settings" corner badge -- removed as unwanted UI (see the floating
+        // car-name pill's own removal). The "Settings" title is real, static content on
+        // SettingsHeaderRow now; it just scrolls off with the rest of the grid.
         // Floating back-arrow + "Settings" label + simple/advanced button.
         Row(
             Modifier.fillMaxWidth().align(Alignment.TopStart).statusBarsPadding()

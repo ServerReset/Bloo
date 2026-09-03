@@ -61,7 +61,6 @@ import androidx.compose.runtime.Stable
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
-import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.State
 import androidx.compose.runtime.remember
@@ -579,34 +578,6 @@ internal fun GarageScreen(state: State<UiState>, vm: AppViewModel) {
                     val targetBlock = currentIndex.coerceIn(0, count - 1) / perPage
                     wrap.snapToReal(targetBlock)
                 }
-                // Per-page (keyed by stable identity, NOT raw page index: an index's real-world
-                // meaning isn't stable across a delete, a perPage-changing resize, or a
-                // drag-to-reorder) live "is THIS page's own title currently docked" flag,
-                // reported up by whichever page is currently live -- see SettingsScreen's own
-                // `onDockedChanged`. Car pages no longer have a floating name pill at all (removed
-                // as unwanted UI -- see TitleFlight.kt's own doc), so in practice the only key
-                // this map ever actually holds now is "settings"; `dockedPageKey` still computes a
-                // VIN for a car page too, harmlessly, since nothing writes it. This map exists
-                // purely so the page-dots collision check below can ask "is the SETTLED page's own
-                // name currently docked" without needing a shared badge to ask it of.
-                val dockedPages = remember { mutableStateMapOf<Any, Boolean>() }
-                // Cleared the instant `perPage` is observed to have actually changed (grid <->
-                // single-car, a live foldable/multi-window resize) -- synchronously, during
-                // composition. dockedPages only ever gets written `if (perPage == 1)` (see
-                // onDockedChanged's own gate below), so any entries left over from a prior
-                // perPage==1 stint are unconditionally stale once perPage has changed at all.
-                var lastPerPage by remember { mutableStateOf(perPage) }
-                if (lastPerPage != perPage) {
-                    dockedPages.clear()
-                    lastPerPage = perPage
-                }
-                fun dockedPageKey(page: Int): Any =
-                    if (settingsAsPage && page == pageCount) "settings" else vehicles.getOrNull(page)?.vin ?: page
-                // Lets the page dots (and anything else that dodges the Title id) hide the
-                // instant the settled page's name is docked, without needing bounds to actually
-                // overlap -- see FloatingRegistry.nameDocked's own doc for why real overlap is
-                // the wrong test here.
-                SideEffect { floatingRegistry.nameDocked = { dockedPages[dockedPageKey(pager.settledPage)] == true } }
                 Box(Modifier.fillMaxSize()) {
                     HorizontalPager(
                         state = pager,
@@ -674,25 +645,6 @@ internal fun GarageScreen(state: State<UiState>, vm: AppViewModel) {
                         val block = realBlock(page)
                         val start = block * perPage
                         val end = minOf(start + perPage, count)
-                        // Removes this page's own dockedPages entry the instant its
-                        // key changes identity OR it leaves composition -- covers
-                        // both real disposal (scrolled past beyondViewportPageCount,
-                        // so a fresh instance later reusing this key starts from "not
-                        // reported docked yet" instead of inheriting a stale `true`)
-                        // and a reorder reassigning this pager slot to a different
-                        // car mid-life (DisposableEffect re-keys on dockedPageKey(page)
-                        // changing, cleaning up the OLD vin's entry as part of the
-                        // same recomposition instead of leaving it orphaned). Nothing
-                        // in this file previously cleared dockedPages at all, so a
-                        // stale `true` could hoist a freshly-recomposed, genuinely
-                        // undocked page for one or more frames -- exactly the class
-                        // of "flash" this whole audit was looking for. perPage > 1
-                        // never writes dockedPages (see onDockedChanged's own gate
-                        // below), so this is a no-op there.
-                        if (perPage == 1) {
-                            val dpKey = dockedPageKey(page)
-                            DisposableEffect(dpKey) { onDispose { dockedPages.remove(dpKey) } }
-                        }
                         // The "is this the settled page" test used to live here, as
                         // `page == pager.settledPage`. Discrete, yes -- but it still
                         // subscribed this page's composition to settledPage, so every
@@ -721,34 +673,10 @@ internal fun GarageScreen(state: State<UiState>, vm: AppViewModel) {
                         // The transition this was meant to improve is not worth
                         // the gesture it happens during: a swipe that tracks the
                         // finger exactly IS the effect.
-                        // remember(page), not a fresh lambda literal per
-                        // recomposition -- this whole per-page content block
-                        // recomposes for reasons unrelated to docking (any
-                        // UiState field this page's own descendants read), and
-                        // `page` alone is enough to make this a stable function
-                        // of "which page", the only thing the callback's own
-                        // closure actually depends on.
-                        val onPageDockedChanged: ((Boolean) -> Unit)? = remember(page) {
-                            if (perPage == 1) ({ d: Boolean -> dockedPages[dockedPageKey(page)] = d }) else null
-                        }
                         if (settingsAsPage && block == pageCount) {
                             // The extra slot: Settings itself, embedded rather than
                             // navigated to -- see SettingsScreen's own `embedded` doc.
-                            // Renders its own docked pill directly now -- no more
-                            // shared/hoisted hand-off, see TitleFlight.kt's own doc.
-                            SettingsScreen(
-                                vm, embedded = true,
-                                onDockedChanged = onPageDockedChanged,
-                                // A State, not a bare `page == pager.settledPage` read right
-                                // here -- see FloatingTitlePill's own `settled` doc for why: this
-                                // whole page composable (and everything it renders) must not be
-                                // the recompose scope that observes settledPage, only the pill
-                                // deep inside it. remember(page), like onPageDockedChanged above:
-                                // this per-page content block recomposes for reasons unrelated to
-                                // paging, and `page` is the only real dependency of this State's
-                                // identity.
-                                settled = remember(page) { derivedStateOf { page == pager.settledPage } },
-                            )
+                            SettingsScreen(vm, embedded = true)
                         } else {
                         Row(Modifier.fillMaxSize()) {
                             for (i in start until end) {
@@ -841,8 +769,7 @@ internal fun GarageScreen(state: State<UiState>, vm: AppViewModel) {
                             LoadingIndicator()
                         }
                     }
-                    // No more shared/hoisted badge here -- each page renders its own
-                    // docked pill directly now (see TitleFlight.kt's own doc on the redesign).
+                    // No floating name badge here at all any more -- removed as unwanted UI.
                 }
             }
         }

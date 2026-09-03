@@ -89,9 +89,9 @@ import kotlin.math.max
  * the reorderable [PebbleList]).
  *
  * The car's name is real, visible content inside the hero card's own title slot -- there is no
- * floating corner badge that takes over once it scrolls out of view (there used to be; removed
- * as unwanted UI, see TitleFlight.kt's own doc for what's left of that system and who still uses
- * it -- just the Settings screen now).
+ * floating corner badge that takes over once it scrolls out of view. There used to be (and,
+ * before that, a floating "Settings" badge too) -- both removed as unwanted UI, along with the
+ * whole TitleFlight/FloatingTitlePill/dock-on-scroll system that existed only to drive them.
  */
 @Composable
 internal fun VehicleDetailContent(
@@ -173,10 +173,10 @@ internal fun VehicleDetailContent(
  * state that lets a pebble be dragged from the scrolling list directly onto
  * that slot to pin it.
  *
- * No floating corner name badge here any more -- removed as unwanted UI (see TitleFlight.kt's
- * own doc). The car's name is real, visible content on CriticalContent's own HeroHeader, same as
- * [VehicleDetailContent]; it simply scrolls off with the rest of that column once it's flipped
- * out of view, like any other content.
+ * No floating corner name badge here any more -- removed as unwanted UI, along with the whole
+ * floating-title system. The car's name is real, visible content on CriticalContent's own
+ * HeroHeader, same as [VehicleDetailContent]; it simply scrolls off with the rest of that column
+ * once it's flipped out of view, like any other content.
  */
 @Composable
 internal fun ExpandedCar(

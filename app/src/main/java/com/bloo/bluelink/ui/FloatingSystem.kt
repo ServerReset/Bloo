@@ -56,8 +56,6 @@ value class FloatingId(val name: String)
 /** The app's own floaters. Anything may define its own id; these are just the ones that
  *  currently negotiate with each other. */
 object FloatingIds {
-    /** The car name / "Settings" title, whether inline on the hero card or docked in its pill. */
-    val Title = FloatingId("title")
     /** The centered page-dot indicator. */
     val PagerDots = FloatingId("pagerDots")
     /** The Settings cog in the top-right corner. */
@@ -127,23 +125,6 @@ class FloatingRegistry {
     var chromeHidden by mutableStateOf(false)
 
     /**
-     * Is a car's name currently showing as the DOCKED pill -- a lambda, not a value, for the
-     * same reason [chromePull] is: reading `flight.docked` at the screen's own broad
-     * composition scope to publish a plain boolean would recompose that whole scope every time
-     * any car's name docks or undocks, so this reads it directly off the shared flight instead.
-     *
-     * What this exists for: [dodgeFloating]'s own collision test is real bounding-box overlap,
-     * which is right for the search bubble (something the user parked somewhere, only worth
-     * dodging if it is actually in the way) but wrong for the page dots against a docked name --
-     * their bounds do not reliably overlap (the pill sits at a corner, the dots run down an
-     * edge), yet the dots are exactly as redundant with a docked name as they would be if they
-     * did collide: both are answering "which page am I on", and once the name has taken over as
-     * the persistent header that question already has its answer on screen. [collidesWithOthers]
-     * folds this in as an automatic collision against [FloatingIds.Title] regardless of geometry.
-     */
-    var nameDocked: () -> Boolean = { false }
-
-    /**
      * Back to rest. A screen that publishes these must call this when it leaves, or the last
      * thing it asserted outlives it -- and "hidden, shifted down 96dp" is a state no screen
      * should be able to leave behind for the next one.
@@ -152,7 +133,6 @@ class FloatingRegistry {
         chromePull = { 0f }
         chromeHolding = false
         chromeHidden = false
-        nameDocked = { false }
     }
 
     /** Who last published each id, so a withdrawal can be checked against it. */
@@ -206,12 +186,6 @@ class FloatingRegistry {
          */
         avoid: Set<FloatingId>? = null,
     ): Boolean {
-        // A docked name is treated as colliding with anything avoiding it, regardless of
-        // where it actually sits -- see [nameDocked]'s own doc for why real bounding-box
-        // overlap is the wrong test here.
-        if (self != FloatingIds.Title && (avoid == null || FloatingIds.Title in avoid) && nameDocked()) {
-            return true
-        }
         if (rect == null) return false
         bounds.forEach { (id, other) ->
             if (id == self) return@forEach

@@ -243,10 +243,9 @@ internal fun PebbleShell(
      * transform -- so a caller reading its position (e.g. via
      * `onGloballyPositioned`) gets the real, final on-screen bounds, not the
      * pre-scale layout size. Unused by every current caller (the hero used to
-     * supply one for the now-removed floating name pill -- see
-     * TitleFlight.kt's own doc); kept as a hook rather than deleted, since a
-     * caller needing to read the title's own live position is a real, cheap-
-     * to-need thing to want again.
+     * supply one for the now fully-removed floating name pill system); kept
+     * as a hook rather than deleted, since a caller needing to read the
+     * title's own live position is a real, cheap-to-need thing to want again.
      */
     titleModifier: Modifier = Modifier,
     // onTitleWidth was deleted here. It reported the title's measured width so the hero could
@@ -507,10 +506,19 @@ internal fun PebbleShell(
                             // Row, the title, the trailing slot, the split button -- when its
                             // only consumers are the .layout{} and graphicsLayer lambdas below,
                             // which invalidate layout and draw respectively and nothing else.
+                            // Different damping each direction, not one spring run in reverse: a
+                            // bounce that reads as delight growing INTO its target reads as a
+                            // jump/wobble shrinking back OUT of it -- reported jumpiness on
+                            // collapse that the expand side never had a matching complaint for.
+                            // Collapse gets a critically-damped spring (1.0, no overshoot at all)
+                            // over the exact same StiffnessVeryLow, so it still takes the same
+                            // unhurried second-plus to settle -- just directly, with nothing to
+                            // pop past its own resting size and back.
+                            val expandingTitle = expanded && growTitleOnExpand
                             val headerTState = animateFloatAsState(
-                                targetValue = if (expanded && growTitleOnExpand) 1f else 0f,
+                                targetValue = if (expandingTitle) 1f else 0f,
                                 animationSpec = spring(
-                                    dampingRatio = 0.62f,
+                                    dampingRatio = if (expandingTitle) 0.62f else 1f,
                                     stiffness = Spring.StiffnessVeryLow,
                                 ),
                                 label = "pebbleHeaderGrow",

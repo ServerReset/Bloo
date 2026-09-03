@@ -123,9 +123,9 @@ internal fun StatusBarScrim() {
 }
 
 /** The one shared "gap below the status bar" every free-floating header
- *  element -- [FloatingIcon]'s own default [FloatingIcon.outerPadding], every
- *  [FloatingTitlePill] call site's `cornerY`, the page-dot overlays -- lines
- *  up against, so they all sit on the same row instead of each surface
+ *  element -- [FloatingIcon]'s own default [FloatingIcon.outerPadding], the
+ *  page-dot overlays -- lines up against, so they all sit on the same row
+ *  instead of each surface
  *  reproducing its own close-but-not-quite value (this used to be `12.dp` in
  *  some places and `10.dp` in others, an inconsistency invisible on any one
  *  screen alone but obvious the moment two headers are compared side by

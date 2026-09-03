@@ -197,21 +197,15 @@ internal fun StatusHeaderRow(icon: ImageVector, tint: Color, title: String, stat
  * matching the base [PebbleShell] scales its own hero title from, not
  * [CarHeaderRow][com.bloo.bluelink.ui]'s own titleLarge name text.
  *
- * Reports its own real, measured position via [LocalFloatingTitle] (the same
- * mechanism [HeroHeader]'s car-page title uses) whenever a controller is
- * present. Unlike the old fly-between-two-anchors design, this Text is the
- * only thing that ever paints "Settings" here -- it just fades itself out as
- * it docks, handing off to FloatingTitlePill's own corner badge (see
- * TitleFlight.kt's own doc for the whole redesign).
+ * The "Settings" title is real, static content here -- there is no floating corner badge that
+ * takes over once it scrolls out of view any more (there used to be, on every screen that had
+ * one; removed as unwanted UI).
  */
 @Composable
 internal fun SettingsHeaderRow(state: UiState, compact: Boolean = false) {
-    val titleFlight = LocalFloatingTitle.current
     // Entrance animation: the page header slides up and fades in (same motion
     // the empty screen and hero use) instead of appearing with no motion --
-    // "the settings header is not animated" -- while the invisible title
-    // anchor inside still reports its real position every frame, so the
-    // floating overlay tracks the animated header perfectly.
+    // "the settings header is not animated".
     val headerAppear = remember { Animatable(0f) }
     LaunchedEffect(Unit) { headerAppear.animateTo(1f, tween(400)) }
     Column(
@@ -246,7 +240,6 @@ internal fun SettingsHeaderRow(state: UiState, compact: Boolean = false) {
                 style = if (compact) MaterialTheme.typography.titleLarge else MaterialTheme.typography.headlineSmall,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.onSurface,
-                modifier = Modifier.reportsToFloatingTitle(titleFlight),
             )
             val carCount = state.vehicles.size
             val modeLabel = if (state.settingsMode == "advanced") "Advanced" else "Simple"
@@ -259,10 +252,9 @@ internal fun SettingsHeaderRow(state: UiState, compact: Boolean = false) {
             // Simple/Advanced lives in the header now (it was a bare row of
             // segmented options further down, easily lost) -- a small tonal
             // chip carrying the current mode, standard surface treatment.
-            // CRITICAL: This must align vertically with the floating back button
-            // and floating Settings name pill. Removed the top padding that was
-            // throwing off vertical alignment; the pill now centers naturally
-            // with Alignment.CenterVertically in the Row.
+            // CRITICAL: This must align vertically with the floating back button in the
+            // Row above it. Removed the top padding that was throwing off vertical
+            // alignment; this now centers naturally with Alignment.CenterVertically.
             Spacer(Modifier.weight(1f))
             Surface(
                 shape = RoundedCornerShape(50),

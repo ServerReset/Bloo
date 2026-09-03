@@ -309,18 +309,13 @@ internal fun PagerDotsFor(
     /** False when the caller publishes these bounds itself -- see the note below. */
     registerBounds: Boolean = true,
 ) {
-    // The collision dodge goes through the floating registry rather than a State hand-threaded
-    // down from GarageScreen (which had to be forwarded through TitleFlightOverlay ->
-    // FloatingNamePill -> FullDetail to get there in the first place): .dodgeFloating fades
-    // these out whenever anything else floating -- today the flying car name -- is in that spot.
-    //
-    // [registerBounds] decides who publishes. Every caller today passes false and publishes from
-    // its own node via Modifier.floatingOverlay, because that node is the one carrying the
-    // status-bar inset, the corner gap and (on the garage) the pull-to-refresh shift -- so it is
-    // the one that knows where the dots really ended up. The default stays true because
-    // dodgeFloating below asks the registry where `self` is and silently never dodges if the
-    // answer is nothing: a new caller that forgets should get a working dodge, not a quiet
-    // no-op. Two publishers on one id is the failure this parameter exists to prevent.
+    // [registerBounds] decides who publishes THIS element's own bounds to the floating registry
+    // (still used so other floaters, e.g. the search bubble, know where the dots are). Every
+    // caller today passes false and publishes from its own node via Modifier.floatingOverlay,
+    // because that node is the one carrying the status-bar inset, the corner gap and (on the
+    // garage) the pull-to-refresh shift -- so it is the one that knows where the dots really
+    // ended up. The default stays true so a new caller that forgets still registers something
+    // rather than silently publishing nothing.
     // Theme-only choices stay in the app: this wrapper is the one place that
     // translates Material colors + app chrome into the uicommon core's
     // parameterized [PagerDotColors], so the core never imports material3.
@@ -335,13 +330,12 @@ internal fun PagerDotsFor(
     com.bloo.uicommon.PagerDots(
         current = real(pager.currentPage),
         count = count,
+        // No more .dodgeFloating here -- its one job was yielding to the docked car-name pill,
+        // which is gone entirely now (see TitleFlight's removal). Nothing else registered wants
+        // these dots to get out of its way: an unfiltered dodge would have made the search
+        // bubble (something the user deliberately parked) hide them too, which was never wanted.
         modifier = modifier
-            .then(if (registerBounds) Modifier.floatingElement(FloatingIds.PagerDots) else Modifier)
-            // The car name, and only the car name. That is what this dodge was built for, and
-            // an unfiltered "anything registered" test means every floater added later silently
-            // gains the ability to hide these -- the draggable search bubble most of all, which
-            // a person can park directly on top of them.
-            .dodgeFloating(FloatingIds.PagerDots, avoid = setOf(FloatingIds.Title)),
+            .then(if (registerBounds) Modifier.floatingElement(FloatingIds.PagerDots) else Modifier),
         onRefresh = onRefresh,
         haptics = haptics?.let { { it.tick() } },
         colors = colors,
