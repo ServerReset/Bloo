@@ -2674,7 +2674,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
      * timeout it was defending could not fire around a blocking call anyway. Both
      * points are addressed where the implementation now lives.
      */
-    private suspend fun reverseGeocode(loc: GeoLocation): String? =
+    private suspend fun reverseGeocode(loc: GeoLocation): com.bloo.bluelink.data.GeocodedPlace? =
         com.bloo.bluelink.data.reverseGeocode(getApplication(), loc.latitude, loc.longitude)
 
     // --- Commands (per-action pending + optimistic state flip) -----------
