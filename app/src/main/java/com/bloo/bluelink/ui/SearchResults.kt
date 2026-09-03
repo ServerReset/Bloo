@@ -115,6 +115,12 @@ internal fun SettingsSearchResults(
     // Same source the main Settings screen uses for its own Security card gate.
     val canBio = remember { vm.canUseBiometrics() }
 
+    // remember(state, appearance, notif, vm, canBio), not rebuilt inline: none of the ~50+
+    // add(...) calls below read `query` at all -- only the scoring pass further down does --
+    // so building this whole list (and every entry's own composable lambda) fresh on every
+    // keystroke was pure waste. Now it only rebuilds when the underlying settings/vehicle data
+    // actually changes.
+    val entries = remember(state, appearance, notif, vm, canBio) {
     val entries = ArrayList<SearchEntry>()
     fun add(title: String, keywords: String, content: @Composable () -> Unit) {
         entries.add(SearchEntry(title, "$title $keywords".lowercase(), content))
@@ -357,6 +363,8 @@ internal fun SettingsSearchResults(
                 ToggleRow(spec.label, spec.checked(v, state)) { spec.onToggle(vm, v, it) }
             }
         }
+    }
+    entries
     }
 
     // Matches render FIRST (top of this composable's output), the AI answer
