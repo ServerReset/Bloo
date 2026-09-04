@@ -157,6 +157,12 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     @Volatile
     private var liveChargeDismissalsResetThisSession = false
 
+    /** Set to true during garage load if the app will show a lock screen, so that
+     *  status fetching is deferred until after unlock (avoiding recomposition jank
+     *  that overlaps the lock-away blur animation). */
+    @Volatile
+    private var deferredStatusLoad = false
+
     private val _state = MutableStateFlow(UiState())
     val state: StateFlow<UiState> = _state.asStateFlow()
 
@@ -794,6 +800,22 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     fun unlocked() {
         _state.update { it.copy(locked = false, lockedToLogin = false, pinAttemptRejected = false) }
         if (_state.value.vehicles.isEmpty() && !loadingGarage) loadGarage()
+        // If status fetching was deferred waiting for the lock screen to unlock,
+        // perform the deferred fetch now — wait for the lock-away blur animation
+        // (450ms) to complete first so pebble recompositions from incoming status
+        // don't overlap the expensive unlock animation.
+        if (deferredStatusLoad) {
+            deferredStatusLoad = false
+            val vehicles = _state.value.vehicles
+            val index = _currentIndex.value
+            viewModelScope.launch {
+                delay(500)  // Wait for unlock blur animation (450ms) to complete
+                vehicles.getOrNull(index)?.let { ensureStatus(it) }
+                launch {
+                    vehicles.forEachIndexed { i, v -> if (i != index) ensureStatus(v) }
+                }
+            }
+        }
     }
 
     /** From the lock overlay, back out to the login screen.
@@ -1107,11 +1129,20 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         com.bloo.bluelink.Shortcuts.refresh(getApplication(), vehicles, shortcutSet)
         // Run any shortcut that was tapped before the garage finished loading.
         tryRunPendingShortcut()
-        // Fetch current car first for an immediate view, then prefetch the rest
-        // (REFRESH=false -> cached last-known status, doesn't burn remote quota).
-        ensureStatus(vehicles[index])
-        viewModelScope.launch {
-            vehicles.forEachIndexed { i, v -> if (i != index) ensureStatus(v) }
+        // Set the defer flag if the app is locked (or will be locked shortly by maybeRelock).
+        // This gates status fetching below -- if true, status fetches are deferred until
+        // unlocked() is called, avoiding recomposition jank that overlaps the lock-away
+        // blur animation. Check the current lock state from the updated state above.
+        val currentLocked = _state.value.locked
+        if (!currentLocked) {
+            // Unlocked session: fetch status now (no lock animation to worry about).
+            ensureStatus(vehicles[index])
+            viewModelScope.launch {
+                vehicles.forEachIndexed { i, v -> if (i != index) ensureStatus(v) }
+            }
+        } else {
+            // Locked session: defer status fetching until after unlock animation completes.
+            deferredStatusLoad = true
         }
     }
 
