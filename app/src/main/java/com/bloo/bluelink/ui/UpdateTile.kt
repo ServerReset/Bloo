@@ -590,8 +590,13 @@ internal fun UpdateStatusLine(
     }
     // Live download progress bar. Own PopVisible rather than a bare `if` --
     // this bar arrives and leaves while the card is already open (download
-    // starts, download finishes).
-    PopVisible(visible = state.updateDownloading) {
+    // starts, download finishes). sizeAnimated: this pebble sits in the
+    // reorderable stack, and the pebble below it repositions itself with its
+    // own ~300ms spring (ReorderColumn's animatePlacement) whenever this one's
+    // height changes -- without this, the bar popped in at full height on one
+    // layout pass while the sibling below was still catching up, so the two
+    // visibly overlapped for that whole window. See PopVisible's own doc.
+    PopVisible(visible = state.updateDownloading, sizeAnimated = true) {
         // fillMaxWidth() is required here, not optional: a Row that's a DIRECT child of
         // PopVisible (AnimatedVisibility) and relies on weight() to size a child (the
         // progress bar below) collapses to a near-zero width without it -- AnimatedVisibility

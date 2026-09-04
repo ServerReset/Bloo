@@ -348,6 +348,23 @@ internal fun collapseExit(shrinkTowards: Alignment.Vertical = Alignment.Top, fad
 internal fun PopVisible(
     visible: Boolean,
     modifier: Modifier = Modifier,
+    /**
+     * True also interpolates the container's HEIGHT (expandVertically/shrinkVertically), not
+     * just fade+scale in place. Off by default to match how every existing call site already
+     * looks -- a pop that pops, not a reveal that slides -- and most sit beside fixed content
+     * where a height change wouldn't read as "pop" and isn't needed anyway.
+     *
+     * Turn it on for a call site whose CONTAINER reflows SIBLINGS when this content's height
+     * changes -- e.g. a pebble inside the reorderable list, where the pebble below animates its
+     * own position to make room via `Modifier.animatePlacement()` (ReorderColumn.kt) over ~300ms
+     * of spring settle. Without this, the pebble's own height jumped to its new value on the
+     * very next layout pass -- instant, not animated -- while the sibling below was still
+     * mid-spring toward its new slot, so for that whole window the two visibly overlapped: this
+     * pebble's newly-grown bottom edge was already there, but the sibling hadn't slid down out
+     * of the way yet. Expanding/shrinking this content's own height in step keeps the two
+     * in sync instead of one snapping and the other catching up.
+     */
+    sizeAnimated: Boolean = false,
     content: @Composable AnimatedVisibilityScope.() -> Unit,
 ) {
     AnimatedVisibility(
@@ -357,9 +374,11 @@ internal fun PopVisible(
             scaleIn(
                 spring(dampingRatio = PebbleBounceDamping, stiffness = PebbleBounceStiffness),
                 initialScale = 0.8f,
-            ),
+            ) +
+            (if (sizeAnimated) expandVertically(spring(dampingRatio = PebbleBounceDamping, stiffness = PebbleBounceStiffness)) else EnterTransition.None),
         exit = fadeOut(MaterialTheme.motionScheme.defaultEffectsSpec<Float>()) +
-            scaleOut(MaterialTheme.motionScheme.defaultSpatialSpec<Float>(), targetScale = 0.8f),
+            scaleOut(MaterialTheme.motionScheme.defaultSpatialSpec<Float>(), targetScale = 0.8f) +
+            (if (sizeAnimated) shrinkVertically(spring(dampingRatio = PebbleBounceDamping, stiffness = PebbleBounceStiffness)) else ExitTransition.None),
         content = content,
     )
 }
