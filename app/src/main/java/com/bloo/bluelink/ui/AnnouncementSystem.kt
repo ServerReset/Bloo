@@ -8,6 +8,7 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -29,6 +30,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -194,27 +196,41 @@ fun AnnouncementToast(
                     // A real button, not a clickable Text. This was a bare label with no
                     // container, no press feedback and a ~16dp tall touch target, sitting on
                     // the one surface most likely to be tapped in a hurry.
+                    //
+                    // Wrapped in SafeExpansiveButton like every other standalone button in the
+                    // app: MorphButton/MorphTextButton only get the press-growth spring for free
+                    // inside an ExpressiveButtonGroup/Row (LocalExpressiveGroup) -- outside one, a
+                    // caller has to opt in itself, and this one didn't, so it sat there with no
+                    // press feedback at all while everything around it grew on press.
                     if (announcement.actionLabel != null) {
-                        MorphTextButton(
-                            text = announcement.actionLabel,
-                            onClick = { announcement.onAction?.invoke() },
-                            modifier = Modifier.padding(top = 8.dp),
-                            contentColor = MaterialTheme.colorScheme.primary,
-                        )
+                        val actionSource = remember { MutableInteractionSource() }
+                        SafeExpansiveButton(interactionSource = actionSource) {
+                            MorphTextButton(
+                                text = announcement.actionLabel,
+                                onClick = { announcement.onAction?.invoke() },
+                                modifier = Modifier.padding(top = 8.dp),
+                                contentColor = MaterialTheme.colorScheme.primary,
+                                interactionSource = actionSource,
+                            )
+                        }
                     }
                 }
 
                 if (announcement.dismissible) {
                     // MorphIconButton: the app's standard icon target (press spring, haptic,
                     // 48dp frame) rather than a stock IconButton, and the glyph sized from the
-                    // shared token instead of Material's own default.
-                    MorphIconButton(onClick = onDismiss) {
-                        Icon(
-                            imageVector = Icons.Filled.Close,
-                            contentDescription = "Dismiss",
-                            modifier = Modifier.size(ButtonIconOnlySize),
-                            tint = foregroundColor(announcement.severity),
-                        )
+                    // shared token instead of Material's own default. Also wrapped in
+                    // SafeExpansiveButton for the same reason as the action button above.
+                    val dismissSource = remember { MutableInteractionSource() }
+                    SafeExpansiveButton(interactionSource = dismissSource) {
+                        MorphIconButton(onClick = onDismiss, interactionSource = dismissSource) {
+                            Icon(
+                                imageVector = Icons.Filled.Close,
+                                contentDescription = "Dismiss",
+                                modifier = Modifier.size(ButtonIconOnlySize),
+                                tint = foregroundColor(announcement.severity),
+                            )
+                        }
                     }
                 }
             }
@@ -279,13 +295,17 @@ private fun AnnouncementHistoryItem(announcement: Announcement) {
         }
 
         // The history list's copy of the same action -- a real button here too, for the same
-        // reason as the banner's above.
+        // reason as the banner's above, including the SafeExpansiveButton wrap for press growth.
         if (announcement.actionLabel != null) {
-            MorphTextButton(
-                text = announcement.actionLabel,
-                onClick = { announcement.onAction?.invoke() },
-                contentColor = MaterialTheme.colorScheme.primary,
-            )
+            val actionSource = remember { MutableInteractionSource() }
+            SafeExpansiveButton(interactionSource = actionSource) {
+                MorphTextButton(
+                    text = announcement.actionLabel,
+                    onClick = { announcement.onAction?.invoke() },
+                    contentColor = MaterialTheme.colorScheme.primary,
+                    interactionSource = actionSource,
+                )
+            }
         }
     }
 }

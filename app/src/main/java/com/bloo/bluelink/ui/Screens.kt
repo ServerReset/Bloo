@@ -68,6 +68,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.State
 import androidx.compose.runtime.remember
@@ -228,7 +229,19 @@ fun BlooApp(vm: AppViewModel) {
         containerColor = Color.Transparent,
         snackbarHost = {
             SnackbarHost(snackbar, modifier = Modifier.imePadding()) { data ->
-                val offsetX = remember(data) { Animatable(0f) }
+                // Two-part state, not one Animatable driven by snapTo: a live drag used to
+                // launch a brand-new coroutine PER drag delta (`swipeScope.launch { offsetX.snapTo(...) }`),
+                // each one entering Animatable's MutatorMutex separately -- at a touch-move's
+                // frame rate that's dozens of allocated coroutines a second fighting the same
+                // mutex, which is exactly the kind of stutter "swipe feels jittery" describes.
+                // `dragOffsetPx` is a plain float written directly and synchronously from the
+                // gesture callback -- follows the finger 1:1 with zero coroutine overhead. The
+                // Animatable is reserved for what actually needs animating: springing back to 0
+                // or flying off-screen once the finger lifts, started with exactly one launch per
+                // gesture instead of one per pixel.
+                var isDragging by remember(data) { mutableStateOf(false) }
+                val dragOffsetPx = remember(data) { mutableFloatStateOf(0f) }
+                val settleOffsetX = remember(data) { Animatable(0f) }
                 val swipeScope = rememberCoroutineScope()
                 val dismissPx = with(LocalDensity.current) { 110.dp.toPx() }
                 // Read off THIS snackbar's own visuals, so a message queued behind
@@ -255,25 +268,49 @@ fun BlooApp(vm: AppViewModel) {
                         // has to blindly swipe around after every action to
                         // discover whether it worked.
                         .semantics { liveRegion = LiveRegionMode.Polite }
-                        .offset { IntOffset(offsetX.value.roundToInt(), 0) }
+                        // Read inside the placement/draw-phase lambdas, not hoisted to a val above
+                        // -- that keeps a live drag to a layout/draw re-run per frame instead of a
+                        // full recomposition of this snackbar (same convention as GarageScreen's
+                        // pull-to-refresh offsets; see its own doc on why the hoisted read is the
+                        // expensive version).
+                        .offset {
+                            val x = if (isDragging) dragOffsetPx.floatValue else settleOffsetX.value
+                            IntOffset(x.roundToInt(), 0)
+                        }
                         .graphicsLayer {
-                            alpha = (1f - abs(offsetX.value) / (dismissPx * 2.2f)).coerceIn(0f, 1f)
+                            val x = if (isDragging) dragOffsetPx.floatValue else settleOffsetX.value
+                            alpha = (1f - abs(x) / (dismissPx * 2.2f)).coerceIn(0f, 1f)
                         }
                         .pointerInput(data) {
                             detectHorizontalDragGestures(
+                                onDragStart = {
+                                    isDragging = true
+                                    dragOffsetPx.floatValue = settleOffsetX.value
+                                },
                                 onHorizontalDrag = { change, dragAmount ->
                                     change.consume()
-                                    swipeScope.launch { offsetX.snapTo(offsetX.value + dragAmount) }
+                                    dragOffsetPx.floatValue += dragAmount
                                 },
                                 onDragEnd = {
-                                    if (abs(offsetX.value) > dismissPx) {
-                                        swipeScope.launch {
-                                            val target = if (offsetX.value > 0) dismissPx * 4 else -dismissPx * 4
-                                            offsetX.animateTo(target)
+                                    isDragging = false
+                                    val released = dragOffsetPx.floatValue
+                                    swipeScope.launch {
+                                        settleOffsetX.snapTo(released)
+                                        if (abs(released) > dismissPx) {
+                                            val target = if (released > 0) dismissPx * 4 else -dismissPx * 4
+                                            settleOffsetX.animateTo(target)
                                             data.dismiss()
+                                        } else {
+                                            settleOffsetX.animateTo(0f)
                                         }
-                                    } else {
-                                        swipeScope.launch { offsetX.animateTo(0f) }
+                                    }
+                                },
+                                onDragCancel = {
+                                    isDragging = false
+                                    val released = dragOffsetPx.floatValue
+                                    swipeScope.launch {
+                                        settleOffsetX.snapTo(released)
+                                        settleOffsetX.animateTo(0f)
                                     }
                                 },
                             )
