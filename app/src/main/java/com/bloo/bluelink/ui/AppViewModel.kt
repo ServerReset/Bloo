@@ -2780,7 +2780,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                     remainingMinutes = remaining,
                     tempF = req.tempF,
                     defrost = req.defrost,
-                    steeringWheelHeat = req.steeringWheelHeat,
+                    steeringWheelHeat = req.steeringWheelHeat.apiValue,
                     seatFrontLeft = req.seatFrontLeft.apiValue,
                     seatFrontRight = req.seatFrontRight.apiValue,
                     seatRearLeft = req.seatRearLeft.apiValue,

@@ -384,13 +384,36 @@ data class SeatCapability(
     val any: Boolean get() = frontLeft || frontRight || rearLeft || rearRight
 }
 
+/**
+ * Steering wheel heat level. Unlike [SeatLevel], most brands' APIs here only ever
+ * modelled this as a plain on/off -- Kia's US request body is the one exception found
+ * with a real second field (`steeringWheelStep`) beyond the on/off one, mirroring the
+ * shape of its seat-heat step. [apiValue] is this app's own flat wire encoding (used
+ * between phone and watch, [ClimateSync]/[WearCommand]) and is NOT the literal value
+ * any vendor API expects -- each brand's request-builder maps a level to whatever its
+ * own protocol wants (see [KiaUsaApi.startClimate]'s `steeringWheelStep`, and every
+ * other brand's plain [isOn] fallback).
+ */
+@Serializable
+enum class WheelHeatLevel(val apiValue: Int, val label: String) {
+    OFF(0, "Off"),
+    LOW(1, "Low"),
+    HIGH(2, "High");
+
+    val isOn: Boolean get() = this != OFF
+
+    companion object {
+        fun fromApi(value: Int?): WheelHeatLevel = entries.firstOrNull { it.apiValue == value } ?: OFF
+    }
+}
+
 /** A full climate-start request assembled by the UI. */
 @Serializable
 data class ClimateRequest(
     val tempF: Int,
     val defrost: Boolean,
     val durationMinutes: Int,
-    val steeringWheelHeat: Boolean = false,
+    val steeringWheelHeat: WheelHeatLevel = WheelHeatLevel.OFF,
     val seatFrontLeft: SeatLevel = SeatLevel.OFF,
     val seatFrontRight: SeatLevel = SeatLevel.OFF,
     val seatRearLeft: SeatLevel = SeatLevel.OFF,

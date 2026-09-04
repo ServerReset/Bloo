@@ -307,11 +307,14 @@ data class WearCommand(
     val vin: String,
     val action: String,
     /** Climate settings to use for [WearAction.CLIMATE_ON]/[WearAction.TOGGLE_CLIMATE].
-     *  Seats are [SeatLevel.apiValue] ints (0 = off) so the wire format stays flat. */
+     *  Seats are [SeatLevel.apiValue] ints (0 = off) so the wire format stays flat.
+     *  [steeringWheelHeat] is likewise [WheelHeatLevel.apiValue] now, not a boolean --
+     *  the watch's own draft is still a plain on/off toggle (see [ClimateDraft] in
+     *  wear/WearViewModel.kt), so "on" from the watch always maps to [WheelHeatLevel.HIGH]. */
     val tempF: Int = DEFAULT_CLIMATE_TEMP_F,
     val durationMinutes: Int = DEFAULT_CLIMATE_DURATION_MIN,
     val defrost: Boolean = false,
-    val steeringWheelHeat: Boolean = false,
+    val steeringWheelHeat: Int = 0,
     val seatFrontLeft: Int = 0,
     val seatFrontRight: Int = 0,
     val seatRearLeft: Int = 0,
@@ -522,14 +525,16 @@ data class WearPresets(
 
 /** The live climate draft for one car, shared both ways. Seat values are
  *  [SeatLevel.apiValue] so the format is platform-neutral (the phone also has
- *  cooling levels; the watch collapses cooling to off). */
+ *  cooling levels; the watch collapses cooling to off). [steering] is likewise
+ *  [WheelHeatLevel.apiValue] now (the watch's own draft stays a plain on/off
+ *  toggle and maps "on" to [WheelHeatLevel.HIGH] at the wire boundary). */
 @Serializable
 data class ClimateSync(
     val activePresetId: String? = null,
     val tempF: Int = DEFAULT_CLIMATE_TEMP_F,
     val durationMinutes: Int = DEFAULT_CLIMATE_DURATION_MIN,
     val defrost: Boolean = false,
-    val steering: Boolean = false,
+    val steering: Int = 0,
     val seatFrontLeft: Int = 0,
     val seatFrontRight: Int = 0,
     val seatRearLeft: Int = 0,
@@ -552,7 +557,7 @@ fun ClimateRequest.toWearCommand(vin: String, action: String): WearCommand =
         tempF = tempF,
         durationMinutes = durationMinutes,
         defrost = defrost,
-        steeringWheelHeat = steeringWheelHeat,
+        steeringWheelHeat = steeringWheelHeat.apiValue,
         seatFrontLeft = seatFrontLeft.apiValue,
         seatFrontRight = seatFrontRight.apiValue,
         seatRearLeft = seatRearLeft.apiValue,
@@ -561,14 +566,15 @@ fun ClimateRequest.toWearCommand(vin: String, action: String): WearCommand =
 
 /** Build the live [ClimateSync] draft mirrored between phone and watch from this
  *  request, expanding the four [SeatLevel] seats to their [SeatLevel.apiValue]
- *  ints (note [ClimateSync.steering] carries this request's [steeringWheelHeat]). */
+ *  ints (note [ClimateSync.steering] carries this request's [steeringWheelHeat],
+ *  likewise as [WheelHeatLevel.apiValue]). */
 fun ClimateRequest.toClimateSync(activePresetId: String?): ClimateSync =
     ClimateSync(
         activePresetId = activePresetId,
         tempF = tempF,
         durationMinutes = durationMinutes,
         defrost = defrost,
-        steering = steeringWheelHeat,
+        steering = steeringWheelHeat.apiValue,
         seatFrontLeft = seatFrontLeft.apiValue,
         seatFrontRight = seatFrontRight.apiValue,
         seatRearLeft = seatRearLeft.apiValue,

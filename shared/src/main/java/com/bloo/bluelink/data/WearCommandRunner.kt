@@ -48,7 +48,7 @@ object WearCommandRunner {
                 tempF = command.tempF,
                 defrost = command.defrost,
                 durationMinutes = command.durationMinutes,
-                steeringWheelHeat = command.steeringWheelHeat,
+                steeringWheelHeat = WheelHeatLevel.fromApi(command.steeringWheelHeat),
                 seatFrontLeft = SeatLevel.fromApi(command.seatFrontLeft),
                 seatFrontRight = SeatLevel.fromApi(command.seatFrontRight),
                 seatRearLeft = SeatLevel.fromApi(command.seatRearLeft),

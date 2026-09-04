@@ -484,7 +484,7 @@ class CanadaApi(private val brand: Brand) {
         fun climateFields() = buildJsonObject {
             put("airCtrl", 1)
             put("defrost", req.defrost)
-            put("heating1", if (req.steeringWheelHeat) 1 else 0)
+            put("heating1", if (req.steeringWheelHeat.isOn) 1 else 0)
             put("igniOnDuration", req.durationMinutes)
             put("airTemp", buildJsonObject {
                 put("value", hexTemp)

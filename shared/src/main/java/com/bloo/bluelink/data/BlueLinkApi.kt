@@ -281,7 +281,7 @@ class BlueLinkApi(private val brand: Brand = Brand.HYUNDAI) {
                         put("unit", kotlinx.serialization.json.JsonPrimitive(1))
                     })
                     put("defrost", kotlinx.serialization.json.JsonPrimitive(req.defrost))
-                    put("heating1", kotlinx.serialization.json.JsonPrimitive(if (req.steeringWheelHeat) 1 else 0))
+                    put("heating1", kotlinx.serialization.json.JsonPrimitive(if (req.steeringWheelHeat.isOn) 1 else 0))
                     // Older (gen-3) EVs additionally accept duration + seat heat.
                     if (gen3) {
                         put("igniOnDuration", kotlinx.serialization.json.JsonPrimitive(req.durationMinutes))
@@ -295,7 +295,7 @@ class BlueLinkApi(private val brand: Brand = Brand.HYUNDAI) {
                         put("value", kotlinx.serialization.json.JsonPrimitive(req.tempF.toString()))
                     })
                     put("defrost", kotlinx.serialization.json.JsonPrimitive(req.defrost))
-                    put("heating1", kotlinx.serialization.json.JsonPrimitive(if (req.steeringWheelHeat) 1 else 0))
+                    put("heating1", kotlinx.serialization.json.JsonPrimitive(if (req.steeringWheelHeat.isOn) 1 else 0))
                     put("igniOnDuration", kotlinx.serialization.json.JsonPrimitive(req.durationMinutes))
                     put("seatHeaterVentInfo", seatInfo())
                     put("username", kotlinx.serialization.json.JsonPrimitive(username))

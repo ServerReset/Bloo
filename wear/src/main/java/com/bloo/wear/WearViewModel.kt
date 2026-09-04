@@ -16,6 +16,7 @@ import com.bloo.bluelink.data.CredentialStore
 import com.bloo.bluelink.data.DoorOpen
 import com.bloo.bluelink.data.EvTrip
 import com.bloo.bluelink.data.SeatLevel
+import com.bloo.bluelink.data.WheelHeatLevel
 import com.bloo.bluelink.data.isGen5W
 import com.bloo.bluelink.data.supportsHornLights
 import com.bloo.bluelink.data.SessionStore
@@ -270,7 +271,7 @@ private fun ClimateDraft.toRequest(tempF: Int = this.tempF, defrost: Boolean = t
         tempF = tempF,
         defrost = defrost,
         durationMinutes = duration,
-        steeringWheelHeat = steering,
+        steeringWheelHeat = if (steering) WheelHeatLevel.HIGH else WheelHeatLevel.OFF,
         seatFrontLeft = seatLevelOf(seatDriver),
         seatFrontRight = seatLevelOf(seatPassenger),
         seatRearLeft = seatLevelOf(seatRearLeft),
@@ -1248,7 +1249,7 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
                 tempF = r.tempF,
                 duration = r.durationMinutes,
                 defrost = r.defrost,
-                steering = r.steeringWheelHeat,
+                steering = r.steeringWheelHeat.isOn,
                 seatDriver = seatStepOf(r.seatFrontLeft),
                 seatPassenger = seatStepOf(r.seatFrontRight),
                 seatRearLeft = seatStepOf(r.seatRearLeft),
@@ -1385,7 +1386,7 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
                     tempF = cs.tempF,
                     duration = cs.durationMinutes,
                     defrost = cs.defrost,
-                    steering = cs.steering,
+                    steering = cs.steering != 0,
                     seatDriver = seatStepOf(SeatLevel.fromApi(cs.seatFrontLeft)),
                     seatPassenger = seatStepOf(SeatLevel.fromApi(cs.seatFrontRight)),
                     seatRearLeft = seatStepOf(SeatLevel.fromApi(cs.seatRearLeft)),
@@ -1448,7 +1449,7 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
                 tempF = d.tempF,
                 durationMinutes = d.duration,
                 defrost = d.defrost,
-                steering = d.steering,
+                steering = (if (d.steering) WheelHeatLevel.HIGH else WheelHeatLevel.OFF).apiValue,
                 seatFrontLeft = seatLevelOf(d.seatDriver).apiValue,
                 seatFrontRight = seatLevelOf(d.seatPassenger).apiValue,
                 seatRearLeft = seatLevelOf(d.seatRearLeft).apiValue,
@@ -2086,7 +2087,7 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
             tempF = d.tempF,
             durationMinutes = d.duration,
             defrost = d.defrost,
-            steeringWheelHeat = d.steering,
+            steeringWheelHeat = (if (d.steering) WheelHeatLevel.HIGH else WheelHeatLevel.OFF).apiValue,
             seatFrontLeft = seatLevelOf(d.seatDriver).apiValue,
             seatFrontRight = seatLevelOf(d.seatPassenger).apiValue,
             seatRearLeft = seatLevelOf(d.seatRearLeft).apiValue,

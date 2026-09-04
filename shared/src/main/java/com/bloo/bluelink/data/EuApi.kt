@@ -555,7 +555,7 @@ class EuApi(private val brand: Brand) {
         val cmd = buildJsonObject {
             put("command", "start")
             put("ignitionDuration", req.durationMinutes)
-            put("strgWhlHeating", if (req.steeringWheelHeat) 1 else 0)
+            put("strgWhlHeating", if (req.steeringWheelHeat.isOn) 1 else 0)
             put("hvacTempType", 1)
             put("hvacTemp", celsius)
             put("sideRearMirrorHeating", 0)

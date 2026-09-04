@@ -88,6 +88,7 @@ import com.bloo.bluelink.data.ClimatePreset
 import com.bloo.bluelink.data.ClimateRequest
 import com.bloo.bluelink.data.SeatConfig
 import com.bloo.bluelink.data.SeatLevel
+import com.bloo.bluelink.data.WheelHeatLevel
 import com.bloo.bluelink.data.degValue
 import com.bloo.bluelink.data.smartClimateTargetF
 import com.bloo.bluelink.data.Vehicle
@@ -154,7 +155,7 @@ internal fun ClimatePebble(
     var tempF by remember(v.vin) { mutableIntStateOf(DEFAULT_CLIMATE_TEMP_F) }
     var duration by remember(v.vin) { mutableIntStateOf(DEFAULT_CLIMATE_DURATION_MIN) }
     var defrost by remember(v.vin) { mutableStateOf(false) }
-    var steeringHeat by remember(v.vin) { mutableStateOf(false) }
+    var steeringHeat by remember(v.vin) { mutableStateOf(WheelHeatLevel.OFF) }
     var driver by remember(v.vin) { mutableStateOf(SeatLevel.OFF) }
     var passenger by remember(v.vin) { mutableStateOf(SeatLevel.OFF) }
     var rearLeft by remember(v.vin) { mutableStateOf(SeatLevel.OFF) }
@@ -220,7 +221,7 @@ internal fun ClimatePebble(
         tempF = r.tempF
         duration = r.durationMinutes
         defrost = r.defrost
-        steeringHeat = r.steering
+        steeringHeat = WheelHeatLevel.fromApi(r.steering)
         driver = SeatLevel.fromApi(r.seatFrontLeft)
         passenger = SeatLevel.fromApi(r.seatFrontRight)
         rearLeft = SeatLevel.fromApi(r.seatRearLeft)
@@ -513,7 +514,7 @@ internal fun ClimatePebble(
 
         ToggleRow("Defrost", defrost) { defrost = it }
         if (seats.steeringWheel) {
-            ToggleRow("Steering wheel heat", steeringHeat) { steeringHeat = it }
+            WheelHeatControl(steeringHeat) { steeringHeat = it }
         }
 
         val isGen5W = state.isGen5WEffective(v)
@@ -639,6 +640,43 @@ internal fun SeatControl(
     }
 }
 
+/**
+ * Steering wheel heat, as a real Low/High level control rather than a plain on/off
+ * toggle -- see [WheelHeatLevel]'s own doc for why most brands still only ever get a
+ * boolean out of this at the network layer, while Kia's request gets a real second
+ * step. Same slider/tint shape as [SeatControl] just below, minus the cool half (the
+ * steering wheel has no cooling mode).
+ */
+@Composable
+internal fun WheelHeatControl(level: WheelHeatLevel, onChange: (WheelHeatLevel) -> Unit) {
+    val range = WheelHeatLevel.entries.toList()
+    val index = range.indexOf(level).coerceAtLeast(0)
+    val tint by androidx.compose.animation.animateColorAsState(
+        targetValue = wheelHeatTint(level),
+        animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
+        label = "wheelHeatTint",
+    )
+    Column {
+        StepRow("Steering wheel heat", level.label, valueColor = tint)
+        AnimatedSlider(
+            value = index.toFloat(),
+            onValueChange = { onChange(range[it.roundToInt().coerceIn(0, range.lastIndex)]) },
+            valueRange = 0f..range.lastIndex.toFloat(),
+            steps = (range.size - 2).coerceAtLeast(0),
+            accent = tint,
+        )
+    }
+}
+
+/** Steering wheel heat tint by intensity -- same light->dark red ramp [seatTint] uses
+ *  for a seat's own heat half. */
+@Composable
+internal fun wheelHeatTint(level: WheelHeatLevel): Color = when (level) {
+    WheelHeatLevel.OFF -> MaterialTheme.colorScheme.onSurfaceVariant
+    WheelHeatLevel.LOW -> Color(0xFFFF8A80)
+    WheelHeatLevel.HIGH -> Color(0xFFC62828)
+}
+
 /** Seat colour by intensity: light->dark blue for cool, light->dark red for heat. */
 @Composable
 internal fun seatTint(level: SeatLevel): Color = when {
@@ -728,7 +766,7 @@ internal fun presetDetail(req: ClimateRequest, fahrenheit: Boolean): String {
     val seats = listOf(req.seatFrontLeft, req.seatFrontRight, req.seatRearLeft, req.seatRearRight)
     if (seats.any { it.isHeat }) parts += "Heat"
     if (seats.any { it.isCool }) parts += "Cool"
-    if (req.steeringWheelHeat) parts += "Wheel"
+    if (req.steeringWheelHeat.isOn) parts += "Wheel"
     return parts.joinToString(" · ")
 }
 

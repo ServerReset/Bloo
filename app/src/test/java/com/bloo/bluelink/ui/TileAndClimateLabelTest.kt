@@ -3,6 +3,7 @@ package com.bloo.bluelink.ui
 import com.bloo.bluelink.data.CLIMATE_DURATION_RANGE
 import com.bloo.bluelink.data.ClimateRequest
 import com.bloo.bluelink.data.SeatLevel
+import com.bloo.bluelink.data.WheelHeatLevel
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
@@ -86,7 +87,7 @@ class TileAndClimateLabelTest {
             durationMinutes = 15,
             seatFrontLeft = if (heat) SeatLevel.HIGH_HEAT else SeatLevel.OFF,
             seatFrontRight = if (cool) SeatLevel.HIGH_COOL else SeatLevel.OFF,
-            steeringWheelHeat = wheel,
+            steeringWheelHeat = if (wheel) WheelHeatLevel.HIGH else WheelHeatLevel.OFF,
         )
 
     @Test

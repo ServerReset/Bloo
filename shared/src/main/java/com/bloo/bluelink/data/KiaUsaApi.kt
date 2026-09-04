@@ -501,8 +501,22 @@ class KiaUsaApi {
                 put("heatingAccessory", buildJsonObject {
                     put("rearWindow", if (req.defrost) 1 else 0)
                     put("sideMirror", if (req.defrost) 1 else 0)
-                    put("steeringWheel", if (req.steeringWheelHeat) 1 else 0)
-                    put("steeringWheelStep", if (req.steeringWheelHeat) 1 else 0)
+                    put("steeringWheel", if (req.steeringWheelHeat.isOn) 1 else 0)
+                    // Best-guess mapping, unverified against real API docs: mirrors seatSettings'
+                    // own inverted step scheme just below (lower step number = MORE heat), on the
+                    // assumption Kia's steering-wheel step follows the same convention as its seat
+                    // step. Confirmed-real-car feedback said this control genuinely has two
+                    // distinct heat levels; this is the field that already exists to carry a
+                    // second one (it was previously hardcoded to 1 regardless of what the app's
+                    // own toggle showed). If a real device reports Low/High swapped, flip this.
+                    put(
+                        "steeringWheelStep",
+                        when (req.steeringWheelHeat) {
+                            WheelHeatLevel.HIGH -> 1
+                            WheelHeatLevel.LOW -> 2
+                            WheelHeatLevel.OFF -> 0
+                        },
+                    )
                 })
                 put("ignitionOnDuration", buildJsonObject { put("unit", 4); put("value", req.durationMinutes) })
                 if (anySeat) {
