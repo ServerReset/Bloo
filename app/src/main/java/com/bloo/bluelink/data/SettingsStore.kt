@@ -926,7 +926,14 @@ class SettingsStore(private val context: Context) {
         if (vins.isEmpty()) return
         editTracked {
             it.remove(stringPreferencesKey("autolock_vins"))
-            vins.forEach { vin -> autoLockKeys(vin).forEach(it::remove) }
+            // MutablePreferences.remove is generic on the key's own value type
+            // (fun <T> remove(key: Preferences.Key<T>): T) and autoLockKeys' mixed
+            // Boolean/String keys collapse to Preferences.Key<*> in the list -- Kotlin can't
+            // infer T from a star projection, so the type parameter is pinned to Any here
+            // instead (an unchecked but safe cast: remove() only ever reads the key's
+            // identity, never the value type, to find and drop the entry).
+            @Suppress("UNCHECKED_CAST")
+            vins.forEach { vin -> autoLockKeys(vin).forEach { key -> it.remove(key as Preferences.Key<Any>) } }
         }
     }
 
