@@ -16,16 +16,43 @@ import com.bloo.bluelink.data.ensureNotificationChannel
 object AutoLockNotification {
     private const val CHANNEL_ID = "bloo_autolock"
 
-    private fun ensureChannel(context: Context) = ensureNotificationChannel(
-        context,
-        id = CHANNEL_ID,
-        name = "AutoLock",
-        importance = NotificationManager.IMPORTANCE_LOW,
-        description = "Shows while AutoLock is deciding whether to lock your car",
-        showBadge = false,
-    )
+    // build() is called on every state transition of a live evaluation -- once a second for
+    // however long the grace countdown runs, up to the configured max of 120. Without this
+    // flag, ensureNotificationChannel's own existence check is a Binder IPC call to
+    // NotificationManagerService, repeated every single one of those ticks, to re-confirm a
+    // channel that (after the very first call in this process's life) is certain to already
+    // exist -- channels persist across app runs, not just within one. @Volatile: build() can
+    // be called from AutoLockService's Main-dispatcher coroutine and, via a "Simulate
+    // leaving" test, potentially interleaved calls -- a plain var risked two threads both
+    // observing false and both paying for the (harmless but pointless) double IPC once.
+    @Volatile private var channelEnsured = false
+
+    private fun ensureChannel(context: Context) {
+        if (channelEnsured) return
+        ensureNotificationChannel(
+            context,
+            id = CHANNEL_ID,
+            name = "AutoLock",
+            importance = NotificationManager.IMPORTANCE_LOW,
+            description = "Shows while AutoLock is deciding whether to lock your car",
+            showBadge = false,
+        )
+        channelEnsured = true
+    }
 
     fun notificationId(vin: String): Int = 0x41_0000 or (vin.hashCode() and 0xFFFF)
+
+    // Both PendingIntent factories below are cached: build() fires on every state transition
+    // of a live evaluation, including once a second for up to 120 seconds of grace countdown,
+    // and every PendingIntent.getService()/getActivity() call is itself a Binder round trip to
+    // the system (to register or, with FLAG_UPDATE_CURRENT, look up and refresh an existing
+    // one) even though the underlying intent -- same vin, same action, same target component
+    // -- is identical every single tick. openAppIntent takes no vin at all, so one instance
+    // genuinely serves every car; actionIntent is cached per (vin, action), since those DO
+    // vary. Neither cache is ever invalidated: nothing about "how do I open the app" or "run
+    // this action for this VIN" changes for the life of the process.
+    @Volatile private var cachedOpenAppIntent: PendingIntent? = null
+    private val actionIntents = java.util.concurrent.ConcurrentHashMap<String, PendingIntent>()
 
     fun build(context: Context, vin: String, carName: String, state: DetectionState, graceRemaining: Int): Notification {
         ensureChannel(context)
@@ -58,20 +85,22 @@ object AutoLockNotification {
         return builder.build()
     }
 
-    private fun openAppIntent(context: Context): PendingIntent {
-        val intent = context.packageManager.getLaunchIntentForPackage(context.packageName)
-        val flags = PendingIntent.FLAG_UPDATE_CURRENT or
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) PendingIntent.FLAG_IMMUTABLE else 0
-        return PendingIntent.getActivity(context, 0, intent, flags)
-    }
-
-    private fun actionIntent(context: Context, vin: String, action: String): PendingIntent {
-        val intent = Intent(context, AutoLockService::class.java).apply {
-            this.action = action
-            putExtra(AutoLockService.EXTRA_VIN, vin)
+    private fun openAppIntent(context: Context): PendingIntent =
+        cachedOpenAppIntent ?: run {
+            val intent = context.packageManager.getLaunchIntentForPackage(context.packageName)
+            val flags = PendingIntent.FLAG_UPDATE_CURRENT or
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) PendingIntent.FLAG_IMMUTABLE else 0
+            PendingIntent.getActivity(context, 0, intent, flags).also { cachedOpenAppIntent = it }
         }
-        val flags = PendingIntent.FLAG_UPDATE_CURRENT or
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) PendingIntent.FLAG_MUTABLE else 0
-        return PendingIntent.getService(context, notificationId(vin) + action.hashCode(), intent, flags)
-    }
+
+    private fun actionIntent(context: Context, vin: String, action: String): PendingIntent =
+        actionIntents.getOrPut("$vin:$action") {
+            val intent = Intent(context, AutoLockService::class.java).apply {
+                this.action = action
+                putExtra(AutoLockService.EXTRA_VIN, vin)
+            }
+            val flags = PendingIntent.FLAG_UPDATE_CURRENT or
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) PendingIntent.FLAG_MUTABLE else 0
+            PendingIntent.getService(context, notificationId(vin) + action.hashCode(), intent, flags)
+        }
 }

@@ -19,13 +19,14 @@ import com.google.android.gms.location.LocationServices
  * request id encodes it), since more than one car can have AutoLock + geofence enabled.
  */
 object GeofenceManager {
+    // request code alone (vin.hashCode()) already keeps each car's PendingIntent distinct for
+    // FLAG_UPDATE_CURRENT, and AutoLockGeofenceReceiver identifies a real geofence callback via
+    // GeofencingEvent.fromIntent() -- so this intent carries only the one extra it actually
+    // needs (EXTRA_VIN), not an unchecked action string that would just be dead weight.
     private fun pendingIntent(context: Context, vin: String): PendingIntent {
         val flags = PendingIntent.FLAG_UPDATE_CURRENT or
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) PendingIntent.FLAG_MUTABLE else 0
-        val intent = Intent(context, AutoLockGeofenceReceiver::class.java).apply {
-            action = ACTION_GEOFENCE
-            putExtra(EXTRA_VIN, vin)
-        }
+        val intent = Intent(context, AutoLockGeofenceReceiver::class.java).putExtra(EXTRA_VIN, vin)
         return PendingIntent.getBroadcast(context, vin.hashCode(), intent, flags)
     }
 
@@ -62,6 +63,5 @@ object GeofenceManager {
 
     private fun requestId(vin: String) = "autolock_geofence_$vin"
 
-    const val ACTION_GEOFENCE = "com.bloo.bluelink.AUTOLOCK_GEOFENCE"
     const val EXTRA_VIN = "vin"
 }

@@ -47,9 +47,20 @@ internal fun AutoLockSettingsGroup(v: Vehicle, vm: AppViewModel) {
     LaunchedEffect(v.vin) { config = vm.autoLockConfig(v.vin) }
     val current = config ?: return
 
+    // Commits to SettingsStore (a DataStore write) -- for toggles and the device picker,
+    // where every call IS the one real change the user made.
     fun update(new: AutoLockConfig) {
         config = new
         vm.setAutoLockConfig(v.vin, new)
+    }
+
+    // Cheap: only updates the slider's own displayed value, no DataStore write. AnimatedSlider
+    // calls onValueChange on every drag tick -- dozens of times for one drag gesture -- so a
+    // slider using `update` directly there was writing to disk that often. The two sliders
+    // below call this from onValueChange and `update` from onValueSettled instead, matching
+    // this file's own documented "sync on commit" pattern (see the Vibrancy/UI-scale sliders).
+    fun updateLocal(new: AutoLockConfig) {
+        config = new
     }
 
     var showDevicePicker by remember { mutableStateOf(false) }
@@ -98,7 +109,8 @@ internal fun AutoLockSettingsGroup(v: Vehicle, vm: AppViewModel) {
                 StepRow("Grace period", "${current.graceSeconds}s")
                 AnimatedSlider(
                     value = current.graceSeconds.toFloat(),
-                    onValueChange = { update(current.copy(graceSeconds = it.roundToInt())) },
+                    onValueChange = { updateLocal(current.copy(graceSeconds = it.roundToInt())) },
+                    onValueSettled = { update(current.copy(graceSeconds = it.roundToInt())) },
                     valueRange = 5f..120f,
                     steps = 22,
                 )
@@ -120,7 +132,8 @@ internal fun AutoLockSettingsGroup(v: Vehicle, vm: AppViewModel) {
                         StepRow("Geofence radius", "${current.geofenceRadiusMeters} m")
                         AnimatedSlider(
                             value = current.geofenceRadiusMeters.toFloat(),
-                            onValueChange = { update(current.copy(geofenceRadiusMeters = it.roundToInt())) },
+                            onValueChange = { updateLocal(current.copy(geofenceRadiusMeters = it.roundToInt())) },
+                            onValueSettled = { update(current.copy(geofenceRadiusMeters = it.roundToInt())) },
                             valueRange = 50f..500f,
                             steps = 8,
                         )

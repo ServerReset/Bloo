@@ -96,9 +96,18 @@ object AutoLockController {
         machines[vin]?.let { advance(vin, it.next(stateFor(vin).detection, DetectionEvent.MovedBeyondGeofence)) }
     }
 
-    /** Reconnect or user cancel: abort a pending evaluation for [vin], if any. */
+    /** Reconnect or user cancel: abort a pending evaluation for [vin], if there is one.
+     *
+     * The Bluetooth receiver calls this on EVERY reconnect to a car with AutoLock enabled --
+     * which, for most drivers most days, means "you just got in your car with nothing
+     * pending", not "an evaluation was actually running". Guarded on the job actually being
+     * active so that ordinary case doesn't log a misleading "cancelled" for a car that was
+     * never mid-evaluation, and doesn't push a spurious ABORTED entry into `state` (and
+     * therefore into the Settings screen's live status line) for no reason. */
     fun cancel(vin: String) {
-        jobs[vin]?.cancel()
+        val job = jobs[vin] ?: return
+        if (!job.isActive) return
+        job.cancel()
         _state.update { it + (vin to AutoLockEvalState(detection = DetectionState.ABORTED)) }
         AppLog.log("AutoLock: cancelled for $vin")
     }
@@ -121,6 +130,14 @@ object AutoLockController {
     }
 
     private suspend fun runEvaluation(context: Context, vin: String) = mutexFor(vin).withLock {
+        // Declared OUTSIDE the try block (and so, unlike a val inside it, visible to the
+        // finally below) and only ever flipped true at the exact point start() is actually
+        // called -- the finally's stop() call is paired against what THIS evaluation really
+        // started, not a fresh settings re-read that could disagree if the user changed the
+        // "confirm with walking" toggle for this car mid-evaluation. A start()/stop() pair
+        // that can silently go unbalanced defeats the whole point of the reference count in
+        // ActivityRecognitionManager.
+        var startedActivityRecognition = false
         try {
             skipGrace.remove(vin)
             walkAwayConfirmed.remove(vin)
@@ -131,7 +148,10 @@ object AutoLockController {
             advance(vin, sm.next(DetectionState.IDLE, DetectionEvent.CarBluetoothDisconnected))
             AppLog.log("AutoLock: left the car ($vin) — evaluating.")
 
-            if (settings.useActivityRecognition) ActivityRecognitionManager.start(context)
+            if (settings.useActivityRecognition) {
+                ActivityRecognitionManager.start(context)
+                startedActivityRecognition = true
+            }
 
             // Wait for corroborating signals (activity + geofence) to promote CONFIRMING -> GRACE,
             // or time out and either proceed on the Bluetooth signal alone or skip, per settings.
@@ -201,15 +221,16 @@ object AutoLockController {
             // NonCancellable: this cleanup must run even when the finally is reached because
             // cancel(vin) already cancelled this exact coroutine (a reconnect during the
             // evaluation) -- a plain suspend call here would throw immediately instead of
-            // running, leaving Activity Recognition updates registered indefinitely.
-            kotlinx.coroutines.withContext(kotlinx.coroutines.NonCancellable) {
-                if (settingsUseActivityRecognition(context, vin)) ActivityRecognitionManager.stop(context)
+            // running, leaving Activity Recognition updates registered indefinitely (or, with
+            // two cars concurrently confirming, permanently unbalancing the reference count
+            // in ActivityRecognitionManager -- see its own doc).
+            if (startedActivityRecognition) {
+                kotlinx.coroutines.withContext(kotlinx.coroutines.NonCancellable) {
+                    ActivityRecognitionManager.stop(context)
+                }
             }
         }
     }
-
-    private suspend fun settingsUseActivityRecognition(context: Context, vin: String): Boolean =
-        runCatching { SettingsStore(context).autoLockConfig(vin).useActivityRecognition }.getOrDefault(false)
 
     private suspend fun statusFor(context: Context, v: Vehicle): VehicleStatus? {
         val repo = repositoryFor(Brand.fromIndicator(v.brandIndicator), SessionStore(context), CredentialStore(context))
