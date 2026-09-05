@@ -647,7 +647,8 @@ internal fun CoverActionButton(
             // No weight(1f): its parent here is SafeExpansiveButton's own layout, not the row,
             // so it was silently doing nothing. The equal share now comes from the group.
             modifier = Modifier
-                .height(if (compact) 44.dp else 56.dp)
+                .fillMaxHeight()
+                .heightIn(min = if (compact) 44.dp else 56.dp)
                 .alpha(if (enabled) 1f else 0.45f),
         ) {
         val glyph: @Composable () -> Unit = {
