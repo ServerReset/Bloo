@@ -36,9 +36,6 @@ class LockStateMachine(useActivityRecognition: Boolean, useGeofence: Boolean) {
             geofenceConfirmed = true
             promoteIfConfirming(current)
         }
-
-        DetectionEvent.GraceElapsed ->
-            if (current == DetectionState.GRACE) DetectionState.VERIFYING else current
     }
 
     private fun promoteIfConfirming(current: DetectionState): DetectionState =

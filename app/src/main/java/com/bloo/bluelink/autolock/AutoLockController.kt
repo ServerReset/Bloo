@@ -14,9 +14,11 @@ import com.bloo.bluelink.data.WearAction
 import com.bloo.bluelink.data.WearCommand
 import com.bloo.bluelink.data.repositoryFor
 import com.bloo.bluelink.data.runCarCommand
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -26,6 +28,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 
 /** Snapshot the UI/notification observe for one car's in-flight (or last) evaluation. */
@@ -213,7 +216,7 @@ object AutoLockController {
                 }
                 LockDecision.Lock -> performLock(context, vin, settings)
             }
-        } catch (c: kotlinx.coroutines.CancellationException) {
+        } catch (c: CancellationException) {
             throw c
         } catch (t: Throwable) {
             fail(vin, "AutoLock hit an error: ${t.message ?: t.javaClass.simpleName}")
@@ -225,7 +228,7 @@ object AutoLockController {
             // two cars concurrently confirming, permanently unbalancing the reference count
             // in ActivityRecognitionManager -- see its own doc).
             if (startedActivityRecognition) {
-                kotlinx.coroutines.withContext(kotlinx.coroutines.NonCancellable) {
+                withContext(NonCancellable) {
                     ActivityRecognitionManager.stop(context)
                 }
             }

@@ -8,7 +8,6 @@ package com.bloo.bluelink.autolock
  */
 enum class DetectionState {
     IDLE,
-    ARMED,        // Watching for a disconnect trigger.
     CONFIRMING,   // Trigger fired; waiting for corroborating signals (activity/geofence).
     GRACE,        // Counting down before acting.
     VERIFYING,    // Querying the vehicle status via the API.
@@ -23,12 +22,13 @@ enum class DetectionState {
         get() = this == LOCKED || this == SKIPPED || this == ABORTED || this == ERROR
 }
 
-/** External signals feeding [LockStateMachine]. */
+/** External signals feeding [LockStateMachine]. GRACE -> VERIFYING has no event of its own --
+ *  [AutoLockController]'s countdown loop advances that transition directly once it finishes,
+ *  since it already owns the timer driving it. */
 sealed interface DetectionEvent {
     data object CarBluetoothDisconnected : DetectionEvent
     data object CarBluetoothReconnected : DetectionEvent
     data object WalkingConfirmed : DetectionEvent
     data object MovedBeyondGeofence : DetectionEvent
-    data object GraceElapsed : DetectionEvent
     data object UserCancelled : DetectionEvent
 }
