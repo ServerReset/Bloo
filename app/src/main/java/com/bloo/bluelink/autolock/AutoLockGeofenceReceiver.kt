@@ -32,11 +32,16 @@ class AutoLockGeofenceReceiver : BroadcastReceiver() {
             try {
                 val settings = SettingsStore(ctx).autoLockConfig(vin)
                 if (settings.enabled && settings.useGeofence) {
-                    AppLog.log("AutoLock: left the geofence for $vin.")
+                    // Logged per branch below, not unconditionally here -- with Bluetooth as
+                    // the trigger (the common case), most geofence exits land in neither
+                    // branch (this car isn't currently CONFIRMING), and "left the geofence"
+                    // read as an event that did something even when it was a no-op.
                     if (AutoLockController.stateFor(vin).detection == DetectionState.CONFIRMING) {
+                        AppLog.log("AutoLock: moved beyond the geofence for $vin — confirmed.")
                         AutoLockController.onMovedBeyondGeofence(vin)
                     } else if (!settings.useBluetoothTrigger) {
                         // Bluetooth trigger disabled: the geofence exit is the primary signal.
+                        AppLog.log("AutoLock: left the geofence for $vin — starting evaluation.")
                         AutoLockService.start(ctx, vin)
                     }
                 }
