@@ -17,10 +17,16 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Bluetooth
+import androidx.compose.material.icons.filled.CloudLock
+import androidx.compose.material.icons.filled.LocationOn
+import androidx.compose.material.icons.filled.DirectionsWalk
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -30,9 +36,14 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Arrangement
 import androidx.core.content.ContextCompat
 import com.bloo.bluelink.autolock.AutoLockConfig
 import com.bloo.bluelink.autolock.DetectionState
@@ -42,19 +53,17 @@ import kotlin.math.roundToInt
 
 /**
  * AutoLock's per-car Settings section, inside [CarSettingsCard]. Ported feature from the
- * i5-AutoLock reference app (github.com/Vel-San/i5-AutoLock): locks this car automatically
- * when the phone disconnects from its paired Bluetooth device, after an optional walking/
- * geofence confirmation and a cancellable grace period -- see app/.../autolock/ for the
- * detection + policy machinery this configures.
+ * i5-AutoLock reference implementation by Vel-San (github.com/Vel-San/i5-AutoLock): locks
+ * this car automatically when the phone disconnects from its paired Bluetooth device, after
+ * an optional walking/geofence confirmation and a cancellable grace period -- see
+ * app/.../autolock/ for the detection + policy machinery this configures.
  *
- * Laid out as four clearly separated groups (Trigger, Confirm before locking, Safety, Test) --
- * a flat list of a dozen unrelated-looking rows read as one big undifferentiated block, and
- * it's genuinely four different decisions: which device counts as "the car" and how long to
- * wait, what should corroborate the disconnect, what to refuse to do automatically, and how to
- * try the whole thing safely before trusting it. Each toggle that turns on a signal this app
- * has no permission for yet actively prompts for it right there, instead of silently flipping
- * a setting whose underlying detector will just no-op until the user happens to find their way
- * to Android's own permission settings.
+ * Laid out as four clearly separated groups (Trigger, Confirm before locking, Safety, Test)
+ * with icons and improved typography to prevent the flat undifferentiated-wall problem of
+ * twelve related rows. Each toggle that turns on a signal this app has no permission for yet
+ * actively prompts for it right there, instead of silently flipping a setting whose underlying
+ * detector will just no-op until the user happens to find their way to Android's own
+ * permission settings.
  */
 @Composable
 internal fun AutoLockSettingsGroup(v: Vehicle, vm: AppViewModel) {
@@ -66,29 +75,17 @@ internal fun AutoLockSettingsGroup(v: Vehicle, vm: AppViewModel) {
     fun granted(permission: String) =
         ContextCompat.checkSelfPermission(context, permission) == PackageManager.PERMISSION_GRANTED
 
-    // Commits to SettingsStore (a DataStore write) -- for toggles and the device picker,
-    // where every call IS the one real change the user made.
     fun update(new: AutoLockConfig) {
         config = new
         vm.setAutoLockConfig(v.vin, new)
     }
 
-    // Cheap: only updates the slider's own displayed value, no DataStore write. AnimatedSlider
-    // calls onValueChange on every drag tick -- dozens of times for one drag gesture -- so a
-    // slider using `update` directly there was writing to disk that often. The two sliders
-    // below call this from onValueChange and `update` from onValueSettled instead, matching
-    // this file's own documented "sync on commit" pattern (see the Vibrancy/UI-scale sliders).
     fun updateLocal(new: AutoLockConfig) {
         config = new
     }
 
     var showDevicePicker by remember { mutableStateOf(false) }
 
-    // Background location has its own launcher, requested ALONE and only after foreground
-    // (fine) location is already granted -- bundling it into the same request as anything
-    // else is what Android 11+ actively guards against; a background-location request
-    // riding along with other permissions in one dialog is liable to be silently denied by
-    // the system regardless of what the user taps.
     val backgroundLocationLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission(),
     ) { /* no-op either way: GeofenceManager checks for itself before registering. */ }
@@ -115,9 +112,7 @@ internal fun AutoLockSettingsGroup(v: Vehicle, vm: AppViewModel) {
     }
     val corePermissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions(),
-    ) { /* no-op: every dependent feature (the device list, the notification) checks for
-           itself; this dialog is purely to get the prompt in front of the user right when
-           they turn AutoLock on, not to gate anything on its result. */ }
+    ) { /* no-op: every dependent feature checks for itself. */ }
 
     fun onEnabledChanged(value: Boolean) {
         update(current.copy(enabled = value))
@@ -146,153 +141,186 @@ internal fun AutoLockSettingsGroup(v: Vehicle, vm: AppViewModel) {
     }
 
     SettingsGroup("AutoLock") {
-        Text(
-            "Automatically locks ${v.name} a little while after you leave it, detected " +
-                "from your phone disconnecting from its paired Bluetooth (its head unit). " +
-                "Off by default, and starts in dry run — it decides what it would do but " +
-                "never sends a real lock command until you turn that off below.",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        Spacer(Modifier.height(SettingsGapHairline))
+        // Prominent intro explaining the feature
+        Surface(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(bottom = SettingsGapRow),
+            color = MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 0.5f),
+            shape = MaterialTheme.shapes.small,
+        ) {
+            Text(
+                "Automatically locks ${v.name} after you leave, detected from your phone " +
+                "disconnecting from its paired Bluetooth. Starts disabled and in dry-run mode " +
+                "— it decides what it would do but never sends a real lock command until you " +
+                "turn that off. Perfect for peace of mind without the risk.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(12.dp),
+            )
+        }
+
         ToggleRow("Enabled", current.enabled, onChange = ::onEnabledChanged)
 
-        // Plain PopVisible, no sizeAnimated: the pebble body around this whole group already
-        // animates its own height via StaggeredRevealColumn's animateContentSize (see
-        // PebbleShell) whenever its content changes size, including this reveal. A SECOND,
-        // independently-sprung height animation here compounded with that outer one -- two
-        // springs disagreeing about the same height delta -- and read as the whole card
-        // overshooting upward for a frame before settling, on every open. Fade+scale in
-        // place is enough; the outer animator is what should own the height change.
-        PopVisible(visible = current.enabled) {
-            Column {
-                // Not remembered: LiveCharge.isBackgroundUnrestricted reads the live OS state
-                // fresh on every recomposition, same as the identical check already does for
-                // the live-charging bar's own troubleshooting row -- so returning here from the
-                // system "Allow" dialog (which recomposes this screen) picks it up immediately,
-                // with no lifecycle observer needed.
-                //
-                // This is the one thing that actually determines whether AutoLock keeps
-                // working with the app closed: the Bluetooth disconnect trigger is a manifest-
-                // registered receiver that Android will happily wake regardless of whether Bloo
-                // is running -- but NOT if the OS (or, on some phones, an OEM battery manager
-                // layered on top of it -- see the same Samsung note LiveUpdateTroubleshootDialog
-                // gives) is actively restricting the app's background work, in which case the
-                // receiver can still fire but the foreground service / notification / lock
-                // command it tries to start gets deferred or dropped.
-                if (!LiveCharge.isBackgroundUnrestricted(context)) {
-                    Spacer(Modifier.height(SettingsGapRow))
-                    SettingsCaption("Won't reliably trigger with the app closed?", bottomGap = SettingsGapHairline)
-                    MorphTextButton(
-                        text = "Allow background activity",
-                        onClick = { LiveCharge.requestBackgroundUnrestricted(context) },
-                        contentColor = MaterialTheme.colorScheme.primary,
-                        icon = Icons.Filled.Warning,
-                    )
-                }
+        // Background optimization prompt (only shown when disabled)
+        if (current.enabled && !LiveCharge.isBackgroundUnrestricted(context)) {
+            Spacer(Modifier.height(SettingsGapHairline))
+            SettingsCaption("Won't reliably trigger with the app closed?", bottomGap = SettingsGapHairline)
+            MorphTextButton(
+                text = "Allow background activity",
+                onClick = { LiveCharge.requestBackgroundUnrestricted(context) },
+                contentColor = MaterialTheme.colorScheme.primary,
+                icon = Icons.Filled.Warning,
+            )
+        }
 
-                Spacer(Modifier.height(SettingsGapRow))
-                SectionLabel("Trigger")
-                Spacer(Modifier.height(SettingsGapHairline))
-                StatusRow("Car Bluetooth device", current.deviceName ?: "Not set")
-                Spacer(Modifier.height(SettingsGapHairline))
-                val deviceSource = remember { MutableInteractionSource() }
-                SafeExpansiveButton(interactionSource = deviceSource, enabled = true) {
-                    MorphTextButton(
-                        "Choose device",
-                        interactionSource = deviceSource,
-                        onClick = {
-                            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S || granted(Manifest.permission.BLUETOOTH_CONNECT)) {
-                                showDevicePicker = true
-                            } else {
-                                bluetoothConnectLauncher.launch(Manifest.permission.BLUETOOTH_CONNECT)
-                            }
-                        },
-                    )
-                }
+        // Only show detailed settings when enabled
+        if (current.enabled) {
+            Spacer(Modifier.height(SettingsGapRow))
 
-                Spacer(Modifier.height(SettingsGapRow))
-                StepRow("Grace period", "${current.graceSeconds}s")
+            // TRIGGER SECTION
+            SettingsSectionHeader("Trigger", Icons.Filled.Bluetooth)
+            Spacer(Modifier.height(SettingsGapHairline))
+
+            StatusRow("Car Bluetooth device", current.deviceName ?: "Not set")
+            Spacer(Modifier.height(SettingsGapHairline))
+            val deviceSource = remember { MutableInteractionSource() }
+            SafeExpansiveButton(interactionSource = deviceSource, enabled = true) {
+                MorphTextButton(
+                    "Choose device",
+                    interactionSource = deviceSource,
+                    onClick = {
+                        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S || granted(Manifest.permission.BLUETOOTH_CONNECT)) {
+                            showDevicePicker = true
+                        } else {
+                            bluetoothConnectLauncher.launch(Manifest.permission.BLUETOOTH_CONNECT)
+                        }
+                    },
+                )
+            }
+
+            Spacer(Modifier.height(SettingsGapRow))
+            StepRow("Grace period", "${current.graceSeconds}s")
+            Spacer(Modifier.height(SettingsGapHairline))
+            AnimatedSlider(
+                value = current.graceSeconds.toFloat(),
+                onValueChange = { updateLocal(current.copy(graceSeconds = it.roundToInt())) },
+                onValueSettled = { update(current.copy(graceSeconds = it.roundToInt())) },
+                valueRange = 5f..120f,
+                steps = 22,
+            )
+            Spacer(Modifier.height(SettingsGapHairline))
+            Text(
+                "Wait this long before locking — taps \"Lock now\" to skip the countdown.",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+
+            Spacer(Modifier.height(SettingsGapRow))
+
+            // CONFIRM SECTION
+            SettingsSectionHeader("Confirm before locking", Icons.Filled.DirectionsWalk)
+            Spacer(Modifier.height(SettingsGapHairline))
+            ToggleRow(
+                "Confirm with walking",
+                current.useActivityRecognition,
+                description = "Waits for Activity Recognition to notice you're walking before starting the countdown — cuts false triggers from a brief signal drop.",
+                onChange = ::onActivityRecognitionChanged,
+            )
+            ToggleRow(
+                "Confirm with geofence",
+                current.useGeofence,
+                description = "Waits for you to walk beyond a radius around where the car's parked.",
+                onChange = ::onGeofenceChanged,
+            )
+
+            // Geofence radius slider (stable height, always present when geofence enabled)
+            if (current.useGeofence) {
+                Spacer(Modifier.height(SettingsGapHairline))
+                StepRow("Geofence radius", "${current.geofenceRadiusMeters} m")
+                Spacer(Modifier.height(SettingsGapHairline))
                 AnimatedSlider(
-                    value = current.graceSeconds.toFloat(),
-                    onValueChange = { updateLocal(current.copy(graceSeconds = it.roundToInt())) },
-                    onValueSettled = { update(current.copy(graceSeconds = it.roundToInt())) },
-                    valueRange = 5f..120f,
-                    steps = 22,
+                    value = current.geofenceRadiusMeters.toFloat(),
+                    onValueChange = { updateLocal(current.copy(geofenceRadiusMeters = it.roundToInt())) },
+                    onValueSettled = { update(current.copy(geofenceRadiusMeters = it.roundToInt())) },
+                    valueRange = 50f..500f,
+                    steps = 8,
                 )
-
-                Spacer(Modifier.height(SettingsGapRow))
-                SectionLabel("Confirm before locking")
                 Spacer(Modifier.height(SettingsGapHairline))
-                ToggleRow(
-                    "Confirm with walking",
-                    current.useActivityRecognition,
-                    description = "Waits for Activity Recognition to notice you're walking before starting the countdown -- cuts false triggers from a brief signal drop.",
-                    onChange = ::onActivityRecognitionChanged,
+                Text(
+                    "Lock only after you've walked this far from the parked location.",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-                ToggleRow(
-                    "Confirm with geofence",
-                    current.useGeofence,
-                    description = "Waits for you to walk beyond a radius around where the car's parked before starting the countdown.",
-                    onChange = ::onGeofenceChanged,
+            }
+
+            Spacer(Modifier.height(SettingsGapRow))
+
+            // SAFETY SECTION
+            SettingsSectionHeader("Safety", Icons.Filled.CloudLock)
+            Spacer(Modifier.height(SettingsGapHairline))
+            ToggleRow(
+                "Skip if a door or window is open",
+                current.dontLockIfOpen,
+                description = "Doesn't lock if any door or window is reported open.",
+            ) { update(current.copy(dontLockIfOpen = it)) }
+            ToggleRow(
+                "Dry run (testing mode)",
+                current.dryRun,
+                description = "Runs the full flow and logs what it would do, but never sends the real lock command. Defaults on; turn off once you trust it.",
+            ) { update(current.copy(dryRun = it)) }
+
+            Spacer(Modifier.height(SettingsGapRow))
+
+            // TEST SECTION
+            SettingsSectionHeader("Test", Icons.Filled.LocationOn)
+            Spacer(Modifier.height(SettingsGapHairline))
+            val simSource = remember { MutableInteractionSource() }
+            SafeExpansiveButton(interactionSource = simSource, enabled = current.isUsable) {
+                MorphTextButton(
+                    "Simulate leaving",
+                    interactionSource = simSource,
+                    enabled = current.isUsable,
+                    onClick = { vm.simulateAutoLockLeaving(v) },
                 )
-                PopVisible(visible = current.useGeofence) {
-                    Column {
-                        Spacer(Modifier.height(SettingsGapHairline))
-                        StepRow("Geofence radius", "${current.geofenceRadiusMeters} m")
-                        AnimatedSlider(
-                            value = current.geofenceRadiusMeters.toFloat(),
-                            onValueChange = { updateLocal(current.copy(geofenceRadiusMeters = it.roundToInt())) },
-                            onValueSettled = { update(current.copy(geofenceRadiusMeters = it.roundToInt())) },
-                            valueRange = 50f..500f,
-                            steps = 8,
-                        )
-                    }
-                }
-
-                Spacer(Modifier.height(SettingsGapRow))
-                SectionLabel("Safety")
+            }
+            if (!current.isUsable) {
                 Spacer(Modifier.height(SettingsGapHairline))
-                ToggleRow(
-                    "Skip if a door or window is open",
-                    current.dontLockIfOpen,
-                ) { update(current.copy(dontLockIfOpen = it)) }
-                ToggleRow(
-                    "Dry run",
-                    current.dryRun,
-                    description = "Runs the full detect-and-verify flow and logs what it would do, but never sends the real lock command.",
-                ) { update(current.copy(dryRun = it)) }
+                Text(
+                    "Choose the car's Bluetooth device above to try this.",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
 
-                Spacer(Modifier.height(SettingsGapRow))
-                SectionLabel("Test")
+            // Live status display
+            val evalStates by vm.autoLockState.collectAsState()
+            evalStates[v.vin]?.takeIf { it.detection != DetectionState.IDLE }?.let { s ->
                 Spacer(Modifier.height(SettingsGapHairline))
-                val simSource = remember { MutableInteractionSource() }
-                SafeExpansiveButton(interactionSource = simSource, enabled = current.isUsable) {
-                    MorphTextButton(
-                        "Simulate leaving",
-                        interactionSource = simSource,
-                        enabled = current.isUsable,
-                        onClick = { vm.simulateAutoLockLeaving(v) },
-                    )
-                }
-                if (!current.isUsable) {
-                    Spacer(Modifier.height(SettingsGapHairline))
-                    Text(
-                        "Choose the car's Bluetooth device above to try this.",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
+                Text(
+                    "Status: ${s.detection.label()}" + if (s.detection == DetectionState.GRACE) " (${s.graceRemaining}s)" else "",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+            }
 
-                val evalStates by vm.autoLockState.collectAsState()
-                evalStates[v.vin]?.takeIf { it.detection != DetectionState.IDLE }?.let { s ->
-                    Spacer(Modifier.height(SettingsGapHairline))
-                    Text(
-                        "Status: ${s.detection.label()}" + if (s.detection == DetectionState.GRACE) " (${s.graceRemaining}s)" else "",
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.primary,
-                    )
-                }
+            Spacer(Modifier.height(SettingsGapRow))
+
+            // ATTRIBUTION SECTION
+            Surface(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = SettingsGapHairline),
+                color = MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 0.3f),
+                shape = MaterialTheme.shapes.small,
+            ) {
+                Text(
+                    "AutoLock feature ported from i5-AutoLock by Vel-San. " +
+                    "github.com/Vel-San/i5-AutoLock",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(10.dp),
+                )
             }
         }
     }
@@ -330,6 +358,39 @@ internal fun AutoLockSettingsGroup(v: Vehicle, vm: AppViewModel) {
             confirmButton = {
                 TextButton(onClick = { showDevicePicker = false }) { Text("Close") }
             },
+        )
+    }
+}
+
+/**
+ * A section header with an icon, used to separate AutoLock settings into distinct decision points.
+ * No animation: the header is always present, and the content below it either is or isn't shown
+ * depending on state.
+ */
+@Composable
+private fun SettingsSectionHeader(
+    text: String,
+    icon: ImageVector,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = SettingsGapRow, bottom = SettingsGapHairline),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = null,
+            modifier = Modifier
+                .padding(top = 2.dp),
+            tint = MaterialTheme.colorScheme.primary,
+        )
+        Text(
+            text,
+            style = MaterialTheme.typography.titleSmall,
+            fontWeight = FontWeight.SemiBold,
+            color = MaterialTheme.colorScheme.onSurface,
         )
     }
 }
