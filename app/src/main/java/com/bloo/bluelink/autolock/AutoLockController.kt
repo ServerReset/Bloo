@@ -21,6 +21,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
@@ -102,6 +103,23 @@ object AutoLockController {
         AppLog.log("AutoLock: cancelled for $vin")
     }
 
+    /** Full sign-out: drop every trace of these cars from live memory -- an in-flight
+     *  evaluation, its state machine, and its notification/UI state -- rather than only
+     *  [cancel]ling and leaving stale [DetectionState.ABORTED] entries and machines behind
+     *  for VINs that no longer exist. Settings' own persisted config is cleared separately
+     *  (see [com.bloo.bluelink.data.SettingsStore.clearAllAutoLockConfigs]). */
+    fun forgetAll(vins: Collection<String>) {
+        if (vins.isEmpty()) return
+        vins.forEach { vin ->
+            jobs.remove(vin)?.cancel()
+            locks.remove(vin)
+            machines.remove(vin)
+            skipGrace.remove(vin)
+            walkAwayConfirmed.remove(vin)
+        }
+        _state.update { it - vins.toSet() }
+    }
+
     private suspend fun runEvaluation(context: Context, vin: String) = mutexFor(vin).withLock {
         try {
             skipGrace.remove(vin)
@@ -117,33 +135,39 @@ object AutoLockController {
 
             // Wait for corroborating signals (activity + geofence) to promote CONFIRMING -> GRACE,
             // or time out and either proceed on the Bluetooth signal alone or skip, per settings.
-            val confirmDeadline = System.currentTimeMillis() + CONFIRM_TIMEOUT_MS
-            while (stateFor(vin).detection == DetectionState.CONFIRMING) {
-                if (System.currentTimeMillis() > confirmDeadline) {
-                    val confirmed = walkAwayConfirmed.contains(vin)
-                    if ((settings.useActivityRecognition || settings.useGeofence) && !confirmed) {
-                        _state.update { it + (vin to AutoLockEvalState(detection = DetectionState.SKIPPED)) }
-                        AppLog.log("AutoLock: no walk-away confirmation for $vin — not locking.")
-                        return@withLock
-                    }
-                    advance(vin, DetectionState.GRACE)
-                    break
-                }
-                delay(250)
+            // Suspends on the state flow itself rather than polling on a timer: a confirmation
+            // (onWalkingConfirmed/onMovedBeyondGeofence) resumes this immediately instead of up
+            // to 250ms late, and the coroutine does no work at all in between -- no wakeups, no
+            // CPU, for however long the confirmation window is open.
+            //
+            // No explicit ABORTED check follows this (or the grace countdown below): cancel(vin)
+            // cancels THIS coroutine directly, so a reconnect/manual cancel during either wait
+            // unwinds via CancellationException at the next suspension point, straight out to the
+            // catch clause below -- there is no path that reaches ABORTED without also cancelling
+            // the very job that would otherwise go on to check for it.
+            val leftConfirming = withTimeoutOrNull(CONFIRM_TIMEOUT_MS) {
+                _state.first { (it[vin]?.detection ?: DetectionState.IDLE) != DetectionState.CONFIRMING }
             }
-            if (stateFor(vin).detection == DetectionState.ABORTED) {
-                AppLog.log("AutoLock: aborted before grace period ($vin).")
-                return@withLock
+            if (leftConfirming == null) {
+                // Timed out still CONFIRMING: proceed on the Bluetooth signal alone unless a
+                // still-enabled confirmation signal was required and never arrived.
+                if ((settings.useActivityRecognition || settings.useGeofence) && !walkAwayConfirmed.contains(vin)) {
+                    _state.update { it + (vin to AutoLockEvalState(detection = DetectionState.SKIPPED)) }
+                    AppLog.log("AutoLock: no walk-away confirmation for $vin — not locking.")
+                    return@withLock
+                }
+                advance(vin, DetectionState.GRACE)
             }
 
-            // Grace countdown, skippable via "Lock now" or cut short by a cancel/reconnect.
+            // Grace countdown, skippable via "Lock now" (skipGrace) or cut short by a cancel/
+            // reconnect (job cancellation, see above). This loop DOES need its own per-second
+            // tick, unlike the wait above -- it's driving a countdown the notification and
+            // Settings UI actually display, not just watching for a state change.
             for (remaining in settings.graceSeconds downTo 1) {
-                if (stateFor(vin).detection == DetectionState.ABORTED) return@withLock
                 if (skipGrace.contains(vin)) break
                 _state.update { it + (vin to AutoLockEvalState(detection = DetectionState.GRACE, graceRemaining = remaining)) }
                 delay(1000)
             }
-            if (stateFor(vin).detection == DetectionState.ABORTED) return@withLock
             advance(vin, DetectionState.VERIFYING)
 
             // Read the CACHED status -- never wake the car for the pre-lock check, matching

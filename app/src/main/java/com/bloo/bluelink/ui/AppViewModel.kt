@@ -721,6 +721,16 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 // watch's own signOutAll (snapshotStore.saveVehicles(emptyList())).
                 runCatching { statusCache.clear() }
                 runCatching { snapshotStore.saveVehicles(emptyList()) }
+                // AutoLock config is account-derived too (it's keyed by VIN): a car left
+                // registered here after its account is gone means every future Bluetooth
+                // connect/disconnect this phone sees keeps checking it, forever, against a
+                // vehicle AutoLockController can now never find. See both functions' own docs.
+                runCatching {
+                    val autoLockVins = settingsStore.autoLockConfiguredVins()
+                    com.bloo.bluelink.autolock.AutoLockController.forgetAll(autoLockVins)
+                    autoLockVins.forEach { com.bloo.bluelink.autolock.GeofenceManager.remove(getApplication(), it) }
+                    settingsStore.clearAllAutoLockConfigs()
+                }
                 // `sessionFetched` is add-only and lives for the ViewModel's life, and
                 // [ensureStatus] returns immediately for any VIN in it. Left uncleared here,
                 // signing out and back in within the same process meant every car's

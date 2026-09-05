@@ -36,9 +36,11 @@ class AutoLockBluetoothReceiver : BroadcastReceiver() {
         val ctx = context.applicationContext
         scope.launch {
             try {
-                val store = SettingsStore(ctx)
-                for (vin in store.autoLockConfiguredVins()) {
-                    val settings = store.autoLockConfig(vin)
+                // ONE DataStore read for every registered car, not one round trip per car --
+                // this fires on every Bluetooth connect/disconnect this phone sees (any
+                // device, not just a car's), so it wants to be cheap when there's nothing to
+                // do, which is almost always.
+                for ((vin, settings) in SettingsStore(ctx).allAutoLockConfigs()) {
                     if (!settings.enabled || !settings.useBluetoothTrigger) continue
                     if (!deviceMac.equals(settings.deviceAddress, ignoreCase = true)) continue
 

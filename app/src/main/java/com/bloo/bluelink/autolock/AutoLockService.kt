@@ -53,12 +53,20 @@ class AutoLockService : Service() {
             }
         }
 
-        // Default: a trigger fired (Bluetooth disconnect / geofence exit).
+        // Default: a trigger fired (Bluetooth disconnect / geofence exit). The FIRST
+        // startForegroundCompat call here is deliberately synchronous and unconditional --
+        // Android requires startForeground() promptly and unconditionally after
+        // startForegroundService(), and a coroutine dispatch (even on Main.immediate) is one
+        // more thing that could theoretically be delayed under load. It posts with the
+        // still-default carName; the coroutine below resolves the real name and reposts
+        // (posting again to the SAME notification id is cheap -- an id/tag update, not a new
+        // notification) as soon as that fast local read completes, which is normally well
+        // before the CONFIRMING phase's own 20s window is even half over.
+        startForegroundCompat(vin, DetectionState.CONFIRMING, 0)
         scope.launch {
             carName = SnapshotStore(applicationContext).current().vehicles.firstOrNull { it.vin == vin }?.name ?: carName
             startForegroundCompat(vin, DetectionState.CONFIRMING, 0)
         }
-        startForegroundCompat(vin, DetectionState.CONFIRMING, 0)
         AutoLockController.onTriggerFired(this, vin)
         observe(vin)
         return START_NOT_STICKY

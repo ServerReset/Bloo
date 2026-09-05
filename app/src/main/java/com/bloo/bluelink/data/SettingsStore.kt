@@ -833,8 +833,18 @@ class SettingsStore(private val context: Context) {
     // it's safe to (unlocked, engine off, doors/windows closed if that's required). See
     // app/.../autolock/ for the state machine, policy and detection plumbing.
 
-    suspend fun autoLockConfig(vin: String): AutoLockConfig {
-        val p = context.settingsDataStore.data.first()
+    suspend fun autoLockConfig(vin: String): AutoLockConfig =
+        autoLockConfig(vin, context.settingsDataStore.data.first())
+
+    /**
+     * [Preferences]-taking overload, same reason as [seatConfig]/[isCarConfigured]: the
+     * Bluetooth receiver checks EVERY registered VIN on every single connect/disconnect
+     * event, and each of those used to be its own full `.data.first()` DataStore round trip
+     * -- N reads for N configured cars, on every Bluetooth event this phone ever sees, not
+     * just the car's own. One snapshot, taken once by the caller (see
+     * [autoLockConfiguredVins]'s own overload), serves all of them.
+     */
+    fun autoLockConfig(vin: String, p: Preferences): AutoLockConfig {
         fun b(key: String, default: Boolean) = p[booleanPreferencesKey(key)] ?: default
         fun s(key: String) = p[stringPreferencesKey(key)]
         fun i(key: String, default: Int) = s(key)?.toIntOrNull() ?: default
@@ -851,6 +861,23 @@ class SettingsStore(private val context: Context) {
             dryRun = b("autolock_dry_run_$vin", true),
         )
     }
+
+    /** Every DataStore key one car's [AutoLockConfig] occupies -- named once so
+     *  [setAutoLockConfig] (which writes them) and [clearAutoLockConfig] (which removes them
+     *  on sign-out) can't drift out of sync with each other the way two hand-written key
+     *  lists eventually would. */
+    private fun autoLockKeys(vin: String) = listOf(
+        booleanPreferencesKey("autolock_enabled_$vin"),
+        stringPreferencesKey("autolock_device_addr_$vin"),
+        stringPreferencesKey("autolock_device_name_$vin"),
+        booleanPreferencesKey("autolock_use_bt_$vin"),
+        stringPreferencesKey("autolock_grace_$vin"),
+        booleanPreferencesKey("autolock_use_activity_$vin"),
+        booleanPreferencesKey("autolock_use_geofence_$vin"),
+        stringPreferencesKey("autolock_geofence_radius_$vin"),
+        booleanPreferencesKey("autolock_dont_lock_if_open_$vin"),
+        booleanPreferencesKey("autolock_dry_run_$vin"),
+    )
 
     suspend fun setAutoLockConfig(vin: String, config: AutoLockConfig) {
         editTracked {
@@ -882,9 +909,34 @@ class SettingsStore(private val context: Context) {
     /** Every VIN that has ever had AutoLock enabled -- see [setAutoLockConfig]'s registry
      *  note. Used by [com.bloo.bluelink.autolock.AutoLockBluetoothReceiver] to find which
      *  car(s), if any, a disconnected Bluetooth device belongs to. */
-    suspend fun autoLockConfiguredVins(): List<String> {
-        val raw = context.settingsDataStore.data.first()[stringPreferencesKey("autolock_vins")] ?: ""
-        return raw.split(',').filter { it.isNotBlank() }
+    suspend fun autoLockConfiguredVins(): List<String> =
+        autoLockConfiguredVins(context.settingsDataStore.data.first())
+
+    fun autoLockConfiguredVins(p: Preferences): List<String> =
+        (p[stringPreferencesKey("autolock_vins")] ?: "").split(',').filter { it.isNotBlank() }
+
+    /** Forgets AutoLock entirely for every currently-registered car -- called on a full
+     *  sign-out (see [com.bloo.bluelink.ui.AppViewModel.logout]) alongside the other
+     *  account-derived stores it already wipes there (statusCache, snapshotStore). Without
+     *  this, a signed-out car's VIN stayed in the registry forever: every Bluetooth
+     *  connect/disconnect this phone ever saw kept checking it, futilely, against a vehicle
+     *  [com.bloo.bluelink.autolock.AutoLockController] can never find again. */
+    suspend fun clearAllAutoLockConfigs() {
+        val vins = autoLockConfiguredVins()
+        if (vins.isEmpty()) return
+        editTracked {
+            it.remove(stringPreferencesKey("autolock_vins"))
+            vins.forEach { vin -> autoLockKeys(vin).forEach(it::remove) }
+        }
+    }
+
+    /** One DataStore read for every registered car's full [AutoLockConfig] -- what the
+     *  Bluetooth/geofence receivers actually want (a device MAC or a VIN comes in, every
+     *  configured car needs checking against it), instead of the registry list plus one
+     *  [autoLockConfig] round trip per car. */
+    suspend fun allAutoLockConfigs(): Map<String, AutoLockConfig> {
+        val p = context.settingsDataStore.data.first()
+        return autoLockConfiguredVins(p).associateWith { autoLockConfig(it, p) }
     }
 
     // --- Per-car section order -------------------------------------------
