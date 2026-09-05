@@ -18,7 +18,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Bluetooth
-import androidx.compose.material.icons.filled.CloudLock
+import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.DirectionsWalk
 import androidx.compose.material.icons.filled.Warning
@@ -257,7 +257,7 @@ internal fun AutoLockSettingsGroup(v: Vehicle, vm: AppViewModel) {
             Spacer(Modifier.height(SettingsGapRow))
 
             // SAFETY SECTION
-            SettingsSectionHeader("Safety", Icons.Filled.CloudLock)
+            SettingsSectionHeader("Safety", Icons.Filled.Security)
             Spacer(Modifier.height(SettingsGapHairline))
             ToggleRow(
                 "Skip if a door or window is open",
@@ -293,15 +293,25 @@ internal fun AutoLockSettingsGroup(v: Vehicle, vm: AppViewModel) {
                 )
             }
 
-            // Live status display
+            // Live status display -- a filled pill rather than plain text, since this is the
+            // one piece of AutoLock's UI that changes while you're looking at it (once a
+            // second during the grace countdown) and deserves to read as "live", not as
+            // another static caption sitting among all the ones above it.
             val evalStates by vm.autoLockState.collectAsState()
             evalStates[v.vin]?.takeIf { it.detection != DetectionState.IDLE }?.let { s ->
-                Spacer(Modifier.height(SettingsGapHairline))
-                Text(
-                    "Status: ${s.detection.label()}" + if (s.detection == DetectionState.GRACE) " (${s.graceRemaining}s)" else "",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.primary,
-                )
+                Spacer(Modifier.height(SettingsGapRow))
+                Surface(
+                    color = MaterialTheme.colorScheme.primaryContainer,
+                    shape = MaterialTheme.shapes.extraLarge,
+                ) {
+                    Text(
+                        "${s.detection.label()}" + if (s.detection == DetectionState.GRACE) " · ${s.graceRemaining}s" else "",
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer,
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                    )
+                }
             }
 
             Spacer(Modifier.height(SettingsGapRow))
