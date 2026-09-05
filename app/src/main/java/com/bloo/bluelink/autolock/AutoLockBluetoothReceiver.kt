@@ -30,7 +30,14 @@ class AutoLockBluetoothReceiver : BroadcastReceiver() {
         if (action != BluetoothDevice.ACTION_ACL_DISCONNECTED && action != BluetoothDevice.ACTION_ACL_CONNECTED) return
         @Suppress("DEPRECATION")
         val device: BluetoothDevice? = intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE)
-        val deviceMac = device?.address ?: return
+        // BluetoothDevice.getAddress() is @RequiresPermission(BLUETOOTH_CONNECT) from API 31 --
+        // and this receiver fires for EVERY Bluetooth device this phone ever sees (headphones,
+        // earbuds, anything), not just a configured car, since the manifest intent-filter has
+        // no way to scope by device. Without runCatching here, a user who has Bluetooth
+        // headphones and has never so much as opened AutoLock's Settings section -- so never
+        // had a reason to grant BLUETOOTH_CONNECT -- would crash the whole app the very first
+        // time those headphones connected or disconnected.
+        val deviceMac = device?.let { runCatching { it.address }.getOrNull() } ?: return
 
         val pending = goAsync()
         val ctx = context.applicationContext
