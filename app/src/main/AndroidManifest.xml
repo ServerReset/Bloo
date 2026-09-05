@@ -45,6 +45,9 @@
          status check, lock) is in flight. -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE" />
+    <!-- Re-arms a car's geofence after a reboot (which clears every app's registered
+         geofences outright) or an app update — see AutoLockBootReceiver's own doc. -->
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <!-- Bloo isn't on the Play Store, so the in-app update prompt downloads
          the new APK itself and launches the system package installer;
          needs this to be allowed to request an install at all on API 26+. -->
@@ -359,6 +362,14 @@
              so neither needs an intent-filter here. -->
         <receiver android:name=".autolock.AutoLockGeofenceReceiver" android:exported="false" />
         <receiver android:name=".autolock.AutoLockActivityReceiver" android:exported="false" />
+        <!-- Re-arms a connected car's geofence after a reboot (which clears every app's
+             registered geofences outright) or an app update — see its own doc comment. -->
+        <receiver android:name=".autolock.AutoLockBootReceiver" android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+            </intent-filter>
+        </receiver>
         <service
             android:name=".autolock.AutoLockService"
             android:exported="false"

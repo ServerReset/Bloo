@@ -16,6 +16,8 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
@@ -34,6 +36,7 @@ import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import com.bloo.bluelink.autolock.AutoLockConfig
 import com.bloo.bluelink.autolock.DetectionState
+import com.bloo.bluelink.data.LiveCharge
 import com.bloo.bluelink.data.Vehicle
 import kotlin.math.roundToInt
 
@@ -163,6 +166,31 @@ internal fun AutoLockSettingsGroup(v: Vehicle, vm: AppViewModel) {
         // place is enough; the outer animator is what should own the height change.
         PopVisible(visible = current.enabled) {
             Column {
+                // Not remembered: LiveCharge.isBackgroundUnrestricted reads the live OS state
+                // fresh on every recomposition, same as the identical check already does for
+                // the live-charging bar's own troubleshooting row -- so returning here from the
+                // system "Allow" dialog (which recomposes this screen) picks it up immediately,
+                // with no lifecycle observer needed.
+                //
+                // This is the one thing that actually determines whether AutoLock keeps
+                // working with the app closed: the Bluetooth disconnect trigger is a manifest-
+                // registered receiver that Android will happily wake regardless of whether Bloo
+                // is running -- but NOT if the OS (or, on some phones, an OEM battery manager
+                // layered on top of it -- see the same Samsung note LiveUpdateTroubleshootDialog
+                // gives) is actively restricting the app's background work, in which case the
+                // receiver can still fire but the foreground service / notification / lock
+                // command it tries to start gets deferred or dropped.
+                if (!LiveCharge.isBackgroundUnrestricted(context)) {
+                    Spacer(Modifier.height(SettingsGapRow))
+                    SettingsCaption("Won't reliably trigger with the app closed?", bottomGap = SettingsGapHairline)
+                    MorphTextButton(
+                        text = "Allow background activity",
+                        onClick = { LiveCharge.requestBackgroundUnrestricted(context) },
+                        contentColor = MaterialTheme.colorScheme.primary,
+                        icon = Icons.Filled.Warning,
+                    )
+                }
+
                 Spacer(Modifier.height(SettingsGapRow))
                 SectionLabel("Trigger")
                 Spacer(Modifier.height(SettingsGapHairline))
