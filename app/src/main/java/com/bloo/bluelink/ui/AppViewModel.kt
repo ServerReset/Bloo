@@ -1963,6 +1963,42 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    // --- AutoLock (app/.../autolock/) -------------------------------------
+    //
+    // Thin passthroughs: the Settings UI reads/writes SettingsStore directly through these
+    // (no UiState copy) because the values are otherwise only ever consumed in the
+    // background, by AutoLockBluetoothReceiver/AutoLockService reading SettingsStore fresh
+    // on each trigger -- there's no live-recomposition need the way seat flags have with the
+    // climate pebble.
+
+    suspend fun autoLockConfig(vin: String): com.bloo.bluelink.autolock.AutoLockConfig =
+        settingsStore.autoLockConfig(vin)
+
+    fun setAutoLockConfig(vin: String, config: com.bloo.bluelink.autolock.AutoLockConfig) {
+        viewModelScope.launch { settingsStore.setAutoLockConfig(vin, config) }
+    }
+
+    /** Bonded (paired) Bluetooth devices, for the "which one is your car" picker. Empty
+     *  without BLUETOOTH_CONNECT granted -- the Settings section prompts for it first. */
+    fun pairedBluetoothDevices(): List<com.bloo.bluelink.autolock.PairedDevice> =
+        com.bloo.bluelink.autolock.BluetoothDevices.bondedDevices(getApplication())
+
+    fun hasBluetoothConnectPermission(): Boolean =
+        com.bloo.bluelink.autolock.BluetoothDevices.hasPermission(getApplication())
+
+    /** "Simulate leaving" test button: runs the exact same evaluation a real Bluetooth
+     *  disconnect would, without needing to actually drive off and walk away. */
+    fun simulateAutoLockLeaving(v: Vehicle) {
+        com.bloo.bluelink.autolock.AutoLockService.start(getApplication(), v.vin)
+        AppLog.log("AutoLock: simulated leaving ${v.name}.")
+    }
+
+    /** Live per-car evaluation state (detection phase + grace countdown), for the Settings
+     *  section to show "watching…" / "locking in 12s" / "locked" while a test or a real
+     *  trigger is in flight. */
+    val autoLockState: StateFlow<Map<String, com.bloo.bluelink.autolock.AutoLockEvalState>>
+        get() = com.bloo.bluelink.autolock.AutoLockController.state
+
     /** Toggle a pebble (detail section) open/closed for a car (persisted). */
     /**
      * Collapse keys ("<vin>:<section>") on their own small flow.

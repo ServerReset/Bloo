@@ -132,6 +132,10 @@ dependencies {
     // Wear OS Data Layer — pushes car snapshots to the watch and receives the
     // watch's remote commands.
     implementation("com.google.android.gms:play-services-wearable:18.2.0")
+    // AutoLock's optional confirmation signals: geofencing (left the car's parking spot)
+    // and Activity Recognition (driving -> walking), plus the fused location read used to
+    // register/confirm a geofence. See app/.../autolock/.
+    implementation("com.google.android.gms:play-services-location:21.3.0")
 
     // Installs the baseline profile packaged at assets/dexopt/baseline.prof so ART can
     // partially AOT-compile ahead of first use, instead of interpreting everything until

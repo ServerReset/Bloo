@@ -1,0 +1,66 @@
+package com.bloo.bluelink.autolock
+
+import android.bluetooth.BluetoothDevice
+import android.content.BroadcastReceiver
+import android.content.Context
+import android.content.Intent
+import com.bloo.bluelink.data.AppLog
+import com.bloo.bluelink.data.SettingsStore
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
+
+/**
+ * Primary "left the car" trigger: fires when the phone disconnects from a car's paired
+ * Bluetooth device (its head unit / hands-free profile). Also cancels a pending lock and
+ * re-arms the geofence on reconnect (the user got back in). Ported from i5-AutoLock's
+ * `BluetoothStateReceiver`, generalized to Bloo's multiple garages: every car with AutoLock
+ * enabled is checked, since more than one could plausibly share a phone.
+ *
+ * Registered in the manifest (not `registerReceiver` at runtime) -- ACL connect/disconnect
+ * is one of the implicit broadcasts still delivered to manifest-declared receivers even
+ * with the app process dead, so no persistent "watching" service is needed to catch it.
+ */
+class AutoLockBluetoothReceiver : BroadcastReceiver() {
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+
+    override fun onReceive(context: Context, intent: Intent) {
+        val action = intent.action ?: return
+        if (action != BluetoothDevice.ACTION_ACL_DISCONNECTED && action != BluetoothDevice.ACTION_ACL_CONNECTED) return
+        @Suppress("DEPRECATION")
+        val device: BluetoothDevice? = intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE)
+        val deviceMac = device?.address ?: return
+
+        val pending = goAsync()
+        val ctx = context.applicationContext
+        scope.launch {
+            try {
+                val store = SettingsStore(ctx)
+                for (vin in store.autoLockConfiguredVins()) {
+                    val settings = store.autoLockConfig(vin)
+                    if (!settings.enabled || !settings.useBluetoothTrigger) continue
+                    if (!deviceMac.equals(settings.deviceAddress, ignoreCase = true)) continue
+
+                    when (action) {
+                        BluetoothDevice.ACTION_ACL_DISCONNECTED -> {
+                            AppLog.log("AutoLock: car Bluetooth disconnected for $vin — starting evaluation.")
+                            AutoLockService.start(ctx, vin)
+                        }
+                        BluetoothDevice.ACTION_ACL_CONNECTED -> {
+                            AutoLockController.cancel(vin)
+                            if (settings.useGeofence) {
+                                LocationHelper.currentLocation(ctx)?.let { loc ->
+                                    GeofenceManager.register(ctx, vin, loc.latitude, loc.longitude, settings.geofenceRadiusMeters)
+                                    AppLog.log("AutoLock: arrived at $vin — geofence armed.")
+                                }
+                            }
+                        }
+                    }
+                }
+            } finally {
+                pending.finish()
+            }
+        }
+    }
+}

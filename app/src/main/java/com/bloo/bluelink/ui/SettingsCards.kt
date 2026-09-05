@@ -271,6 +271,8 @@ internal fun CarSettingsCard(
             ToggleRow("Heated steering wheel", seats.steeringWheel) { vm.setSeatFlag(v, "sw", it) }
         }
 
+        AutoLockSettingsGroup(v, vm)
+
         if (state.settingsMode == "advanced") SettingsGroup("Default climate start") {
             val carPresets = state.climatePresets[v.vin].orEmpty()
             val currentDefault = state.defaultClimatePresets[v.vin] ?: "smart"

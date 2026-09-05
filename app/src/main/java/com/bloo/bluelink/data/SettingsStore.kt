@@ -13,6 +13,7 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.emptyPreferences
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
+import com.bloo.bluelink.autolock.AutoLockConfig
 import com.bloo.bluelink.ui.ColorPalette
 import com.bloo.bluelink.ui.CustomPaletteData
 import com.bloo.bluelink.ui.FontChoice
@@ -821,6 +822,69 @@ class SettingsStore(private val context: Context) {
 
     suspend fun setCarConfigured(vin: String) {
         editTracked { it[booleanPreferencesKey("car_configured_$vin")] = true }
+    }
+
+    // --- AutoLock (per car) ------------------------------------------------
+    //
+    // Ported from the i5-AutoLock reference app (github.com/Vel-San/i5-AutoLock): locks a
+    // car automatically when the phone disconnects from its paired Bluetooth device (the
+    // head unit), optionally confirmed by Activity Recognition (driving -> walking) and/or a
+    // geofence, after a cancellable grace period, and only when the car's own status says
+    // it's safe to (unlocked, engine off, doors/windows closed if that's required). See
+    // app/.../autolock/ for the state machine, policy and detection plumbing.
+
+    suspend fun autoLockConfig(vin: String): AutoLockConfig {
+        val p = context.settingsDataStore.data.first()
+        fun b(key: String, default: Boolean) = p[booleanPreferencesKey(key)] ?: default
+        fun s(key: String) = p[stringPreferencesKey(key)]
+        fun i(key: String, default: Int) = s(key)?.toIntOrNull() ?: default
+        return AutoLockConfig(
+            enabled = b("autolock_enabled_$vin", false),
+            deviceAddress = s("autolock_device_addr_$vin"),
+            deviceName = s("autolock_device_name_$vin"),
+            useBluetoothTrigger = b("autolock_use_bt_$vin", true),
+            graceSeconds = i("autolock_grace_$vin", 30),
+            useActivityRecognition = b("autolock_use_activity_$vin", false),
+            useGeofence = b("autolock_use_geofence_$vin", false),
+            geofenceRadiusMeters = i("autolock_geofence_radius_$vin", 100),
+            dontLockIfOpen = b("autolock_dont_lock_if_open_$vin", false),
+            dryRun = b("autolock_dry_run_$vin", true),
+        )
+    }
+
+    suspend fun setAutoLockConfig(vin: String, config: AutoLockConfig) {
+        editTracked {
+            it[booleanPreferencesKey("autolock_enabled_$vin")] = config.enabled
+            val addrKey = stringPreferencesKey("autolock_device_addr_$vin")
+            if (config.deviceAddress == null) it.remove(addrKey) else it[addrKey] = config.deviceAddress
+            val nameKey = stringPreferencesKey("autolock_device_name_$vin")
+            if (config.deviceName == null) it.remove(nameKey) else it[nameKey] = config.deviceName
+            it[booleanPreferencesKey("autolock_use_bt_$vin")] = config.useBluetoothTrigger
+            it[stringPreferencesKey("autolock_grace_$vin")] = config.graceSeconds.toString()
+            it[booleanPreferencesKey("autolock_use_activity_$vin")] = config.useActivityRecognition
+            it[booleanPreferencesKey("autolock_use_geofence_$vin")] = config.useGeofence
+            it[stringPreferencesKey("autolock_geofence_radius_$vin")] = config.geofenceRadiusMeters.toString()
+            it[booleanPreferencesKey("autolock_dont_lock_if_open_$vin")] = config.dontLockIfOpen
+            it[booleanPreferencesKey("autolock_dry_run_$vin")] = config.dryRun
+        }
+        // Maintain the registry of "cars with AutoLock configured" so the Bluetooth/geofence
+        // receivers -- which start from a raw device MAC or a VIN, not a UI selection -- can
+        // enumerate every car to check instead of needing one BroadcastReceiver registration
+        // per car.
+        editTracked {
+            val key = stringPreferencesKey("autolock_vins")
+            val current = (it[key] ?: "").split(',').filter { s -> s.isNotBlank() }.toMutableSet()
+            if (config.enabled) current += vin else current -= vin
+            it[key] = current.joinToString(",")
+        }
+    }
+
+    /** Every VIN that has ever had AutoLock enabled -- see [setAutoLockConfig]'s registry
+     *  note. Used by [com.bloo.bluelink.autolock.AutoLockBluetoothReceiver] to find which
+     *  car(s), if any, a disconnected Bluetooth device belongs to. */
+    suspend fun autoLockConfiguredVins(): List<String> {
+        val raw = context.settingsDataStore.data.first()[stringPreferencesKey("autolock_vins")] ?: ""
+        return raw.split(',').filter { it.isNotBlank() }
     }
 
     // --- Per-car section order -------------------------------------------
