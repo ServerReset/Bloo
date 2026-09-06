@@ -776,7 +776,15 @@ internal fun OnboardingTipCard(icon: ImageVector, title: String, body: String) {
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(14.dp),
         ) {
-            Icon(icon, contentDescription = null, tint = scheme.primary, modifier = Modifier.size(22.dp))
+            // The same leading-circle icon badge the search results list, the update pebble,
+            // and the settings hero stats all already use -- a bare tinted icon here was the
+            // one place left still doing it differently for no reason tied to this screen.
+            Box(
+                Modifier.size(28.dp).clip(CircleShape).background(scheme.primary.copy(alpha = 0.14f)),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(icon, contentDescription = null, tint = scheme.primary, modifier = Modifier.size(15.dp))
+            }
             Column {
                 Text(title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
                 Text(body, style = MaterialTheme.typography.bodySmall, color = scheme.onSurfaceVariant)
