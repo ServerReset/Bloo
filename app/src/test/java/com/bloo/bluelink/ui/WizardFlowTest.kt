@@ -138,6 +138,7 @@ class WizardFlowTest {
                 OnboardingStepKind.CAR,
                 OnboardingStepKind.CAR,
                 OnboardingStepKind.CRASH_COURSE,
+                OnboardingStepKind.FEATURES,
             ),
             steps.map { it.kind },
         )
@@ -153,6 +154,7 @@ class WizardFlowTest {
                 OnboardingStepKind.SETUP,
                 OnboardingStepKind.CAR,
                 OnboardingStepKind.CRASH_COURSE,
+                OnboardingStepKind.FEATURES,
             ),
             steps.map { it.kind },
         )
@@ -167,6 +169,7 @@ class WizardFlowTest {
                 OnboardingStepKind.INTRO,
                 OnboardingStepKind.SETUP,
                 OnboardingStepKind.CRASH_COURSE,
+                OnboardingStepKind.FEATURES,
             ),
             steps.map { it.kind },
         )
