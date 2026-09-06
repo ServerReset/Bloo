@@ -91,7 +91,6 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import com.bloo.bluelink.data.SettingsStore
-import com.bloo.bluelink.data.Vehicle
 import com.bloo.uicommon.dropShadow
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
