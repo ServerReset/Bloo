@@ -148,7 +148,7 @@ internal fun buildSetupPages(vehicles: List<com.bloo.bluelink.data.Vehicle>): Li
     }
 }
 
-internal enum class OnboardingStepKind { INTRO, SETUP, CAR, CRASH_COURSE }
+internal enum class OnboardingStepKind { INTRO, SETUP, CAR, CRASH_COURSE, FEATURES }
 
 internal data class OnboardingStep(val kind: OnboardingStepKind, val vin: String? = null)
 
@@ -157,9 +157,12 @@ internal data class OnboardingStep(val kind: OnboardingStepKind, val vin: String
  * intro, a combined notifications+biometrics+sync setup step, one CAR step
  * per vehicle that isn't already configured (each vehicle gets its own
  * dedicated screen rather than being stacked in one scroll or split into
- * per-feature pages), and a closing crash-course. Drives the single
- * [AnimatedContent] in [OnboardingScreen] the same way [buildSetupPages]
- * drives [CarFeatureWizard].
+ * per-feature pages), a crash-course on the basic gestures (swipe, hold to
+ * reorder, hold to refresh), and a closing FEATURES page -- the last thing
+ * shown before "Enter Bloo" hands off to the real garage, so it is the one
+ * screen every new user is guaranteed to see once, unlike a feature buried
+ * in Settings they may never open. Drives the single [AnimatedContent] in
+ * [OnboardingScreen] the same way [buildSetupPages] drives [CarFeatureWizard].
  *
  * [preConfiguredVins] skips a car's whole CAR step -- restoring a Drive/
  * manual backup on the SETUP step (which always comes before any CAR step)
@@ -176,12 +179,14 @@ internal fun buildOnboardingSteps(
     add(OnboardingStep(OnboardingStepKind.SETUP))
     vehicles.forEach { if (it.vin !in preConfiguredVins) add(OnboardingStep(OnboardingStepKind.CAR, it.vin)) }
     add(OnboardingStep(OnboardingStepKind.CRASH_COURSE))
+    add(OnboardingStep(OnboardingStepKind.FEATURES))
 }
 
 /**
  * First-run onboarding: a button-driven multi-screen wizard -- intro, then
- * notifications/biometrics, then one screen per car, then a crash course --
- * capped off by [AppViewModel.finishOnboarding]. Shares its shell shape
+ * notifications/biometrics, then one screen per car, then a crash course on
+ * the app's gestures, then a features highlight reel -- capped off by
+ * [AppViewModel.finishOnboarding]. Shares its shell shape
  * (animated top progress bar, [AnimatedContent] slide/fade transitions,
  * Back/Next footer) with [CarFeatureWizard] but keeps its own copy since
  * this flow's steps are heterogeneous (intro/setup/crash-course pages
@@ -331,6 +336,7 @@ internal fun OnboardingScreen(vm: AppViewModel) {
                                 OnboardingCarPage(vehicle, state, sc, vm)
                             }
                             OnboardingStepKind.CRASH_COURSE -> OnboardingCrashCoursePage()
+                            OnboardingStepKind.FEATURES -> OnboardingFeaturesPage(state)
                         }
                     }
                 }
@@ -879,7 +885,8 @@ internal fun OnboardingCarPage(
     }
 }
 
-/** Final step: a quick tip list covering the app's core gestures. */
+/** Second-to-last step: a quick tip list covering the app's core gestures. Followed by
+ *  [OnboardingFeaturesPage], the actual final step. */
 @Composable
 internal fun OnboardingCrashCoursePage() {
     val scheme = MaterialTheme.colorScheme
@@ -903,6 +910,48 @@ internal fun OnboardingCrashCoursePage() {
         Triple(Icons.Filled.Refresh, "Hold to refresh", "Press and hold the refresh control to pull the latest status from your car"),
         Triple(Icons.Filled.Settings, "Tune it anytime", "Powertrain, seats, and lock settings all live in Settings if things change"),
     )
+    tips.forEach { (icon, title, body) ->
+        OnboardingTipCard(icon, title, body)
+    }
+}
+
+/**
+ * The actual final step -- the one screen shown right before "Enter Bloo" hands off to the
+ * garage, so it is the one place every new user is guaranteed to see these highlighted at
+ * least once, unlike a feature that only shows itself to someone who happens to open
+ * Settings. Distinct from [OnboardingCrashCoursePage] just before it: that page is about
+ * *how to use the screen you're about to land on* (gestures); this one is about
+ * *things the app can do that aren't obvious from looking at it* (AutoLock, live charging,
+ * natural-language search, widgets/watch). On-device AI is the one entry gated on
+ * [UiState.aiSupported] -- the others work on every device, but advertising a feature this
+ * phone's own hardware can't run would be a promise the app can't keep.
+ */
+@Composable
+internal fun OnboardingFeaturesPage(state: UiState) {
+    val scheme = MaterialTheme.colorScheme
+    Text("✨", style = MaterialTheme.typography.displayMedium)
+    Spacer(Modifier.height(4.dp))
+    Text(
+        "A few more things Bloo can do",
+        style = MaterialTheme.typography.headlineMedium,
+        fontWeight = FontWeight.Black,
+        color = scheme.onSurface,
+    )
+    Text(
+        "Worth knowing about, whenever you're ready for them:",
+        style = MaterialTheme.typography.bodyLarge,
+        color = scheme.onSurfaceVariant,
+    )
+    Spacer(Modifier.height(4.dp))
+    val tips = buildList {
+        add(Triple(Icons.Filled.Lock, "AutoLock", "Locks your car on its own soon after you walk away, confirmed by a Bluetooth disconnect -- turn it on anytime in each car's Settings"))
+        add(Triple(Icons.Filled.Bolt, "Live charging updates", "Watch an EV's charge progress right from your lock screen while it's plugged in"))
+        add(Triple(Icons.Filled.Search, "Just ask", "Search for things like \"lock my car\" or \"start climate at 70\" and it runs right from the search bar"))
+        add(Triple(Icons.Filled.Devices, "Widgets and your watch", "Add a home screen widget or check in from a paired Wear OS watch for one-tap lock, unlock, and climate"))
+        if (state.aiSupported) {
+            add(Triple(Icons.Filled.AutoAwesome, "On-device AI summaries", "Get a plain-language summary of your car's status, generated right on your phone -- nothing leaves the device"))
+        }
+    }
     tips.forEach { (icon, title, body) ->
         OnboardingTipCard(icon, title, body)
     }

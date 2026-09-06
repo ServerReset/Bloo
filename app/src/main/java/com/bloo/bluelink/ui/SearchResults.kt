@@ -64,8 +64,10 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.bloo.bluelink.autolock.AutoLockConfig
 import com.bloo.bluelink.data.LockTiming
 import com.bloo.bluelink.data.Powertrain
+import com.bloo.bluelink.data.Vehicle
 import com.bloo.bluelink.data.platformOverridable
 import com.bloo.bluelink.data.SettingsStore
 import com.bloo.bluelink.data.TileCommandRunner
@@ -374,6 +376,27 @@ internal fun SettingsSearchResults(
                 ToggleRow(spec.label, spec.checked(v, state)) { spec.onToggle(vm, v, it) }
             }
         }
+        // AutoLock's own toggles, same one-entry-per-toggle granularity as everything else in
+        // this per-car section -- NOT drivable through VehicleToggleSpec/[checked] like the
+        // seat/section ones above, though, since AutoLockConfig lives in SettingsStore's own
+        // DataStore keys rather than UiState: there's nothing synchronous here to read it
+        // from. AutoLockSearchToggle (below) loads it itself, same LaunchedEffect(v.vin)
+        // pattern AutoLockSettingsGroup's own Settings card already uses.
+        add("AutoLock · ${v.name}", "autolock automatic lock leave walk away bluetooth disconnect ${v.name}") {
+            AutoLockSearchToggle(v, vm, "Enabled", { it.enabled }, { c, x -> c.copy(enabled = x) })
+        }
+        add("AutoLock walking confirmation · ${v.name}", "autolock confirm walk activity recognition ${v.name}") {
+            AutoLockSearchToggle(v, vm, "Confirm with walking", { it.useActivityRecognition }, { c, x -> c.copy(useActivityRecognition = x) })
+        }
+        add("AutoLock geofence confirmation · ${v.name}", "autolock confirm geofence location area ${v.name}") {
+            AutoLockSearchToggle(v, vm, "Confirm with geofence", { it.useGeofence }, { c, x -> c.copy(useGeofence = x) })
+        }
+        add("AutoLock skip if open · ${v.name}", "autolock door window open skip safety ${v.name}") {
+            AutoLockSearchToggle(v, vm, "Skip if a door or window is open", { it.dontLockIfOpen }, { c, x -> c.copy(dontLockIfOpen = x) })
+        }
+        add("AutoLock dry run · ${v.name}", "autolock dry run test simulate safety ${v.name}") {
+            AutoLockSearchToggle(v, vm, "Dry run", { it.dryRun }, { c, x -> c.copy(dryRun = x) })
+        }
     }
     entries
     }
@@ -654,5 +677,32 @@ internal fun SettingsSearchResults(
                 }
             }
         }
+    }
+}
+
+/**
+ * One AutoLock toggle, as a search result. AutoLockConfig isn't part of [UiState] (it lives in
+ * SettingsStore's own DataStore keys -- see AutoLockConfig's own doc for why), so unlike every
+ * other per-car toggle in this file it can't be driven by a synchronous [checked]/[onToggle]
+ * pair reading straight off `state`. This loads its own copy the exact same way
+ * AutoLockSettingsGroup's Settings-card row does (LaunchedEffect(v.vin) on first composition),
+ * so a result only renders its real value once that read completes rather than flashing a
+ * default first.
+ */
+@Composable
+private fun AutoLockSearchToggle(
+    v: Vehicle,
+    vm: AppViewModel,
+    label: String,
+    checked: (AutoLockConfig) -> Boolean,
+    update: (AutoLockConfig, Boolean) -> AutoLockConfig,
+) {
+    var config by remember(v.vin) { mutableStateOf<AutoLockConfig?>(null) }
+    LaunchedEffect(v.vin) { config = vm.autoLockConfig(v.vin) }
+    val current = config ?: return
+    ToggleRow(label, checked(current)) { value ->
+        val updated = update(current, value)
+        config = updated
+        vm.setAutoLockConfig(v.vin, updated)
     }
 }
