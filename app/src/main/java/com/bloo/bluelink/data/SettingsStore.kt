@@ -863,8 +863,8 @@ class SettingsStore(private val context: Context) {
     }
 
     /** Every DataStore key one car's [AutoLockConfig] occupies -- named once so
-     *  [setAutoLockConfig] (which writes them) and [clearAutoLockConfig] (which removes them
-     *  on sign-out) can't drift out of sync with each other the way two hand-written key
+     *  [setAutoLockConfig] (which writes them) and [clearAllAutoLockConfigs] (which removes
+     *  them on sign-out) can't drift out of sync with each other the way two hand-written key
      *  lists eventually would. */
     private fun autoLockKeys(vin: String) = listOf(
         booleanPreferencesKey("autolock_enabled_$vin"),

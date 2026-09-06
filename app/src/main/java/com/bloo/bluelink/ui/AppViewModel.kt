@@ -1993,9 +1993,6 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     fun pairedBluetoothDevices(): List<com.bloo.bluelink.autolock.PairedDevice> =
         com.bloo.bluelink.autolock.BluetoothDevices.bondedDevices(getApplication())
 
-    fun hasBluetoothConnectPermission(): Boolean =
-        com.bloo.bluelink.autolock.BluetoothDevices.hasPermission(getApplication())
-
     /** "Simulate leaving" test button: runs the exact same evaluation a real Bluetooth
      *  disconnect would, without needing to actually drive off and walk away. */
     fun simulateAutoLockLeaving(v: Vehicle) {
