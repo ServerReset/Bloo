@@ -14,6 +14,7 @@ import com.bloo.bluelink.data.WearPresets
 import com.bloo.bluelink.data.WearSettingsPayload
 import com.bloo.bluelink.data.WearSync
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.Dispatchers
@@ -83,8 +84,27 @@ class WearSyncedStore<T> private constructor(
      */
     val flow: Flow<T> = store.data.map { decode(it[key]) }.flowOn(Dispatchers.Default)
 
-    /** Persist the raw JSON [raw] as produced by the phone / a WearSync encoder. */
+    /**
+     * Persist the raw JSON [raw] as produced by the phone / a WearSync encoder.
+     *
+     * Skips the write entirely when [raw] is byte-identical to what's already stored --
+     * checked cheaply, since DataStore keeps its data cached in memory after the first
+     * read, so this costs an in-memory comparison, not a disk hit. The phone republishes
+     * these blobs constantly (settings/presets/climate ride along on every extras change:
+     * a weather refresh, an AI summary landing, a status poll -- see WearBridge's own
+     * doc), and most of those republishes carry content this store already has. Before
+     * this, EVERY one of them cost a full DataStore edit (a real flash write, atomic
+     * temp-file-then-rename) plus the JSON decode it triggers in [flow] -- unconditional
+     * work for a result that was already on disk, repeated many times a minute, on the
+     * one device in this project with the smallest battery and the least tolerance for it.
+     * A benign, self-correcting race with a concurrent writer to the same path (rare: only
+     * the phone sync and this watch's own optimistic writes ever touch these paths) is
+     * fine to leave unguarded here, matching how the rest of this sync layer already
+     * tolerates eventual consistency (see settingsOverride/pebbleOverride in WearUi).
+     */
     suspend fun save(raw: String) {
+        val current = store.data.map { it[key] }.first()
+        if (current == raw) return
         store.edit { it[key] = raw }
     }
 
