@@ -108,6 +108,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -430,38 +431,24 @@ internal fun OnboardingScreen(vm: AppViewModel) {
 }
 
 /**
- * Step 1: a short welcome + feature highlights. No per-item entrance
- * animation here -- [AnimatedContent]'s own slide/fade in [OnboardingScreen]
- * already animates the whole page in, and layering a second, blur-based
- * entrance on top of every single line/card (as this page used to) fought
- * with that slide and read as jittery rather than smooth.
+ * Step 1: a short welcome + feature highlights. See [OnboardingTipListPage]'s own doc for why
+ * this shares that shape (including its no-per-item-entrance-animation rule) with the two
+ * closing pages -- this page is where that rule was originally learned the hard way.
  */
 @Composable
 internal fun OnboardingIntroPage() {
-    val scheme = MaterialTheme.colorScheme
-    Text("👋", style = MaterialTheme.typography.displayMedium)
-    Spacer(Modifier.height(4.dp))
-    Text(
-        "Welcome to Bloo",
-        style = MaterialTheme.typography.displaySmall,
-        fontWeight = FontWeight.Black,
-        color = scheme.onSurface,
-    )
-    Text(
-        "Control your Hyundai, Genesis, or Kia from your phone -- lock, climate, " +
+    OnboardingTipListPage(
+        emoji = "👋",
+        title = "Welcome to Bloo",
+        titleStyle = MaterialTheme.typography.displaySmall,
+        subtitle = "Control your Hyundai, Genesis, or Kia from your phone -- lock, climate, " +
             "charge status, and more. Let's get your car set up.",
-        style = MaterialTheme.typography.bodyLarge,
-        color = scheme.onSurfaceVariant,
+        tips = listOf(
+            Triple(Icons.Filled.Bolt, "Live status", "Battery, fuel, and lock state at a glance"),
+            Triple(Icons.Filled.Thermostat, "Remote climate", "Warm it up or cool it down before you get in"),
+            Triple(Icons.Filled.SwapHoriz, "Multiple cars", "Swipe between every car on your account"),
+        ),
     )
-    Spacer(Modifier.height(8.dp))
-    val highlights = listOf(
-        Triple(Icons.Filled.Bolt, "Live status", "Battery, fuel, and lock state at a glance"),
-        Triple(Icons.Filled.Thermostat, "Remote climate", "Warm it up or cool it down before you get in"),
-        Triple(Icons.Filled.SwapHoriz, "Multiple cars", "Swipe between every car on your account"),
-    )
-    highlights.forEach { (icon, title, body) ->
-        OnboardingTipCard(icon, title, body)
-    }
 }
 
 /**
@@ -887,34 +874,56 @@ internal fun OnboardingCarPage(
     }
 }
 
+/**
+ * The shared shape all three intro/closing pages ([OnboardingIntroPage],
+ * [OnboardingCrashCoursePage], [OnboardingFeaturesPage]) turned out to want: an emoji, a big
+ * title, a supporting line, then a list of tip cards. Extracted after finding it hand-written
+ * three times over -- the pages differ only in their copy, [titleStyle] (the intro page's
+ * welcome is a size up from the other two), and their tip list, never in shape, so a future
+ * fourth page (or a copy edit to any existing one) has exactly one place to change.
+ *
+ * Deliberately no per-item entrance animation on the tip list, matching what
+ * [OnboardingIntroPage] itself already settled on: [AnimatedContent]'s own slide/fade in
+ * [OnboardingScreen] already animates the whole page in, and this exact page family already
+ * tried layering a second per-card entrance on top of that once (see intro's own history) and
+ * found it fought with the page slide, reading as jittery rather than smooth. The two closing
+ * pages get the same plain, instant stack intro already uses -- not a separate animation
+ * choice per page that happens to agree today.
+ */
+@Composable
+internal fun OnboardingTipListPage(
+    emoji: String,
+    title: String,
+    subtitle: String,
+    tips: List<Triple<ImageVector, String, String>>,
+    titleStyle: TextStyle = MaterialTheme.typography.headlineMedium,
+) {
+    val scheme = MaterialTheme.colorScheme
+    Text(emoji, style = MaterialTheme.typography.displayMedium)
+    Spacer(Modifier.height(4.dp))
+    Text(title, style = titleStyle, fontWeight = FontWeight.Black, color = scheme.onSurface)
+    Text(subtitle, style = MaterialTheme.typography.bodyLarge, color = scheme.onSurfaceVariant)
+    Spacer(Modifier.height(4.dp))
+    tips.forEach { (icon, cardTitle, body) ->
+        OnboardingTipCard(icon, cardTitle, body)
+    }
+}
+
 /** Second-to-last step: a quick tip list covering the app's core gestures. Followed by
  *  [OnboardingFeaturesPage], the actual final step. */
 @Composable
 internal fun OnboardingCrashCoursePage() {
-    val scheme = MaterialTheme.colorScheme
-    Text("🎉", style = MaterialTheme.typography.displayMedium)
-    Spacer(Modifier.height(4.dp))
-    Text(
-        "You're all set",
-        style = MaterialTheme.typography.headlineMedium,
-        fontWeight = FontWeight.Black,
-        color = scheme.onSurface,
+    OnboardingTipListPage(
+        emoji = "🎉",
+        title = "You're all set",
+        subtitle = "A few things that make Bloo quick to use:",
+        tips = listOf(
+            Triple(Icons.Filled.SwapHoriz, "Swipe between cars", "If you have more than one, swipe left or right on the garage screen"),
+            Triple(Icons.Filled.DragHandle, "Tap to expand, hold to reorder", "Tap any pebble for details, or hold and drag to rearrange them"),
+            Triple(Icons.Filled.Refresh, "Hold to refresh", "Press and hold the refresh control to pull the latest status from your car"),
+            Triple(Icons.Filled.Settings, "Tune it anytime", "Powertrain, seats, and lock settings all live in Settings if things change"),
+        ),
     )
-    Text(
-        "A few things that make Bloo quick to use:",
-        style = MaterialTheme.typography.bodyLarge,
-        color = scheme.onSurfaceVariant,
-    )
-    Spacer(Modifier.height(4.dp))
-    val tips = listOf(
-        Triple(Icons.Filled.SwapHoriz, "Swipe between cars", "If you have more than one, swipe left or right on the garage screen"),
-        Triple(Icons.Filled.DragHandle, "Tap to expand, hold to reorder", "Tap any pebble for details, or hold and drag to rearrange them"),
-        Triple(Icons.Filled.Refresh, "Hold to refresh", "Press and hold the refresh control to pull the latest status from your car"),
-        Triple(Icons.Filled.Settings, "Tune it anytime", "Powertrain, seats, and lock settings all live in Settings if things change"),
-    )
-    tips.forEach { (icon, title, body) ->
-        OnboardingTipCard(icon, title, body)
-    }
 }
 
 /**
@@ -930,21 +939,6 @@ internal fun OnboardingCrashCoursePage() {
  */
 @Composable
 internal fun OnboardingFeaturesPage(state: UiState) {
-    val scheme = MaterialTheme.colorScheme
-    Text("✨", style = MaterialTheme.typography.displayMedium)
-    Spacer(Modifier.height(4.dp))
-    Text(
-        "A few more things Bloo can do",
-        style = MaterialTheme.typography.headlineMedium,
-        fontWeight = FontWeight.Black,
-        color = scheme.onSurface,
-    )
-    Text(
-        "Worth knowing about, whenever you're ready for them:",
-        style = MaterialTheme.typography.bodyLarge,
-        color = scheme.onSurfaceVariant,
-    )
-    Spacer(Modifier.height(4.dp))
     val tips = buildList {
         add(Triple(Icons.Filled.Lock, "AutoLock", "Locks your car on its own soon after you walk away, confirmed by a Bluetooth disconnect -- turn it on anytime in each car's Settings"))
         add(Triple(Icons.Filled.Bolt, "Live charging updates", "Watch an EV's charge progress right from your lock screen while it's plugged in"))
@@ -954,9 +948,12 @@ internal fun OnboardingFeaturesPage(state: UiState) {
             add(Triple(Icons.Filled.AutoAwesome, "On-device AI summaries", "Get a plain-language summary of your car's status, generated right on your phone -- nothing leaves the device"))
         }
     }
-    tips.forEach { (icon, title, body) ->
-        OnboardingTipCard(icon, title, body)
-    }
+    OnboardingTipListPage(
+        emoji = "✨",
+        title = "A few more things Bloo can do",
+        subtitle = "Worth knowing about, whenever you're ready for them:",
+        tips = tips,
+    )
 }
 
 /**
