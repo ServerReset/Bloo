@@ -208,7 +208,15 @@ internal fun UpdateAvailableTile(state: UiState, vm: AppViewModel, dragHandle: M
             color = scheme.surfaceContainerHighest,
             contentColor = scheme.onSurface,
         ) {
-            Box(Modifier.padding(12.dp)) {
+            // Column, not Box: UpdateStatusLine emits two top-level siblings of its own (the
+            // icon+status Row, then the PopVisible progress bar) with no Column of its own
+            // wrapping them -- see its own call site in SettingsScreen.kt, which already
+            // places it inside a Column and renders correctly. A bare Box here instead
+            // stacked those two children ON TOP of each other at the same position (Box's
+            // default behavior for un-aligned children) rather than one above the other,
+            // which is exactly what put "Downloading" directly over the progress bar's own
+            // trailing percentage label -- reported from a real screenshot.
+            Column(Modifier.padding(12.dp)) {
                 UpdateStatusLine(
                     deltaLabel, seamless, state, vm,
                     showDelta = info.run.displayTitle?.isNotBlank() == true,
