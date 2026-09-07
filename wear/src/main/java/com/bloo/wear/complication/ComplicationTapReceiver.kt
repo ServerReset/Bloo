@@ -6,7 +6,7 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import com.bloo.bluelink.data.WearCommand
-import com.bloo.wear.WearComms
+import com.bloo.wear.MainToSecondaryComms
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -15,7 +15,7 @@ import kotlinx.coroutines.withTimeoutOrNull
 
 /**
  * Handles a tap on the Lock / Climate complication: relays the toggle command to
- * the phone (or runs it standalone) via [WearComms.send], which applies an
+ * the phone (or runs it standalone) via [MainToSecondaryComms.send], which applies an
  * optimistic snapshot update, then asks the complications to re-read so the
  * icon/label flips to the new state immediately.
  */
@@ -32,7 +32,7 @@ class ComplicationTapReceiver : BroadcastReceiver() {
         scope.launch {
             try {
                 // goAsync()'s extended process lifetime is ~10s and not guaranteed
-                // beyond that. WearComms.send can chain up to 10s on a phone-relay
+                // beyond that. MainToSecondaryComms.send can chain up to 10s on a phone-relay
                 // attempt and then, on failure, an unbounded standalone network call
                 // to the car API — easily exceeding that budget on a degraded
                 // connection, which risks the process being reclaimed before
@@ -41,7 +41,7 @@ class ComplicationTapReceiver : BroadcastReceiver() {
                 // within budget and the complications still get a best-effort refresh
                 // request even if the underlying command didn't finish in time.
                 withTimeoutOrNull(9_000) {
-                    runCatching { WearComms.send(ctx, WearCommand(vin, action)) }
+                    runCatching { MainToSecondaryComms.send(ctx, WearCommand(vin, action)) }
                 }
                 ComplicationLink.requestUpdate(ctx)
             } finally {

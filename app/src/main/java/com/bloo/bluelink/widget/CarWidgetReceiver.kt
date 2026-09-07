@@ -99,7 +99,7 @@ class WidgetRefreshWorker(ctx: Context, params: WorkerParameters) : CoroutineWor
         private const val WORK = "bloo_car_widget_refresh"
 
         fun schedule(context: Context) {
-            // Gated on connectivity, like DriveSyncWorker and UpdateCheckWorker. This
+            // Gated on connectivity, like MainToMainSyncWorker and UpdateCheckWorker. This
             // job's whole purpose is a network fetch; without the constraint an offline
             // device still woke every 30 minutes to attempt one against a 30s-connect,
             // 60s-read client, while holding BlueLinkGate.statusMutex.

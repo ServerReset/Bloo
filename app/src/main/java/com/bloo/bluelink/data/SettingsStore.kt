@@ -45,15 +45,15 @@ private val Context.settingsDataStore by preferencesDataStore(
     corruptionHandler = ReplaceFileCorruptionHandler { emptyPreferences() },
 )
 
-// Process-wide serialization for performDriveSync(): the periodic worker, the
+// Process-wide serialization for performMainToMainSync(): the periodic worker, the
 // auto-sync-on-refresh collector, and a watch-requested sync can all fire at
 // nearly the same moment, and SettingsStore is instantiated fresh at each call
 // site (not a singleton) — a per-instance lock wouldn't serialize anything, so
 // this lives at module scope instead, same pattern as BlueLinkGate.statusMutex.
-private val driveSyncMutex = Mutex()
+private val mainToMainSyncMutex = Mutex()
 
 // A stalled SAF/DocumentsProvider call previously had no bound and could hold
-// driveSyncMutex indefinitely; each Drive I/O step in performDriveSync() is
+// mainToMainSyncMutex indefinitely; each Drive I/O step in performMainToMainSync() is
 // capped at this long instead.
 private const val DRIVE_IO_TIMEOUT_MS = 20_000L
 
@@ -160,7 +160,7 @@ const val TILE_COUNT = 12
  * hardcoded default when the key is absent, which is what "this preference was
  * never set" always looks like) and every setter writes through [editTracked],
  * a wrapper around DataStore's `edit {}` that also records which keys changed so
- * Google Drive sync (see [performDriveSync]) can tell which values are "dirty"
+ * Google Drive sync (see [performMainToMainSync]) can tell which values are "dirty"
  * (changed locally but not yet uploaded).
  *
  * Because DataStore only stores primitives, anything structured (climate presets,
@@ -1218,7 +1218,7 @@ class SettingsStore(private val context: Context) {
     }
 
     /** The full content-based file id this device currently has cached, or null.
-     *  Used by [performDriveSync] to decide whether to preserve the remote file's
+     *  Used by [performMainToMainSync] to decide whether to preserve the remote file's
      *  id or mint a new one. */
     private suspend fun syncFileId(): String? =
         context.settingsDataStore.data.first()[stringPreferencesKey("sync_file_id")]?.takeIf { it.isNotBlank() }
@@ -1375,7 +1375,7 @@ class SettingsStore(private val context: Context) {
      *  Separate from [syncPrimaryDeviceId] because that pref carries two different
      *  meanings which must not be conflated: "what the file says" (cached for offline
      *  Settings display) and "what I want the file to say". Reading the cache as a write
-     *  intent is what stopped the primary from ever changing -- see [performDriveSync]. */
+     *  intent is what stopped the primary from ever changing -- see [performMainToMainSync]. */
     private suspend fun syncPrimaryPending(): String? =
         context.settingsDataStore.data.first()[stringPreferencesKey("sync_primary_pending")]?.takeIf { it.isNotBlank() }
 
@@ -1387,7 +1387,7 @@ class SettingsStore(private val context: Context) {
     }
 
     /** Designate the primary device (source of truth). Persists locally; the value
-     *  is written into the Drive file on the next [performDriveSync] upload.
+     *  is written into the Drive file on the next [performMainToMainSync] upload.
      *
      *  Records the choice TWICE, deliberately: as a pending write intent (consumed by the
      *  next successful upload) and in the display cache (so Settings reflects the tap
@@ -1438,8 +1438,8 @@ class SettingsStore(private val context: Context) {
         )
     }
 
-    /** Outcome of one [performDriveSync] pass. */
-    data class DriveSyncOutcome(
+    /** Outcome of one [performMainToMainSync] pass. */
+    data class MainToMainSyncOutcome(
         /** False when sync isn't configured, or was skipped (Wi-Fi-only, not on Wi-Fi). */
         val ran: Boolean,
         /** True if a newer remote file was found and imported into this device. */
@@ -1476,7 +1476,7 @@ class SettingsStore(private val context: Context) {
      * The last-modified time a Storage Access Framework document reports, in epoch millis, or
      * null when the URI is not a document URI, the provider returns nothing, or the query throws.
      *
-     * performDriveSync reads this in two places -- the download gate and the upload's
+     * performMainToMainSync reads this in two places -- the download gate and the upload's
      * self-write guard -- to compare in the PROVIDER's clock domain rather than the device's,
      * which is what keeps the sync skew-safe and free of self-reimport. The two reads were
      * byte-for-byte identical; this is that query, once. Never throws (runCatching), because a
@@ -1491,19 +1491,19 @@ class SettingsStore(private val context: Context) {
         } else null
     }.getOrNull()
 
-    suspend fun performDriveSync(): DriveSyncOutcome = driveSyncMutex.withLock {
+    suspend fun performMainToMainSync(): MainToMainSyncOutcome = mainToMainSyncMutex.withLock {
         // The periodic worker, the auto-sync-on-refresh collector, and a
         // watch-requested sync can all fire within moments of each other with
         // no coordination otherwise -- this mutex makes them run one at a time
         // instead of racing to read/merge/upload the same Drive file.
-        val uri = syncUri() ?: return@withLock DriveSyncOutcome(ran = false, imported = false, uploaded = false, syncedAtMs = lastSyncMs())
+        val uri = syncUri() ?: return@withLock MainToMainSyncOutcome(ran = false, imported = false, uploaded = false, syncedAtMs = lastSyncMs())
         if (syncWifiOnly()) {
             val cm = context.getSystemService(android.content.Context.CONNECTIVITY_SERVICE) as android.net.ConnectivityManager
             val wifi = cm.getNetworkCapabilities(cm.activeNetwork)
                 ?.hasTransport(android.net.NetworkCapabilities.TRANSPORT_WIFI) == true
             if (!wifi) {
                 AppLog.log("⚠ Drive sync: skipped (Wi-Fi only, on cellular)")
-                return@withLock DriveSyncOutcome(ran = false, imported = false, uploaded = false, syncedAtMs = lastSyncMs())
+                return@withLock MainToMainSyncOutcome(ran = false, imported = false, uploaded = false, syncedAtMs = lastSyncMs())
             }
         }
         val parsed = android.net.Uri.parse(uri)
@@ -1522,7 +1522,7 @@ class SettingsStore(private val context: Context) {
         // withTimeout, not just runCatching -- a stalled SAF/DocumentsProvider
         // call (Drive app backgrounded, flaky network) previously had no
         // bound at all and could hang this coroutine indefinitely while still
-        // holding driveSyncMutex, blocking every other sync path (the worker,
+        // holding mainToMainSyncMutex, blocking every other sync path (the worker,
         // the refresh collector, a watch-requested sync) until it resolved.
         // withDriveRetry: one immediate retry so a single transient blip
         // (momentary network hiccup, Drive app briefly waking up) doesn't
@@ -1642,7 +1642,7 @@ class SettingsStore(private val context: Context) {
             // Snapshot the dirty set that this upload body actually carries, taken
             // right before the body is built. Only these keys may be cleared on
             // success -- a key edited AFTER this point (setters don't take
-            // driveSyncMutex, so a local edit can land mid-upload) isn't reflected
+            // mainToMainSyncMutex, so a local edit can land mid-upload) isn't reflected
             // in `body`, so it must keep its dirty flag or a later remote import
             // could silently overwrite the un-uploaded value.
             val uploadedDirtyKeys = dirtyKeys()
@@ -1662,7 +1662,7 @@ class SettingsStore(private val context: Context) {
             )
             val self = selfSyncDevice(now)
             outcomeDevices = SyncMerge.mergeDevices(remoteMeta?.devices ?: emptyList(), self, now)
-            val driveBody = SyncMerge.buildExportForDrive(
+            val driveBody = SyncMerge.buildExportForMainToMain(
                 prefs = prefsMap,
                 dirtyKeys = uploadedDirtyKeys,
                 photos = photos,
@@ -1723,7 +1723,7 @@ class SettingsStore(private val context: Context) {
                 setLastSyncMs(uploadedModifiedMs ?: now)
                 // Clear ONLY the keys this upload body actually carried, not the
                 // whole set -- an edit made after the body snapshot (setters don't
-                // hold driveSyncMutex) is still pending and must stay dirty so a
+                // hold mainToMainSyncMutex) is still pending and must stay dirty so a
                 // later remote import can't overwrite it.
                 clearDirtyKeys(uploadedDirtyKeys)
                 // The content-hash self-write guard: next pass reads this exact hash
@@ -1746,7 +1746,7 @@ class SettingsStore(private val context: Context) {
         // still shows up in Settings next time the app is opened, instead of
         // silently only ever reaching AppLog.
         setLastSyncError(error)
-        return DriveSyncOutcome(
+        return MainToMainSyncOutcome(
             // Match what was actually persisted above: report the OLD synced
             // time on total failure, not "now", so a caller that copies this
             // straight into UI state (AppViewModel does) can't show "synced
@@ -1767,7 +1767,7 @@ class SettingsStore(private val context: Context) {
     /**
      * A non-destructive end-to-end self-test of the Drive round-trip, for the
      * Settings "Test sync" button. Exercises the EXACT provider path
-     * [performDriveSync] relies on — persisted permission, read, truncate-write,
+     * [performMainToMainSync] relies on — persisted permission, read, truncate-write,
      * write-verify, read-back — against the user's real configured file, but
      * writes the file's own current bytes back VERBATIM so nothing the user has
      * is changed. (A brand-new/empty file is written with a harmless one-line
@@ -1794,8 +1794,8 @@ class SettingsStore(private val context: Context) {
             return SyncTestResult(false, "Lost access to the Drive file — set up sync again.")
         }
         // Serialize with real syncs so the read-then-write-back can't interleave
-        // with a concurrent performDriveSync writing different content.
-        return driveSyncMutex.withLock {
+        // with a concurrent performMainToMainSync writing different content.
+        return mainToMainSyncMutex.withLock {
             // 2. Read current bytes (an empty/new file reads as "" or null).
             val current = runCatching {
                 withDriveRetry {
@@ -1811,7 +1811,7 @@ class SettingsStore(private val context: Context) {
             // genuinely empty file gets a throwaway marker (overwritten by the
             // next real sync's upload).
             val payload = current?.takeIf { it.isNotEmpty() } ?: "bloo-sync-test"
-            // 3. Truncate-write + 4. verify, exactly as performDriveSync does.
+            // 3. Truncate-write + 4. verify, exactly as performMainToMainSync does.
             val verified = runCatching {
                 withDriveRetry {
                     kotlinx.coroutines.withTimeout(DRIVE_IO_TIMEOUT_MS) {
@@ -2075,7 +2075,7 @@ class SettingsStore(private val context: Context) {
     /**
      * Wraps a settings mutation to record which preference keys it actually
      * changed into the "dirty" set — the keys this device has touched locally
-     * since its own last successful Drive sync. [performDriveSync] protects
+     * since its own last successful Drive sync. [performMainToMainSync] protects
      * these from being overwritten by an incoming remote file, so a local edit
      * that hasn't been uploaded yet is never silently lost (field-level merge
      * instead of one whole-file last-write-wins).
@@ -2465,7 +2465,7 @@ class SettingsStore(private val context: Context) {
             // Re-read the dirty set from THIS transaction's live prefs, not just the
             // protect snapshot taken before the pass started: a local edit that
             // landed between that snapshot and this edit block (setters don't hold
-            // driveSyncMutex) would otherwise be clobbered by the incoming remote
+            // mainToMainSyncMutex) would otherwise be clobbered by the incoming remote
             // value. Treat those live-dirty keys exactly like protect -- skip
             // writing and skip removing them. [SyncMerge.mergePlan] applies the
             // guarded drop (and the DEVICE_LOCAL_KEYS exclusion, and value typing)

@@ -369,7 +369,7 @@ class WearLocalStore(private val context: Context) {
     // ── PIN lock ───────────────────────────────────────────────────────────────
     // The PIN is never stored in plaintext and never leaves the watch: only a
     // salted SHA-256 hash lives in DataStore, and only [verifyPin] ever reads it
-    // back (to compare, not to reveal). WearComms/WearLocalPayload mirror just
+    // back (to compare, not to reveal). MainToSecondaryComms/WearLocalPayload mirror just
     // the enabled flag + timing to the phone for its settings backup — never the
     // hash. There is deliberately no attempt-counting or lockout here (or
     // anywhere in this store); every verify is an independent, un-rate-limited

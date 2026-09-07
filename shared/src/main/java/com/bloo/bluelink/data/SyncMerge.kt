@@ -28,7 +28,7 @@ import kotlinx.serialization.json.put
  *   what the manual "export settings to a file" feature produces (a file the user
  *   may share/email), and it is also the exact byte-content the change-detection
  *   [portableContentHash] is computed over. It carries **no device metadata**.
- * - [buildExportForDrive] — the portable shape **plus** the Drive-sync-only keys
+ * - [buildExportForMainToMain] — the portable shape **plus** the Drive-sync-only keys
  *   (`_hash`, `_primaryDeviceId`, `_writerDeviceId`, `devices`). Used only for the
  *   Drive file, never for the shareable export, so device names/ids never leak.
  *
@@ -172,7 +172,7 @@ object SyncMerge {
 
     // --- Portable export (prefs/photos/_removed only — safe to share) ----------
 
-    /** The `prefs` object shared by [buildExport] and [buildExportForDrive]:
+    /** The `prefs` object shared by [buildExport] and [buildExportForMainToMain]:
      *  skips [DEVICE_LOCAL_KEYS] and local-file `img_` paths (a "/"-prefixed String
      *  path is meaningless on another device — only the photos channel carries
      *  local photos), and types each value as a JSON boolean/string (anything else
@@ -264,7 +264,7 @@ object SyncMerge {
      * this device's own entry is upserted and stale peers pruned; peers are
      * otherwise preserved. [primaryDeviceId] is omitted when null.
      */
-    fun buildExportForDrive(
+    fun buildExportForMainToMain(
         prefs: Map<String, Any>,
         dirtyKeys: Set<String>,
         photos: Map<String, String>,
@@ -320,7 +320,7 @@ object SyncMerge {
         prefs: Map<String, Any>,
         dirtyKeys: Set<String>,
         photos: Map<String, String> = emptyMap(),
-        /** Must be the SAME set passed to [buildExportForDrive]. The hash is documented as being
+        /** Must be the SAME set passed to [buildExportForMainToMain]. The hash is documented as being
          *  computed over the exact content uploaded, and `_removed` is part of that content -- so
          *  once tombstones are carried forward, omitting them here would leave `_hash` describing
          *  a file that no longer exists. Callers that pass one and not the other break the
@@ -404,7 +404,7 @@ object SyncMerge {
     /**
      * Just the `_removed` list from a backup, for carrying tombstones forward.
      *
-     * Separate from [parseBackup] deliberately: performDriveSync needs this on the UPLOAD half,
+     * Separate from [parseBackup] deliberately: performMainToMainSync needs this on the UPLOAD half,
      * which runs even when the import half was skipped (nothing newer, or an unreadable prefs
      * block). Going through parseBackup would tie the two together and lose the tombstones in
      * exactly the passes that still have to republish them. Never throws.

@@ -251,12 +251,12 @@ class SyncMergeTest {
         assertTrue(plan.removes.contains("portable_one"), "a portable carried tombstone should survive")
     }
 
-    // 6d. The Drive export carries them too, not just the portable one -- performDriveSync uses
-    //     buildExportForDrive, so a fix that only reached buildExport would fix nothing in
+    // 6d. The Drive export carries them too, not just the portable one -- performMainToMainSync uses
+    //     buildExportForMainToMain, so a fix that only reached buildExport would fix nothing in
     //     practice.
     @Test
     fun driveExportAlsoCarriesPriorTombstones() {
-        val json = SyncMerge.buildExportForDrive(
+        val json = SyncMerge.buildExportForMainToMain(
             prefs = mapOf("kept" to "value"),
             dirtyKeys = emptySet(),
             photos = emptyMap(),
@@ -276,14 +276,14 @@ class SyncMergeTest {
 
     private val dev = SyncMerge.SyncDevice(id = "uuid-A", name = "Adi's S24", model = "SM-S921", appVersion = "1.0", lastSeenMs = 1000L)
 
-    // 8. buildExportForDrive parses back to the SAME MergePlan as a plain portable
+    // 8. buildExportForMainToMain parses back to the SAME MergePlan as a plain portable
     //    file — the additive Drive-only keys (_hash/devices/_primaryDeviceId/
     //    _writerDeviceId) never leak into stringPuts/boolPuts/removes.
     @Test
     fun driveExportParsesLikePortable() {
         val prefs = mapOf("theme_mode" to "DARK", "notify_service" to true, "ui_scale" to "1.2")
         val portable = SyncMerge.buildExport(prefs, emptySet())
-        val drive = SyncMerge.buildExportForDrive(
+        val drive = SyncMerge.buildExportForMainToMain(
             prefs = prefs, dirtyKeys = emptySet(), photos = emptyMap(),
             hash = SyncMerge.portableContentHash(prefs, emptySet()),
             primaryDeviceId = "uuid-A", selfDevice = dev, knownDevices = emptyList(), nowMs = 5000L,

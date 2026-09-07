@@ -5,8 +5,8 @@ import kotlinx.coroutines.delay
 /**
  * Retry [block] with exponential backoff, returning whether it eventually succeeded.
  *
- * Extracted from three byte-for-byte copies of the same loop -- WearBridge.putItem and
- * WearPhoneService.sendResult on the phone, WearComms.publish on the watch -- each guarding a
+ * Extracted from three byte-for-byte copies of the same loop -- MainToSecondarySync.putItem and
+ * WearPhoneService.sendResult on the phone, MainToSecondaryComms.publish on the watch -- each guarding a
  * Wearable Data Layer call (`Tasks.await(putDataItem / sendMessage)`) that can fail transiently
  * while the peer app is being installed, updated, or momentarily unreachable, and whose failure
  * is otherwise SILENT: a swallowed write returns exactly what a successful one does, so a caller

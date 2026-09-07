@@ -62,7 +62,7 @@ object WearPhotoAssets {
      * the CACHED asset, which is the whole point of the cache. This doc used to
      * say "or null if ... nothing has changed since the last call", describing
      * behaviour that would be a serious bug, because the caller treats null as
-     * "skip this car" (`?: return@forEach` in WearBridge.publishExtrasNow). Had
+     * "skip this car" (`?: return@forEach` in MainToSecondarySync.publishExtrasNow). Had
      * it actually behaved that way, the asset key would be absent from the
      * DataMap on every publish after the first and the watch would LOSE each car
      * photo the moment any unrelated extra changed. Left as a warning rather

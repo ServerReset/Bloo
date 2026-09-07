@@ -58,13 +58,13 @@ import java.util.concurrent.TimeUnit
  * never block a command coroutine indefinitely — a stuck send just becomes a
  * failure the caller can react to.
  */
-object WearComms {
+object MainToSecondaryComms {
 
     /** How long any single Data Layer [Tasks.await] is allowed to block. */
     private const val TIMEOUT_SECONDS = 10L
 
     /** Attempts per Data Layer write, and the first backoff between them
-     *  (doubling: 400ms, then 800ms). Mirrors the phone's WearBridge.putItem. */
+     *  (doubling: 400ms, then 800ms). Mirrors the phone's MainToSecondarySync.putItem. */
     private const val PUBLISH_ATTEMPTS = 3
     private const val PUBLISH_RETRY_MS = 400L
 
@@ -414,7 +414,7 @@ object WearComms {
                 dataMap.putLong(WearSync.KEY_TIMESTAMP, System.currentTimeMillis())
             }.asPutDataRequest().setUrgent()
             // Retried, and logged when it still fails -- the phone half does the
-            // same (see WearBridge.putItem). This one carries the watch's own
+            // same (see MainToSecondarySync.putItem). This one carries the watch's own
             // edits: a reordered pebble stack, a preset the user just saved, a
             // climate draft. Every one of those has an optimistic override on
             // the watch waiting for the phone to echo it back, so a write that

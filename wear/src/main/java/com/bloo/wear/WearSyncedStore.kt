@@ -91,7 +91,7 @@ class WearSyncedStore<T> private constructor(
      * checked cheaply, since DataStore keeps its data cached in memory after the first
      * read, so this costs an in-memory comparison, not a disk hit. The phone republishes
      * these blobs constantly (settings/presets/climate ride along on every extras change:
-     * a weather refresh, an AI summary landing, a status poll -- see WearBridge's own
+     * a weather refresh, an AI summary landing, a status poll -- see MainToSecondarySync's own
      * doc), and most of those republishes carry content this store already has. Before
      * this, EVERY one of them cost a full DataStore edit (a real flash write, atomic
      * temp-file-then-rename) plus the JSON decode it triggers in [flow] -- unconditional

@@ -17,7 +17,7 @@ import com.bloo.bluelink.data.SessionStore
 import com.bloo.bluelink.data.SettingsStore
 import com.bloo.bluelink.data.SnapshotStore
 import com.bloo.bluelink.data.VehicleStatus
-import com.bloo.bluelink.wear.WearBridge
+import com.bloo.bluelink.wear.MainToSecondarySync
 import kotlinx.coroutines.sync.withLock
 import java.util.concurrent.TimeUnit
 
@@ -57,7 +57,7 @@ class AlertWorker(context: Context, params: WorkerParameters) : CoroutineWorker(
      *    obtained (possibly null, which `evaluate` itself interprets as "poll
      *    failed, don't guess") and posts every alert it returns.
      * 5. Folds every successfully-fetched status back into [SnapshotStore] in a
-     *    single write, then calls [WearBridge.refreshAllSurfaces] once, so this
+     *    single write, then calls [MainToSecondarySync.refreshAllSurfaces] once, so this
      *    30-minute poll doubles as a general data refresh for the watch, tiles
      *    and widgets instead of them waiting on their own schedules.
      *
@@ -87,7 +87,7 @@ class AlertWorker(context: Context, params: WorkerParameters) : CoroutineWorker(
         // This worker fetches fresh status for every car every 30 minutes and used to
         // throw all of it away: it read the status, raised alerts, updated the live
         // charging bar, and never wrote it anywhere. Then it called
-        // WearBridge.refreshAllSurfaces() at the end, which republishes from
+        // MainToSecondarySync.refreshAllSurfaces() at the end, which republishes from
         // SnapshotStore -- so the watch, the QS tiles and the widgets were handed
         // whatever the phone app last persisted, however old, seconds after the phone
         // had learned the truth. Every "Updated 4h ago" on a glanceable surface was
@@ -166,7 +166,7 @@ class AlertWorker(context: Context, params: WorkerParameters) : CoroutineWorker(
 
         // The 30-min alert poll also constitutes a data refresh — fan out to the
         // watch + QS tiles so they don't wait for their own next scheduled update.
-        WearBridge.refreshAllSurfaces(applicationContext)
+        MainToSecondarySync.refreshAllSurfaces(applicationContext)
         return Result.success()
     }
 

@@ -14,7 +14,7 @@ import com.bloo.bluelink.data.WearSync
  * here, one entrypoint per path:
  *
  *   - [WearListenerService.onDataChanged] — live pushes while the watch is running.
- *   - [WearComms.pullLatest]              — cold-launch backfill of the last blob
+ *   - [MainToSecondaryComms.pullLatest]              — cold-launch backfill of the last blob
  *                                            published on each path.
  *
  * Both dispatch through a `when(path)` block keyed on the frozen paths, so the

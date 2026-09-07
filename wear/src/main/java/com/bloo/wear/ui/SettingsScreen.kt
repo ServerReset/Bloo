@@ -519,12 +519,12 @@ fun SettingsScreen(vm: WearViewModel, ui: WearUi, onAddAccount: () -> Unit) {
                             )
                             Spacer(Modifier.height(4.dp))
                             MorphButton(
-                                label = if (ui.driveSyncBusy) "Syncing…" else "Drive sync",
+                                label = if (ui.mainToMainSyncBusy) "Syncing…" else "Drive sync",
                                 icon = Icons.Filled.Bolt,
                                 active = false,
                                 activeColor = MaterialTheme.colorScheme.tertiary,
-                                pending = ui.driveSyncBusy,
-                                onClick = { vm.syncDrive() },
+                                pending = ui.mainToMainSyncBusy,
+                                onClick = { vm.syncMainToMain() },
                             )
                         }
                     }

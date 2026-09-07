@@ -243,7 +243,7 @@ class WearCommandRunnerTest {
     /**
      * THE reason [stateFor] and [withState] exist, and the bug they replaced.
      *
-     * Both revert sites -- WidgetActions' WidgetCommandWorker and WearComms'
+     * Both revert sites -- WidgetActions' WidgetCommandWorker and MainToSecondaryComms'
      * runStandalone -- capture before the optimistic flip and restore after a
      * failure. This asserts the full round trip holds for EVERY tri-state starting
      * value, including null.

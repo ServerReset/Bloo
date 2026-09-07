@@ -55,7 +55,7 @@ import java.util.concurrent.TimeUnit
  * fresh timestamp on every push even when the underlying vehicle data hasn't changed --
  * otherwise a byte-identical payload would be silently coalesced/skipped by the Data Layer.
  */
-object WearBridge {
+object MainToSecondarySync {
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
@@ -465,9 +465,9 @@ object WearBridge {
      *  means sync isn't configured on this phone at all.
      *
      *  The download/compare/import/upload sequence itself lives in
-     *  [SettingsStore.performDriveSync] — shared with the phone's own
+     *  [SettingsStore.performMainToMainSync] — shared with the phone's own
      *  auto-sync-on-refresh collector, so there's exactly one implementation. */
-    suspend fun driveSync(context: Context): SettingsStore.DriveSyncOutcome? {
+    suspend fun mainToMainSync(context: Context): SettingsStore.MainToMainSyncOutcome? {
         return runCatching {
             val store = SettingsStore(context)
             if (store.syncUri() == null) {
@@ -475,7 +475,7 @@ object WearBridge {
                 return@runCatching null
             }
             com.bloo.bluelink.data.AppLog.log("Drive sync: starting")
-            val outcome = store.performDriveSync()
+            val outcome = store.performMainToMainSync()
             val appearance = store.appearance.first()
             publishSettingsNow(context, appearance)
             // Was `updateAllSurfaces(context)`, a private function with a LITERALLY EMPTY
@@ -486,16 +486,16 @@ object WearBridge {
             outcome
         }.getOrElse { e ->
             // Fall back to the real last-known sync time (not 0L/"never") on a
-            // genuinely unexpected exception -- performDriveSync already
+            // genuinely unexpected exception -- performMainToMainSync already
             // catches everything it reasonably can internally, so reaching
             // here is rare, but a stray uncaught exception here shouldn't
             // regress "Last synced" to blank when a real prior sync exists.
             val lastKnown = runCatching { SettingsStore(context).lastSyncMs() }.getOrDefault(0L)
-            SettingsStore.DriveSyncOutcome(ran = true, imported = false, uploaded = false, syncedAtMs = lastKnown, error = e.message ?: "Sync failed")
+            SettingsStore.MainToMainSyncOutcome(ran = true, imported = false, uploaded = false, syncedAtMs = lastKnown, error = e.message ?: "Sync failed")
         }
     }
 
     /** Refresh watch tiles (no state re-fetch). */
-    // updateAllSurfaces was deleted here. Its body was empty, and its one caller (driveSync)
+    // updateAllSurfaces was deleted here. Its body was empty, and its one caller (mainToMainSync)
     // now updates the widget directly.
 }

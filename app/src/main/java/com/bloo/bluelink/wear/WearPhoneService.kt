@@ -46,7 +46,7 @@ import kotlinx.coroutines.sync.withLock
  *   persisted or replayed; if the phone is unreachable when sent, it's simply lost (the
  *   watch's UI has to handle that as a timeout, not an explicit failure).
  * - [onDataChanged]: fired when a *Data Item* (`DataClient.putDataItem`, written by the
- *   watch the same way [WearBridge] writes them phone-side) changes. Data items ARE
+ *   watch the same way [MainToSecondarySync] writes them phone-side) changes. Data items ARE
  *   persisted and synced-on-reconnect, so they suit state the phone must eventually learn
  *   even if the phone was offline when the watch wrote it (climate drafts, presets, toggle
  *   states edited on-watch).
@@ -114,7 +114,7 @@ class WearPhoneService : WearableListenerService() {
      *   that don't touch the car at all. Ordinary commands run via [WearCommandRunner.execute]
      *   and always send a reply on [WearSync.PATH_COMMAND_RESULT] back to `event.sourceNodeId`
      *   (the specific watch node that sent the request) so its UI knows the outcome, then
-     *   fans the refreshed state out to every other surface via [WearBridge.refreshAllSurfaces].
+     *   fans the refreshed state out to every other surface via [MainToSecondarySync.refreshAllSurfaces].
      * - [WearSync.PATH_SYNC_REQUEST]: the watch asking the phone to either force a status
      *   refresh or kick off a Drive settings sync; REFRESH replies via the general surface
      *   fan-out (no dedicated result message), DRIVE_SYNC replies with an explicit outcome
@@ -156,7 +156,7 @@ class WearPhoneService : WearableListenerService() {
                     else AppLog.log("⚠ Phone relay: ${command.action} → ${result.message}")
                     sendResult(event.sourceNodeId, WearSync.PATH_COMMAND_RESULT, WearSync.encodeResult(result))
                     val ctx = applicationContext
-                    WearBridge.refreshAllSurfaces(ctx)
+                    MainToSecondarySync.refreshAllSurfaces(ctx)
                 }
             }
 
@@ -167,11 +167,11 @@ class WearPhoneService : WearableListenerService() {
                     when (command?.action) {
                         WearAction.REFRESH -> {
                             WearCommandRunner.refresh(ctx, command.vin)
-                            WearBridge.refreshAllSurfaces(ctx)
+                            MainToSecondarySync.refreshAllSurfaces(ctx)
                         }
-                        WearAction.RESYNC -> WearBridge.publishAll(ctx)
+                        WearAction.RESYNC -> MainToSecondarySync.publishAll(ctx)
                         WearAction.DRIVE_SYNC -> {
-                            val outcome = WearBridge.driveSync(ctx)
+                            val outcome = MainToSecondarySync.mainToMainSync(ctx)
                             val result = if (outcome == null) {
                                 WearSyncResult(ok = false, message = "Drive sync isn't set up on this phone")
                             } else {
@@ -186,8 +186,8 @@ class WearPhoneService : WearableListenerService() {
                         // Anything else on this path is the watch's "Sync from
                         // phone" button, which means everything -- not just the
                         // state + settings refreshAllSurfaces covers. See
-                        // WearBridge.publishAll.
-                        else -> WearBridge.publishAll(ctx)
+                        // MainToSecondarySync.publishAll.
+                        else -> MainToSecondarySync.publishAll(ctx)
                     }
                 }
             }
@@ -206,7 +206,7 @@ class WearPhoneService : WearableListenerService() {
                     val signedIn = runCatching { SessionStore(ctx).loggedInBrands().isNotEmpty() }.getOrDefault(false)
                     if (signedIn) {
                         AppLog.log("Watch setup request: already signed in, pushing auth")
-                        runCatching { WearBridge.publishAuth(ctx) }
+                        runCatching { MainToSecondarySync.publishAuth(ctx) }
                     } else {
                         AppLog.log("Watch setup request: not signed in, prompting on phone")
                         Notifications.post(
@@ -279,7 +279,7 @@ class WearPhoneService : WearableListenerService() {
                             // (and the watch's optimistic override) lines up.
                             runCatching {
                                 val appearance = SettingsStore(applicationContext).appearance.first()
-                                WearBridge.publishSettingsNow(applicationContext, appearance)
+                                MainToSecondarySync.publishSettingsNow(applicationContext, appearance)
                             }
                         }
                     }
@@ -289,7 +289,7 @@ class WearPhoneService : WearableListenerService() {
                         // NOT store.setUiScale(payload.uiScale). That was a feedback loop and it
                         // squared the watch's own text-size slider.
                         //
-                        // The watch fills this field with its LOCAL fontScale -- WearComms
+                        // The watch fills this field with its LOCAL fontScale -- MainToSecondaryComms
                         // .publishLocalSettings takes it as a parameter literally named
                         // `uiScale`, and WearViewModel passes `ls.fontScale` into it. Writing it
                         // here made it the PHONE's appearance uiScale, which the phone then
@@ -324,7 +324,7 @@ class WearPhoneService : WearableListenerService() {
                         // settles on the confirmed value, same as pebble order.
                         runCatching {
                             val appearance = store.appearance.first()
-                            WearBridge.publishSettingsNow(applicationContext, appearance)
+                            MainToSecondarySync.publishSettingsNow(applicationContext, appearance)
                         }
                     }
                     WearSync.PATH_AURORA_TOGGLE -> {
@@ -337,7 +337,7 @@ class WearPhoneService : WearableListenerService() {
                         // Same settle-back pattern as the AI toggle above.
                         runCatching {
                             val appearance = store.appearance.first()
-                            WearBridge.publishSettingsNow(applicationContext, appearance)
+                            MainToSecondarySync.publishSettingsNow(applicationContext, appearance)
                         }
                     }
                 }
@@ -389,7 +389,7 @@ class WearPhoneService : WearableListenerService() {
         }.firstOrNull() ?: WearExtras()
         items.release()
         val updated = transform(existing) ?: return@withLock false
-        WearBridge.publishExtrasNow(ctx, updated)
+        MainToSecondarySync.publishExtrasNow(ctx, updated)
         true
     }
 

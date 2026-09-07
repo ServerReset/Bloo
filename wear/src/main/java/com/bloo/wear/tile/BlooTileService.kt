@@ -34,7 +34,7 @@ import com.bloo.bluelink.data.pinnedOrSelected
 import com.bloo.bluelink.data.vehicleStateLabel
 import com.bloo.wear.R
 import com.bloo.wear.TILE_CHIP_ACTIONS
-import com.bloo.wear.WearComms
+import com.bloo.wear.MainToSecondaryComms
 import com.bloo.wear.WearLocalStore
 import com.bloo.wear.WearSettingsStore
 import com.bloo.wear.complication.ComplicationLink
@@ -193,13 +193,13 @@ abstract class BlooTileService : TileService() {
                         // below reflects it (applyOptimistic also resolves toggle
                         // vocab before flipping), then relay the slow network half
                         // in the background so the tile still renders immediately.
-                        val resolved = WearComms.applyOptimistic(ctx, WearCommand(c.vin, action))
+                        val resolved = MainToSecondaryComms.applyOptimistic(ctx, WearCommand(c.vin, action))
                         // Relay on the process-lifetime scope, NOT a service
                         // scope: the system can tear this Service down the moment
                         // buildTile returns, cancelling an in-flight relay and
                         // silently dropping the user's command mid-send.
                         TileCommandRelay.scope.launch {
-                            runCatching { WearComms.relayCommand(ctx, resolved) }
+                            runCatching { MainToSecondaryComms.relayCommand(ctx, resolved) }
                         }
                     }
                     data = store.current()

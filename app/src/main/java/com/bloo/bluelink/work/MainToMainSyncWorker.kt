@@ -11,7 +11,7 @@ import androidx.glance.appwidget.updateAll
 import com.bloo.bluelink.widget.CarWidget
 import com.bloo.bluelink.data.AppLog
 import com.bloo.bluelink.data.SettingsStore
-import com.bloo.bluelink.wear.WearBridge
+import com.bloo.bluelink.wear.MainToSecondarySync
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withTimeout
 import java.util.concurrent.TimeUnit
@@ -23,10 +23,10 @@ import java.util.concurrent.TimeUnit
  * to be in the foreground and a refresh settled.
  *
  * A no-op (cheap early exit) when Drive sync isn't configured; [SettingsStore.
- * performDriveSync] itself re-checks the Wi-Fi-only preference each run, so the
+ * performMainToMainSync] itself re-checks the Wi-Fi-only preference each run, so the
  * WorkManager-level constraint only needs "any network."
  */
-class DriveSyncWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ctx, params) {
+class MainToMainSyncWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ctx, params) {
 
     /**
      * WorkManager's entry point, invoked on each periodic tick (see [schedule]).
@@ -37,7 +37,7 @@ class DriveSyncWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(
      *    doing any work -- this keeps the periodic job registered (so it's
      *    ready to go the moment sync *is* configured) while making every tick
      *    a no-op cost until then.
-     * 2. Runs the actual sync via [SettingsStore.performDriveSync], wrapped in
+     * 2. Runs the actual sync via [SettingsStore.performMainToMainSync], wrapped in
      *    [runCatching] so an unexpected exception doesn't crash the worker;
      *    an unexpected throwable (e.g. a DataStore IOException) is logged and
      *    turned into [Result.retry] rather than being swallowed, so a real
@@ -59,7 +59,7 @@ class DriveSyncWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(
         val ctx = applicationContext
         val store = SettingsStore(ctx)
         if (store.syncUri() == null) return Result.success()
-        val result = runCatching { store.performDriveSync() }
+        val result = runCatching { store.performMainToMainSync() }
         val outcome = result.getOrElse { t ->
             // An unexpected throwable (e.g. a DataStore IOException from the
             // trailing writes) must not be swallowed into a silent success --
@@ -76,7 +76,7 @@ class DriveSyncWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(
             // execution ceiling.
             runCatching {
                 withTimeout(5_000L) {
-                    WearBridge.publishSettingsNow(ctx, store.appearance.first())
+                    MainToSecondarySync.publishSettingsNow(ctx, store.appearance.first())
                 }
             }
             // Restored. Step 3 of this class's KDoc has always promised it, and the
@@ -100,7 +100,7 @@ class DriveSyncWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(
             //
             // That last sentence was not true until this was bounded: WorkManager never
             // gives up on Result.retry(), so a revoked Drive grant retried forever,
-            // each attempt paying performDriveSync's ~15 DataStore reads, a Drive round
+            // each attempt paying performMainToMainSync's ~15 DataStore reads, a Drive round
             // trip and (when photos sync) a full per-car JPEG re-encode. Backoff caps
             // the RATE, not the count. LiveChargePollWorker and TileCommandWorker both
             // already bound theirs; this is the same shape.
@@ -133,10 +133,10 @@ class DriveSyncWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(
          *  day of use, without the battery/data cost of anything tighter for a
          *  low-urgency settings-sync convenience feature. */
         fun schedule(context: Context) {
-            val request = PeriodicWorkRequestBuilder<DriveSyncWorker>(2, TimeUnit.HOURS)
+            val request = PeriodicWorkRequestBuilder<MainToMainSyncWorker>(2, TimeUnit.HOURS)
                 // Requires any usable network connection (not Wi-Fi-only at the
                 // WorkManager level) since the Wi-Fi-only preference, if the user
-                // set one, is instead re-checked inside performDriveSync() itself
+                // set one, is instead re-checked inside performMainToMainSync() itself
                 // every run -- letting the constraint here stay the loosest
                 // possible so the worker is scheduled to run as often as intended
                 // and only skips the actual network call when the user's own

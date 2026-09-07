@@ -53,7 +53,7 @@ object WearPhotoCache {
                 val asset: Asset = map.getAsset(WearSync.assetKeyFor(vin)) ?: continue
                 runCatching {
                     // Bounded, like every other Data Layer call in this app
-                    // (WearBridge.putItem uses the same shape). An asset fetch
+                    // (MainToSecondarySync.putItem uses the same shape). An asset fetch
                     // waits on a transfer from the phone over Bluetooth: if the
                     // phone walks out of range mid-pull, an unbounded await
                     // parks an IO thread until it comes back. A photo is the
