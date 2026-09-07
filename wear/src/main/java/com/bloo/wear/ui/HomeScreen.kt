@@ -807,7 +807,7 @@ internal fun BoxScope.MessageSnackbar(message: String?, onDismiss: () -> Unit) {
                     liveRegion = LiveRegionMode.Polite
                     contentDescription = "${message.orEmpty()}. Double tap to dismiss."
                 }
-                .clickable(onClickLabel = "Dismiss") { onDismiss() }
+                .pressScaleClickable(onClickLabel = "Dismiss") { onDismiss() }
                 .padding(horizontal = 12.dp, vertical = 8.dp),
         ) {
             Text(

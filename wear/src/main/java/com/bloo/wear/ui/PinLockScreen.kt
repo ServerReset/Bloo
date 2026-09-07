@@ -305,7 +305,7 @@ fun PinEntryScreen(
                 "Cancel",
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.clickable(onClickLabel = "Cancel", role = Role.Button, onClick = onCancel),
+                modifier = Modifier.pressScaleClickable(onClickLabel = "Cancel", role = Role.Button, onClick = onCancel),
             )
         }
     }

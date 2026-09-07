@@ -22,6 +22,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -52,6 +53,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
@@ -474,7 +476,7 @@ fun MapThumbnail(lat: Double, lon: Double, modifier: Modifier = Modifier) {
             // are not, and which would have made the rim sound load-bearing for a
             // reason it isn't.)
             .border(BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.18f)), thumbShape)
-            .clickable(enabled = isError) { retryKey++ },
+            .pressScaleClickable(onClickLabel = "Retry", enabled = isError) { retryKey++ },
         contentAlignment = Alignment.Center,
     ) {
         if (isError) {
@@ -663,6 +665,52 @@ fun AnimatedSlider(
         onStepTick = { haptics.tick() },
         onSettle = { haptics.click(); onSettle?.invoke() },
     )
+}
+
+/**
+ * A press-scale for a tap target that isn't a full [MorphButton] -- a bare text link, a
+ * custom-shaped surface (a map thumbnail, a snackbar), an icon-only nub -- so every tappable
+ * element in the app answers a touch with the SAME deliberate motion language [MorphButton]
+ * and the PIN pad's own keys already use, instead of falling back to Compose's default ripple.
+ * The default ripple is what this replaces: it clips oddly against a clipped/shadowed custom
+ * shape and, being a fixed platform effect, is the one piece of feedback in the whole app that
+ * doesn't match the springs and haptics everything else was hand-tuned with.
+ *
+ * [scale] defaults to 0.92f, between [MorphButton]'s own 0.95f (a full-width chip, where a
+ * bigger dip would look like the button is buckling) and the icon-only preset-delete nub's
+ * 0.88f (a small target that reads a stronger dip as "more responsive," not distorted) --
+ * pass either explicitly for a target closer to one of those than a generic link.
+ *
+ * Deliberately just a scale, no haptic call: [MorphButton] differentiates click vs. tap by
+ * whether the press commits a real state change, which none of this modifier's callers do
+ * (a Cancel link, a retry tap, a dismiss) -- adding one flat haptic here would be a THIRD tap
+ * feel in the app alongside MorphButton's two, not a consistent one.
+ */
+@Composable
+fun Modifier.pressScaleClickable(
+    onClickLabel: String? = null,
+    role: Role? = null,
+    enabled: Boolean = true,
+    scale: Float = 0.92f,
+    onClick: () -> Unit,
+): Modifier {
+    val interaction = remember { MutableInteractionSource() }
+    val pressed by interaction.collectIsPressedAsState()
+    val animatedScale by animateFloatAsState(
+        targetValue = if (pressed) scale else 1f,
+        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessHigh),
+        label = "pressScaleClickable",
+    )
+    return this
+        .graphicsLayer { scaleX = animatedScale; scaleY = animatedScale }
+        .clickable(
+            interactionSource = interaction,
+            indication = null,
+            enabled = enabled,
+            onClickLabel = onClickLabel,
+            role = role,
+            onClick = onClick,
+        )
 }
 
 /** THE watch's pill→rounded-square morphing button: a thin wear-specific shell
