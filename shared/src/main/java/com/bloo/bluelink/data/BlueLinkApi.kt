@@ -281,7 +281,18 @@ class BlueLinkApi(private val brand: Brand = Brand.HYUNDAI) {
                         put("unit", kotlinx.serialization.json.JsonPrimitive(1))
                     })
                     put("defrost", kotlinx.serialization.json.JsonPrimitive(req.defrost))
-                    put("heating1", kotlinx.serialization.json.JsonPrimitive(if (req.steeringWheelHeat.isOn) 1 else 0))
+                    // heating1 is a bundle-selector, not a plain boolean: the real values are
+                    // 0 (all off), 2 (rear window + mirrors only), 3 (steering wheel only) and
+                    // 4 (steering wheel + rear window + mirrors) -- confirmed across multiple
+                    // independent reverse-engineering efforts (bluelinky issues #139/#230,
+                    // hyundai_kia_connect_api's own documented heating1 fix). This sent the
+                    // plain `1` a boolean-shaped fallback would produce, which isn't one of
+                    // those four values at all -- consistent with a real user's report that
+                    // requesting steering wheel heat landed at some other (lower) state instead
+                    // of the one asked for, on a CCNC Ioniq 5. No separate mirrors/rear-window
+                    // toggle exists in this app yet, so this only ever needs "wheel alone" (3)
+                    // or "all off" (0) -- not the combined value 4.
+                    put("heating1", kotlinx.serialization.json.JsonPrimitive(if (req.steeringWheelHeat.isOn) 3 else 0))
                     // Older (gen-3) EVs additionally accept duration + seat heat.
                     if (gen3) {
                         put("igniOnDuration", kotlinx.serialization.json.JsonPrimitive(req.durationMinutes))
@@ -295,7 +306,18 @@ class BlueLinkApi(private val brand: Brand = Brand.HYUNDAI) {
                         put("value", kotlinx.serialization.json.JsonPrimitive(req.tempF.toString()))
                     })
                     put("defrost", kotlinx.serialization.json.JsonPrimitive(req.defrost))
-                    put("heating1", kotlinx.serialization.json.JsonPrimitive(if (req.steeringWheelHeat.isOn) 1 else 0))
+                    // heating1 is a bundle-selector, not a plain boolean: the real values are
+                    // 0 (all off), 2 (rear window + mirrors only), 3 (steering wheel only) and
+                    // 4 (steering wheel + rear window + mirrors) -- confirmed across multiple
+                    // independent reverse-engineering efforts (bluelinky issues #139/#230,
+                    // hyundai_kia_connect_api's own documented heating1 fix). This sent the
+                    // plain `1` a boolean-shaped fallback would produce, which isn't one of
+                    // those four values at all -- consistent with a real user's report that
+                    // requesting steering wheel heat landed at some other (lower) state instead
+                    // of the one asked for, on a CCNC Ioniq 5. No separate mirrors/rear-window
+                    // toggle exists in this app yet, so this only ever needs "wheel alone" (3)
+                    // or "all off" (0) -- not the combined value 4.
+                    put("heating1", kotlinx.serialization.json.JsonPrimitive(if (req.steeringWheelHeat.isOn) 3 else 0))
                     put("igniOnDuration", kotlinx.serialization.json.JsonPrimitive(req.durationMinutes))
                     put("seatHeaterVentInfo", seatInfo())
                     put("username", kotlinx.serialization.json.JsonPrimitive(username))

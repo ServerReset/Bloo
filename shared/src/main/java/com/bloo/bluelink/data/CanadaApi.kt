@@ -484,7 +484,10 @@ class CanadaApi(private val brand: Brand) {
         fun climateFields() = buildJsonObject {
             put("airCtrl", 1)
             put("defrost", req.defrost)
-            put("heating1", if (req.steeringWheelHeat.isOn) 1 else 0)
+            // heating1 is a bundle-selector, not a plain boolean -- see BlueLinkApi's own
+            // (US/Genesis) copy of this same field for the sourced values (0/2/3/4, not a
+            // 0/1 toggle) and the real-world report that motivated the fix.
+            put("heating1", if (req.steeringWheelHeat.isOn) 3 else 0)
             put("igniOnDuration", req.durationMinutes)
             put("airTemp", buildJsonObject {
                 put("value", hexTemp)
