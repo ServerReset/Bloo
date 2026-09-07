@@ -214,6 +214,12 @@ data class WearUi(
     val chargeLimitDrafts: Map<String, ChargeLimitDraft> = emptyMap(),
     val settings: com.bloo.bluelink.data.WearSettingsPayload? = null,
     val localSettings: WearLocalSettings = WearLocalSettings(),
+    /** Bumped per-VIN whenever [WearPhotoEvents] reports that car's synced photo file was
+     *  just overwritten -- included in the photo decode's own remember/produceState key
+     *  (HomeScreen.kt) so a photo REPLACING another synced photo (same fixed filename,
+     *  same [WearExtras.images] path string) is still noticed without a restart. See
+     *  WearPhotoEvents' own doc for why the path string alone can't carry this. */
+    val photoGeneration: Map<String, Int> = emptyMap(),
     /** Optimistic per-car pebble orders the watch just set, held until the phone
      *  echoes the same order back via [settings]. */
     val pebbleOverride: Map<String, List<String>> = emptyMap(),
@@ -520,6 +526,18 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
                 // stale/duplicate reply (e.g. after a timeout already cleared it)
                 // shouldn't clobber unrelated busy state or messages.
                 _ui.update { if (it.aiBusy == r.vin) it.copy(aiBusy = null, message = r.message) else it }
+            }
+        }
+        // A synced photo just got overwritten at its own fixed filename -- see
+        // WearPhotoEvents' own doc for why the path string this normally rides on
+        // (extras.images[vin]) can't carry that by itself. Bump each reported VIN's
+        // counter so HomeScreen's decode key (which includes photoGeneration[vin])
+        // changes even though the path didn't.
+        viewModelScope.launch {
+            WearPhotoEvents.changed.collect { vins ->
+                _ui.update { s ->
+                    s.copy(photoGeneration = s.photoGeneration + vins.associateWith { (s.photoGeneration[it] ?: 0) + 1 })
+                }
             }
         }
         // Auth-arrival (the "Set up on phone" handoff): WearListenerService persists

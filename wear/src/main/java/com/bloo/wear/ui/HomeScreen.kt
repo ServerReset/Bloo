@@ -1124,14 +1124,16 @@ private fun SummaryCard(vm: WearViewModel, ui: WearUi, car: CarView) = SectionCa
     // collected into `ui` and this card already reads it in eleven other places -- and it needs
     // no I/O in composition, unlike stat-ing the file on every recomposition.
     //
-    // Known gap, stated rather than hidden: a photo arriving via Drive sync lands at the fixed
-    // `car_${'$'}vin_synced.jpg`, so replacing a synced photo with another synced photo does not move
-    // this key. That path still needs a restart. Fixing it properly means plumbing
-    // WearPhotoCache.ingest's return value -- it already reports which VINs changed and the
-    // caller discards it -- through an event to the UI.
+    // A photo arriving via the live phone push (main-to-secondary) lands at the fixed
+    // `car_${'$'}vin_synced.jpg`, so replacing one synced photo with another does not move
+    // `photoKey` at all -- same filename both times. `photoGeneration[vin]` is the other half:
+    // WearPhotoEvents/WearListenerService bump it specifically when WearPhotoCache.ingest
+    // reports new bytes actually landed for this VIN, so the decode still re-keys even when the
+    // path string alone can't tell the difference. See WearPhotoEvents' own doc.
     val ctx = LocalContext.current
     val photoKey = ui.extras.images[car.vin]
-    val photo by produceState<android.graphics.Bitmap?>(initialValue = null, car.vin, photoKey) {
+    val photoGen = ui.photoGeneration[car.vin]
+    val photo by produceState<android.graphics.Bitmap?>(initialValue = null, car.vin, photoKey, photoGen) {
         value = withContext(Dispatchers.IO) {
             WearPhotoCache.pathFor(ctx, car.vin)?.let {
                 runCatching { android.graphics.BitmapFactory.decodeFile(it) }.getOrNull()

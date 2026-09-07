@@ -144,7 +144,17 @@ class WearListenerService : WearableListenerService() {
                             // around both calls would have skipped it
                             // entirely, leaving that car's cached photo file
                             // on the watch forever.
-                            if (vins.isNotEmpty()) WearPhotoCache.ingest(applicationContext, vins, dataMap)
+                            // ingest's return -- which VINs it actually wrote new bytes for --
+                            // used to be discarded here. Nothing else in this file (or the fixed
+                            // filename ingest writes to) ever changes when a synced photo is
+                            // REPLACED by another synced one, so that was the one path a photo
+                            // update could vanish into: forwarded to WearPhotoEvents so a live
+                            // WearViewModel can bump the one VIN that actually changed instead of
+                            // the UI needing a restart to notice. See WearPhotoEvents' own doc.
+                            if (vins.isNotEmpty()) {
+                                val changed = WearPhotoCache.ingest(applicationContext, vins, dataMap)
+                                if (changed.isNotEmpty()) WearPhotoEvents.emit(changed)
+                            }
                             WearPhotoCache.prune(applicationContext, vins)
                             WearStateWriter.persistExtras(applicationContext, raw)
                         }
