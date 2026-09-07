@@ -52,3 +52,14 @@ fun HapticFeedback.click() = performHapticFeedback(HapticFeedbackType.Confirm)
  * command). Signals "that didn't take" without any text.
  */
 fun HapticFeedback.reject() = performHapticFeedback(HapticFeedbackType.Reject)
+
+/**
+ * The "you've grabbed it" feel — a long-press that starts a drag (tile
+ * reorder), distinct from every feel above: not a tap (nothing was pressed
+ * to completion), not a confirm (nothing committed yet, the drag hasn't
+ * even started moving), not a tick (this isn't incremental motion) and not
+ * a rejection (nothing failed). The one control that needed this used to
+ * reach for HapticFeedbackType.LongPress directly, the one interactive
+ * control in the file breaking the rule this vocabulary exists to enforce.
+ */
+fun HapticFeedback.dragStart() = performHapticFeedback(HapticFeedbackType.LongPress)

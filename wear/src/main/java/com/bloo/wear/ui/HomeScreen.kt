@@ -81,7 +81,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.runtime.snapshotFlow
-import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.foundation.Canvas
@@ -2586,7 +2585,7 @@ fun TileReorderScreen(vm: WearViewModel, ui: WearUi, vin: String) {
                                 detectDragGesturesAfterLongPress(
                                     onDragStart = {
                                         draggingKey = key; offsetY = 0f
-                                        haptics.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
+                                        haptics.dragStart()
                                     },
                                 onDragEnd = { draggingKey = null; offsetY = 0f; commit() },
                                 onDragCancel = { draggingKey = null; offsetY = 0f },
