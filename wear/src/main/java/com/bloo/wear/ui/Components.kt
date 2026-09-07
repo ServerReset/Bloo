@@ -54,7 +54,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.lerp
@@ -76,17 +75,12 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.wear.compose.foundation.lazy.AutoCenteringParams
-import androidx.wear.compose.foundation.lazy.ScalingLazyColumn
-import androidx.wear.compose.foundation.lazy.ScalingLazyColumnDefaults
 import androidx.wear.compose.material3.LocalContentColor
 import com.bloo.uicommon.MorphButtonCore
-import androidx.wear.compose.foundation.lazy.ScalingLazyListScope
-import androidx.wear.compose.foundation.lazy.ScalingLazyListState
-import androidx.wear.compose.foundation.lazy.ScalingParams
-import androidx.wear.compose.foundation.lazy.rememberScalingLazyListState
-import androidx.wear.compose.foundation.rotary.RotaryScrollableDefaults
-import androidx.wear.compose.foundation.rotary.rotaryScrollable
+import androidx.wear.compose.foundation.lazy.TransformingLazyColumn
+import androidx.wear.compose.foundation.lazy.TransformingLazyColumnScope
+import androidx.wear.compose.foundation.lazy.TransformingLazyColumnState
+import androidx.wear.compose.foundation.lazy.rememberTransformingLazyColumnState
 import androidx.wear.compose.material3.CircularProgressIndicator
 import androidx.wear.compose.material3.Icon
 import androidx.wear.compose.material3.ListHeader
@@ -1001,70 +995,78 @@ fun BusySpinner(caption: String, modifier: Modifier = Modifier) {
 }
 
 /**
- * The rotary-scrollable ScalingLazyColumn scaffold every list screen (Login,
- * Settings, Trips, Home) hand-rolled identically: a FocusRequester + a
- * LaunchedEffect(Unit) that requests focus (guarded with runCatching so a
- * not-yet-attached requester can't crash), plus the crown/bezel wiring itself.
- * Uses the native foundation [rotaryScrollable] (stable in wear.compose 1.4+),
- * which routes the crown/bezel into [state] with real fling + snap + haptic
- * detents and claims focus via the supplied [focusRequester] (so no separate
- * .focusable() is needed). Centralised so the focus + rotary wiring lives in one
- * place; callers keep their own wrapping Box/siblings and just supply [content].
+ * The rotary-scrollable [TransformingLazyColumn] scaffold every list screen (Login,
+ * Settings, Trips, tile-reorder) shares -- Wear Compose Material3's successor to
+ * [androidx.wear.compose.foundation.lazy.ScalingLazyColumn], migrated from it wholesale
+ * (see [RotaryScreenScaffold]'s own doc for the migration's scope and what it
+ * deliberately did NOT attempt).
+ *
+ * Unlike the old ScalingLazyColumn setup, this needs no manual FocusRequester +
+ * LaunchedEffect dance to make the crown/bezel actually reach the list:
+ * [TransformingLazyColumn]'s own `rotaryScrollableBehavior` parameter defaults to
+ * `RotaryScrollableDefaults.behavior(state)` -- the same continuous-scroll behavior the
+ * old setup built by hand -- and claims focus automatically once paired with
+ * [ScreenScaffold], per Wear's own guidance that the two "handle rotary input
+ * automatically... when properly configured together." One less thing for every caller
+ * to get right, not just a shorter version of the same wiring.
  */
 @Composable
 fun RotaryScalingColumn(
     modifier: Modifier = Modifier,
-    state: ScalingLazyListState = rememberScalingLazyListState(),
+    state: TransformingLazyColumnState = rememberTransformingLazyColumnState(),
     contentPadding: PaddingValues = PaddingValues(horizontal = roundSafeHorizontalPadding(), vertical = 30.dp),
     verticalArrangement: Arrangement.Vertical = Arrangement.spacedBy(6.dp),
-    scalingParams: ScalingParams = ScalingLazyColumnDefaults.scalingParams(),
-    content: ScalingLazyListScope.() -> Unit,
+    content: TransformingLazyColumnScope.() -> Unit,
 ) {
-    val focusRequester = remember { FocusRequester() }
-    LaunchedEffect(Unit) { runCatching { focusRequester.requestFocus() } }
-    ScalingLazyColumn(
-        modifier = modifier
-            .fillMaxSize()
-            .rotaryScrollable(
-                RotaryScrollableDefaults.behavior(scrollableState = state),
-                focusRequester = focusRequester,
-            ),
+    TransformingLazyColumn(
+        modifier = modifier.fillMaxSize(),
         state = state,
         contentPadding = contentPadding,
         verticalArrangement = verticalArrangement,
-        scalingParams = scalingParams,
-        // First/last items can scroll to screen center on a round face
-        // (the enabled default; stated explicitly for clarity).
-        autoCentering = AutoCenteringParams(),
         content = content,
     )
 }
 
 /**
  * A list screen's [ScreenScaffold] + [RotaryScalingColumn] pair, owning the one
- * [ScalingLazyListState] both must share (the scaffold's curved scroll indicator and
- * the column must scroll the same list) and suppressing the inherited AppScaffold clock
- * (`timeText = {}`) that otherwise overlaps a content screen's top header. Login,
+ * [TransformingLazyColumnState] both must share (the scaffold's curved scroll indicator
+ * and the column must scroll the same list) and suppressing the inherited AppScaffold
+ * clock (`timeText = {}`) that otherwise overlaps a content screen's top header. Login,
  * Settings, Trips and the tile-reorder screen all hand-rolled this exact trio; they now
- * call this and pass only what differs -- the [RotaryScalingColumn] tuning params and
- * the list [content]. Callers keep any surrounding Box/overlay siblings of their own.
+ * call this and pass only what differs -- padding/spacing and the list [content].
+ * Callers keep any surrounding Box/overlay siblings of their own.
+ *
+ * Migrated from [androidx.wear.compose.foundation.lazy.ScalingLazyColumn] to
+ * [TransformingLazyColumn] (Wear Compose Material3's successor -- both are already part
+ * of the wear.compose 1.5.1 already in this project, no new dependency). Deliberately
+ * scoped to the STRUCTURAL migration only: state type, the newer [ScreenScaffold]
+ * overload, and the simpler automatic rotary/focus wiring [RotaryScalingColumn]'s own doc
+ * describes. NOT attempted here: the center-of-face scale/fade "focus" emphasis the old
+ * `ScalingParams` gave these lists by default. TransformingLazyColumn's equivalent
+ * (`SurfaceTransformation` + `Modifier.transformedHeight`) is built around Material3's
+ * own Button/Card, which expose a `transformation` parameter these screens' bespoke
+ * [SectionCard] does not -- giving it one is real, separate follow-up work, not something
+ * to guess at inside the same change that swaps the underlying list engine out from under
+ * four real screens at once. Every list here reads as a plain flat stack for now, same as
+ * the tile-reorder screen already deliberately looked before this change (it disabled
+ * scaling outright with `edgeScale = 1f, edgeAlpha = 1f`) -- Login/Settings/Trips lose
+ * only the shrink/fade emphasis at the very top and bottom of a scroll, not any
+ * functionality.
  */
 @Composable
 fun RotaryScreenScaffold(
     modifier: Modifier = Modifier,
     contentPadding: PaddingValues = PaddingValues(horizontal = roundSafeHorizontalPadding(), vertical = 30.dp),
     verticalArrangement: Arrangement.Vertical = Arrangement.spacedBy(6.dp),
-    scalingParams: ScalingParams = ScalingLazyColumnDefaults.scalingParams(),
-    content: ScalingLazyListScope.() -> Unit,
+    content: TransformingLazyColumnScope.() -> Unit,
 ) {
-    val listState = rememberScalingLazyListState()
+    val listState = rememberTransformingLazyColumnState()
     ScreenScaffold(scrollState = listState, timeText = {}) {
         RotaryScalingColumn(
             modifier = modifier,
             state = listState,
             contentPadding = contentPadding,
             verticalArrangement = verticalArrangement,
-            scalingParams = scalingParams,
             content = content,
         )
     }

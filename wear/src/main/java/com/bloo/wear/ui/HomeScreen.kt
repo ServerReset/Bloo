@@ -2483,10 +2483,9 @@ fun TileReorderScreen(vm: WearViewModel, ui: WearUi, vin: String) {
     }
 
     // RotaryScreenScaffold owns the shared list state and suppresses the inherited clock
-    // (it overlapped the "Reorder tiles" header); this screen keeps its own edge-scale-off
-    // params, padding and spacing.
+    // (it overlapped the "Reorder tiles" header); this screen keeps its own padding and
+    // spacing.
     RotaryScreenScaffold(
-        scalingParams = ScalingLazyColumnDefaults.scalingParams(edgeScale = 1f, edgeAlpha = 1f),
         contentPadding = PaddingValues(horizontal = roundSafeHorizontalPadding(flat = 8.dp, round = 18.dp), vertical = 32.dp),
         verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
