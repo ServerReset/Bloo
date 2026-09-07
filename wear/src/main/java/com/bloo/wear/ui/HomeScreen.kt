@@ -347,6 +347,28 @@ private fun openLabel(items: List<String>): String = when {
     else -> "${items.size} open"
 }
 
+/**
+ * Tiles that duplicate a DEEPER phone feature rather than offering a quick glance/control:
+ * seat-by-seat heat (Comfort), saved climate presets (Presets), AC/DC charge-limit sliders
+ * (Limits), full diagnostics (Diagnostics), car facts like VIN/plate/odometer (Info), and
+ * roadside/service links (Assist). None of these are things you reach for mid-walk the way
+ * "is it locked" or "start the climate" are -- they're the kind of editing you sit down and
+ * do once in a while, which the phone is already better suited for (a real keyboard, a real
+ * screen, no bezel to fight).
+ *
+ * Hidden only while [WearUi.phoneConnected] -- with no phone reachable the watch IS the only
+ * way to reach the car at all, so every one of these becomes the opposite of optional and the
+ * full tile set returns. This is a deliberate simplification, not a capability gate: unlike
+ * [WearTiles.AI] (which is hidden standalone because it genuinely cannot run without the
+ * phone's on-device model), every tile named here works perfectly well standalone -- it's
+ * just that reaching for a phone already in your pocket beats a temperature slider you have
+ * to drag with a fingertip on a 1.4" face.
+ */
+private val PHONE_AVAILABLE_DEEP_TILES = setOf(
+    WearTiles.COMFORT, WearTiles.PRESETS, WearTiles.LIMITS,
+    WearTiles.DIAGNOSTICS, WearTiles.INFO, WearTiles.ASSIST,
+)
+
 private fun visibleTiles(ui: WearUi, car: CarView): List<String> {
     val hasAlerts = car.alertCount > 0
     val out = ArrayList<String>()
@@ -356,6 +378,7 @@ private fun visibleTiles(ui: WearUi, car: CarView): List<String> {
     // the phone are dropped so a hidden section doesn't still show up here.
     val hidden = ui.settings?.hiddenSections?.get(car.vin).orEmpty()
     for (key in WearPebbles.tilesFor(ui.pebbleOrderFor(car.vin), hidden)) {
+        if (ui.phoneConnected && key in PHONE_AVAILABLE_DEEP_TILES) continue
         val show = when (key) {
             // Always shown so you can save the first preset from the watch.
             WearTiles.PRESETS -> true
@@ -2223,6 +2246,12 @@ private fun AssistCard(car: CarView) = SectionCard("Assist", Icons.Filled.Call) 
  * tile-reorder screen, and -- appended at the very end when one is available
  * -- the on-device app-update banner.
  *
+ * Trips and Reorder are hidden whenever a phone is connected -- both are
+ * "sit down and do it once in a while" jobs, same reasoning as
+ * [PHONE_AVAILABLE_DEEP_TILES] just above [visibleTiles]. Refresh/Flash/
+ * Horn/Settings/the update banner stay regardless: they're either a single
+ * everyday tap or watch-local state a phone link can't substitute for.
+ *
  * Most of the buttons here are simple one-shot commands (`vm.refreshStatus`,
  * `vm.flashLights`, `vm.hornAndLights`) or navigation callbacks
  * (`onTrips`/`onSettings`/`onReorder`) with no local state; the more
@@ -2305,7 +2334,11 @@ private fun MoreCard(vm: WearViewModel, ui: WearUi, car: CarView, onSettings: ()
             )
         }
     }
-    if (car.hasBattery && car.tripsSupported) {
+    // Trips and Reorder are the same kind of "sit down and do it once in a while" job as
+    // PHONE_AVAILABLE_DEEP_TILES above, not an everyday glance/control -- hidden with a phone
+    // connected for the same reason, full again the moment there isn't one. Settings stays
+    // regardless: haptics/units/PIN/sign-out are watch-local, not a phone-duplicated feature.
+    if (!ui.phoneConnected && car.hasBattery && car.tripsSupported) {
         Spacer(Modifier.height(6.dp))
         MorphButton(
             label = "Trips",
@@ -2325,15 +2358,17 @@ private fun MoreCard(vm: WearViewModel, ui: WearUi, car: CarView, onSettings: ()
         pending = false,
         onClick = onSettings,
     )
-    Spacer(Modifier.height(6.dp))
-    MorphButton(
-        label = "Reorder",
-        icon = Icons.Filled.DragHandle,
-        active = false,
-        activeColor = accent,
-        pending = false,
-        onClick = { onReorder(car.vin) },
-    )
+    if (!ui.phoneConnected) {
+        Spacer(Modifier.height(6.dp))
+        MorphButton(
+            label = "Reorder",
+            icon = Icons.Filled.DragHandle,
+            active = false,
+            activeColor = accent,
+            pending = false,
+            onClick = { onReorder(car.vin) },
+        )
+    }
     // Fully on-device now: tapping this downloads the watch's own APK and
     // hands it straight to the system installer -- no phone needed at all.
     // "Remind me later" is the only dismiss offered here (vs. phone's "Not
