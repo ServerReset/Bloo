@@ -13,6 +13,7 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.emptyPreferences
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
+import coil.imageLoader
 import com.bloo.bluelink.autolock.AutoLockConfig
 import com.bloo.bluelink.ui.ColorPalette
 import com.bloo.bluelink.ui.CustomPaletteData
@@ -2350,7 +2351,7 @@ class SettingsStore(private val context: Context) {
     private fun applySyncPhotos(photos: JsonObject?, protect: Set<String> = emptySet()): Map<String, String> {
         if (photos == null) return emptyMap()
         val dir = java.io.File(context.filesDir, "cars").apply { mkdirs() }
-        return photos.mapNotNull { (vin, element) ->
+        val result = photos.mapNotNull { (vin, element) ->
             if ("img_$vin" in protect) return@mapNotNull null
             val b64 = (element as? JsonPrimitive)?.contentOrNull ?: return@mapNotNull null
             runCatching {
@@ -2360,6 +2361,27 @@ class SettingsStore(private val context: Context) {
                 vin to file.absolutePath
             }.getOrNull()
         }.toMap()
+        // Every synced photo lands at the SAME fixed path across imports (deliberately -- see
+        // this function's own doc on why a fixed name beats a fresh timestamped one), which is
+        // exactly the shape Coil's default File-model cache key can't tell apart: a second
+        // import that overwrites car_$vin_synced.jpg with genuinely different bytes still hits
+        // whatever Coil already decoded and cached for that identical path, in-process, without
+        // ever reading the new file. This is the same "same path, new content" gap the watch's
+        // WearPhotoEvents fix closed for its own hand-rolled decode -- this app's actual image
+        // loads go through Coil (rememberPhotoModel in Hero.kt) instead of a manual
+        // BitmapFactory decode, so the fix here is Coil's own cache, not a produceState key.
+        // A blanket clear() rather than targeting just these VINs' keys: constructing Coil's
+        // exact internal MemoryCache.Key for a File source is an implementation detail that can
+        // change between versions, while every OTHER cached image (weather icons, brand logos)
+        // costs nothing to redecode once, on the rare event an import actually runs.
+        if (result.isNotEmpty()) {
+            runCatching {
+                val loader = context.imageLoader
+                loader.memoryCache?.clear()
+                loader.diskCache?.clear()
+            }
+        }
+        return result
     }
 
     /**
