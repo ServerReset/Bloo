@@ -125,7 +125,6 @@ internal fun HeroHeader(
      *  both call sites already hold the UiState they would read it from. */
     photoExpanded: Boolean = true,
 ) {
-    val charging = hasBattery && status?.evStatus?.batteryCharge == true
     // Play the fade/slide-up entrance only ONCE per car per session, gated on the
     // same coldStartIntroPlayed set the pebble stagger uses. Previously this was an
     // unconditional LaunchedEffect(Unit) that replayed on EVERY (re)composition of

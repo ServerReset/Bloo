@@ -423,7 +423,6 @@ internal fun CompactCar(
 ) {
     // Live source passed to SinglePebble (which takes State<UiState> now).
     val stateSource = rememberUpdatedState(state)
-    val status = state.statusFor(v)
     val isGen5W = remember(v.brand, v.generation, state.platforms[v.vin]) { state.isGen5WEffective(v) }
     // Cover-screen tiles follow the same order the user arranged the pebbles in
     // (state.sectionsFor). "summary" maps to the always-present "main" tile;
