@@ -65,6 +65,15 @@ private const val UPDATE_CHECK_INTERVAL_MS = 12L * 60 * 60 * 1000L // 12h
 // without hammering the endpoint. Snooze is still respected either way.
 private const val UPDATE_RECHECK_INTERVAL_MS = 15L * 60 * 1000L // 15 min
 
+// How long the cold-start update check waits before running. Purely a
+// launch-cost measure: the check itself is cheap to postpone (it decides whether
+// a banner appears on one card) but expensive to run during launch (OkHttp
+// construction + TLS + a JSON parse on a watch CPU that is simultaneously doing
+// the disk reads and first composition the user is waiting on). Long enough for
+// the UI to be up and idle, short enough that an available update still shows on
+// this launch rather than the next one.
+private const val UPDATE_CHECK_STARTUP_DELAY_MS = 6_000L
+
 /** See [WearViewModel.submitPin]'s doc comment: consecutive-wrong-PIN lockout. */
 private const val PIN_MAX_ATTEMPTS = 5
 private const val PIN_LOCKOUT_MS = 30_000L // 30s
@@ -677,7 +686,21 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
             }
         }
         // Cold-start update check -- see runUpdateCheck's own doc comment.
-        viewModelScope.launch { runUpdateCheck(force = false) }
+        //
+        // Held back a few seconds rather than fired immediately. This is the least
+        // urgent thing the app does (it decides whether to show a banner at the bottom
+        // of one card), and unheld it was among the most expensive things happening
+        // during launch: a DataStore read, then OkHttp client construction, a TLS
+        // handshake to the GitHub API and a JSON parse, all contending for the watch's
+        // one small CPU with the disk reads and first composition that the user is
+        // actually waiting on. The delay costs nothing -- nobody launches Bloo to find
+        // out about Bloo updates -- and it also settles the duplicate check that used
+        // to race here, since MainActivity.onResume fires onAppResumed() at cold start
+        // too and both could pass the debounce gate before either stamped it.
+        viewModelScope.launch {
+            kotlinx.coroutines.delay(UPDATE_CHECK_STARTUP_DELAY_MS)
+            runUpdateCheck(force = false)
+        }
         // Periodic re-check while the app stays open: the cold-start check alone
         // meant a build pushed mid-session never surfaced until relaunch. Loops on
         // the shorter recheck floor (runUpdateCheck no-ops until the interval
@@ -733,8 +756,26 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
             if (settings?.pinLockEnabled == true && settings.hasPin) {
                 _ui.update { it.copy(pinLocked = true) }
             }
-            runCatching { MainToSecondaryComms.pullLatest(ctx) }
-            refreshConnection()
+            // Everything from here down is LOCAL disk (plus one keystore read) and does
+            // not depend on the phone, so it no longer waits for it. The cold-launch
+            // backfill from the phone used to sit right here, awaited -- and
+            // pullLatest is a Play Services round trip with a TEN SECOND timeout. With
+            // the phone out of range, asleep, or simply absent on a standalone watch,
+            // this coroutine parked on that timeout before it read a single byte of the
+            // caches that already hold everything the garage needs, so the user watched
+            // "Loading…" for up to ten seconds with all the data sitting on the wrist.
+            // Even with a healthy phone it put an IPC round trip in front of the first
+            // real frame.
+            //
+            // It now runs concurrently (see the second launch in bootstrap) instead of
+            // in front. Nothing is lost by not waiting: pullLatest's only job is to
+            // PERSIST what the phone has into these same local stores, and this class
+            // already collects every one of them reactively -- settings, presets,
+            // extras, climate and snapshots each have a collector in init, and the
+            // snapshot one re-runs loadGarage() when the VIN set changes. So a late
+            // arrival redraws the screen by itself. Same for a watch that has never
+            // been paired: it renders SignedOut immediately and the WearAuthEvents
+            // collector advances it past login when the phone's auth lands.
             snapshots = runCatching { snapshotStore.current().vehicles.associateBy { it.vin } }.getOrElse { snapshots }
             runCatching {
                 val cached = statusCache.load()
@@ -754,6 +795,16 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
                 _ui.update { it.copy(accounts = emails) }
                 loadGarage()
             }
+        }
+
+        // The phone-side half, deliberately NOT on the path to the first frame.
+        // refreshConnection() was already non-blocking here (it launches its own
+        // coroutine); the change is that pullLatest no longer gates the local load
+        // above. Both still happen exactly once per cold start, just beside the UI
+        // rather than in front of it.
+        viewModelScope.launch {
+            runCatching { MainToSecondaryComms.pullLatest(ctx) }
+            refreshConnection()
         }
     }
 
