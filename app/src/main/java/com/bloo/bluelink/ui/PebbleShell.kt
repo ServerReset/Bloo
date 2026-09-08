@@ -179,7 +179,6 @@ internal fun Pebble(
         onToggle = if (canToggle) { { vm.togglePebble(v, section) } } else { {} },
         icon = icon,
         title = title,
-        vm = vm,
         dragHandle = dragHandle,
         summary = summary,
         containerColor = containerColor,
@@ -206,7 +205,6 @@ internal fun PebbleShell(
     onToggle: () -> Unit,
     icon: ImageVector,
     title: String,
-    vm: AppViewModel,
     dragHandle: Modifier = Modifier,
     summary: String? = null,
     /**

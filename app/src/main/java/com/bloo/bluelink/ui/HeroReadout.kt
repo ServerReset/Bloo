@@ -460,13 +460,6 @@ internal fun HeroMorphReadout(
      *  `statusAlpha` for why it isn't just `t`. Defaults to `t` so the CoverTile call
      *  site (a fixed t = 1f, nothing animating) keeps behaving exactly as before. */
     statusAlpha: Float = t,
-    /** Vertical alignment for the numbers themselves. The EXPANDED copy
-     *  bottom-aligns (the range and the status line stack under the pct);
-     *  the COLLAPSED instance sits beside the car name in the header row
-     *  where Bottom pinned the whole block a line lower than the name
-     *  ("the name and the % / mi&km aren't aligned" -- reported). The row
-     *  it lives in is already centered, so the numbers should be too. */
-    verticalAlign: Alignment.Vertical = Alignment.Bottom,
 ) {
     val type = MaterialTheme.typography
     // Real type steps, lerped -- not a graphicsLayer scale -- and the reason is DEPENDENT

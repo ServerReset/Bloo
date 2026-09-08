@@ -274,7 +274,6 @@ internal fun HeroHeader(
             onToggle = { vm.togglePebble(v, com.bloo.bluelink.data.HERO_PHOTO_SECTION) },
             icon = Icons.Filled.DirectionsCar,
             title = v.name,
-            vm = vm,
             dragHandle = dragHandle,
             titleColor = heroTitleColorNow,
             // The ONLY pebble that grows its title. Here the title is the car's NAME and the

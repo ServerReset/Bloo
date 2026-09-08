@@ -229,7 +229,6 @@ internal fun CarSettingsCard(
         onToggle = onToggle,
         icon = Icons.Filled.DirectionsCar,
         title = v.name,
-        vm = vm,
         dragHandle = dragHandle,
         summary = "${v.model} · ${state.powertrainLabel(v)}",
         containerColor = cardBg,

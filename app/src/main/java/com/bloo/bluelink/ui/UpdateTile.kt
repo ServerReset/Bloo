@@ -138,7 +138,6 @@ internal fun UpdateAvailableTile(state: UiState, vm: AppViewModel, dragHandle: M
             dragHandle = dragHandle,
             icon = Icons.Filled.SystemUpdate,
             title = "Update available",
-            vm = vm,
             summary = info.run.displayTitle?.takeIf { it.isNotBlank() } ?: deltaLabel,
             // No containerColor override -- PebbleShell's own default
             // (surfaceVariant) is what every ordinary pebble uses too

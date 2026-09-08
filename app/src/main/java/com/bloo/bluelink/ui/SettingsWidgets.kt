@@ -336,7 +336,6 @@ internal fun SettingsCard(
             onToggle = { if (!inline) vm.toggleSettingsCard(title) },
             icon = icon ?: Icons.Filled.Settings,
             title = title,
-            vm = vm,
             canToggle = !inline,
             titleTrailing = inlineSetting ?: status?.takeIf { it.isNotBlank() }?.let {
                 {

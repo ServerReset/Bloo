@@ -283,7 +283,6 @@ internal fun QuickTileCard(index: Int, vin: String, state: UiState, vm: AppViewM
         onToggle = { expanded = !expanded },
         icon = headerIcon,
         title = title,
-        vm = vm,
         summary = liveLabel ?: tileSummary(cmd, target, presetName),
         headerAction = PebbleHeaderAction(
             label = "Add",
