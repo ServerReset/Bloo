@@ -1694,22 +1694,44 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
             }
             if (!unmeteredNetwork()) return@launch
             if (_ui.value.updateDownloading) return@launch
-            _ui.update { it.copy(updateDownloading = true) }
-            _updateDownloadProgress.value = 0f
-            var lastPercent = -1
-            val ok = com.bloo.bluelink.data.UpdateApi.downloadApk(url, dest) { progress ->
-                val percent = (progress * 100f).toInt()
-                if (percent != lastPercent) {
-                    lastPercent = percent
-                    _updateDownloadProgress.value = progress
-                }
-            }
-            _updateDownloadProgress.value = null
-            _ui.update { it.copy(updateDownloading = false, updateApkReady = ok) }
+            val ok = downloadApkReportingProgress(url, dest)
+            _ui.update { it.copy(updateApkReady = ok) }
             // Record the build only on success, so a half-finished download can never
             // be mistaken for a ready one on the next launch.
             if (ok) runCatching { localStore.setUpdateDownloadedRun(run.runNumber) }
         }
+    }
+
+    /**
+     * Download [url] to [dest], publishing progress and owning the `updateDownloading`
+     * flag for the duration. Returns whether it succeeded.
+     *
+     * One implementation for both callers -- the background prefetch and the
+     * download-on-tap -- which had been carrying byte-identical copies of the throttle
+     * below, the two flag flips around it and the reset afterwards. Three things that
+     * must agree, duplicated in two places, is how they stop agreeing.
+     *
+     * Progress starts at 0f rather than null because UpdateApi only fires onProgress
+     * when the response carried a Content-Length; leaving it null for a server without
+     * one would flip the bar from determinate-0% to indeterminate. And it is throttled
+     * to whole percents: UpdateApi calls back once per 64KB buffer, hundreds of times a
+     * second, and a bar cannot render finer than a percent -- the rest would be pure
+     * recomposition cost on the device least able to afford it.
+     */
+    private suspend fun downloadApkReportingProgress(url: String, dest: java.io.File): Boolean {
+        _updateDownloadProgress.value = 0f
+        _ui.update { it.copy(updateDownloading = true) }
+        var lastPercent = -1
+        val ok = com.bloo.bluelink.data.UpdateApi.downloadApk(url, dest) { progress ->
+            val percent = (progress * 100f).toInt()
+            if (percent != lastPercent) {
+                lastPercent = percent
+                _updateDownloadProgress.value = progress
+            }
+        }
+        _updateDownloadProgress.value = null
+        _ui.update { it.copy(updateDownloading = false) }
+        return ok
     }
 
     /** True only on a connection the system reports as NOT metered -- see
@@ -1753,32 +1775,9 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
         if (_ui.value.updateApkReady) {
             _ui.update { it.copy(updateApkReady = false) }
         }
-        // 0f, not null: UpdateApi only fires onProgress when the response carried a
-        // Content-Length, so a server without one would otherwise leave this null and
-        // flip the bar from determinate-0% to indeterminate. Same reasoning as the phone.
-        _updateDownloadProgress.value = 0f
-        _ui.update { it.copy(updateDownloading = true) }
         viewModelScope.launch {
             val dest = updateApkFile()
-            // Progress was previously discarded outright (the callback was `{ }`), so a
-            // multi-megabyte APK over a watch's connection showed nothing but an
-            // indeterminate spinner for its entire duration, with no way to tell a slow
-            // download from a stalled one.
-            //
-            // Throttled to whole percents: UpdateApi calls back once per 64KB buffer,
-            // which is hundreds of emissions a second, and a bar cannot render more than
-            // a percent anyway -- the rest would be pure recomposition cost on the
-            // device least able to afford it.
-            var lastPercent = -1
-            val ok = com.bloo.bluelink.data.UpdateApi.downloadApk(url, dest) { progress ->
-                val percent = (progress * 100f).toInt()
-                if (percent != lastPercent) {
-                    lastPercent = percent
-                    _updateDownloadProgress.value = progress
-                }
-            }
-            _updateDownloadProgress.value = null
-            _ui.update { it.copy(updateDownloading = false) }
+            val ok = downloadApkReportingProgress(url, dest)
             if (!ok) {
                 _ui.update { it.copy(message = "Download failed. Check your connection and try again.") }
                 return@launch
