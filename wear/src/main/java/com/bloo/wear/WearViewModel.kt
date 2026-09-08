@@ -743,6 +743,18 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
     fun onAppResumed() {
         foregrounded.value = true
         viewModelScope.launch { runUpdateCheck(force = false, minInterval = UPDATE_RECHECK_INTERVAL_MS) }
+        // Retry a prefetch that never happened. prefetchUpdateApk runs once, from the
+        // check that discovers the update -- and it declines on a metered connection.
+        // A watch is very often on one at that moment (reaching the internet through
+        // the phone's Bluetooth link), and runUpdateCheck early-returns for the rest of
+        // the session once updateRun is set, so without this the download was skipped
+        // for that whole session and the promise of having the update ready quietly
+        // did not hold. Resuming the app is the natural moment to look again: it is
+        // cheap when conditions still say no, and prefetchUpdateApk itself re-checks
+        // the cache and the in-flight flag, so this cannot double-download.
+        _ui.value.updateRun?.let { run ->
+            if (!_ui.value.updateApkReady) prefetchUpdateApk(run)
+        }
     }
 
     /** Called from [com.bloo.wear.MainActivity.onStop] -- see [foregrounded]. */
@@ -1772,6 +1784,12 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
                 return@launch
             }
             runCatching { localStore.setUpdateDownloadedRun(run.runNumber) }
+            // The APK is on disk now, so record that in the UI as well as on disk.
+            // Without this, dismissing the system installer (or any failure to launch
+            // it) left updateApkReady false while the finished download sat right
+            // there -- so the next tap paid for the whole multi-megabyte transfer a
+            // second time, over a watch's connection. Now it costs one more tap.
+            _ui.update { it2 -> it2.copy(updateApkReady = true) }
             if (!launchApkInstaller(dest)) {
                 _ui.update { it2 -> it2.copy(message = "Downloaded, but couldn't open the installer.") }
             }

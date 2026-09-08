@@ -232,13 +232,19 @@ object MainToSecondaryComms {
         // id across two channels is exactly the kind of thing that behaves differently
         // per OEM. Separate ids, cancelled in a finally, has no such ambiguity.
         val progressId = ("cmdProgress" + command.vin + command.action).hashCode()
-        WearNotifications.postProgress(
-            context,
-            progressId,
-            title = commandProgressTitle(command.action),
-            text = "Talking to your car…",
-            shortCriticalText = commandChipText(command.action),
-        )
+        // runCatching: this is decoration around the command, never a precondition for
+        // it. Posting a notification touches the NotificationManager and builds a
+        // PendingIntent, and nothing about that is worth failing to lock someone's car
+        // over.
+        runCatching {
+            WearNotifications.postProgress(
+                context,
+                progressId,
+                title = commandProgressTitle(command.action),
+                text = "Talking to your car…",
+                shortCriticalText = commandChipText(command.action),
+            )
+        }
         val result = try {
             WearCommandRunner.execute(context, command)
         } finally {
