@@ -68,6 +68,7 @@ import androidx.compose.material.icons.filled.WbSunny
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableFloatStateOf
@@ -128,6 +129,7 @@ import androidx.wear.compose.foundation.lazy.items
 import androidx.wear.compose.material3.Card
 import androidx.wear.compose.material3.CardDefaults
 import androidx.wear.compose.material3.Icon
+import androidx.wear.compose.material3.LinearProgressIndicator
 import androidx.wear.compose.material3.MaterialTheme
 import androidx.wear.compose.material3.Text
 import com.bloo.bluelink.data.CLIMATE_DURATION_RANGE
@@ -2378,14 +2380,41 @@ private fun MoreCard(vm: WearViewModel, ui: WearUi, car: CarView, onSettings: ()
     // it already serves as a lightweight "not now".
     if (ui.updateRun != null) {
         Spacer(Modifier.height(10.dp))
+        // Collected here rather than read off `ui` on purpose: this is the only
+        // composable that needs the value, and vm.updateDownloadProgress is a separate
+        // flow precisely so a moving progress bar recomposes THIS card and nothing else
+        // (a WearUi emission would recompose every visible tile in the carousel).
+        // See WearViewModel.updateDownloadProgress.
+        val downloadProgress by vm.updateDownloadProgress.collectAsState()
+        // Read the delegate once into a local so the label and the bar below are
+        // guaranteed to describe the same instant, and so the null check smart-casts.
+        val progress = downloadProgress
         MorphButton(
-            label = if (ui.updateDownloading) "Downloading…" else "Update",
+            // A real percentage, not just "Downloading…": an APK over a watch's
+            // connection is a long, silent wait otherwise, with nothing to
+            // distinguish slow from stalled. Falls back to the bare label when the
+            // server sent no Content-Length, since there is genuinely no percentage
+            // to show then.
+            label = when {
+                !ui.updateDownloading -> "Update"
+                progress != null -> "Downloading ${(progress * 100).roundToInt()}%"
+                else -> "Downloading…"
+            },
             icon = Icons.Filled.SystemUpdate,
             active = true,
             activeColor = accent,
             pending = ui.updateDownloading,
             onClick = { vm.downloadAndInstallUpdate() },
         )
+        // The bar the phone's update pebble has always had. Determinate, so it also
+        // conveys rate -- the thing a spinner cannot show.
+        if (ui.updateDownloading && progress != null) {
+            Spacer(Modifier.height(6.dp))
+            LinearProgressIndicator(
+                progress = { progress },
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
         // The phone's own update pebble shows the release's changelog; this
         // banner previously only ever showed the bare button, with no way to
         // see what's actually in the update before installing it.

@@ -41,6 +41,7 @@ import com.bloo.bluelink.data.toWearCommand
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
@@ -423,6 +424,17 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
 
     private val _ui = MutableStateFlow(WearUi())
     val ui = _ui.asStateFlow()
+
+    /** Live update-download progress, 0f..1f, or null when no download is running.
+     *
+     *  Deliberately its OWN flow rather than a [WearUi] field, for the same reason the
+     *  phone keeps it out of its UiState: every [WearUi] emission recomposes the whole
+     *  car carousel and every visible tile with it, and a download emits continuously.
+     *  Kept here, only the one composable that collects it (the update banner)
+     *  recomposes as the bar moves. That matters more on the watch than on the phone --
+     *  this is the device with the tight CPU and battery budget. */
+    private val _updateDownloadProgress = MutableStateFlow<Float?>(null)
+    val updateDownloadProgress: StateFlow<Float?> = _updateDownloadProgress.asStateFlow()
 
     /** True whenever [com.bloo.wear.MainActivity] is on-screen -- gates the
      *  periodic update-recheck loop in [init] so it only makes a network
@@ -1565,10 +1577,31 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
             return
         }
         if (_ui.value.updateDownloading) return
+        // 0f, not null: UpdateApi only fires onProgress when the response carried a
+        // Content-Length, so a server without one would otherwise leave this null and
+        // flip the bar from determinate-0% to indeterminate. Same reasoning as the phone.
+        _updateDownloadProgress.value = 0f
         _ui.update { it.copy(updateDownloading = true) }
         viewModelScope.launch {
             val dest = java.io.File(java.io.File(ctx.cacheDir, "apk"), "Bloo-Wear.apk")
-            val ok = com.bloo.bluelink.data.UpdateApi.downloadApk(url, dest) { }
+            // Progress was previously discarded outright (the callback was `{ }`), so a
+            // multi-megabyte APK over a watch's connection showed nothing but an
+            // indeterminate spinner for its entire duration, with no way to tell a slow
+            // download from a stalled one.
+            //
+            // Throttled to whole percents: UpdateApi calls back once per 64KB buffer,
+            // which is hundreds of emissions a second, and a bar cannot render more than
+            // a percent anyway -- the rest would be pure recomposition cost on the
+            // device least able to afford it.
+            var lastPercent = -1
+            val ok = com.bloo.bluelink.data.UpdateApi.downloadApk(url, dest) { progress ->
+                val percent = (progress * 100f).toInt()
+                if (percent != lastPercent) {
+                    lastPercent = percent
+                    _updateDownloadProgress.value = progress
+                }
+            }
+            _updateDownloadProgress.value = null
             _ui.update { it.copy(updateDownloading = false) }
             if (!ok) {
                 _ui.update { it.copy(message = "Download failed. Check your connection and try again.") }
