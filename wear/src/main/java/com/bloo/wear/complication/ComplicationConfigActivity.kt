@@ -5,11 +5,8 @@ import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
@@ -26,8 +23,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.lifecycleScope
-import androidx.wear.compose.foundation.lazy.ScalingLazyColumn
 import androidx.wear.compose.foundation.lazy.items
+import androidx.wear.compose.material3.AppScaffold
 import androidx.wear.compose.material3.CircularProgressIndicator
 import androidx.wear.compose.material3.ListHeader
 import androidx.wear.compose.material3.MaterialTheme
@@ -39,7 +36,7 @@ import com.bloo.bluelink.data.WearSettingsPayload
 import com.bloo.wear.WearSettingsStore
 import com.bloo.wear.ui.BlooWearTheme
 import com.bloo.wear.ui.MorphButton
-import com.bloo.wear.ui.roundSafeHorizontalPadding
+import com.bloo.wear.ui.RotaryScreenScaffold
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
@@ -92,61 +89,69 @@ class ComplicationConfigActivity : ComponentActivity() {
                 loaded = true
             }
             BlooWearTheme(settings) {
-                ScalingLazyColumn(
-                    modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(horizontal = roundSafeHorizontalPadding(), vertical = 30.dp),
-                    verticalArrangement = Arrangement.spacedBy(6.dp),
-                ) {
-                    item { ListHeader { Text("Show which car?", textAlign = TextAlign.Center) } }
-                    if (!loaded) {
-                        item {
-                            Column(
-                                horizontalAlignment = Alignment.CenterHorizontally,
-                                modifier = Modifier.fillMaxWidth(),
-                            ) {
-                                CircularProgressIndicator(modifier = Modifier.size(24.dp))
-                                Spacer(Modifier.height(8.dp))
+                // AppScaffold + RotaryScreenScaffold -- the same pair every in-app list
+                // screen goes through. This screen used to host a bare ScalingLazyColumn,
+                // which on a round watch meant no crown/bezel scrolling AT ALL (nothing
+                // ever wired rotary input into the list) and no curved scroll indicator,
+                // so anyone with more cars than fit on screen had to finger-drag a list
+                // that gave no hint it scrolled. It was missed when the shared scaffold
+                // was introduced because it lives in its own Activity, outside the
+                // WatchApp AppScaffold every other screen inherits -- hence the explicit
+                // AppScaffold here. RotaryScreenScaffold's defaults are already exactly
+                // the padding and spacing this call was passing by hand, so they go.
+                AppScaffold {
+                    RotaryScreenScaffold {
+                        item { ListHeader { Text("Show which car?", textAlign = TextAlign.Center) } }
+                        if (!loaded) {
+                            item {
+                                Column(
+                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                    modifier = Modifier.fillMaxWidth(),
+                                ) {
+                                    CircularProgressIndicator(modifier = Modifier.size(24.dp))
+                                    Spacer(Modifier.height(8.dp))
+                                    Text(
+                                        "Loading cars…",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        textAlign = TextAlign.Center,
+                                    )
+                                }
+                            }
+                        } else if (cars.isEmpty()) {
+                            item {
                                 Text(
-                                    "Loading cars…",
+                                    "No cars yet — sign in on your phone first, then it syncs here.",
                                     style = MaterialTheme.typography.labelSmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                     textAlign = TextAlign.Center,
                                 )
                             }
                         }
-                    } else if (cars.isEmpty()) {
-                        item {
-                            Text(
-                                "No cars yet — sign in on your phone first, then it syncs here.",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                textAlign = TextAlign.Center,
-                            )
+                        if (cars.isNotEmpty()) {
+                            // "Follow selected" mirrors the Settings Tile pool: unpin so
+                            // this slot tracks whatever car is selected in the app.
+                            item {
+                                MorphButton(
+                                    label = "Follow selected",
+                                    icon = Icons.Filled.MyLocation,
+                                    active = currentVin == null,
+                                    activeColor = MaterialTheme.colorScheme.primary,
+                                    pending = false,
+                                    onClick = { followSelected(dataSource, complicationId, component) },
+                                )
+                            }
                         }
-                    }
-                    if (cars.isNotEmpty()) {
-                        // "Follow selected" mirrors the Settings Tile pool: unpin so
-                        // this slot tracks whatever car is selected in the app.
-                        item {
+                        items(cars, key = { it.vin }) { car ->
                             MorphButton(
-                                label = "Follow selected",
-                                icon = Icons.Filled.MyLocation,
-                                active = currentVin == null,
+                                label = car.name,
+                                icon = Icons.Filled.DirectionsCar,
+                                active = car.vin == currentVin,
                                 activeColor = MaterialTheme.colorScheme.primary,
                                 pending = false,
-                                onClick = { followSelected(dataSource, complicationId, component) },
+                                onClick = { choose(dataSource, complicationId, component, car.vin) },
                             )
                         }
-                    }
-                    items(cars, key = { it.vin }) { car ->
-                        MorphButton(
-                            label = car.name,
-                            icon = Icons.Filled.DirectionsCar,
-                            active = car.vin == currentVin,
-                            activeColor = MaterialTheme.colorScheme.primary,
-                            pending = false,
-                            onClick = { choose(dataSource, complicationId, component, car.vin) },
-                        )
                     }
                 }
             }

@@ -35,9 +35,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.wear.compose.foundation.rotary.RotaryScrollableDefaults
+import androidx.wear.compose.foundation.rotary.rotaryScrollable
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -221,6 +224,16 @@ fun PinEntryScreen(
     }
     val entranceAlpha = remember { Animatable(0f) }
     LaunchedEffect(Unit) { entranceAlpha.animateTo(1f, tween(220)) }
+    // Hoisted (was inline in .verticalScroll) so the crown/bezel can be wired into
+    // the same ScrollState below. Without that, the overflow case this scroll exists
+    // for scrolled by finger only -- on a round watch the crown is the primary way to
+    // move a screen, and turning it over a clipped PIN pad did nothing at all.
+    val scrollState = rememberScrollState()
+    val focusRequester = remember { FocusRequester() }
+    // runCatching: the requester may not be attached yet on the very first frame
+    // (and this composable is re-keyed per PIN step by PinManagementOverlay, so it
+    // runs often); a failed grab is harmless -- touch scrolling still works.
+    LaunchedEffect(Unit) { runCatching { focusRequester.requestFocus() } }
     Column(
         modifier
             .fillMaxSize()
@@ -232,7 +245,14 @@ fun PinEntryScreen(
             // common case) it stays centered and scroll never engages. Touch-target
             // key sizes are intentionally kept full (48/44/40dp) — shrinking a PIN
             // pad to fit is worse than letting it scroll.
-            .verticalScroll(rememberScrollState())
+            .verticalScroll(scrollState)
+            // Crown/bezel drives that same scroll. A no-op in the common case where
+            // the pad fits (there is nothing to scroll), so this costs nothing except
+            // on the small faces where the stack actually overflows.
+            .rotaryScrollable(
+                RotaryScrollableDefaults.behavior(scrollableState = scrollState),
+                focusRequester = focusRequester,
+            )
             .graphicsLayer { alpha = entranceAlpha.value }
             // A small fixed horizontal inset, NOT roundSafeHorizontalPadding:
             // that helper widens the inset to 22dp on round for scrolling LIST
