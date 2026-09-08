@@ -80,7 +80,6 @@ import com.bloo.uicommon.MorphButtonCore
 import androidx.wear.compose.foundation.lazy.TransformingLazyColumn
 import androidx.wear.compose.foundation.lazy.TransformingLazyColumnItemScope
 import androidx.wear.compose.foundation.lazy.TransformingLazyColumnScope
-import androidx.wear.compose.foundation.lazy.TransformingLazyColumnState
 import androidx.wear.compose.foundation.lazy.rememberTransformingLazyColumnState
 import androidx.wear.compose.foundation.lazy.items
 import androidx.wear.compose.material3.lazy.TransformationSpec
@@ -1094,48 +1093,21 @@ class RotaryListScope internal constructor(
 }
 
 /**
- * The rotary-scrollable [TransformingLazyColumn] scaffold every list screen (Login,
- * Settings, Trips, tile-reorder) shares -- Wear Compose Material3's successor to
- * [androidx.wear.compose.foundation.lazy.ScalingLazyColumn].
+ * The one list screen every watch screen is: a [ScreenScaffold] and a
+ * [TransformingLazyColumn] sharing a single state (the scaffold's curved scroll
+ * indicator and the column must scroll the same list), with the inherited AppScaffold
+ * clock suppressed (`timeText = {}`) because it otherwise overlaps a content screen's
+ * top header. Login, Settings, Trips and the tile-reorder screen each hand-rolled this
+ * exact trio; they now pass only what differs -- padding/spacing and the list [content]
+ * -- and keep any surrounding Box/overlay siblings of their own.
  *
- * Unlike the old ScalingLazyColumn setup, this needs no manual FocusRequester +
- * LaunchedEffect dance to make the crown/bezel actually reach the list:
- * [TransformingLazyColumn]'s own `rotaryScrollableBehavior` parameter defaults to
- * `RotaryScrollableDefaults.behavior(state)` -- the same continuous-scroll behavior the
- * old setup built by hand -- and claims focus automatically once paired with
- * [ScreenScaffold], per Wear's own guidance that the two "handle rotary input
- * automatically... when properly configured together." One less thing for every caller
- * to get right, not just a shorter version of the same wiring.
- *
- * The low-level half of the pair: takes a raw [TransformingLazyColumnScope]. The
- * round-screen item transform lives in [RotaryScreenScaffold], which is what screens
- * actually call.
- */
-@Composable
-fun RotaryScalingColumn(
-    modifier: Modifier = Modifier,
-    state: TransformingLazyColumnState = rememberTransformingLazyColumnState(),
-    contentPadding: PaddingValues = PaddingValues(horizontal = roundSafeHorizontalPadding(), vertical = 30.dp),
-    verticalArrangement: Arrangement.Vertical = Arrangement.spacedBy(6.dp),
-    content: TransformingLazyColumnScope.() -> Unit,
-) {
-    TransformingLazyColumn(
-        modifier = modifier.fillMaxSize(),
-        state = state,
-        contentPadding = contentPadding,
-        verticalArrangement = verticalArrangement,
-        content = content,
-    )
-}
-
-/**
- * A list screen's [ScreenScaffold] + [RotaryScalingColumn] pair, owning the one
- * [TransformingLazyColumnState] both must share (the scaffold's curved scroll indicator
- * and the column must scroll the same list) and suppressing the inherited AppScaffold
- * clock (`timeText = {}`) that otherwise overlaps a content screen's top header. Login,
- * Settings, Trips and the tile-reorder screen all hand-rolled this exact trio; they now
- * call this and pass only what differs -- padding/spacing and the list [content].
- * Callers keep any surrounding Box/overlay siblings of their own.
+ * [TransformingLazyColumn] is Wear Compose Material3's successor to
+ * [androidx.wear.compose.foundation.lazy.ScalingLazyColumn], and needs no manual
+ * FocusRequester + LaunchedEffect dance to get the crown/bezel into the list: its
+ * `rotaryScrollableBehavior` defaults to `RotaryScrollableDefaults.behavior(state)` --
+ * the same continuous scroll the old setup built by hand -- and it claims focus
+ * automatically once paired with [ScreenScaffold], which is Wear's own documented way
+ * to wire the two together.
  *
  * It also owns the round-screen item transform: [content] is a [RotaryListScope], whose
  * `item`/`items` are call-compatible with the raw ones but route every item through
@@ -1157,8 +1129,8 @@ fun RotaryScreenScaffold(
     val listState = rememberTransformingLazyColumnState()
     val spec = rememberTransformationSpec()
     ScreenScaffold(scrollState = listState, timeText = {}) {
-        RotaryScalingColumn(
-            modifier = modifier,
+        TransformingLazyColumn(
+            modifier = modifier.fillMaxSize(),
             state = listState,
             contentPadding = contentPadding,
             verticalArrangement = verticalArrangement,

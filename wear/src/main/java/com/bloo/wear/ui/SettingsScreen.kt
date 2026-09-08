@@ -44,7 +44,7 @@ import com.bloo.wear.WearViewModel
 import kotlin.math.roundToInt
 
 /**
- * The Settings screen: one scrollable [RotaryScalingColumn] of [SettingSection]
+ * The Settings screen: one scrollable [RotaryScreenScaffold] of [SettingSection]
  * cards — Accounts, Appearance, PIN lock, AI Summaries, Aurora, Watch text size,
  * Tile chips, per-slot Tile car pinning, Tile order, Sync, Phone status, Refresh
  * all, Sign out — capped by a build-label footer.
