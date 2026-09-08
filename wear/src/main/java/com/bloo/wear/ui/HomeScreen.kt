@@ -2485,9 +2485,20 @@ fun TileReorderScreen(vm: WearViewModel, ui: WearUi, vin: String) {
     // RotaryScreenScaffold owns the shared list state and suppresses the inherited clock
     // (it overlapped the "Reorder tiles" header); this screen keeps its own padding and
     // spacing.
+    //
+    // transform = false: this is the one list that must NOT shrink and fade its items
+    // toward the edges of the face. Rows here are drag targets, and the reorder maths
+    // below measures real row heights (`heights[key]`) to decide when a dragged row has
+    // crossed its neighbour -- a row whose rendered height changes with its scroll
+    // position would make those thresholds lie. It also composes its own graphicsLayer
+    // (drag translation + lift scale) and zIndex per row, which the transform's wrapper
+    // would sit outside of, breaking the dragged row's z-order. The pre-migration code
+    // disabled edge scaling here for the same reason, via
+    // `scalingParams(edgeScale = 1f, edgeAlpha = 1f)`.
     RotaryScreenScaffold(
         contentPadding = PaddingValues(horizontal = roundSafeHorizontalPadding(flat = 8.dp, round = 18.dp), vertical = 32.dp),
         verticalArrangement = Arrangement.spacedBy(4.dp),
+        transform = false,
     ) {
         item {
             Column(horizontalAlignment = Alignment.CenterHorizontally,

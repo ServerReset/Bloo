@@ -78,9 +78,14 @@ import androidx.compose.ui.unit.sp
 import androidx.wear.compose.material3.LocalContentColor
 import com.bloo.uicommon.MorphButtonCore
 import androidx.wear.compose.foundation.lazy.TransformingLazyColumn
+import androidx.wear.compose.foundation.lazy.TransformingLazyColumnItemScope
 import androidx.wear.compose.foundation.lazy.TransformingLazyColumnScope
 import androidx.wear.compose.foundation.lazy.TransformingLazyColumnState
 import androidx.wear.compose.foundation.lazy.rememberTransformingLazyColumnState
+import androidx.wear.compose.foundation.lazy.items
+import androidx.wear.compose.material3.lazy.TransformationSpec
+import androidx.wear.compose.material3.lazy.rememberTransformationSpec
+import androidx.wear.compose.material3.lazy.transformedHeight
 import androidx.wear.compose.material3.CircularProgressIndicator
 import androidx.wear.compose.material3.Icon
 import androidx.wear.compose.material3.ListHeader
@@ -995,11 +1000,93 @@ fun BusySpinner(caption: String, modifier: Modifier = Modifier) {
 }
 
 /**
+ * The scale + fade an item gets as it approaches the top or bottom of a round face --
+ * what makes a watch list read as curved, rather than as a flat list whose ends are
+ * chopped off by the bezel.
+ *
+ * Material3 ships this as a `transformation = SurfaceTransformation(spec)` parameter,
+ * but only on ITS OWN Button/Card/ListHeader. This app's cards deliberately aren't
+ * Material3 Cards (see [SectionCard]: every M3 Card overload requires onClick, which
+ * made every non-interactive section its own dead TalkBack stop), so they can't take
+ * that parameter. This is the documented alternative for custom content:
+ * [transformedHeight] to shrink the space the item claims in the layout, plus the
+ * spec's own `applyContainerTransformation` inside a [graphicsLayer] to scale, re-centre
+ * and fade what actually gets drawn. (`Modifier.scrollTransform` used to bundle the two
+ * together but was removed from the public API; this pairing is what replaced it.)
+ *
+ * Both halves have to land on the SAME element -- applyContainerTransformation's
+ * translationY exists to compensate for precisely the height transformedHeight removed,
+ * so splitting them across a wrapper and its child would visibly misalign every item.
+ */
+private fun Modifier.roundScreenTransform(
+    scope: TransformingLazyColumnItemScope,
+    spec: TransformationSpec,
+): Modifier = this
+    .transformedHeight(scope, spec)
+    .graphicsLayer {
+        // Three receivers are in play here and all three are load-bearing:
+        // GraphicsLayerScope (this lambda) is what both of the others extend,
+        // the item scope supplies `scrollProgress`, and the spec supplies the
+        // transformation itself. Hence the nested `with`s.
+        with(scope) { with(spec) { applyContainerTransformation(scrollProgress) } }
+    }
+
+/**
+ * The list DSL [RotaryScreenScaffold] hands callers: the same `item`/`items` they would
+ * call on a raw [TransformingLazyColumnScope], except each item is wrapped in the
+ * round-screen [roundScreenTransform] on the way through.
+ *
+ * Doing it here instead of at the call sites is the whole point. The transform has to be
+ * applied to the composable itself, so the alternative was threading a Modifier into all
+ * ~35 individual items across Settings, Login and Trips -- and a list where ONE item
+ * forgot it looks worse than a list where none of them have it, because that item alone
+ * stays full-size and fully opaque while everything around it shrinks and fades. Routing
+ * every item through a single wrapper makes forgetting it impossible.
+ *
+ * When [spec] is null the list has opted out (see [RotaryScreenScaffold]'s `transform`)
+ * and items are forwarded completely untouched -- not even the wrapper Box.
+ */
+class RotaryListScope internal constructor(
+    private val delegate: TransformingLazyColumnScope,
+    private val spec: TransformationSpec?,
+) {
+    fun item(key: Any? = null, content: @Composable TransformingLazyColumnItemScope.() -> Unit) {
+        val transform = spec
+        if (transform == null) {
+            delegate.item(key = key, content = content)
+            return
+        }
+        delegate.item(key = key) {
+            val itemScope = this
+            Box(Modifier.fillMaxWidth().roundScreenTransform(itemScope, transform)) {
+                itemScope.content()
+            }
+        }
+    }
+
+    fun <T> items(
+        items: List<T>,
+        key: ((item: T) -> Any)? = null,
+        itemContent: @Composable TransformingLazyColumnItemScope.(item: T) -> Unit,
+    ) {
+        val transform = spec
+        if (transform == null) {
+            delegate.items(items = items, key = key, itemContent = itemContent)
+            return
+        }
+        delegate.items(items = items, key = key) { value ->
+            val itemScope = this
+            Box(Modifier.fillMaxWidth().roundScreenTransform(itemScope, transform)) {
+                itemScope.itemContent(value)
+            }
+        }
+    }
+}
+
+/**
  * The rotary-scrollable [TransformingLazyColumn] scaffold every list screen (Login,
  * Settings, Trips, tile-reorder) shares -- Wear Compose Material3's successor to
- * [androidx.wear.compose.foundation.lazy.ScalingLazyColumn], migrated from it wholesale
- * (see [RotaryScreenScaffold]'s own doc for the migration's scope and what it
- * deliberately did NOT attempt).
+ * [androidx.wear.compose.foundation.lazy.ScalingLazyColumn].
  *
  * Unlike the old ScalingLazyColumn setup, this needs no manual FocusRequester +
  * LaunchedEffect dance to make the crown/bezel actually reach the list:
@@ -1009,6 +1096,10 @@ fun BusySpinner(caption: String, modifier: Modifier = Modifier) {
  * [ScreenScaffold], per Wear's own guidance that the two "handle rotary input
  * automatically... when properly configured together." One less thing for every caller
  * to get right, not just a shorter version of the same wiring.
+ *
+ * The low-level half of the pair: takes a raw [TransformingLazyColumnScope]. The
+ * round-screen item transform lives in [RotaryScreenScaffold], which is what screens
+ * actually call.
  */
 @Composable
 fun RotaryScalingColumn(
@@ -1036,39 +1127,34 @@ fun RotaryScalingColumn(
  * call this and pass only what differs -- padding/spacing and the list [content].
  * Callers keep any surrounding Box/overlay siblings of their own.
  *
- * Migrated from [androidx.wear.compose.foundation.lazy.ScalingLazyColumn] to
- * [TransformingLazyColumn] (Wear Compose Material3's successor -- both are already part
- * of the wear.compose 1.5.1 already in this project, no new dependency). Deliberately
- * scoped to the STRUCTURAL migration only: state type, the newer [ScreenScaffold]
- * overload, and the simpler automatic rotary/focus wiring [RotaryScalingColumn]'s own doc
- * describes. NOT attempted here: the center-of-face scale/fade "focus" emphasis the old
- * `ScalingParams` gave these lists by default. TransformingLazyColumn's equivalent
- * (`SurfaceTransformation` + `Modifier.transformedHeight`) is built around Material3's
- * own Button/Card, which expose a `transformation` parameter these screens' bespoke
- * [SectionCard] does not -- giving it one is real, separate follow-up work, not something
- * to guess at inside the same change that swaps the underlying list engine out from under
- * four real screens at once. Every list here reads as a plain flat stack for now, same as
- * the tile-reorder screen already deliberately looked before this change (it disabled
- * scaling outright with `edgeScale = 1f, edgeAlpha = 1f`) -- Login/Settings/Trips lose
- * only the shrink/fade emphasis at the very top and bottom of a scroll, not any
- * functionality.
+ * It also owns the round-screen item transform: [content] is a [RotaryListScope], whose
+ * `item`/`items` are call-compatible with the raw ones but route every item through
+ * [roundScreenTransform] so items shrink and fade toward the top and bottom of the face
+ * instead of running flat into the bezel. This is what the old ScalingLazyColumn's
+ * default `ScalingParams` used to do for these screens for free.
+ *
+ * Set [transform] to false for a list that genuinely shouldn't do that -- see the
+ * tile-reorder screen, which has always deliberately disabled edge scaling.
  */
 @Composable
 fun RotaryScreenScaffold(
     modifier: Modifier = Modifier,
     contentPadding: PaddingValues = PaddingValues(horizontal = roundSafeHorizontalPadding(), vertical = 30.dp),
     verticalArrangement: Arrangement.Vertical = Arrangement.spacedBy(6.dp),
-    content: TransformingLazyColumnScope.() -> Unit,
+    transform: Boolean = true,
+    content: RotaryListScope.() -> Unit,
 ) {
     val listState = rememberTransformingLazyColumnState()
+    val spec = rememberTransformationSpec()
     ScreenScaffold(scrollState = listState, timeText = {}) {
         RotaryScalingColumn(
             modifier = modifier,
             state = listState,
             contentPadding = contentPadding,
             verticalArrangement = verticalArrangement,
-            content = content,
-        )
+        ) {
+            RotaryListScope(this, spec.takeIf { transform }).content()
+        }
     }
 }
 
