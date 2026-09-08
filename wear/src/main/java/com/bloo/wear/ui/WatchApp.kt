@@ -1,6 +1,8 @@
 package com.bloo.wear.ui
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -22,6 +24,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -31,6 +34,8 @@ import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.wear.compose.foundation.rotary.RotaryScrollableDefaults
+import androidx.wear.compose.foundation.rotary.rotaryScrollable
 import androidx.wear.compose.material3.AppScaffold
 import androidx.wear.compose.material3.CircularProgressIndicator
 import androidx.wear.compose.material3.MaterialTheme
@@ -191,11 +196,31 @@ private fun WatchAppContent(vm: WearViewModel, ui: WearUi) {
                     Modifier.fillMaxSize(),
                     contentAlignment = Alignment.Center,
                 ) {
+                    // Same safety net, and the same reasoning, as PinEntryScreen's.
+                    // This stack -- spinner, caption, two-to-four-line hint, button --
+                    // fits a small round face at the default text size with room to
+                    // spare, but the watch's font scale goes to 1.4x and multiplies the
+                    // OS accessibility scale on top, at which point the hint gains lines
+                    // and Arrangement.Center splits the overflow, clipping the spinner
+                    // off the top and the Sync button off the bottom. Being the FIRST
+                    // screen of a cold launch, that is the worst place in the app to
+                    // lose the one button on offer. Scrolls only when it has to; when
+                    // the stack fits it stays centred and this never engages.
+                    val scrollState = rememberScrollState()
+                    val focusRequester = remember { FocusRequester() }
+                    LaunchedEffect(Unit) { runCatching { focusRequester.requestFocus() } }
                     Column(
                         horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.Center,
                         modifier = Modifier
                             .fillMaxWidth()
+                            .verticalScroll(scrollState)
+                            // Crown/bezel drives that same scroll, so the button stays
+                            // reachable the way it is everywhere else on the watch.
+                            .rotaryScrollable(
+                                RotaryScrollableDefaults.behavior(scrollableState = scrollState),
+                                focusRequester = focusRequester,
+                            )
                             .padding(horizontal = roundSafeHorizontalPadding(flat = 24.dp, round = 32.dp)),
                     ) {
                         CircularProgressIndicator()
