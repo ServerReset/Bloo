@@ -9,6 +9,9 @@ import kotlinx.serialization.json.Json
 import okhttp3.HttpUrl.Companion.toHttpUrl
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import android.content.Context
+import android.content.Intent
+import androidx.core.content.FileProvider
 import java.io.File
 import java.util.concurrent.TimeUnit
 
@@ -218,6 +221,34 @@ object UpdateApi {
             }.getOrDefault(false)
         }
 }
+
+/**
+ * Hand an already-downloaded APK to the system package installer, returning whether the
+ * installer actually launched.
+ *
+ * A content:// URI through FileProvider, never file://, which modern Android rejects
+ * outright with FileUriExposedException. Both apps declare the same
+ * `${applicationId}.fileprovider` authority and both expose their cache/apk directory to
+ * it, so the one authority string works for either caller.
+ *
+ * attempt-and-report rather than check-then-act: there is no reliable way to know in
+ * advance that an installer activity will resolve the intent, so this tries and says what
+ * happened. Callers show their own message on false -- the download succeeded, so "we have
+ * it but could not open the installer" is a different thing to say than "download failed".
+ *
+ * Shared because Bloo is sideloaded on BOTH surfaces -- neither app is on a store, so each
+ * installs its own updates -- and the phone and watch copies of this were byte-identical
+ * bar how each reached its Context. That is the same duplication UpdateGate and
+ * UPDATE_SNOOZE_MS were pulled in here to end.
+ */
+fun installDownloadedApk(context: Context, apk: File): Boolean = runCatching {
+    val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", apk)
+    val intent = Intent(Intent.ACTION_VIEW).apply {
+        setDataAndType(uri, "application/vnd.android.package-archive")
+        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
+    }
+    context.startActivity(intent)
+}.isSuccess
 
 /**
  * The side-effect-free decisions shared by the phone's UpdateChecker.checkPhone and the

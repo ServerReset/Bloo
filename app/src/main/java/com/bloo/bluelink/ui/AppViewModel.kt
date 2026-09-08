@@ -2168,17 +2168,6 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
      *  runCatching since there's no reliable way to know in advance whether
      *  an installer activity will actually be available to resolve the
      *  intent; returns whether the install UI was successfully launched. */
-    private fun launchApkInstaller(dest: java.io.File): Boolean {
-        val ctx = getApplication<Application>()
-        return runCatching {
-            val uri = androidx.core.content.FileProvider.getUriForFile(ctx, "${ctx.packageName}.fileprovider", dest)
-            val intent = android.content.Intent(android.content.Intent.ACTION_VIEW).apply {
-                setDataAndType(uri, "application/vnd.android.package-archive")
-                addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION or android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
-            }
-            ctx.startActivity(intent)
-        }.isSuccess
-    }
 
     /** The update tile's primary button, first tap: downloads the APK in the
      *  background with no other UI change yet -- lets someone start the
@@ -2299,7 +2288,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     /** The classic tap-through system installer (also the fallback for the seamless
      *  path). Reports only if even this can't be launched. */
     private fun fallbackInstall(dest: java.io.File) {
-        if (!launchApkInstaller(dest)) {
+        if (!com.bloo.bluelink.data.installDownloadedApk(getApplication<Application>(), dest)) {
             _state.update { it.copy(message = "Couldn't open the installer. Find Bloo.apk in your downloads.") }
         }
     }

@@ -1765,7 +1765,7 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
         // the update is waiting before the user ever opens the card, so the tap
         // installs instead of starting a download they then watch.
         if (_ui.value.updateApkReady && ready.exists()) {
-            if (!launchApkInstaller(ready)) {
+            if (!com.bloo.bluelink.data.installDownloadedApk(ctx, ready)) {
                 _ui.update { it.copy(message = "Downloaded, but couldn't open the installer.") }
             }
             return
@@ -1789,27 +1789,11 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
             // there -- so the next tap paid for the whole multi-megabyte transfer a
             // second time, over a watch's connection. Now it costs one more tap.
             _ui.update { it2 -> it2.copy(updateApkReady = true) }
-            if (!launchApkInstaller(dest)) {
+            if (!com.bloo.bluelink.data.installDownloadedApk(ctx, dest)) {
                 _ui.update { it2 -> it2.copy(message = "Downloaded, but couldn't open the installer.") }
             }
         }
     }
-
-    /** Hand a downloaded APK to the system package installer through a FileProvider
-     *  content:// URI (a file:// one is rejected by FileUriExposedException on modern
-     *  Android). Returns whether the installer actually launched -- there is no
-     *  reliable way to know in advance that an installer activity will resolve, so
-     *  this is attempt-and-report rather than check-then-act. Mirrors the phone's
-     *  launchApkInstaller. */
-    private fun launchApkInstaller(dest: java.io.File): Boolean = runCatching {
-        val uri = androidx.core.content.FileProvider.getUriForFile(ctx, "${ctx.packageName}.fileprovider", dest)
-        val intent = android.content.Intent(android.content.Intent.ACTION_VIEW).apply {
-            setDataAndType(uri, "application/vnd.android.package-archive")
-            addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION or android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
-        }
-        ctx.startActivity(intent)
-        true
-    }.getOrDefault(false)
 
     /** Set the watch's own display font scale (local-only setting, never read
      *  from the phone), clamp it to a sane range, persist it, then push the
