@@ -217,4 +217,9 @@ dependencies {
 
     // Watch-face complications (charge % slot, ranged value slot).
     implementation("androidx.wear.watchface:watchface-complications-data-source-ktx:1.2.1")
+
+    // Same JUnit runner the other modules use. The wear module had no test source
+    // set at all until now -- every piece of watch-only logic was verified only by
+    // building it, which is not the same as verifying it behaves.
+    testImplementation("org.jetbrains.kotlin:kotlin-test-junit:2.2.20")
 }
