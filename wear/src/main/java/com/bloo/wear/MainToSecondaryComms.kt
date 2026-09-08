@@ -175,6 +175,34 @@ object MainToSecondaryComms {
             }
         }
 
+    /** Present-tense title for the in-flight Live Update. Toggles are resolved to a
+     *  concrete verb by applyOptimistic long before this runs, but they are handled
+     *  anyway so an unresolved one degrades to a sensible phrase instead of "Working". */
+    private fun commandProgressTitle(action: String): String = when (action) {
+        WearAction.LOCK, WearAction.TOGGLE_LOCK -> "Locking your car…"
+        WearAction.UNLOCK -> "Unlocking your car…"
+        WearAction.CLIMATE_ON, WearAction.TOGGLE_CLIMATE -> "Starting climate…"
+        WearAction.CLIMATE_OFF -> "Stopping climate…"
+        WearAction.CHARGE_ON, WearAction.TOGGLE_CHARGE -> "Starting charge…"
+        WearAction.CHARGE_OFF -> "Stopping charge…"
+        WearAction.FLASH_LIGHTS -> "Flashing lights…"
+        WearAction.HORN_AND_LIGHTS -> "Horn and lights…"
+        WearAction.SET_CHARGE_LIMITS -> "Updating charge limits…"
+        WearAction.REFRESH -> "Refreshing your car…"
+        else -> "Working…"
+    }
+
+    /** The few characters a Wear status chip has room for -- a noun, not a sentence. */
+    private fun commandChipText(action: String): String = when (action) {
+        WearAction.LOCK, WearAction.TOGGLE_LOCK, WearAction.UNLOCK -> "Lock"
+        WearAction.CLIMATE_ON, WearAction.CLIMATE_OFF, WearAction.TOGGLE_CLIMATE -> "Climate"
+        WearAction.CHARGE_ON, WearAction.CHARGE_OFF, WearAction.TOGGLE_CHARGE -> "Charge"
+        WearAction.SET_CHARGE_LIMITS -> "Limits"
+        WearAction.FLASH_LIGHTS, WearAction.HORN_AND_LIGHTS -> "Alert"
+        WearAction.REFRESH -> "Refresh"
+        else -> "Bloo"
+    }
+
     /** Execute a command on the watch's own connection and, on failure, post a
      *  native watch notification — the phone isn't there to report the outcome.
      *  On failure this also reverts the optimistic flip [applyOptimistic] made
@@ -190,7 +218,35 @@ object MainToSecondaryComms {
      *  nothing about was unlocked. Restoring the captured value puts the null back. */
     private suspend fun runStandalone(context: Context, sent: Optimistic): Boolean {
         val command = sent.command
-        val result = WearCommandRunner.execute(context, command)
+        // A Live Update for the duration of the call. This is the standalone path, so
+        // the command is real network work against the car's own API with no bound on
+        // how long it takes -- tens of seconds is ordinary. Until now the watch showed
+        // nothing at all outside the app while that happened: the tile flipped
+        // optimistically and then the user had no way to tell a command still in
+        // flight from one that had quietly finished. On Wear OS 7+ this is promotable
+        // to a status chip; below that it is an ordinary ongoing notification, which is
+        // the same information in a less prominent place.
+        //
+        // Its own id, deliberately NOT the one the failure notification below uses:
+        // that one posts to a different (high-importance) channel, and reusing a single
+        // id across two channels is exactly the kind of thing that behaves differently
+        // per OEM. Separate ids, cancelled in a finally, has no such ambiguity.
+        val progressId = ("cmdProgress" + command.vin + command.action).hashCode()
+        WearNotifications.postProgress(
+            context,
+            progressId,
+            title = commandProgressTitle(command.action),
+            text = "Talking to your car…",
+            shortCriticalText = commandChipText(command.action),
+        )
+        val result = try {
+            WearCommandRunner.execute(context, command)
+        } finally {
+            // finally, not after the call: an exception or cancellation must not leave
+            // an ongoing notification stranded on the wrist with no way to dismiss it
+            // (setOngoing means the user cannot swipe it away themselves).
+            WearNotifications.cancel(context, progressId)
+        }
         if (!result.ok) {
             AppLog.log("⚠ Watch standalone command failed: ${command.action} → ${result.message}")
             runCatching {

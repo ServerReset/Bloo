@@ -14,6 +14,15 @@
          needed to be allowed to request an install at all on API 26+. -->
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
 
+    <!-- Lets a watch-local Live Update (a command in flight) be PROMOTED to a status
+         chip rather than only sitting in the tray. Install-time, never a runtime
+         prompt. This is condition 2 of the promotion checklist documented on the
+         phone's LiveCharge; the phone has declared it since that feature shipped and
+         the watch did not, so a promotable notification posted here could never
+         actually be promoted. Live Updates render as ordinary notifications on
+         watches below Wear OS 7 / API 36, which is correct behaviour, not a failure. -->
+    <uses-permission android:name="android.permission.POST_PROMOTED_NOTIFICATIONS" />
+
     <application
         android:allowBackup="false"
         android:icon="@drawable/ic_bloo"
