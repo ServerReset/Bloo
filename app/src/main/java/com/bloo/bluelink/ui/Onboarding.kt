@@ -858,7 +858,6 @@ internal fun OnboardingCarPage(
 
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Text("Extras", style = MaterialTheme.typography.labelMedium, color = scheme.primary, fontWeight = FontWeight.SemiBold)
-        val extrasHaptics = LocalHaptics.current
         // Same MorphButton as the rest of the app: a filled pill that lights up
         // secondaryContainer while the feature is on (for cars with it).
         MorphButton(

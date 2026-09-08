@@ -102,7 +102,6 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.rotary.onRotaryScrollEvent
 import androidx.compose.ui.layout.onSizeChanged
-import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.semantics.CustomAccessibilityAction
@@ -429,7 +428,6 @@ private fun CarColumn(
 ) {
     val scope = rememberCoroutineScope()
     val focusRequester = remember { FocusRequester() }
-    val round = LocalConfiguration.current.isScreenRound
 
     // Narrowly keyed on just what visibleTiles() actually reads -- keying on
     // the whole ui.settings/ui.extras objects meant any unrelated push (e.g.

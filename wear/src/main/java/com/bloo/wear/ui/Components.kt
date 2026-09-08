@@ -814,11 +814,8 @@ fun MorphButton(
                 } else Modifier,
             ),
         containerColor = containerColor,
-        contentColor = scheme.onSurface,
         activeContainerColor = activeColor,
-        activeContentColor = scheme.onPrimary,
         contentPadding = PaddingValues(horizontal = 16.dp, vertical = 10.dp),
-        disabledContentColor = resolvedContent.copy(alpha = 0.55f),
         // A flat surfaceContainerHigh fill with 38%-alpha content and no
         // border (the old `pending` case) had nothing left to read as
         // "busy" rather than "broken" -- keeping a dimmer rim and a less

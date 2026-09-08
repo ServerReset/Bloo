@@ -143,20 +143,6 @@ internal fun HeroHeader(
         launch { heroAlpha.animateTo(1f, tween(400)) }
         launch { heroOffset.animateTo(0f, spring(dampingRatio = 0.7f, stiffness = Spring.StiffnessMediumLow)) }
     }
-    val corner by animateDpAsState(
-        targetValue = if (charging) 40.dp else 24.dp,
-        animationSpec = spring(
-            dampingRatio = SoftDamping,
-            stiffness = Spring.StiffnessMediumLow,
-        ),
-        label = "heroCorner",
-    )
-    // On the PHONE, match the EXPANDED pebble corner (PebbleCornerExpanded = 20dp) —
-    // the hero reads as an always-expanded card, so it should share the tighter
-    // expanded radius, not the rounder collapsed one. The old hardcoded charging 40dp /
-    // idle 24dp both mismatched. The COVER keeps its own animated corner (full-height tile).
-    val heroShape = RoundedCornerShape(if (LocalForceExpanded.current) corner else PebbleCornerExpanded)
-    val heroOutline = LocalAppearance.current
     // On the flip cover this hero is one full-screen tile. Unlike every other
     // pebble it rolls its own Card and never went through PebbleShell, so it never
     // got the cover's fill-height treatment — it wrapped its content and left a

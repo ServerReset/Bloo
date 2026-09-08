@@ -44,18 +44,22 @@ import kotlin.math.roundToInt
  *    everywhere because the highlight colour IS the active state: the lock/
  *    unlock button, the chevron on an expanded pebble and the climate/charge
  *    toggles all activate the exact same way, so their highlight also comes
- *    from the same default ([activeContainerColor] = theme primary /
- *    [activeContentColor] = onPrimary). There is no "green when expanded" or
- *    "gray when selected" special case left anywhere -- one state, one colour.
+ *    from the same default ([activeContainerColor] = theme primary). There is
+ *    no "green when expanded" or "gray when selected" special case left
+ *    anywhere -- one state, one colour.
  *  - **The press state and the click/long-click surface.** Pressed is read
  *    from [interactionSource] (so callers can share one source for their own
  *    pressed-driven extras), and the click surface is a standard
  *    `combinedClickable` -- [onLongClick] is how the chevron's hold-to-spin
  *    easter egg and the cover button's hold-for-lights arrive without any
  *    second gesture system.
- *  - **The colours.** Idle vs [active], plus the disabled pair: the container
- *    stays fully painted when disabled (M3's default onSurface@12% wash is
- *    invisible against these light cards) and only the content dims.
+ *  - **The CONTAINER colours.** Idle vs [active], plus the disabled case: the
+ *    container stays fully painted when disabled (M3's default onSurface@12%
+ *    wash is invisible against these light cards) and only the content dims.
+ *    Content colour is deliberately NOT handled here -- this component is
+ *    foundation-only and cannot reach material3's LocalContentColor, so each
+ *    wrapper provides that itself around its call (see MorphButton on both the
+ *    phone and the watch, which is where the disabled/pending dimming lives).
  *
  * Fundamentally foundation-only (no Material dependency): the phone and the
  * watch supply their own platform colours (via the wrappers in each module)
@@ -90,18 +94,13 @@ fun MorphButtonCore(
     enabled: Boolean = true,
     active: Boolean = false,
     containerColor: Color,
-    contentColor: Color,
     activeContainerColor: Color,
-    activeContentColor: Color,
     contentPadding: PaddingValues = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
     border: BorderStroke? = null,
     /** When null, the disabled container keeps the (animated) idle/active fill
      *  instead of washing out -- matching the app's "only the label fades"
      *  disabled treatment everywhere. */
     disabledContainerColor: Color? = null,
-    /** When null, disabled content dims the resolved content colour to 38%
-     *  alpha. The watch overrides with its own 55% version. */
-    disabledContentColor: Color? = null,
     interactionSource: MutableInteractionSource = remember { MutableInteractionSource() },
     /** Hold-to-act variety: the chevron easter egg, the cover screen's
      *  flash-lights. Null means plain click-only, exactly like M3 `Button`. */
@@ -124,8 +123,6 @@ fun MorphButtonCore(
     content: @Composable RowScope.() -> Unit,
 ) {
     val pressed by interactionSource.collectIsPressedAsState()
-    val resolvedContent = if (active) activeContentColor else contentColor
-    val disabledContent = disabledContentColor ?: resolvedContent.copy(alpha = 0.38f)
 
     // The split: the clickable ANIMATED half lives in `MorphChrome` (child
     // scope -- it recomposes every morph frame), the CONTENT is a stable
