@@ -1,7 +1,6 @@
 package com.bloo.bluelink.ui
 
 import com.bloo.bluelink.data.EvStatus
-import com.bloo.bluelink.data.Weather
 import com.bloo.bluelink.data.Vehicle
 import com.bloo.bluelink.data.VehicleStatus
 import kotlin.test.Test
