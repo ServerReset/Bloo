@@ -246,6 +246,10 @@ data class WearUi(
     val updateRun: com.bloo.bluelink.data.WorkflowRun? = null,
     /** True while the update APK is downloading (see downloadAndInstallUpdate). */
     val updateDownloading: Boolean = false,
+    /** An APK for [updateRun] is already downloaded and waiting -- the update
+     *  button installs immediately instead of downloading first. See
+     *  [WearViewModel.prefetchUpdateApk]. */
+    val updateApkReady: Boolean = false,
     /** True when the PIN lock gate (see PinLockScreen) is covering the app. */
     val pinLocked: Boolean = false,
     /** True while a manual "Sync from phone" (resync) is in flight -- every
@@ -1620,9 +1624,73 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
         localStore.setUpdateLastCheckedAt(now)
         return if (UpdateGate.isNewer(run, com.bloo.wear.BuildConfig.BUILD_RUN_NUMBER)) {
             _ui.update { it.copy(updateRun = run) }
+            prefetchUpdateApk(run)
             true
         } else false
     }
+
+    /** The cached update APK. One fixed name: only ever one build is worth keeping,
+     *  and [WearLocalSettings.updateDownloadedRun] records which one it is. */
+    private fun updateApkFile(): java.io.File =
+        java.io.File(java.io.File(ctx.cacheDir, "apk"), "Bloo-Wear.apk")
+
+    /**
+     * Fetch the update's APK ahead of the user asking, so the update button installs
+     * on the spot instead of starting a multi-megabyte download over a watch's
+     * connection while they wait on a spinner.
+     *
+     * Conditions, in order:
+     *  - The release must actually carry a wear asset. Without one the button falls
+     *    back to opening the release page on the phone, and there is nothing to fetch.
+     *  - An APK already downloaded for THIS build is reused. The recorded build number
+     *    is checked against the run we just found, so a newer build supersedes an older
+     *    cached APK rather than installing it; and the file's continued existence is
+     *    verified, because a cache directory belongs to the OS and can be reclaimed
+     *    whenever it likes.
+     *  - Unmetered network only. This is the whole reason it is safe to do unasked: a
+     *    watch often reaches the internet through the phone's Bluetooth link or a
+     *    metered hotspot, and silently pulling megabytes over either is exactly the
+     *    kind of thing a watch app should never do behind the user's back. On a
+     *    metered link nothing happens here and the existing download-on-tap path
+     *    still works, unchanged.
+     */
+    private fun prefetchUpdateApk(run: com.bloo.bluelink.data.WorkflowRun) {
+        val url = run.wearApkUrl ?: return
+        viewModelScope.launch {
+            val dest = updateApkFile()
+            val already = runCatching { localStore.flow.first().updateDownloadedRun }.getOrDefault(0)
+            if (already == run.runNumber && dest.exists()) {
+                _ui.update { it.copy(updateApkReady = true) }
+                return@launch
+            }
+            if (!unmeteredNetwork()) return@launch
+            if (_ui.value.updateDownloading) return@launch
+            _ui.update { it.copy(updateDownloading = true) }
+            _updateDownloadProgress.value = 0f
+            var lastPercent = -1
+            val ok = com.bloo.bluelink.data.UpdateApi.downloadApk(url, dest) { progress ->
+                val percent = (progress * 100f).toInt()
+                if (percent != lastPercent) {
+                    lastPercent = percent
+                    _updateDownloadProgress.value = progress
+                }
+            }
+            _updateDownloadProgress.value = null
+            _ui.update { it.copy(updateDownloading = false, updateApkReady = ok) }
+            // Record the build only on success, so a half-finished download can never
+            // be mistaken for a ready one on the next launch.
+            if (ok) runCatching { localStore.setUpdateDownloadedRun(run.runNumber) }
+        }
+    }
+
+    /** True only on a connection the system reports as NOT metered -- see
+     *  [prefetchUpdateApk] for why an unasked download is gated on it. Absent or
+     *  unknown capabilities count as metered: the safe answer is "don't". */
+    private fun unmeteredNetwork(): Boolean = runCatching {
+        val cm = ctx.getSystemService(android.net.ConnectivityManager::class.java)
+        val caps = cm?.activeNetwork?.let { cm.getNetworkCapabilities(it) }
+        caps?.hasCapability(android.net.NetworkCapabilities.NET_CAPABILITY_NOT_METERED) == true
+    }.getOrDefault(false)
 
     /** The GitHub Actions build number this watch app was compiled from. */
     val currentBuildNumber: Int get() = com.bloo.wear.BuildConfig.BUILD_RUN_NUMBER
@@ -1640,13 +1708,29 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
             return
         }
         if (_ui.value.updateDownloading) return
+        val ready = updateApkFile()
+        // Already fetched in the background (see prefetchUpdateApk) -- go straight to
+        // the installer. This is the whole point of prefetching: on a good connection
+        // the update is waiting before the user ever opens the card, so the tap
+        // installs instead of starting a download they then watch.
+        if (_ui.value.updateApkReady && ready.exists()) {
+            if (!launchApkInstaller(ready)) {
+                _ui.update { it.copy(message = "Downloaded, but couldn't open the installer.") }
+            }
+            return
+        }
+        // Flag says ready but the file is gone -- a cache dir is the OS's to reclaim.
+        // Fall through and fetch it again rather than failing.
+        if (_ui.value.updateApkReady) {
+            _ui.update { it.copy(updateApkReady = false) }
+        }
         // 0f, not null: UpdateApi only fires onProgress when the response carried a
         // Content-Length, so a server without one would otherwise leave this null and
         // flip the bar from determinate-0% to indeterminate. Same reasoning as the phone.
         _updateDownloadProgress.value = 0f
         _ui.update { it.copy(updateDownloading = true) }
         viewModelScope.launch {
-            val dest = java.io.File(java.io.File(ctx.cacheDir, "apk"), "Bloo-Wear.apk")
+            val dest = updateApkFile()
             // Progress was previously discarded outright (the callback was `{ }`), so a
             // multi-megabyte APK over a watch's connection showed nothing but an
             // indeterminate spinner for its entire duration, with no way to tell a slow
@@ -1670,18 +1754,28 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
                 _ui.update { it.copy(message = "Download failed. Check your connection and try again.") }
                 return@launch
             }
-            runCatching {
-                val uri = androidx.core.content.FileProvider.getUriForFile(ctx, "${ctx.packageName}.fileprovider", dest)
-                val intent = android.content.Intent(android.content.Intent.ACTION_VIEW).apply {
-                    setDataAndType(uri, "application/vnd.android.package-archive")
-                    addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION or android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
-                }
-                ctx.startActivity(intent)
-            }.onFailure {
+            runCatching { localStore.setUpdateDownloadedRun(run.runNumber) }
+            if (!launchApkInstaller(dest)) {
                 _ui.update { it2 -> it2.copy(message = "Downloaded, but couldn't open the installer.") }
             }
         }
     }
+
+    /** Hand a downloaded APK to the system package installer through a FileProvider
+     *  content:// URI (a file:// one is rejected by FileUriExposedException on modern
+     *  Android). Returns whether the installer actually launched -- there is no
+     *  reliable way to know in advance that an installer activity will resolve, so
+     *  this is attempt-and-report rather than check-then-act. Mirrors the phone's
+     *  launchApkInstaller. */
+    private fun launchApkInstaller(dest: java.io.File): Boolean = runCatching {
+        val uri = androidx.core.content.FileProvider.getUriForFile(ctx, "${ctx.packageName}.fileprovider", dest)
+        val intent = android.content.Intent(android.content.Intent.ACTION_VIEW).apply {
+            setDataAndType(uri, "application/vnd.android.package-archive")
+            addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION or android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+        ctx.startActivity(intent)
+        true
+    }.getOrDefault(false)
 
     /** Set the watch's own display font scale (local-only setting, never read
      *  from the phone), clamp it to a sane range, persist it, then push the

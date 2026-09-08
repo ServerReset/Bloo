@@ -7,6 +7,7 @@ import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.emptyPreferences
 import androidx.datastore.preferences.core.floatPreferencesKey
+import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
@@ -198,6 +199,15 @@ data class WearLocalSettings(
     val updateLastCheckedAt: Long = 0L,
     val updateSnoozeUntil: Long = 0L,
     /**
+     * The GitHub Actions build number whose APK is already downloaded and waiting
+     * in the cache, or 0 for none. Persisted rather than kept in memory so a
+     * pre-downloaded update survives the watch killing the process (which it does
+     * eagerly) instead of being fetched over the air a second time. Always checked
+     * against the file actually still existing — the cache dir is the OS's to
+     * reclaim, so this is a hint, never a promise.
+     */
+    val updateDownloadedRun: Int = 0,
+    /**
      * Whether the watch's own PIN lock is armed. Only meaningful when [hasPin]
      * is also true — turning this on with no PIN set yet is a no-op gate.
      */
@@ -230,6 +240,7 @@ class WearLocalStore(private val context: Context) {
     private val keyUnitSystem = stringPreferencesKey("unit_system")
     private val keyUpdateLastCheckedAt = longPreferencesKey("update_last_checked_at")
     private val keyUpdateSnoozeUntil = longPreferencesKey("update_snooze_until")
+    private val keyUpdateDownloadedRun = intPreferencesKey("update_downloaded_run")
     private val keyPinLockEnabled = booleanPreferencesKey("pin_lock_enabled")
     private val keyPinLockTiming = stringPreferencesKey("pin_lock_timing")
     private val keyPinSalt = stringPreferencesKey("pin_salt")
@@ -289,6 +300,7 @@ class WearLocalStore(private val context: Context) {
             tileCarVins = tileCarVins,
             updateLastCheckedAt = prefs[keyUpdateLastCheckedAt] ?: 0L,
             updateSnoozeUntil = prefs[keyUpdateSnoozeUntil] ?: 0L,
+            updateDownloadedRun = prefs[keyUpdateDownloadedRun] ?: 0,
             pinLockEnabled = prefs[keyPinLockEnabled] ?: false,
             pinLockTiming = prefs[keyPinLockTiming]?.takeIf { it in PIN_LOCK_TIMINGS } ?: "immediate",
             // hasPin is derived purely from presence of the stored hash — the
@@ -327,6 +339,11 @@ class WearLocalStore(private val context: Context) {
     /** Record until when update-check reminders should be suppressed after the user snoozes one. */
     suspend fun setUpdateSnoozeUntil(millis: Long) {
         context.wearLocalStore.edit { it[keyUpdateSnoozeUntil] = millis }
+    }
+
+    /** Record which build's APK is sitting in the cache, ready to install (0 = none). */
+    suspend fun setUpdateDownloadedRun(run: Int) {
+        context.wearLocalStore.edit { it[keyUpdateDownloadedRun] = run }
     }
 
     // ── Tiles ──────────────────────────────────────────────────────────────────

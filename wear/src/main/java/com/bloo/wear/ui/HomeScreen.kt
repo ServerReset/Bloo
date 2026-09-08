@@ -2394,9 +2394,13 @@ private fun MoreCard(vm: WearViewModel, ui: WearUi, car: CarView, onSettings: ()
             // server sent no Content-Length, since there is genuinely no percentage
             // to show then.
             label = when {
-                !ui.updateDownloading -> "Update"
-                progress != null -> "Downloading ${(progress * 100).roundToInt()}%"
-                else -> "Downloading…"
+                ui.updateDownloading && progress != null -> "Downloading ${(progress * 100).roundToInt()}%"
+                ui.updateDownloading -> "Downloading…"
+                // Prefetched and waiting: say so, because "Update" on a button that
+                // installs instantly reads the same as one that is about to make you
+                // wait through a download, and those are very different taps.
+                ui.updateApkReady -> "Install now"
+                else -> "Update"
             },
             icon = Icons.Filled.SystemUpdate,
             active = true,
@@ -2405,7 +2409,9 @@ private fun MoreCard(vm: WearViewModel, ui: WearUi, car: CarView, onSettings: ()
             onClick = { vm.downloadAndInstallUpdate() },
         )
         // The bar the phone's update pebble has always had. Determinate, so it also
-        // conveys rate -- the thing a spinner cannot show.
+        // conveys rate -- the thing a spinner cannot show. Shows for a background
+        // prefetch too, so a download the user did not start still explains itself
+        // rather than just making the watch feel busy.
         if (ui.updateDownloading && progress != null) {
             Spacer(Modifier.height(6.dp))
             LinearProgressIndicator(
