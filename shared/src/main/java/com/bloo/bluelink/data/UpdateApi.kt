@@ -243,10 +243,34 @@ object UpdateGate {
         lastCheckedAt: Long,
         snoozeUntil: Long,
         minIntervalMs: Long,
-    ): Boolean =
-        buildRunNumber <= 0 ||
-            (!force && now - lastCheckedAt < minIntervalMs) ||
-            (!force && now < snoozeUntil)
+    ): Boolean {
+        // Nothing to compare against: a build not stamped by CI has no run number.
+        if (buildRunNumber <= 0) return true
+        if (force) return false
+
+        // Both windows below are bounded on BOTH sides, and that is the point.
+        //
+        // Each is a stored wall-clock timestamp compared against the current wall
+        // clock, and wall clocks move backwards: a watch that has drifted, or a device
+        // whose date was set wrong and later corrected, leaves timestamps sitting in
+        // the future. The old form was a bare `now - lastCheckedAt < minIntervalMs`,
+        // which is TRUE for any negative difference -- so a lastCheckedAt an hour, or a
+        // year, ahead of the clock suppressed every non-forced update check for exactly
+        // that long, silently and with nothing on screen to explain it. A timestamp in
+        // the future is not a recent check; it is a broken one, and the safe reading of
+        // a broken debounce is to check now.
+        val sinceLastCheck = now - lastCheckedAt
+        if (sinceLastCheck in 0 until minIntervalMs) return true
+
+        // Same reasoning for the snooze, with the bound expressed as "no snooze anyone
+        // can set reaches further out than this". Callers snooze for UPDATE_SNOOZE_MS
+        // or less (the update tile's "Remind me" uses one day), so a stored deadline
+        // beyond that maximum cannot have been produced by a real snooze on a sane
+        // clock -- and honouring it would suppress updates for as long as the skew.
+        if (now < snoozeUntil && snoozeUntil - now <= UPDATE_SNOOZE_MS) return true
+
+        return false
+    }
 
     /** This build's branch, falling back to [UpdateApi.DEFAULT_BRANCH] when unstamped. */
     fun resolveBranch(buildBranch: String): String = buildBranch.ifBlank { UpdateApi.DEFAULT_BRANCH }
