@@ -744,6 +744,14 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     private fun bootstrap() {
+        // Started FIRST so it overlaps the local reads below, but deliberately not
+        // awaited unless there turns out to be nothing cached to draw (see the join
+        // further down). Ordering here is "start early, wait late".
+        val phoneBackfill = viewModelScope.launch {
+            runCatching { MainToSecondaryComms.pullLatest(ctx) }
+            refreshConnection()
+        }
+
         viewModelScope.launch {
             // Resolve the PIN-lock setting BEFORE anything below can reach the
             // Ready screen with real car data. This used to run in a separate,
@@ -767,8 +775,9 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
             // Even with a healthy phone it put an IPC round trip in front of the first
             // real frame.
             //
-            // It now runs concurrently (see the second launch in bootstrap) instead of
-            // in front. Nothing is lost by not waiting: pullLatest's only job is to
+            // It now starts before this coroutine and runs alongside it (see
+            // phoneBackfill above) instead of in front. Nothing is lost by not waiting
+            // on it here: pullLatest's only job is to
             // PERSIST what the phone has into these same local stores, and this class
             // already collects every one of them reactively -- settings, presets,
             // extras, climate and snapshots each have a collector in init, and the
@@ -781,6 +790,19 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
                 val cached = statusCache.load()
                 statuses = cached.statuses
                 fetchedAt = cached.fetched
+            }
+            // The one case where the phone IS the critical path: nothing cached to
+            // render. That means a first launch (or cleared data), where racing ahead
+            // would publish an empty "No cars yet" garage a second or two before the
+            // phone's data lands and replaces it -- a worse thing to show than the
+            // spinner the user is already looking at. So wait here, and only here.
+            // Because the backfill was started before the local reads rather than in
+            // front of them, even this path is quicker than it used to be: the disk
+            // work has already happened alongside it.
+            if (snapshots.isEmpty()) {
+                phoneBackfill.join()
+                snapshots = runCatching { snapshotStore.current().vehicles.associateBy { it.vin } }
+                    .getOrElse { snapshots }
             }
             val brands = sessionStore.loggedInBrands()
             if (brands.isEmpty()) {
@@ -795,16 +817,6 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
                 _ui.update { it.copy(accounts = emails) }
                 loadGarage()
             }
-        }
-
-        // The phone-side half, deliberately NOT on the path to the first frame.
-        // refreshConnection() was already non-blocking here (it launches its own
-        // coroutine); the change is that pullLatest no longer gates the local load
-        // above. Both still happen exactly once per cold start, just beside the UI
-        // rather than in front of it.
-        viewModelScope.launch {
-            runCatching { MainToSecondaryComms.pullLatest(ctx) }
-            refreshConnection()
         }
     }
 
