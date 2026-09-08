@@ -2519,8 +2519,15 @@ fun TileReorderScreen(vm: WearViewModel, ui: WearUi, vin: String) {
             // Rows displaced by the drag (not the dragged row itself) had no
             // placement animation at all — they teleported straight to their new
             // slot the instant the swap threshold was crossed. Slide them in from
-            // their previous slot instead, since ScalingLazyColumn doesn't support
-            // Modifier.animateItem() the way LazyColumn does.
+            // their previous slot instead.
+            //
+            // This predates the TransformingLazyColumn migration, which DID bring a
+            // real Modifier.animateItem() to this scope (ScalingLazyColumn had none,
+            // which is why this exists). It is kept hand-rolled on purpose: this
+            // list is a drag surface, and animateItem() animates placement for
+            // every item including the one under the finger, where this version
+            // deliberately excludes the dragged row (`if (!dragging ...)`) so the
+            // drag stays locked to the finger. Worth revisiting on a real device.
             val idx = order.indexOf(key)
             var prevIdx by remember(key) { mutableIntStateOf(idx) }
             val slideOffset = remember(key) { Animatable(0f) }

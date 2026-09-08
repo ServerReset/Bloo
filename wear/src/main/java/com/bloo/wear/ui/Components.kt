@@ -105,7 +105,7 @@ import kotlin.math.roundToInt
 internal val WearCardCorner = 12.dp
 
 /**
- * Horizontal ScalingLazyColumn inset that actually widens on a round screen.
+ * Horizontal list inset that actually widens on a round screen.
  * Only HomeScreen accounted for `isScreenRound` before this; Settings, Login,
  * Trips, and the tile-reorder screen all used a flat inset regardless of
  * screen shape, so on a genuinely round watch their text/card edges sat

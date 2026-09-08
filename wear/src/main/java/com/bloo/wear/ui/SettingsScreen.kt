@@ -502,8 +502,7 @@ fun SettingsScreen(vm: WearViewModel, ui: WearUi, onAddAccount: () -> Unit) {
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                     // 3 lines: real device names ("Galaxy Watch6 Classic")
                                     // ellipsized the primary's name away at 2. The card is
-                                    // a ScalingLazyColumn item so it just grows; nothing
-                                    // clips.
+                                    // a list item that just grows; nothing clips.
                                     maxLines = 3,
                                     overflow = TextOverflow.Ellipsis,
                                 )
