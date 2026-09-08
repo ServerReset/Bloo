@@ -230,6 +230,32 @@ fun chargerLabel(plugin: Int?): String? = when (plugin) {
     else -> null
 }
 
+// The three formatters tripDate needs, built once per thread instead of three
+// times per call. tripDate renders the title of every row in the watch's trips
+// list, so on a scroll it was constructing a SimpleDateFormat -- which parses its
+// pattern and loads a full set of locale DateFormatSymbols -- several times for
+// every item that came into view, on the device least able to afford it.
+//
+// ThreadLocal rather than a plain val because SimpleDateFormat is not thread-safe,
+// and deliberately NOT java.time: DateTimeFormatter would be immutable and need no
+// ThreadLocal, but it also parses strictly where SimpleDateFormat is lenient, and
+// this parses a vendor feed whose exact shape is only known by observation (the
+// two patterns below were themselves discovered that way). Swapping in a stricter
+// parser to save a wrapper would risk silently falling back to raw text on real
+// timestamps. Same pattern, and the same reasoning, as KiaUsaApi's rfc1123Format.
+private val tripOutWithWeekday = ThreadLocal.withInitial {
+    java.text.SimpleDateFormat("EEE MMM d · h:mm a", java.util.Locale.US)
+}
+private val tripOutNoWeekday = ThreadLocal.withInitial {
+    java.text.SimpleDateFormat("MMM d · h:mm a", java.util.Locale.US)
+}
+private val tripParsers = ThreadLocal.withInitial {
+    arrayOf(
+        java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", java.util.Locale.US),
+        java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss", java.util.Locale.US),
+    )
+}
+
 /** "2026-06-01 18:22:31.0" / "2026-06-01T18:22:31" -> "Mon Jun 1 · 6:22 PM"
  *  (falls back to a trimmed raw string). Was defined separately on phone and
  *  watch; the watch's version was fixed to try both a 'T' and a plain-space
@@ -241,18 +267,13 @@ fun tripDate(raw: String?, includeWeekday: Boolean = true): String {
     if (raw.isNullOrBlank()) return "Trip"
     // Drop any fractional seconds - the feed's precision varies (".0" vs ".000000").
     val trimmed = raw.substringBefore('.').trim()
-    val outFormat = java.text.SimpleDateFormat(
-        if (includeWeekday) "EEE MMM d · h:mm a" else "MMM d · h:mm a",
-        java.util.Locale.US,
-    )
+    val outFormat = if (includeWeekday) tripOutWithWeekday.get()!! else tripOutNoWeekday.get()!!
     // Mechanism: tries each known raw-timestamp shape in turn (ISO-8601 with a
     // 'T' separator, then the plain-space variant) and returns as soon as one
     // successfully parses; runCatching swallows the ParseException from a
     // pattern that doesn't match so the loop can just move on to the next one.
-    for (pattern in arrayOf("yyyy-MM-dd'T'HH:mm:ss", "yyyy-MM-dd HH:mm:ss")) {
-        val parsed = runCatching {
-            java.text.SimpleDateFormat(pattern, java.util.Locale.US).parse(trimmed)
-        }.getOrNull()
+    for (parser in tripParsers.get()!!) {
+        val parsed = runCatching { parser.parse(trimmed) }.getOrNull()
         if (parsed != null) return outFormat.format(parsed)
     }
     // Neither pattern matched (unexpected feed shape): fall back to a

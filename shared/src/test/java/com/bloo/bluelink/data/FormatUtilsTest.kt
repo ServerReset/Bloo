@@ -94,6 +94,35 @@ class FormatUtilsTest {
     }
 
     @Test
+    fun tripDate_reusesCachedFormattersWithoutCarryingStateBetweenCalls() {
+        // tripDate now holds its SimpleDateFormats in ThreadLocals instead of building
+        // three of them per call, which is a real speedup on the watch's trips list but
+        // introduces a risk the old code could not have: SimpleDateFormat is stateful,
+        // so a reused instance that carried anything between calls would corrupt later
+        // rows. These pin that it does not.
+
+        // Same input twice -> byte-identical output.
+        assertEquals(tripDate("2026-06-01T18:22:31"), tripDate("2026-06-01T18:22:31"))
+
+        // The two output formatters are separate instances and must not bleed into each
+        // other, in either order.
+        val withDay = tripDate("2026-06-01T18:22:31", includeWeekday = true)
+        val noDay = tripDate("2026-06-01T18:22:31", includeWeekday = false)
+        assertEquals(withDay, tripDate("2026-06-01T18:22:31", includeWeekday = true))
+        assertEquals(noDay, tripDate("2026-06-01T18:22:31", includeWeekday = false))
+        assertTrue(withDay.endsWith(noDay), "$withDay should be $noDay plus a weekday prefix")
+
+        // A parse FAILURE followed by a success: the first pattern throws on a
+        // space-separated value before the second one succeeds, and that must leave the
+        // shared parsers usable.
+        assertEquals("Trip", tripDate(null))
+        val afterFallback = tripDate("not a timestamp at all")
+        assertTrue(afterFallback.isNotBlank())
+        assertTrue(tripDate("2026-06-01 18:22:31.0").contains("6:22 PM"))
+        assertTrue(tripDate("2026-06-01T18:22:31").contains("Jun 1"))
+    }
+
+    @Test
     fun tripDate_spaceSeparatedWithFractionalSeconds_alsoParses() {
         // The exact bug this dual-pattern parse exists to fix: a space-separated
         // feed value (with the fractional-seconds suffix trimmed off first).
