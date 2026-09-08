@@ -1045,6 +1045,13 @@ private fun Modifier.roundScreenTransform(
  *
  * When [spec] is null the list has opted out (see [RotaryScreenScaffold]'s `transform`)
  * and items are forwarded completely untouched -- not even the wrapper Box.
+ *
+ * The wrapper's `contentAlignment = TopCenter` is load-bearing, not cosmetic.
+ * [TransformingLazyColumn] aligns its items `CenterHorizontally` by default, so an item
+ * narrower than the list -- a bare [ListHeader], which is `wrapContentSize()` and does
+ * NOT fill width -- was centred by the column itself. A full-width wrapper Box with
+ * Compose's default TopStart alignment would silently left-align exactly those items
+ * (every screen title, among others) while leaving full-width cards looking identical.
  */
 class RotaryListScope internal constructor(
     private val delegate: TransformingLazyColumnScope,
@@ -1058,7 +1065,10 @@ class RotaryListScope internal constructor(
         }
         delegate.item(key = key) {
             val itemScope = this
-            Box(Modifier.fillMaxWidth().roundScreenTransform(itemScope, transform)) {
+            Box(
+                Modifier.fillMaxWidth().roundScreenTransform(itemScope, transform),
+                contentAlignment = Alignment.TopCenter,
+            ) {
                 itemScope.content()
             }
         }
@@ -1076,7 +1086,10 @@ class RotaryListScope internal constructor(
         }
         delegate.items(items = items, key = key) { value ->
             val itemScope = this
-            Box(Modifier.fillMaxWidth().roundScreenTransform(itemScope, transform)) {
+            Box(
+                Modifier.fillMaxWidth().roundScreenTransform(itemScope, transform),
+                contentAlignment = Alignment.TopCenter,
+            ) {
                 itemScope.itemContent(value)
             }
         }
