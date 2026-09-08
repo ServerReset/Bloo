@@ -73,7 +73,12 @@ internal class WeatherController(
             return@launch
         }
         val cached = state.value.homeWeather
-        if (!force && cached != null && System.currentTimeMillis() - cached.fetchedAt < WEATHER_TTL_MS) return@launch
+        // withinWindow, not `now - fetchedAt < TTL`: the latter is also true for a
+        // fetchedAt in the FUTURE, which a backwards clock correction produces, and
+        // that froze the weather until real time caught up. See withinWindow.
+        if (!force && cached != null &&
+            com.bloo.bluelink.data.withinWindow(System.currentTimeMillis(), cached.fetchedAt, WEATHER_TTL_MS)
+        ) return@launch
         WeatherApi.fetch(lat, lon)?.let { w -> state.update { it.copy(homeWeather = w) } }
     }
 
@@ -81,7 +86,10 @@ internal class WeatherController(
     fun loadCarWeather(v: Vehicle, force: Boolean = false) = scope.launch {
         val loc = state.value.locations[v.vin] ?: return@launch
         val cached = state.value.carWeather[v.vin]
-        if (!force && cached != null && System.currentTimeMillis() - cached.fetchedAt < WEATHER_TTL_MS) return@launch
+        // Same guard as loadHomeWeather above.
+        if (!force && cached != null &&
+            com.bloo.bluelink.data.withinWindow(System.currentTimeMillis(), cached.fetchedAt, WEATHER_TTL_MS)
+        ) return@launch
         WeatherApi.fetch(loc.latitude, loc.longitude)?.let { w ->
             state.update { it.copy(carWeather = it.carWeather + (v.vin to w)) }
         }

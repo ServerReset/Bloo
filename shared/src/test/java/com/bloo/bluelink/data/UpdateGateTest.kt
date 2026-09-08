@@ -117,6 +117,33 @@ class UpdateGateTest {
         assertTrue(skip(lastCheckedAt = now - 13 * hour, snoozeUntil = now + hour))
     }
 
+    // ---- the shared window rule --------------------------------------------
+
+    @Test
+    fun `withinWindow treats a future stamp as due, not as recent`() {
+        val window = 12 * hour
+        // Ordinary recent stamp.
+        assertTrue(withinWindow(now, now - hour, window))
+        assertTrue(withinWindow(now, now, window))
+        // Half-open: exactly one window old is due.
+        assertFalse(withinWindow(now, now - window, window))
+        assertFalse(withinWindow(now, now - window - 1, window))
+        // The whole point: a stamp ahead of the clock is a broken stamp, and the safe
+        // reading of a broken throttle is to do the work. `now - stamp < window` would
+        // return true for every one of these.
+        assertFalse(withinWindow(now, now + 1, window))
+        assertFalse(withinWindow(now, now + hour, window))
+        assertFalse(withinWindow(now, now + 365L * 24 * hour, window))
+    }
+
+    @Test
+    fun `withinWindow with a zero window is never within`() {
+        // A zero-length window means "never throttle" -- half-open makes that fall out
+        // rather than needing a special case at the call sites.
+        assertFalse(withinWindow(now, now, 0))
+        assertFalse(withinWindow(now, now - 1, 0))
+    }
+
     // ---- isNewer / resolveBranch -------------------------------------------
 
     private fun run(n: Int) = WorkflowRun(runNumber = n, htmlUrl = "https://example.test/$n")

@@ -172,7 +172,11 @@ abstract class BlooTileService : TileService() {
         val settings = SettingsStore(ctx)
         if (!settings.tileLiveRefresh()) return
         val now = System.currentTimeMillis()
-        if (now - settings.tileRefreshedAt(vin) < LIVE_REFRESH_THROTTLE_MS) return
+        // withinWindow rather than `now - stamp < THROTTLE`: this stamp is PERSISTED,
+        // so once a backwards clock correction leaves it in the future, the plain
+        // comparison suppressed live refresh for the whole skew and survived restarts
+        // while doing it. See withinWindow.
+        if (com.bloo.bluelink.data.withinWindow(now, settings.tileRefreshedAt(vin), LIVE_REFRESH_THROTTLE_MS)) return
         settings.setTileRefreshedAt(vin, now)
         TileCommandWorker.enqueueRefresh(ctx, vin)
     }

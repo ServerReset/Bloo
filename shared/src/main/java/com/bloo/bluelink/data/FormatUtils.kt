@@ -172,6 +172,34 @@ val STALE_STATUS_MS = 15L * 60 * 1000L
  *  here. */
 val UPDATE_SNOOZE_MS = 3L * 24 * 60 * 60 * 1000L
 
+/**
+ * Whether [stamp] is within [windowMs] before [now] -- the one correct way to ask
+ * "did this happen recently enough to skip doing it again?".
+ *
+ * The obvious spelling, `now - stamp < windowMs`, is wrong in a way that does not
+ * show up in testing: it is also true for every NEGATIVE difference, i.e. whenever
+ * the stamp is in the future. And these stamps go into the future routinely. They
+ * are wall-clock readings taken with System.currentTimeMillis() and then persisted,
+ * so any backwards correction of the clock -- a watch that has drifted and re-synced
+ * from its phone, a device whose date was set wrong and later fixed -- leaves stored
+ * stamps ahead of the current time. Every throttle written the obvious way then
+ * suppresses its own work for exactly as long as the skew lasts, silently, with
+ * nothing on screen to explain it. Real instances found in this codebase: update
+ * checks (so no update ever appeared), weather refresh, and the tile live-refresh
+ * throttle.
+ *
+ * Requiring the difference to be non-negative reads a future stamp as what it
+ * actually is -- not a recent event but a broken one -- and the safe reading of a
+ * broken throttle is to do the work. Half-open on purpose: a stamp exactly
+ * [windowMs] old is due, matching how every caller's interval is documented.
+ *
+ * Note this is for "skip if recent" throttles. A staleness test spelled
+ * `now - stamp > windowMs` already fails safe, since a future stamp reads as fresh
+ * rather than hiding data, so those are deliberately left alone.
+ */
+fun withinWindow(now: Long, stamp: Long, windowMs: Long): Boolean =
+    (now - stamp) in 0 until windowMs
+
 /** The climate request used when nothing else is configured -- no saved
  *  preset, no smart-climate weather data, just "turn it on." Was
  *  independently typed in at 6 call sites (TileCommandRunner, AppViewModel's

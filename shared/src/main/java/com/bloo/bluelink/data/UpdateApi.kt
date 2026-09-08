@@ -248,19 +248,12 @@ object UpdateGate {
         if (buildRunNumber <= 0) return true
         if (force) return false
 
-        // Both windows below are bounded on BOTH sides, and that is the point.
-        //
-        // Each is a stored wall-clock timestamp compared against the current wall
-        // clock, and wall clocks move backwards: a watch that has drifted, or a device
-        // whose date was set wrong and later corrected, leaves timestamps sitting in
-        // the future. The old form was a bare `now - lastCheckedAt < minIntervalMs`,
-        // which is TRUE for any negative difference -- so a lastCheckedAt an hour, or a
-        // year, ahead of the clock suppressed every non-forced update check for exactly
-        // that long, silently and with nothing on screen to explain it. A timestamp in
-        // the future is not a recent check; it is a broken one, and the safe reading of
-        // a broken debounce is to check now.
-        val sinceLastCheck = now - lastCheckedAt
-        if (sinceLastCheck in 0 until minIntervalMs) return true
+        // Both windows below are bounded on BOTH sides. withinWindow carries the full
+        // reasoning; in short, a bare `now - lastCheckedAt < minIntervalMs` is also true
+        // for a stamp in the FUTURE, which a backwards clock correction produces
+        // routinely -- and that suppressed every non-forced update check for the length
+        // of the skew.
+        if (withinWindow(now, lastCheckedAt, minIntervalMs)) return true
 
         // Same reasoning for the snooze, with the bound expressed as "no snooze anyone
         // can set reaches further out than this". Callers snooze for UPDATE_SNOOZE_MS
