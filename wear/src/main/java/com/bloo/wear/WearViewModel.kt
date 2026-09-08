@@ -435,6 +435,9 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
      */
     private val geocodedAt = mutableMapOf<String, Pair<Long, Long>>()
 
+    /** In-flight guard for [refreshConnection] -- see its own comment. */
+    private var connectionRefreshing = false
+
     private val _ui = MutableStateFlow(WearUi())
     val ui = _ui.asStateFlow()
 
@@ -833,11 +836,25 @@ class WearViewModel(app: Application) : AndroidViewModel(app) {
      *  send itself fails, so this value can be a beat stale without breaking
      *  correctness. */
     fun refreshConnection() {
+        // Re-entry guard, for the same reason loadGarage() has one and read/written
+        // the same way (viewModelScope is Main.immediate, so this is only ever touched
+        // on the main thread -- no lock needed). At COLD START this was called twice
+        // within milliseconds: once by bootstrap's phone-side leg and once by
+        // MainActivity.onResume, which always fires on a fresh launch. Each call is a
+        // Play Services node lookup that can block its IO thread for up to ten seconds,
+        // so the duplicate was a second pointless round trip during the busiest moment
+        // of startup, racing the first one to write the same answer.
+        if (connectionRefreshing) return
+        connectionRefreshing = true
         viewModelScope.launch {
-            // Resolve the (up to 10s) node lookup BEFORE update{}, so a lost CAS race
-            // can't re-run the network round-trip inside the inline retry lambda.
-            val connected = MainToSecondaryComms.phoneNodeId(ctx) != null
-            _ui.update { it.copy(phoneConnected = connected) }
+            try {
+                // Resolve the (up to 10s) node lookup BEFORE update{}, so a lost CAS race
+                // can't re-run the network round-trip inside the inline retry lambda.
+                val connected = MainToSecondaryComms.phoneNodeId(ctx) != null
+                _ui.update { it.copy(phoneConnected = connected) }
+            } finally {
+                connectionRefreshing = false
+            }
         }
     }
 

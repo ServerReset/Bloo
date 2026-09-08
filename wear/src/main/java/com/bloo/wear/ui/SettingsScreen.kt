@@ -96,7 +96,15 @@ fun SettingsScreen(vm: WearViewModel, ui: WearUi, onAddAccount: () -> Unit) {
                                 Text(
                                     email,
                                     style = MaterialTheme.typography.bodySmall,
-                                    maxLines = 1,
+                                    // 2 lines, not 1. This card is the only place the
+                                    // watch says WHICH account it is signed into, and a
+                                    // card row on a small round face fits roughly 18
+                                    // characters at bodySmall -- so an ordinary address
+                                    // like a full name at gmail was cut mid-domain, and
+                                    // two accounts sharing a prefix became identical on
+                                    // screen. Same fix, same reason, as the device list
+                                    // further down this file.
+                                    maxLines = 2,
                                     overflow = TextOverflow.Ellipsis,
                                 )
                             }
