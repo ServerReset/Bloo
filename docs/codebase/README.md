@@ -4,7 +4,7 @@ A durable, micrometer-level reference for the entire Bloo codebase. Start with *
 
 Each per-file doc follows the same 8-part structure: Purpose · Public surface · Internal structure · Data & types · State & concurrency · Collaborators & data flow · Invariants & assumptions · Gotchas & sharp edges.
 
-Generated from a full read of every one of the 91 Kotlin files (giant files sliced). Companion documents in the repo root: **[REVIEW.md](../../REVIEW.md)** (verified bug review) and **[FIX_PROMPT.md](../../FIX_PROMPT.md)** (actionable fix plan).
+Generated from a full read of every one of the 91 Kotlin files (giant files sliced).
 
 > Two load-bearing invariants underpin everything (see ARCHITECTURE §4): **(1)** every car request runs inside `BlueLinkGate.statusMutex`; **(2)** climate-start is gated on `isDriving` on every out-of-process path. Watch the encoding traps: `plugType` 0=DC/1=AC vs `batteryPlugin` 0=unplugged/1=DC/2=AC; `hasBattery` (user override) not raw `isEv` drives percent/range.
 

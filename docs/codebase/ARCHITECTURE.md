@@ -63,7 +63,7 @@ Persistence stores (all `:shared`, all read from multiple processes):
 
 ## 4. The two invariants everything depends on
 
-These are the load-bearing rules. Most of the confirmed bugs in `REVIEW.md` are a surface that forgot one of them.
+These are the load-bearing rules. Nearly every real bug found in this codebase has been a surface that forgot one of them.
 
 ### 4.1 Serialize every car request through `BlueLinkGate.statusMutex`
 The OEM backends reject overlapping requests for the same account with `502 "a previous request is pending"`. So **every** status fetch and command — from the phone UI, the background `AlertWorker`, the QS tile, the widget worker, the watch (standalone) — must run inside `BlueLinkGate.statusMutex.withLock { }`. It's a single process-wide `Mutex` in `:shared`. A path that does car I/O outside this lock is a latent 502 / duplicate-command bug.
