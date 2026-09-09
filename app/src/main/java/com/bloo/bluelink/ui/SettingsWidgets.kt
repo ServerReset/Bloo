@@ -56,7 +56,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
@@ -290,7 +290,7 @@ internal fun SettingsCard(
     // same store under a reserved pseudo-VIN (see AppViewModel.toggleSettingsCard). This used to
     // be a local `rememberSaveable`, which is why a Settings card forgot whether it was open
     // whenever the process was killed while a car's pebble two screens away remembered.
-    val collapsed by vm.collapsedSections.collectAsState()
+    val collapsed by vm.collapsedSections.collectAsStateWithLifecycle()
     val inline = inlineSetting != null
     val expanded = !inline && "$SETTINGS_CARD_VIN:$title" !in collapsed
     // heading() on the outer wrapper, not inside PebbleShell's own header Text -- PebbleShell

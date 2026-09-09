@@ -66,7 +66,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -122,8 +122,8 @@ import kotlin.math.roundToInt
  */
 @Composable
 fun BlooApp(vm: AppViewModel) {
-    val state by vm.state.collectAsState()
-    val appearance by vm.appearance.collectAsState()
+    val state by vm.state.collectAsStateWithLifecycle()
+    val appearance by vm.appearance.collectAsStateWithLifecycle()
     val snackbar = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
     val clipboard = LocalClipboardManager.current
@@ -196,7 +196,7 @@ fun BlooApp(vm: AppViewModel) {
         LocalHaptics provides haptics,
         // Provided once here (the app root already collects `appearance` above) so
         // every pebble/tile reads LocalAppearance.current instead of opening its own
-        // collectAsState() collector — see LocalAppearance.
+        // collectAsStateWithLifecycle() collector — see LocalAppearance.
         LocalAppearance provides appearance,
     ) {
     // Edge-to-edge: a soft full-bleed gradient paints behind the transparent
@@ -435,7 +435,7 @@ fun BlooApp(vm: AppViewModel) {
         // anything to search; login, onboarding and the setup wizard don't.
         val searchable = target == Screen.Garage || target == Screen.Settings
         val cover = isCompactCoverScreen()
-        val notifPrefs by vm.notifications.collectAsState()
+        val notifPrefs by vm.notifications.collectAsStateWithLifecycle()
         // On the garage (and the cover) it is the user's switch. In Settings it
         // is always there -- that is how you find a setting. `|| state.onSettingsPageSlot`
         // on both lines below extends that same rule to Settings-as-an-embedded-page

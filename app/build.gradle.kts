@@ -164,6 +164,13 @@ dependencies {
     implementation("androidx.core:core-ktx:1.19.0")
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.8.7")
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.7")
+    // collectAsStateWithLifecycle() -- same 2.8.7 line as the two lifecycle artifacts above,
+    // which ship together and are meant to be pinned in lockstep. Lets every StateFlow
+    // collector in the UI pause while the app is backgrounded (below STARTED) instead of
+    // collecting -- and preparing a recomposition for -- state nobody can see, the same
+    // "don't do work off-screen" principle this app already applies to WearViewModel's
+    // periodic update-recheck loop and CarWidget's refresh worker.
+    implementation("androidx.lifecycle:lifecycle-runtime-compose:2.8.7")
     implementation("androidx.activity:activity-compose:1.9.3")
     implementation("androidx.fragment:fragment-ktx:1.8.5")
 

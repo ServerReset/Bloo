@@ -222,7 +222,7 @@ internal fun FloatingIcon(
 /**
  * The current [SettingsStore.Appearance], provided once at the app root (see
  * BlooApp) so pebbles/tiles read it via LocalAppearance.current instead of each
- * opening its own vm.appearance.collectAsState() coroutine collector. ~20 hot
+ * opening its own vm.appearance.collectAsStateWithLifecycle() coroutine collector. ~20 hot
  * per-pebble/per-tile collectors collapse to one. Default is a fresh Appearance()
  * (all defaults) so a reader outside the provider degrades gracefully rather than
  * crashing — but every real screen is inside the provider.

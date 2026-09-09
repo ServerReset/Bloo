@@ -60,7 +60,7 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.State
@@ -186,7 +186,7 @@ internal fun CompactGarage(state: UiState, vm: AppViewModel, appearance: Setting
     // app (the expanded pager, the default grid) and the cover screen's own
     // tile pager, which already looped.
     // Same as GarageScreen: the index is its own flow, collected here.
-    val currentIndex by vm.currentIndex.collectAsState()
+    val currentIndex by vm.currentIndex.collectAsStateWithLifecycle()
     val wrap = rememberWrapPager(count, currentIndex.coerceIn(0, count - 1))
     val pager = wrap.pager
     fun realCar(virtualPage: Int) = wrap.real(virtualPage)

@@ -92,7 +92,7 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -202,7 +202,7 @@ internal fun buildOnboardingSteps(
 internal fun OnboardingScreen(vm: AppViewModel) {
     val context = LocalContext.current
     val haptics = LocalHaptics.current
-    val state by vm.state.collectAsState()
+    val state by vm.state.collectAsStateWithLifecycle()
     val canBio = remember { vm.canUseBiometrics() }
     val scheme = MaterialTheme.colorScheme
 
@@ -968,7 +968,7 @@ internal fun OnboardingFeaturesPage(state: UiState) {
  */
 @Composable
 internal fun CarSetupWizardScreen(vm: AppViewModel, vins: List<String>) {
-    val state by vm.state.collectAsState()
+    val state by vm.state.collectAsStateWithLifecycle()
     BackHandler {}
     val vehicles = remember(state.vehicles, vins) { state.vehicles.filter { it.vin in vins } }
     val pages = remember(vehicles) { buildSetupPages(vehicles) }
@@ -995,7 +995,7 @@ internal fun CarFeatureWizard(
     onComplete: () -> Unit,
 ) {
     val scheme = MaterialTheme.colorScheme
-    val state by vm.state.collectAsState()
+    val state by vm.state.collectAsStateWithLifecycle()
 
     var pageIndex by remember { mutableIntStateOf(0) }
 

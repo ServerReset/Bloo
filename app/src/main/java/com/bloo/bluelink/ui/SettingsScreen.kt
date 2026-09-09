@@ -114,7 +114,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableFloatStateOf
@@ -233,9 +233,9 @@ internal fun SettingsScreen(
     compact: Boolean = false,
 ) {
     val appearance = LocalAppearance.current
-    val notif by vm.notifications.collectAsState()
-    val state by vm.state.collectAsState()
-    val logs by vm.logs.collectAsState()
+    val notif by vm.notifications.collectAsStateWithLifecycle()
+    val state by vm.state.collectAsStateWithLifecycle()
+    val logs by vm.logs.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val clipboard = LocalClipboardManager.current
     val canBio = remember { vm.canUseBiometrics() }

@@ -87,7 +87,8 @@ import kotlin.math.max
 internal fun VehicleDetailContent(
     v: Vehicle,
     /**
-     * State SOURCE (vm.state.value.collectAsState()), consistent with PebbleList/SinglePebble:
+     * State SOURCE (vm.state.value from a collectAsStateWithLifecycle()), consistent with
+     * PebbleList/SinglePebble:
      * per-use state.value reads keep this page and its pebble rows stable against
      * emissions that don't touch the values they actually read.
      */

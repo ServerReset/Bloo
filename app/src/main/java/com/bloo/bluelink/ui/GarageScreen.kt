@@ -51,7 +51,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
@@ -119,7 +119,7 @@ internal fun GarageScreen(state: State<UiState>, vm: AppViewModel) {
     // own flow now precisely so that finishing a swipe does not invalidate the
     // car pages. Reading it in THIS composable is fine and intended -- this is
     // one of the few places that genuinely needs it, and it is above the pages.
-    val currentIndex by vm.currentIndex.collectAsState()
+    val currentIndex by vm.currentIndex.collectAsStateWithLifecycle()
     val currentVehicle = vehicles.getOrNull(currentIndex.coerceIn(0, vehicles.lastIndex))
     val currentFetchedAt = currentVehicle?.let { state.value.fetchedAt(it) }
     val sessionStartMs = remember { System.currentTimeMillis() }

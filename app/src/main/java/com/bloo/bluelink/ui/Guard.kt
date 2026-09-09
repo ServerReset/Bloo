@@ -61,7 +61,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -145,11 +145,11 @@ internal fun LockAlphaOverlay(locked: Boolean, vm: AppViewModel) {
 internal fun LockOverlay(vm: AppViewModel) {
     val context = LocalContext.current
     val compact = isCompactCoverScreen()
-    val appState by vm.state.collectAsState()
+    val appState by vm.state.collectAsStateWithLifecycle()
     // The device-biometric gate is a binder call -- evaluate once per overlay
     // mount, not per recomposition of the (frequently updating) state below.
     val bioAvailable = remember { vm.canUseBiometrics() }
-    val appearance by vm.appearance.collectAsState()
+    val appearance by vm.appearance.collectAsStateWithLifecycle()
     // Start on the biometric prompt when there's one to show; the user can
     // switch to PIN; devices without biometrics land straight on PIN.
     var usePinMode by remember { mutableStateOf(!bioAvailable) }
@@ -421,7 +421,7 @@ internal fun LockOverlay(vm: AppViewModel) {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun EmptyScreen(vm: AppViewModel) {
-    val state by vm.state.collectAsState()
+    val state by vm.state.collectAsStateWithLifecycle()
     val scheme = MaterialTheme.colorScheme
     val haptics = LocalHaptics.current
     // Note: pull-to-refresh feature temporarily disabled due to Material 3 version compatibility

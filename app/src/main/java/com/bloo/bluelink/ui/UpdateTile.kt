@@ -67,7 +67,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -116,7 +116,7 @@ internal fun UpdateAvailableTile(state: UiState, vm: AppViewModel, dragHandle: M
         // so a per-chunk tick invalidates only this tile's bar/percent, not every pebble on the
         // live pager pages. state.updateDownloading (the boolean that gates the display below)
         // stays on UiState -- it changes twice per download, not hundreds of times.
-        val downloadProgress by vm.updateDownloadProgress.collectAsState()
+        val downloadProgress by vm.updateDownloadProgress.collectAsStateWithLifecycle()
         val hasDirectDownload = info.run.phoneApkUrl != null
         val current = vm.currentBuildNumber
         // Build delta: "build 812 → build 828" when we know the installed build,
@@ -506,7 +506,7 @@ internal fun UpdateStatusLine(
     showDelta: Boolean = true,
 ) {
     val scheme = MaterialTheme.colorScheme
-    val downloadProgress by vm.updateDownloadProgress.collectAsState()
+    val downloadProgress by vm.updateDownloadProgress.collectAsStateWithLifecycle()
     // ONE state-driven status line -- see the tile's own long comment (git
     // history) on why statusKind, not the rendered string, drives the
     // AnimatedContent: the static word must stay put while the percent moves.

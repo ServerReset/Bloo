@@ -32,7 +32,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -296,7 +296,7 @@ internal fun AutoLockSettingsGroup(v: Vehicle, vm: AppViewModel) {
             // one piece of AutoLock's UI that changes while you're looking at it (once a
             // second during the grace countdown) and deserves to read as "live", not as
             // another static caption sitting among all the ones above it.
-            val evalStates by vm.autoLockState.collectAsState()
+            val evalStates by vm.autoLockState.collectAsStateWithLifecycle()
             evalStates[v.vin]?.takeIf { it.detection != DetectionState.IDLE }?.let { s ->
                 Spacer(Modifier.height(SettingsGapRow))
                 Surface(
