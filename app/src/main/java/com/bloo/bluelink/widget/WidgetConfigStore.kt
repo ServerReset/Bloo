@@ -6,7 +6,9 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.emptyPreferences
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 
@@ -61,15 +63,29 @@ class WidgetConfigStore(private val context: Context) {
         corner, backgroundOpacity, textScale, showHeader, showFooter, accent, theme,
     )
 
-    /** Read one widget's config, or a default if it's never been configured. */
-    suspend fun get(widgetId: Int): WidgetConfig {
-        val raw = context.widgetConfigStore.data.first()[key(widgetId)] ?: return WidgetConfig()
-        return runCatching { json.decodeFromString(Stored.serializer(), raw).toConfig() }
+    /**
+     * Read one widget's config, or a default if it's never been configured.
+     *
+     * withContext(Dispatchers.IO), because the CALLER here is [CarWidget.provideGlance] --
+     * a suspend function Glance itself invokes, but Google's own guidance is explicit that
+     * it is NOT guaranteed to run on a background dispatcher. DataStore's `.data` Flow only
+     * promises the underlying FILE read is off the main thread; the decode below is a
+     * separate, synchronous JSON parse this class does itself afterwards, on whatever
+     * dispatcher the caller happens to be on. Without this it silently parsed on the main
+     * thread on every widget repaint -- the exact defect already found and fixed for
+     * SnapshotStore's own `payload` flow (see its own `.flowOn(Dispatchers.IO)` and doc),
+     * just missed here because this is a second, separate store.
+     */
+    suspend fun get(widgetId: Int): WidgetConfig = withContext(Dispatchers.IO) {
+        val raw = context.widgetConfigStore.data.first()[key(widgetId)] ?: return@withContext WidgetConfig()
+        runCatching { json.decodeFromString(Stored.serializer(), raw).toConfig() }
             .getOrDefault(WidgetConfig())
     }
 
-    /** Persist one widget's config. */
-    suspend fun set(widgetId: Int, config: WidgetConfig) {
+    /** Persist one widget's config. Same reasoning as [get] -- the encode is a synchronous
+     *  JSON serialize this class does itself, not covered by DataStore's own off-main
+     *  guarantee for the file write. */
+    suspend fun set(widgetId: Int, config: WidgetConfig): Unit = withContext(Dispatchers.IO) {
         context.widgetConfigStore.edit {
             it[key(widgetId)] = json.encodeToString(Stored.serializer(), config.toStored())
         }
