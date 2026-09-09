@@ -28,7 +28,6 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
-import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
@@ -795,22 +794,15 @@ internal fun PrimaryActions(
             // Kia's US API has no equivalent endpoint (see Vehicle.supportsHornLights),
             // so these only appear for Hyundai/Genesis, matching what those apps show.
             // A connected M3 button group with the Lock/Unlock button (see
-            // StateControl/connectedGroupShape). [label] gives each one a short visible
-            // word, but it is only ever SHOWN when the group as a whole has room for every
-            // member's label -- StateControl caps the group's own available width at what's
-            // left after the weighted name/state column takes its floor, and passes that
-            // down so the group's own fit rule (see ExpressiveButtonGroup) can correctly
-            // decide "does everyone's label actually fit," compacting every member to its
-            // icon alone, together, the instant it does not -- rather than a labelled
-            // "Lights"/"Horn" pill unconditionally squeezing that column down to nothing,
-            // which is why these used to be icon-only always. contentDescription keeps
-            // them labelled for TalkBack even on the (far more common, on an ordinary
-            // phone width) icon-only rendering.
+            // StateControl/connectedGroupShape) -- icon-only, since a labelled
+            // "Lights"/"Horn" pill this size squeezed the weighted name/state
+            // column (the "Locked"/"Unlocked" label) down to nothing. contentDescription
+            // keeps them labelled for TalkBack even with no visible text.
             groupActions = if (v.supportsHornLights) {
                 val hlPending = state.isPending(v.vin, "hornLights")
                 listOf(
-                    GroupIconAction(Icons.Filled.FlashOn, "Flash lights", !hlPending, label = "Flash") { vm.flashLights(v) },
-                    GroupIconAction(Icons.Filled.Campaign, "Horn & lights", !hlPending, label = "Horn") { vm.hornAndLights(v) },
+                    GroupIconAction(Icons.Filled.FlashOn, "Flash lights", !hlPending) { vm.flashLights(v) },
+                    GroupIconAction(Icons.Filled.Campaign, "Horn & lights", !hlPending) { vm.hornAndLights(v) },
                 )
             } else emptyList(),
         )
@@ -844,22 +836,6 @@ internal fun StateControl(
 ) {
     // Which state is the "highlighted" (on) one.
     val highlighted = enabled && (if (highlightWhenOff) isOn == false else isOn == true)
-    // BoxWithConstraints ONLY to learn the row's real total width, so the button group below
-    // can be told how much of it is actually left over once the weighted name/state column has
-    // taken its own floor -- see groupMaxWidth. Nothing about the Row's own structure changes.
-    BoxWithConstraints(Modifier.fillMaxWidth()) {
-        // The name/state column's own floor (its `widthIn(min = 120.dp)` a few lines down) plus
-        // the gap between it and the button group -- "the other stuff in the pebble" the button
-        // group's own room decision has to leave space for. Without this, the connected group
-        // below was measured as a plain (non-weighted) Row child, which Compose's Row hands the
-        // FULL row width as its own upper bound -- Row measures non-weighted children before it
-        // even knows what its weighted sibling will need, so the group's own internal fit check
-        // ("does every member's label actually fit?", see ExpressiveButtonGroup) always saw far
-        // more room than genuinely existed once the name column's floor was accounted for. This
-        // is a real, not theoretical, gap: it is exactly why the group's icon-only buttons never
-        // grew labels even on a wide two-column layout with visibly empty space next to them --
-        // the fit check thought it had the WHOLE row to itself.
-        val groupMaxWidth = (maxWidth - 120.dp - 12.dp).coerceAtLeast(0.dp)
     Row(
         Modifier.fillMaxWidth().height(ControlHeight),
         verticalAlignment = Alignment.CenterVertically,
@@ -998,11 +974,6 @@ internal fun StateControl(
         // seam appearing on the next line down would not be a control at all. Too narrow, and
         // the segments compact instead.
         ExpressiveButtonRow(
-            // Caps this group's own room at what groupMaxWidth actually computed -- see its
-            // doc above for why the group could not know this on its own. `false` (this
-            // Row's own wrap param stays false too, unrelated) is not enough on its own:
-            // without this cap the group's internal fit check still saw the whole row.
-            modifier = Modifier.widthIn(max = groupMaxWidth),
             spacing = 3.dp,
             verticalAlignment = Alignment.CenterVertically,
             wrap = false,
@@ -1016,35 +987,8 @@ internal fun StateControl(
                         interactionSource = actionSource,
                         contentPadding = PaddingValues(0.dp),
                         shapeForCorner = { morph, cp -> connectedGroupShape(i, segmentCount, cp, morph) },
-                        // widthIn, not the old fixed .size(): a fixed size pins BOTH the min
-                        // AND max width to the same value, which leaves the group's fit check
-                        // (see ExpressiveButtonGroup, and groupMaxWidth's own doc above) nothing
-                        // to compact FROM -- min floors it at today's exact icon-only footprint
-                        // (so the everyday, no-room case renders pixel-identical to before);
-                        // leaving max open is what lets it grow to fit [action.label] when the
-                        // group decides there is genuinely room for one.
-                        //
-                        // contentDescription stays on the button itself, not on the glyph
-                        // inside: MorphButtonLabel's own icon carries no description of its
-                        // own (see its doc -- the visible label speaks for it when there is
-                        // one), and in the compact/icon-only rendering there is no visible
-                        // text at all, so without this TalkBack would have nothing to
-                        // announce. Kept as the fuller phrase ("Flash lights") regardless of
-                        // whether the terser visible label ("Flash") is also showing -- an
-                        // accessible name doesn't have to match a space-constrained visible
-                        // one word-for-word, only describe the action accurately.
-                        modifier = Modifier
-                            .heightIn(min = groupBtnSize).widthIn(min = groupBtnSize)
-                            .semantics { contentDescription = action.contentDescription },
-                    ) {
-                        // Same component the main Lock/Unlock button already uses for its own
-                        // label (see its doc): whole label or icon alone, never a truncated
-                        // word. Which one appears here is decided by the group above, not by
-                        // this button locally -- see groupMaxWidth's doc for why that has to be
-                        // a GROUP decision (an "Unlock" button that grew a label while its
-                        // "Flash"/"Horn" neighbours stayed icon-only would read as a mistake).
-                        MorphButtonLabel(action.icon, action.label, pending = false, iconSize = actionIconSize)
-                    }
+                        modifier = Modifier.size(groupBtnSize),
+                    ) { Icon(action.icon, contentDescription = action.contentDescription, modifier = Modifier.size(actionIconSize)) }
                 }
             }
             // Pill when off, rounded rectangle + highlight colour when on - same
@@ -1078,7 +1022,6 @@ internal fun StateControl(
             }
         }
     }
-    } // BoxWithConstraints
 }
 
 

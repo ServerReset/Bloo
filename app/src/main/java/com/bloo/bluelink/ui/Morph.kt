@@ -107,14 +107,6 @@ internal data class GroupIconAction(
     val icon: ImageVector,
     val contentDescription: String,
     val enabled: Boolean,
-    /**
-     * A short visible word ("Flash", "Horn") shown next to the icon whenever the connected
-     * group as a whole has room for every member's label -- see [MorphButtonLabel]'s own
-     * intrinsics-driven fit rule and StateControl's use of it. Falls back to icon-only exactly
-     * as before wherever the group doesn't have room, so this is additive: a caller that leaves
-     * it blank keeps today's icon-only rendering unconditionally.
-     */
-    val label: String = "",
     val onClick: () -> Unit,
 )
 
