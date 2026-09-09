@@ -459,15 +459,20 @@ internal fun PebbleShell(
                     // screenshot: text truncating on the left while the button keeps its full
                     // label on the right, the opposite of the intended priority.
                     //
-                    // 90dp for the title floor, not StateControl's 120dp for its own
-                    // name/state column: that column holds a short STATE WORD ("Locked"),
-                    // this one holds a short pebble TITLE ("Diagnostics", "AI Summary",
-                    // "Location") which run a similar length -- 90dp comfortably covers the
-                    // common ones at 1x font scale without being a strict guarantee (the
-                    // title still ellipsizes on its own past that, same as before; this
-                    // only changes who gives way FIRST).
+                    // 140dp for the title floor -- raised from an initial 90dp, which turned
+                    // out to still lose the tug-of-war: 90dp was sized for the TITLE alone
+                    // ("AI Summary", "Diagnostics") and this column also carries the STATUS
+                    // line right underneath it ("Not summarized", "Imperial", "Atkinson"),
+                    // a second, independently-ellipsizing Text competing for the exact same
+                    // width. 140dp comfortably covers either line at 1x font scale with real
+                    // margin, not just the shorter of the two -- explicitly biased toward the
+                    // text over the button, per the follow-up report that it should be. This
+                    // is a floor for how much the ACTION BUTTON gives way, not a guarantee the
+                    // text never ellipsizes: a title long enough to still exceed 140dp keeps
+                    // ellipsizing on its own past that, same as before -- this only changes
+                    // who gives way FIRST when the two compete.
                     val headerActionMaxWidth = (
-                        maxWidth - 16.dp - 20.dp - ButtonIconGap - 10.dp - 12.dp - 90.dp
+                        maxWidth - 16.dp - 20.dp - ButtonIconGap - 10.dp - 12.dp - 140.dp
                         ).coerceAtLeast(0.dp)
                     Row(
                         Modifier
