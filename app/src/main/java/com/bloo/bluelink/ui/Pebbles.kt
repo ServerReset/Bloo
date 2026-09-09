@@ -1011,6 +1011,28 @@ internal fun StateControl(
                     } else {
                         null
                     },
+                    // MorphButton's own default is ButtonDefaults.ContentPadding (24dp
+                    // horizontal) -- sized for a labelled pill, which is what this button
+                    // shows almost always. But it is still a member of the connected group
+                    // above (ExpressiveButtonGroup, ALWAYS wraps it, whether or not there
+                    // are Flash/Horn siblings), and that group's own all-or-nothing fit rule
+                    // can drop it to icon-only on a narrow enough row -- with the same
+                    // "car pebble too narrow for the label" 24dp padding still wrapped
+                    // around just the bare glyph. That reads as a conspicuously oversized
+                    // icon button ("the Unlock button is still too big even though it's
+                    // just an icon") next to the group actions beside it, which use 0dp
+                    // padding plus a floor precisely so their own icon-only footprint stays
+                    // tight. 14dp/10dp -- an existing value used for several other
+                    // MorphButtons elsewhere in this file/module (PebbleShell, SettingsScreen)
+                    // -- keeps the labelled case comfortable while landing this button's own
+                    // compact footprint (icon + 28dp total horizontal padding) close to the
+                    // group actions' own ~50dp square, rather than the ~70dp the default gave
+                    // it. A single fixed value on purpose, not one that reacts to which mode
+                    // is showing: reacting would reopen the same instability MorphButtonLabel's
+                    // own per-frame width check already causes during a press (see
+                    // ExpressivePressGrowth) -- this fixes the SIZE without adding a second
+                    // thing that changes based on live layout state.
+                    contentPadding = PaddingValues(horizontal = 14.dp, vertical = 10.dp),
                     // Same pill height as the pebble header actions (the row stays
                     // ControlHeight tall, so the button is vertically centred in it);
                     // taller on the cover for a thumb.
