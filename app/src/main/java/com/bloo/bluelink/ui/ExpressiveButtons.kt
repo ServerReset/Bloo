@@ -13,6 +13,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -105,11 +106,17 @@ private const val PressDamping = 0.88f
 @Composable
 private fun expressivePressFraction(interactionSource: InteractionSource, enabled: Boolean): State<Float> {
     val anim = remember { Animatable(0f) }
-    LaunchedEffect(interactionSource, enabled) {
-        if (!enabled) {
-            anim.snapTo(0f)
-            return@LaunchedEffect
-        }
+    // Tracks whether a press is CURRENTLY held, shared with the enabled-watching effect below.
+    // Needed because a tap's own onClick routinely disables the button as its direct side
+    // effect (Lock/Unlock -> pending, "Check for updates" -> updateChecking) -- so `enabled`
+    // flips false while the SAME gesture's Release is still in flight. Keying the interaction
+    // collector below on `enabled` (the old code did) restarted its whole coroutine scope right
+    // then, cancelling the in-progress `runTo` leg and leaving the button snapped to rest with
+    // no visible push at all: reported as "lock/unlock doesn't animate" and "same bug on Check
+    // for updates" -- both buttons that disable themselves on tap; ordinary buttons that stay
+    // enabled through their own click never showed it.
+    val isPressed = remember { mutableStateOf(false) }
+    LaunchedEffect(interactionSource) {
         // Barely-bouncy and quick, because this fraction drives real WIDTH. A bouncy, slow
         // spring is the right feel for something that only paints -- it was the original
         // graphicsLayer scale -- but on width every overshoot frame re-measures the row and
@@ -157,19 +164,36 @@ private fun expressivePressFraction(interactionSource: InteractionSource, enable
             when (interaction) {
                 is PressInteraction.Press -> {
                     held += interaction
+                    isPressed.value = true
                     runTo(1f, finishPushFirst = false)
                 }
                 is PressInteraction.Release -> {
                     held -= interaction.press
-                    if (held.isEmpty()) runTo(0f, finishPushFirst = true)
+                    if (held.isEmpty()) {
+                        isPressed.value = false
+                        runTo(0f, finishPushFirst = true)
+                    }
                 }
                 is PressInteraction.Cancel -> {
                     held -= interaction.press
-                    if (held.isEmpty()) runTo(0f, finishPushFirst = true)
+                    if (held.isEmpty()) {
+                        isPressed.value = false
+                        runTo(0f, finishPushFirst = true)
+                    }
                 }
                 else -> {}
             }
         }
+    }
+    // Separate from the collector above ON PURPOSE, so a click-triggered disable can no longer
+    // cancel that coroutine (see the comment on `isPressed`). This one only ever snaps to rest,
+    // and only when nothing is actually held -- a button disabled while genuinely mid-press
+    // (some other cause, not its own click finishing) still gets pulled back to 0 instead of
+    // being left visually stuck mid-push with no gesture left to release it; a button whose own
+    // tap disabled it keeps its full push-then-release cycle uninterrupted, since `isPressed`
+    // is still true (or has already gone false and settled the animation itself) when this runs.
+    LaunchedEffect(enabled) {
+        if (!enabled && !isPressed.value) anim.snapTo(0f)
     }
     return anim.asState()
 }

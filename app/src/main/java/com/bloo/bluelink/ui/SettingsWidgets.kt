@@ -13,7 +13,6 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
 import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -68,7 +67,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.blur
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
@@ -295,17 +293,6 @@ internal fun SettingsCard(
     val collapsed by vm.collapsedSections.collectAsState()
     val inline = inlineSetting != null
     val expanded = !inline && "$SETTINGS_CARD_VIN:$title" !in collapsed
-    // A soft lift while the card is OPEN: the expanded card scales up ~1.5%
-    // and settles back -- the same "the thing that changed just came
-    // forward" language the pebble cards' own open bounce already speaks,
-    // so an expansion reads as the card arriving rather than the neighbours
-    // merely moving out of its way. Pure draw-phase (graphicsLayer), so it
-    // never re-measures the grid.
-    val lift by animateFloatAsState(
-        targetValue = if (expanded) 1f else 0f,
-        animationSpec = spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessLow),
-        label = "settingsCardLift",
-    )
     // heading() on the outer wrapper, not inside PebbleShell's own header Text -- PebbleShell
     // doesn't expose a hook into its title's own Modifier, so this is applied one level up
     // instead. PebbleShell's header row is already ONE merged TalkBack stop (tap-to-toggle),
@@ -324,11 +311,6 @@ internal fun SettingsCard(
             // the cards, then it snaps". Living on this wrapper instead means the gap sits
             // INSIDE that same outer AnimatedVisibility and shrinks away with the card.
             .padding(bottom = SettingsCardGap)
-            .graphicsLayer {
-                val s = 1f + 0.015f * lift
-                scaleX = s
-                scaleY = s
-            }
             .semantics { heading() },
     ) {
         PebbleShell(
