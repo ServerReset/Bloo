@@ -44,6 +44,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
@@ -438,6 +439,36 @@ internal fun PebbleShell(
                     // Header: tap anywhere to toggle, long-press to drag-reorder. The
                     // action button and chevron handle their own clicks. Fixed min height
                     // so every collapsed pebble lines up.
+                    //
+                    // BoxWithConstraints ONLY to learn this row's real width, so
+                    // headerActionMaxWidth below can cap SplitExpandButton -- see that
+                    // val's own doc for why. Nothing about the Row itself changes.
+                    BoxWithConstraints(Modifier.fillMaxWidth()) {
+                    // headerActionMaxWidth reserves room for "the other stuff in the row"
+                    // (the leading icon, the two gaps either side of the title column, the
+                    // row's own start/end padding, and a floor for the title itself) before
+                    // handing whatever's left to SplitExpandButton. Without this, the action
+                    // button -- a plain, non-weighted Row child -- was measured against the
+                    // row's FULL width (Row measures non-weighted children before it knows
+                    // what its weighted sibling, the title column, will need), so its own
+                    // already-existing compact-to-icon-only fit rule never had a reason to
+                    // fire: it always concluded it had more than enough room for "Summarize",
+                    // even while the title beside it ("AI Summary" -> "AI summ...") and its
+                    // status line ("Not summarized" -> "Not summar...") were being ellipsized
+                    // for space the button was never actually using. Reported from a real
+                    // screenshot: text truncating on the left while the button keeps its full
+                    // label on the right, the opposite of the intended priority.
+                    //
+                    // 90dp for the title floor, not StateControl's 120dp for its own
+                    // name/state column: that column holds a short STATE WORD ("Locked"),
+                    // this one holds a short pebble TITLE ("Diagnostics", "AI Summary",
+                    // "Location") which run a similar length -- 90dp comfortably covers the
+                    // common ones at 1x font scale without being a strict guarantee (the
+                    // title still ellipsizes on its own past that, same as before; this
+                    // only changes who gives way FIRST).
+                    val headerActionMaxWidth = (
+                        maxWidth - 16.dp - 20.dp - ButtonIconGap - 10.dp - 12.dp - 90.dp
+                        ).coerceAtLeast(0.dp)
                     Row(
                         Modifier
                             .fillMaxWidth()
@@ -811,6 +842,7 @@ internal fun PebbleShell(
                                     expanded = expanded,
                                     onToggle = onToggle,
                                     canToggle = canToggle,
+                                    modifier = Modifier.widthIn(max = headerActionMaxWidth),
                                 )
                             } else if (canToggle) {
                                 // Gated on canToggle, which this branch used to ignore. Without
@@ -828,6 +860,7 @@ internal fun PebbleShell(
                             }
                         }
                     }
+                    } // BoxWithConstraints (headerActionMaxWidth)
                     // Normal pebbles: animate the body sliding open/closed. fade = false on
                     // the exit -- StaggeredRevealColumn's rows own their own fade now (see
                     // collapseExit's own doc for why running a SECOND, block-level fade at the
@@ -900,6 +933,13 @@ internal fun SplitExpandButton(
     expanded: Boolean,
     onToggle: () -> Unit,
     canToggle: Boolean = true,
+    /** Caps how much of the header row this whole control may claim -- see the call
+     *  site's own doc (PebbleShell's header Row) for why this exists: without it, this
+     *  being a plain (non-weighted) Row sibling meant it was always measured against
+     *  the row's FULL width, so its own already-existing compact-to-icon fit rule never
+     *  had a reason to fire even when the weighted title beside it was starved for room
+     *  and had to ellipsize instead. */
+    modifier: Modifier = Modifier,
 ) {
     val haptics = LocalHaptics.current
     val rotation by animateFloatAsState(
@@ -923,11 +963,20 @@ internal fun SplitExpandButton(
     // The row's own real, measured height. The halves' corners are expressed
     // as a PERCENT of the short side (the shared MorphButton model -- exact
     // pills by construction, no fixed-dp radius that could exceed an edge),
-    // and the chevron's morphed corner is "10dp" in that language, so the
-    // percent is derived from the measured height: 10dp / rowHeight.
+    // and the chevron's FULLY MORPHED corner needs to land on the exact same
+    // absolute radius seamCorner's own morphed end does (16dp -- see its
+    // default params) so the two corners of the SAME half converge to one
+    // consistent curve once fully pressed, instead of the seam opening to
+    // 16dp while the outer corner (percent-based, so its absolute radius
+    // depends on THIS row's own height) settled on a different number. This
+    // used to be based on 10dp -- seamCorner's IDLE value, not its morphed
+    // one -- which is why holding the chevron (reported from a real
+    // screenshot: "the shape is not consistent on the corners") showed two
+    // visibly different radii on the one shape at the exact moment (fully
+    // pressed) they should have matched.
     var rowHeightDp by remember { mutableStateOf(52.dp) }
     val density = LocalDensity.current
-    val morphedPercent = 100f * 10.dp.value / rowHeightDp.value
+    val morphedPercent = 100f * 16.dp.value / rowHeightDp.value
     // Each half gets its own shape: the OUTER corner morphs (pill when idle, rounded square
     // when that half's own state says morphed), the INNER corner is the shared seamCorner() --
     // the SAME idle/morphed nub the lock/horn/lights connected group and the split pills draw,
@@ -985,7 +1034,7 @@ internal fun SplitExpandButton(
     // Settings' LazyVerticalStaggeredGrid items, where a size change during scroll crashes the
     // grid. See ExpressiveButtons.kt for the full why.
     ExpressiveButtonGroup(
-        modifier = Modifier
+        modifier = modifier
             // A fixed 52dp target (the old content-driven ~40dp pill read as
             // undersized next to the 76dp header it sits in -- reported from
             // a real screenshot). IntrinsicSize.Min still reconciles the two
