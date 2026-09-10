@@ -324,7 +324,7 @@ fun HomeScreen(vm: WearViewModel, ui: WearUi, onSettings: () -> Unit, onTrips: (
             // pager state, so reading it here would invalidate this whole Box --
             // the pager and every composed car page inside it -- each time a
             // swipe crosses the halfway point.
-            CurvedDots(count = count, activeIndex = { carPager.currentPage }, anchor = 90f, animate = true)
+            CurvedDots(count = count, activeIndex = { carPager.currentPage }, anchor = 90f)
             // Shown once for the whole screen, above all pages.
             MessageSnackbar(ui.message, onDismiss = { vm.dismissMessage() })
         }
@@ -587,7 +587,6 @@ private fun CarColumn(
             // centerItemIndexState above.
             activeIndex = { if (tileCount > 0) centerItemIndexState.value % tileCount else 0 },
             anchor = 0f,
-            animate = true,
             cap = 12,
         )
 
@@ -835,12 +834,14 @@ private fun TileContent(
  * indicators this screen draws (which used to be near-identical copies):
  *
  * - The one-dot-per-*tile* indicator hugging the right bezel (`anchor = 0f`),
- *   used by [CarColumn] to show scroll progress through a car's tiles. Its
- *   dots [animate] size/color as the active dot moves, and it [cap]s the
- *   rendered count at 12 (see below).
+ *   used by [CarColumn] to show scroll progress through a car's tiles. It
+ *   [cap]s the rendered count at 12 (see below).
  * - The one-dot-per-*car* page indicator ([HomeScreen] passes `anchor = 90f`
- *   to hug the bottom), which tracks the pager live and renders its dots
- *   plainly (no per-dot animation).
+ *   to hug the bottom), which tracks the pager live.
+ *
+ * Both animate the active dot's size/color as it moves -- there is no
+ * caller left that wants the plain (unanimated) version, so that variant
+ * (and the `animate` param that used to pick between the two) was removed.
  *
  * When [count] exceeds [cap], the active dot is computed by *proportionally*
  * mapping [activeIndex] (0..count-1) onto the compressed 0..cap-1 dot range,
@@ -857,7 +858,6 @@ private fun CurvedDots(
      *  hosts the list. */
     activeIndex: () -> Int,
     anchor: Float,
-    animate: Boolean,
     cap: Int = count,
 ) {
     if (count <= 1) return
@@ -873,19 +873,9 @@ private fun CurvedDots(
             repeat(shown) { i ->
                 curvedComposable {
                     val isOn = i == active
-                    if (animate) {
-                        val sz by animateDpAsState(if (isOn) 7.dp else 4.dp, tween(150), label = "cd$i")
-                        val c by animateColorAsState(if (isOn) selected else unselected, tween(150), label = "cc$i")
-                        Box(Modifier.padding(1.5.dp).size(sz).clip(CircleShape).background(c))
-                    } else {
-                        Box(
-                            Modifier
-                                .padding(1.5.dp)
-                                .size(if (isOn) 7.dp else 4.dp)
-                                .clip(CircleShape)
-                                .background(if (isOn) selected else unselected),
-                        )
-                    }
+                    val sz by animateDpAsState(if (isOn) 7.dp else 4.dp, tween(150), label = "cd$i")
+                    val c by animateColorAsState(if (isOn) selected else unselected, tween(150), label = "cc$i")
+                    Box(Modifier.padding(1.5.dp).size(sz).clip(CircleShape).background(c))
                 }
             }
         }

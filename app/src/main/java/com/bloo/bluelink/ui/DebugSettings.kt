@@ -30,7 +30,6 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import android.os.Build
 import com.bloo.bluelink.BuildConfig
 
@@ -250,45 +249,3 @@ fun DebugSettingsPanel(
     }
 }
 
-/**
- * Compact debug info section for device/app status.
- * Lighter weight than DebugSettingsPanel, useful for status bar or quick reference.
- *
- * @param modifier Optional modifier
- */
-@Composable
-fun CompactDebugInfo(
-    modifier: Modifier = Modifier,
-) {
-    val debugInfo = getDebugInfo().take(3)  // Just app version, device, OS
-
-    Row(
-        modifier = modifier
-            .fillMaxWidth()
-            .background(
-                color = MaterialTheme.colorScheme.surfaceContainerLowest,
-                shape = RoundedCornerShape(8.dp)
-            )
-            .padding(8.dp),
-        horizontalArrangement = Arrangement.spacedBy(16.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        debugInfo.forEach { info ->
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Text(
-                    text = info.label,
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    fontSize = 9.sp,
-                )
-                Text(
-                    text = info.value,
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    fontFamily = FontFamily.Monospace,
-                    fontSize = 9.sp,
-                )
-            }
-        }
-    }
-}

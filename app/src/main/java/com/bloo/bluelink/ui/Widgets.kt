@@ -547,9 +547,6 @@ internal fun WiggleText(
     )
 }
 
-internal fun snapToStep(v: Float, range: ClosedFloatingPointRange<Float>, steps: Int): Float =
-    com.bloo.uicommon.snapToStep(v, range, steps)
-
 /**
  * Softly fades the top/bottom [length] of a vertically scrolling area instead of
  * hard-clipping it at the bounds. The fade only appears on an edge that has more
