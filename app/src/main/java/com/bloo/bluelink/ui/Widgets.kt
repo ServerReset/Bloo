@@ -7,6 +7,7 @@
 
 package com.bloo.bluelink.ui
 
+import android.os.Build
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -148,16 +149,29 @@ internal fun StatusBarScrim(
     if (inMultiWindowMode) return
     val topInset = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
     val scheme = MaterialTheme.colorScheme
+    // Modifier.blur is backed by RenderEffect, which the Android framework only implements
+    // from API 31 (S) onward -- Compose has no software fallback for it. minSdk here is 26,
+    // so on any API 26-30 device this modifier was ALWAYS a visual no-op: it attached, the
+    // GPU compositing cost `active` above exists to avoid was ALREADY zero on those devices
+    // (nothing to recomposite), and the gradient alone -- with no blur softening it -- was
+    // the only thing anyone on those devices ever actually saw. Reported directly as "not
+    // working". Gating on the real capability rather than leaving a dead modifier attached,
+    // and giving pre-S devices a stronger gradient (blur's whole job, legibility under the
+    // status bar icons, otherwise falls entirely on a fairly light 0.55 alpha fade) instead
+    // of silently doing less than intended.
+    val canBlur = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
     Box(
         Modifier
             .fillMaxWidth()
             .height(topInset + 28.dp)
             .background(
                 Brush.verticalGradient(
-                    listOf(scheme.surface.copy(alpha = 0.55f), Color.Transparent),
+                    listOf(scheme.surface.copy(alpha = if (canBlur) 0.55f else 0.8f), Color.Transparent),
                 ),
             )
-            .then(if (active) Modifier.blur(18.dp, edgeTreatment = BlurredEdgeTreatment.Unbounded) else Modifier),
+            .then(
+                if (canBlur && active) Modifier.blur(18.dp, edgeTreatment = BlurredEdgeTreatment.Unbounded) else Modifier,
+            ),
     )
 }
 
