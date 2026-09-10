@@ -573,37 +573,53 @@ internal fun PebbleShell(
                             // those frames is a genuine re-layout at a new font size, so what
                             // you see is a few discrete jumps rather than a glide.
                             //
-                            // dampingRatio 0.62 gives a real overshoot -- the name grows a
+                            // Expand: dampingRatio 0.62 gives a real overshoot -- the name grows a
                             // touch past its target and settles back -- and StiffnessVeryLow
                             // stretches it over enough frames for the intermediate sizes to
                             // read as motion instead of steps. Both halves matter: bounce with
                             // a fast spring is still steppy, and a slow spring without bounce
-                            // is just a slower version of the same flat move.
+                            // is just a slower version of the same flat move. (Collapse no longer
+                            // shares this stiffness -- see its own doc below.)
                             // Only animates for the pebble that asked (the hero). For the
                             // rest the target is a constant 0, so the spring never leaves its
                             // resting value, titleStyle stays titleMedium, and the per-frame
                             // font-size relayout never happens at all.
-                            // The STATE, not its value. This is a StiffnessVeryLow spring, so it
-                            // runs for a second or more, and reading it here put every one of
-                            // those frames on the composition path for this whole header -- the
-                            // Row, the title, the trailing slot, the split button -- when its
-                            // only consumers are the .layout{} and graphicsLayer lambdas below,
-                            // which invalidate layout and draw respectively and nothing else.
+                            // The STATE, not its value. Expanding runs for a second or more
+                            // (StiffnessVeryLow); collapsing is quicker now (PebbleBounceStiffness,
+                            // see below) but still real per-frame work either way, and reading it
+                            // here put every one of those frames on the composition path for this
+                            // whole header -- the Row, the title, the trailing slot, the split
+                            // button -- when its only consumers are the .layout{} and graphicsLayer
+                            // lambdas below, which invalidate layout and draw respectively and
+                            // nothing else.
                             // Different damping each direction, not one spring run in reverse: a
                             // bounce that reads as delight growing INTO its target reads as a
                             // jump/wobble shrinking back OUT of it -- reported jumpiness on
                             // collapse that the expand side never had a matching complaint for.
                             // Collapse gets a critically-damped spring (1.0, no overshoot at all)
-                            // over the exact same StiffnessVeryLow, so it still takes the same
-                            // unhurried second-plus to settle -- just directly, with nothing to
-                            // pop past its own resting size and back.
+                            // -- but at PebbleBounceStiffness (200), the SAME stiffness the card's
+                            // own frame (corner, body collapseExit) collapses with, not the
+                            // expand side's StiffnessVeryLow (50). Still reported jumpy after three
+                            // prior fixes to this exact spring's OWN internal behavior (the
+                            // atRestScale threshold/Crossfade work above) -- because none of those
+                            // addressed the actual mismatch: at 4x the card frame's settle speed,
+                            // the card visibly finished collapsing to its final size well before
+                            // the name had finished shrinking inside it, so the name kept visibly
+                            // resizing after everything around it had already stopped moving,
+                            // which reads as the animation "catching up" rather than one continuous
+                            // motion. Matching stiffness means both finish together. Expand keeps
+                            // its own slower StiffnessVeryLow (with the 0.62 overshoot) --
+                            // untouched, since the complaint was specifically about collapse, and a
+                            // slow, lightly-bouncy GROWTH still reads as intentional delight rather
+                            // than lag the way a slow SHRINK reads as disconnected.
                             val expandingTitle = expanded && growTitleOnExpand
                             val headerTState = animateFloatAsState(
                                 targetValue = if (expandingTitle) 1f else 0f,
-                                animationSpec = spring(
-                                    dampingRatio = if (expandingTitle) 0.62f else 1f,
-                                    stiffness = Spring.StiffnessVeryLow,
-                                ),
+                                animationSpec = if (expandingTitle) {
+                                    spring(dampingRatio = 0.62f, stiffness = Spring.StiffnessVeryLow)
+                                } else {
+                                    spring(dampingRatio = 1f, stiffness = PebbleBounceStiffness)
+                                },
                                 label = "pebbleHeaderGrow",
                             )
                             // Drawn at the LARGER size always and SCALED down, rather than
