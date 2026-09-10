@@ -131,7 +131,20 @@ internal var inMultiWindowMode by mutableStateOf(false)
  * it is a single process-wide flag every caller should honour identically.
  */
 @Composable
-internal fun StatusBarScrim() {
+internal fun StatusBarScrim(
+    /**
+     * False drops just the `.blur(...)` for this composition, keeping the plain gradient.
+     * `Modifier.blur` attaches a RenderEffect that the GPU recomposites on every frame this
+     * layer draws -- fine for a static screen, but this scrim sits as a persistent sibling
+     * drawn ON TOP of both car pagers (GarageScreen's own call sites), so during an active
+     * drag/fling it was paying that recomposite cost on every single swipe frame, every
+     * swipe, competing with the pager's own translation work for the same frame budget.
+     * Callers with a pager in scope pass `!pagerState.isScrollInProgress` so the blur is
+     * only actually installed while genuinely idle; every other caller (no pager in scope)
+     * leaves this at its default and keeps the blur exactly as before.
+     */
+    active: Boolean = true,
+) {
     if (inMultiWindowMode) return
     val topInset = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
     val scheme = MaterialTheme.colorScheme
@@ -144,7 +157,7 @@ internal fun StatusBarScrim() {
                     listOf(scheme.surface.copy(alpha = 0.55f), Color.Transparent),
                 ),
             )
-            .blur(18.dp, edgeTreatment = BlurredEdgeTreatment.Unbounded),
+            .then(if (active) Modifier.blur(18.dp, edgeTreatment = BlurredEdgeTreatment.Unbounded) else Modifier),
     )
 }
 

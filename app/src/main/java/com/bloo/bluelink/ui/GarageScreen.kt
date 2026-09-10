@@ -359,7 +359,12 @@ internal fun GarageScreen(state: State<UiState>, vm: AppViewModel) {
                             }
                         }
                     }
-                    StatusBarScrim()
+                    // Finger swipe is disabled on this pager (userScrollEnabled = false
+                    // above), so there's no continuous drag to protect the blur from here --
+                    // still gated the same way as the collapsed pager below for consistency,
+                    // and it's free: isScrollInProgress only flips at the (rare, programmatic)
+                    // start/end of an animateScrollToPage, not per frame.
+                    StatusBarScrim(active = !exPager.isScrollInProgress)
                     if (count > 1 && !LocalReorderActive.current) {
                         PagerDotsFor(
                             pager = exPager,
@@ -714,7 +719,11 @@ internal fun GarageScreen(state: State<UiState>, vm: AppViewModel) {
                         }
                         }
                     }
-                    StatusBarScrim()
+                    // active = !isScrollInProgress: this pager has REAL finger swipe (unlike
+                    // the expanded one above), so its own drag/fling frames are exactly the
+                    // ones StatusBarScrim's blur was competing with for GPU time on every
+                    // single swipe -- see that parameter's own doc.
+                    StatusBarScrim(active = !pager.isScrollInProgress)
                     // Floating animated page indicator (no thin top bar). totalBlocks,
                     // not pageCount -- the dots include the Settings slot (one more,
                     // trailing dot) when settingsAsPage is on, same as any other page.
