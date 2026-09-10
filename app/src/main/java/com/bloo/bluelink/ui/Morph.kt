@@ -78,6 +78,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -706,6 +707,12 @@ fun MorphChip(
 internal fun MorphExpandButton(
     expanded: Boolean,
     onToggle: () -> Unit,
+    /** Reports this button's own pressed (held-down) state to the caller, live --
+     *  so the pebble card this chevron belongs to can square its own outer shape
+     *  off together with the chevron's, instead of only the small chevron itself
+     *  reacting to the hold. Null (the default) for every caller that doesn't
+     *  care. */
+    onPressChange: ((Boolean) -> Unit)? = null,
 ) {
     val haptics = LocalHaptics.current
     val rotation by animateFloatAsState(
@@ -728,6 +735,15 @@ internal fun MorphExpandButton(
     // the shared percent model expresses cleanly for a fixed-size button.
     // With expansion animation.
     val chevronSource = remember { MutableInteractionSource() }
+    if (onPressChange != null) {
+        val pressed by chevronSource.collectIsPressedAsState()
+        LaunchedEffect(pressed) { onPressChange(pressed) }
+        // Whatever was true when this leaves the composition (a collapse that
+        // unmounts this button mid-press, say) shouldn't leave the pebble
+        // permanently squared -- the effect above only reacts to CHANGES, not
+        // to being torn down.
+        DisposableEffect(Unit) { onDispose { onPressChange(false) } }
+    }
     SafeExpansiveButton(
         interactionSource = chevronSource,
         enabled = true,

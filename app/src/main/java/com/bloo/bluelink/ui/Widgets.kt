@@ -98,14 +98,41 @@ import com.bloo.uicommon.coldStartIntroPlayed
 import com.bloo.uicommon.animatePlacement
 
 /**
+ * True while the Activity is in Android's multi-window/split-screen/freeform
+ * presentation ("floating" -- the app no longer owns the whole display).
+ * Driven entirely from [com.bloo.bluelink.MainActivity]: seeded from
+ * `Activity.isInMultiWindowMode()` at `onCreate`, kept live via its
+ * `onMultiWindowModeChanged` override. A plain top-level `mutableStateOf`,
+ * not a CompositionLocal -- there is exactly one Activity for this whole
+ * process, so there is nothing to scope it to, and every composable that
+ * cares (today, just [StatusBarScrim]) can read it directly.
+ *
+ * Why [StatusBarScrim] needs this at all: in multi-window mode the OS draws
+ * its own real, opaque status/task bar and this app's own window does NOT
+ * extend edge-to-edge behind it the way [enableEdgeToEdge][androidx.activity.enableEdgeToEdge]
+ * makes it do full-screen -- so "the area behind the status bar" is no
+ * longer transparent app content the scrim is free to blur, it is empty
+ * space outside this app's own window. Blurring it there would do nothing
+ * useful and cost a RenderEffect for no visible effect.
+ */
+internal var inMultiWindowMode by mutableStateOf(false)
+
+/**
  * A soft blurred scrim behind the status bar so scrolling content underneath
  * (a car photo, Aurora, dense text) doesn't fight the system clock/battery
  * icons drawn on top of it. Not the normal (non-cover-screen) layouts -- the
  * cover screen already reserves real space above its content instead of
- * drawing under the status bar at all, so it has nothing to scrim.
+ * drawing under the status bar at all, so it has nothing to scrim -- and not
+ * [inMultiWindowMode] ("floating"), where this app doesn't draw behind the
+ * status bar at all (see that flag's own doc). Callers still gate the
+ * cover-screen case themselves (`if (!isCompactCoverScreen()) StatusBarScrim()`)
+ * since that check is already cheap and in scope at every call site; the
+ * multi-window check lives HERE instead of being repeated at each one, since
+ * it is a single process-wide flag every caller should honour identically.
  */
 @Composable
 internal fun StatusBarScrim() {
+    if (inMultiWindowMode) return
     val topInset = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
     val scheme = MaterialTheme.colorScheme
     Box(

@@ -1,6 +1,7 @@
 package com.bloo.bluelink
 
 import android.content.Intent
+import android.content.res.Configuration
 import android.graphics.Color
 import android.os.Build
 import android.os.Bundle
@@ -75,6 +76,12 @@ class MainActivity : FragmentActivity() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             window.isNavigationBarContrastEnforced = false
         }
+        // Seed com.bloo.bluelink.ui.inMultiWindowMode from the Activity's actual
+        // starting state -- onMultiWindowModeChanged (below) only fires on a
+        // TRANSITION, so a cold start directly INTO split-screen/freeform would
+        // otherwise never set this at all and StatusBarScrim would blur empty
+        // space outside this window from the very first frame.
+        com.bloo.bluelink.ui.inMultiWindowMode = isInMultiWindowMode
         // Each schedule() call does a synchronous Room round-trip inside WorkManager's
         // enqueueUniquePeriodicWork (regardless of the ExistingPeriodicWorkPolicy), so
         // running these on the main thread ahead of setContent() delays the first
@@ -146,6 +153,15 @@ class MainActivity : FragmentActivity() {
                 BlooApp(viewModel)
             }
         }
+    }
+
+    /** Keeps [com.bloo.bluelink.ui.inMultiWindowMode] live across a drag into/out of
+     *  split-screen or freeform while this Activity is already running -- see that
+     *  flag's own doc for why [StatusBarScrim][com.bloo.bluelink.ui.StatusBarScrim]
+     *  needs to know. */
+    override fun onMultiWindowModeChanged(isInMultiWindowMode: Boolean, newConfig: Configuration) {
+        super.onMultiWindowModeChanged(isInMultiWindowMode, newConfig)
+        com.bloo.bluelink.ui.inMultiWindowMode = isInMultiWindowMode
     }
 
     /** Records the wall-clock time the Activity left the foreground, so the next

@@ -496,6 +496,12 @@ internal fun LoginScreen(
                 }
             }
         }
+        // Nothing above scrolls under a system inset the way the garage/settings
+        // scrollers do, but the hero wordmark's own Column has no top inset padding
+        // (deliberate -- see its own layout above), so it draws right up under the
+        // status bar just like they do. Same scrim, same cover-screen exclusion as
+        // every other call site (StatusBarScrim itself excludes multi-window).
+        if (!isCompactCoverScreen()) StatusBarScrim()
     }
 }
 

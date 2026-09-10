@@ -24,6 +24,10 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.shrinkVertically
+import androidx.compose.animation.expandHorizontally
+import androidx.compose.animation.shrinkHorizontally
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
@@ -40,6 +44,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.animation.core.snap
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Box
@@ -84,6 +89,8 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableIntStateOf
@@ -344,9 +351,28 @@ internal fun PebbleShell(
     } else {
         PebbleCornerCollapsed
     }
+    // True while the expand/collapse chevron (MorphExpandButton, or
+    // SplitExpandButton's chevron half) is actively held down -- fed up via
+    // onChevronPressChange from whichever of the two this pebble renders
+    // below, so the WHOLE CARD squares off together with the small control
+    // sitting on top of it, not just that control's own shape. Previously
+    // only the chevron/split-button morphed on hold; the card underneath
+    // stayed at its normal expanded/collapsed corner the whole time, which
+    // read as the tiny control changing shape independently of the pebble it
+    // belongs to -- reported directly: "not just the button shape goes
+    // square but the actual collapsed pebble is square."
+    var chevronPressed by remember { mutableStateOf(false) }
     val corner by animateDpAsState(
-        targetValue = if (expanded) PebbleCornerExpanded else collapsedCorner,
-        animationSpec = if (expanded) {
+        targetValue = when {
+            chevronPressed -> PebbleCornerSquareHold
+            expanded -> PebbleCornerExpanded
+            else -> collapsedCorner
+        },
+        // The press morph reuses the OPEN spring regardless of expanded/collapsed:
+        // a hold is a direct, immediate response to the finger still on the
+        // screen, not a settle-into-place motion, so it wants the livelier of
+        // the two springs this card already had rather than a third one.
+        animationSpec = if (expanded || chevronPressed) {
             spring(dampingRatio = PebbleBounceDamping, stiffness = PebbleBounceStiffness)
         } else {
             spring(dampingRatio = PebbleCloseDamping, stiffness = PebbleBounceStiffness)
@@ -821,8 +847,31 @@ internal fun PebbleShell(
                             // `verticalAlignment = CenterVertically` this Row already carries, which
                             // is what the numbers were built to sit in (see HeroNumbers' own
                             // `verticalAlign` doc). Falling back to that default here is the fix.
-                            if (titleTrailing != null) {
-                                Box { titleTrailing() }
+                            // AnimatedVisibility, not a bare `if` -- titleTrailing flips in and
+                            // out purely as a SIDE EFFECT of switching Settings between simple
+                            // and advanced (see Pebble()'s inlineSimple/canToggle above), and
+                            // that used to just pop the inline control in or the chevron back
+                            // out with no transition at all, while the body a few lines below
+                            // was already gliding open/closed on a real spring -- the header
+                            // rearranging felt disconnected from the card it was on. Same
+                            // fade+scale language as this card's own lock-state readout
+                            // elsewhere in the app (see StateControl's "lockStateAnim").
+                            //
+                            // `lastTitleTrailing`, not `titleTrailing` itself, inside the
+                            // AnimatedVisibility content: the mode switch that hides this slot
+                            // sets titleTrailing to null on the SAME recomposition that starts
+                            // the exit animation, and AnimatedVisibility's content lambda keeps
+                            // re-running every frame of that exit -- rendering the live (already
+                            // null) value would fade out nothing instead of the control that was
+                            // actually there.
+                            var lastTitleTrailing by remember { mutableStateOf(titleTrailing) }
+                            if (titleTrailing != null) lastTitleTrailing = titleTrailing
+                            AnimatedVisibility(
+                                visible = titleTrailing != null,
+                                enter = fadeIn(tween(180)) + scaleIn(tween(180), initialScale = 0.85f),
+                                exit = fadeOut(tween(140)) + scaleOut(tween(140), targetScale = 0.85f),
+                            ) {
+                                lastTitleTrailing?.let { Box { it() } }
                             }
                             }
                             if (summary != null) {
@@ -847,15 +896,31 @@ internal fun PebbleShell(
                             }
                             headerContent?.invoke()
                         }
+                        // AnimatedVisibility around BOTH the gap and the control it precedes --
+                        // together, so the whole trailing area slides/fades away as one unit
+                        // instead of the Spacer's width popping independently of what follows
+                        // it. This is the OTHER half of the settings-mode header animation (see
+                        // titleTrailing's own AnimatedVisibility above): a single-setting pebble
+                        // with no headerAction loses its chevron entirely the moment
+                        // inlineSettingInSimpleMode takes over in simple mode (canToggle flips
+                        // false, the `else if (canToggle)` branch below stops matching at all),
+                        // and that used to just vanish with no transition while titleTrailing's
+                        // control popped in at the same instant on the same row. No "last known
+                        // value" snapshot needed here unlike titleTrailing's: headerAction/
+                        // onToggle/expanded aren't conditionally null the way titleTrailing was,
+                        // they're just not rendered while `visible` is false.
+                        AnimatedVisibility(
+                            visible = !forceExpanded && (headerAction != null || canToggle),
+                            enter = fadeIn(tween(180)) + expandHorizontally(tween(180)),
+                            exit = fadeOut(tween(140)) + shrinkHorizontally(tween(140)),
+                        ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
                         // The gap between the header's text column and whatever control ends the
                         // row. Without it a title-row status ran straight into the chevron --
                         // "Imperial" and "Atkinson" touching the button beside them, reported
                         // from a real screenshot. The text column is weighted, so nothing else
                         // was ever going to introduce this space.
-                        if (!forceExpanded && (headerAction != null || canToggle)) {
-                            Spacer(Modifier.width(10.dp))
-                        }
-                        if (!forceExpanded) {
+                        Spacer(Modifier.width(10.dp))
                             if (headerAction != null) {
                                 // Renders the action half regardless; canToggle decides whether
                                 // the chevron half comes with it (and reshapes the action's
@@ -866,6 +931,7 @@ internal fun PebbleShell(
                                     onToggle = onToggle,
                                     canToggle = canToggle,
                                     modifier = Modifier.widthIn(max = headerActionMaxWidth),
+                                    onChevronPressChange = { chevronPressed = it },
                                 )
                             } else if (canToggle) {
                                 // Gated on canToggle, which this branch used to ignore. Without
@@ -879,8 +945,10 @@ internal fun PebbleShell(
                                 MorphExpandButton(
                                     expanded = expanded,
                                     onToggle = onToggle,
+                                    onPressChange = { chevronPressed = it },
                                 )
                             }
+                        }
                         }
                     }
                     // Normal pebbles: animate the body sliding open/closed. fade = false on
@@ -962,6 +1030,11 @@ internal fun SplitExpandButton(
      *  had a reason to fire even when the weighted title beside it was starved for room
      *  and had to ellipsize instead. */
     modifier: Modifier = Modifier,
+    /** Reports the CHEVRON half's own pressed (held-down) state, live -- see
+     *  [MorphExpandButton]'s identical parameter for why. The action half
+     *  (the label button) does not report through this; only the chevron is
+     *  the pebble's own expand/collapse control. */
+    onChevronPressChange: ((Boolean) -> Unit)? = null,
 ) {
     val haptics = LocalHaptics.current
     val rotation by animateFloatAsState(
@@ -1158,6 +1231,14 @@ internal fun SplitExpandButton(
         // Hidden if canToggle is false (single-setting pebbles in simple mode).
         if (canToggle) {
             val chevronSource = remember { MutableInteractionSource() }
+            if (onChevronPressChange != null) {
+                val pressed by chevronSource.collectIsPressedAsState()
+                LaunchedEffect(pressed) { onChevronPressChange(pressed) }
+                // See MorphExpandButton's identical DisposableEffect for why: a
+                // collapse that unmounts this half mid-press must not leave the
+                // pebble permanently squared behind it.
+                DisposableEffect(Unit) { onDispose { onChevronPressChange(false) } }
+            }
             GroupButton(
                 interactionSource = chevronSource,
                 enabled = true,

@@ -102,6 +102,14 @@ internal val PebbleHeaderHeight = ControlHeight
 internal val PebbleCornerCollapsed = 38.dp
 internal val PebbleCornerExpanded = 20.dp
 
+/** The whole pebble card's own corner while its expand/collapse chevron is
+ *  held down -- see [PebbleShell]'s `chevronPressed`. Distinctly smaller than
+ *  even [PebbleCornerExpanded] so the card visibly squares off, matching the
+ *  chevron/split-button's own held shape (see `seamCorner`'s 16dp morphed
+ *  endpoint) instead of just the small control looking square on top of a
+ *  card that's still a soft pill or rounded square underneath it. */
+internal val PebbleCornerSquareHold = 8.dp
+
 /** The charge bar's height, shared by every surface that draws this bar so the
  *  proportions read as one component rather than five near-misses. */
 internal val ChargeBarHeight = 18.dp
