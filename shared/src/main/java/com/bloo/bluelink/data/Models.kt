@@ -53,7 +53,6 @@ data class VehicleDetails(
     val modelYear: String? = null,
     val vehicleGeneration: String? = null,
     val brandIndicator: String? = null,
-    val enrollmentDate: String? = null,
     val evStatus: String? = null,
     val odometer: String? = null,
 )

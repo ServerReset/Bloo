@@ -424,6 +424,11 @@ data class WearSeatConfig(
 /** Appearance + preferences mirrored to the watch. */
 @Serializable
 data class WearSettingsPayload(
+    /** Unread on the watch -- [colors] already carries the resolved dark/light palette
+     *  itself, so nothing needs this separate flag to decide how to render. Left on the
+     *  wire rather than removed, same reasoning as [useFahrenheit]'s own doc a few lines
+     *  down: dropping a serialized field would break older pairings (a watch still on a
+     *  build that expects this key would fail to decode a payload missing it). */
     val dark: Boolean = true,
     val useFahrenheit: Boolean = true,
     val unitSystem: String = "imperial",
