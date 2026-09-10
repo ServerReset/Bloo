@@ -222,13 +222,19 @@ fun HomeScreen(vm: WearViewModel, ui: WearUi, onSettings: () -> Unit, onTrips: (
 
     // Kept outside key() so scroll positions survive when the VIN list refreshes.
     val listStates = remember { mutableStateMapOf<String, ScalingLazyListState>() }
-    LaunchedEffect(ui.cars) {
+    // Computed once per `ui.cars` identity and reused below, rather than mapped twice --
+    // `ui.cars` is a freshly-allocated list on every publish() (any car-status event
+    // anywhere in the app), so key()'s own re-derivation used to re-run this same .map on
+    // essentially every recomposition of this whole screen, not just when the VIN set
+    // (what key() actually cares about) had changed.
+    val vins = remember(ui.cars) { ui.cars.map { it.vin } }
+    LaunchedEffect(vins) {
         // Evict scroll state for removed cars so the map can't grow unbounded
         // across a session of adding/removing cars.
-        listStates.keys.retainAll(ui.cars.map { it.vin }.toSet())
+        listStates.keys.retainAll(vins.toSet())
     }
 
-    key(ui.cars.map { it.vin }) {
+    key(vins) {
         val carPager = rememberPagerState(initialPage = 0) { count }
 
         // settledPage watched through snapshotFlow rather than read into a
@@ -778,10 +784,10 @@ private fun TileContent(
         WearTiles.SMART_CLIMATE -> SmartClimateCard(vm, ui, car)
         WearTiles.COMFORT -> ComfortCard(vm, ui, car)
         WearTiles.PRESETS -> PresetsCard(vm, ui, car)
-        WearTiles.CHARGE -> ChargeCard(vm, ui, car)
+        WearTiles.CHARGE -> ChargeCard(vm, ui.localSettings.unitSystem == "metric", "${car.vin}:charge" in ui.pending, car)
         WearTiles.LIMITS -> LimitsCard(vm, ui, car)
-        WearTiles.LOCATION -> LocationCard(vm, ui, car)
-        WearTiles.WEATHER -> WeatherCard(ui, car)
+        WearTiles.LOCATION -> LocationCard(vm, "${car.vin}:refresh" in ui.pending, car)
+        WearTiles.WEATHER -> WeatherCard(ui.extras.carWeather[car.vin] ?: ui.extras.homeWeather, useFahrenheit(ui), ui.localSettings.unitSystem == "metric", car)
         WearTiles.INFO -> InfoCard(car, ui)
         WearTiles.DIAGNOSTICS -> DiagnosticsCard(car)
         WearTiles.AI -> AiCard(vm, ui, car)
@@ -1657,14 +1663,18 @@ private fun PresetsCard(vm: WearViewModel, ui: WearUi, car: CarView) = SectionCa
  * `timeToFullMin` simply omits that row rather than showing a placeholder.
  */
 @Composable
-private fun ChargeCard(vm: WearViewModel, ui: WearUi, car: CarView) = SectionCard("Charge", Icons.Filled.Bolt) {
-    val metric = ui.localSettings.unitSystem == "metric"
+// Takes `metric`/`pending` rather than the whole WearUi -- narrowed so this card only
+// recomposes for what it actually reads. WearUi is rebuilt wholesale on every status
+// refresh/busy-flag change/weather push anywhere in the app, so accepting it directly
+// meant e.g. a `mark("$vin:refresh")` for THIS car's Location card also forced every
+// visible car's Charge card to recompose, not just the one that changed.
+private fun ChargeCard(vm: WearViewModel, metric: Boolean, pending: Boolean, car: CarView) = SectionCard("Charge", Icons.Filled.Bolt) {
     MorphButton(
         label = if (car.charging == true) "Stop" else "Charge",
         icon = Icons.Filled.Bolt,
         active = car.charging == true,
         activeColor = WearColors.chargeGreen,
-        pending = "${car.vin}:charge" in ui.pending,
+        pending = pending,
         onClick = { vm.toggleCharge(car.vin) },
         toggled = car.charging == true,
     )
@@ -1783,7 +1793,8 @@ private fun LimitsCard(vm: WearViewModel, ui: WearUi, car: CarView) = SectionCar
  * buttons to refresh or open the location in the phone's maps app.
  */
 @Composable
-private fun LocationCard(vm: WearViewModel, ui: WearUi, car: CarView) = SectionCard("Location", Icons.Filled.LocationOn) {
+// `pending` rather than the whole WearUi -- see ChargeCard's identical note.
+private fun LocationCard(vm: WearViewModel, pending: Boolean, car: CarView) = SectionCard("Location", Icons.Filled.LocationOn) {
     // visibleTiles() only shows this card when both are non-null; guarded
     // explicitly here too so a future reordering can't silently render
     // "0.0, 0.0" instead of failing loudly.
@@ -1860,7 +1871,7 @@ private fun LocationCard(vm: WearViewModel, ui: WearUi, car: CarView) = SectionC
             icon = Icons.Filled.LocationOn,
             active = false,
             activeColor = MaterialTheme.colorScheme.primary,
-            pending = "${car.vin}:refresh" in ui.pending,
+            pending = pending,
             onClick = { vm.refreshStatus(car.vin) },
             modifier = Modifier.weight(1f),
             showIcon = false,
@@ -1878,17 +1889,17 @@ private fun LocationCard(vm: WearViewModel, ui: WearUi, car: CarView) = SectionC
     }
 }
 
+// `weather`/`fahrenheit`/`metric` rather than the whole WearUi -- see ChargeCard's
+// identical note. The car-weather-first, home-weather-fallback lookup (SmartClimateCard
+// uses the same one, so the two cards always agree on which reading they're showing for
+// this car) now happens at the call site instead of in here.
 @Composable
-private fun WeatherCard(ui: WearUi, car: CarView) {
+private fun WeatherCard(w: com.bloo.bluelink.data.WearWeather?, fahrenheit: Boolean, metric: Boolean, car: CarView) {
     // Every other multi-line card (Climate, Comfort, Charge, Location, Info,
     // Diagnostics, AI, Assist, More) passes a header icon; Weather was the
     // one bare-text header in the stack. Resolved up front (rather than
     // inside SectionCard's content slot) so the header can use the same
     // per-condition glyph the body already renders.
-    // Same car-weather-first, home-weather-fallback lookup SmartClimateCard
-    // uses, so the two cards always agree on which reading they're showing
-    // for this car.
-    val w = ui.extras.carWeather[car.vin] ?: ui.extras.homeWeather
     val headerIcon = w?.let { weatherIcon(it.code, it.isDay) } ?: Icons.Filled.WbSunny
     SectionCard("Weather", headerIcon) {
     // No reading yet (neither the car nor home location has resolved
@@ -1902,7 +1913,7 @@ private fun WeatherCard(ui: WearUi, car: CarView) {
         )
         return@SectionCard
     }
-    val f = useFahrenheit(ui)
+    val f = fahrenheit
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         Icon(weatherIcon(w.code, w.isDay), contentDescription = null,
             tint = com.bloo.uicommon.weatherTint(w.code, w.isDay, MaterialTheme.colorScheme.onSurfaceVariant),
@@ -1922,7 +1933,7 @@ private fun WeatherCard(ui: WearUi, car: CarView) {
     Spacer(Modifier.height(2.dp))
     StatusRow("Feels", weatherTemp(w.feelsLikeC, f))
     w.humidity?.let { StatusRow("Humidity", "$it%") }
-    if (w.windKph > 0) StatusRow("Wind", formatSpeed(w.windKph.toDouble(), ui.localSettings.unitSystem == "metric"))
+    if (w.windKph > 0) StatusRow("Wind", formatSpeed(w.windKph.toDouble(), metric))
     }
 }
 

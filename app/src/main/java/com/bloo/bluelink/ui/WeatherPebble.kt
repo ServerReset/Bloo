@@ -21,7 +21,7 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
@@ -67,6 +67,8 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
@@ -392,13 +394,24 @@ internal fun CarMap(location: GeoLocation, modifier: Modifier = Modifier) {
         MaterialTheme.colorScheme.surfaceContainerLowest
     }
 
-    BoxWithConstraints(
-        modifier.background(mapBackground),
+    // The box's own real, measured size -- onSizeChanged, not BoxWithConstraints. Both
+    // report the same numbers, but BoxWithConstraints is a SubcomposeLayout: its content
+    // composes in a SEPARATE, deferred pass, which is avoidable overhead on a composable
+    // that recomposes on every `location` update, i.e. continuously while the car/phone
+    // is moving -- the exact frequency the rest of this app's onSizeChanged conversions
+    // (PebbleShell.kt, Pebbles.kt) were made for. Zero-sized for the one frame before the
+    // real size lands is safe here (unlike a width CAP elsewhere in the app, a wrong-low
+    // default just means one frame with no tiles drawn yet, not a false layout decision).
+    var boxSizePx by remember { mutableStateOf(IntSize.Zero) }
+    Box(
+        modifier
+            .background(mapBackground)
+            .onSizeChanged { boxSizePx = it },
     ) {
         val density = LocalDensity.current
         val tilePx = MapTiles.TILE_PX.toFloat()
-        val wPx = with(density) { maxWidth.toPx() }
-        val hPx = with(density) { maxHeight.toPx() }
+        val wPx = boxSizePx.width.toFloat()
+        val hPx = boxSizePx.height.toFloat()
         val span = MapTiles.span(zoom)
         val xTileF = MapTiles.tileX(location.longitude, zoom)
         val yTileF = MapTiles.tileY(location.latitude, zoom)

@@ -806,11 +806,16 @@ internal fun PresetPill(
     // CornerSize(Dp) states directly. The morphed OUTER corner goes back to the app-wide
     // MorphedCornerPercent every other button uses, which is one less thing these two pills do
     // differently from everything around them.
-    val leftShapeForCorner: (Float, Int) -> Shape = { morph, cp ->
-        splitPillShapes(morph, cp).first
+    // Remembered, not rebuilt every recomposition: this composable is one item's body inside
+    // a ReorderColumn (one call per preset, per recomposition of ANY preset's row), and these
+    // two capture nothing that ever changes -- splitPillShapes is a pure function of its own
+    // arguments -- so a fresh lambda pair here bought nothing but per-item allocation on every
+    // reorder-driven recomposition of the list.
+    val leftShapeForCorner: (Float, Int) -> Shape = remember {
+        { morph, cp -> splitPillShapes(morph, cp).first }
     }
-    val rightShapeForCorner: (Float, Int) -> Shape = { morph, cp ->
-        splitPillShapes(morph, cp).second
+    val rightShapeForCorner: (Float, Int) -> Shape = remember {
+        { morph, cp -> splitPillShapes(morph, cp).second }
     }
 
     // The drag handle wraps the whole pill so long-press anywhere reorders.
@@ -911,12 +916,15 @@ internal fun ChargeLimitPill(
 ) {
     val haptics = LocalHaptics.current
     // Same split-pill geometry as the preset pill above, and the same reason there is no
-    // measured row height here any more -- see that one's note.
-    val leftShapeForCorner: (Float, Int) -> Shape = { morph, cp ->
-        splitPillShapes(morph, cp).first
+    // measured row height here any more -- see that one's note. Remembered for the same
+    // reason too: this pill recomposes on every slider-drag tick (onValueChange), so an
+    // unremembered lambda pair here was rebuilt on every single drag frame, not just once
+    // per reorder like PresetPill's.
+    val leftShapeForCorner: (Float, Int) -> Shape = remember {
+        { morph, cp -> splitPillShapes(morph, cp).first }
     }
-    val rightShapeForCorner: (Float, Int) -> Shape = { morph, cp ->
-        splitPillShapes(morph, cp).second
+    val rightShapeForCorner: (Float, Int) -> Shape = remember {
+        { morph, cp -> splitPillShapes(morph, cp).second }
     }
 
     Column(Modifier.fillMaxWidth()) {

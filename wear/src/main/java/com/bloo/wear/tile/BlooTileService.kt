@@ -294,7 +294,6 @@ abstract class BlooTileService : TileService() {
         val isSmall = screenDp < 193
         val isTiny = screenDp < 182
 
-        val locked = snap.locked == true
         val charging = snap.charging == true
         val climate = snap.climateOn == true
         val pct = snap.percent ?: 0
