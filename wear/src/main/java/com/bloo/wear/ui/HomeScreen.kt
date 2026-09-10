@@ -133,6 +133,7 @@ import androidx.wear.compose.material3.MaterialTheme
 import androidx.wear.compose.material3.Text
 import com.bloo.bluelink.data.CLIMATE_DURATION_RANGE
 import com.bloo.bluelink.data.CLIMATE_TEMP_RANGE_F
+import com.bloo.bluelink.data.ClimatePreset
 import com.bloo.bluelink.data.DEFAULT_AC_CHARGE_LIMIT_PCT
 import com.bloo.bluelink.data.DEFAULT_DC_CHARGE_LIMIT_PCT
 import com.bloo.bluelink.data.SeatLevel
@@ -146,6 +147,8 @@ import com.bloo.bluelink.data.serviceDue
 import com.bloo.bluelink.data.nextServiceMiles
 import com.bloo.bluelink.data.smartClimateIsCooling
 import com.bloo.wear.CarView
+import com.bloo.wear.ChargeLimitDraft
+import com.bloo.wear.ClimateDraft
 import com.bloo.wear.WearRemote
 import com.bloo.wear.WearPebbles
 import com.bloo.wear.WearPhotoCache
@@ -777,22 +780,53 @@ private fun TileContent(
     onTrips: (String) -> Unit,
     onReorder: (String) -> Unit,
 ) {
+    // Derived once here rather than inline per branch below -- every one of these narrow
+    // values (not `ui` itself) is what actually gets passed to each card now, mirroring
+    // ChargeCard/LocationCard/WeatherCard's own established pattern: `ui` is rebuilt
+    // wholesale on every status refresh/busy-flag change/weather push anywhere in the
+    // app, so a card taking `ui` directly recomposes on all of that traffic even when it
+    // only reads one or two fields. `TileContent` itself still recomposes on every such
+    // change (it's a cheap dispatch), but the CARD calls below can now be skipped by
+    // Compose whenever their own narrow arguments didn't actually change.
+    val metric = ui.localSettings.unitSystem == "metric"
+    val fahrenheit = useFahrenheit(ui)
     when (key) {
         TILE_ALERTS -> AlertsCard(car)
-        WearTiles.SUMMARY -> SummaryCard(vm, ui, car)
-        WearTiles.CLIMATE -> ClimateCard(vm, ui, car)
-        WearTiles.SMART_CLIMATE -> SmartClimateCard(vm, ui, car)
-        WearTiles.COMFORT -> ComfortCard(vm, ui, car)
-        WearTiles.PRESETS -> PresetsCard(vm, ui, car)
-        WearTiles.CHARGE -> ChargeCard(vm, ui.localSettings.unitSystem == "metric", "${car.vin}:charge" in ui.pending, car)
-        WearTiles.LIMITS -> LimitsCard(vm, ui, car)
+        WearTiles.SUMMARY -> SummaryCard(
+            vm,
+            ui.extras.images[car.vin],
+            ui.photoGeneration[car.vin],
+            metric,
+            ui.phoneConnected,
+            "${car.vin}:doors" in ui.pending,
+            "${car.vin}:climate" in ui.pending,
+            car,
+        )
+        WearTiles.CLIMATE -> ClimateCard(vm, ui.draftFor(car.vin), "${car.vin}:climate" in ui.pending, fahrenheit, car)
+        WearTiles.SMART_CLIMATE -> SmartClimateCard(vm, fahrenheit, ui.extras.carWeather[car.vin] ?: ui.extras.homeWeather, "${car.vin}:climate" in ui.pending, car)
+        WearTiles.COMFORT -> ComfortCard(vm, ui.draftFor(car.vin), ui.settings?.seatConfigs?.get(car.vin) ?: com.bloo.bluelink.data.WearSeatConfig(), car)
+        WearTiles.PRESETS -> PresetsCard(vm, ui.presets[car.vin].orEmpty(), ui.draftFor(car.vin).activePresetId, "${car.vin}:climate" in ui.pending, car)
+        WearTiles.CHARGE -> ChargeCard(vm, metric, "${car.vin}:charge" in ui.pending, car)
+        WearTiles.LIMITS -> LimitsCard(vm, ui.chargeDraftFor(car.vin), "${car.vin}:chargeLimit" in ui.pending, car)
         WearTiles.LOCATION -> LocationCard(vm, "${car.vin}:refresh" in ui.pending, car)
-        WearTiles.WEATHER -> WeatherCard(ui.extras.carWeather[car.vin] ?: ui.extras.homeWeather, useFahrenheit(ui), ui.localSettings.unitSystem == "metric", car)
-        WearTiles.INFO -> InfoCard(car, ui)
+        WearTiles.WEATHER -> WeatherCard(ui.extras.carWeather[car.vin] ?: ui.extras.homeWeather, fahrenheit, metric, car)
+        WearTiles.INFO -> InfoCard(car, fahrenheit, metric)
         WearTiles.DIAGNOSTICS -> DiagnosticsCard(car)
-        WearTiles.AI -> AiCard(vm, ui, car)
+        WearTiles.AI -> AiCard(vm, ui.extras.ai[car.vin], ui.aiBusy == car.vin, car)
         WearTiles.ASSIST -> AssistCard(car)
-        WearTiles.MORE -> MoreCard(vm, ui, car, onSettings, onTrips, onReorder)
+        WearTiles.MORE -> MoreCard(
+            vm,
+            "${car.vin}:refresh" in ui.pending,
+            "${car.vin}:hornLights" in ui.pending,
+            ui.phoneConnected,
+            ui.updateRun,
+            ui.updateDownloading,
+            ui.updateApkReady,
+            car,
+            onSettings,
+            onTrips,
+            onReorder,
+        )
     }
 }
 
@@ -1035,15 +1069,29 @@ private fun AlertsCard(car: CarView) {
  * an alert-count badge, and the two most-used quick actions (lock, climate).
  *
  * Recomposes whenever [car] changes (a new live-status push from the phone
- * replaces the whole [CarView] for its VIN) or when [ui.localSettings] /
- * [ui.phoneConnected] change. `isStale` is a plain derived boolean (not
- * `remember`ed) recomputed on every recomposition against
- * `System.currentTimeMillis()`, so the "how long ago" freshness color only
- * actually updates when *something else* causes a recomposition (a new
- * status push, a settings change, etc.) -- it is not a ticking clock.
+ * replaces the whole [CarView] for its VIN) or when [metric] / [phoneConnected]
+ * change. `isStale` is a plain derived boolean (not `remember`ed) recomputed on
+ * every recomposition against `System.currentTimeMillis()`, so the "how long
+ * ago" freshness color only actually updates when *something else* causes a
+ * recomposition (a new status push, a settings change, etc.) -- it is not a
+ * ticking clock.
+ *
+ * Narrow params rather than the whole [WearUi] -- see [ChargeCard]'s identical
+ * note. This is the always-visible hero tile (first in every car's list), so
+ * it's the single most-recomposed card in the app -- the highest-value place
+ * for this narrowing to land.
  */
 @Composable
-private fun SummaryCard(vm: WearViewModel, ui: WearUi, car: CarView) = SectionCard(null) {
+private fun SummaryCard(
+    vm: WearViewModel,
+    photoKey: String?,
+    photoGen: Int?,
+    metric: Boolean,
+    phoneConnected: Boolean,
+    doorsPending: Boolean,
+    climatePending: Boolean,
+    car: CarView,
+) = SectionCard(null) {
     val alertCount = car.alertCount
     // The car's own photo, if the phone has sent one. Loaded from the watch's cache.
     //
@@ -1068,8 +1116,6 @@ private fun SummaryCard(vm: WearViewModel, ui: WearUi, car: CarView) = SectionCa
     // reports new bytes actually landed for this VIN, so the decode still re-keys even when the
     // path string alone can't tell the difference. See WearPhotoEvents' own doc.
     val ctx = LocalContext.current
-    val photoKey = ui.extras.images[car.vin]
-    val photoGen = ui.photoGeneration[car.vin]
     val photo by produceState<android.graphics.Bitmap?>(initialValue = null, car.vin, photoKey, photoGen) {
         value = withContext(Dispatchers.IO) {
             WearPhotoCache.pathFor(ctx, car.vin)?.let {
@@ -1121,7 +1167,6 @@ private fun SummaryCard(vm: WearViewModel, ui: WearUi, car: CarView) = SectionCa
             }
         }
         Column {
-            val metric = ui.localSettings.unitSystem == "metric"
             AnimatedValue(
                 value = car.rangeMi?.let { formatDistance(it, metric) } ?: "—",
                 style = MaterialTheme.typography.titleMedium,
@@ -1147,7 +1192,7 @@ private fun SummaryCard(vm: WearViewModel, ui: WearUi, car: CarView) = SectionCa
                             else MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
-            if (!ui.phoneConnected) {
+            if (!phoneConnected) {
                 Text(
                     "Standalone",
                     style = MaterialTheme.typography.labelSmall,
@@ -1194,7 +1239,7 @@ private fun SummaryCard(vm: WearViewModel, ui: WearUi, car: CarView) = SectionCa
             // actually reported itself unlocked.
             active = car.locked == false,
             activeColor = MaterialTheme.colorScheme.primary,
-            pending = "${car.vin}:doors" in ui.pending,
+            pending = doorsPending,
             onClick = { vm.toggleLock(car.vin) },
             modifier = Modifier.weight(1f),
             // Nullable all the way through -- MorphButton's `toggled` is Boolean? and feeds
@@ -1220,7 +1265,7 @@ private fun SummaryCard(vm: WearViewModel, ui: WearUi, car: CarView) = SectionCa
             icon = Icons.Filled.Thermostat,
             active = car.climateOn == true,
             activeColor = MaterialTheme.colorScheme.tertiary,
-            pending = "${car.vin}:climate" in ui.pending,
+            pending = climatePending,
             onClick = { vm.toggleClimate(car.vin) },
             modifier = Modifier.weight(1f),
             toggled = car.climateOn == true,
@@ -1258,9 +1303,10 @@ private fun SummaryCard(vm: WearViewModel, ui: WearUi, car: CarView) = SectionCa
  * `vm.setClimateDuration`, `vm.toggleDefrost`, `vm.toggleClimate`) writes
  * straight into that draft/command layer in the view model.
  */
+// `d`/`climatePending`/`fahrenheit` rather than the whole WearUi -- see ChargeCard's
+// identical note.
 @Composable
-private fun ClimateCard(vm: WearViewModel, ui: WearUi, car: CarView) = SectionCard("Climate", Icons.Filled.Thermostat) {
-    val d = ui.draftFor(car.vin)
+private fun ClimateCard(vm: WearViewModel, d: ClimateDraft, climatePending: Boolean, fahrenheit: Boolean, car: CarView) = SectionCard("Climate", Icons.Filled.Thermostat) {
     // Stacked right above Smart Climate, with a near-identical button --
     // Smart Climate already explains itself ("Ambient: 58° · adjusts ±10°");
     // without an equivalent line here the two read as two unexplained
@@ -1276,14 +1322,13 @@ private fun ClimateCard(vm: WearViewModel, ui: WearUi, car: CarView) = SectionCa
         icon = Icons.Filled.Thermostat,
         active = car.climateOn == true,
         activeColor = MaterialTheme.colorScheme.tertiary,
-        pending = "${car.vin}:climate" in ui.pending,
+        pending = climatePending,
         onClick = { vm.toggleClimate(car.vin) },
         toggled = car.climateOn == true,
     )
     Spacer(Modifier.height(6.dp))
     // 2°F steps, not 1° - the round screen only has room for so many dots before
     // they crowd into an unreadable smear; halving the count (11 vs 21) fixes that.
-    val fahrenheit = useFahrenheit(ui)
     // Local draft during the drag -- setClimateTemp writes into the shared
     // climate draft AND pushes it to the phone over the Data Layer (see
     // WearViewModel.updateDraft/publishClimateDrafts), so it commits once on
@@ -1367,9 +1412,9 @@ private fun ClimateCard(vm: WearViewModel, ui: WearUi, car: CarView) = SectionCa
  *   in the user's preferred unit.
  */
 @Composable
-private fun SmartClimateCard(vm: WearViewModel, ui: WearUi, car: CarView) = SectionCard("Smart Climate", Icons.Filled.Thermostat) {
-    val fahrenheit = useFahrenheit(ui)
-    val weather: WearWeather? = ui.extras.carWeather[car.vin] ?: ui.extras.homeWeather
+// `fahrenheit`/`weather`/`climatePending` rather than the whole WearUi -- see
+// ChargeCard's identical note.
+private fun SmartClimateCard(vm: WearViewModel, fahrenheit: Boolean, weather: WearWeather?, climatePending: Boolean, car: CarView) = SectionCard("Smart Climate", Icons.Filled.Thermostat) {
     val ambientF = weather?.let { com.bloo.bluelink.data.ambientFahrenheit(it.tempC) }
     val label = if (ambientF != null) {
         val action = if (smartClimateIsCooling(ambientF)) "Cool" else "Heat"
@@ -1388,7 +1433,7 @@ private fun SmartClimateCard(vm: WearViewModel, ui: WearUi, car: CarView) = Sect
         // yet" isn't an in-flight request, so it shouldn't show the same
         // spinner a real command does (that read as "stuck loading forever"
         // when the phone has no weather configured). Disabled, not pending.
-        pending = "${car.vin}:climate" in ui.pending,
+        pending = climatePending,
         enabled = weather != null,
         onClick = { if (weather != null) vm.smartClimate(car.vin) },
     )
@@ -1433,9 +1478,8 @@ private fun SmartClimateCard(vm: WearViewModel, ui: WearUi, car: CarView) = Sect
  * matching the phone's own [com.bloo.bluelink.data.WearSeatConfig] default.
  */
 @Composable
-private fun ComfortCard(vm: WearViewModel, ui: WearUi, car: CarView) = SectionCard("Comfort", Icons.Filled.AirlineSeatReclineNormal) {
-    val d = ui.draftFor(car.vin)
-    val seats = ui.settings?.seatConfigs?.get(car.vin) ?: com.bloo.bluelink.data.WearSeatConfig()
+// `d`/`seats` rather than the whole WearUi -- see ChargeCard's identical note.
+private fun ComfortCard(vm: WearViewModel, d: ClimateDraft, seats: com.bloo.bluelink.data.WearSeatConfig, car: CarView) = SectionCard("Comfort", Icons.Filled.AirlineSeatReclineNormal) {
     // Moved from a trailing caption after the sliders (where it read as a
     // bare, easy-to-miss afterthought -- the only card in the file ending on
     // plain text rather than a control) to right under the header, matching
@@ -1531,8 +1575,15 @@ private fun ComfortCard(vm: WearViewModel, ui: WearUi, car: CarView) = SectionCa
  *   the *current* draft (not any particular preset) under that name.
  */
 @Composable
-private fun PresetsCard(vm: WearViewModel, ui: WearUi, car: CarView) = SectionCard("Presets", Icons.Filled.Thermostat) {
-    val list = ui.presets[car.vin].orEmpty()
+// `list`/`activePresetId`/`climatePending` rather than the whole WearUi -- see
+// ChargeCard's identical note.
+private fun PresetsCard(
+    vm: WearViewModel,
+    list: List<ClimatePreset>,
+    activePresetId: String?,
+    climatePending: Boolean,
+    car: CarView,
+) = SectionCard("Presets", Icons.Filled.Thermostat) {
     var confirmDeleteId by remember(car.vin) { mutableStateOf<String?>(null) }
     // Matches Settings' "Sign out" confirm, the app's other destructive-action
     // pattern -- that one auto-resets after 4s so a stale "tap again" can't
@@ -1552,7 +1603,7 @@ private fun PresetsCard(vm: WearViewModel, ui: WearUi, car: CarView) = SectionCa
         Spacer(Modifier.height(6.dp))
     }
     list.forEach { preset ->
-        val isActive = ui.draftFor(car.vin).activePresetId == preset.id && car.climateOn == true
+        val isActive = activePresetId == preset.id && car.climateOn == true
         val confirming = confirmDeleteId == preset.id
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -1564,7 +1615,7 @@ private fun PresetsCard(vm: WearViewModel, ui: WearUi, car: CarView) = SectionCa
                 icon = Icons.Filled.Thermostat,
                 active = isActive,
                 activeColor = MaterialTheme.colorScheme.tertiary,
-                pending = "${car.vin}:climate" in ui.pending,
+                pending = climatePending,
                 // User-named presets can be long and this row shares its width with
                 // a delete button, so allow the name to wrap to 2 lines instead of
                 // truncating.
@@ -1726,8 +1777,9 @@ private fun ChargeCard(vm: WearViewModel, metric: Boolean, pending: Boolean, car
  *   state layered on top of (but not yet written to) the car.
  */
 @Composable
-private fun LimitsCard(vm: WearViewModel, ui: WearUi, car: CarView) = SectionCard("Charge limits", Icons.Filled.Bolt) {
-    val draft = ui.chargeDraftFor(car.vin)
+// `draft`/`chargeLimitPending` rather than the whole WearUi -- see ChargeCard's
+// identical note.
+private fun LimitsCard(vm: WearViewModel, draft: ChargeLimitDraft, chargeLimitPending: Boolean, car: CarView) = SectionCard("Charge limits", Icons.Filled.Bolt) {
     val ac = draft.ac ?: car.acLimit ?: DEFAULT_AC_CHARGE_LIMIT_PCT
     val dc = draft.dc ?: car.dcLimit ?: DEFAULT_DC_CHARGE_LIMIT_PCT
     val isDirty = (draft.ac != null && draft.ac != car.acLimit) ||
@@ -1768,7 +1820,7 @@ private fun LimitsCard(vm: WearViewModel, ui: WearUi, car: CarView) = SectionCar
         icon = Icons.Filled.Bolt,
         active = false,
         activeColor = WearColors.chargeGreen,
-        pending = "${car.vin}:chargeLimit" in ui.pending,
+        pending = chargeLimitPending,
         onClick = { vm.applyChargeLimits(car.vin) },
         // Both sliders fall back to 80/90 (or the car's last-known limits)
         // before the user has ever touched them -- without this, a stray tap
@@ -1938,8 +1990,8 @@ private fun WeatherCard(w: com.bloo.bluelink.data.WearWeather?, fahrenheit: Bool
 }
 
 @Composable
-private fun InfoCard(car: CarView, ui: WearUi) = SectionCard("Info", Icons.Filled.DirectionsCar) {
-    val fahrenheit = useFahrenheit(ui)
+// `fahrenheit`/`metric` rather than the whole WearUi -- see ChargeCard's identical note.
+private fun InfoCard(car: CarView, fahrenheit: Boolean, metric: Boolean) = SectionCard("Info", Icons.Filled.DirectionsCar) {
     val err = MaterialTheme.colorScheme.error
     // This card is a flat list of ~10 rows with nothing summarizing "is
     // everything closed up" at a glance -- DiagnosticsCard already solved the
@@ -1990,7 +2042,6 @@ private fun InfoCard(car: CarView, ui: WearUi) = SectionCard("Info", Icons.Fille
     if (live && car.trunkOpen) StatusRow("Trunk", "Open", valueColor = MaterialTheme.colorScheme.error)
     if (live && car.hoodOpen) StatusRow("Hood", "Open", valueColor = MaterialTheme.colorScheme.error)
     StatusRow("VIN", car.vin.takeLast(6))
-    val metric = ui.localSettings.unitSystem == "metric"
     // car.odometer arrives as a display-formatted string (e.g. "12,345"), so
     // it has to be de-commafied before it can be parsed back into a number
     // for the service-due math below; parseOdometerMiles handles the comma
@@ -2101,9 +2152,8 @@ private fun DiagnosticsCard(car: CarView) = SectionCard("Diagnostics", Icons.Fil
  * eventually replace `ui.extras.ai[car.vin]` once the phone responds.
  */
 @Composable
-private fun AiCard(vm: WearViewModel, ui: WearUi, car: CarView) = SectionCard("AI Summary", Icons.Filled.AutoAwesome) {
-    val summary = ui.extras.ai[car.vin]
-    val busy = ui.aiBusy == car.vin
+// `summary`/`busy` rather than the whole WearUi -- see ChargeCard's identical note.
+private fun AiCard(vm: WearViewModel, summary: String?, busy: Boolean, car: CarView) = SectionCard("AI Summary", Icons.Filled.AutoAwesome) {
     if (summary != null && !busy) {
         Text(
             summary,
@@ -2221,7 +2271,20 @@ private fun AssistCard(car: CarView) = SectionCard("Assist", Icons.Filled.Call) 
  *   scrolling past it already works as a lightweight dismissal.
  */
 @Composable
-private fun MoreCard(vm: WearViewModel, ui: WearUi, car: CarView, onSettings: () -> Unit, onTrips: (String) -> Unit, onReorder: (String) -> Unit) = SectionCard("More", Icons.Filled.Settings) {
+// Narrow params rather than the whole WearUi -- see ChargeCard's identical note.
+private fun MoreCard(
+    vm: WearViewModel,
+    refreshPending: Boolean,
+    hlPending: Boolean,
+    phoneConnected: Boolean,
+    updateRun: com.bloo.bluelink.data.WorkflowRun?,
+    updateDownloading: Boolean,
+    updateApkReady: Boolean,
+    car: CarView,
+    onSettings: () -> Unit,
+    onTrips: (String) -> Unit,
+    onReorder: (String) -> Unit,
+) = SectionCard("More", Icons.Filled.Settings) {
     val accent = MaterialTheme.colorScheme.primary
     val alertCount = car.alertCount
     if (alertCount > 0) {
@@ -2237,7 +2300,7 @@ private fun MoreCard(vm: WearViewModel, ui: WearUi, car: CarView, onSettings: ()
         icon = Icons.Filled.Refresh,
         active = false,
         activeColor = accent,
-        pending = "${car.vin}:refresh" in ui.pending,
+        pending = refreshPending,
         onClick = { vm.refreshStatus(car.vin) },
     )
     // Kia's US API has no equivalent endpoint, and neither does Canada's -- see
@@ -2253,7 +2316,6 @@ private fun MoreCard(vm: WearViewModel, ui: WearUi, car: CarView, onSettings: ()
     // widget's own comment says it fixed for itself.
     if (car.hornLightsSupported) {
         Spacer(Modifier.height(6.dp))
-        val hlPending = "${car.vin}:hornLights" in ui.pending
         Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             MorphButton(
                 label = "Flash",
@@ -2281,7 +2343,7 @@ private fun MoreCard(vm: WearViewModel, ui: WearUi, car: CarView, onSettings: ()
     // PHONE_AVAILABLE_DEEP_TILES above, not an everyday glance/control -- hidden with a phone
     // connected for the same reason, full again the moment there isn't one. Settings stays
     // regardless: haptics/units/PIN/sign-out are watch-local, not a phone-duplicated feature.
-    if (!ui.phoneConnected && car.hasBattery && car.tripsSupported) {
+    if (!phoneConnected && car.hasBattery && car.tripsSupported) {
         Spacer(Modifier.height(6.dp))
         MorphButton(
             label = "Trips",
@@ -2301,7 +2363,7 @@ private fun MoreCard(vm: WearViewModel, ui: WearUi, car: CarView, onSettings: ()
         pending = false,
         onClick = onSettings,
     )
-    if (!ui.phoneConnected) {
+    if (!phoneConnected) {
         Spacer(Modifier.height(6.dp))
         MorphButton(
             label = "Reorder",
@@ -2318,7 +2380,7 @@ private fun MoreCard(vm: WearViewModel, ui: WearUi, car: CarView, onSettings: ()
     // now" + snooze) - this banner sits passively in an already-scrollable
     // list rather than interrupting like a dialog, so simply scrolling past
     // it already serves as a lightweight "not now".
-    if (ui.updateRun != null) {
+    if (updateRun != null) {
         Spacer(Modifier.height(10.dp))
         // Collected here rather than read off `ui` on purpose: this is the only
         // composable that needs the value, and vm.updateDownloadProgress is a separate
@@ -2336,25 +2398,25 @@ private fun MoreCard(vm: WearViewModel, ui: WearUi, car: CarView, onSettings: ()
             // server sent no Content-Length, since there is genuinely no percentage
             // to show then.
             label = when {
-                ui.updateDownloading && progress != null -> "Downloading ${(progress * 100).roundToInt()}%"
-                ui.updateDownloading -> "Downloading…"
+                updateDownloading && progress != null -> "Downloading ${(progress * 100).roundToInt()}%"
+                updateDownloading -> "Downloading…"
                 // Prefetched and waiting: say so, because "Update" on a button that
                 // installs instantly reads the same as one that is about to make you
                 // wait through a download, and those are very different taps.
-                ui.updateApkReady -> "Install now"
+                updateApkReady -> "Install now"
                 else -> "Update"
             },
             icon = Icons.Filled.SystemUpdate,
             active = true,
             activeColor = accent,
-            pending = ui.updateDownloading,
+            pending = updateDownloading,
             onClick = { vm.downloadAndInstallUpdate() },
         )
         // The bar the phone's update pebble has always had. Determinate, so it also
         // conveys rate -- the thing a spinner cannot show. Shows for a background
         // prefetch too, so a download the user did not start still explains itself
         // rather than just making the watch feel busy.
-        if (ui.updateDownloading && progress != null) {
+        if (updateDownloading && progress != null) {
             Spacer(Modifier.height(6.dp))
             LinearProgressIndicator(
                 progress = { progress },
@@ -2364,7 +2426,7 @@ private fun MoreCard(vm: WearViewModel, ui: WearUi, car: CarView, onSettings: ()
         // The phone's own update pebble shows the release's changelog; this
         // banner previously only ever showed the bare button, with no way to
         // see what's actually in the update before installing it.
-        ui.updateRun.releaseNotes?.takeIf { it.isNotBlank() }?.let { notes ->
+        updateRun.releaseNotes?.takeIf { it.isNotBlank() }?.let { notes ->
             Spacer(Modifier.height(4.dp))
             Text(
                 notes,
