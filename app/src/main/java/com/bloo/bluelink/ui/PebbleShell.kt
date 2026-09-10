@@ -361,11 +361,17 @@ internal fun PebbleShell(
     // read as the tiny control changing shape independently of the pebble it
     // belongs to -- reported directly: "not just the button shape goes
     // square but the actual collapsed pebble is square."
+    //
+    // Targets PebbleCornerExpanded -- the SAME corner the card already lands
+    // on once actually expanded -- not a separate, squarer constant. A hold
+    // is a preview of "this is about to expand", so it should morph to
+    // exactly the shape expanding gets you; landing on a DIFFERENT (more
+    // square) radius made holding and expanding look like two different
+    // target shapes for the same card, reported directly as inconsistent.
     var chevronPressed by remember { mutableStateOf(false) }
     val corner by animateDpAsState(
         targetValue = when {
-            chevronPressed -> PebbleCornerSquareHold
-            expanded -> PebbleCornerExpanded
+            chevronPressed || expanded -> PebbleCornerExpanded
             else -> collapsedCorner
         },
         // The press morph reuses the OPEN spring regardless of expanded/collapsed:
