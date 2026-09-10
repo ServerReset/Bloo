@@ -661,8 +661,10 @@ class SettingsStore(private val context: Context) {
     }
 
     /** Per-VIN default climate preset ID for the one-tap Start button. */
-    suspend fun defaultClimatePreset(vin: String): String? =
-        context.settingsDataStore.data.first()[stringPreferencesKey(Keys.DEFAULT_CLIMATE_PRESET_PREFIX + vin)]?.takeIf { it.isNotBlank() }
+    suspend fun defaultClimatePreset(vin: String): String? = defaultClimatePreset(vin, context.settingsDataStore.data.first())
+
+    fun defaultClimatePreset(vin: String, p: Preferences): String? =
+        p[stringPreferencesKey(Keys.DEFAULT_CLIMATE_PRESET_PREFIX + vin)]?.takeIf { it.isNotBlank() }
 
     suspend fun setDefaultClimatePreset(vin: String, id: String?) {
         editTracked {
@@ -718,9 +720,10 @@ class SettingsStore(private val context: Context) {
     }
 
     /** User-defined display order of vehicles (by VIN). */
-    suspend fun vehicleOrder(): List<String> =
-        context.settingsDataStore.data.first()[Keys.ORDER]
-            ?.split("\n")?.filter { it.isNotBlank() } ?: emptyList()
+    suspend fun vehicleOrder(): List<String> = vehicleOrder(context.settingsDataStore.data.first())
+
+    fun vehicleOrder(p: Preferences): List<String> =
+        p[Keys.ORDER]?.split("\n")?.filter { it.isNotBlank() } ?: emptyList()
 
     suspend fun setVehicleOrder(order: List<String>) {
         editTracked { it[Keys.ORDER] = order.joinToString("\n") }

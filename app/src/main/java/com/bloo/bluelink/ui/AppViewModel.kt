@@ -1057,15 +1057,17 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             _state.update { it.copy(vehicles = emptyList(), screen = Screen.Empty, garageLoadError = lastError) }
             return
         }
-        val vehicles = applyOrder(fetched, settingsStore.vehicleOrder())
-        // ONE Preferences read for every per-car setting below, instead of one read per
-        // getter per car -- twelve of them, so 36 round trips on a three-car account,
-        // all returning the identical object. See SettingsStore.snapshot().
+        // ONE Preferences read for every per-car setting below (including vehicleOrder,
+        // right after), instead of one read per getter -- vehicleOrder used to be its own
+        // extra data.first() taken separately, one more round trip sitting directly ahead
+        // of the very snapshot meant to eliminate this class of cost on the cold-start
+        // critical path. See SettingsStore.snapshot().
         //
         // Taken HERE and not at the top of the function, deliberately: everything above
         // this is network work that can take seconds, and a snapshot read before it would
         // be stale by the time it was used if the user changed a setting meanwhile.
         val prefs = settingsStore.snapshot()
+        val vehicles = applyOrder(fetched, settingsStore.vehicleOrder(prefs))
         // The 17 per-car/per-tile config fields, shared with refreshLocalCarConfig via
         // perCarConfig so the two can't drift. firstRun's empty-collapsed rule lives inside it.
         val cfg = perCarConfig(vehicles, prefs)
@@ -1204,10 +1206,17 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
      * and callers layer their own distinct fields (loadGarageInner adds vehicles/screen/
      * garageLoadError; refreshLocalCarConfig adds nothing) on top of the returned transform.
      */
+    // Dispatchers.Default, same reasoning as SettingsStore.appearance's own .flowOn(Default):
+    // climatePresets(vin, prefs) below JSON-decodes each car's saved preset list, and this whole
+    // function runs right on the Loading -> Garage transition frame (loadGarageInner) or a
+    // settings-import refresh -- exactly the "decode ran on the main thread while the first
+    // frame was trying to draw" cost that fix already called out elsewhere. Everything else here
+    // is a pure, already-in-memory Preferences read (no real suspension), so hopping dispatchers
+    // once for the whole function costs one context switch, not one per getter.
     private suspend fun perCarConfig(
         vehicles: List<Vehicle>,
         prefs: androidx.datastore.preferences.core.Preferences,
-    ): PerCarConfig {
+    ): PerCarConfig = withContext(Dispatchers.Default) {
         val seatConfigs = vehicles.associate { it.vin to settingsStore.seatConfig(it.vin, prefs) }
         val powertrains = vehicles.mapNotNull { v -> settingsStore.powertrain(v.vin, prefs)?.let { v.vin to it } }.toMap()
         val platforms = vehicles.mapNotNull { v -> settingsStore.platform(v.vin, prefs)?.let { v.vin to it } }.toMap()
@@ -1229,7 +1238,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         val tileBackground = settingsStore.tileBackground(prefs)
         val tileLiveRefresh = settingsStore.tileLiveRefresh(prefs)
         val shortcutSet = settingsStore.enabledShortcuts(prefs)
-        return PerCarConfig(
+        PerCarConfig(
             apply = {
                 it.copy(
                     seatConfigs = seatConfigs,
@@ -1305,8 +1314,13 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     private suspend fun seedDefaultClimatePresets() {
         val vehicles = _state.value.vehicles
         if (vehicles.isEmpty()) return
+        // ONE Preferences read, not one suspend data.first() per car -- this runs right on
+        // the cold-start critical path (called from loadGarageInner immediately after the
+        // Loading -> Garage flip), the exact "N getters x N cars" shape SettingsStore.snapshot()
+        // exists to eliminate everywhere else in this file.
+        val prefs = settingsStore.snapshot()
         val presets = vehicles.associate { v ->
-            v.vin to (settingsStore.defaultClimatePreset(v.vin) ?: "smart")
+            v.vin to (settingsStore.defaultClimatePreset(v.vin, prefs) ?: "smart")
         }
         _state.update { it.copy(defaultClimatePresets = presets) }
     }
