@@ -583,13 +583,16 @@ internal fun GarageScreen(state: State<UiState>, vm: AppViewModel) {
                         // in-transit skeleton. Swipe smoothness comes from two places:
                         // PebbleList's own one-frame lazy-fill (only the first EAGER_PEBBLES
                         // sections compose their bodies immediately; the rest fill one frame
-                        // later) and beyondViewportPageCount=1 pre-composing the neighbour
-                        // while idle, off the drag critical path.
+                        // later) and beyondViewportPageCount pre-composing the neighbour
+                        // while idle, off the drag critical path -- 1 on a single-car-per-
+                        // page (phone) screen, 0 on a multi-car-per-page (wide/foldable)
+                        // one, see that parameter's own doc below for why the two screen
+                        // shapes need different answers.
                         userScrollEnabled = true,
-                        // beyondViewportPageCount = 1 (was unset → default 0): the
-                        // default meant the (heavy) neighbour car page only started
-                        // composing the instant it peeked in — i.e. on the FIRST frames
-                        // of the drag — so swiping between cars hitched right as it
+                        // beyondViewportPageCount = 1 on a single-car page (was unset →
+                        // default 0): the default meant the (heavy) neighbour car page only
+                        // started composing the instant it peeked in — i.e. on the FIRST
+                        // frames of the drag — so swiping between cars hitched right as it
                         // began. Pre-composing one neighbour while idle moves that work
                         // off the drag critical path. This matches the expanded pager
                         // (which already sets 1 with the same VehicleDetailContent
@@ -598,9 +601,11 @@ internal fun GarageScreen(state: State<UiState>, vm: AppViewModel) {
                         // page composes a whole car's pebble list; making that lazy is
                         // a bigger, reorder-model-sensitive change left for a device.)
                         //
-                        // KEEP THIS AT 1 — do NOT raise it. 1→2 holds two more live
-                        // compositions and widens any state emission that DOES change
-                        // UiState from ~3 pages to ~5.
+                        // On a single-car page, KEEP THIS AT 1 — do NOT raise it. 1→2 holds
+                        // two more live compositions and widens any state emission that DOES
+                        // change UiState from ~3 pages to ~5.
+                        //
+                        // Dropped to 0 when perPage > 1 -- see the parameter's own doc below.
                         //
                         // This used to say "because UiState is unstable". It is not: it is
                         // @Immutable, as are Appearance/NotificationPrefs, AppViewModel is
@@ -626,7 +631,22 @@ internal fun GarageScreen(state: State<UiState>, vm: AppViewModel) {
                         // measurable cold-start/car-switch lag on a real device; see
                         // SinglePebble's own doc for the full reasoning and the per-pebble
                         // dependency lists.
-                        beyondViewportPageCount = 1,
+                        //
+                        // ...EXCEPT on a wide/large screen (perPage > 1), where each "page"
+                        // here is a whole ROW of `perPage` cars (see `block`/`start`/`end`
+                        // below), not one car -- so pre-warming "1 neighbour" pre-composes
+                        // `perPage` more full pebble columns, not one. On a big foldable's
+                        // unfolded screen (perPage 2-3), that is 2-3x the live-composition
+                        // cost this constant's own KEEP-AT-1 warning was calibrated against,
+                        // and it is now carried on EVERY ordinary drag rather than paid once
+                        // as an occasional hitch reaching a genuinely new neighbour --
+                        // reported directly as "laggy while dragging" on exactly this kind
+                        // of large screen. 0 accepts that one-time hitch (still cheaper than
+                        // the phone-sized case that motivated 1, since a single-car page was
+                        // never the problem) in exchange for not carrying 2-3 extra full car
+                        // columns through every swipe on the screens where a "neighbour" is
+                        // heaviest.
+                        beyondViewportPageCount = if (perPage > 1) 0 else 1,
                     ) { page ->
                         // Same fade/scale transition the expanded single-car pager
                         // above uses (see its own comment for why: the continuous
