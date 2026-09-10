@@ -28,6 +28,7 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
@@ -836,6 +837,27 @@ internal fun StateControl(
 ) {
     // Which state is the "highlighted" (on) one.
     val highlighted = enabled && (if (highlightWhenOff) isOn == false else isOn == true)
+    // BoxWithConstraints ONLY to learn this row's real width, so the button group below can
+    // be capped at what's actually left over once the name/state column takes its own
+    // 120dp floor -- see groupMaxWidth's own doc just below for why this is necessary at
+    // all, not optional polish.
+    BoxWithConstraints(Modifier.fillMaxWidth()) {
+    // Without this cap, the button group -- a plain (non-weighted) Row child -- is measured
+    // against the row's FULL width, because Row measures non-weighted children BEFORE it
+    // knows what a weighted sibling (the name/state column, `widthIn(min = 120.dp)` a few
+    // lines down) will need. That min is a REQUEST, not a guarantee the Row's own weight
+    // arithmetic honours on its own: when the row overall is too narrow for both, Row still
+    // hands the column `Constraints(minWidth = share, maxWidth = share)` off its OWN
+    // (button-first) division of space, and widthIn(min) cannot raise that ABOVE an
+    // already-fixed, SMALLER incoming max -- it coerces down to fit the parent's hard upper
+    // bound instead of forcing the parent to overflow, which is the opposite of what a
+    // "floor" sounds like it should do. So on a narrow enough row, "Unlocked" truncated to
+    // "Unlock…" while the button group beside it kept its own full, unconstrained width --
+    // reported from a real screenshot, and the fix genuinely requires the button group's own
+    // width to be bounded first, not a bigger number on the column's own floor (already tried
+    // once, on the pebble-header version of this exact bug, and it only bought a bit more
+    // room rather than fixing the actual priority).
+    val groupMaxWidth = (maxWidth - 120.dp - 12.dp).coerceAtLeast(0.dp)
     Row(
         Modifier.fillMaxWidth().height(ControlHeight),
         verticalAlignment = Alignment.CenterVertically,
@@ -974,6 +996,9 @@ internal fun StateControl(
         // seam appearing on the next line down would not be a control at all. Too narrow, and
         // the segments compact instead.
         ExpressiveButtonRow(
+            // Caps this group's own room at groupMaxWidth -- see that val's own doc above
+            // for why the group cannot work this out for itself.
+            modifier = Modifier.widthIn(max = groupMaxWidth),
             spacing = 3.dp,
             verticalAlignment = Alignment.CenterVertically,
             wrap = false,
@@ -1044,6 +1069,7 @@ internal fun StateControl(
             }
         }
     }
+    } // BoxWithConstraints (groupMaxWidth)
 }
 
 
