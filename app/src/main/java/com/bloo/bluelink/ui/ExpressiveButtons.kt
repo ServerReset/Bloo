@@ -116,6 +116,17 @@ private fun expressivePressFraction(interactionSource: InteractionSource, enable
     // for updates" -- both buttons that disable themselves on tap; ordinary buttons that stay
     // enabled through their own click never showed it.
     val isPressed = remember { mutableStateOf(false) }
+    // True from the moment a Release/Cancel starts the animation BACK to rest until it actually
+    // gets there. Needed for the exact same reason `isPressed` is: `enabled` still flips false
+    // WHILE this leg is running, not after -- Release is processed (isPressed already false)
+    // before onClick ever runs, and a click that disables itself does so essentially the same
+    // frame. Without this, the enabled-effect below saw `!isPressed.value` already true (release
+    // already registered) and snapped straight to 0 instead of letting the leg it raced past
+    // play out -- so the "fix" for the push getting cancelled left the RELEASE half of the exact
+    // same gesture getting cut short instead, on the exact same two buttons this was reported on:
+    // a quick tap looked like it barely moved, or didn't spring back, rather than not moving at
+    // all -- easy to miss next to the original "doesn't animate at all" symptom this was chasing.
+    val isSettling = remember { mutableStateOf(false) }
     LaunchedEffect(interactionSource) {
         // Barely-bouncy and quick, because this fraction drives real WIDTH. A bouncy, slow
         // spring is the right feel for something that only paints -- it was the original
@@ -133,16 +144,29 @@ private fun expressivePressFraction(interactionSource: InteractionSource, enable
         fun runTo(target: Float, finishPushFirst: Boolean) {
             leg?.cancel()
             leg = launch {
-                // Finish the push before returning. THIS is what makes a tap feel like a
-                // push: a press and its release can be milliseconds apart, and simply
-                // springing toward whatever the current state is would send the animation
-                // home before it had travelled anywhere -- press a button, watch nothing
-                // happen. Tap and hold differ only in how long the button dwells at full
-                // push, like a physical one.
-                if (finishPushFirst && anim.value < 1f) {
-                    anim.animateTo(1f, spring(dampingRatio = PressDamping, stiffness = Spring.StiffnessHigh))
+                // Marks the WHOLE leg, not just the final animateTo below -- finishPushFirst's
+                // own animateTo(1f) is still part of "getting back to rest", and a snapTo landing
+                // in the middle of THAT leg would be exactly as visible a cut as one landing
+                // during the release spring itself.
+                if (target == 0f) isSettling.value = true
+                try {
+                    // Finish the push before returning. THIS is what makes a tap feel like a
+                    // push: a press and its release can be milliseconds apart, and simply
+                    // springing toward whatever the current state is would send the animation
+                    // home before it had travelled anywhere -- press a button, watch nothing
+                    // happen. Tap and hold differ only in how long the button dwells at full
+                    // push, like a physical one.
+                    if (finishPushFirst && anim.value < 1f) {
+                        anim.animateTo(1f, spring(dampingRatio = PressDamping, stiffness = Spring.StiffnessHigh))
+                    }
+                    anim.animateTo(target, spec)
+                } finally {
+                    // Runs on a clean finish AND on cancellation (a new press interrupting the
+                    // release, say) -- either way this leg is done owning the settle, and the
+                    // NEXT leg (or the enabled-effect) is free to act without a stale true
+                    // blocking it forever.
+                    if (target == 0f) isSettling.value = false
                 }
-                anim.animateTo(target, spec)
             }
         }
         // Collecting the raw interaction FLOW, not a derived `pressed` boolean, and reacting
@@ -187,13 +211,16 @@ private fun expressivePressFraction(interactionSource: InteractionSource, enable
     }
     // Separate from the collector above ON PURPOSE, so a click-triggered disable can no longer
     // cancel that coroutine (see the comment on `isPressed`). This one only ever snaps to rest,
-    // and only when nothing is actually held -- a button disabled while genuinely mid-press
-    // (some other cause, not its own click finishing) still gets pulled back to 0 instead of
-    // being left visually stuck mid-push with no gesture left to release it; a button whose own
-    // tap disabled it keeps its full push-then-release cycle uninterrupted, since `isPressed`
-    // is still true (or has already gone false and settled the animation itself) when this runs.
+    // and only when NEITHER `isPressed` NOR `isSettling` is true -- a button disabled while
+    // genuinely mid-press (some other cause, not its own click finishing) still gets pulled
+    // back to 0 instead of being left visually stuck mid-push with no gesture left to release
+    // it, and a button whose own tap disabled it (Lock/Unlock, Check for updates) gets to
+    // finish its own push-then-release cycle uninterrupted -- `isSettling` is what makes that
+    // second case actually true: Release fires (and `isPressed` goes false) BEFORE onClick
+    // even runs, so by the time the click's own disable reaches this effect, `isPressed` alone
+    // was already false and this used to snap the release spring to a dead stop mid-flight.
     LaunchedEffect(enabled) {
-        if (!enabled && !isPressed.value) anim.snapTo(0f)
+        if (!enabled && !isPressed.value && !isSettling.value) anim.snapTo(0f)
     }
     return anim.asState()
 }

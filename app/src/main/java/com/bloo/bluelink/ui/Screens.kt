@@ -14,8 +14,10 @@ import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
 import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
@@ -361,10 +363,19 @@ fun BlooApp(vm: AppViewModel) {
         AnimatedContent(
             targetState = target,
             transitionSpec = {
-                // Settings slides in from the right; returning slides back left.
+                // Settings slides in from the right; returning slides back left. A real
+                // spring (this app's own SoftDamping/StiffnessMediumLow, the same feel
+                // the garage's own expand/collapse AnimatedContent uses a few screens
+                // down) rather than AnimatedContent's bare default -- the default spec
+                // is tuned for a small content swap settling quickly, and on a screen-
+                // sized slide that read as slightly clipped/mechanical next to every
+                // other full-screen motion in the app. fadeIn/fadeOut keep their own
+                // (fast, linear-feeling) defaults on purpose: only the SLIDE -- the part
+                // that actually travels screen-sized distance -- needed the softer landing.
                 val sign = if (targetState == Screen.Settings) 1 else -1
-                (slideInHorizontally { w -> sign * w } + fadeIn()) togetherWith
-                    (slideOutHorizontally { w -> -sign * w } + fadeOut())
+                val slideSpec = spring<IntOffset>(dampingRatio = SoftDamping, stiffness = Spring.StiffnessMediumLow)
+                (slideInHorizontally(slideSpec) { w -> sign * w } + fadeIn()) togetherWith
+                    (slideOutHorizontally(slideSpec) { w -> -sign * w } + fadeOut())
             },
             label = "screen",
         ) { screen ->
