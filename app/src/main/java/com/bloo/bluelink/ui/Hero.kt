@@ -14,6 +14,7 @@ import androidx.compose.animation.scaleOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
@@ -88,6 +89,8 @@ import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
+import coil.compose.AsyncImagePainter
+import coil.decode.DataSource
 import coil.request.ImageRequest
 import com.bloo.bluelink.data.brand
 import com.bloo.bluelink.data.Vehicle
@@ -738,30 +741,62 @@ internal fun HeroVisual(
         // A transparent PNG renders edge-to-edge with no opaque box, so it blends
         // seamlessly into the pebble (fit, not crop, so the whole subject shows).
         val transparent = imageUrl.endsWith(".png", ignoreCase = true)
-        // crossfade, so the car photo ARRIVES instead of popping. This is the one hero
-        // element that had no animation of any kind: the pebble's collapse animates, the
-        // readout's numbers roll, the bar's fill springs -- and then the photo itself
-        // appeared between two frames. The map tiles below already did this; the hero,
-        // the largest image in the app and the one the eye lands on first, did not.
+        // The car photo ARRIVES instead of popping. This is the one hero element that
+        // had no animation of any kind: the pebble's collapse animates, the readout's
+        // numbers roll, the bar's fill springs -- and then the photo itself appeared
+        // between two frames. The map tiles below already did a plain Coil crossfade;
+        // the hero, the largest image in the app and the one the eye lands on first,
+        // got the same treatment first -- but a bare alpha fade read as flat next to
+        // everything else here springing or sliding into place, so this now does its
+        // own fade+slide+scale "arrival" (same language as ReorderColumn's cold-start
+        // row intro: alpha 0->1 alongside a short upward translation) instead of
+        // leaning on Coil's built-in crossfade.
         //
-        // Coil skips the fade for memory-cache hits by design, which is exactly right
-        // here: a first load fades in, but scrolling back to an already-decoded photo
-        // does not re-fade, so this cannot turn into a flicker on the car pager.
+        // `loadedFrom` (not a plain Boolean) carries WHICH kind of success this was,
+        // because a memory-cache hit must NOT replay the arrival -- scrolling back to
+        // an already-decoded photo (flipping cars and back on the pager, most commonly)
+        // should show it instantly, not fade it in again every time. This is exactly
+        // the distinction Coil's own `crossfade(true)` already made automatically; doing
+        // the animation by hand means re-deriving that distinction from the callback's
+        // own DataSource instead of getting it for free.
+        var loadedFrom by remember(model) { mutableStateOf<DataSource?>(null) }
+        val entrance = remember(model) { Animatable(0f) }
+        LaunchedEffect(loadedFrom) {
+            when (loadedFrom) {
+                null -> {} // still loading -- nothing to animate to yet.
+                DataSource.MEMORY_CACHE -> entrance.snapTo(1f)
+                else -> entrance.animateTo(1f, tween(360, easing = FastOutSlowInEasing))
+            }
+        }
         // Memoized like the map tiles: creating a fresh ImageRequest every recomposition
         // would trigger unnecessary reloads and cause visible flicker/jank.
         val context = LocalContext.current
         val imageRequest = remember(model) {
             ImageRequest.Builder(context)
                 .data(model)
-                .crossfade(true)
                 .build()
         }
         AsyncImage(
             model = imageRequest,
             contentDescription = v.model,
             contentScale = if (transparent) ContentScale.Fit else ContentScale.Crop,
+            onState = { state ->
+                if (state is AsyncImagePainter.State.Success) loadedFrom = state.result.dataSource
+            },
             modifier = sizeModifier
-                .then(if (transparent) Modifier else Modifier.clip(RoundedCornerShape(corner))),
+                .then(if (transparent) Modifier else Modifier.clip(RoundedCornerShape(corner)))
+                .graphicsLayer {
+                    alpha = entrance.value
+                    // A short upward drift, not a full ReorderColumn-sized 28dp one -- this
+                    // is a photo arriving into place it already occupies, not a row sliding
+                    // in from off-list, so the motion is a hint of settling rather than a
+                    // real journey. Same reasoning for the scale: 0.97->1 reads as the photo
+                    // gently coming forward, not a distracting zoom.
+                    translationY = (1f - entrance.value) * 10.dp.toPx()
+                    val s = 0.97f + 0.03f * entrance.value
+                    scaleX = s
+                    scaleY = s
+                },
         )
     }
 }

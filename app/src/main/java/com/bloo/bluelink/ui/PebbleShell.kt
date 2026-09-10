@@ -683,7 +683,23 @@ internal fun PebbleShell(
                             // pebble's title was already reading fine here (nothing beside it needs
                             // a text baseline), and this only swaps which style produces the same
                             // on-screen font size for them too.
-                            val atRestScale = !growTitleOnExpand || headerTState.value < 0.001f
+                            //
+                            // 0.02f, not the tighter 0.001f this used to be: animateFloatAsState's
+                            // own spring implementation SNAPS its value to the exact target the
+                            // instant it's within its (much smaller) internal visibility threshold,
+                            // rather than creeping the rest of the way over further frames -- so at
+                            // 0.001f this swap fired on the SAME frame as that internal snap, one
+                            // discontinuity (the scale jumping straight to its exact rest value
+                            // instead of the smoothly-decaying delta every prior frame had) landing
+                            // on top of another (this Crossfade beginning). Reported as a jump right
+                            // at the tail of the collapse even with the Crossfade below already in
+                            // place -- it was softening the STYLE swap, not this scale discontinuity
+                            // feeding into it. 0.02f fires the swap a little earlier, while the
+                            // scaled title is still visibly mid-decay (imperceptibly close to rest --
+                            // 2% of the gap between collapsed and expanded scale, not 2% of the
+                            // glyph size), so the Crossfade's own blend absorbs the last bit of
+                            // motion instead of colliding with the spring's own hard snap.
+                            val atRestScale = !growTitleOnExpand || headerTState.value < 0.02f
                             Row(
                                 // Only stretched when the trailing slot is being pushed to the
                                 // end -- a row that merely holds a name and a stat must stay
@@ -737,10 +753,19 @@ internal fun PebbleShell(
                                 // alpha cross-dissolve over the swap doesn't need either path to be
                                 // pixel-perfect against the other -- it just means the viewer's eye
                                 // is never asked to register a same-frame jump.
+                                // Wrapped in a Box with an explicit CenterStart alignment, rather
+                                // than relying on Crossfade's own default (TopStart): the two
+                                // outgoing/incoming Texts below are NOT guaranteed the same box
+                                // height (that's the whole reason this Crossfade exists -- see its
+                                // doc above), so top-aligning them stacks glyphs at visibly
+                                // different vertical offsets for the whole 140ms blend instead of
+                                // sharing the row's own CenterVertically. Matches the Row's own
+                                // alignment and the left-anchored transformOrigin the scaled path
+                                // already uses.
+                                Box(modifier = titleBaseModifier, contentAlignment = Alignment.CenterStart) {
                                 Crossfade(
                                     targetState = atRestScale,
                                     animationSpec = tween(140),
-                                    modifier = titleBaseModifier,
                                     label = "heroTitleRestSwap",
                                 ) { atRest ->
                                     Text(
@@ -807,6 +832,7 @@ internal fun PebbleShell(
                                         maxLines = 1,
                                         overflow = TextOverflow.Ellipsis,
                                     )
+                                }
                                 }
                             } else {
                                 // The common case: no grow/shrink, no rest-scale swap ever, so no
