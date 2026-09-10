@@ -53,6 +53,16 @@ sealed interface Screen {
     data object Login : Screen
     /** No vehicles enrolled (or still loading the first time). */
     data object Empty : Screen
+    /**
+     * Shown once, right after a first-time sign-in resolves at least one
+     * vehicle -- BEFORE [Onboarding] -- asking whether to pull an existing
+     * Drive-synced setup or start fresh. Exists so a second phone (or a
+     * reinstall) never has to sit through the whole welcome wizard just to
+     * find the "Sync across devices" card buried in its SETUP step; see
+     * [AppViewModel.restoreFromSyncThenContinue]/[AppViewModel.declineSyncRestore]
+     * for where this leads next.
+     */
+    data object SyncChoice : Screen
     /** First-run welcome wizard that sets up car features before reaching the app. */
     data object Onboarding : Screen
     /** Feature-setup wizard for one or more newly-detected cars (post-first-run). */

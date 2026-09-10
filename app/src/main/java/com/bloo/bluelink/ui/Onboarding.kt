@@ -85,6 +85,7 @@ import androidx.compose.material3.OutlinedCard
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
+import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
@@ -425,6 +426,107 @@ internal fun OnboardingScreen(vm: AppViewModel) {
                     )
                 }
             }
+        }
+    }
+}
+
+/**
+ * [Screen.SyncChoice]: the very first thing a first-run device shows once sign-in
+ * resolves at least one vehicle -- before the welcome wizard gets a chance to
+ * start. Two ways forward:
+ *
+ * - "Restore from sync" opens a document picker for an existing Drive-sync
+ *   file, exactly the same join [OnboardingSetupPage]'s own buried "Sync
+ *   across devices" card and Settings' "Backup & sync" card both use
+ *   ([AppViewModel.importSettingsAndSync]/[AppViewModel.restoreFromSyncThenContinue]).
+ *   That's deliberate reuse, not a new sync mechanism -- this screen only
+ *   changes WHEN the option is offered, surfacing it before a single wizard
+ *   page renders instead of requiring a click through to the SETUP step to
+ *   discover it. Once the join finishes, [AppViewModel.restoreFromSyncThenContinue]
+ *   re-resolves the destination screen from what actually got restored:
+ *   straight to the garage if the import already answered everything
+ *   onboarding would have asked, [Screen.CarSetup] for any car it didn't
+ *   cover, or the normal wizard if the file didn't resolve first-run status
+ *   at all.
+ * - "Set up fresh" ([AppViewModel.declineSyncRestore]) proceeds into
+ *   [OnboardingScreen] exactly as if this screen didn't exist.
+ *
+ * `restoring` only guards against double-tapping the restore button while its
+ * (network-bound) join is in flight -- there's nothing to reset it back to
+ * false on failure, because a failed join reports its own snackbar and this
+ * whole screen stays composed either way, ready to be tapped again.
+ */
+@Composable
+internal fun SyncChoiceScreen(vm: AppViewModel) {
+    val context = LocalContext.current
+    var restoring by remember { mutableStateOf(false) }
+    val restoreLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocument(),
+    ) { uri ->
+        if (uri != null) {
+            restoring = true
+            vm.restoreFromSyncThenContinue(context, uri)
+        }
+    }
+    val scheme = MaterialTheme.colorScheme
+    Box(Modifier.fillMaxSize()) {
+        AuroraBackground(Modifier.matchParentSize())
+        Column(
+            Modifier
+                .fillMaxSize()
+                .statusBarsPadding()
+                .navigationBarsPadding()
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 24.dp),
+            verticalArrangement = Arrangement.Center,
+        ) {
+            Text("🔄", style = MaterialTheme.typography.displaySmall)
+            Spacer(Modifier.height(12.dp))
+            Text(
+                "Set up this device",
+                style = MaterialTheme.typography.headlineMedium,
+                fontWeight = FontWeight.Black,
+                color = scheme.onSurface,
+            )
+            Spacer(Modifier.height(4.dp))
+            Text(
+                "Already use Bloo somewhere else with sync turned on? Bring that " +
+                    "setup in here instead of answering everything again.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = scheme.onSurfaceVariant,
+            )
+            Spacer(Modifier.height(28.dp))
+
+            OnboardingSetupCard(
+                icon = Icons.Filled.CloudSync,
+                title = "Restore from sync",
+                body = "Pick the sync file another device is already using -- theme, " +
+                    "layout, alert thresholds, climate presets, and car setup all come with it.",
+                done = false,
+            ) {
+                MorphButton(
+                    onClick = { restoreLauncher.launch(arrayOf("application/json")) },
+                    enabled = !restoring,
+                    modifier = Modifier.fillMaxWidth(),
+                    contentPadding = PaddingValues(vertical = 12.dp),
+                ) {
+                    if (restoring) LoadingIndicator() else MorphButtonLabel(Icons.Filled.Cloud, "Choose sync file", pending = false)
+                }
+            }
+
+            Spacer(Modifier.height(16.dp))
+
+            MorphButton(
+                onClick = vm::declineSyncRestore,
+                enabled = !restoring,
+                modifier = Modifier.fillMaxWidth(),
+                containerColor = scheme.secondaryContainer,
+                contentColor = scheme.onSecondaryContainer,
+            ) {
+                Text("Set up fresh", style = ButtonLabelStyle, fontWeight = FontWeight.SemiBold)
+            }
+
+            Spacer(Modifier.height(24.dp))
         }
     }
 }

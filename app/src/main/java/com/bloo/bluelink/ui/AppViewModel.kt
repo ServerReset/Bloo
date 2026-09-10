@@ -1075,15 +1075,9 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         // the cold-start critical path (every one of them returning fields off the identical
         // snapshot). See snapshot()'s own doc for why this is the pattern every per-car/global
         // getter here is meant to be paired with.
-        val firstRun = !settingsStore.onboardingSeen(prefs)
-        val unconfiguredVins = vehicles.filter { !settingsStore.isCarConfigured(it.vin, prefs) }.map { it.vin }
         val lastVin = settingsStore.lastVehicleVin(prefs)
         val index = vehicles.indexOfFirst { it.vin == lastVin }.let { if (it < 0) 0 else it }
-        val screen = when {
-            firstRun -> Screen.Onboarding
-            unconfiguredVins.isNotEmpty() -> Screen.CarSetup(unconfiguredVins)
-            else -> Screen.Garage
-        }
+        val screen = resolveScreen(vehicles, prefs)
         _state.update {
             // Shared config first, then the fields only the full garage load owns.
             cfg.apply(it).copy(
@@ -1166,6 +1160,33 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
      * Settings screen already open) kept showing whatever it loaded before the
      * import, until some unrelated event happened to trigger a full reload.
      */
+    /**
+     * Decides which screen a signed-in session with [vehicles] already loaded should land
+     * on, from a fresh [prefs] snapshot: [firstRunScreen] for a genuinely first-run device,
+     * then [Screen.CarSetup] for any vehicle that first-run screen doesn't cover (a car
+     * added since, or one a partial restore didn't configure), else straight to the garage.
+     *
+     * Shared by [loadGarageInner] (a fresh vehicle fetch, where "first run" means
+     * [Screen.SyncChoice] -- ask before assuming anything) and
+     * [restoreFromSyncThenContinue] (an import that can flip onboarding_seen/isCarConfigured
+     * without any new vehicle fetch at all -- there [firstRunScreen] is [Screen.Onboarding],
+     * so a restore that didn't actually resolve first-run status falls into the normal
+     * wizard instead of looping back to the choice the user just answered).
+     */
+    private suspend fun resolveScreen(
+        vehicles: List<Vehicle>,
+        prefs: androidx.datastore.preferences.core.Preferences,
+        firstRunScreen: Screen = Screen.SyncChoice,
+    ): Screen {
+        val firstRun = !settingsStore.onboardingSeen(prefs)
+        val unconfiguredVins = vehicles.filter { !settingsStore.isCarConfigured(it.vin, prefs) }.map { it.vin }
+        return when {
+            firstRun -> firstRunScreen
+            unconfiguredVins.isNotEmpty() -> Screen.CarSetup(unconfiguredVins)
+            else -> Screen.Garage
+        }
+    }
+
     /**
      * Reads this device's 17 local per-car / per-tile config values for [vehicles] from one
      * [prefs] snapshot and returns a UiState transform that folds them into `copy()`, plus the
@@ -2060,6 +2081,37 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             // watch's matching tile hides/shows immediately.
             com.bloo.bluelink.wear.MainToSecondarySync.publishSettings(getApplication(), appearance.value)
         }
+    }
+
+    /** [Screen.SyncChoice] -- user picked "Set up fresh" instead of restoring.
+     *  Proceeds into the normal welcome wizard exactly as if this device had
+     *  no sync option to offer at all. */
+    fun declineSyncRestore() {
+        _state.update { it.copy(screen = Screen.Onboarding) }
+    }
+
+    /**
+     * [Screen.SyncChoice] -- user picked "Restore from sync". Joins the picked
+     * file exactly like Settings' own "Backup & sync" card
+     * ([importSettingsAndSync]) does, then re-resolves which screen this
+     * device lands on from the freshly-imported config, instead of leaving it
+     * parked on the choice screen forever: straight to the garage if the
+     * import's onboarding_seen/isCarConfigured flags say this device is
+     * already fully set up, [Screen.CarSetup] for whichever cars it doesn't
+     * cover (a car added since the backup, say), or -- if the picked file
+     * turned out not to actually resolve first-run status at all (a bad file,
+     * a failed join, or one from before this app tracked those flags) -- the
+     * normal onboarding wizard, deliberately NOT back to this same choice.
+     */
+    fun restoreFromSyncThenContinue(context: android.content.Context, uri: android.net.Uri) = viewModelScope.launch {
+        importSettingsAndSyncSuspend(context, uri)
+        val vehicles = _state.value.vehicles
+        val screen = if (vehicles.isEmpty()) {
+            Screen.Onboarding
+        } else {
+            resolveScreen(vehicles, settingsStore.snapshot(), firstRunScreen = Screen.Onboarding)
+        }
+        _state.update { it.copy(screen = screen) }
     }
 
     /** Finish first-run onboarding (wizard complete) and land in the app. */
@@ -3241,6 +3293,19 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
      * the file is readable, (2) take a persisted grant, (3) reset per-file gate state
      * so join-adopt arms, then (4) run one pass. */
     fun importSettingsAndSync(context: android.content.Context, uri: android.net.Uri) = viewModelScope.launch {
+        importSettingsAndSyncSuspend(context, uri)
+    }
+
+    /**
+     * Suspending body of [importSettingsAndSync], split out so
+     * [restoreFromSyncThenContinue] can await the whole join (read, persisted
+     * grant, join-adopt pass, local-config refresh) before it re-resolves
+     * which screen to land on -- a plain `viewModelScope.launch` gives no way
+     * to know when that's actually finished. Returns whether the join
+     * succeeded (a persisted grant was obtained and the sync pass ran), not
+     * whether the picked file actually had anything to adopt.
+     */
+    private suspend fun importSettingsAndSyncSuspend(context: android.content.Context, uri: android.net.Uri): Boolean {
         // Read once purely to confirm the file is reachable; do NOT import it here.
         val readable = withContext(Dispatchers.IO) {
             runCatching { context.contentResolver.openInputStream(uri)?.use { it.bufferedReader().readText() } }.isSuccess
@@ -3259,7 +3324,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             _state.update {
                 it.copy(message = "Couldn't get lasting access to that file. Try picking it again", messageType = "error")
             }
-            return@launch
+            return false
         }
         // Reset per-file gate state so join-adopt arms for this file (synced_ever
         // cleared), then point sync at it.
@@ -3271,6 +3336,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         // import into the already-loaded vehicles (seats/powertrain/photo) right away.
         runDriveSyncNow()
         if (_state.value.syncError == null) refreshLocalCarConfig()
+        return true
     }
 
     /** Set Wi-Fi only vs any network for auto-sync. */
