@@ -1842,9 +1842,26 @@ internal fun SettingsScreen(
                             enabled = !state.updateChecking,
                             active = true,
                         ) {
+                            // Label deliberately does NOT change to "Checking…" -- it stays
+                            // "Check" the whole time, and pending=true alone swaps the icon
+                            // to a spinner (MorphButtonGlyph). This button lives inside an
+                            // ExpressiveButtonRow alongside "GitHub": MorphButtonLabel feeds
+                            // its own measured width into that group's intrinsics-based
+                            // fit check on every recomposition, and this button's own
+                            // width-growth animation is a SEPARATE spring already running on
+                            // press/release (see expressivePressFraction). A label that also
+                            // changed length right as that press fired -- and animateContentSize
+                            // is deliberately OFF for group members, see MorphButtonCore's own
+                            // comment, so that length change would have SNAPPED rather than
+                            // eased -- stacked a second, uncoordinated width change on top of
+                            // the first and could shove "GitHub" sideways or force the whole
+                            // row to compact, right when you tap it. Reported as jank on this
+                            // exact button. A fixed label removes the second width change
+                            // entirely; the spinner alone communicates "in progress" just as
+                            // clearly.
                             MorphButtonLabel(
                                 icon = Icons.Filled.Refresh,
-                                label = if (state.updateChecking) "Checking…" else "Check",
+                                label = "Check",
                                 pending = state.updateChecking,
                             )
                         }
