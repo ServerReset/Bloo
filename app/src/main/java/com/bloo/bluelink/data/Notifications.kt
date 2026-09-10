@@ -902,7 +902,22 @@ object CarAlerts {
                 val since = settings.unlockedSince(v.vin)
                 if (since == null) {
                     settings.setUnlockedSince(v.vin, now)
-                } else if (canDeliver && now - since > prefs.unlockedMinutes * 60_000L && !settings.alertFired(key)) {
+                } else if (
+                    canDeliver &&
+                    // Not while actually driving: some cars report doorLock == false
+                    // for a stretch of active driving (child-lock/central-locking
+                    // states that don't map cleanly to the simple locked/unlocked
+                    // status field), and "your car has been left unlocked" is a
+                    // false alarm when you're the one driving it right now -- reported
+                    // as a real false-positive alert mid-drive. Deliberately NOT
+                    // resetting `since` here (see below): once actual driving stops,
+                    // a genuinely-still-unlocked car alerts immediately using the
+                    // ORIGINAL start time, rather than waiting a fresh unlockedMinutes
+                    // from the moment the drive ended.
+                    !status.isDriving &&
+                    now - since > prefs.unlockedMinutes * 60_000L &&
+                    !settings.alertFired(key)
+                ) {
                     out += Alert(
                         unlockedId(v),
                         "${v.name} is unlocked",
@@ -931,7 +946,21 @@ object CarAlerts {
                 val since = settings.engineOnSince(v.vin)
                 if (since == null) {
                     settings.setEngineOnSince(v.vin, now)
-                } else if (canDeliver && now - since > prefs.runningMinutes * 60_000L && !settings.alertFired(key)) {
+                } else if (
+                    canDeliver &&
+                    // Not while actually driving: the engine/climate being "on" for
+                    // more than runningMinutes is completely expected the entire time
+                    // you're driving -- that alert exists to catch a car idling
+                    // unattended (remote-started and forgotten, or left running in a
+                    // driveway), not to interrupt an ordinary long drive. Reported as
+                    // a real false-positive mid-drive. `since` is deliberately NOT
+                    // reset here (see the matching note on the unlocked check above):
+                    // once you stop, a car that's STILL running alerts right away off
+                    // the original on-since timestamp rather than restarting the clock.
+                    !status.isDriving &&
+                    now - since > prefs.runningMinutes * 60_000L &&
+                    !settings.alertFired(key)
+                ) {
                     out += Alert(
                         runningId(v),
                         "${v.name} is running",

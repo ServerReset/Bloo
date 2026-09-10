@@ -199,6 +199,12 @@ internal fun LoginScreen(
     loading: Boolean,
     onLogin: (String, String, String, Brand) -> Unit,
     onCancel: (() -> Unit)? = null,
+    /** Opens a document picker for an existing Drive-sync/backup file and joins
+     *  it -- see the call site's doc for exactly what this does and does not
+     *  restore. Null hides the option entirely (kept optional so any other
+     *  caller of this composable isn't forced to wire up a picker it doesn't
+     *  need). */
+    onRestoreFromSync: (() -> Unit)? = null,
 ) {
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
@@ -476,6 +482,29 @@ internal fun LoginScreen(
                             },
                             contentColor = scheme.onSurfaceVariant,
                         )
+                        }
+                    }
+
+                    // Restore from an existing Drive-sync file -- for a second phone/
+                    // reinstall that already has one set up elsewhere. Doesn't touch
+                    // sign-in (see onRestoreFromSync's own doc for exactly why not);
+                    // it just means the app already looks like the synced device's
+                    // (theme, pebble layout, thresholds, presets, car setup already
+                    // marked done) the moment sign-in actually completes below.
+                    if (onRestoreFromSync != null) {
+                        Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                            val restoreSource = remember { MutableInteractionSource() }
+                            SafeExpansiveButton(
+                                interactionSource = restoreSource,
+                                enabled = true,
+                            ) {
+                                MorphTextButton(
+                                    text = "Restore from sync",
+                                    interactionSource = restoreSource,
+                                    onClick = onRestoreFromSync,
+                                    contentColor = scheme.onSurfaceVariant,
+                                )
+                            }
                         }
                     }
 

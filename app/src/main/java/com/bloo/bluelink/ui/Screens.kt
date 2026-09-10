@@ -7,6 +7,8 @@
 
 package com.bloo.bluelink.ui
 
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -385,10 +387,31 @@ fun BlooApp(vm: AppViewModel) {
                 // than before, not more.
                 Screen.Loading -> LoadingScreen(Modifier.padding(padding))
                 Screen.Login -> Box(Modifier.padding(padding)) {
+                    // Lets a second device join an existing Drive sync file BEFORE
+                    // signing in at all -- same call the "Backup & sync" card in
+                    // Settings already uses (importSettingsAndSync both restores
+                    // preferences and turns on auto-sync going forward, rather
+                    // than a one-shot import that would drift again immediately).
+                    // This deliberately does NOT touch sign-in itself: credentials
+                    // live in CredentialStore (Android Keystore-backed), never in
+                    // the portable settings file (see SyncMerge.DEVICE_LOCAL_KEYS
+                    // and CredentialStore's own doc) -- a synced file is something
+                    // the user's own Drive/cloud provider can see, and shipping a
+                    // plaintext account password through it is not a trade this
+                    // app makes silently. What it DOES buy: onboarding_seen and
+                    // every car's isCarConfigured flag are ordinary synced keys
+                    // (not device-local), so once the user signs in for real,
+                    // AppViewModel.kt's screen-selection (firstRun / unconfiguredVins)
+                    // finds them already true and lands straight on the garage
+                    // instead of replaying the intro + per-car setup wizard.
+                    val restoreSyncLauncher = rememberLauncherForActivityResult(
+                        ActivityResultContracts.OpenDocument(),
+                    ) { uri -> uri?.let { vm.importSettingsAndSync(context, it) } }
                     LoginScreen(
                         loading = state.loading,
                         onLogin = vm::login,
                         onCancel = if (state.accounts.isNotEmpty()) ({ vm.cancelAddAccount() }) else null,
+                        onRestoreFromSync = { restoreSyncLauncher.launch(arrayOf("application/json")) },
                     )
                     state.kiaOtp?.let { otp -> KiaOtpDialog(otp, loading = state.loading, vm = vm) }
                     state.canadaOtp?.let { otp -> CanadaOtpDialog(otp, loading = state.loading, vm = vm) }
