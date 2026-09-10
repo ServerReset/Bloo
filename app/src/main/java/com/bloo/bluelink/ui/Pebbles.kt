@@ -28,7 +28,6 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
-import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
@@ -101,6 +100,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
@@ -837,11 +837,24 @@ internal fun StateControl(
 ) {
     // Which state is the "highlighted" (on) one.
     val highlighted = enabled && (if (highlightWhenOff) isOn == false else isOn == true)
-    // BoxWithConstraints ONLY to learn this row's real width, so the button group below can
-    // be capped at what's actually left over once the name/state column takes its own
-    // 120dp floor -- see groupMaxWidth's own doc just below for why this is necessary at
-    // all, not optional polish.
-    BoxWithConstraints(Modifier.fillMaxWidth()) {
+    // The row's own real, measured width -- onSizeChanged, not BoxWithConstraints. Both
+    // report the same number, but BoxWithConstraints is a SubcomposeLayout under the hood:
+    // its content is composed in a SEPARATE pass, deferred until the constraints are known,
+    // which is real, avoidable overhead on something this exact composable is not rare --
+    // it draws EVERY car's Lock/Unlock row, so every car page composing during a swipe
+    // (beyondViewportPageCount = 1 means up to three at once) paid it. onSizeChanged is a
+    // plain draw/layout callback on the SAME Row that was always here, no extra composition
+    // pass at all -- the identical trade PebbleHeaderHeight's own rowHeightDp already makes
+    // a few lines below in this same file's sibling function.
+    //
+    // Default a generous 1000.dp, not a small one: this value is read to CAP the button
+    // group, so an inaccurate LOW default (before the real width lands, one frame after
+    // first composition) would wrongly force it to compact on that first frame. A HIGH
+    // default instead means the first frame renders exactly as it always did -- uncapped --
+    // and the real cap takes over a frame later, imperceptible and safe in the direction
+    // that matters (never a false compact, only a one-frame-late correct one).
+    var rowWidthDp by remember { mutableStateOf(1000.dp) }
+    val density = LocalDensity.current
     // Without this cap, the button group -- a plain (non-weighted) Row child -- is measured
     // against the row's FULL width, because Row measures non-weighted children BEFORE it
     // knows what a weighted sibling (the name/state column, `widthIn(min = 120.dp)` a few
@@ -857,9 +870,12 @@ internal fun StateControl(
     // width to be bounded first, not a bigger number on the column's own floor (already tried
     // once, on the pebble-header version of this exact bug, and it only bought a bit more
     // room rather than fixing the actual priority).
-    val groupMaxWidth = (maxWidth - 120.dp - 12.dp).coerceAtLeast(0.dp)
+    val groupMaxWidth = (rowWidthDp - 120.dp - 12.dp).coerceAtLeast(0.dp)
     Row(
-        Modifier.fillMaxWidth().height(ControlHeight),
+        Modifier
+            .fillMaxWidth()
+            .height(ControlHeight)
+            .onSizeChanged { rowWidthDp = with(density) { it.width.toDp() } },
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
@@ -1069,7 +1085,6 @@ internal fun StateControl(
             }
         }
     }
-    } // BoxWithConstraints (groupMaxWidth)
 }
 
 

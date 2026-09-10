@@ -44,7 +44,6 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
-import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
@@ -322,6 +321,23 @@ internal fun PebbleShell(
     // corner now targets ITS half, so the card is a true capsule at whatever height this
     // pebble's own content actually needs, not just the one height it was tuned against.
     var headerRowHeightPx by remember { mutableIntStateOf(0) }
+    // The row's own real, measured width -- read off the SAME onSizeChanged callback that
+    // already reports headerRowHeightPx below, rather than a separate BoxWithConstraints
+    // wrapper. Both would report the same number, but BoxWithConstraints is a
+    // SubcomposeLayout: its content composes in a SEPARATE, deferred pass, which is real,
+    // avoidable overhead on a composable that runs for EVERY pebble's header, on every car
+    // page -- reported as an app-wide stutter switching between cars, where up to three full
+    // pebble columns (beyondViewportPageCount = 1) compose or recompose at once. A plain
+    // onSizeChanged callback is layout-phase only, no extra composition pass, the same trade
+    // headerRowHeightPx already made for the corner radius just below.
+    //
+    // Default a generous 1000.dp, not headerRowHeightPx's small-is-safe 0: this value CAPS
+    // SplitExpandButton, so an inaccurate LOW default (before the real width lands, one
+    // frame after first composition) would wrongly force it to compact on that first frame.
+    // A HIGH default means the first frame renders exactly as it always did -- uncapped --
+    // and the real cap takes over a frame later, imperceptible and safe in the direction
+    // that matters (never a false compact, only a one-frame-late correct one).
+    var headerRowWidthDp by remember { mutableStateOf(1000.dp) }
     val density = LocalDensity.current
     val collapsedCorner = if (headerRowHeightPx > 0) {
         with(density) { (headerRowHeightPx / 2f).toDp() }
@@ -440,10 +456,6 @@ internal fun PebbleShell(
                     // action button and chevron handle their own clicks. Fixed min height
                     // so every collapsed pebble lines up.
                     //
-                    // BoxWithConstraints ONLY to learn this row's real width, so
-                    // headerActionMaxWidth below can cap SplitExpandButton -- see that
-                    // val's own doc for why. Nothing about the Row itself changes.
-                    BoxWithConstraints(Modifier.fillMaxWidth()) {
                     // headerActionMaxWidth reserves room for "the other stuff in the row"
                     // (the leading icon, the two gaps either side of the title column, the
                     // row's own start/end padding, and a floor for the title itself) before
@@ -472,7 +484,7 @@ internal fun PebbleShell(
                     // ellipsizing on its own past that, same as before -- this only changes
                     // who gives way FIRST when the two compete.
                     val headerActionMaxWidth = (
-                        maxWidth - 16.dp - 20.dp - ButtonIconGap - 10.dp - 12.dp - 140.dp
+                        headerRowWidthDp - 16.dp - 20.dp - ButtonIconGap - 10.dp - 12.dp - 140.dp
                         ).coerceAtLeast(0.dp)
                     Row(
                         Modifier
@@ -481,8 +493,14 @@ internal fun PebbleShell(
                             // whole card's collapsed height (the body is hidden then),
                             // and it's stable across the expand/collapse animation
                             // itself (only the body grows/shrinks below it), so this
-                            // never fires mid-bounce with a transient wrong value.
-                            .onSizeChanged { headerRowHeightPx = it.height }
+                            // never fires mid-bounce with a transient wrong value. Also
+                            // feeds headerActionMaxWidth above, off the SAME callback --
+                            // see headerRowWidthDp's own doc for why this replaced a
+                            // BoxWithConstraints wrapper here.
+                            .onSizeChanged {
+                                headerRowHeightPx = it.height
+                                headerRowWidthDp = with(density) { it.width.toDp() }
+                            }
                             .then(
                                 if (forceExpanded || !canToggle) Modifier
                                 else Modifier.clickable {
@@ -865,7 +883,6 @@ internal fun PebbleShell(
                             }
                         }
                     }
-                    } // BoxWithConstraints (headerActionMaxWidth)
                     // Normal pebbles: animate the body sliding open/closed. fade = false on
                     // the exit -- StaggeredRevealColumn's rows own their own fade now (see
                     // collapseExit's own doc for why running a SECOND, block-level fade at the
