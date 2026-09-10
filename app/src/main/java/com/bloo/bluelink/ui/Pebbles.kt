@@ -83,6 +83,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.State
 import androidx.compose.runtime.remember
@@ -466,16 +467,33 @@ internal fun PebbleList(v: Vehicle, state: State<UiState>, vm: AppViewModel, exc
     // which run BEFORE their Pebble() call regardless of collapsed state) on the
     // fling-settle frame is the biggest remaining car-swipe cost. So: compose the
     // hero + first EAGER_PEBBLES sections immediately (they're the only ones
-    // above the fold), stub the rest with a collapsed-height placeholder for ONE
-    // frame, then fill them in once idle (`filled` flips after the first frame).
+    // above the fold), stub the rest with a collapsed-height placeholder, then
+    // fill them in ONE AT A TIME, one per frame, rather than all at once.
     // Keyed on VIN so a disposed→recomposed page re-defers cheaply; a page kept
     // warm by beyondViewportPageCount=1 fills before the user ever swipes to it.
     // CRITICAL: `items` stays the FULL section list, so ReorderColumn's per-item
     // Box/key/animatePlacement/onSizeChanged/drag/semantics all exist from frame
     // one — only the body inside the content lambda is deferred, so the reorder
     // model is 100% intact and the off-screen stub→real swap is never visible.
-    var filled by remember(v.vin) { mutableStateOf(false) }
-    LaunchedEffect(v.vin) { withFrameNanos { }; filled = true }
+    //
+    // One-at-a-time, not the single "wait one frame, then fill everything" this used to
+    // be: on a wide/foldable screen (GarageScreen's perPage > 1, multiple cars sharing one
+    // page), every car's PebbleList ran that same one-frame defer independently -- so
+    // frame 2 of a page settle didn't just fill ONE car's remaining 5-7 pebbles, it filled
+    // EVERY visible car's remaining pebbles simultaneously, concentrating the exact cost
+    // this mechanism exists to spread out into one single, now-bigger frame. Reported as
+    // sluggish switching cars specifically on a large-screen foldable. Filling one pebble
+    // per frame spreads that same total work across however many non-eager pebbles there
+    // are, so no single frame pays for more than one pebble's worth of composition,
+    // regardless of how many cars share the page.
+    var filledCount by remember(v.vin) { mutableIntStateOf(0) }
+    LaunchedEffect(v.vin, sections.size) {
+        val remaining = (sections.size - EAGER_PEBBLES).coerceAtLeast(0)
+        repeat(remaining) {
+            withFrameNanos { }
+            filledCount++
+        }
+    }
     val eager = remember(sections) { sections.take(EAGER_PEBBLES).toSet() }
     ReorderColumn(
         items = sections,
@@ -506,13 +524,19 @@ internal fun PebbleList(v: Vehicle, state: State<UiState>, vm: AppViewModel, exc
         staggerInOnColdStart = true,
         introKey = v.vin,
     ) { section, dragHandle, _ ->
-        if (filled || section in eager) {
+        // This section's own position among the NON-eager ones, so filledCount (which
+        // ticks up by one per frame) can unlock them in list order, first-below-the-fold
+        // first -- sections.indexOf is O(n) on an 8-10 item list, negligible next to the
+        // pebble composition this whole mechanism exists to defer.
+        val nonEagerIndex = sections.indexOf(section) - EAGER_PEBBLES
+        if (section in eager || nonEagerIndex < filledCount) {
             SinglePebble(section, v, state, vm, dragHandle)
         } else {
-            // One-frame off-screen placeholder: reserves ~collapsed pebble height so
-            // the list doesn't visibly jump when the real body fills in, and carries
-            // the dragHandle so ReorderColumn's item is fully formed. Below the fold,
-            // so this transient state is never seen or interacted with.
+            // Off-screen placeholder, up to a few frames now rather than always exactly
+            // one: reserves ~collapsed pebble height so the list doesn't visibly jump
+            // when the real body fills in, and carries the dragHandle so ReorderColumn's
+            // item is fully formed. Below the fold, so this transient state is never
+            // seen or interacted with.
             Box(Modifier.fillMaxWidth().height(PebbleHeaderHeight).then(dragHandle))
         }
     }
