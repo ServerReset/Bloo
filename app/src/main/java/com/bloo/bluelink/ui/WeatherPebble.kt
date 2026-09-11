@@ -16,6 +16,7 @@ package com.bloo.bluelink.ui
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import android.os.Build
 import androidx.browser.customtabs.CustomTabsIntent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Animatable
@@ -117,6 +118,7 @@ import androidx.compose.ui.window.DialogWindowProvider
 import dev.chrisbanes.haze.HazeState
 import dev.chrisbanes.haze.HazeProgressive
 import dev.chrisbanes.haze.hazeEffect
+import dev.chrisbanes.haze.hazeSource
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.bloo.uicommon.dropShadow
@@ -1209,6 +1211,13 @@ private fun CarMapSheetBody(
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val density = LocalDensity.current
+    // Its own HazeState, independent of [hazeState] (which sources the SCREEN
+    // behind this sheet, for the scrim above) -- this one sources the map tiles
+    // THEMSELVES, drawn inside this sheet, so the drag handle's own frosted chip
+    // (below) can blur what's actually behind it regardless of whether this sheet
+    // is hosted in a Dialog (where [hazeState] is always null) or GarageScreen's
+    // own overlay.
+    val mapHazeState = remember { HazeState() }
 
     // This map area's own full-size on-screen rect, captured once laid out --
     // constant for the life of this sheet (only the graphicsLayer transform below
@@ -1378,7 +1387,15 @@ private fun CarMapSheetBody(
             ) {
                 CarMap(
                     location,
-                    Modifier.fillMaxSize(),
+                    // hazeSource, not just fillMaxSize: marks the map's own tiles as
+                    // blurrable content for the drag handle's own frosted chip below
+                    // (mapHazeState) -- a SEPARATE HazeState from the sheet's own
+                    // scrim blur ([hazeState] param), which sources the screen behind
+                    // this sheet, not the map drawn on top of it. Blurring the handle
+                    // against the map itself needs its own source regardless of
+                    // whether this sheet is a Dialog or an in-tree overlay, so this
+                    // works either way even when [hazeState] itself is null.
+                    Modifier.fillMaxSize().hazeSource(mapHazeState),
                     state = mapState,
                     deviceLocation = deviceLocation,
                     onExpand = null,
@@ -1472,12 +1489,39 @@ private fun CarMapSheetBody(
                     },
                 contentAlignment = Alignment.TopCenter,
             ) {
+                // A small frosted chip behind the pill itself, blurring the map
+                // (via mapHazeState -- see its own doc for why this one, not the
+                // sheet's own [hazeState]) -- reported directly as wanting the
+                // handle "more visible": a bare translucent bar sitting directly on
+                // the map read fine over open sky but vanished over a light road or
+                // a bright building roof right under it. Blurring (on API 31+,
+                // where Haze's RenderEffect backing actually exists -- same
+                // canBlur guard StatusBarScrim uses) or, on older devices, just
+                // darkening the map immediately behind this one small area
+                // guarantees contrast for the pill regardless of what's drawn
+                // under it.
+                val canBlurHandle = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
                 Box(
                     Modifier
                         .padding(top = 8.dp)
-                        .size(width = 28.dp, height = 4.dp)
-                        .background(Color.White.copy(alpha = 0.4f), RoundedCornerShape(2.dp)),
-                )
+                        .size(width = 56.dp, height = 20.dp)
+                        .clip(RoundedCornerShape(50))
+                        .then(
+                            if (canBlurHandle) {
+                                Modifier.hazeEffect(state = mapHazeState)
+                            } else {
+                                Modifier
+                            },
+                        )
+                        .background(Color.Black.copy(alpha = if (canBlurHandle) 0.2f else 0.35f)),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Box(
+                        Modifier
+                            .size(width = 28.dp, height = 4.dp)
+                            .background(Color.White.copy(alpha = 0.8f), RoundedCornerShape(2.dp)),
+                    )
+                }
             }
         }
     }
