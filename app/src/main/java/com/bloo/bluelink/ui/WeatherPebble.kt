@@ -28,6 +28,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.material.ripple.ripple
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -227,11 +228,11 @@ internal fun LocationPebble(v: Vehicle, state: UiState, vm: AppViewModel, dragHa
                     // headline. This tile rendered the address three times at once -- headline,
                     // hero and the map stripe's caption.
                 }
-                // Expanding grows this SAME map into a full-screen overlay -- see CarMap's
-                // own onExpand doc and, for how "same" that really is, ExpandedMapState's.
-                // LocalExpandedMap is only provided by GarageScreen today; anywhere else
-                // (the flip-cover screen) falls back to the old, self-contained path: a
-                // genuinely separate CarMap/CarMapState inside a Dialog-based CarMapSheet.
+                // THE SAME CarMap rendered here is what expands to fill the screen.
+                // When NOT expanded: visible in the pebble. When expanded: appears
+                // at full-screen, morphing from this exact location. It's a single
+                // CarMapState + bounds tracked, with one rendering in the pebble
+                // (invisible when expanded) and one at full-screen (morphing from it).
                 val expandedMap = LocalExpandedMap.current
                 if (expandedMap != null) {
                     val isExpanded = expandedMap.vin == v.vin
@@ -244,11 +245,9 @@ internal fun LocationPebble(v: Vehicle, state: UiState, vm: AppViewModel, dragHa
                             .onGloballyPositioned {
                                 expandedMap.originBoundsFor(v.vin).value = Rect(it.positionOnScreen(), it.size.toSize())
                             }
-                            // Hidden (not removed) while expanded -- the overlay drawn
-                            // elsewhere in GarageScreen's own tree is what's actually
-                            // visible growing out of this slot; keeping this composed
-                            // (rather than an `if (!isExpanded)`) means it's still here,
-                            // still measured, the instant the overlay collapses back.
+                            // Hidden while expanded - still in the tree, still laid out
+                            // correctly, but invisible. The overlay version at full-screen
+                            // morphs from this map's measured bounds.
                             .graphicsLayer { alpha = if (isExpanded) 0f else 1f },
                         state = expandedMap.mapStateFor(v.vin),
                         deviceLocation = state.deviceLocation,
@@ -256,12 +255,6 @@ internal fun LocationPebble(v: Vehicle, state: UiState, vm: AppViewModel, dragHa
                     )
                 } else {
                     var showMapSheet by remember { mutableStateOf(false) }
-                    // This map's own on-SCREEN bounds, in ABSOLUTE display coordinates
-                    // (positionOnScreen(), not a window-relative boundsInWindow()) --
-                    // CarMapSheet's own map area grows FROM this rect rather than just
-                    // appearing, regardless of whether the sheet ends up sharing this
-                    // Activity's window or opening its own (screen-absolute coordinates
-                    // are correct either way, so this doesn't have to know or care).
                     var mapOriginBounds by remember { mutableStateOf<Rect?>(null) }
                     CarMap(
                         loc,
@@ -270,6 +263,7 @@ internal fun LocationPebble(v: Vehicle, state: UiState, vm: AppViewModel, dragHa
                             .height(if (coverGlance) 130.dp else 220.dp)
                             .clip(RoundedCornerShape(18.dp))
                             .onGloballyPositioned { mapOriginBounds = Rect(it.positionOnScreen(), it.size.toSize()) },
+                        state = remember { CarMapState() },
                         deviceLocation = state.deviceLocation,
                         onExpand = { showMapSheet = true },
                     )
