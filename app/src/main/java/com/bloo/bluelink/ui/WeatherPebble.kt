@@ -20,6 +20,7 @@ import androidx.browser.customtabs.CustomTabsIntent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -53,6 +54,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -61,6 +64,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -369,15 +373,30 @@ internal fun WeatherPebble(v: Vehicle, state: UiState, vm: AppViewModel, dragHan
     }
 }
 
+/** Zoom bounds for [CarMap]'s pinch-zoom -- 3 is "half the continent", 19 is past
+ *  what OSM/CARTO actually serve tiles for. Same floor/ceiling either surface can hit. */
+private const val CarMapMinZoom = 3
+private const val CarMapMaxZoom = 19
+
 /**
- * A small slippy map centred on the car, assembled from key-free OpenStreetMap
- * raw tiles (tile.openstreetmap.org). We compute the tiles needed to fill the box
- * with the car at the centre, draw each at its pixel offset, then drop a pin in
- * the middle. This avoids the flaky static-map render services that painted blank.
+ * A small slippy map centred on the car, assembled from key-free raster tiles
+ * (OpenStreetMap's own tiles, or CARTO's Dark Matter basemap when [dark] --
+ * same z/x/y/PNG scheme, so it drops into the exact same draw loop). We compute
+ * the tiles needed to fill the box with the car at the centre, draw each at its
+ * pixel offset, then drop a pin. This avoids the flaky static-map render
+ * services that painted blank.
+ *
+ * Interactive: one- or two-finger drag pans, pinch zooms. Both were previously
+ * fixed at "car dead-centre, zoom 15" with no way to look around it -- reported
+ * directly as wanting to actually explore the map rather than stare at a static
+ * thumbnail. [pan] and [zoom] are pixel/tile-level state private to one CarMap
+ * instance (via `remember`), so panning one Location pebble's map never affects
+ * another's, and a fresh `location` update does not yank the view back to
+ * centre out from under a hand mid-pan/zoom -- only the ORIGIN each tile/the pin
+ * is drawn from moves with a new fix, same as it always did.
  */
 @Composable
 internal fun CarMap(location: GeoLocation, modifier: Modifier = Modifier) {
-    val zoom = 15
     val context = LocalContext.current
 
     // Contrast-aware pin color: bright on dark maps, dark on light maps
@@ -394,6 +413,20 @@ internal fun CarMap(location: GeoLocation, modifier: Modifier = Modifier) {
         MaterialTheme.colorScheme.surfaceContainerLowest
     }
 
+    // Zoom level and pixel pan offset from the car-centred origin, both driven purely by
+    // the pointerInput gesture below -- nothing else in this composable writes them, so a
+    // `location` update mid-pan/zoom (the car's fix refreshing) reuses whatever the finger
+    // last left them at instead of snapping back to centre/zoom 15.
+    var zoom by remember { mutableIntStateOf(15) }
+    var panX by remember { mutableFloatStateOf(0f) }
+    var panY by remember { mutableFloatStateOf(0f) }
+    // Accumulates the gesture's own multiplicative zoom between whole zoom-level steps --
+    // detectTransformGestures reports a per-frame RATIO, not an absolute scale, so this is
+    // what a pinch has to build up against before it's worth redrawing a whole new tile
+    // grid. Reset (not just decremented) every time a level actually flips, so the next
+    // level change needs a full pinch of its own rather than coasting on leftover ratio.
+    var pinchAccum by remember { mutableFloatStateOf(1f) }
+
     // The box's own real, measured size -- onSizeChanged, not BoxWithConstraints. Both
     // report the same numbers, but BoxWithConstraints is a SubcomposeLayout: its content
     // composes in a SEPARATE, deferred pass, which is avoidable overhead on a composable
@@ -406,7 +439,31 @@ internal fun CarMap(location: GeoLocation, modifier: Modifier = Modifier) {
     Box(
         modifier
             .background(mapBackground)
-            .onSizeChanged { boxSizePx = it },
+            .onSizeChanged { boxSizePx = it }
+            .pointerInput(Unit) {
+                detectTransformGestures { _, gesturePan, gestureZoom, _ ->
+                    // Drag right -> the map (and the pin riding on it) should slide right
+                    // with the finger, exactly like sliding a sheet of paper -- so the
+                    // WORLD-pixel offset accumulates in the same direction as the drag; see
+                    // originX/originY below, which subtract this to shift what's visible.
+                    panX += gesturePan.x
+                    panY += gesturePan.y
+                    pinchAccum *= gestureZoom
+                    // Bump a whole zoom level every time the pinch crosses a 2x/0.5x
+                    // threshold, carrying the leftover ratio forward rather than
+                    // snapping it to 1 -- so a fast, continuous pinch can cross several
+                    // levels in one gesture instead of needing to be released and
+                    // re-started at each one. The pan offset is halved/doubled in step:
+                    // it is measured in tile PIXELS at the OLD zoom, and a zoom step
+                    // doubles/halves how many pixels the same world distance covers.
+                    while (pinchAccum >= 2f && zoom < CarMapMaxZoom) {
+                        zoom++; panX *= 2f; panY *= 2f; pinchAccum /= 2f
+                    }
+                    while (pinchAccum <= 0.5f && zoom > CarMapMinZoom) {
+                        zoom--; panX /= 2f; panY /= 2f; pinchAccum *= 2f
+                    }
+                }
+            },
     ) {
         val density = LocalDensity.current
         val tilePx = MapTiles.TILE_PX.toFloat()
@@ -415,9 +472,10 @@ internal fun CarMap(location: GeoLocation, modifier: Modifier = Modifier) {
         val span = MapTiles.span(zoom)
         val xTileF = MapTiles.tileX(location.longitude, zoom)
         val yTileF = MapTiles.tileY(location.latitude, zoom)
-        // World-pixel of the box's top-left so the car lands dead-centre.
-        val originX = (xTileF * tilePx - wPx / 2f).toFloat()
-        val originY = (yTileF * tilePx - hPx / 2f).toFloat()
+        // World-pixel of the box's top-left: car-centred, then shifted by whatever the
+        // user has panned away from that centre.
+        val originX = (xTileF * tilePx - wPx / 2f - panX)
+        val originY = (yTileF * tilePx - hPx / 2f - panY)
         val firstX = floor(originX / tilePx).toInt()
         val firstY = floor(originY / tilePx).toInt()
         val lastX = floor((originX + wPx) / tilePx).toInt()
@@ -446,9 +504,9 @@ internal fun CarMap(location: GeoLocation, modifier: Modifier = Modifier) {
                     // it "reloads") for every visible tile on every location
                     // update, even for tiles already sitting in Coil's memory
                     // cache -- visible flicker across the whole map.
-                    val request = remember(wrappedX, ty, zoom) {
+                    val request = remember(wrappedX, ty, zoom, isDarkMode) {
                         ImageRequest.Builder(context)
-                            .data(MapTiles.tileUrl(zoom, wrappedX, ty))
+                            .data(MapTiles.tileUrl(zoom, wrappedX, ty, dark = isDarkMode))
                             // OSM returns a "blocked" placeholder tile to clients whose
                             // User-Agent doesn't identify the app. This one used to read
                             // "Bloo Bluelink companion app" -- no version, no contact URL,
@@ -468,12 +526,21 @@ internal fun CarMap(location: GeoLocation, modifier: Modifier = Modifier) {
                 }
             }
         }
-        // A pin whose tip points at the centred car position.
+        // The pin's screen offset from the box's own centre: zero (i.e. dead-centre) at
+        // rest, and it rides along with panX/panY exactly like the tiles do -- so panning
+        // away from the car slides the pin off toward wherever the car actually is
+        // relative to the new view, instead of it staying glued to the middle of the box.
+        val pinOffsetX = with(density) { panX.toDp() }
+        val pinOffsetY = with(density) { panY.toDp() }
         Icon(
             Icons.Filled.LocationOn,
             contentDescription = "Car location",
             tint = pinColor,
-            modifier = Modifier.align(Alignment.Center).size(40.dp).offset(y = (-20).dp),
+            modifier = Modifier
+                .align(Alignment.Center)
+                .offset(x = pinOffsetX, y = pinOffsetY)
+                .size(40.dp)
+                .offset(y = (-20).dp),
         )
     }
 }

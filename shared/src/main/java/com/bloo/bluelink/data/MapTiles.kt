@@ -46,9 +46,25 @@ object MapTiles {
      */
     fun userAgent(platform: String): String = "Bloo-$platform/1.0 (https://claude.ai/code)"
 
-    /** The OSM tile URL for a z/x/y triple. */
-    fun tileUrl(zoom: Int, x: Int, y: Int): String =
-        "https://tile.openstreetmap.org/$zoom/$x/$y.png"
+    /**
+     * The tile URL for a z/x/y triple. [dark] switches to CARTO's "Dark Matter"
+     * basemap instead of stock OSM tiles -- same z/x/y/PNG scheme, no API key, so
+     * it drops into the exact same request/draw path as the light tiles.
+     *
+     * Only the phone's interactive map uses [dark] today (see CarMap): OSM's own
+     * light-only raster tiles were the one part of a dark-themed cover/phone
+     * screen that stayed a bright white square regardless of the app's theme --
+     * reported directly as the map "not being dark mode." The widget and watch
+     * keep the plain OSM tiles; a home-screen widget already sits on the
+     * launcher's own wallpaper rather than the app's theme, so "dark tiles when
+     * the app is dark" doesn't apply the same way there.
+     */
+    fun tileUrl(zoom: Int, x: Int, y: Int, dark: Boolean = false): String =
+        if (dark) {
+            "https://basemaps.cartocdn.com/dark_all/$zoom/$x/$y.png"
+        } else {
+            "https://tile.openstreetmap.org/$zoom/$x/$y.png"
+        }
 
     /** Number of tiles per axis at [zoom], i.e. 2^zoom. */
     fun span(zoom: Int): Int = 1 shl zoom
