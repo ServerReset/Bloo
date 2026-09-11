@@ -8,6 +8,8 @@
 package com.bloo.bluelink.ui
 
 import android.os.Build
+import dev.chrisbanes.haze.HazeState
+import dev.chrisbanes.haze.hazeEffect
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -134,43 +136,79 @@ internal var inMultiWindowMode by mutableStateOf(false)
 @Composable
 internal fun StatusBarScrim(
     /**
-     * False drops just the `.blur(...)` for this composition, keeping the plain gradient.
-     * `Modifier.blur` attaches a RenderEffect that the GPU recomposites on every frame this
-     * layer draws -- fine for a static screen, but this scrim sits as a persistent sibling
-     * drawn ON TOP of both car pagers (GarageScreen's own call sites), so during an active
-     * drag/fling it was paying that recomposite cost on every single swipe frame, every
-     * swipe, competing with the pager's own translation work for the same frame budget.
-     * Callers with a pager in scope pass `!pagerState.isScrollInProgress` so the blur is
-     * only actually installed while genuinely idle; every other caller (no pager in scope)
-     * leaves this at its default and keeps the blur exactly as before.
+     * False drops just the blur for this composition, keeping the plain gradient.
+     * Both blur paths below attach a RenderEffect that the GPU recomposites on every
+     * frame this layer draws -- fine for a static screen, but this scrim sits as a
+     * persistent sibling drawn ON TOP of both car pagers (GarageScreen's own call
+     * sites), so during an active drag/fling it was paying that recomposite cost on
+     * every single swipe frame, every swipe, competing with the pager's own
+     * translation work for the same frame budget. Callers with a pager in scope pass
+     * `!pagerState.isScrollInProgress` so the blur is only actually installed while
+     * genuinely idle; every other caller (no pager in scope) leaves this at its
+     * default and keeps the blur exactly as before.
      */
     active: Boolean = true,
+    /**
+     * The [HazeState] whose matching [dev.chrisbanes.haze.hazeSource] marks the
+     * content actually behind this scrim (the car photo, Aurora, scrolling list --
+     * one per screen, applied where that screen already draws its own background).
+     * Non-null makes this a REAL backdrop blur of that content; null (every screen
+     * not yet wired to a HazeState) falls back to the old self-blur behaviour
+     * unchanged, so adopting Haze screen-by-screen carries no regression for the
+     * ones that haven't yet.
+     *
+     * Plain `Modifier.blur` was always a no-op here regardless of API level: it only
+     * ever blurred what THIS composable's own modifier chain draws, which is a flat
+     * vertical gradient with no detail in it for a blur convolution to soften --
+     * reported directly as "still not working" even after gating it to real API 31+
+     * hardware. A gradient blurred is the same gradient. What legibility under the
+     * status bar icons actually needs is the CONTENT drawn behind this scrim to look
+     * soft, which requires capturing that content into its own layer first -- Haze's
+     * whole job, and not something `Modifier.blur` alone can do without it.
+     */
+    hazeState: HazeState? = null,
 ) {
     if (inMultiWindowMode) return
     val topInset = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
     val scheme = MaterialTheme.colorScheme
-    // Modifier.blur is backed by RenderEffect, which the Android framework only implements
-    // from API 31 (S) onward -- Compose has no software fallback for it. minSdk here is 26,
-    // so on any API 26-30 device this modifier was ALWAYS a visual no-op: it attached, the
-    // GPU compositing cost `active` above exists to avoid was ALREADY zero on those devices
-    // (nothing to recomposite), and the gradient alone -- with no blur softening it -- was
-    // the only thing anyone on those devices ever actually saw. Reported directly as "not
-    // working". Gating on the real capability rather than leaving a dead modifier attached,
-    // and giving pre-S devices a stronger gradient (blur's whole job, legibility under the
-    // status bar icons, otherwise falls entirely on a fairly light 0.55 alpha fade) instead
-    // of silently doing less than intended.
+    // Modifier.blur (the hazeState == null fallback path below) is backed by
+    // RenderEffect, which the Android framework only implements from API 31 (S)
+    // onward -- Compose has no software fallback for it, and neither does Haze's own
+    // blur. minSdk here is 26, so on any API 26-30 device both paths are a visual
+    // no-op: the gradient alone -- with no blur softening it -- is the only thing
+    // anyone on those devices ever actually sees. Gating on the real capability
+    // rather than leaving a dead modifier attached, and giving pre-S devices a
+    // stronger gradient (blur's whole job, legibility under the status bar icons,
+    // otherwise falls entirely on a fairly light 0.55 alpha fade) instead of
+    // silently doing less than intended.
     val canBlur = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
     Box(
         Modifier
             .fillMaxWidth()
             .height(topInset + 28.dp)
+            .then(
+                if (hazeState != null && canBlur && active) {
+                    // The actual fix: blurs whatever is really drawn behind this scrim, via
+                    // the matching Modifier.hazeSource(hazeState) on that screen's own
+                    // background -- not this Box's own gradient. That gradient (below,
+                    // applied identically either way) still does the same legibility
+                    // tinting job it always did, now over a genuinely blurred backdrop.
+                    Modifier.hazeEffect(state = hazeState)
+                } else {
+                    Modifier
+                },
+            )
             .background(
                 Brush.verticalGradient(
                     listOf(scheme.surface.copy(alpha = if (canBlur) 0.55f else 0.8f), Color.Transparent),
                 ),
             )
             .then(
-                if (canBlur && active) Modifier.blur(18.dp, edgeTreatment = BlurredEdgeTreatment.Unbounded) else Modifier,
+                if (hazeState == null && canBlur && active) {
+                    Modifier.blur(18.dp, edgeTreatment = BlurredEdgeTreatment.Unbounded)
+                } else {
+                    Modifier
+                },
             ),
     )
 }

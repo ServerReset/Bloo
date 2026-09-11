@@ -201,6 +201,16 @@ dependencies {
     // Real car photos (URL or the system photo picker)
     implementation("io.coil-kt:coil-compose:2.7.0")
 
+    // Real backdrop blur for StatusBarScrim (Widgets.kt) -- Modifier.blur() only
+    // affects what the modifier's OWN node draws, which for a scrim is just its own
+    // flat gradient; blurring a smooth gradient with no detail in it is a visual
+    // no-op regardless of API level, which is why the status bar scrim never actually
+    // looked blurred. Haze captures the content behind an overlay into its own layer
+    // and blurs THAT, the actual "frosted glass" effect this needed. Pinned to the
+    // last 1.x release, before the 2.0 pluggable-effects rewrite changed hazeEffect's
+    // own configuration shape.
+    implementation("dev.chrisbanes.haze:haze:1.7.0")
+
 
 
     // On-device Gemini Nano (ML Kit GenAI) — optional AI summaries; gated at

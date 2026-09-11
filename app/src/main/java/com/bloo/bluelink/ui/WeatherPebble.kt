@@ -35,13 +35,13 @@ import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.only
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -64,8 +64,9 @@ import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -92,15 +93,9 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.geometry.Rect
-import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.onSizeChanged
-import androidx.compose.ui.layout.positionOnScreen
-import androidx.compose.ui.unit.toSize
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.Dialog
-import androidx.compose.ui.window.DialogProperties
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.bloo.bluelink.data.GeoLocation
@@ -185,28 +180,21 @@ internal fun LocationPebble(v: Vehicle, state: UiState, vm: AppViewModel, dragHa
                     // headline. This tile rendered the address three times at once -- headline,
                     // hero and the map stripe's caption.
                 }
-                // Expanding is a NEW full-screen surface (CarMapFullScreenDialog), not this
-                // map growing in place -- see CarMap's own onExpand doc. Local to this
-                // pebble instance: opening it here never affects another car's own map.
-                var showFullScreenMap by remember { mutableStateOf(false) }
-                // This map's own on-SCREEN bounds (absolute, not window-relative -- a
-                // Dialog opens its own separate window, so a plain boundsInWindow() here
-                // would not line up with anything measured inside it). Feeds
-                // CarMapFullScreenDialog's own morph so it can grow FROM exactly here
-                // instead of just appearing -- see that dialog's own doc.
-                var mapOriginBounds by remember { mutableStateOf<Rect?>(null) }
+                // Expanding opens CarMapSheet, a bottom sheet rather than the small map
+                // growing in place -- see CarMap's own onExpand doc. Local to this pebble
+                // instance: opening it here never affects another car's own map.
+                var showMapSheet by remember { mutableStateOf(false) }
                 CarMap(
                     loc,
                     Modifier
                         .fillMaxWidth()
                         .height(if (coverGlance) 130.dp else 220.dp)
-                        .clip(RoundedCornerShape(18.dp))
-                        .onGloballyPositioned { mapOriginBounds = Rect(it.positionOnScreen(), it.size.toSize()) },
+                        .clip(RoundedCornerShape(18.dp)),
                     deviceLocation = state.deviceLocation,
-                    onExpand = { showFullScreenMap = true },
+                    onExpand = { showMapSheet = true },
                 )
-                if (showFullScreenMap) {
-                    CarMapFullScreenDialog(loc, v.name, state.deviceLocation, mapOriginBounds) { showFullScreenMap = false }
+                if (showMapSheet) {
+                    CarMapSheet(loc, v.name, state.deviceLocation) { showMapSheet = false }
                 }
                 // Same reasoning as the cover hero above: a resolved address is
                 // already the pebble's header/summary, so a permanent raw-coordinate
@@ -804,126 +792,124 @@ private fun MapFeatureRow(features: List<MapFeature>, modifier: Modifier = Modif
 }
 
 /**
- * The map, expanded to fill the screen -- reached from [CarMap]'s own corner button.
+ * The map, expanded into a bottom sheet -- reached from [CarMap]'s own corner button.
  * Its own [CarMapState] ([rememberCarMapState]), independent of whatever the small
  * inline map is panned/zoomed to: expanding is a bigger canvas to look at the SAME
  * car on, not a continuation of one specific gesture.
  *
- * [originBounds] is the small map's own on-SCREEN rect at the moment it was tapped
- * (see the call site's own doc for why this has to be absolute screen coordinates, not
- * a plain window-relative one -- a [Dialog] opens its own separate window). The map
- * area morphs from that rect to full size (a `graphicsLayer` scale + translate driven
- * by one shared [Animatable], reversed on the way out) instead of just appearing/
- * disappearing -- reported directly as wanting the transition to read as the same
- * element growing, not a new screen popping in over it. The header and toolbar chrome
- * (neither of which exists on the small map) fade in/out alongside it rather than
- * pretending to morph from something that was never there.
+ * A real [ModalBottomSheet], not a hand-rolled [Dialog]. That was the first attempt
+ * here, driving its own `graphicsLayer` scale/translate from a captured on-screen
+ * rect -- reported directly as not actually seamless, not full screen, and covering
+ * its own close button. A bottom sheet gets the genuinely wanted behaviour for free
+ * from a component the platform already gets right: it rises from the bottom rather
+ * than appearing in place, covers most but not all of the screen (the app stays
+ * visible, dimmed, above it -- `sheetGesturesEnabled` sizing leaves the status bar
+ * clear rather than the previous attempt's edge-to-edge Dialog), carries a real drag
+ * handle, and -- most importantly for "pull it back down to collapse" -- already
+ * supports swipe-to-dismiss as a first-class gesture instead of something this file
+ * would have to reinvent on top of a Dialog.
+ *
+ * [CarMap] itself still grows in with a short scale+fade (see `entryScale` below) so
+ * opening reads as the map continuing to expand rather than a flat cut, without
+ * reaching for the previous attempt's cross-window position math to do it.
  *
  * The bottom [MapFeatureRow] is deliberately sparse today (recentre, open in the
- * system Maps app) -- see [MapFeature]'s own doc. This dialog, not a new screen in
- * the app's own navigation, is the FRAMEWORK request this shipped alongside: a
- * self-contained full-screen surface future map features can build against (a
- * drawn route, live traffic, nearby search, saved places) without first having to
- * plumb a new destination through the rest of the app.
+ * system Maps app) -- see [MapFeature]'s own doc. This sheet, not a new screen in the
+ * app's own navigation, is the FRAMEWORK request this shipped alongside: a
+ * self-contained expanded surface future map features can build against (a drawn
+ * route, live traffic, nearby search, saved places) without first having to plumb a
+ * new destination through the rest of the app.
  */
 @Composable
-internal fun CarMapFullScreenDialog(
+internal fun CarMapSheet(
     location: GeoLocation,
     vehicleName: String,
     deviceLocation: GeoLocation?,
-    originBounds: Rect?,
     onDismiss: () -> Unit,
 ) {
     val context = LocalContext.current
-    // 0 = sitting exactly over originBounds (what the small map looked like the instant
-    // this opened), 1 = fully grown to fill the screen. One shared value drives both the
-    // map's own grow/shrink AND the chrome's fade, so they can never desync from each
-    // other -- the same "one source of truth" reasoning SplitExpandButton's own
-    // expandedMorph uses for its two halves.
-    val morph = remember { Animatable(0f) }
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val scope = rememberCoroutineScope()
-    LaunchedEffect(Unit) {
-        morph.animateTo(1f, spring(dampingRatio = Spring.DampingRatioLowBouncy, stiffness = Spring.StiffnessLow))
-    }
-    // Runs the shrink-back-to-origin leg BEFORE actually dismissing, so the dialog
-    // never just vanishes -- both the close button and the system back gesture/scrim
-    // tap (Dialog's own onDismissRequest) go through this rather than calling
-    // onDismiss() directly.
+    // Runs the sheet's own hide animation (a slide back down, same motion a drag-to-
+    // dismiss ends in) before actually dismissing, so the close button matches
+    // whatever a swipe already does rather than snapping the sheet away instantly.
     val dismissAnimated = {
         scope.launch {
-            morph.animateTo(0f, spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessMediumLow))
+            sheetState.hide()
             onDismiss()
         }
         Unit
     }
-    Dialog(
-        onDismissRequest = dismissAnimated,
-        properties = DialogProperties(usePlatformDefaultWidth = false),
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
     ) {
-        // The map's own full-size on-screen rect, captured once laid out -- constant
-        // for the life of this dialog (only the graphicsLayer transform below moves,
-        // never the actual layout), so it only needs to be captured, not re-tracked.
-        var fullBounds by remember { mutableStateOf<Rect?>(null) }
-        Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.surface) {
-            Column(Modifier.fillMaxSize()) {
-                Row(
-                    Modifier
-                        .fillMaxWidth()
-                        .statusBarsPadding()
-                        .padding(horizontal = 12.dp, vertical = 8.dp)
-                        .graphicsLayer { alpha = morph.value },
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    FloatingIcon(Icons.Filled.Close, "Close", dismissAnimated)
-                    Spacer(Modifier.width(12.dp))
-                    Text(vehicleName, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                }
-                val fullScreenState = rememberCarMapState()
-                Box(
-                    Modifier
-                        .weight(1f)
-                        .fillMaxWidth()
-                        .onGloballyPositioned { fullBounds = Rect(it.positionOnScreen(), it.size.toSize()) }
-                        .graphicsLayer {
-                            val origin = originBounds
-                            val full = fullBounds
-                            if (origin != null && full != null && full.width > 0f && full.height > 0f) {
-                                val t = morph.value
-                                val originScaleX = origin.width / full.width
-                                val originScaleY = origin.height / full.height
-                                scaleX = originScaleX + (1f - originScaleX) * t
-                                scaleY = originScaleY + (1f - originScaleY) * t
-                                translationX = (origin.center.x - full.center.x) * (1f - t)
-                                translationY = (origin.center.y - full.center.y) * (1f - t)
-                            }
-                        },
-                ) {
-                    CarMap(
-                        location,
-                        Modifier.fillMaxSize(),
-                        state = fullScreenState,
-                        deviceLocation = deviceLocation,
-                        onExpand = null,
-                    )
-                }
-                MapFeatureRow(
-                    features = listOf(
-                        MapFeature(Icons.Filled.MyLocation, "Recentre") { fullScreenState.recenter() },
-                        MapFeature(Icons.Filled.Map, "Open in Maps") {
-                            openInExternalMaps(context, location, vehicleName)
-                        },
-                        // FRAMEWORK: append future map features here -- each is just an
-                        // icon, a label and an action, e.g.:
-                        //   MapFeature(Icons.Filled.AltRoute, "Directions") { ... }
-                        //   MapFeature(Icons.Filled.Layers, "Traffic") { ... }
-                        //   MapFeature(Icons.Filled.Search, "Nearby") { ... }
-                        //   MapFeature(Icons.Filled.Share, "Share location") { ... }
-                    ),
-                    modifier = Modifier
-                        .navigationBarsPadding()
-                        .graphicsLayer { alpha = morph.value },
+        // The map's own short grow-in -- NOT tied to the sheet's own slide-up (that
+        // already has its own motion; doubling it up read as the map "catching up"
+        // late). Scale from a touch under full size rather than from zero: this is
+        // "the map continuing to expand", not a new element materialising.
+        val entryScale = remember { Animatable(0.92f) }
+        LaunchedEffect(Unit) {
+            entryScale.animateTo(1f, spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessMediumLow))
+        }
+        Column(
+            Modifier
+                // ~90% of the sheet's own available height, itself already capped
+                // short of the full display by ModalBottomSheet -- together the app
+                // stays visible (dimmed by the sheet's own scrim) in the gap above,
+                // reported directly as wanting the background to still read as "the
+                // app," not a second full screen replacing it outright.
+                .fillMaxHeight(0.9f)
+                .fillMaxWidth(),
+        ) {
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 20.dp, vertical = 4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    vehicleName,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.weight(1f),
+                )
+                FloatingIcon(Icons.Filled.Close, "Close", dismissAnimated)
+            }
+            val sheetMapState = rememberCarMapState()
+            Box(
+                Modifier
+                    .weight(1f)
+                    .fillMaxWidth()
+                    .padding(horizontal = 4.dp)
+                    .graphicsLayer {
+                        scaleX = entryScale.value
+                        scaleY = entryScale.value
+                    },
+            ) {
+                CarMap(
+                    location,
+                    Modifier.fillMaxSize().clip(RoundedCornerShape(18.dp)),
+                    state = sheetMapState,
+                    deviceLocation = deviceLocation,
+                    onExpand = null,
                 )
             }
+            MapFeatureRow(
+                features = listOf(
+                    MapFeature(Icons.Filled.MyLocation, "Recentre") { sheetMapState.recenter() },
+                    MapFeature(Icons.Filled.Map, "Open in Maps") {
+                        openInExternalMaps(context, location, vehicleName)
+                    },
+                    // FRAMEWORK: append future map features here -- each is just an
+                    // icon, a label and an action, e.g.:
+                    //   MapFeature(Icons.Filled.AltRoute, "Directions") { ... }
+                    //   MapFeature(Icons.Filled.Layers, "Traffic") { ... }
+                    //   MapFeature(Icons.Filled.Search, "Nearby") { ... }
+                    //   MapFeature(Icons.Filled.Share, "Share location") { ... }
+                ),
+                modifier = Modifier.navigationBarsPadding(),
+            )
         }
     }
 }

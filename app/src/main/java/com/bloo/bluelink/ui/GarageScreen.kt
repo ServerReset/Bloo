@@ -8,6 +8,8 @@
 package com.bloo.bluelink.ui
 
 import android.os.Build
+import dev.chrisbanes.haze.HazeState
+import dev.chrisbanes.haze.hazeSource
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
@@ -250,6 +252,12 @@ internal fun GarageScreen(state: State<UiState>, vm: AppViewModel) {
     DisposableEffect(floatingRegistry) {
         onDispose { floatingRegistry.resetChrome() }
     }
+    // Backs both StatusBarScrim calls below (expanded and collapsed pager alike --
+    // only one is ever composed at a time, so one shared instance is enough) with a
+    // REAL backdrop blur: Modifier.hazeSource on whichever pager is actually visible
+    // marks it as the content to blur, StatusBarScrim's own hazeState param reads it
+    // back. See StatusBarScrim's doc for why plain Modifier.blur never worked here.
+    val hazeState = remember { HazeState() }
     // How many full-height cards fit side by side; pages advance by this many.
     val perPage = (widthDp / MIN_CARD_DP).coerceIn(1, count)
     // Expanding to the dual-column view only makes sense on a wide screen.
@@ -285,7 +293,7 @@ internal fun GarageScreen(state: State<UiState>, vm: AppViewModel) {
                 Box(Modifier.fillMaxSize()) {
                     HorizontalPager(
                         state = exPager,
-                        modifier = Modifier.fillMaxSize(),
+                        modifier = Modifier.fillMaxSize().hazeSource(hazeState),
                         // Finger swipe between cars is disabled per user request (the
                         // page-to-page swipe felt bad). To view a different car
                         // full-screen the user collapses back to the grid (the "Back to
@@ -364,7 +372,7 @@ internal fun GarageScreen(state: State<UiState>, vm: AppViewModel) {
                     // still gated the same way as the collapsed pager below for consistency,
                     // and it's free: isScrollInProgress only flips at the (rare, programmatic)
                     // start/end of an animateScrollToPage, not per frame.
-                    StatusBarScrim(active = !exPager.isScrollInProgress)
+                    StatusBarScrim(active = !exPager.isScrollInProgress, hazeState = hazeState)
                     if (count > 1 && !LocalReorderActive.current) {
                         PagerDotsFor(
                             pager = exPager,
@@ -577,7 +585,7 @@ internal fun GarageScreen(state: State<UiState>, vm: AppViewModel) {
                 Box(Modifier.fillMaxSize()) {
                     HorizontalPager(
                         state = pager,
-                        modifier = Modifier.fillMaxSize(),
+                        modifier = Modifier.fillMaxSize().hazeSource(hazeState),
                         // Finger swipe between cars is ON. Every page renders its FULL
                         // pebble column (VehicleDetailContent → PebbleList) — there is no
                         // in-transit skeleton. Swipe smoothness comes from two places:
@@ -743,7 +751,7 @@ internal fun GarageScreen(state: State<UiState>, vm: AppViewModel) {
                     // the expanded one above), so its own drag/fling frames are exactly the
                     // ones StatusBarScrim's blur was competing with for GPU time on every
                     // single swipe -- see that parameter's own doc.
-                    StatusBarScrim(active = !pager.isScrollInProgress)
+                    StatusBarScrim(active = !pager.isScrollInProgress, hazeState = hazeState)
                     // Floating animated page indicator (no thin top bar). totalBlocks,
                     // not pageCount -- the dots include the Settings slot (one more,
                     // trailing dot) when settingsAsPage is on, same as any other page.
