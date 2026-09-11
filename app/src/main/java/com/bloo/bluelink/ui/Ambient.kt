@@ -82,6 +82,8 @@ import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import dev.chrisbanes.haze.HazeState
+import dev.chrisbanes.haze.hazeSource
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
@@ -239,9 +241,13 @@ internal fun LoginScreen(
 
     if (onCancel != null) BackHandler { onCancel() }
 
+    // Backs the StatusBarScrim call below with a REAL backdrop blur of the Aurora
+    // background -- same pattern GarageScreen.kt uses for its own two pagers. See
+    // StatusBarScrim's own doc for why plain Modifier.blur never worked here.
+    val hazeState = remember { HazeState() }
     Box(Modifier.fillMaxSize()) {
         // Same gate as LoadingScreen -- see its comment.
-        if (LocalAppearance.current.auroraBackground) AuroraBackground(Modifier.matchParentSize())
+        if (LocalAppearance.current.auroraBackground) AuroraBackground(Modifier.matchParentSize().hazeSource(hazeState))
         Column(
             Modifier
                 .fillMaxSize()
@@ -501,7 +507,7 @@ internal fun LoginScreen(
         // (deliberate -- see its own layout above), so it draws right up under the
         // status bar just like they do. Same scrim, same cover-screen exclusion as
         // every other call site (StatusBarScrim itself excludes multi-window).
-        if (!isCompactCoverScreen()) StatusBarScrim()
+        if (!isCompactCoverScreen()) StatusBarScrim(hazeState = hazeState)
     }
 }
 

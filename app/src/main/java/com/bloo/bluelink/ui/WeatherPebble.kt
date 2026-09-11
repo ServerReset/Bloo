@@ -78,6 +78,7 @@ import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -112,6 +113,7 @@ import com.bloo.bluelink.data.coordString
 import com.bloo.bluelink.data.links
 import com.bloo.bluelink.data.formatSpeed
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlin.math.floor
@@ -799,26 +801,27 @@ internal data class MapFeature(
     val onClick: () -> Unit,
 )
 
-/** The full-screen map's bottom toolbar: one plain (unconnected) [MorphButton] pill
- *  per [MapFeature], in a horizontally scrolling row so the list can grow past
- *  whatever fits on one screen width without needing its own overflow menu. */
+/**
+ * The map sheet's bottom toolbar: one [MorphButton] pill per [MapFeature], sharing an
+ * [ExpressiveButtonRow] -- the same connected-group framework the lock/horn cluster
+ * and every other multi-button row in the app uses, so pressing one pill takes width
+ * FROM its neighbour (both keep their own independent pill shape; only the WIDTH
+ * trades) instead of each growing independently into free space. That was the first
+ * version here: each button wrapped in a standalone [SafeExpansiveButton], which
+ * grows for real -- correct for a lone button, but reported directly as "the map
+ * buttons don't push each other, they just expand" once there were two of them
+ * sharing a row. `wrap = true` (not a scrolling Row): a future feature list long
+ * enough to overflow one line wraps to a second instead of needing its own
+ * horizontal-scroll affordance.
+ */
 @Composable
 private fun MapFeatureRow(features: List<MapFeature>, modifier: Modifier = Modifier) {
-    Row(
-        modifier
-            .fillMaxWidth()
-            .horizontalScroll(rememberScrollState())
-            .padding(horizontal = 12.dp, vertical = 10.dp),
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
+    ExpressiveButtonRow(
+        modifier = modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp),
+        spacing = 10.dp,
+        wrap = true,
     ) {
         features.forEach { feature ->
-            // SafeExpansiveButton, not a bare MorphButton -- the same press-grow
-            // wrapper every other standalone button in the app uses. Reported
-            // directly: these were bare MorphButtons with no press wrapper at all,
-            // exactly the "nothing here to animate" shape Pebbles.kt's own
-            // groupActions once had (see that file's identical fix). Independent
-            // pills in a scrollable row, not a connected group, so each one grows
-            // for real on press rather than trading width with a neighbour.
             val source = remember { MutableInteractionSource() }
             SafeExpansiveButton(interactionSource = source, enabled = feature.enabled) {
                 MorphButton(
@@ -896,59 +899,55 @@ internal fun CarMapSheet(
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
-        // ~90% of the SCREEN, on the sheet's own modifier -- not on the content
-        // inside it. That was the first attempt here, and it did not do what it
-        // looked like it should: constraining the CONTENT to 90% left the sheet's
-        // own shape/drag-handle sizing itself the way it always does (nearly full
-        // height with `skipPartiallyExpanded`), so the content just sat inside a
-        // mostly-empty card with a dead gap of the sheet's own background colour
-        // above it -- reported directly, from a screenshot, as a black gap with the
-        // drag handle floating near the physical top of the screen, nothing like a
-        // dimmed app peeking through. Capping the SHEET itself here means its shape,
-        // its scrim, and its drag handle are ALL sized to the same 90%, and the
-        // actual app shows (dimmed, by the sheet's own scrim) in the real 10% gap
-        // above it.
-        modifier = Modifier.fillMaxHeight(0.9f),
+        // 85% of the SCREEN (not counting the status bar -- ModalBottomSheet's own
+        // max-height calculation already keeps clear of it), on the sheet's own
+        // modifier -- not on the content inside it. Content-level sizing was the
+        // first attempt here, and it did not do what it looked like it should:
+        // constraining the CONTENT left the sheet's own shape/drag-handle sizing
+        // itself the way it always does (nearly full height with
+        // `skipPartiallyExpanded`), so the content sat inside a mostly-empty card
+        // with a dead gap of the sheet's own background colour above it -- reported
+        // directly, from a screenshot, as a black gap with the drag handle floating
+        // near the physical top of the screen, nothing like a dimmed app peeking
+        // through. Capping the SHEET itself here means its shape, its scrim, and its
+        // drag handle are ALL sized together, and the actual app shows (dimmed, by
+        // the sheet's own scrim) in the real 15% gap above it.
+        modifier = Modifier.fillMaxHeight(0.85f),
     ) {
+        // This map area's own full-size on-screen rect, captured once laid out --
+        // constant for the life of this sheet (only the graphicsLayer transform
+        // below moves, never the actual layout).
+        var fullBounds by remember { mutableStateOf<Rect?>(null) }
         // 0 = sitting exactly over originBounds (what the small map looked like the
         // instant this opened), 1 = grown to this map area's own natural size/
-        // position. NOT tied to the sheet's own slide-up (that already has its own
-        // motion; doubling it up read as the map "catching up" late) -- this drives
-        // ONLY the map's own transform, a separate, slightly slower spring so the
-        // grow reads as continuing after the sheet arrives rather than racing it.
+        // position. Deliberately NOT started until fullBounds is actually known
+        // (when there's an origin to grow FROM at all): starting immediately meant
+        // the first several frames rendered through the "no origin yet" fallback
+        // below, and then jump-cut to the origin-based transform the moment
+        // fullBounds appeared, already partway through the spring -- a jump reads as
+        // no animation at all, which is exactly what was reported ("still not seeing
+        // [it] at all"). Waiting for the real target first means every frame that
+        // actually plays uses the same, correct transform from the very first one.
         val morph = remember { Animatable(0f) }
-        LaunchedEffect(Unit) {
+        LaunchedEffect(originBounds) {
+            if (originBounds != null) snapshotFlow { fullBounds }.filterNotNull().first()
             morph.animateTo(1f, spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessMediumLow))
         }
-        Column(Modifier.fillMaxSize()) {
-            Row(
-                Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 20.dp, vertical = 4.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text(
-                    vehicleName,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier.weight(1f),
-                )
-                FloatingIcon(Icons.Filled.Close, "Close", dismissAnimated)
-            }
-            val sheetMapState = rememberCarMapState()
-            // This map area's own full-size on-screen rect, captured once laid out --
-            // constant for the life of this sheet (only the graphicsLayer transform
-            // below moves, never the actual layout), so it only needs capturing once.
-            var fullBounds by remember { mutableStateOf<Rect?>(null) }
+        val sheetMapState = rememberCarMapState()
+        Box(Modifier.fillMaxSize()) {
+            // The map fills the WHOLE sheet, edge to edge -- no boxed-in margin --
+            // with the header and toolbar floating semi-transparently ON TOP of it
+            // instead of splitting the sheet into three stacked, non-overlapping
+            // bands. Reported directly as wanting the map to run behind the chrome,
+            // the same "content flows behind floating elements" relationship the
+            // rest of the app already gives its own scrolling content.
             Box(
                 Modifier
-                    .weight(1f)
-                    .fillMaxWidth()
-                    .padding(horizontal = 4.dp)
+                    .fillMaxSize()
                     .onGloballyPositioned { fullBounds = Rect(it.positionOnScreen(), it.size.toSize()) }
                     // Clips the growing content to this box's own bounds -- belt and
                     // braces against the translation below ever drawing outside its
-                    // slot (the previous attempt's reported "covers the close button"
+                    // slot (an earlier attempt's reported "covers the close button"
                     // came from a similar transform on an UNCLIPPED Column, which
                     // Compose happily draws past its own measured bounds).
                     .clipToBounds()
@@ -964,9 +963,9 @@ internal fun CarMapSheet(
                             translationX = (origin.center.x - full.center.x) * (1f - t)
                             translationY = (origin.center.y - full.center.y) * (1f - t)
                         } else {
-                            // No origin to grow from (mistimed measurement, or a caller
-                            // that passed null) -- the old fallback: a plain scale-in
-                            // from a touch under full size rather than nothing at all.
+                            // No origin to grow from (a caller that passed null) --
+                            // the old fallback: a plain scale-in from a touch under
+                            // full size rather than nothing at all.
                             val t = morph.value
                             scaleX = 0.92f + 0.08f * t
                             scaleY = 0.92f + 0.08f * t
@@ -975,11 +974,28 @@ internal fun CarMapSheet(
             ) {
                 CarMap(
                     location,
-                    Modifier.fillMaxSize().clip(RoundedCornerShape(18.dp)),
+                    Modifier.fillMaxSize(),
                     state = sheetMapState,
                     deviceLocation = deviceLocation,
                     onExpand = null,
                 )
+            }
+            Row(
+                Modifier
+                    .align(Alignment.TopCenter)
+                    .fillMaxWidth()
+                    .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.85f))
+                    .padding(horizontal = 20.dp, vertical = 4.dp)
+                    .graphicsLayer { alpha = morph.value },
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    vehicleName,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.weight(1f),
+                )
+                FloatingIcon(Icons.Filled.Close, "Close", dismissAnimated)
             }
             MapFeatureRow(
                 features = listOf(
@@ -994,7 +1010,12 @@ internal fun CarMapSheet(
                     //   MapFeature(Icons.Filled.Search, "Nearby") { ... }
                     //   MapFeature(Icons.Filled.Share, "Share location") { ... }
                 ),
-                modifier = Modifier.navigationBarsPadding(),
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .fillMaxWidth()
+                    .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.85f))
+                    .navigationBarsPadding()
+                    .graphicsLayer { alpha = morph.value },
             )
         }
     }

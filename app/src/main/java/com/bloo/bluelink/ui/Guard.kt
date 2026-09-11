@@ -65,6 +65,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import dev.chrisbanes.haze.HazeState
+import dev.chrisbanes.haze.hazeSource
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -461,6 +463,10 @@ internal fun EmptyScreen(vm: AppViewModel) {
         launch { contentOffset.animateTo(0f, spring(dampingRatio = 0.7f, stiffness = Spring.StiffnessMediumLow)) }
     }
 
+    // Backs the StatusBarScrim call below with a REAL backdrop blur of the Aurora
+    // background -- same pattern GarageScreen.kt uses for its own two pagers. See
+    // StatusBarScrim's own doc for why plain Modifier.blur never worked here.
+    val hazeState = remember { HazeState() }
     Box(
         Modifier
             .fillMaxSize(),
@@ -470,8 +476,8 @@ internal fun EmptyScreen(vm: AppViewModel) {
         // Onboarding all float their header over an animated Aurora backdrop
         // with a blurred status-bar scrim and translucent circular icon
         // buttons. This was the one screen still doing it the plain way.
-        AuroraBackground(Modifier.matchParentSize())
-        StatusBarScrim()
+        AuroraBackground(Modifier.matchParentSize().hazeSource(hazeState))
+        StatusBarScrim(hazeState = hazeState)
         Column(Modifier.fillMaxSize()) {
             Row(
                 Modifier

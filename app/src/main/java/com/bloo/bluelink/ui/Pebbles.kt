@@ -1068,8 +1068,34 @@ internal fun StateControl(
                     contentPadding = PaddingValues(horizontal = 14.dp, vertical = 10.dp),
                     modifier = Modifier.heightIn(min = groupBtnSize),
                 ) {
-                    val buttonIcon = if (isOn == true) (deactivateIcon ?: icon) else icon
-                    MorphButtonLabel(buttonIcon, if (isOn == true) turnOff else turnOn, pending, iconSize = actionIconSize)
+                    // Reserves ONE constant natural width for both "Lock" and "Unlock" --
+                    // an invisible copy of whichever label ISN'T showing, stacked in the
+                    // same Box, so the Box's own size is always the wider of the two
+                    // regardless of which is actually on screen. Without this, tapping
+                    // Lock/Unlock genuinely changed this button's own natural width mid-
+                    // gesture: onActivate()/onDeactivate() apply an OPTIMISTIC doorLock
+                    // flip (AppViewModel.lock/unlock's own runCommand call) essentially the
+                    // same frame the click fires, i.e. right as SafeExpansiveButton's
+                    // release spring starts chasing back toward rest -- but that spring's
+                    // own grow target is computed from a natural-width CACHE that only
+                    // ever refreshes once the press is fully back at 0 (see its own
+                    // "measure the same Measurable twice in a pass throws" doc), so a
+                    // width that changes mid-release stayed pinned to the OLD label's
+                    // size for the whole spring and only SNAPPED to the new, shorter
+                    // label's size in one frame right at the very end -- reported directly
+                    // as the button "collapsing" instead of smoothly settling; it should
+                    // still push out and then get smaller, not push out and then jump.
+                    // Reserving one fixed width for both states removes the conflict at
+                    // its source, scoped to this one call site, rather than reworking the
+                    // shared measure algorithm every other standalone button in the app
+                    // also depends on.
+                    Box(contentAlignment = Alignment.Center) {
+                        val buttonIcon = if (isOn == true) (deactivateIcon ?: icon) else icon
+                        MorphButtonLabel(buttonIcon, if (isOn == true) turnOff else turnOn, pending, iconSize = actionIconSize)
+                        Box(Modifier.alpha(0f)) {
+                            MorphButtonLabel(icon, if (isOn == true) turnOn else turnOff, false, iconSize = actionIconSize)
+                        }
+                    }
                 }
             }
         } else {
@@ -1136,8 +1162,17 @@ internal fun StateControl(
                         // taller on the cover for a thumb.
                         modifier = Modifier.heightIn(min = groupBtnSize),
                     ) {
-                        val buttonIcon = if (isOn == true) (deactivateIcon ?: icon) else icon
-                        MorphButtonLabel(buttonIcon, if (isOn == true) turnOff else turnOn, pending, iconSize = actionIconSize)
+                        // Same fixed-width reservation as the solo (no groupActions) branch
+                        // above -- see its own doc for why the label's own optimistic
+                        // Lock<->Unlock flip needs this regardless of which branch renders
+                        // the button.
+                        Box(contentAlignment = Alignment.Center) {
+                            val buttonIcon = if (isOn == true) (deactivateIcon ?: icon) else icon
+                            MorphButtonLabel(buttonIcon, if (isOn == true) turnOff else turnOn, pending, iconSize = actionIconSize)
+                            Box(Modifier.alpha(0f)) {
+                                MorphButtonLabel(icon, if (isOn == true) turnOn else turnOff, false, iconSize = actionIconSize)
+                            }
+                        }
                     }
                 }
             }

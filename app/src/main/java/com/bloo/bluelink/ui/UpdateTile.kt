@@ -87,6 +87,17 @@ import com.bloo.bluelink.data.Weather
 import kotlin.math.roundToInt
 
 /**
+ * Rounds a live download-progress fraction (0f..1f) to the nearest 5% for
+ * display, e.g. 0.71f -> 70, 0.73f -> 75. Nearest-5 rather than floor-to-5:
+ * "increments of 5" reads as normal rounding to the viewer, and floor would
+ * make the number visibly lag a few points behind the bar's own smooth fill.
+ * Only the TEXT is rounded -- the underlying [Float] progress (see
+ * AppViewModel.updateDownloadProgress) stays full precision so the progress
+ * bar itself keeps filling smoothly rather than jumping in 5% steps.
+ */
+private fun roundedDownloadPercent(p: Float): Int = ((p * 100).roundToInt() / 5) * 5
+
+/**
  * Bloo isn't on the Play Store, so this is its own update surface: a
  * standalone tile pinned directly below the hero tile whenever the checker
  * has found a newer build, animating in/out instead of interrupting with a
@@ -149,7 +160,15 @@ internal fun UpdateAvailableTile(state: UiState, vm: AppViewModel, dragHandle: M
             headerAction = PebbleHeaderAction(
                 label = when {
                     state.updateInstalling -> "Installing…"
-                    state.updateDownloading -> downloadProgress?.let { "${(it * 100).roundToInt()}%" } ?: "Downloading…"
+                    // Rounded to the nearest 5% -- this chip is now the ONE place a
+                    // download percentage shows at all (see UpdateStatusLine's own doc:
+                    // the inline "Downloading X%" text and the number beside the
+                    // progress bar were both removed as redundant with this exact same
+                    // value, reported directly from a screenshot showing the same
+                    // percentage twice on screen at once). Coarser increments read as
+                    // "still moving" just as clearly as 1% ticks while recomposing this
+                    // pill a fifth as often.
+                    state.updateDownloading -> downloadProgress?.let { "${(it * 100 / 5f).roundToInt() * 5}%" } ?: "Downloading…"
                     state.updateApkReady -> if (seamless) "Install now" else "Install"
                     hasDirectDownload -> "Update"
                     else -> "Open"
@@ -478,8 +497,11 @@ internal fun runUpdateAction(
 
 /**
  * The live status half of the update flow: the tonal icon badge, the
- * animated one-line status ("Downloading 46%", "Downloaded · tap Install",
- * "Installing silently via Shizuku…") and the download progress bar.
+ * animated one-line status ("Downloading", "Downloaded · tap Install",
+ * "Installing silently via Shizuku…") and the download progress bar. The live
+ * percentage itself shows only on the header action pill above this (this
+ * file's own PebbleHeaderAction) -- it used to also repeat here AND next to
+ * the bar below, reported directly as the same number appearing three times.
  *
  * Shared by the update pebble's body and the Settings Updates card, so the
  * two can never drift apart -- this is the same state machine rendered the
@@ -557,34 +579,19 @@ internal fun UpdateStatusLine(
             label = "updateStatusText",
             modifier = Modifier.weight(1f),
         ) { kind ->
-            // color resolved explicitly, not left Color.Unspecified -- the
-            // "Downloading X%" AnimatedValue below renders through BasicText,
-            // which (unlike Text) does NOT fall back to LocalContentColor for
-            // an unspecified color; it fell back to Android's own paint
-            // default (black) instead.
             val textStyle = MaterialTheme.typography.titleMedium.copy(
                 fontWeight = FontWeight.Bold,
                 color = LocalContentColor.current,
             )
             when (kind) {
                 "installing" -> Text("Installing silently via Shizuku…", style = textStyle)
-                "downloading" -> Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text("Downloading", style = textStyle)
-                    downloadProgress?.let { p ->
-                        Text(" ", style = textStyle)
-                        // Its own AnimatedValue, not part of this AnimatedContent's own
-                        // string -- this is the one piece of the line that legitimately
-                        // changes every tick, so it's the only piece that should move.
-                        // fontFeatureSettings = "tnum" enables tabular figures so only
-                        // the changing digit animates up without the whole number
-                        // shifting left/right.
-                        com.bloo.uicommon.AnimatedValue(
-                            "${(p * 100).roundToInt()}%",
-                            style = textStyle.copy(fontFeatureSettings = "tnum"),
-                            reduceMotion = LocalReduceMotion.current,
-                        )
-                    } ?: Text("…", style = textStyle)
-                }
+                // Plain "Downloading", no trailing percentage -- this line and the
+                // number beside the progress bar below used to EACH carry their own
+                // copy of the same value the header action pill above already shows
+                // (PebbleHeaderAction's own label, up in this file), reported directly
+                // from a screenshot as the same percentage appearing twice on screen at
+                // once. That header pill is now the one place it's shown.
+                "downloading" -> Text("Downloading", style = textStyle)
                 "ready_seamless" -> Text("Downloaded · installs silently via Shizuku", style = textStyle)
                 "ready" -> Text("Downloaded · tap Install", style = textStyle)
                 "seamless" -> Text("Installs silently via Shizuku, no prompts", style = textStyle)
@@ -611,6 +618,9 @@ internal fun UpdateStatusLine(
         // child to size against, unlike a Row inside an already-bounded parent. See
         // SettingsScreen.kt's Weather-card place-name Row for the same bug, confirmed by
         // screenshot (text wrapped one character per line).
+        // No adjacent percentage text here either -- see the "downloading" case
+        // above for why: the header action pill above is the one place a download
+        // percentage shows, not this bar AND the line above it AND this too.
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             val p = downloadProgress
             Surface(
@@ -623,17 +633,6 @@ internal fun UpdateStatusLine(
                 } else {
                     LinearProgressIndicator(modifier = Modifier.fillMaxSize(), trackColor = Color.Transparent)
                 }
-            }
-            if (p != null) {
-                com.bloo.uicommon.AnimatedValue(
-                    "${(p * 100).roundToInt()}%",
-                    style = MaterialTheme.typography.labelMedium.copy(
-                        fontWeight = FontWeight.Bold,
-                        color = LocalContentColor.current,
-                        fontFeatureSettings = "tnum",
-                    ),
-                    reduceMotion = LocalReduceMotion.current,
-                )
             }
         }
     }

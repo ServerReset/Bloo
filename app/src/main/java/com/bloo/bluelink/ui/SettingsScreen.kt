@@ -120,6 +120,8 @@ import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import dev.chrisbanes.haze.HazeState
+import dev.chrisbanes.haze.hazeSource
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -303,6 +305,12 @@ internal fun SettingsScreen(
           }
       }
   }
+  // Backs the StatusBarScrim call far below with a REAL backdrop blur of the
+  // settings grid -- same pattern GarageScreen.kt uses for its own two pagers.
+  // Declared here (not inside the Box below) so it stays in scope all the way
+  // down to that StatusBarScrim call, well outside that Box's own closing brace.
+  // See StatusBarScrim's own doc for why plain Modifier.blur never worked here.
+  val hazeState = remember { HazeState() }
   BackdropHost {
         // A real multi-column grid on wide screens (tablets, landscape, foldables
         // unfolded) instead of one narrow centred column with empty space on
@@ -332,6 +340,7 @@ internal fun SettingsScreen(
             modifier = Modifier
                 .widthIn(max = 1100.dp)
                 .fillMaxWidth()
+                .hazeSource(hazeState)
                 .padding(horizontal = if (compact) 10.dp else 16.dp),
             verticalItemSpacing = if (compact) 8.dp else 12.dp,
             horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -2192,7 +2201,7 @@ internal fun SettingsScreen(
         // every page in it (cars included) -- drawing a second one here stacked
         // the same scrim twice for exactly this one page, reading as a subtly
         // darker/hazier status-bar band than every car page beside it.
-        if (!isCompactCoverScreen() && !embedded) StatusBarScrim()
+        if (!isCompactCoverScreen() && !embedded) StatusBarScrim(hazeState = hazeState)
         // No more floating "Settings" corner badge -- removed as unwanted UI (see the floating
         // car-name pill's own removal). The "Settings" title is real, static content on
         // SettingsHeaderRow now; it just scrolls off with the rest of the grid.

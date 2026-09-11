@@ -367,12 +367,12 @@ internal fun GarageScreen(state: State<UiState>, vm: AppViewModel) {
                             }
                         }
                     }
-                    // Finger swipe is disabled on this pager (userScrollEnabled = false
-                    // above), so there's no continuous drag to protect the blur from here --
-                    // still gated the same way as the collapsed pager below for consistency,
-                    // and it's free: isScrollInProgress only flips at the (rare, programmatic)
-                    // start/end of an animateScrollToPage, not per frame.
-                    StatusBarScrim(active = !exPager.isScrollInProgress, hazeState = hazeState)
+                    // Always active, even mid-drag -- disabling it during a scroll (the
+                    // previous behaviour, a perf optimization) made it disappear while
+                    // swiping between cars, reported directly as wanting it to always be
+                    // there. Accepted tradeoff: a live drag now pays Haze's per-frame
+                    // recomposite cost the same as an idle frame does.
+                    StatusBarScrim(active = true, hazeState = hazeState)
                     if (count > 1 && !LocalReorderActive.current) {
                         PagerDotsFor(
                             pager = exPager,
@@ -747,11 +747,11 @@ internal fun GarageScreen(state: State<UiState>, vm: AppViewModel) {
                         }
                         }
                     }
-                    // active = !isScrollInProgress: this pager has REAL finger swipe (unlike
-                    // the expanded one above), so its own drag/fling frames are exactly the
-                    // ones StatusBarScrim's blur was competing with for GPU time on every
-                    // single swipe -- see that parameter's own doc.
-                    StatusBarScrim(active = !pager.isScrollInProgress, hazeState = hazeState)
+                    // Always active, even during this pager's real finger-swipe drags --
+                    // disabling it mid-scroll (the previous behaviour, a perf optimization)
+                    // made it disappear while swiping between cars, reported directly as
+                    // wanting it to always be there.
+                    StatusBarScrim(active = true, hazeState = hazeState)
                     // Floating animated page indicator (no thin top bar). totalBlocks,
                     // not pageCount -- the dots include the Settings slot (one more,
                     // trailing dot) when settingsAsPage is on, same as any other page.
