@@ -3,6 +3,7 @@
     ExperimentalMaterial3ExpressiveApi::class,
     ExperimentalFoundationApi::class,
     ExperimentalLayoutApi::class,
+    ExperimentalSharedTransitionApi::class,
 )
 
 package com.bloo.bluelink.ui
@@ -13,6 +14,8 @@ import dev.chrisbanes.haze.hazeSource
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.ExperimentalSharedTransitionApi
+import androidx.compose.animation.SharedTransitionLayout
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
@@ -264,6 +267,22 @@ internal fun GarageScreen(state: State<UiState>, vm: AppViewModel) {
     // rather than a copy fading in. One instance for the whole screen: only one
     // car's map can be expanded at a time regardless of which page it's on.
     val expandedMap = remember { ExpandedMapState() }
+    // Drives expandedMap.overlayVisible (a MutableTransitionState, not a plain
+    // boolean -- see its own doc) so opening/closing both play a real transition
+    // instead of the map overlay just appearing/disappearing outright. Closing
+    // itself is also kicked off directly from CarMapSheetBody's own close(); this
+    // covers the OPEN side, and mirrors close() in case anything else ever nulls
+    // vin without going through that path.
+    LaunchedEffect(expandedMap.vin) {
+        expandedMap.overlayVisible.targetState = expandedMap.vin != null
+    }
+    // The vehicle/location the overlay renders -- frozen at the last non-null vin
+    // rather than read fresh from expandedMap.vin, which itself goes back to null
+    // the moment closing STARTS (see CarMapSheetBody's own close()), well before
+    // the exit transition this same vehicle/location need to keep rendering
+    // during has actually finished.
+    var lastExpandedVin by remember { mutableStateOf<String?>(null) }
+    if (expandedMap.vin != null) lastExpandedVin = expandedMap.vin
     // How many full-height cards fit side by side; pages advance by this many.
     val perPage = (widthDp / MIN_CARD_DP).coerceIn(1, count)
     // Expanding to the dual-column view only makes sense on a wide screen.
@@ -277,6 +296,15 @@ internal fun GarageScreen(state: State<UiState>, vm: AppViewModel) {
 
     CompositionLocalProvider(LocalPullFraction provides pullFractionState, LocalExpandedMap provides expandedMap) {
     BackdropHost {
+    // Provides the real shared-element-transition scope a Location pebble's own
+    // compact map and CarMapExpandedOverlay share an element through -- see
+    // ExpandedMapState's own doc. Wraps this screen's ENTIRE content (both
+    // pagers, every floating icon, the map overlay itself at the end) since the
+    // pebble sharing an element lives arbitrarily deep inside whichever one is
+    // currently composed, and SharedTransitionScope has to be a live ancestor of
+    // BOTH ends of the transition, wherever in this tree each of them is.
+    SharedTransitionLayout(Modifier.fillMaxSize()) {
+    CompositionLocalProvider(LocalSharedTransitionScope provides this) {
         AnimatedContent(
             targetState = expandedIdx != null,
             transitionSpec = {
@@ -855,20 +883,31 @@ internal fun GarageScreen(state: State<UiState>, vm: AppViewModel) {
         // current. See ExpandedMapState's own doc for why this lives here (not
         // inside LocationPebble) at all: this is the one place in the tree that's
         // both full-screen and a sibling of the car pagers themselves.
-        val expandedVin = expandedMap.vin
-        val expandedVehicle = if (expandedVin != null) vehicles.firstOrNull { it.vin == expandedVin } else null
+        //
+        // Gated on overlayVisible's own currentState/targetState, NOT just
+        // `expandedMap.vin != null` -- see its own doc. vin itself goes back to
+        // null the instant closing STARTS (CarMapSheetBody's own close()), well
+        // before the exit transition this composable needs to stay mounted for
+        // has actually finished; lastExpandedVin (above) is what keeps the
+        // vehicle/location resolvable for that whole window regardless.
+        val expandedVehicle = lastExpandedVin?.let { v -> vehicles.firstOrNull { it.vin == v } }
         val expandedLocation = expandedVehicle?.let { state.value.locations[it.vin] }
-        if (expandedVehicle != null && expandedLocation != null) {
+        if ((expandedMap.overlayVisible.currentState || expandedMap.overlayVisible.targetState) &&
+            expandedVehicle != null && expandedLocation != null
+        ) {
             CarMapExpandedOverlay(
+                vin = expandedVehicle.vin,
                 location = expandedLocation,
                 vehicleName = expandedVehicle.name,
                 deviceLocation = state.value.deviceLocation,
                 mapState = expandedMap.mapStateFor(expandedVehicle.vin),
-                originBounds = expandedMap.originBoundsFor(expandedVehicle.vin).value,
                 hazeState = hazeState,
+                visibleState = expandedMap.overlayVisible,
                 onDismiss = { expandedMap.vin = null },
             )
         }
+    }
+    }
     }
     }
 }
