@@ -271,7 +271,9 @@ internal val MorphedCornerPercent get() = com.bloo.uicommon.MorphedCornerPercent
 // animating the height and the corners of the SAME card at once is what read as "the bounce
 // doesn't feel connected to the pebble actually opening" rather than one coherent motion.
 internal val PebbleBounceDamping = 0.68f
-internal val PebbleCloseDamping = Spring.DampingRatioNoBouncy
+// Slightly underdamped (0.95) instead of critically damped (1.0) for a smoother,
+// more natural close transition that isn't stiff
+internal val PebbleCloseDamping = 0.95f
 internal val PebbleBounceStiffness = Spring.StiffnessLow
 
 // The PillDock* spring tokens and pillDockSpring() that used to live here

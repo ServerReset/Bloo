@@ -618,21 +618,28 @@ internal fun UpdateStatusLine(
         // child to size against, unlike a Row inside an already-bounded parent. See
         // SettingsScreen.kt's Weather-card place-name Row for the same bug, confirmed by
         // screenshot (text wrapped one character per line).
-        // No adjacent percentage text here either -- see the "downloading" case
-        // above for why: the header action pill above is the one place a download
-        // percentage shows, not this bar AND the line above it AND this too.
-        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            val p = downloadProgress
-            Surface(
-                modifier = Modifier.weight(1f).height(8.dp),
-                shape = CircleShape,
-                color = scheme.onSurface.copy(alpha = 0.12f),
-            ) {
-                if (p != null) {
-                    LinearProgressIndicator(progress = { p }, modifier = Modifier.fillMaxSize(), trackColor = Color.Transparent)
-                } else {
-                    LinearProgressIndicator(modifier = Modifier.fillMaxSize(), trackColor = Color.Transparent)
+        Column(Modifier.fillMaxWidth()) {
+            Spacer(Modifier.height(8.dp))
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                val p = downloadProgress
+                Surface(
+                    modifier = Modifier.weight(1f).height(8.dp),
+                    shape = CircleShape,
+                    color = scheme.onSurface.copy(alpha = 0.12f),
+                ) {
+                    if (p != null) {
+                        LinearProgressIndicator(progress = { p }, modifier = Modifier.fillMaxSize(), trackColor = Color.Transparent)
+                    } else {
+                        LinearProgressIndicator(modifier = Modifier.fillMaxSize(), trackColor = Color.Transparent)
+                    }
                 }
+                // Show the percentage next to the progress bar
+                Text(
+                    downloadProgress?.let { "${roundedDownloadPercent(it)}%" } ?: "—",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = scheme.onSurfaceVariant,
+                    modifier = Modifier.width(28.dp),
+                )
             }
         }
     }
