@@ -1018,6 +1018,12 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     private suspend fun loadGarageInner() {
+        // Fire-and-forget, in parallel with the vehicle fetch below (its own
+        // viewModelScope.launch, not awaited here) -- refreshes the DEVICE's own
+        // last-known location on every cold start/app open. See refreshDeviceLocation's
+        // own doc; this is the "whenever the app... opened" half of that, refreshStatus
+        // covers "whenever the app refreshed".
+        refreshDeviceLocation()
         // Merge vehicles from every signed-in brand; one brand failing shouldn't
         // hide the others. Track failures separately from "this account
         // genuinely has zero vehicles" -- collapsing both into the same empty
@@ -1581,6 +1587,11 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         // refreshes) update check here instead of only ever firing once at
         // cold start, which could go a whole session without re-checking.
         checkForUpdate()
+        // Same reasoning: this is also exactly the moment to refresh the DEVICE's own
+        // last-known location (UiState.deviceLocation), not just the car's -- reported
+        // directly as only ever updating on the map's own one-shot fetch, never on an
+        // app refresh/open.
+        refreshDeviceLocation()
     }
 
     /** Shared by the cold-start check and every refreshStatus() call. Debounced/
@@ -2753,7 +2764,41 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         )
     }
 
+    /**
+     * Refreshes [UiState.deviceLocation] -- the PHONE's own last-known position, not any
+     * car's. Best-effort via the same fused-location helper AutoLock's geofence uses
+     * ([com.bloo.bluelink.autolock.LocationHelper]); fails soft (leaves whatever value
+     * was already there) with no permission or no fix, the same way [locate] already
+     * treats a failed car GPS fix. Fire-and-forget: callers do not await this, since a
+     * missing/slow device fix should never hold up whatever ELSE they were doing (loading
+     * the garage, refreshing a car's status, locating the car).
+     *
+     * Called on cold start/app open ([loadGarageInner]), on every pull-to-refresh
+     * ([refreshStatus]), and again by [locate] itself -- reported directly: tapping
+     * "Locate" only ever refreshed the CAR's position, leaving this one stale until the
+     * next unrelated refresh happened to touch it.
+     */
+    private fun refreshDeviceLocation() {
+        viewModelScope.launch {
+            val loc = com.bloo.bluelink.autolock.LocationHelper.currentLocation(getApplication()) ?: return@launch
+            _state.update {
+                it.copy(
+                    deviceLocation = GeoLocation(
+                        loc.latitude,
+                        loc.longitude,
+                        if (loc.hasSpeed()) loc.speed.toDouble() else null,
+                    ),
+                )
+            }
+        }
+    }
+
     fun locate(v: Vehicle) = runCommand(v.vin, "locate", "Location updated", optimistic = null) {
+        // "Locate" is the one button whose entire job is refreshing a position -- the
+        // car's, below -- so it refreshes the DEVICE's own right alongside it. Fire-and-
+        // forget: a slow/missing device fix must not delay or fail the car locate this
+        // command exists for.
+        refreshDeviceLocation()
         // The GPS rides along with a status refresh (this is what the official app
         // uses); prefer it over the heavily rate-limited findMyCar, which is the
         // thing that throws "exceeded the daily remote service request limit".

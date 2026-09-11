@@ -121,6 +121,8 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.bloo.bluelink.data.Vehicle
 import com.bloo.uicommon.dropShadow
+import com.bloo.uicommon.MorphedCornerPercent
+import com.bloo.uicommon.PillCornerPercent
 import com.bloo.uicommon.seamCorner
 import com.bloo.bluelink.data.Weather
 import kotlinx.coroutines.flow.first
@@ -1120,6 +1122,29 @@ internal fun SplitExpandButton(
     var rowHeightDp by remember { mutableStateOf(52.dp) }
     val density = LocalDensity.current
     val morphedPercent = 100f * 16.dp.value / rowHeightDp.value
+    // Expansion also pushes BOTH halves' OUTER corner toward the morphed (squarer) shape,
+    // on top of each half's own independent press morph below -- reported directly: the
+    // header's action+chevron pill stayed a full pill even once its own card had squared
+    // off on expand (PebbleShell's own `corner` a few hundred lines up), reading as a
+    // mismatched leftover shape on an otherwise-square card.
+    //
+    // This is NOT the same thing as passing `active = expanded` to either half's
+    // MorphButton -- that is deliberately excluded (see MorphButtonCore's own doc: a
+    // connected half's outer corner must not react to a STANDING active state, because two
+    // independent `active` flags -- one per half -- can disagree and leave the pair
+    // PERMANENTLY mismatched, e.g. Charge's "Stop" squared while its neighbour chevron
+    // stayed round). `expandedMorph` sidesteps that: it is ONE shared value, read
+    // identically by both halves' shape lambdas below, so it can never desync them the way
+    // two independent `active`s could -- whenever neither half is actively being pressed,
+    // both resolve to the exact same corner. A live press on just one half still pushes
+    // THAT half further via `maxOf`, which is the same transient, per-segment tactile
+    // deviation every other press in this row already has (each half already computes its
+    // own seam corner from its own press state); it self-resolves on release.
+    val expandedMorph by animateFloatAsState(
+        targetValue = if (expanded) 1f else 0f,
+        animationSpec = spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessLow),
+        label = "splitExpandCorner",
+    )
     // Each half gets its own shape: the OUTER corner morphs (pill when idle, rounded square
     // when that half's own state says morphed), the INNER corner is the shared seamCorner() --
     // the SAME idle/morphed nub the lock/horn/lights connected group and the split pills draw,
@@ -1129,7 +1154,9 @@ internal fun SplitExpandButton(
     // what made a card's action+chevron read as a slightly different kind of control from the
     // connected lock group right below it on the same screen. Both halves are the same
     // MorphButton component; each one's own active/pressed state drives its OWN morph, forwarded
-    // here as `morph` and fed straight into the shared helper.
+    // here as `morph` and combined with `expandedMorph` (via `maxOf`) rather than fed straight
+    // into the shared helper -- `cp` itself (MorphButtonCore's own resolved percent) only ever
+    // reflects a press, per the doc above, so it cannot carry the expanded state on its own.
     //
     // That seam nub is wrong when canToggle is false: the chevron half is never
     // rendered then (see the `if (canToggle)` below), so the action button sits
@@ -1138,15 +1165,19 @@ internal fun SplitExpandButton(
     // real screenshot: the Summarize action, whose pebble is permanently
     // expanded in simple mode and so never shows a chevron). Full pill on both
     // sides in that case instead.
-    val leftShapeForCorner: (Float, Int) -> Shape = { morph, cp ->
-        val end = if (canToggle) seamCorner(morph) else CornerSize(percent = cp)
+    val leftShapeForCorner: (Float, Int) -> Shape = { morph, _ ->
+        val combined = maxOf(morph, expandedMorph)
+        val cp = (PillCornerPercent + (MorphedCornerPercent - PillCornerPercent) * combined).roundToInt()
+        val end = if (canToggle) seamCorner(combined) else CornerSize(percent = cp)
         RoundedCornerShape(
             topStart = CornerSize(percent = cp), bottomStart = CornerSize(percent = cp),
             topEnd = end, bottomEnd = end,
         )
     }
-    val rightShapeForCorner: (Float, Int) -> Shape = { morph, cp ->
-        val start = seamCorner(morph)
+    val rightShapeForCorner: (Float, Int) -> Shape = { morph, _ ->
+        val combined = maxOf(morph, expandedMorph)
+        val cp = (50f + (morphedPercent - 50f) * combined).roundToInt()
+        val start = seamCorner(combined)
         RoundedCornerShape(
             topStart = start, bottomStart = start,
             topEnd = CornerSize(percent = cp), bottomEnd = CornerSize(percent = cp),

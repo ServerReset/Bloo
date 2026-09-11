@@ -139,6 +139,16 @@ data class UiState(
     /** Wall-clock millis the app last pulled status from the server, keyed by VIN. */
     val lastFetched: Map<String, Long> = emptyMap(),
     val locations: Map<String, GeoLocation> = emptyMap(),
+    /**
+     * The DEVICE's own last-known position (not a car's) -- one value, not per-VIN, since
+     * there is exactly one phone. Feeds the "you are here" dot on CarMap and any future
+     * weather-at-my-location feature. Refreshed on cold start/pull-to-refresh
+     * ([AppViewModel.refreshDeviceLocation]) and again whenever [AppViewModel.locate] runs
+     * (tapping "Locate" was reported as only ever refreshing the CAR's fix, leaving this
+     * one stale) -- never on a schedule of its own, so a parked phone isn't polling GPS
+     * between those moments.
+     */
+    val deviceLocation: GeoLocation? = null,
     /** Recent EV trips by VIN (loaded lazily when the Trips pebble is shown). */
     val trips: Map<String, List<EvTrip>> = emptyMap(),
     /** User-named climate presets by VIN. */
