@@ -9,7 +9,6 @@ package com.bloo.bluelink.ui
 
 import android.os.Build
 import dev.chrisbanes.haze.HazeState
-import dev.chrisbanes.haze.HazeStyle
 import dev.chrisbanes.haze.hazeEffect
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.fadeIn
@@ -194,9 +193,11 @@ internal fun StatusBarScrim(
                     // background -- not this Box's own gradient. That gradient (below,
                     // applied identically either way) still does the same legibility
                     // tinting job it always did, now over a genuinely blurred backdrop.
-                    // blurRadius explicit, a bit under Haze's own 20dp default -- reported
-                    // directly as wanting the blur "a bit less strong".
-                    Modifier.hazeEffect(state = hazeState, style = HazeStyle(blurRadius = 14.dp))
+                    // No explicit HazeStyle override here -- `style` and `state` together
+                    // hit an "overload resolution ambiguity" at compile time against this
+                    // pinned 1.7.0 (caught by CI); "a bit less strong" is carried entirely
+                    // by the gradient's own reduced alpha below instead.
+                    Modifier.hazeEffect(state = hazeState)
                 } else {
                     Modifier
                 },
