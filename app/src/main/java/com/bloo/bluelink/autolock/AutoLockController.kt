@@ -5,6 +5,7 @@ import com.bloo.bluelink.data.AppLog
 import com.bloo.bluelink.data.Brand
 import com.bloo.bluelink.data.BlueLinkGate
 import com.bloo.bluelink.data.CredentialStore
+import com.bloo.bluelink.data.Notifications
 import com.bloo.bluelink.data.SessionStore
 import com.bloo.bluelink.data.SettingsStore
 import com.bloo.bluelink.data.SnapshotStore
@@ -213,7 +214,7 @@ object AutoLockController {
                     _state.update { it + (vin to AutoLockEvalState(detection = DetectionState.SKIPPED)) }
                     AppLog.log("AutoLock: skipped for $vin — ${decision.reason}.")
                 }
-                LockDecision.Lock -> performLock(context, vin, settings)
+                LockDecision.Lock -> performLock(context, vin, v.name, settings)
             }
         } catch (c: CancellationException) {
             throw c
@@ -239,7 +240,7 @@ object AutoLockController {
         return withTimeoutOrNull(30_000) { BlueLinkGate.statusMutex.withLock { repo.status(v, refresh = false) } }
     }
 
-    private suspend fun performLock(context: Context, vin: String, settings: AutoLockConfig) {
+    private suspend fun performLock(context: Context, vin: String, carName: String, settings: AutoLockConfig) {
         _state.update { it + (vin to AutoLockEvalState(detection = DetectionState.LOCKING)) }
         if (settings.dryRun) {
             AppLog.log("AutoLock DRY RUN: would have locked $vin now. (No command sent.)")
@@ -256,12 +257,48 @@ object AutoLockController {
             }
         } else {
             fail(vin, "AutoLock: lock command failed${result?.message?.let { " — $it" } ?: ""}.")
+            notifyLockFailed(context, vin, carName, result?.message)
         }
     }
 
     private fun fail(vin: String, message: String) {
         AppLog.log("⚠ $message")
         _state.update { it + (vin to AutoLockEvalState(detection = DetectionState.ERROR)) }
+    }
+
+    /**
+     * A real, standalone user notification for a failed automatic lock -- not just
+     * AutoLockNotification's own low-priority "evaluation in progress" foreground
+     * update, which the ERROR state above already quietly turns into (AutoLockService's
+     * own state collector) but which can come and go in the status bar before anyone
+     * glances at it, and never explains WHY. Reported directly: wants to actually be
+     * told the car could not lock, e.g. after hitting the day's remote-command limit.
+     *
+     * `reason` is whatever server-provided message the failed command carried, checked
+     * for the same "limit" wording AppViewModel.locate() already recognises from real
+     * BlueLink error text ("...daily location-lookup limit...", "...daily remote
+     * service request limit..."), so this can say something more useful than "it
+     * failed" when that's specifically what happened.
+     */
+    private fun notifyLockFailed(context: Context, vin: String, carName: String, reason: String?) {
+        val limited = reason?.contains("limit", ignoreCase = true) == true
+        val text = if (limited) {
+            "$carName may be over today's remote-command limit. Lock it manually when you can."
+        } else {
+            "AutoLock couldn't lock $carName" + (reason?.let { " ($it)" } ?: "") + ". Lock it manually if needed."
+        }
+        // +1, distinct from AutoLockNotification.notificationId(vin) -- that id is the
+        // live "evaluation in progress" foreground notification (AutoLockService owns
+        // its lifecycle entirely, cancelling/replacing it on every state change); this
+        // is a separate, ordinary notification that should stick around on its own
+        // until the user dismisses it, not get silently swapped out by the next
+        // evaluation's own notification traffic.
+        Notifications.post(
+            context,
+            id = AutoLockNotification.notificationId(vin) + 1,
+            title = "$carName didn't lock",
+            text = text,
+        )
     }
 
     private fun advance(vin: String, next: DetectionState) {

@@ -83,6 +83,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.graphics.Color
@@ -93,9 +94,13 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.layout.positionOnScreen
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.toSize
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.bloo.bluelink.data.GeoLocation
@@ -184,17 +189,25 @@ internal fun LocationPebble(v: Vehicle, state: UiState, vm: AppViewModel, dragHa
                 // growing in place -- see CarMap's own onExpand doc. Local to this pebble
                 // instance: opening it here never affects another car's own map.
                 var showMapSheet by remember { mutableStateOf(false) }
+                // This map's own on-SCREEN bounds, in ABSOLUTE display coordinates
+                // (positionOnScreen(), not a window-relative boundsInWindow()) --
+                // CarMapSheet's own map area grows FROM this rect rather than just
+                // appearing, regardless of whether the sheet ends up sharing this
+                // Activity's window or opening its own (screen-absolute coordinates
+                // are correct either way, so this doesn't have to know or care).
+                var mapOriginBounds by remember { mutableStateOf<Rect?>(null) }
                 CarMap(
                     loc,
                     Modifier
                         .fillMaxWidth()
                         .height(if (coverGlance) 130.dp else 220.dp)
-                        .clip(RoundedCornerShape(18.dp)),
+                        .clip(RoundedCornerShape(18.dp))
+                        .onGloballyPositioned { mapOriginBounds = Rect(it.positionOnScreen(), it.size.toSize()) },
                     deviceLocation = state.deviceLocation,
                     onExpand = { showMapSheet = true },
                 )
                 if (showMapSheet) {
-                    CarMapSheet(loc, v.name, state.deviceLocation) { showMapSheet = false }
+                    CarMapSheet(loc, v.name, state.deviceLocation, mapOriginBounds) { showMapSheet = false }
                 }
                 // Same reasoning as the cover hero above: a resolved address is
                 // already the pebble's header/summary, so a permanent raw-coordinate
@@ -434,13 +447,17 @@ internal class CarMapState {
     var panY by mutableFloatStateOf(0f)
         private set
 
-    // Accumulates a pinch gesture's own multiplicative ratio between whole
-    // zoom-level steps -- detectTransformGestures reports a per-frame RATIO, not
-    // an absolute scale, so this is what a pinch has to build up against before
-    // it's worth redrawing a whole new tile grid. Reset (not just decremented)
-    // every time a level actually flips, so the next level change needs a full
-    // pinch of its own rather than coasting on leftover ratio.
-    private var pinchAccum by mutableFloatStateOf(1f)
+    // The pinch gesture's own running scale, 1x at [zoom]'s own fetched tile
+    // resolution -- and NOT just internal bookkeeping the way an accumulator toward a
+    // silent step change would be. CarMap applies this directly as a graphicsLayer
+    // scale over the already-drawn tile grid, every frame of the gesture, which is
+    // what makes zooming feel genuinely fluid instead of jumping between whole levels:
+    // reported directly as wanting a continuous zoom, not steps. Only CROSSING a
+    // whole octave (2x or 0.5x) actually swaps which tiles are fetched/on screen --
+    // see pinch() below -- everything in between is pure visual scale, no new tiles,
+    // no snapping.
+    var scale by mutableFloatStateOf(1f)
+        private set
 
     /** A continuous drag, in screen pixels. Drag right -> the map (and
      *  everything drawn on it) should slide right with the finger, exactly like
@@ -452,17 +469,18 @@ internal class CarMapState {
         panY += dy
     }
 
-    /** One frame of a pinch gesture's multiplicative ratio. The pan offset is
-     *  halved/doubled in step with every level change: it is measured in tile
-     *  PIXELS at the OLD zoom, and a zoom step doubles/halves how many pixels
-     *  the same world distance covers. */
+    /** One frame of a pinch gesture's multiplicative ratio, folded straight into
+     *  [scale] -- see that property's own doc. The pan offset is halved/doubled in
+     *  step with every whole-LEVEL change (crossing 2x/0.5x): it is measured in tile
+     *  PIXELS at the OLD zoom, and a zoom step doubles/halves how many pixels the
+     *  same world distance covers. */
     fun pinch(ratio: Float) {
-        pinchAccum *= ratio
-        while (pinchAccum >= 2f && zoom < CarMapMaxZoom) {
-            zoom++; panX *= 2f; panY *= 2f; pinchAccum /= 2f
+        scale *= ratio
+        while (scale >= 2f && zoom < CarMapMaxZoom) {
+            zoom++; panX *= 2f; panY *= 2f; scale /= 2f
         }
-        while (pinchAccum <= 0.5f && zoom > CarMapMinZoom) {
-            zoom--; panX /= 2f; panY /= 2f; pinchAccum *= 2f
+        while (scale <= 0.5f && zoom > CarMapMinZoom) {
+            zoom--; panX /= 2f; panY /= 2f; scale *= 2f
         }
     }
 
@@ -472,7 +490,7 @@ internal class CarMapState {
         zoom = CarMapDefaultZoom
         panX = 0f
         panY = 0f
-        pinchAccum = 1f
+        scale = 1f
     }
 }
 
@@ -623,6 +641,20 @@ internal fun CarMap(
         val lastX = floor((originX + wPx) / tilePx).toInt()
         val lastY = floor((originY + hPx) / tilePx).toInt()
         val tileDp = with(density) { tilePx.toDp() }
+        // Everything below (tiles, pin, device dot) sits inside its own scaled layer --
+        // NOT the outer Box, which also hosts the expand button (CarMap's own doc) and
+        // must stay at 1x regardless of how far a pinch has scaled the map itself.
+        // state.scale is the CONTINUOUS part of a pinch (see its own doc): applying it
+        // here, every frame of the gesture, is what makes zooming feel fluid instead of
+        // jumping between the whole levels a fresh tile fetch actually needs.
+        Box(
+            Modifier
+                .fillMaxSize()
+                .graphicsLayer {
+                    scaleX = state.scale
+                    scaleY = state.scale
+                },
+        ) {
         for (tx in firstX..lastX) {
             for (ty in firstY..lastY) {
                 if (ty < 0 || ty >= span) continue
@@ -704,6 +736,7 @@ internal fun CarMap(
                     .background(DeviceLocationBlue, CircleShape),
             )
         }
+        } // close the scaled tiles/pin/dot layer
         if (onExpand != null) {
             MapOverlayIconButton(
                 Icons.Filled.Fullscreen,
@@ -779,13 +812,22 @@ private fun MapFeatureRow(features: List<MapFeature>, modifier: Modifier = Modif
         horizontalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         features.forEach { feature ->
+            // SafeExpansiveButton, not a bare MorphButton -- the same press-grow
+            // wrapper every other standalone button in the app uses. Reported
+            // directly: these were bare MorphButtons with no press wrapper at all,
+            // exactly the "nothing here to animate" shape Pebbles.kt's own
+            // groupActions once had (see that file's identical fix). Independent
+            // pills in a scrollable row, not a connected group, so each one grows
+            // for real on press rather than trading width with a neighbour.
             val source = remember { MutableInteractionSource() }
-            MorphButton(
-                onClick = feature.onClick,
-                interactionSource = source,
-                enabled = feature.enabled,
-            ) {
-                MorphButtonLabel(feature.icon, feature.label, pending = false)
+            SafeExpansiveButton(interactionSource = source, enabled = feature.enabled) {
+                MorphButton(
+                    onClick = feature.onClick,
+                    interactionSource = source,
+                    enabled = feature.enabled,
+                ) {
+                    MorphButtonLabel(feature.icon, feature.label, pending = false)
+                }
             }
         }
     }
@@ -825,6 +867,17 @@ internal fun CarMapSheet(
     location: GeoLocation,
     vehicleName: String,
     deviceLocation: GeoLocation?,
+    /**
+     * The small map's own on-screen rect (absolute screen coordinates -- see the
+     * call site's own doc) at the moment it was tapped. The sheet's own map area
+     * morphs from this rect to its natural size/position (a `graphicsLayer` scale +
+     * translate driven by one shared [Animatable]) instead of just fading/scaling in
+     * from its own centre -- reported directly as wanting the card to expand FROM
+     * the map pebble, not materialise over the bottom of the screen. Null (measured
+     * too late, or the caller has no origin to offer) falls back to the plain
+     * scale-from-a-touch-under-full-size CarMapSheet always had.
+     */
+    originBounds: Rect?,
     onDismiss: () -> Unit,
 ) {
     val context = LocalContext.current
@@ -843,25 +896,31 @@ internal fun CarMapSheet(
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
+        // ~90% of the SCREEN, on the sheet's own modifier -- not on the content
+        // inside it. That was the first attempt here, and it did not do what it
+        // looked like it should: constraining the CONTENT to 90% left the sheet's
+        // own shape/drag-handle sizing itself the way it always does (nearly full
+        // height with `skipPartiallyExpanded`), so the content just sat inside a
+        // mostly-empty card with a dead gap of the sheet's own background colour
+        // above it -- reported directly, from a screenshot, as a black gap with the
+        // drag handle floating near the physical top of the screen, nothing like a
+        // dimmed app peeking through. Capping the SHEET itself here means its shape,
+        // its scrim, and its drag handle are ALL sized to the same 90%, and the
+        // actual app shows (dimmed, by the sheet's own scrim) in the real 10% gap
+        // above it.
+        modifier = Modifier.fillMaxHeight(0.9f),
     ) {
-        // The map's own short grow-in -- NOT tied to the sheet's own slide-up (that
-        // already has its own motion; doubling it up read as the map "catching up"
-        // late). Scale from a touch under full size rather than from zero: this is
-        // "the map continuing to expand", not a new element materialising.
-        val entryScale = remember { Animatable(0.92f) }
+        // 0 = sitting exactly over originBounds (what the small map looked like the
+        // instant this opened), 1 = grown to this map area's own natural size/
+        // position. NOT tied to the sheet's own slide-up (that already has its own
+        // motion; doubling it up read as the map "catching up" late) -- this drives
+        // ONLY the map's own transform, a separate, slightly slower spring so the
+        // grow reads as continuing after the sheet arrives rather than racing it.
+        val morph = remember { Animatable(0f) }
         LaunchedEffect(Unit) {
-            entryScale.animateTo(1f, spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessMediumLow))
+            morph.animateTo(1f, spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessMediumLow))
         }
-        Column(
-            Modifier
-                // ~90% of the sheet's own available height, itself already capped
-                // short of the full display by ModalBottomSheet -- together the app
-                // stays visible (dimmed by the sheet's own scrim) in the gap above,
-                // reported directly as wanting the background to still read as "the
-                // app," not a second full screen replacing it outright.
-                .fillMaxHeight(0.9f)
-                .fillMaxWidth(),
-        ) {
+        Column(Modifier.fillMaxSize()) {
             Row(
                 Modifier
                     .fillMaxWidth()
@@ -877,14 +936,41 @@ internal fun CarMapSheet(
                 FloatingIcon(Icons.Filled.Close, "Close", dismissAnimated)
             }
             val sheetMapState = rememberCarMapState()
+            // This map area's own full-size on-screen rect, captured once laid out --
+            // constant for the life of this sheet (only the graphicsLayer transform
+            // below moves, never the actual layout), so it only needs capturing once.
+            var fullBounds by remember { mutableStateOf<Rect?>(null) }
             Box(
                 Modifier
                     .weight(1f)
                     .fillMaxWidth()
                     .padding(horizontal = 4.dp)
+                    .onGloballyPositioned { fullBounds = Rect(it.positionOnScreen(), it.size.toSize()) }
+                    // Clips the growing content to this box's own bounds -- belt and
+                    // braces against the translation below ever drawing outside its
+                    // slot (the previous attempt's reported "covers the close button"
+                    // came from a similar transform on an UNCLIPPED Column, which
+                    // Compose happily draws past its own measured bounds).
+                    .clipToBounds()
                     .graphicsLayer {
-                        scaleX = entryScale.value
-                        scaleY = entryScale.value
+                        val origin = originBounds
+                        val full = fullBounds
+                        if (origin != null && full != null && full.width > 0f && full.height > 0f) {
+                            val t = morph.value
+                            val originScaleX = origin.width / full.width
+                            val originScaleY = origin.height / full.height
+                            scaleX = originScaleX + (1f - originScaleX) * t
+                            scaleY = originScaleY + (1f - originScaleY) * t
+                            translationX = (origin.center.x - full.center.x) * (1f - t)
+                            translationY = (origin.center.y - full.center.y) * (1f - t)
+                        } else {
+                            // No origin to grow from (mistimed measurement, or a caller
+                            // that passed null) -- the old fallback: a plain scale-in
+                            // from a touch under full size rather than nothing at all.
+                            val t = morph.value
+                            scaleX = 0.92f + 0.08f * t
+                            scaleY = 0.92f + 0.08f * t
+                        }
                     },
             ) {
                 CarMap(

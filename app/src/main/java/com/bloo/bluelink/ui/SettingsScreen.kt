@@ -2108,6 +2108,55 @@ internal fun SettingsScreen(
             }
             }
         }
+            item {
+                // Every third-party project/API this app draws on, in one place -- moved
+                // here from a Surface+Text that used to sit inside AutoLock's own settings
+                // (see AutoLockSettingsUi.kt's own comment), which was the ONLY place any
+                // of them were credited and only showed up while that one feature happened
+                // to be enabled. OpenStreetMap's own tile usage policy in particular expects
+                // a visible attribution; this is that, even if it isn't literally overlaid
+                // on the map itself.
+                SettingsCard("Credits", Icons.Filled.Info, vm) {
+                    Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                        listOf(
+                            Triple(
+                                "OpenStreetMap",
+                                "Map tiles for the car's and device's location, on the phone, the flip cover, the home-screen widget, and the watch.",
+                                "© OpenStreetMap contributors · openstreetmap.org",
+                            ),
+                            Triple(
+                                "Haze",
+                                "Real backdrop blur behind the status bar.",
+                                "github.com/chrisbanes/haze",
+                            ),
+                            Triple(
+                                "Coil",
+                                "Image loading throughout the app.",
+                                "github.com/coil-kt/coil",
+                            ),
+                            Triple(
+                                "i5-AutoLock",
+                                "AutoLock ported from Vel-San's reference implementation.",
+                                "github.com/Vel-San/i5-AutoLock",
+                            ),
+                        ).forEach { (name, description, link) ->
+                            Column {
+                                Text(name, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
+                                Text(
+                                    description,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                                Text(
+                                    link,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                        }
+                    }
+                }
+            }
           // Full-line, same reason as the leading spacer above: this is the
           // grid's own trailing footer, not a card.
           item(span = StaggeredGridItemSpan.FullLine) {

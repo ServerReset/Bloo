@@ -313,25 +313,12 @@ internal fun AutoLockSettingsGroup(v: Vehicle, vm: AppViewModel) {
                 }
             }
 
-            Spacer(Modifier.height(SettingsGapRow))
-
-            // ATTRIBUTION SECTION
-            Surface(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = SettingsGapHairline),
-                color = MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 0.3f),
-                shape = MaterialTheme.shapes.small,
-            ) {
-                Text(
-                    "AutoLock feature ported from i5-AutoLock by Vel-San. " +
-                    "github.com/Vel-San/i5-AutoLock",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(10.dp),
-                )
-            }
         }
+        // The i5-AutoLock attribution that used to sit here (a Surface + Text,
+        // shown only while AutoLock is enabled) moved to a single app-wide Credits
+        // card -- SettingsScreen.kt's own "Credits" SettingsCard -- alongside every
+        // other third-party project/API this app draws on, rather than one feature's
+        // settings section being the only place any of them were ever acknowledged.
     }
 
     if (showDevicePicker) {
