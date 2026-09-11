@@ -1840,7 +1840,23 @@ internal fun SettingsScreen(
                             onClick = { vm.checkForUpdateManually() },
                             interactionSource = checkSource,
                             enabled = !state.updateChecking,
-                            active = true,
+                            // NOT active = true. That was here purely to get the primary
+                            // tint (MorphButtonCore's own doc: "the highlight colour IS
+                            // the active state") -- but active ALSO pins the button
+                            // permanently at its morphed rounded-square corner, the exact
+                            // same rule Charge's "Stop" and Lock/Unlock's "highlighted"
+                            // state rely on to STAY square while genuinely toggled on.
+                            // "Check" isn't a toggle -- it never has an "on" state to stay
+                            // morphed for -- so it sat permanently square with nothing left
+                            // to morph FROM, the one button in the row (next to a normal
+                            // pill-at-rest "GitHub") that never played the press animation
+                            // everything else in the app does. Reported directly: "the
+                            // animation isn't right, not the same as the others." Setting
+                            // the container/content colours directly gets the identical
+                            // primary look without borrowing the toggle semantics, so this
+                            // rests as a pill and morphs on press exactly like GitHub does.
+                            containerColor = MaterialTheme.colorScheme.primary,
+                            contentColor = MaterialTheme.colorScheme.onPrimary,
                         ) {
                             // Label deliberately does NOT change to "Checking…" -- it stays
                             // "Check" the whole time, and pending=true alone swaps the icon
