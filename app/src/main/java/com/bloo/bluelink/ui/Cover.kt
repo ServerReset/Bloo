@@ -646,9 +646,26 @@ internal fun CoverActionButton(
             groupWeight = 1f,
             // No weight(1f): its parent here is SafeExpansiveButton's own layout, not the row,
             // so it was silently doing nothing. The equal share now comes from the group.
+            //
+            // heightIn(min = max = ...), not just a floor: `fillMaxHeight()` fills whatever
+            // height ITS PARENT (this ExpressiveButtonRow) reports needing, and this button's
+            // row sits inside CoverTile's bottom band -- a plain Column, bottom-aligned inside
+            // a Box that fills the WHOLE tile. A Box hands every child (including a bottom-
+            // aligned one) the SAME max-height constraint it was given itself, so a row with
+            // room to fill up to the box's max would fillMaxHeight() into it -- reported from a
+            // real screenshot as one lone action button (a Charge tile's single "Stop", no
+            // identity pill sibling narrow enough to visually hide the effect) ballooning to
+            // cover most of the tile, overlapping the readout above it. A fixed exact height
+            // (not just a minimum) matches what this button was always meant to be -- a small,
+            // constant-height action row, identical whether it is one button or four -- and
+            // caps fillMaxHeight() back down to it regardless of how much room the row itself
+            // was handed.
             modifier = Modifier
                 .fillMaxHeight()
-                .heightIn(min = if (compact) 44.dp else 56.dp)
+                .heightIn(
+                    min = if (compact) 44.dp else 56.dp,
+                    max = if (compact) 44.dp else 56.dp,
+                )
                 .alpha(if (enabled) 1f else 0.45f),
         ) {
         val glyph: @Composable () -> Unit = {
