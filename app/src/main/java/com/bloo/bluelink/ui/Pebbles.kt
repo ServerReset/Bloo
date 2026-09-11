@@ -1035,34 +1035,28 @@ internal fun StateControl(
         // wrap = false: this is a CONNECTED group -- one silhouette with seams in it -- so a
         // seam appearing on the next line down would not be a control at all. Too narrow, and
         // the segments compact instead.
-        ExpressiveButtonRow(
-            // Caps this group's own room at groupMaxWidth -- see that val's own doc above
-            // for why the group cannot work this out for itself.
-            modifier = Modifier.widthIn(max = groupMaxWidth),
-            spacing = 3.dp,
-            verticalAlignment = Alignment.CenterVertically,
-            wrap = false,
-        ) {
-            groupActions.forEachIndexed { i, action ->
-                val actionSource = remember { MutableInteractionSource() }
-                SafeExpansiveButton(interactionSource = actionSource, enabled = action.enabled) {
-                    MorphButton(
-                        onClick = action.onClick,
-                        enabled = action.enabled,
-                        interactionSource = actionSource,
-                        contentPadding = PaddingValues(0.dp),
-                        shapeForCorner = { morph, cp -> connectedGroupShape(i, segmentCount, cp, morph) },
-                        modifier = Modifier.size(groupBtnSize),
-                    ) { Icon(action.icon, contentDescription = action.contentDescription, modifier = Modifier.size(actionIconSize)) }
-                }
-            }
-            // Pill when off, rounded rectangle + highlight colour when on - same
-            // as the climate/charge controls -- except when it's part of a
-            // group, where the connected shape takes over (see MorphButton's
-            // shape param doc): a connected group's silhouette is static, not
-            // something one segment morphs independently of the others.
-            val mainSource = remember { MutableInteractionSource() }
-            SafeExpansiveButton(interactionSource = mainSource, enabled = enabled && !pending) {
+        val mainSource = remember { MutableInteractionSource() }
+        if (groupActions.isEmpty()) {
+            // No ExpressiveButtonRow at all here -- most cars have no horn/lights support
+            // (Kia's US API has none, see the doc above), so this is the common case, and it
+            // was reported directly as "the unlock button doesn't animate when tapped": a
+            // connected group's OWN defining rule is that its outer footprint never changes
+            // on press -- growth is redistributed FROM a neighbour, never from thin air (see
+            // ExpressiveButtonGroup's/ExpressivePressGrowth's own doc: "a member with none
+            // carries nothing to reserve for"). A lone member has no neighbour to take width
+            // from, so wrapping it in the group gave it a press fraction that was faithfully
+            // computed and just as faithfully multiplied by a reserve of zero -- not a bug in
+            // the animation itself, a design that only works with two or more real segments,
+            // silently applied to the one-segment case too. SafeExpansiveButton's OTHER path
+            // (outside a group) grows the button for real, which is exactly the fallback a
+            // solitary button wants and every other lone MorphButton in the app already gets.
+            SafeExpansiveButton(
+                interactionSource = mainSource,
+                enabled = enabled && !pending,
+                // Same cap the group version applies via its own Modifier -- see groupMaxWidth's
+                // doc above for why this can't be worked out from inside the button itself.
+                modifier = Modifier.widthIn(max = groupMaxWidth),
+            ) {
                 MorphButton(
                     onClick = { if (isOn == true) onDeactivate() else onActivate() },
                     onClickHaptic = { haptics?.heavy() },
@@ -1071,40 +1065,80 @@ internal fun StateControl(
                     active = highlighted,
                     activeContainerColor = highlightColor,
                     activeContentColor = highlightContentColor,
-                    shapeForCorner = if (groupActions.isNotEmpty()) {
-                        { morph, cp -> connectedGroupShape(segmentCount - 1, segmentCount, cp, morph) }
-                    } else {
-                        null
-                    },
-                    // MorphButton's own default is ButtonDefaults.ContentPadding (24dp
-                    // horizontal) -- sized for a labelled pill, which is what this button
-                    // shows almost always. But it is still a member of the connected group
-                    // above (ExpressiveButtonGroup, ALWAYS wraps it, whether or not there
-                    // are Flash/Horn siblings), and that group's own all-or-nothing fit rule
-                    // can drop it to icon-only on a narrow enough row -- with the same
-                    // "car pebble too narrow for the label" 24dp padding still wrapped
-                    // around just the bare glyph. That reads as a conspicuously oversized
-                    // icon button ("the Unlock button is still too big even though it's
-                    // just an icon") next to the group actions beside it, which use 0dp
-                    // padding plus a floor precisely so their own icon-only footprint stays
-                    // tight. 14dp/10dp -- an existing value used for several other
-                    // MorphButtons elsewhere in this file/module (PebbleShell, SettingsScreen)
-                    // -- keeps the labelled case comfortable while landing this button's own
-                    // compact footprint (icon + 28dp total horizontal padding) close to the
-                    // group actions' own ~50dp square, rather than the ~70dp the default gave
-                    // it. A single fixed value on purpose, not one that reacts to which mode
-                    // is showing: reacting would reopen the same instability MorphButtonLabel's
-                    // own per-frame width check already causes during a press (see
-                    // ExpressivePressGrowth) -- this fixes the SIZE without adding a second
-                    // thing that changes based on live layout state.
                     contentPadding = PaddingValues(horizontal = 14.dp, vertical = 10.dp),
-                    // Same pill height as the pebble header actions (the row stays
-                    // ControlHeight tall, so the button is vertically centred in it);
-                    // taller on the cover for a thumb.
                     modifier = Modifier.heightIn(min = groupBtnSize),
                 ) {
                     val buttonIcon = if (isOn == true) (deactivateIcon ?: icon) else icon
                     MorphButtonLabel(buttonIcon, if (isOn == true) turnOff else turnOn, pending, iconSize = actionIconSize)
+                }
+            }
+        } else {
+            ExpressiveButtonRow(
+                // Caps this group's own room at groupMaxWidth -- see that val's own doc above
+                // for why the group cannot work this out for itself.
+                modifier = Modifier.widthIn(max = groupMaxWidth),
+                spacing = 3.dp,
+                verticalAlignment = Alignment.CenterVertically,
+                wrap = false,
+            ) {
+                groupActions.forEachIndexed { i, action ->
+                    val actionSource = remember { MutableInteractionSource() }
+                    SafeExpansiveButton(interactionSource = actionSource, enabled = action.enabled) {
+                        MorphButton(
+                            onClick = action.onClick,
+                            enabled = action.enabled,
+                            interactionSource = actionSource,
+                            contentPadding = PaddingValues(0.dp),
+                            shapeForCorner = { morph, cp -> connectedGroupShape(i, segmentCount, cp, morph) },
+                            modifier = Modifier.size(groupBtnSize),
+                        ) { Icon(action.icon, contentDescription = action.contentDescription, modifier = Modifier.size(actionIconSize)) }
+                    }
+                }
+                // Pill when off, rounded rectangle + highlight colour when on - same
+                // as the climate/charge controls -- except when it's part of a
+                // group, where the connected shape takes over (see MorphButton's
+                // shape param doc): a connected group's silhouette is static, not
+                // something one segment morphs independently of the others.
+                SafeExpansiveButton(interactionSource = mainSource, enabled = enabled && !pending) {
+                    MorphButton(
+                        onClick = { if (isOn == true) onDeactivate() else onActivate() },
+                        onClickHaptic = { haptics?.heavy() },
+                        enabled = enabled && !pending,
+                        interactionSource = mainSource,
+                        active = highlighted,
+                        activeContainerColor = highlightColor,
+                        activeContentColor = highlightContentColor,
+                        shapeForCorner = { morph, cp -> connectedGroupShape(segmentCount - 1, segmentCount, cp, morph) },
+                        // MorphButton's own default is ButtonDefaults.ContentPadding (24dp
+                        // horizontal) -- sized for a labelled pill, which is what this button
+                        // shows almost always. But it is still a member of the connected group
+                        // above (real here: this branch only runs when groupActions is
+                        // non-empty), and that group's own all-or-nothing fit rule can drop it
+                        // to icon-only on a narrow enough row -- with the same "car pebble too
+                        // narrow for the label" 24dp padding still wrapped around just the bare
+                        // glyph. That reads as a conspicuously oversized icon button ("the
+                        // Unlock button is still too big even though it's just an icon") next
+                        // to the group actions beside it, which use 0dp padding plus a floor
+                        // precisely so their own icon-only footprint stays tight. 14dp/10dp --
+                        // an existing value used for several other MorphButtons elsewhere in
+                        // this file/module (PebbleShell, SettingsScreen) -- keeps the labelled
+                        // case comfortable while landing this button's own compact footprint
+                        // (icon + 28dp total horizontal padding) close to the group actions'
+                        // own ~50dp square, rather than the ~70dp the default gave it. A single
+                        // fixed value on purpose, not one that reacts to which mode is showing:
+                        // reacting would reopen the same instability MorphButtonLabel's own
+                        // per-frame width check already causes during a press (see
+                        // ExpressivePressGrowth) -- this fixes the SIZE without adding a second
+                        // thing that changes based on live layout state.
+                        contentPadding = PaddingValues(horizontal = 14.dp, vertical = 10.dp),
+                        // Same pill height as the pebble header actions (the row stays
+                        // ControlHeight tall, so the button is vertically centred in it);
+                        // taller on the cover for a thumb.
+                        modifier = Modifier.heightIn(min = groupBtnSize),
+                    ) {
+                        val buttonIcon = if (isOn == true) (deactivateIcon ?: icon) else icon
+                        MorphButtonLabel(buttonIcon, if (isOn == true) turnOff else turnOn, pending, iconSize = actionIconSize)
+                    }
                 }
             }
         }
