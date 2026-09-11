@@ -228,31 +228,48 @@ internal fun LocationPebble(v: Vehicle, state: UiState, vm: AppViewModel, dragHa
                     // headline. This tile rendered the address three times at once -- headline,
                     // hero and the map stripe's caption.
                 }
-                // THE SAME CarMap rendered here is what expands to fill the screen.
-                // When NOT expanded: visible in the pebble. When expanded: appears
-                // at full-screen, morphing from this exact location. It's a single
-                // CarMapState + bounds tracked, with one rendering in the pebble
-                // (invisible when expanded) and one at full-screen (morphing from it).
+                // The ACTUAL CarMap is now rendered at the screen level as a single,
+                // repositionable instance. This pebble just provides a placeholder that
+                // captures its position and location data. When collapsed, the map at
+                // screen level is positioned here and clipped to pebble size. When
+                // expanded, the same map grows to fill the screen. No morphing, no
+                // illusion -- literally the same Box growing.
                 val expandedMap = LocalExpandedMap.current
                 if (expandedMap != null) {
                     val isExpanded = expandedMap.vin == v.vin
-                    CarMap(
-                        loc,
+                    // Placeholder: captures pebble bounds and location. The real
+                    // CarMap is drawn at GarageScreen level as an overlay.
+                    Box(
                         Modifier
                             .fillMaxWidth()
                             .height(if (coverGlance) 130.dp else 220.dp)
                             .clip(RoundedCornerShape(18.dp))
+                            .background(
+                                // Dark bg so it's visible while the map loads/transitions
+                                MaterialTheme.colorScheme.surfaceContainerHigh
+                            )
                             .onGloballyPositioned {
                                 expandedMap.originBoundsFor(v.vin).value = Rect(it.positionOnScreen(), it.size.toSize())
+                                // Also track the location for the map
+                                expandedMap.locationFor(v.vin).value = loc
                             }
-                            // Hidden while expanded - still in the tree, still laid out
-                            // correctly, but invisible. The overlay version at full-screen
-                            // morphs from this map's measured bounds.
-                            .graphicsLayer { alpha = if (isExpanded) 0f else 1f },
-                        state = expandedMap.mapStateFor(v.vin),
-                        deviceLocation = state.deviceLocation,
-                        onExpand = { expandedMap.vin = v.vin },
-                    )
+                            .clickable(
+                                interactionSource = remember { MutableInteractionSource() },
+                                indication = ripple(),
+                            ) {
+                                if (!isExpanded) expandedMap.vin = v.vin
+                            },
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        if (!isExpanded) {
+                            Icon(
+                                Icons.Filled.Map,
+                                contentDescription = "Expand map",
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.size(48.dp),
+                            )
+                        }
+                    }
                 } else {
                     var showMapSheet by remember { mutableStateOf(false) }
                     var mapOriginBounds by remember { mutableStateOf<Rect?>(null) }
@@ -651,6 +668,7 @@ internal class ExpandedMapState {
     var vin by mutableStateOf<String?>(null)
     private val perVinMapState = mutableMapOf<String, CarMapState>()
     private val perVinOrigin = mutableMapOf<String, MutableState<Rect?>>()
+    private val perVinLocation = mutableMapOf<String, MutableState<GeoLocation?>>()
 
     /** The one [CarMapState] a given car's compact map and expanded overlay both
      *  read/write -- created once per VIN, on first use, and kept for as long as
@@ -663,6 +681,10 @@ internal class ExpandedMapState {
      *  already a real, current origin to grow from -- not a stale one from
      *  whenever this was last measured, or none at all. */
     fun originBoundsFor(vin: String): MutableState<Rect?> = perVinOrigin.getOrPut(vin) { mutableStateOf(null) }
+
+    /** The location for this VIN's map, kept live so the screen-level map layer
+     *  knows what location to display. */
+    fun locationFor(vin: String): MutableState<GeoLocation?> = perVinLocation.getOrPut(vin) { mutableStateOf(null) }
 }
 
 /** Null (the default) when no host has set one up. See [ExpandedMapState]'s own doc. */
@@ -1121,6 +1143,28 @@ internal fun CarMapSheet(
             onDismiss = onDismiss,
         )
     }
+}
+
+/**
+ * The single CarMap instance, repositionable between pebble and full-screen.
+ * Literally one Box growing from the pebble location to fill the screen, with
+ * the same map content inside. Not two separate maps or a morphing animation --
+ * the actual component expanding.
+ */
+@Composable
+internal fun ExpandableMapLayer(
+    isExpanded: Boolean,
+    originBounds: Rect,
+    location: GeoLocation,
+    vehicleName: String,
+    deviceLocation: GeoLocation?,
+    mapState: CarMapState,
+    hazeState: HazeState?,
+    onDismiss: () -> Unit,
+) {
+    // For now, just use CarMapSheetBody since it has all the UI logic.
+    // The positioning will be handled differently, but the content is the same.
+    CarMapSheetBody(location, vehicleName, deviceLocation, mapState, originBounds, hazeState, onDismiss)
 }
 
 /**
