@@ -34,6 +34,7 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.LocationOn
@@ -67,6 +68,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.graphics.ColorMatrix
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
@@ -374,17 +377,19 @@ internal fun WeatherPebble(v: Vehicle, state: UiState, vm: AppViewModel, dragHan
 }
 
 /** Zoom bounds for [CarMap]'s pinch-zoom -- 3 is "half the continent", 19 is past
- *  what OSM/CARTO actually serve tiles for. Same floor/ceiling either surface can hit. */
+ *  what OSM actually serves tiles for. */
 private const val CarMapMinZoom = 3
 private const val CarMapMaxZoom = 19
 
+/** The standard "you are here" blue, distinct from the car's own [MaterialTheme]
+ *  error-toned pin so the two markers never read as the same kind of thing. */
+private val DeviceLocationBlue = Color(0xFF4285F4)
+
 /**
- * A small slippy map centred on the car, assembled from key-free raster tiles
- * (OpenStreetMap's own tiles, or CARTO's Dark Matter basemap when [dark] --
- * same z/x/y/PNG scheme, so it drops into the exact same draw loop). We compute
- * the tiles needed to fill the box with the car at the centre, draw each at its
- * pixel offset, then drop a pin. This avoids the flaky static-map render
- * services that painted blank.
+ * A small slippy map centred on the car, assembled from key-free OpenStreetMap raw
+ * tiles. We compute the tiles needed to fill the box with the car at the centre,
+ * draw each at its pixel offset, then drop a pin. This avoids the flaky static-map
+ * render services that painted blank.
  *
  * Interactive: one- or two-finger drag pans, pinch zooms. Both were previously
  * fixed at "car dead-centre, zoom 15" with no way to look around it -- reported
@@ -394,6 +399,13 @@ private const val CarMapMaxZoom = 19
  * another's, and a fresh `location` update does not yank the view back to
  * centre out from under a hand mid-pan/zoom -- only the ORIGIN each tile/the pin
  * is drawn from moves with a new fix, same as it always did.
+ *
+ * Also shows a second, smaller marker for the DEVICE's own last-known position
+ * (best-effort, fetched once per map instance) -- so the map answers "how far
+ * away is the car from me" at a glance instead of only ever showing where the
+ * car is with nothing to measure that against. Reported directly. It is a
+ * reference point, not the map's subject: fetching it never moves the camera,
+ * which stays centred on the car exactly as before.
  */
 @Composable
 internal fun CarMap(location: GeoLocation, modifier: Modifier = Modifier) {
@@ -426,6 +438,54 @@ internal fun CarMap(location: GeoLocation, modifier: Modifier = Modifier) {
     // grid. Reset (not just decremented) every time a level actually flips, so the next
     // level change needs a full pinch of its own rather than coasting on leftover ratio.
     var pinchAccum by remember { mutableFloatStateOf(1f) }
+
+    // "You are here": the device's own last-known location, fetched once per map
+    // instance rather than tracked live -- a parked phone reading its own position
+    // once is plenty, and this is a reference dot, not a subject that needs to move
+    // in real time. LocationHelper already fails soft to null with no permission or
+    // no fix, so the marker below simply never appears rather than the map showing
+    // an error state.
+    var deviceLocation by remember { mutableStateOf<android.location.Location?>(null) }
+    LaunchedEffect(Unit) {
+        deviceLocation = com.bloo.bluelink.autolock.LocationHelper.currentLocation(context)
+    }
+
+    // Client-side dark filter over these SAME OSM tiles, not a second tile source.
+    // CARTO's Dark Matter basemap used to fill this role -- reverted after its
+    // endpoint started serving an "API KEY REQUIRED" watermark over the whole tile
+    // with no key configured, reported directly as a broken map. invert() +
+    // hue-rotate(180deg) is the standard trick several map SDKs' own "quick dark
+    // mode" use for turning a light raster map into a passable dark one without a
+    // second tile source: inverting alone flips every hue to its raw RGB complement
+    // (parks read magenta, water reads orange); the hue rotation brings each colour
+    // back close to its original hue with the lightness still inverted. See
+    // MapTiles.tileUrl's own doc for why this replaced a second tile provider
+    // entirely rather than just swapping in a different (also key-gated) one.
+    val darkMapFilter = remember(isDarkMode) {
+        if (!isDarkMode) return@remember null
+        val invert = android.graphics.ColorMatrix(
+            floatArrayOf(
+                -1f, 0f, 0f, 0f, 255f,
+                0f, -1f, 0f, 0f, 255f,
+                0f, 0f, -1f, 0f, 255f,
+                0f, 0f, 0f, 1f, 0f,
+            ),
+        )
+        // The W3C hue-rotate(180deg) filter matrix, applied to the ALREADY-inverted
+        // colour rather than the original -- postConcat runs `invert` first, then
+        // this, exactly matching the CSS `filter: invert(1) hue-rotate(180deg)`
+        // order the whole trick is borrowed from.
+        val hueRotate180 = android.graphics.ColorMatrix(
+            floatArrayOf(
+                -0.574f, 1.430f, 0.144f, 0f, 0f,
+                0.426f, 0.430f, 0.144f, 0f, 0f,
+                0.426f, 1.430f, -0.856f, 0f, 0f,
+                0f, 0f, 0f, 1f, 0f,
+            ),
+        )
+        invert.postConcat(hueRotate180)
+        ColorFilter.colorMatrix(ColorMatrix(invert.array))
+    }
 
     // The box's own real, measured size -- onSizeChanged, not BoxWithConstraints. Both
     // report the same numbers, but BoxWithConstraints is a SubcomposeLayout: its content
@@ -510,9 +570,9 @@ internal fun CarMap(location: GeoLocation, modifier: Modifier = Modifier) {
                     // it "reloads") for every visible tile on every location
                     // update, even for tiles already sitting in Coil's memory
                     // cache -- visible flicker across the whole map.
-                    val request = remember(wrappedX, ty, zoom, isDarkMode) {
+                    val request = remember(wrappedX, ty, zoom) {
                         ImageRequest.Builder(context)
-                            .data(MapTiles.tileUrl(zoom, wrappedX, ty, dark = isDarkMode))
+                            .data(MapTiles.tileUrl(zoom, wrappedX, ty))
                             // OSM returns a "blocked" placeholder tile to clients whose
                             // User-Agent doesn't identify the app. This one used to read
                             // "Bloo Bluelink companion app" -- no version, no contact URL,
@@ -525,6 +585,7 @@ internal fun CarMap(location: GeoLocation, modifier: Modifier = Modifier) {
                     AsyncImage(
                         model = request,
                         contentDescription = null,
+                        colorFilter = darkMapFilter,
                         modifier = Modifier
                             .size(tileDp)
                             .offset(x = with(density) { offX.toDp() }, y = with(density) { offY.toDp() }),
@@ -548,6 +609,25 @@ internal fun CarMap(location: GeoLocation, modifier: Modifier = Modifier) {
                 .size(40.dp)
                 .offset(y = (-20).dp),
         )
+        // The device's own position, if it fetched one -- offset from the box's centre
+        // the same way the tiles/pin are, but derived from ITS OWN tile coordinate
+        // rather than riding along with panX/panY: the pin's offset (panX, panY) is a
+        // shortcut that only works because the pin IS what the view is centred on.
+        // Anything else on the map has to go through the full conversion: its tile
+        // position minus the car's, in pixels, plus however far the user has panned.
+        deviceLocation?.let { dev ->
+            val devOffX = (((MapTiles.tileX(dev.longitude, zoom) - xTileF) * tilePx) + panX).toFloat()
+            val devOffY = (((MapTiles.tileY(dev.latitude, zoom) - yTileF) * tilePx) + panY).toFloat()
+            Box(
+                Modifier
+                    .align(Alignment.Center)
+                    .offset(x = with(density) { devOffX.toDp() }, y = with(density) { devOffY.toDp() })
+                    .size(16.dp)
+                    .background(Color.White, CircleShape)
+                    .padding(3.dp)
+                    .background(DeviceLocationBlue, CircleShape),
+            )
+        }
     }
 }
 

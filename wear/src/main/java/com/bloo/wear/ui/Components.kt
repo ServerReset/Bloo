@@ -54,6 +54,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.graphics.ColorMatrix
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.lerp
@@ -396,6 +398,34 @@ fun ChargeRing(
     }
 }
 
+/**
+ * Client-side dark-mode filter for the plain OSM tile [MapThumbnail] draws -- invert()
+ * then the W3C hue-rotate(180deg) matrix, same combination as the phone's CarMap and the
+ * widget's WidgetMap.render (see either's own doc for the reasoning). A plain top-level
+ * constant, not `remember`ed inside the composable: it depends on nothing that ever
+ * changes at runtime, unlike the phone's version which is gated on isSystemInDarkTheme().
+ */
+private val wearDarkMapFilter: ColorFilter = run {
+    val invert = android.graphics.ColorMatrix(
+        floatArrayOf(
+            -1f, 0f, 0f, 0f, 255f,
+            0f, -1f, 0f, 0f, 255f,
+            0f, 0f, -1f, 0f, 255f,
+            0f, 0f, 0f, 1f, 0f,
+        ),
+    )
+    val hueRotate180 = android.graphics.ColorMatrix(
+        floatArrayOf(
+            -0.574f, 1.430f, 0.144f, 0f, 0f,
+            0.426f, 0.430f, 0.144f, 0f, 0f,
+            0.426f, 1.430f, -0.856f, 0f, 0f,
+            0f, 0f, 0f, 1f, 0f,
+        ),
+    )
+    invert.postConcat(hueRotate180)
+    ColorFilter.colorMatrix(ColorMatrix(invert.array))
+}
+
 /** A small OSM map thumbnail centred on the car, with a marker. Shows a
  *  loading indicator while the tile downloads and an error state on failure
  *  with tap-to-retry. */
@@ -506,6 +536,14 @@ fun MapThumbnail(lat: Double, lon: Double, modifier: Modifier = Modifier) {
                 painter = asyncPainter,
                 contentDescription = "Map of car location",
                 contentScale = ContentScale.Crop,
+                // Wear OS has no light theme to switch out of -- unlike the phone's
+                // isSystemInDarkTheme() gate, this filter always applies here. Same
+                // invert()+hue-rotate(180deg) trick as the phone's CarMap and the
+                // widget's WidgetMap.render (see either's own doc for why): turns the
+                // plain OSM tile dark client-side rather than reaching for a second,
+                // key-gated tile source for a round face that was previously the one
+                // surface still showing a plain white map square.
+                colorFilter = wearDarkMapFilter,
                 modifier = Modifier.matchParentSize(),
             )
             Canvas(Modifier.matchParentSize()) {

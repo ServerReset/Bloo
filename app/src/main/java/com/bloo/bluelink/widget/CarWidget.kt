@@ -197,7 +197,7 @@ class CarWidget : GlanceAppWidget() {
         val mapBitmap = if (config.showMap && car?.lat != null && car.lon != null) {
             val density = context.resources.displayMetrics.density
             val edge = (150 * density).toInt()
-            runCatching { WidgetMap.render(context, car.lat!!, car.lon!!, edge, theme.accentArgb) }.getOrNull()
+            runCatching { WidgetMap.render(context, car.lat!!, car.lon!!, edge, theme.accentArgb, dark = theme.isDark) }.getOrNull()
         } else null
         // No-ops gracefully to the themed background when the car has no photo
         // set (SettingsStore.imageUrl is only ever a local file path here --

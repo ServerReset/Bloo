@@ -67,6 +67,10 @@ object WidgetMap {
     /**
      * @param sizePx square output edge in px (caller converts dp→px)
      * @param markerColor ARGB of the location dot
+     * @param dark applies the same client-side invert+hue-rotate filter the phone's
+     *   interactive map uses (see WeatherPebble.kt's CarMap) instead of a second,
+     *   key-gated tile source -- one OSM tile fetch/cache path for every surface
+     *   that draws a map, dark or not.
      * @return the map bitmap with a marker, or null if the tile couldn't be fetched
      *
      * Runs on [Dispatchers.IO]: Glance's provideGlance is suspend but doesn't
@@ -78,9 +82,10 @@ object WidgetMap {
         lon: Double,
         sizePx: Int,
         markerColor: Int,
+        dark: Boolean = false,
     ): Bitmap? = withContext(Dispatchers.IO) {
         val edge = sizePx.coerceIn(48, 1024)
-        val key = MapKey(quantize(lat), quantize(lon), edge, markerColor)
+        val key = MapKey(quantize(lat), quantize(lon), edge, markerColor, dark)
         // Composing this is not cheap: up to four 256x256 PNGs decoded off disk plus a
         // fresh ARGB_8888 the size of the output, which on a 3x device is around
         // 450x450, i.e. ~800KB. The tiles themselves are already disk-cached, but the
@@ -108,7 +113,9 @@ object WidgetMap {
 
         val out = Bitmap.createBitmap(edge, edge, Bitmap.Config.ARGB_8888)
         val canvas = Canvas(out)
-        val paint = Paint(Paint.FILTER_BITMAP_FLAG)
+        val paint = Paint(Paint.FILTER_BITMAP_FLAG).apply {
+            if (dark) colorFilter = android.graphics.ColorMatrixColorFilter(darkTileMatrix())
+        }
         var haveCentre = false
         for (ty in floorDiv(top)..floorDiv(top + TILE_PX - 1)) {
             // No vertical wrap: past the poles there is no tile to fetch, and
@@ -165,7 +172,35 @@ object WidgetMap {
      * The bitmap is handed out to multiple callers and must never be recycled or drawn
      * into after publication; nothing here does either.
      */
-    private data class MapKey(val latQ: Long, val lonQ: Long, val edge: Int, val marker: Int)
+    private data class MapKey(val latQ: Long, val lonQ: Long, val edge: Int, val marker: Int, val dark: Boolean)
+
+    /**
+     * The same invert() + hue-rotate(180deg) trick the phone's interactive map uses (see
+     * WeatherPebble.kt's CarMap for the full reasoning) -- turns the plain light OSM tiles
+     * dark client-side, so the widget never needed CARTO's key-gated basemap either.
+     * Recomputed per render rather than cached: composing a whole map bitmap already costs
+     * far more than building two 20-float matrices.
+     */
+    private fun darkTileMatrix(): android.graphics.ColorMatrix {
+        val invert = android.graphics.ColorMatrix(
+            floatArrayOf(
+                -1f, 0f, 0f, 0f, 255f,
+                0f, -1f, 0f, 0f, 255f,
+                0f, 0f, -1f, 0f, 255f,
+                0f, 0f, 0f, 1f, 0f,
+            ),
+        )
+        val hueRotate180 = android.graphics.ColorMatrix(
+            floatArrayOf(
+                -0.574f, 1.430f, 0.144f, 0f, 0f,
+                0.426f, 0.430f, 0.144f, 0f, 0f,
+                0.426f, 1.430f, -0.856f, 0f, 0f,
+                0f, 0f, 0f, 1f, 0f,
+            ),
+        )
+        invert.postConcat(hueRotate180)
+        return invert
+    }
 
     private class Memo(val key: MapKey, val bitmap: Bitmap)
 
