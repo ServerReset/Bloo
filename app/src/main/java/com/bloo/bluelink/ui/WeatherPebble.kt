@@ -118,6 +118,7 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.compose.ui.window.DialogWindowProvider
 import dev.chrisbanes.haze.HazeState
+import dev.chrisbanes.haze.HazeStyle
 import dev.chrisbanes.haze.HazeProgressive
 import dev.chrisbanes.haze.hazeEffect
 import dev.chrisbanes.haze.hazeSource
@@ -1146,10 +1147,10 @@ internal fun CarMapSheet(
 }
 
 /**
- * The single CarMap instance, repositionable between pebble and full-screen.
- * Literally one Box growing from the pebble location to fill the screen, with
- * the same map content inside. Not two separate maps or a morphing animation --
- * the actual component expanding.
+ * THE single CarMap instance, repositionable between pebble and full-screen.
+ * Literally one Box growing from the pebble location to fill the screen.
+ * Not two separate maps or a morphing animation -- the actual component
+ * expanding with smooth size/position animation.
  */
 @Composable
 internal fun ExpandableMapLayer(
@@ -1162,9 +1163,187 @@ internal fun ExpandableMapLayer(
     hazeState: HazeState?,
     onDismiss: () -> Unit,
 ) {
-    // For now, just use CarMapSheetBody since it has all the UI logic.
-    // The positioning will be handled differently, but the content is the same.
-    CarMapSheetBody(location, vehicleName, deviceLocation, mapState, originBounds, hazeState, onDismiss)
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val density = LocalDensity.current
+    val mapHazeState = remember { HazeState() }
+
+    // Animate from pebble size to full screen
+    val expandFraction = remember { Animatable(if (isExpanded) 1f else 0f) }
+
+    LaunchedEffect(isExpanded) {
+        expandFraction.animateTo(
+            if (isExpanded) 1f else 0f,
+            animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMediumLow)
+        )
+    }
+
+    // Captured at full-screen layout
+    var fullBounds by remember { mutableStateOf<Rect?>(null) }
+
+    // Back handler for closing
+    BackHandler(enabled = isExpanded) {
+        scope.launch {
+            expandFraction.animateTo(0f, animationSpec = spring(dampingRatio = 0.95f, stiffness = Spring.StiffnessMedium))
+            onDismiss()
+        }
+    }
+
+    Box(Modifier.fillMaxSize()) {
+        // Scrim background (dims/blurs content behind)
+        if (isExpanded) {
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .drawBehind {
+                        drawRect(Color.Black, alpha = (if (hazeState != null) 0.35f else 0.5f) * expandFraction.value.coerceIn(0f, 1f))
+                    }
+            )
+            if (hazeState != null) {
+                Box(
+                    Modifier
+                        .fillMaxSize()
+                        .graphicsLayer { alpha = expandFraction.value.coerceIn(0f, 1f) }
+                        .hazeEffect(state = hazeState) {
+                            progressive = HazeProgressive.verticalGradient(startIntensity = 1f, endIntensity = 0f)
+                        }
+                )
+            }
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null,
+                    ) {
+                        scope.launch {
+                            expandFraction.animateTo(0f, animationSpec = spring(dampingRatio = 0.95f, stiffness = Spring.StiffnessMedium))
+                            onDismiss()
+                        }
+                    }
+            )
+        }
+
+        // The map container - single Box that animates from pebble to full-screen
+        // Using graphicsLayer to scale and position, creating the visual effect
+        // of the same Box growing without morphing or scale tricks
+        Box(
+            Modifier
+                .fillMaxSize()
+                .graphicsLayer {
+                    val t = expandFraction.value.coerceIn(0f, 1f)
+                    // Calculate scale from pebble size to full-screen
+                    val scaleX = originBounds.width / this@graphicsLayer.size.width
+                    val scaleY = originBounds.height / this@graphicsLayer.size.height
+                    this.scaleX = scaleX + (1f - scaleX) * t
+                    this.scaleY = scaleY + (1f - scaleY) * t
+                    // Calculate translation from pebble center to screen center
+                    val screenCenterX = this@graphicsLayer.size.width / 2f
+                    val screenCenterY = this@graphicsLayer.size.height / 2f
+                    val pebbleCenterX = originBounds.center.x
+                    val pebbleCenterY = originBounds.center.y
+                    this.translationX = (pebbleCenterX - screenCenterX) * (1f - t)
+                    this.translationY = (pebbleCenterY - screenCenterY) * (1f - t)
+                }
+                .clip(
+                    // Clip corners: 18dp when collapsed, 0dp when expanded
+                    RoundedCornerShape(18.dp * (1f - expandFraction.value.coerceIn(0f, 1f)))
+                )
+                .clipToBounds()
+        ) {
+            // The actual map content
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .onGloballyPositioned { fullBounds = Rect(it.positionOnScreen(), it.size.toSize()) }
+            ) {
+                CarMap(
+                    location,
+                    Modifier.fillMaxSize().hazeSource(mapHazeState),
+                    state = mapState,
+                    deviceLocation = deviceLocation,
+                    onExpand = null,
+                )
+            }
+        }
+
+        // Vehicle name pill (appears when expanded)
+        if (isExpanded && expandFraction.value > 0.1f) {
+            Surface(
+                shape = RoundedCornerShape(50),
+                color = MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = glassContainerAlpha()),
+                contentColor = Color.White,
+                modifier = Modifier
+                    .align(Alignment.TopStart)
+                    .padding(horizontal = 16.dp, vertical = 12.dp)
+                    .graphicsLayer { alpha = expandFraction.value.coerceIn(0f, 1f) }
+                    .dropShadow(RoundedCornerShape(50))
+                    .appGlassRim(RoundedCornerShape(50)),
+            ) {
+                Text(
+                    vehicleName,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                )
+            }
+        }
+
+        // Bottom buttons (appear when expanded)
+        if (isExpanded && expandFraction.value > 0.1f) {
+            MapFeatureRow(
+                features = listOf(
+                    MapFeature(Icons.Filled.MyLocation, "Recentre") { mapState.recenter() },
+                    MapFeature(Icons.Filled.Map, "Open in Maps") {
+                        openInExternalMaps(context, location, vehicleName)
+                    },
+                ),
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .fillMaxWidth()
+                    .navigationBarsPadding()
+                    .graphicsLayer { alpha = expandFraction.value.coerceIn(0f, 1f) },
+            )
+        }
+
+        // Drag handle (appears when expanded)
+        if (isExpanded && expandFraction.value > 0.1f) {
+            Box(
+                Modifier
+                    .align(Alignment.TopCenter)
+                    .fillMaxWidth()
+                    .height(40.dp)
+                    .pointerInput(Unit) {
+                        detectVerticalDragGestures(
+                            onVerticalDrag = { _, _ -> },
+                            onDragEnd = {
+                                scope.launch {
+                                    expandFraction.animateTo(0f, animationSpec = spring(dampingRatio = 0.95f, stiffness = Spring.StiffnessMedium))
+                                    onDismiss()
+                                }
+                            }
+                        )
+                    }
+            ) {
+                // Drag handle pill
+                Box(
+                    Modifier
+                        .align(Alignment.Center)
+                        .width(28.dp)
+                        .height(4.dp)
+                        .clip(RoundedCornerShape(2.dp))
+                        .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f))
+                        .graphicsLayer { alpha = expandFraction.value.coerceIn(0f, 1f) }
+                        .hazeEffect(
+                            state = mapHazeState,
+                            shape = RoundedCornerShape(2.dp),
+                            style = HazeStyle(blurRadius = 4.dp)
+                        )
+                        .dropShadow(RoundedCornerShape(2.dp))
+                )
+            }
+        }
+    }
 }
 
 /**
