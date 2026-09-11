@@ -190,6 +190,7 @@ class SettingsStore(private val context: Context) {
         val WEATHER_LAT = stringPreferencesKey("weather_lat")
         val WEATHER_LON = stringPreferencesKey("weather_lon")
         val WEATHER_LABEL = stringPreferencesKey("weather_label")
+        val WEATHER_FOLLOWS_DEVICE = stringPreferencesKey("weather_follows_device")
         val BIOMETRIC = stringPreferencesKey("biometric_lock")
         val LOCK_TIMING = stringPreferencesKey("lock_timing")
         val FLIPPED = stringPreferencesKey("columns_flipped")
@@ -251,6 +252,14 @@ class SettingsStore(private val context: Context) {
         val weatherLat: Double? = null,
         val weatherLon: Double? = null,
         val weatherLabel: String? = null,
+        /** True when the weather location was last set via [setWeatherFromDeviceLocation]
+         *  (the "use device location" mode) rather than a typed place. Lets a refresh
+         *  re-sync it to wherever the device is NOW instead of it staying a one-time
+         *  snapshot from whenever that mode was turned on -- reported directly as the
+         *  location "not updating in settings when the app is refreshed if it's set to
+         *  location mode". False whenever a place is set explicitly, or the location is
+         *  cleared -- see [setWeatherLocation]. */
+        val weatherFollowsDevice: Boolean = false,
         /** True for imperial (°F), false for metric (°C). Derived from [unitSystem]. */
         val useFahrenheit: Boolean = true,
         val biometricLock: Boolean = false,
@@ -337,6 +346,7 @@ class SettingsStore(private val context: Context) {
             weatherLat = prefs[Keys.WEATHER_LAT]?.toDoubleOrNull(),
             weatherLon = prefs[Keys.WEATHER_LON]?.toDoubleOrNull(),
             weatherLabel = prefs[Keys.WEATHER_LABEL],
+            weatherFollowsDevice = prefs[Keys.WEATHER_FOLLOWS_DEVICE]?.toBoolean() ?: false,
             biometricLock = prefs[Keys.BIOMETRIC]?.toBooleanStrictOrNull() ?: false,
             lockTiming = prefs[Keys.LOCK_TIMING]?.let { runCatching { LockTiming.valueOf(it) }.getOrNull() }
                 ?: LockTiming.IMMEDIATE,
@@ -2575,7 +2585,11 @@ class SettingsStore(private val context: Context) {
 
     // --- Weather ---------------------------------------------------------
 
-    /** Set or clear the weather location. Passing null lat/lon clears it. */
+    /** Set or clear the weather location. Passing null lat/lon clears it. Always
+     *  resets [Appearance.weatherFollowsDevice] to false -- every caller of this
+     *  EXCEPT [setWeatherFromDeviceLocation] is setting an explicit, static
+     *  location (a typed place, or clearing it entirely), and that one turns the
+     *  flag back on itself, right after calling this. */
     suspend fun setWeatherLocation(lat: Double?, lon: Double?, label: String?) {
         editTracked {
             if (lat == null || lon == null) {
@@ -2587,6 +2601,7 @@ class SettingsStore(private val context: Context) {
                 it[Keys.WEATHER_LON] = lon.toString()
                 if (label.isNullOrBlank()) it.remove(Keys.WEATHER_LABEL) else it[Keys.WEATHER_LABEL] = label
             }
+            it.remove(Keys.WEATHER_FOLLOWS_DEVICE)
         }
     }
 
@@ -2631,6 +2646,12 @@ class SettingsStore(private val context: Context) {
                 }
         }.getOrNull() ?: "My location"
         setWeatherLocation(loc.latitude, loc.longitude, label)
+        // Re-set AFTER setWeatherLocation, which unconditionally clears this flag
+        // (see its own doc) -- this is the one call site that's allowed to turn it
+        // back on, marking the location as "following the device" so a later
+        // refresh (WeatherController.refreshDeviceLocationForWeather) knows to
+        // re-run this same fetch instead of leaving it frozen at this one fix.
+        editTracked { it[Keys.WEATHER_FOLLOWS_DEVICE] = "true" }
         return true
     }
 }

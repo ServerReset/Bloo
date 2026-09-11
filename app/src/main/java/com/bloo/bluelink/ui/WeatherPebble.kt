@@ -64,12 +64,12 @@ import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
-import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableFloatStateOf
@@ -80,6 +80,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.setValue
+import androidx.compose.animation.core.tween
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -95,6 +96,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.layout.onGloballyPositioned
@@ -103,6 +105,9 @@ import androidx.compose.ui.layout.positionOnScreen
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.toSize
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
+import androidx.compose.ui.window.DialogWindowProvider
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.bloo.bluelink.data.GeoLocation
@@ -125,6 +130,26 @@ internal fun LocationPebble(v: Vehicle, state: UiState, vm: AppViewModel, dragHa
     val context = LocalContext.current
     val fahrenheit = LocalAppearance.current.useFahrenheit
     val location = state.locations[v.vin]
+    // ACCESS_FINE_LOCATION -- needed for the map's own "device location" blue dot
+    // ([UiState.deviceLocation], via LocationHelper -- see its own doc) -- is
+    // otherwise only ever requested from AutoLock's settings screen. A user who
+    // has never touched AutoLock had no way to grant it at all, so the dot
+    // silently never appeared: not a rendering bug, [AppViewModel.refreshDeviceLocation]
+    // was faithfully calling LocationHelper every refresh and getting null back
+    // every single time from a permission check that had nothing to request it.
+    // Reported directly as "the map is also not showing the person's location" --
+    // tying the request to this pebble's own existing "Locate" action means
+    // granting it happens as a direct result of something the user already does
+    // to use this card, not a surprise prompt the moment it renders.
+    val fineLocationLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.RequestPermission(),
+    ) { granted -> if (granted) vm.locate(v) }
+    fun locateWithPermission() {
+        val granted = androidx.core.content.ContextCompat.checkSelfPermission(
+            context, android.Manifest.permission.ACCESS_FINE_LOCATION,
+        ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+        if (granted) vm.locate(v) else fineLocationLauncher.launch(android.Manifest.permission.ACCESS_FINE_LOCATION)
+    }
     // On the cover, this becomes the identity pill's own headline, riding beside the car name
     // ("810 Devonshire Way, Sunnyvale  ·  Daisy") -- the long form there reliably wrapped
     // that pill onto two lines, a real reported "looks bad" bug. The compact form (street +
@@ -143,7 +168,7 @@ internal fun LocationPebble(v: Vehicle, state: UiState, vm: AppViewModel, dragHa
         headerAction = PebbleHeaderAction(
             label = "Locate",
             icon = Icons.Filled.LocationOn,
-            onClick = { vm.locate(v) },
+            onClick = { locateWithPermission() },
             enabled = !locating,
             pending = locating,
             bounceIcon = true,
@@ -817,21 +842,34 @@ private fun MapFeatureRow(features: List<MapFeature>, modifier: Modifier = Modif
  * inline map is panned/zoomed to: expanding is a bigger canvas to look at the SAME
  * car on, not a continuation of one specific gesture.
  *
- * A real [ModalBottomSheet], not a hand-rolled [Dialog]. That was the first attempt
- * here, driving its own `graphicsLayer` scale/translate from a captured on-screen
- * rect -- reported directly as not actually seamless, not full screen, and covering
- * its own close button. A bottom sheet gets the genuinely wanted behaviour for free
- * from a component the platform already gets right: it rises from the bottom rather
- * than appearing in place, covers most but not all of the screen (the app stays
- * visible, dimmed, above it -- `sheetGesturesEnabled` sizing leaves the status bar
- * clear rather than the previous attempt's edge-to-edge Dialog), carries a real drag
- * handle, and -- most importantly for "pull it back down to collapse" -- already
- * supports swipe-to-dismiss as a first-class gesture instead of something this file
- * would have to reinvent on top of a Dialog.
+ * A hand-rolled overlay on a plain [Dialog], NOT [androidx.compose.material3.ModalBottomSheet]
+ * -- that was the SECOND attempt here (the first was a hand-rolled [Dialog] driving
+ * its own `graphicsLayer` scale/translate from a captured on-screen rect, reported as
+ * not actually seamless, not full screen, and covering its own close button).
+ * `ModalBottomSheet` fixed all of that, but turned out to have a problem of its own
+ * that no configuration can reach: it is *itself* implemented as a `Dialog` under the
+ * hood, and Android/Compose Dialogs adapt to large screens by centering themselves
+ * and capping their width (`sheetMaxWidth`) -- so on a tablet or unfolded foldable
+ * this rendered as a boxed, dialog-shaped card floating in the middle of the screen
+ * with the app visible on all four sides, including BELOW its own bottom edge.
+ * Reported directly from a screenshot: "why does it float like that? That's wrong."
+ * `ModalBottomSheetProperties` exposes no override for that adaptive centering --
+ * it's baked into the Dialog underneath, not a configurable behaviour of the sheet.
  *
- * [CarMap] itself still grows in with a short scale+fade (see `entryScale` below) so
- * opening reads as the map continuing to expand rather than a flat cut, without
- * reaching for the previous attempt's cross-window position math to do it.
+ * So this goes one level lower: a plain [Dialog] with `usePlatformDefaultWidth =
+ * false` gets NONE of that adaptive treatment -- it's just a full-screen surface this
+ * draws its own true bottom-anchored, full-width sheet onto, identically regardless
+ * of how wide the window is. Everything `ModalBottomSheet` used to give for free now
+ * lives here instead: [visible] (an [Animatable] the sheet's whole lifecycle runs on,
+ * 0 = slid fully off the bottom edge, 1 = at rest) drives the slide-in/out and the
+ * scrim's fade together, a tap on the scrim dismisses, and the drag handle (not the
+ * whole sheet -- the map area already owns pan/pinch of its own) supports drag-to-
+ * dismiss via [dragPx]. The one thing genuinely lost versus `ModalBottomSheet` is its
+ * built-in fling-velocity dismiss; a plain distance threshold stands in for it below.
+ *
+ * [CarMap] itself still grows in from [originBounds] (see `morph`'s own doc, now
+ * folded into [visible]) so opening reads as the map continuing to expand rather than
+ * a flat cut.
  *
  * The bottom [MapFeatureRow] is deliberately sparse today (recentre, open in the
  * system Maps app) -- see [MapFeature]'s own doc. This sheet, not a new screen in the
@@ -859,50 +897,121 @@ internal fun CarMapSheet(
     onDismiss: () -> Unit,
 ) {
     val context = LocalContext.current
-    // No close (X) button anymore -- see the header's own comment below -- so this no
-    // longer needs its own "hide, then dismiss" wrapper; ModalBottomSheet's own
-    // onDismissRequest already runs the identical hide animation for a swipe or a
-    // scrim tap, and that is now the only way this closes.
-    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-    ModalBottomSheet(
-        onDismissRequest = onDismiss,
-        sheetState = sheetState,
-        // 85% of the SCREEN (not counting the status bar -- ModalBottomSheet's own
-        // max-height calculation already keeps clear of it), on the sheet's own
-        // modifier -- not on the content inside it. Content-level sizing was the
-        // first attempt here, and it did not do what it looked like it should:
-        // constraining the CONTENT left the sheet's own shape/drag-handle sizing
-        // itself the way it always does (nearly full height with
-        // `skipPartiallyExpanded`), so the content sat inside a mostly-empty card
-        // with a dead gap of the sheet's own background colour above it -- reported
-        // directly, from a screenshot, as a black gap with the drag handle floating
-        // near the physical top of the screen, nothing like a dimmed app peeking
-        // through. Capping the SHEET itself here means its shape, its scrim, and its
-        // drag handle are ALL sized together, and the actual app shows (dimmed, by
-        // the sheet's own scrim) in the real 15% gap above it.
-        modifier = Modifier.fillMaxHeight(0.85f),
-    ) {
-        // This map area's own full-size on-screen rect, captured once laid out --
-        // constant for the life of this sheet (only the graphicsLayer transform
-        // below moves, never the actual layout).
-        var fullBounds by remember { mutableStateOf<Rect?>(null) }
-        // 0 = sitting exactly over originBounds (what the small map looked like the
-        // instant this opened), 1 = grown to this map area's own natural size/
-        // position. Deliberately NOT started until fullBounds is actually known
-        // (when there's an origin to grow FROM at all): starting immediately meant
-        // the first several frames rendered through the "no origin yet" fallback
-        // below, and then jump-cut to the origin-based transform the moment
-        // fullBounds appeared, already partway through the spring -- a jump reads as
-        // no animation at all, which is exactly what was reported ("still not seeing
-        // [it] at all"). Waiting for the real target first means every frame that
-        // actually plays uses the same, correct transform from the very first one.
-        val morph = remember { Animatable(0f) }
-        LaunchedEffect(originBounds) {
-            if (originBounds != null) snapshotFlow { fullBounds }.filterNotNull().first()
-            morph.animateTo(1f, spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessMediumLow))
+    val scope = rememberCoroutineScope()
+    val density = LocalDensity.current
+
+    // This map area's own full-size on-screen rect, captured once laid out --
+    // constant for the life of this sheet (only the graphicsLayer transform below
+    // moves, never the actual layout).
+    var fullBounds by remember { mutableStateOf<Rect?>(null) }
+    // 0 = fully hidden (slid off the bottom of the screen, or -- while there's an
+    // origin to grow from -- sitting exactly over originBounds, what the small map
+    // looked like the instant this opened), 1 = at rest / grown to this map area's
+    // own natural size and position. One value now drives BOTH the sheet's own
+    // slide-in/out (this no longer gets ModalBottomSheet's enter/exit state machine
+    // for free) and the map's grow-from-the-pebble morph, so the two read as one
+    // continuous motion instead of two separately-timed animations.
+    val visible = remember { Animatable(0f) }
+    var closing by remember { mutableStateOf(false) }
+    // How far the drag handle has been pulled down from rest, in px -- 0 normally,
+    // positive while a drag-to-dismiss gesture is in progress. Only the handle
+    // itself feeds this (see its own pointerInput far below), never the sheet at
+    // large: the map area already owns pan/pinch gestures of its own, and a
+    // whole-sheet drag-to-dismiss would fight it for every downward pan.
+    val dragPx = remember { Animatable(0f) }
+
+    fun close() {
+        if (closing) return
+        closing = true
+        scope.launch {
+            // Both play at once (this used to be ModalBottomSheet's own hide
+            // animation) so a mid-drag dismiss doesn't visibly snap dragPx back to
+            // 0 before the slide-out starts.
+            val a = scope.launch { visible.animateTo(0f, tween(220)) }
+            val b = scope.launch { dragPx.animateTo(0f, tween(220)) }
+            a.join(); b.join()
+            onDismiss()
         }
+    }
+
+    LaunchedEffect(originBounds) {
+        if (originBounds != null) snapshotFlow { fullBounds }.filterNotNull().first()
+        visible.animateTo(1f, spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessMediumLow))
+    }
+
+    Dialog(
+        onDismissRequest = { close() },
+        // false: a full-screen canvas, not a Dialog sized/positioned by the
+        // platform's own adaptive rules -- see this function's own doc for why
+        // ModalBottomSheet (itself a Dialog) couldn't avoid that. decorFitsSystemWindows
+        // = false so this draws genuinely edge-to-edge and positions its own content
+        // (the map area's own insets/padding already handle the status/nav bars)
+        // rather than having the window itself carve out a smaller content area.
+        properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false),
+    ) {
+        // As in GlassAlertDialog: this Dialog owns its own platform Window, entirely
+        // separate from the main Activity window, so the platform's own default
+        // dim/background behind it has to be turned off explicitly -- both are
+        // replaced by this composable's own scrim Box below, which fades with
+        // [visible] instead of snapping in at a flat platform default the instant
+        // the window appears.
+        val dialogView = LocalView.current
+        SideEffect {
+            val window = (dialogView.parent as? DialogWindowProvider)?.window
+            window?.setDimAmount(0f)
+            window?.setBackgroundDrawable(android.graphics.drawable.ColorDrawable(android.graphics.Color.TRANSPARENT))
+        }
+
         val sheetMapState = rememberCarMapState()
         Box(Modifier.fillMaxSize()) {
+            // The scrim -- dims the app behind the sheet, and (like ModalBottomSheet's
+            // own scrim) a tap on it dismisses. Fades in/out with [visible] rather
+            // than being either fully on or fully off the instant the Dialog appears.
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .background(Color.Black.copy(alpha = 0.5f * visible.value))
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null,
+                    ) { close() },
+            )
+            // The sheet itself: bottom-anchored and full-width on EVERY screen size
+            // -- see this function's own doc for why that's the whole point of not
+            // being a Dialog-backed ModalBottomSheet anymore. `translationY` (not a
+            // plain offset) so the same graphicsLayer that slides it in from fully
+            // off-screen at [visible] == 0 also carries the live drag-to-dismiss
+            // gesture (`dragPx`) without the two ever fighting over which owns the
+            // sheet's position.
+            Box(
+                Modifier
+                    .align(Alignment.BottomCenter)
+                    .fillMaxWidth()
+                    // 85% of the SCREEN (not counting the status bar). Sizing the
+                    // SHEET itself here, not the content inside it, was the lesson
+                    // from the ModalBottomSheet era: constraining only the content
+                    // left a gap of whatever sat above it unaccounted for. Here
+                    // there's no separate container to get that wrong -- this Box
+                    // IS the sheet.
+                    .fillMaxHeight(0.85f)
+                    .graphicsLayer { translationY = (1f - visible.value) * size.height + dragPx.value }
+                    .clip(RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp))
+                    // Deliberately no background/Surface fill here. ModalBottomSheet's
+                    // own container Surface -- a solid tonal rectangle painted behind
+                    // the sheet's ENTIRE bounds regardless of what content sat on top
+                    // -- was the actual source of the "boxed dialog card" look,
+                    // compounding its width-capping on large screens into something
+                    // that read as a floating card rather than a sheet. The map below
+                    // fills this box edge to edge on its own; nothing else here needs
+                    // a background to sit on, and removing it is exactly the "no
+                    // background behind it, it should be floating" fix reported
+                    // directly against the screenshot.
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null,
+                        onClick = {}, // swallow taps so they don't fall through to the scrim behind
+                    ),
+            ) {
             // The map fills the WHOLE sheet, edge to edge -- no boxed-in margin --
             // with the header and toolbar floating semi-transparently ON TOP of it
             // instead of splitting the sheet into three stacked, non-overlapping
@@ -923,7 +1032,7 @@ internal fun CarMapSheet(
                         val origin = originBounds
                         val full = fullBounds
                         if (origin != null && full != null && full.width > 0f && full.height > 0f) {
-                            val t = morph.value
+                            val t = visible.value
                             val originScaleX = origin.width / full.width
                             val originScaleY = origin.height / full.height
                             scaleX = originScaleX + (1f - originScaleX) * t
@@ -934,7 +1043,7 @@ internal fun CarMapSheet(
                             // No origin to grow from (a caller that passed null) --
                             // the old fallback: a plain scale-in from a touch under
                             // full size rather than nothing at all.
-                            val t = morph.value
+                            val t = visible.value
                             scaleX = 0.92f + 0.08f * t
                             scaleY = 0.92f + 0.08f * t
                         }
@@ -963,7 +1072,7 @@ internal fun CarMapSheet(
                 modifier = Modifier
                     .align(Alignment.TopStart)
                     .padding(horizontal = 20.dp, vertical = 12.dp)
-                    .graphicsLayer { alpha = morph.value },
+                    .graphicsLayer { alpha = visible.value },
             )
             // No close (X) button -- swipe-to-dismiss (or tapping the scrim above the
             // sheet) is already how this closes; a second, redundant affordance for
@@ -988,8 +1097,56 @@ internal fun CarMapSheet(
                     .align(Alignment.BottomCenter)
                     .fillMaxWidth()
                     .navigationBarsPadding()
-                    .graphicsLayer { alpha = morph.value },
+                    .graphicsLayer { alpha = visible.value },
             )
+            // The drag handle -- and, now that this isn't a ModalBottomSheet with a
+            // built-in swipe gesture of its own, the ONLY thing on this sheet a user
+            // can pull down to dismiss (see [dragPx]'s own doc up top for why that's
+            // deliberately scoped to just this handle rather than the whole sheet).
+            // A generous 48dp touch target around a slim visible pill, the same
+            // "small glyph, big hit area" shape every other icon-only control in the
+            // app already uses -- the pill alone would be a needle-thin target to
+            // grab reliably with a thumb.
+            Box(
+                Modifier
+                    .align(Alignment.TopCenter)
+                    .fillMaxWidth()
+                    .height(48.dp)
+                    .pointerInput(Unit) {
+                        detectVerticalDragGestures(
+                            onVerticalDrag = { change, amount ->
+                                change.consume()
+                                scope.launch { dragPx.snapTo((dragPx.value + amount).coerceAtLeast(0f)) }
+                            },
+                            onDragEnd = {
+                                // Distance, not velocity -- ModalBottomSheet's own
+                                // fling-to-dismiss doesn't have an equivalent here,
+                                // and a fixed 96dp pull is a close enough stand-in
+                                // for "the user clearly meant to close this".
+                                val thresholdPx = with(density) { 96.dp.toPx() }
+                                if (dragPx.value > thresholdPx) {
+                                    close()
+                                } else {
+                                    scope.launch {
+                                        dragPx.animateTo(0f, spring(dampingRatio = SoftDamping))
+                                    }
+                                }
+                            },
+                            onDragCancel = {
+                                scope.launch { dragPx.animateTo(0f, spring(dampingRatio = SoftDamping)) }
+                            },
+                        )
+                    },
+                contentAlignment = Alignment.TopCenter,
+            ) {
+                Box(
+                    Modifier
+                        .padding(top = 10.dp)
+                        .size(width = 32.dp, height = 4.dp)
+                        .background(Color.White.copy(alpha = 0.6f), RoundedCornerShape(2.dp)),
+                )
+            }
+        }
         }
     }
 }

@@ -63,6 +63,26 @@ internal class WeatherController(
         loadHomeWeather(force = true)
     }
 
+    /**
+     * Silently re-syncs the weather location to the device's CURRENT position, but only
+     * when [SettingsStore.Appearance.weatherFollowsDevice] is set -- i.e. it was last put
+     * into this state by [useDeviceLocationForWeather], not a typed place. That call used
+     * to be the only time this location was ever fetched: fine for a one-shot "set my
+     * location" action, but the reported bug was that it then stayed frozen at that one
+     * fix forever, never moving even as the app refreshed everything else. Meant to be
+     * called alongside [AppViewModel]'s own [UiState.deviceLocation] refresh -- cold
+     * start, pull-to-refresh, and "Locate" -- so both device-position readings stay in
+     * step on the same schedule. Fails soft and silently (no `state.message`) on a
+     * missing fix: this is a background refresh nobody explicitly asked for right now,
+     * not a user-initiated action that deserves an error toast.
+     */
+    fun refreshDeviceLocationForWeather() = scope.launch {
+        if (!settingsStore.appearance.first().weatherFollowsDevice) return@launch
+        if (withContext(Dispatchers.IO) { settingsStore.setWeatherFromDeviceLocation() }) {
+            loadHomeWeather(force = true)
+        }
+    }
+
     /** Fetch weather for the configured home location. Skips if a recent reading exists. */
     fun loadHomeWeather(force: Boolean = false) = scope.launch {
         val appearance = settingsStore.appearance.first()

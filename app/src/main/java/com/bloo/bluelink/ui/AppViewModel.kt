@@ -2791,6 +2791,12 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 )
             }
         }
+        // Separate from the fetch above -- a different location API path
+        // (LocationManager, via SettingsStore.setWeatherFromDeviceLocation) and its
+        // own persisted "follows device" flag, but the same three call sites and
+        // the same underlying bug report: see WeatherController.refreshDeviceLocationForWeather's
+        // own doc.
+        weather.refreshDeviceLocationForWeather()
     }
 
     fun locate(v: Vehicle) = runCommand(v.vin, "locate", "Location updated", optimistic = null) {
