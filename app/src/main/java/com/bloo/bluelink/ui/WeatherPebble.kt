@@ -3,7 +3,6 @@
     ExperimentalMaterial3ExpressiveApi::class,
     ExperimentalFoundationApi::class,
     ExperimentalLayoutApi::class,
-    ExperimentalSharedTransitionApi::class,
 )
 
 package com.bloo.bluelink.ui
@@ -20,12 +19,7 @@ import android.net.Uri
 import android.os.Build
 import androidx.browser.customtabs.CustomTabsIntent
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.EnterTransition
-import androidx.compose.animation.ExitTransition
-import androidx.compose.animation.ExperimentalSharedTransitionApi
-import androidx.compose.animation.SharedTransitionScope
 import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.MutableTransitionState
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -89,6 +83,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.animation.core.tween
@@ -232,56 +227,33 @@ internal fun LocationPebble(v: Vehicle, state: UiState, vm: AppViewModel, dragHa
                     // headline. This tile rendered the address three times at once -- headline,
                     // hero and the map stripe's caption.
                 }
-                // Expanding grows this SAME map into a full-screen overlay -- a REAL
-                // shared element transition (Modifier.sharedBounds), not a copy: see
-                // ExpandedMapState's own doc for why. LocalExpandedMap/
-                // LocalSharedTransitionScope are only provided by GarageScreen today;
-                // anywhere else (the flip-cover screen) falls back to the old,
-                // self-contained path: a genuinely separate CarMap/CarMapState inside
-                // a Dialog-based CarMapSheet, which morphs via a hand-rolled
-                // graphicsLayer transform instead of a real shared element.
+                // Expanding grows this SAME map into a full-screen overlay -- see CarMap's
+                // own onExpand doc and, for how "same" that really is, ExpandedMapState's.
+                // LocalExpandedMap is only provided by GarageScreen today; anywhere else
+                // (the flip-cover screen) falls back to the old, self-contained path: a
+                // genuinely separate CarMap/CarMapState inside a Dialog-based CarMapSheet.
                 val expandedMap = LocalExpandedMap.current
-                val sharedTransitionScope = LocalSharedTransitionScope.current
                 if (expandedMap != null) {
                     val isExpanded = expandedMap.vin == v.vin
-                    // enter/exit = None: this AnimatedVisibility exists ONLY to hand
-                    // sharedBounds below an AnimatedVisibilityScope, not to animate
-                    // this compact map's own appearance -- the shared-bounds
-                    // transform IS that animation, playing out over in
-                    // CarMapExpandedOverlay's own copy of this same key instead of
-                    // here. `visible = !isExpanded`, not an alpha graphicsLayer:
-                    // sharedBounds needs this composable to genuinely enter/exit
-                    // composition (matching the expanded side's own AnimatedVisibility)
-                    // to find the other end of the shared element at all.
-                    AnimatedVisibility(
-                        visible = !isExpanded,
-                        enter = EnterTransition.None,
-                        exit = ExitTransition.None,
-                    ) {
-                        val mapModifier = Modifier
+                    CarMap(
+                        loc,
+                        Modifier
                             .fillMaxWidth()
                             .height(if (coverGlance) 130.dp else 220.dp)
                             .clip(RoundedCornerShape(18.dp))
-                            .let { m ->
-                                if (sharedTransitionScope != null) {
-                                    with(sharedTransitionScope) {
-                                        m.sharedBounds(
-                                            rememberSharedContentState(key = "car-map-${v.vin}"),
-                                            animatedVisibilityScope = this@AnimatedVisibility,
-                                        )
-                                    }
-                                } else {
-                                    m
-                                }
+                            .onGloballyPositioned {
+                                expandedMap.originBoundsFor(v.vin).value = Rect(it.positionOnScreen(), it.size.toSize())
                             }
-                        CarMap(
-                            loc,
-                            mapModifier,
-                            state = expandedMap.mapStateFor(v.vin),
-                            deviceLocation = state.deviceLocation,
-                            onExpand = { expandedMap.vin = v.vin },
-                        )
-                    }
+                            // Hidden (not removed) while expanded -- the overlay drawn
+                            // elsewhere in GarageScreen's own tree is what's actually
+                            // visible growing out of this slot; keeping this composed
+                            // (rather than an `if (!isExpanded)`) means it's still here,
+                            // still measured, the instant the overlay collapses back.
+                            .graphicsLayer { alpha = if (isExpanded) 0f else 1f },
+                        state = expandedMap.mapStateFor(v.vin),
+                        deviceLocation = state.deviceLocation,
+                        onExpand = { expandedMap.vin = v.vin },
+                    )
                 } else {
                     var showMapSheet by remember { mutableStateOf(false) }
                     // This map's own on-SCREEN bounds, in ABSOLUTE display coordinates
@@ -684,40 +656,23 @@ internal class ExpandedMapState {
     /** VIN of the car whose map is currently expanded, or null. */
     var vin by mutableStateOf<String?>(null)
     private val perVinMapState = mutableMapOf<String, CarMapState>()
+    private val perVinOrigin = mutableMapOf<String, MutableState<Rect?>>()
 
     /** The one [CarMapState] a given car's compact map and expanded overlay both
      *  read/write -- created once per VIN, on first use, and kept for as long as
      *  this [ExpandedMapState] itself lives (its host's own lifetime). */
     fun mapStateFor(vin: String): CarMapState = perVinMapState.getOrPut(vin) { CarMapState() }
 
-    /**
-     * Drives [CarMapExpandedOverlay]'s own `AnimatedVisibility` -- a
-     * [MutableTransitionState], not a plain boolean, specifically so the overlay
-     * stays composed for the whole EXIT transition instead of vanishing the
-     * instant [vin] goes back to null. [Modifier.sharedBounds] (see
-     * [CarMapSheetBody]'s own doc) only animates a shared element's bounds while
-     * BOTH ends are actually in composition; removing this composable outright
-     * the moment closing starts -- rather than telling it to transition out and
-     * waiting -- would make the map POP back into the pebble instead of
-     * shrinking into it, no better than not sharing the element at all.
-     */
-    val overlayVisible = MutableTransitionState(false)
+    /** The compact map's own last-measured on-screen rect for this VIN, kept
+     *  live (via the compact map's own `onGloballyPositioned`) whether or not
+     *  it's the currently-expanded one, so the moment it IS expanded there's
+     *  already a real, current origin to grow from -- not a stale one from
+     *  whenever this was last measured, or none at all. */
+    fun originBoundsFor(vin: String): MutableState<Rect?> = perVinOrigin.getOrPut(vin) { mutableStateOf(null) }
 }
 
 /** Null (the default) when no host has set one up. See [ExpandedMapState]'s own doc. */
 internal val LocalExpandedMap = staticCompositionLocalOf<ExpandedMapState?> { null }
-
-/**
- * The [SharedTransitionScope] a [GarageScreen]-level [SharedTransitionLayout] provides,
- * threaded down via CompositionLocal rather than as an explicit parameter through every
- * intermediate composable (`Pebble`, `ExpandedCar`/`CollapsedCar`, ...) between it and
- * [LocationPebble]/[CarMapExpandedOverlay] -- the standard pattern for adopting shared
- * element transitions into an existing, deeply-nested composable tree without a
- * mechanical, purely-plumbing change to every function signature in between. Null
- * (the default) on any host that hasn't wrapped itself in one (the flip-cover screen);
- * see [CarMapSheet]/[CarMapSheetBody]'s own doc for the fallback that runs then.
- */
-internal val LocalSharedTransitionScope = staticCompositionLocalOf<SharedTransitionScope?> { null }
 
 /**
  * A small slippy map centred on the car, assembled from key-free OpenStreetMap raw
@@ -1165,12 +1120,10 @@ internal fun CarMapSheet(
             window?.setBackgroundDrawable(android.graphics.drawable.ColorDrawable(android.graphics.Color.TRANSPARENT))
         }
         CarMapSheetBody(
-            vin = null,
-            location = location, vehicleName = vehicleName, deviceLocation = deviceLocation,
+            location, vehicleName, deviceLocation,
             mapState = rememberCarMapState(),
             originBounds = originBounds,
             hazeState = null,
-            visibleState = null,
             onDismiss = onDismiss,
         )
     }
@@ -1182,30 +1135,27 @@ internal fun CarMapSheet(
  * [ExpandedMapState] (currently only [GarageScreen]). Rendered as a plain overlay
  * in that host's own composition (a sibling Box drawn last, so it's on top of
  * everything else) instead of a system Dialog: being in the SAME window as the
- * compact map is what lets it (a) share that map's own [CarMapState] ([mapState]
- * here is [ExpandedMapState.mapStateFor], not a fresh one), (b) genuinely SHARE
- * the map's own container across the two -- via [vin] and [visibleState],
- * [CarMapSheetBody]'s own `Modifier.sharedBounds` call morphs the exact same
- * element the compact map drew, a real Compose shared element transition, not a
- * hand-rolled position/scale copy -- and (c) give the visible strip of app above
- * the sheet a REAL blur of the actual content behind it (the same technique
- * [StatusBarScrim] already uses), something a separate Dialog window has no
- * access to at all. [CarMapSheet]'s own Dialog fallback gets none of these three
- * (a fresh CarMapState, a hand-rolled graphicsLayer morph, a flat scrim) since a
- * Dialog is, precisely, a separate window/composition from the pebble's own.
+ * compact map is what lets it share that map's own [CarMapState] ([mapState] here
+ * is [ExpandedMapState.mapStateFor], not a fresh one) instead of starting over at
+ * a blank pan/zoom and re-fetching tiles Coil already has cached from the compact
+ * view -- reported directly as wanting "literally that same component" to expand,
+ * not a copy fading in. It also means [hazeState] can give the visible strip of
+ * app above the sheet a REAL blur of the actual content behind it (the same
+ * technique [StatusBarScrim] already uses) -- something a separate Dialog window
+ * has no access to at all, so [CarMapSheet]'s own Dialog fallback above still just
+ * dims that strip instead.
  */
 @Composable
 internal fun CarMapExpandedOverlay(
-    vin: String,
     location: GeoLocation,
     vehicleName: String,
     deviceLocation: GeoLocation?,
     mapState: CarMapState,
+    originBounds: Rect?,
     hazeState: HazeState?,
-    visibleState: MutableTransitionState<Boolean>,
     onDismiss: () -> Unit,
 ) {
-    CarMapSheetBody(vin, location, vehicleName, deviceLocation, mapState, null, hazeState, visibleState, onDismiss)
+    CarMapSheetBody(location, vehicleName, deviceLocation, mapState, originBounds, hazeState, onDismiss)
 }
 
 /**
@@ -1247,11 +1197,6 @@ internal fun CarMapExpandedOverlay(
  */
 @Composable
 private fun CarMapSheetBody(
-    /** The car's VIN, non-null only from [CarMapExpandedOverlay] -- the shared
-     *  element key ("car-map-$vin") [LocationPebble]'s own compact map registers
-     *  under. Null from [CarMapSheet]'s Dialog path, which has no
-     *  [LocalSharedTransitionScope] to share an element through anyway. */
-    vin: String?,
     location: GeoLocation,
     vehicleName: String,
     deviceLocation: GeoLocation?,
@@ -1262,26 +1207,10 @@ private fun CarMapSheetBody(
      *  path) falls back to a plain darkened scrim, since Haze cannot reach across
      *  windows. */
     hazeState: HazeState?,
-    /** Non-null (only from [CarMapExpandedOverlay]) drives the map area's own
-     *  `AnimatedVisibility` -- see [ExpandedMapState.overlayVisible]'s own doc for
-     *  why a [MutableTransitionState], not a plain boolean: [close] below sets its
-     *  `targetState` to false immediately, then keeps this composable itself
-     *  mounted (via [onDismiss] only firing once the CUSTOM scrim/chrome animation
-     *  below finishes, same as before) long enough for the shared-bounds SHRINK to
-     *  actually play, rather than the map just vanishing/popping the instant
-     *  closing starts. */
-    visibleState: MutableTransitionState<Boolean>?,
     onDismiss: () -> Unit,
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    val sharedTransitionScope = LocalSharedTransitionScope.current
-    // All three -- a real SharedTransitionScope to share the element through, an
-    // ExpandedMapState-owned MutableTransitionState to drive its own
-    // AnimatedVisibility, and the VIN to key it -- only ever arrive together, from
-    // CarMapExpandedOverlay. Missing any one (the Dialog path, always) falls back
-    // to the ORIGINAL hand-rolled origin/fullBounds graphicsLayer morph below.
-    val useSharedBounds = sharedTransitionScope != null && visibleState != null && vin != null
     val density = LocalDensity.current
     // Its own HazeState, independent of [hazeState] (which sources the SCREEN
     // behind this sheet, for the scrim above) -- this one sources the map tiles
@@ -1313,11 +1242,6 @@ private fun CarMapSheetBody(
     fun close() {
         if (closing) return
         closing = true
-        // Starts the shared-bounds SHRINK immediately -- see [visibleState]'s own
-        // doc for why this composable stays mounted (via onDismiss below only
-        // firing once the custom animation finishes) long enough for that to
-        // actually play out, instead of the map just vanishing.
-        visibleState?.targetState = false
         scope.launch {
             // Both play at once so a mid-drag dismiss doesn't visibly snap dragPx
             // back to 0 before the slide-out starts.
@@ -1333,10 +1257,8 @@ private fun CarMapSheetBody(
     // onDismiss directly, as a fallback -- see its own doc).
     BackHandler(enabled = true) { close() }
 
-    LaunchedEffect(originBounds, useSharedBounds) {
-        // Only the fallback path needs to wait for fullBounds -- sharedBounds has
-        // no such dependency, it tracks the shared element's own layout directly.
-        if (!useSharedBounds && originBounds != null) snapshotFlow { fullBounds }.filterNotNull().first()
+    LaunchedEffect(originBounds) {
+        if (originBounds != null) snapshotFlow { fullBounds }.filterNotNull().first()
         // Bouncier than the rest of the app's own SoftDamping default, specifically
         // for opening: the origin->full scale/position interpolation below (and the
         // sheet's own slide-in translation) is driven directly off this value with
@@ -1446,88 +1368,52 @@ private fun CarMapSheetBody(
             // instead of splitting the sheet into three stacked, non-overlapping
             // bands, the same "content flows behind floating elements" relationship
             // the rest of the app already gives its own scrolling content.
-            //
-            // hazeSource, not just fillMaxSize, either way below: marks the map's
-            // own tiles as blurrable content for the drag handle's own frosted chip
-            // further down (mapHazeState) -- a SEPARATE HazeState from the sheet's
-            // own scrim blur ([hazeState] param), which sources the screen behind
-            // this sheet, not the map drawn on top of it. Blurring the handle
-            // against the map itself needs its own source regardless of whether
-            // this sheet is a Dialog or an in-tree overlay, so this works either
-            // way even when [hazeState] itself is null.
-            if (useSharedBounds) {
-                // The REAL shared element transition: Modifier.sharedBounds morphs
-                // this exact container from wherever LocationPebble's own compact
-                // map (registered under the identical "car-map-$vin" key) last
-                // measured itself, to this Box's own natural size/position here --
-                // no manual origin/fullBounds tracking, no graphicsLayer scale/
-                // translate math, because the FRAMEWORK is now doing that
-                // interpolation itself instead of this file reimplementing it.
-                // enter/exit = None: the CONTENT'S OWN fade/scale is intentionally
-                // disabled here (this function's own `visible` Animatable already
-                // owns the sheet's overall appear/disappear); only the bounds
-                // transform itself is wanted from this AnimatedVisibility.
-                AnimatedVisibility(
-                    visibleState = visibleState!!,
-                    enter = EnterTransition.None,
-                    exit = ExitTransition.None,
-                ) {
-                    with(sharedTransitionScope!!) {
-                        CarMap(
-                            location,
-                            Modifier
-                                .fillMaxSize()
-                                .sharedBounds(
-                                    rememberSharedContentState(key = "car-map-$vin"),
-                                    animatedVisibilityScope = this@AnimatedVisibility,
-                                )
-                                .hazeSource(mapHazeState),
-                            state = mapState,
-                            deviceLocation = deviceLocation,
-                            onExpand = null,
-                        )
-                    }
-                }
-            } else {
-                Box(
-                    Modifier
-                        .fillMaxSize()
-                        .onGloballyPositioned { fullBounds = Rect(it.positionOnScreen(), it.size.toSize()) }
-                        // Clips the growing content to this box's own bounds -- belt and
-                        // braces against the translation below ever drawing outside its
-                        // slot (an earlier attempt's reported "covers the close button"
-                        // came from a similar transform on an UNCLIPPED Column, which
-                        // Compose happily draws past its own measured bounds).
-                        .clipToBounds()
-                        .graphicsLayer {
-                            val origin = originBounds
-                            val full = fullBounds
-                            if (origin != null && full != null && full.width > 0f && full.height > 0f) {
-                                val t = visible.value
-                                val originScaleX = origin.width / full.width
-                                val originScaleY = origin.height / full.height
-                                scaleX = originScaleX + (1f - originScaleX) * t
-                                scaleY = originScaleY + (1f - originScaleY) * t
-                                translationX = (origin.center.x - full.center.x) * (1f - t)
-                                translationY = (origin.center.y - full.center.y) * (1f - t)
-                            } else {
-                                // No origin to grow from (a caller that passed null) --
-                                // the old fallback: a plain scale-in from a touch under
-                                // full size rather than nothing at all.
-                                val t = visible.value
-                                scaleX = 0.92f + 0.08f * t
-                                scaleY = 0.92f + 0.08f * t
-                            }
-                        },
-                ) {
-                    CarMap(
-                        location,
-                        Modifier.fillMaxSize().hazeSource(mapHazeState),
-                        state = mapState,
-                        deviceLocation = deviceLocation,
-                        onExpand = null,
-                    )
-                }
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .onGloballyPositioned { fullBounds = Rect(it.positionOnScreen(), it.size.toSize()) }
+                    // Clips the growing content to this box's own bounds -- belt and
+                    // braces against the translation below ever drawing outside its
+                    // slot (an earlier attempt's reported "covers the close button"
+                    // came from a similar transform on an UNCLIPPED Column, which
+                    // Compose happily draws past its own measured bounds).
+                    .clipToBounds()
+                    .graphicsLayer {
+                        val origin = originBounds
+                        val full = fullBounds
+                        if (origin != null && full != null && full.width > 0f && full.height > 0f) {
+                            val t = visible.value
+                            val originScaleX = origin.width / full.width
+                            val originScaleY = origin.height / full.height
+                            scaleX = originScaleX + (1f - originScaleX) * t
+                            scaleY = originScaleY + (1f - originScaleY) * t
+                            translationX = (origin.center.x - full.center.x) * (1f - t)
+                            translationY = (origin.center.y - full.center.y) * (1f - t)
+                        } else {
+                            // No origin to grow from (a caller that passed null) --
+                            // the old fallback: a plain scale-in from a touch under
+                            // full size rather than nothing at all.
+                            val t = visible.value
+                            scaleX = 0.92f + 0.08f * t
+                            scaleY = 0.92f + 0.08f * t
+                        }
+                    },
+            ) {
+                CarMap(
+                    location,
+                    // hazeSource, not just fillMaxSize: marks the map's own tiles as
+                    // blurrable content for the drag handle's own frosted chip below
+                    // (mapHazeState) -- a SEPARATE HazeState from the sheet's own
+                    // scrim blur ([hazeState] param), which sources the screen behind
+                    // this sheet, not the map drawn on top of it. Blurring the handle
+                    // against the map itself needs its own source regardless of
+                    // whether this sheet is a Dialog or an in-tree overlay, so this
+                    // works either way even when [hazeState] itself is null.
+                    Modifier.fillMaxSize().hazeSource(mapHazeState),
+                    state = mapState,
+                    deviceLocation = deviceLocation,
+                    onExpand = null,
+                )
             }
             // The vehicle name, as its own small floating pill -- the same
             // translucent glass chrome every other floating control in the app

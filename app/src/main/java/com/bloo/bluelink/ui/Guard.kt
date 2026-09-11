@@ -493,8 +493,8 @@ internal fun EmptyScreen(vm: AppViewModel) {
                     color = scheme.onSurface,
                     modifier = Modifier.weight(1f),
                 )
-                FloatingIcon(Icons.Filled.Refresh, "Reload", { vm.loadGarage() })
-                FloatingIcon(Icons.Filled.Settings, "Settings", { vm.openSettings() })
+                FloatingIcon(Icons.Filled.Refresh, "Reload", { vm.loadGarage() }, hazeState = hazeState)
+                FloatingIcon(Icons.Filled.Settings, "Settings", { vm.openSettings() }, hazeState = hazeState)
             }
             Box(
                 modifier = Modifier

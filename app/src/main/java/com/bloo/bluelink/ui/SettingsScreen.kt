@@ -2222,7 +2222,7 @@ internal fun SettingsScreen(
             // No back arrow when embedded -- there's no separate screen it would be
             // returning FROM (swiping to a car does that), and "Back to the app"
             // literally isn't true here: this already is the app's main screen.
-            if (!embedded) FloatingIcon(Icons.Filled.ArrowBack, "Back to the app", { vm.closeSettings() })
+            if (!embedded) FloatingIcon(Icons.Filled.ArrowBack, "Back to the app", { vm.closeSettings() }, hazeState = hazeState)
             Spacer(Modifier.weight(1f))
             // A real segmented control (not a single button that only ever
             // names the OTHER mode) so the CURRENT mode is always obvious at a

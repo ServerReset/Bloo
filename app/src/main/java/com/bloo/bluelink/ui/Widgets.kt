@@ -30,6 +30,7 @@ import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
+import androidx.compose.foundation.layout.matchParentSize
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
@@ -77,6 +78,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.blur
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.draw.BlurredEdgeTreatment
 import androidx.compose.ui.draw.drawWithContent
@@ -287,6 +289,15 @@ internal fun FloatingIcon(
     // this exact shape re-built by hand; it now passes these instead).
     containerColor: Color? = null,
     contentColor: Color = MaterialTheme.colorScheme.onSurface,
+    /** The screen's own [HazeState] (its `hazeSource` marks the content actually
+     *  behind this button), giving this a REAL backdrop blur instead of just a
+     *  translucent tonal fill -- reported directly as wanting every floating
+     *  button's background to carry the same blur the status bar/map sheet
+     *  already do. Null (the default) keeps every existing call site exactly as
+     *  it was: a plain glass tint, no blur, opted into per screen as each one's
+     *  own hazeState becomes available here, the same gradual-adoption shape
+     *  [StatusBarScrim]'s own `hazeState` param already uses. */
+    hazeState: HazeState? = null,
 ) {
     val haptics = LocalHaptics.current
     val interaction = remember { MutableInteractionSource() }
@@ -296,31 +307,45 @@ internal fun FloatingIcon(
         animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium),
         label = "floatIconScale",
     )
-    // Plain semi-transparent fill (see GlassChrome.kt) -- more transparent
-    // than the original flat version per feedback that it read as too opaque.
-    // The ambient halo/shadow frame it over car photos.
-    Surface(
-        onClick = { haptics?.click(); onClick() },
-        shape = CircleShape,
-        color = containerColor ?: MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = glassContainerAlpha()),
-        contentColor = contentColor,
-        interactionSource = interaction,
-        modifier = modifier
-            .padding(outerPadding)
-            .size(HeaderButtonSize)
-            // Lambda form: the press spring is read at DRAW time, so the animation
-            // never recomposes this button (the arg-taking overload reads it in
-            // composition instead -- see ExpressiveButtons.kt for the same fix).
-            .graphicsLayer {
-                scaleX = scale
-                scaleY = scale
-            }
-            .ambientRing(CircleShape)
-            .dropShadow(CircleShape)
-            .appGlassRim(CircleShape),
+    // The blur (when hazeState is given) sits in its OWN Box behind the Surface,
+    // not as a modifier on the Surface itself: Surface paints its own `color`
+    // fill internally as part of the same modifier chain, so there's no reliable
+    // way to slot a blur BETWEEN that fill and whatever's behind it from inside
+    // Surface's own modifier parameter -- the same reason the map sheet's scrim/
+    // drag-handle chip use a plain Box for this rather than Surface.
+    Box(
+        modifier = modifier.padding(outerPadding).size(HeaderButtonSize),
+        contentAlignment = Alignment.Center,
     ) {
-        Box(contentAlignment = Alignment.Center) {
-            Icon(icon, contentDescription = description)
+        if (hazeState != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            Box(Modifier.matchParentSize().clip(CircleShape).hazeEffect(state = hazeState))
+        }
+        // Plain semi-transparent fill (see GlassChrome.kt) -- more transparent
+        // than the original flat version per feedback that it read as too opaque.
+        // The ambient halo/shadow frame it over car photos. Layers over the blur
+        // Box above exactly like StatusBarScrim's own tint layers over its blur.
+        Surface(
+            onClick = { haptics?.click(); onClick() },
+            shape = CircleShape,
+            color = containerColor ?: MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = glassContainerAlpha()),
+            contentColor = contentColor,
+            interactionSource = interaction,
+            modifier = Modifier
+                .fillMaxSize()
+                // Lambda form: the press spring is read at DRAW time, so the animation
+                // never recomposes this button (the arg-taking overload reads it in
+                // composition instead -- see ExpressiveButtons.kt for the same fix).
+                .graphicsLayer {
+                    scaleX = scale
+                    scaleY = scale
+                }
+                .ambientRing(CircleShape)
+                .dropShadow(CircleShape)
+                .appGlassRim(CircleShape),
+        ) {
+            Box(contentAlignment = Alignment.Center) {
+                Icon(icon, contentDescription = description)
+            }
         }
     }
 }
