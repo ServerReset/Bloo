@@ -83,6 +83,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.MutableState
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.animation.core.tween
 import androidx.compose.ui.Alignment
@@ -106,6 +107,7 @@ import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.layout.positionOnScreen
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.toSize
@@ -130,6 +132,7 @@ import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlin.math.floor
+import kotlin.math.roundToInt
 
 
 @Composable
@@ -520,12 +523,20 @@ internal class CarMapState {
     var scale by mutableFloatStateOf(1f)
         private set
 
+    /** True once the user has actually panned or pinched this map -- an automatic
+     *  "fit both the car and the device in view" (see [fitBothLocations]) should
+     *  only ever run BEFORE that, never yanking the view out from under a hand
+     *  that's already deliberately looked somewhere else. [recenter] clears this,
+     *  since that's an explicit "start over". */
+    private var userAdjusted = false
+
     /** A continuous drag, in screen pixels. Drag right -> the map (and
      *  everything drawn on it) should slide right with the finger, exactly like
      *  sliding a sheet of paper -- so the WORLD-pixel offset accumulates in the
      *  same direction as the drag; see CarMap's own originX/originY, which
      *  subtract this to shift what's visible. */
     fun pan(dx: Float, dy: Float) {
+        userAdjusted = true
         panX += dx
         panY += dy
     }
@@ -536,6 +547,7 @@ internal class CarMapState {
      *  PIXELS at the OLD zoom, and a zoom step doubles/halves how many pixels the
      *  same world distance covers. */
     fun pinch(ratio: Float) {
+        userAdjusted = true
         scale *= ratio
         while (scale >= 2f && zoom < CarMapMaxZoom) {
             zoom++; panX *= 2f; panY *= 2f; scale /= 2f
@@ -543,12 +555,64 @@ internal class CarMapState {
         while (scale <= 0.5f && zoom > CarMapMinZoom) {
             zoom--; panX /= 2f; panY /= 2f; scale *= 2f
         }
+        // At the zoom ceiling/floor there's no further level left to snap into, so
+        // the continuous scale itself has to be clamped instead of drifting
+        // arbitrarily far past the octave boundary. Left unclamped, pinching out
+        // past [CarMapMinZoom] kept shrinking the already-fetched tile grid
+        // indefinitely -- CarMap's own tile fetch is sized for the box at scale
+        // 1, so a scale well below that shrinks the grid smaller than the
+        // viewport it needs to fill, leaving blank, tile-less margins around the
+        // edges. Reported directly: "if you zoom out all the way, you don't see
+        // stuff anymore, it cuts off the edges." CarMap's own tile-range fetch
+        // also over-fetches by 1/scale to cover the worst case within this
+        // clamp -- see its own `coverage` doc -- so between the two, the grid
+        // now always covers the viewport regardless of where scale sits.
+        scale = scale.coerceIn(0.5f, 2f)
     }
 
     /** Back to the car, dead centre, default zoom -- the full-screen map's
-     *  "Recentre" feature. */
+     *  "Recentre" feature. Clears [userAdjusted]: an explicit "start over" that
+     *  also re-allows a fresh [fitBothLocations] to run, the same as a map that
+     *  had never been touched at all. */
     fun recenter() {
+        userAdjusted = false
         zoom = CarMapDefaultZoom
+        panX = 0f
+        panY = 0f
+        scale = 1f
+    }
+
+    /**
+     * Zooms out (never in past [CarMapDefaultZoom]) just enough that both the car
+     * (which stays dead-centre, per [pan]'s own doc) and the device's own location
+     * fit on screen with a margin -- called automatically, once, the first time
+     * both fixes are available and the map is still at rest (see [userAdjusted]).
+     *
+     * Without this, the device-location dot -- drawn at its true tile-projected
+     * offset from the car, same as the car's own pin -- was reported as simply
+     * never appearing "alongside" the car: at the default street-level zoom, a
+     * phone even a few blocks from the car sits many SCREENS of pixels outside
+     * the visible box, not just near an edge, so nothing after that default ever
+     * brought it into view on its own.
+     */
+    fun fitBothLocations(
+        carLat: Double, carLon: Double,
+        deviceLat: Double, deviceLon: Double,
+        viewWidthPx: Float, viewHeightPx: Float,
+    ) {
+        if (userAdjusted || viewWidthPx <= 0f || viewHeightPx <= 0f) return
+        var z = CarMapDefaultZoom
+        while (z > CarMapMinZoom) {
+            val dxPx = kotlin.math.abs(MapTiles.tileX(deviceLon, z) - MapTiles.tileX(carLon, z)) * MapTiles.TILE_PX
+            val dyPx = kotlin.math.abs(MapTiles.tileY(deviceLat, z) - MapTiles.tileY(carLat, z)) * MapTiles.TILE_PX
+            // The car sits dead-centre, so the device only has to fit within HALF
+            // the viewport on whichever side it's offset toward -- hence *2, not
+            // the raw distance. 0.8x leaves some breathing room rather than
+            // placing the device right at the very edge.
+            if (dxPx * 2f <= viewWidthPx * 0.8f && dyPx * 2f <= viewHeightPx * 0.8f) break
+            z--
+        }
+        zoom = z
         panX = 0f
         panY = 0f
         scale = 1f
@@ -557,6 +621,11 @@ internal class CarMapState {
 
 @Composable
 internal fun rememberCarMapState(): CarMapState = remember { CarMapState() }
+
+/** The inclusive tile-index range [CarMap] currently needs fetched -- see its own
+ *  `range`/`derivedStateOf` doc for why this is its own equatable value rather
+ *  than four loose Ints computed inline. */
+private data class TileRange(val firstX: Int, val firstY: Int, val lastX: Int, val lastY: Int)
 
 /**
  * Cross-composable state for expanding a Location pebble's own compact map
@@ -725,26 +794,61 @@ internal fun CarMap(
         val wPx = boxSizePx.width.toFloat()
         val hPx = boxSizePx.height.toFloat()
         val zoom = state.zoom
-        val panX = state.panX
-        val panY = state.panY
         val span = MapTiles.span(zoom)
         val xTileF = MapTiles.tileX(location.longitude, zoom)
         val yTileF = MapTiles.tileY(location.latitude, zoom)
-        // World-pixel of the box's top-left: car-centred, then shifted by whatever the
-        // user has panned away from that centre. .toFloat() matters here, not just
-        // style: xTileF/yTileF are Double (MapTiles.tileX/Y), so without it originX/Y
-        // silently promote to Double via Kotlin's numeric-tower rules -- fine for the
-        // arithmetic a few lines down, but Double has no .toDp() extension, only
-        // Float/Int, so every offX.toDp()/offY.toDp() call below stopped resolving
-        // at all. Caught by CI, not by this compiling clean before the pan/zoom work
-        // (originX/Y used to end in an explicit .toFloat() of the whole expression).
-        val originX = (xTileF * tilePx - wPx / 2f - panX).toFloat()
-        val originY = (yTileF * tilePx - hPx / 2f - panY).toFloat()
-        val firstX = floor(originX / tilePx).toInt()
-        val firstY = floor(originY / tilePx).toInt()
-        val lastX = floor((originX + wPx) / tilePx).toInt()
-        val lastY = floor((originY + hPx) / tilePx).toInt()
         val tileDp = with(density) { tilePx.toDp() }
+
+        // Brings the device's own location into view (zooming out, never in) the
+        // first time both fixes are known and the map is still at rest -- see
+        // CarMapState.fitBothLocations's own doc for why: at the default
+        // street-level zoom the device sits, more often than not, many SCREENS of
+        // pixels outside the box, not just near an edge, so the blue dot below
+        // was reported as simply never appearing "alongside" the car at all.
+        LaunchedEffect(location.latitude, location.longitude, deviceLocation?.latitude, deviceLocation?.longitude, wPx, hPx) {
+            val dev = deviceLocation
+            if (dev != null) {
+                state.fitBothLocations(location.latitude, location.longitude, dev.latitude, dev.longitude, wPx, hPx)
+            }
+        }
+
+        // Which tiles are actually needed -- recomputed only when this genuinely
+        // changes (a new zoom level, a resize, or the pan/scale crossing into a
+        // different integer tile range), NOT on every single pixel of a live pan
+        // or pinch. Reading state.panX/panY/scale directly as plain vals here
+        // (the previous shape of this code) subscribed this whole composable --
+        // and the per-tile AsyncImage/Modifier chain it drives, one full rebuild
+        // PER VISIBLE TILE -- to recompose on every one of those pixels, reported
+        // directly as poor map performance while panning. derivedStateOf reads
+        // them the same way but only actually invalidates readers when the
+        // DERIVED tile range changes, which for a drag is roughly once per whole
+        // 256px tile crossed rather than every frame.
+        //
+        // fetchScaleCoverage over-fetches by 1/scale so this range still covers
+        // the box even while a live pinch has shrunk the tile grid below scale 1
+        // (see CarMapState.pinch's own clamp/doc): without it, the fetched range
+        // matched the box's own unscaled size exactly, so the moment a pinch-out
+        // shrank the content below that, blank/tile-less margins appeared around
+        // the edges -- worst, and permanently, once pinched past CarMapMinZoom,
+        // where scale can never recover via a further zoom-level snap. Reported
+        // directly: "if you zoom out all the way, you don't see stuff anymore,
+        // it cuts off the edges."
+        val range by remember(zoom, xTileF, yTileF, wPx, hPx) {
+            derivedStateOf {
+                val fetchScaleCoverage = 1f / state.scale.coerceAtLeast(0.5f)
+                val fetchW = wPx * fetchScaleCoverage
+                val fetchH = hPx * fetchScaleCoverage
+                val fetchOriginX = xTileF * tilePx - fetchW / 2f - state.panX
+                val fetchOriginY = yTileF * tilePx - fetchH / 2f - state.panY
+                TileRange(
+                    firstX = floor(fetchOriginX / tilePx).toInt(),
+                    firstY = floor(fetchOriginY / tilePx).toInt(),
+                    lastX = floor((fetchOriginX + fetchW) / tilePx).toInt(),
+                    lastY = floor((fetchOriginY + fetchH) / tilePx).toInt(),
+                )
+            }
+        }
+
         // Everything below (tiles, pin, device dot) sits inside its own scaled layer --
         // NOT the outer Box, which also hosts the expand button (CarMap's own doc) and
         // must stay at 1x regardless of how far a pinch has scaled the map itself.
@@ -759,12 +863,10 @@ internal fun CarMap(
                     scaleY = state.scale
                 },
         ) {
-        for (tx in firstX..lastX) {
-            for (ty in firstY..lastY) {
+        for (tx in range.firstX..range.lastX) {
+            for (ty in range.firstY..range.lastY) {
                 if (ty < 0 || ty >= span) continue
                 val wrappedX = MapTiles.wrapX(tx, zoom)
-                val offX = tx * tilePx - originX
-                val offY = ty * tilePx - originY
                 // key(), not a bare loop body: gives each tile a stable slot
                 // keyed by its own tile coordinate, so the remember() just
                 // below is safe to use inside a plain for-loop (whose visible
@@ -800,7 +902,18 @@ internal fun CarMap(
                         colorFilter = darkMapFilter,
                         modifier = Modifier
                             .size(tileDp)
-                            .offset(x = with(density) { offX.toDp() }, y = with(density) { offY.toDp() }),
+                            // Layout-phase placement, not a composition-time Dp
+                            // offset(x=,y=): reads the live pan fresh every frame
+                            // without ever recomposing this AsyncImage -- see
+                            // `range`'s own doc above for why that matters.
+                            .offset {
+                                val originX = xTileF * tilePx - wPx / 2f - state.panX
+                                val originY = yTileF * tilePx - hPx / 2f - state.panY
+                                IntOffset(
+                                    (tx * tilePx - originX).roundToInt(),
+                                    (ty * tilePx - originY).roundToInt(),
+                                )
+                            },
                     )
                 }
             }
@@ -809,15 +922,13 @@ internal fun CarMap(
         // rest, and it rides along with panX/panY exactly like the tiles do -- so panning
         // away from the car slides the pin off toward wherever the car actually is
         // relative to the new view, instead of it staying glued to the middle of the box.
-        val pinOffsetX = with(density) { panX.toDp() }
-        val pinOffsetY = with(density) { panY.toDp() }
         Icon(
             Icons.Filled.LocationOn,
             contentDescription = "Car location",
             tint = pinColor,
             modifier = Modifier
                 .align(Alignment.Center)
-                .offset(x = pinOffsetX, y = pinOffsetY)
+                .offset { IntOffset(state.panX.roundToInt(), state.panY.roundToInt()) }
                 .size(40.dp)
                 .offset(y = (-20).dp),
         )
@@ -828,12 +939,14 @@ internal fun CarMap(
         // Anything else on the map has to go through the full conversion: its tile
         // position minus the car's, in pixels, plus however far the user has panned.
         deviceLocation?.let { dev ->
-            val devOffX = (((MapTiles.tileX(dev.longitude, zoom) - xTileF) * tilePx) + panX).toFloat()
-            val devOffY = (((MapTiles.tileY(dev.latitude, zoom) - yTileF) * tilePx) + panY).toFloat()
             Box(
                 Modifier
                     .align(Alignment.Center)
-                    .offset(x = with(density) { devOffX.toDp() }, y = with(density) { devOffY.toDp() })
+                    .offset {
+                        val devOffX = ((MapTiles.tileX(dev.longitude, zoom) - xTileF) * tilePx) + state.panX
+                        val devOffY = ((MapTiles.tileY(dev.latitude, zoom) - yTileF) * tilePx) + state.panY
+                        IntOffset(devOffX.roundToInt(), devOffY.roundToInt())
+                    }
                     .size(16.dp)
                     .background(Color.White, CircleShape)
                     .padding(3.dp)
