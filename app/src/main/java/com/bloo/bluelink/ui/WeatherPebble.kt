@@ -20,26 +20,38 @@ import androidx.browser.customtabs.CustomTabsIntent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTransformGestures
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.only
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Fullscreen
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Map
+import androidx.compose.material.icons.filled.MyLocation
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.WbSunny
 import androidx.compose.ui.semantics.contentDescription
@@ -49,6 +61,7 @@ import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.runtime.Composable
@@ -77,6 +90,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.bloo.bluelink.data.GeoLocation
@@ -161,13 +176,21 @@ internal fun LocationPebble(v: Vehicle, state: UiState, vm: AppViewModel, dragHa
                     // headline. This tile rendered the address three times at once -- headline,
                     // hero and the map stripe's caption.
                 }
+                // Expanding is a NEW full-screen surface (CarMapFullScreenDialog), not this
+                // map growing in place -- see CarMap's own onExpand doc. Local to this
+                // pebble instance: opening it here never affects another car's own map.
+                var showFullScreenMap by remember { mutableStateOf(false) }
                 CarMap(
                     loc,
                     Modifier
                         .fillMaxWidth()
                         .height(if (coverGlance) 130.dp else 220.dp)
                         .clip(RoundedCornerShape(18.dp)),
+                    onExpand = { showFullScreenMap = true },
                 )
+                if (showFullScreenMap) {
+                    CarMapFullScreenDialog(loc, v.name) { showFullScreenMap = false }
+                }
                 // Same reasoning as the cover hero above: a resolved address is
                 // already the pebble's header/summary, so a permanent raw-coordinate
                 // row here was redundant with it every single time -- exactly what
@@ -189,16 +212,7 @@ internal fun LocationPebble(v: Vehicle, state: UiState, vm: AppViewModel, dragHa
                     if (carWeather != null) WeatherStripe(carWeather, fahrenheit, place ?: "At the car")
                 }
                 CommandButton("Open in maps", Icons.Filled.Map, Modifier.fillMaxWidth(), true) {
-                    val uri = Uri.parse(
-                        "geo:${loc.latitude},${loc.longitude}" +
-                            "?q=${loc.latitude},${loc.longitude}(${v.name})"
-                    )
-                    // Use the default maps app instead of hardcoding Google Maps
-                    runCatching {
-                        context.startActivity(
-                            Intent(Intent.ACTION_VIEW, uri).apply { addFlags(Intent.FLAG_ACTIVITY_NEW_TASK) },
-                        )
-                    }
+                    openInExternalMaps(context, loc, v.name)
                 }
                 }
             }
@@ -376,14 +390,100 @@ internal fun WeatherPebble(v: Vehicle, state: UiState, vm: AppViewModel, dragHan
     }
 }
 
-/** Zoom bounds for [CarMap]'s pinch-zoom -- 3 is "half the continent", 19 is past
- *  what OSM actually serves tiles for. */
+/** Zoom bounds for [CarMap]'s zoom, pinch or button-driven -- 3 is "half the
+ *  continent", 19 is past what OSM actually serves tiles for. */
 private const val CarMapMinZoom = 3
 private const val CarMapMaxZoom = 19
+
+/** Where every [CarMapState] starts: street level, car dead-centre. */
+private const val CarMapDefaultZoom = 15
 
 /** The standard "you are here" blue, distinct from the car's own [MaterialTheme]
  *  error-toned pin so the two markers never read as the same kind of thing. */
 private val DeviceLocationBlue = Color(0xFF4285F4)
+
+/**
+ * Live view state for one [CarMap] instance: zoom level and the pixel pan offset
+ * from the car-centred origin, plus the pinch gesture's own running accumulator.
+ * Pulled out of CarMap's body (three separate `remember`ed vars, previously) into
+ * one object for two reasons:
+ *
+ *  - A caller that wants a DISCRETE action -- the +/- zoom buttons, the
+ *    full-screen map's "Recentre" -- needs something to call into, not raw
+ *    `remember` state private to the composable that drew the gesture.
+ *  - The full-screen map ([CarMapFullScreenDialog]) needs its OWN state,
+ *    independent of whatever the small inline map is currently panned/zoomed
+ *    to -- expanding to full screen is a bigger canvas to look at the SAME car
+ *    on, not a continuation of one specific pan gesture.
+ *
+ * This is also the intended extension point for future map features that carry
+ * their own live view state (a drawn route, a second tracked point, a saved
+ * "look here again" bookmark): add fields/methods here rather than threading
+ * more loose state through CarMap's own parameters.
+ */
+internal class CarMapState {
+    var zoom by mutableIntStateOf(CarMapDefaultZoom)
+        private set
+    var panX by mutableFloatStateOf(0f)
+        private set
+    var panY by mutableFloatStateOf(0f)
+        private set
+
+    // Accumulates a pinch gesture's own multiplicative ratio between whole
+    // zoom-level steps -- detectTransformGestures reports a per-frame RATIO, not
+    // an absolute scale, so this is what a pinch has to build up against before
+    // it's worth redrawing a whole new tile grid. Reset (not just decremented)
+    // every time a level actually flips, so the next level change needs a full
+    // pinch of its own rather than coasting on leftover ratio.
+    private var pinchAccum by mutableFloatStateOf(1f)
+
+    /** A continuous drag, in screen pixels. Drag right -> the map (and
+     *  everything drawn on it) should slide right with the finger, exactly like
+     *  sliding a sheet of paper -- so the WORLD-pixel offset accumulates in the
+     *  same direction as the drag; see CarMap's own originX/originY, which
+     *  subtract this to shift what's visible. */
+    fun pan(dx: Float, dy: Float) {
+        panX += dx
+        panY += dy
+    }
+
+    /** One frame of a pinch gesture's multiplicative ratio. The pan offset is
+     *  halved/doubled in step with every level change: it is measured in tile
+     *  PIXELS at the OLD zoom, and a zoom step doubles/halves how many pixels
+     *  the same world distance covers. */
+    fun pinch(ratio: Float) {
+        pinchAccum *= ratio
+        while (pinchAccum >= 2f && zoom < CarMapMaxZoom) {
+            zoom++; panX *= 2f; panY *= 2f; pinchAccum /= 2f
+        }
+        while (pinchAccum <= 0.5f && zoom > CarMapMinZoom) {
+            zoom--; panX /= 2f; panY /= 2f; pinchAccum *= 2f
+        }
+    }
+
+    /** One discrete zoom-level step -- the +/- buttons. Same pan rescale a
+     *  pinch step does, so a button tap and a pinch crossing the same
+     *  threshold land on identical math, just without needing a gesture to
+     *  get there. */
+    fun stepZoom(delta: Int) {
+        val target = (zoom + delta).coerceIn(CarMapMinZoom, CarMapMaxZoom)
+        while (zoom < target) { zoom++; panX *= 2f; panY *= 2f }
+        while (zoom > target) { zoom--; panX /= 2f; panY /= 2f }
+        pinchAccum = 1f
+    }
+
+    /** Back to the car, dead centre, default zoom -- the full-screen map's
+     *  "Recentre" feature. */
+    fun recenter() {
+        zoom = CarMapDefaultZoom
+        panX = 0f
+        panY = 0f
+        pinchAccum = 1f
+    }
+}
+
+@Composable
+internal fun rememberCarMapState(): CarMapState = remember { CarMapState() }
 
 /**
  * A small slippy map centred on the car, assembled from key-free OpenStreetMap raw
@@ -391,14 +491,15 @@ private val DeviceLocationBlue = Color(0xFF4285F4)
  * draw each at its pixel offset, then drop a pin. This avoids the flaky static-map
  * render services that painted blank.
  *
- * Interactive: one- or two-finger drag pans, pinch zooms. Both were previously
- * fixed at "car dead-centre, zoom 15" with no way to look around it -- reported
- * directly as wanting to actually explore the map rather than stare at a static
- * thumbnail. [pan] and [zoom] are pixel/tile-level state private to one CarMap
- * instance (via `remember`), so panning one Location pebble's map never affects
- * another's, and a fresh `location` update does not yank the view back to
- * centre out from under a hand mid-pan/zoom -- only the ORIGIN each tile/the pin
- * is drawn from moves with a new fix, same as it always did.
+ * Interactive: one- or two-finger drag pans, pinch zooms, and (when
+ * [showZoomControls]) a small +/- pair for a precise stepped zoom without a
+ * pinch gesture -- reported directly as wanting an easier way to zoom than
+ * pinching on a small tile. [state] is pixel/tile-level view state for one
+ * CarMap instance; the default `rememberCarMapState()` keeps it private to
+ * this call site, so panning one Location pebble's map never affects another's,
+ * and a fresh `location` update does not yank the view back to centre out from
+ * under a hand mid-pan/zoom -- only the ORIGIN each tile/the pin is drawn from
+ * moves with a new fix, same as it always did.
  *
  * Also shows a second, smaller marker for the DEVICE's own last-known position
  * (best-effort, fetched once per map instance) -- so the map answers "how far
@@ -408,7 +509,21 @@ private val DeviceLocationBlue = Color(0xFF4285F4)
  * which stays centred on the car exactly as before.
  */
 @Composable
-internal fun CarMap(location: GeoLocation, modifier: Modifier = Modifier) {
+internal fun CarMap(
+    location: GeoLocation,
+    modifier: Modifier = Modifier,
+    state: CarMapState = rememberCarMapState(),
+    /** Small +/- buttons in the bottom-end corner. On by default; the
+     *  full-screen map keeps them too -- a whole screen is exactly where a
+     *  precise stepped zoom is easiest to reach for, not just the small tile's
+     *  fallback for an awkward pinch. */
+    showZoomControls: Boolean = true,
+    /** A small expand icon in the top-end corner, calling this when tapped --
+     *  the compact map's way into [CarMapFullScreenDialog]. Null (the default)
+     *  hides the button entirely; the full-screen map itself passes null, since
+     *  it has nowhere further to expand to. */
+    onExpand: (() -> Unit)? = null,
+) {
     val context = LocalContext.current
 
     // Contrast-aware pin color: bright on dark maps, dark on light maps
@@ -424,20 +539,6 @@ internal fun CarMap(location: GeoLocation, modifier: Modifier = Modifier) {
     } else {
         MaterialTheme.colorScheme.surfaceContainerLowest
     }
-
-    // Zoom level and pixel pan offset from the car-centred origin, both driven purely by
-    // the pointerInput gesture below -- nothing else in this composable writes them, so a
-    // `location` update mid-pan/zoom (the car's fix refreshing) reuses whatever the finger
-    // last left them at instead of snapping back to centre/zoom 15.
-    var zoom by remember { mutableIntStateOf(15) }
-    var panX by remember { mutableFloatStateOf(0f) }
-    var panY by remember { mutableFloatStateOf(0f) }
-    // Accumulates the gesture's own multiplicative zoom between whole zoom-level steps --
-    // detectTransformGestures reports a per-frame RATIO, not an absolute scale, so this is
-    // what a pinch has to build up against before it's worth redrawing a whole new tile
-    // grid. Reset (not just decremented) every time a level actually flips, so the next
-    // level change needs a full pinch of its own rather than coasting on leftover ratio.
-    var pinchAccum by remember { mutableFloatStateOf(1f) }
 
     // "You are here": the device's own last-known location, fetched once per map
     // instance rather than tracked live -- a parked phone reading its own position
@@ -500,28 +601,10 @@ internal fun CarMap(location: GeoLocation, modifier: Modifier = Modifier) {
         modifier
             .background(mapBackground)
             .onSizeChanged { boxSizePx = it }
-            .pointerInput(Unit) {
+            .pointerInput(state) {
                 detectTransformGestures { _, gesturePan, gestureZoom, _ ->
-                    // Drag right -> the map (and the pin riding on it) should slide right
-                    // with the finger, exactly like sliding a sheet of paper -- so the
-                    // WORLD-pixel offset accumulates in the same direction as the drag; see
-                    // originX/originY below, which subtract this to shift what's visible.
-                    panX += gesturePan.x
-                    panY += gesturePan.y
-                    pinchAccum *= gestureZoom
-                    // Bump a whole zoom level every time the pinch crosses a 2x/0.5x
-                    // threshold, carrying the leftover ratio forward rather than
-                    // snapping it to 1 -- so a fast, continuous pinch can cross several
-                    // levels in one gesture instead of needing to be released and
-                    // re-started at each one. The pan offset is halved/doubled in step:
-                    // it is measured in tile PIXELS at the OLD zoom, and a zoom step
-                    // doubles/halves how many pixels the same world distance covers.
-                    while (pinchAccum >= 2f && zoom < CarMapMaxZoom) {
-                        zoom++; panX *= 2f; panY *= 2f; pinchAccum /= 2f
-                    }
-                    while (pinchAccum <= 0.5f && zoom > CarMapMinZoom) {
-                        zoom--; panX /= 2f; panY /= 2f; pinchAccum *= 2f
-                    }
+                    state.pan(gesturePan.x, gesturePan.y)
+                    state.pinch(gestureZoom)
                 }
             },
     ) {
@@ -529,6 +612,9 @@ internal fun CarMap(location: GeoLocation, modifier: Modifier = Modifier) {
         val tilePx = MapTiles.TILE_PX.toFloat()
         val wPx = boxSizePx.width.toFloat()
         val hPx = boxSizePx.height.toFloat()
+        val zoom = state.zoom
+        val panX = state.panX
+        val panY = state.panY
         val span = MapTiles.span(zoom)
         val xTileF = MapTiles.tileX(location.longitude, zoom)
         val yTileF = MapTiles.tileY(location.latitude, zoom)
@@ -628,11 +714,190 @@ internal fun CarMap(location: GeoLocation, modifier: Modifier = Modifier) {
                     .background(DeviceLocationBlue, CircleShape),
             )
         }
+        if (showZoomControls) {
+            Column(
+                Modifier.align(Alignment.BottomEnd).padding(8.dp),
+                verticalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                MapOverlayIconButton(Icons.Filled.Add, "Zoom in", enabled = zoom < CarMapMaxZoom) {
+                    state.stepZoom(1)
+                }
+                MapOverlayIconButton(Icons.Filled.Remove, "Zoom out", enabled = zoom > CarMapMinZoom) {
+                    state.stepZoom(-1)
+                }
+            }
+        }
+        if (onExpand != null) {
+            MapOverlayIconButton(
+                Icons.Filled.Fullscreen,
+                "Expand map",
+                modifier = Modifier.align(Alignment.TopEnd).padding(8.dp),
+                onClick = onExpand,
+            )
+        }
+    }
+}
+
+/**
+ * One small round chrome button floating over the map -- the zoom +/- pair and the
+ * expand corner button. Not [MorphIconButton]: that one is deliberately containerless
+ * chrome (see its own doc), which reads fine against a card's flat background but
+ * disappears against a map whose colour underneath it is whatever terrain happens to
+ * be there. A filled, semi-opaque circle behind the glyph keeps it legible over any
+ * tile.
+ */
+@Composable
+private fun MapOverlayIconButton(
+    icon: ImageVector,
+    contentDescription: String,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true,
+    onClick: () -> Unit,
+) {
+    val haptics = LocalHaptics.current
+    Box(
+        modifier
+            .size(32.dp)
+            .alpha(if (enabled) 1f else 0.4f)
+            .clip(CircleShape)
+            .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.85f))
+            .clickable(enabled = enabled) { haptics?.click(); onClick() },
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(
+            icon,
+            contentDescription = contentDescription,
+            tint = MaterialTheme.colorScheme.onSurface,
+            modifier = Modifier.size(18.dp),
+        )
+    }
+}
+
+/**
+ * One entry in the full-screen map's bottom toolbar -- an icon, a label and an
+ * action, nothing else. This IS the "framework" for future map features (a traffic
+ * layer, turn-by-turn directions, nearby search, a saved-places list, sharing a live
+ * location...): each new capability is just another [MapFeature] appended to the list
+ * [CarMapFullScreenDialog] builds, never a change to the row itself, the button
+ * styling, or the layout around it. Two real ones exist today -- recentre and open in
+ * the system Maps app -- and every future one is exactly this same shape.
+ */
+internal data class MapFeature(
+    val icon: ImageVector,
+    val label: String,
+    val enabled: Boolean = true,
+    val onClick: () -> Unit,
+)
+
+/** The full-screen map's bottom toolbar: one plain (unconnected) [MorphButton] pill
+ *  per [MapFeature], in a horizontally scrolling row so the list can grow past
+ *  whatever fits on one screen width without needing its own overflow menu. */
+@Composable
+private fun MapFeatureRow(features: List<MapFeature>, modifier: Modifier = Modifier) {
+    Row(
+        modifier
+            .fillMaxWidth()
+            .horizontalScroll(rememberScrollState())
+            .padding(horizontal = 12.dp, vertical = 10.dp),
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        features.forEach { feature ->
+            val source = remember { MutableInteractionSource() }
+            MorphButton(
+                onClick = feature.onClick,
+                interactionSource = source,
+                enabled = feature.enabled,
+            ) {
+                MorphButtonLabel(feature.icon, feature.label, pending = false)
+            }
+        }
+    }
+}
+
+/**
+ * The map, expanded to fill the screen -- reached from [CarMap]'s own corner button.
+ * Its own [CarMapState] ([rememberCarMapState]), independent of whatever the small
+ * inline map is panned/zoomed to: expanding is a bigger canvas to look at the SAME
+ * car on, not a continuation of one specific gesture.
+ *
+ * The bottom [MapFeatureRow] is deliberately sparse today (recentre, open in the
+ * system Maps app) -- see [MapFeature]'s own doc. This dialog, not a new screen in
+ * the app's own navigation, is the FRAMEWORK request this shipped alongside: a
+ * self-contained full-screen surface future map features can build against (a
+ * drawn route, live traffic, nearby search, saved places) without first having to
+ * plumb a new destination through the rest of the app.
+ */
+@Composable
+internal fun CarMapFullScreenDialog(
+    location: GeoLocation,
+    vehicleName: String,
+    onDismiss: () -> Unit,
+) {
+    val context = LocalContext.current
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false),
+    ) {
+        Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.surface) {
+            Column(Modifier.fillMaxSize()) {
+                Row(
+                    Modifier
+                        .fillMaxWidth()
+                        .statusBarsPadding()
+                        .padding(horizontal = 12.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    FloatingIcon(Icons.Filled.Close, "Close", onDismiss)
+                    Spacer(Modifier.width(12.dp))
+                    Text(vehicleName, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                }
+                val fullScreenState = rememberCarMapState()
+                CarMap(
+                    location,
+                    Modifier.weight(1f).fillMaxWidth(),
+                    state = fullScreenState,
+                    showZoomControls = true,
+                    onExpand = null,
+                )
+                MapFeatureRow(
+                    features = listOf(
+                        MapFeature(Icons.Filled.MyLocation, "Recentre") { fullScreenState.recenter() },
+                        MapFeature(Icons.Filled.Map, "Open in Maps") {
+                            openInExternalMaps(context, location, vehicleName)
+                        },
+                        // FRAMEWORK: append future map features here -- each is just an
+                        // icon, a label and an action, e.g.:
+                        //   MapFeature(Icons.Filled.AltRoute, "Directions") { ... }
+                        //   MapFeature(Icons.Filled.Layers, "Traffic") { ... }
+                        //   MapFeature(Icons.Filled.Search, "Nearby") { ... }
+                        //   MapFeature(Icons.Filled.Share, "Share location") { ... }
+                    ),
+                    modifier = Modifier.navigationBarsPadding(),
+                )
+            }
+        }
     }
 }
 
 // --- Service & links ------------------------------------------------------
 
+
+/**
+ * Opens the car's location in the device's default Maps app -- a `geo:` intent
+ * rather than hardcoding Google Maps, since the OS resolves it to whatever the user
+ * actually has set. Shared by [LocationPebble]'s own "Open in maps" button and
+ * [CarMapFullScreenDialog]'s [MapFeature] row so the two never drift on the URI
+ * format.
+ */
+internal fun openInExternalMaps(context: Context, location: GeoLocation, label: String) {
+    val uri = Uri.parse(
+        "geo:${location.latitude},${location.longitude}" +
+            "?q=${location.latitude},${location.longitude}($label)"
+    )
+    runCatching {
+        context.startActivity(Intent(Intent.ACTION_VIEW, uri).apply { addFlags(Intent.FLAG_ACTIVITY_NEW_TASK) })
+    }
+}
 
 internal fun openUrl(context: Context, url: String, inApp: Boolean) {
     val uri = Uri.parse(url)
