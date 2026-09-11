@@ -258,6 +258,12 @@ internal fun GarageScreen(state: State<UiState>, vm: AppViewModel) {
     // marks it as the content to blur, StatusBarScrim's own hazeState param reads it
     // back. See StatusBarScrim's doc for why plain Modifier.blur never worked here.
     val hazeState = remember { HazeState() }
+    // Backs every Location pebble's map-expand button on this screen -- see its own
+    // doc for why a shared, hoisted instance (not local state inside the pebble
+    // itself) is what lets the expanded view be "literally that same" map/component
+    // rather than a copy fading in. One instance for the whole screen: only one
+    // car's map can be expanded at a time regardless of which page it's on.
+    val expandedMap = remember { ExpandedMapState() }
     // How many full-height cards fit side by side; pages advance by this many.
     val perPage = (widthDp / MIN_CARD_DP).coerceIn(1, count)
     // Expanding to the dual-column view only makes sense on a wide screen.
@@ -269,7 +275,7 @@ internal fun GarageScreen(state: State<UiState>, vm: AppViewModel) {
 
     BackHandler(enabled = expandedByUser != null) { vm.collapse() }
 
-    CompositionLocalProvider(LocalPullFraction provides pullFractionState) {
+    CompositionLocalProvider(LocalPullFraction provides pullFractionState, LocalExpandedMap provides expandedMap) {
     BackdropHost {
         AnimatedContent(
             targetState = expandedIdx != null,
@@ -842,6 +848,25 @@ internal fun GarageScreen(state: State<UiState>, vm: AppViewModel) {
                 // absence of a modifier.
                 modifier = Modifier.align(Alignment.TopEnd).statusBarsPadding()
                     .floatingOverlay(FloatingIds.SettingsIcon, fade = false, shift = false),
+            )
+        }
+        // The expanded map overlay -- drawn LAST in this Box on purpose, so it's on
+        // top of every pager/pebble/floating icon above regardless of which one is
+        // current. See ExpandedMapState's own doc for why this lives here (not
+        // inside LocationPebble) at all: this is the one place in the tree that's
+        // both full-screen and a sibling of the car pagers themselves.
+        val expandedVin = expandedMap.vin
+        val expandedVehicle = if (expandedVin != null) vehicles.firstOrNull { it.vin == expandedVin } else null
+        val expandedLocation = expandedVehicle?.let { state.value.locations[it.vin] }
+        if (expandedVehicle != null && expandedLocation != null) {
+            CarMapExpandedOverlay(
+                location = expandedLocation,
+                vehicleName = expandedVehicle.name,
+                deviceLocation = state.value.deviceLocation,
+                mapState = expandedMap.mapStateFor(expandedVehicle.vin),
+                originBounds = expandedMap.originBoundsFor(expandedVehicle.vin).value,
+                hazeState = hazeState,
+                onDismiss = { expandedMap.vin = null },
             )
         }
     }

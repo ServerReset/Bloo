@@ -64,7 +64,9 @@ import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.runtime.Composable
@@ -80,6 +82,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.MutableState
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.animation.core.tween
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -108,8 +112,11 @@ import androidx.compose.ui.unit.toSize
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.compose.ui.window.DialogWindowProvider
+import dev.chrisbanes.haze.HazeState
+import dev.chrisbanes.haze.hazeEffect
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
+import com.bloo.uicommon.dropShadow
 import com.bloo.bluelink.data.GeoLocation
 import com.bloo.bluelink.data.MapTiles
 import com.bloo.bluelink.data.Vehicle
@@ -213,29 +220,55 @@ internal fun LocationPebble(v: Vehicle, state: UiState, vm: AppViewModel, dragHa
                     // headline. This tile rendered the address three times at once -- headline,
                     // hero and the map stripe's caption.
                 }
-                // Expanding opens CarMapSheet, a bottom sheet rather than the small map
-                // growing in place -- see CarMap's own onExpand doc. Local to this pebble
-                // instance: opening it here never affects another car's own map.
-                var showMapSheet by remember { mutableStateOf(false) }
-                // This map's own on-SCREEN bounds, in ABSOLUTE display coordinates
-                // (positionOnScreen(), not a window-relative boundsInWindow()) --
-                // CarMapSheet's own map area grows FROM this rect rather than just
-                // appearing, regardless of whether the sheet ends up sharing this
-                // Activity's window or opening its own (screen-absolute coordinates
-                // are correct either way, so this doesn't have to know or care).
-                var mapOriginBounds by remember { mutableStateOf<Rect?>(null) }
-                CarMap(
-                    loc,
-                    Modifier
-                        .fillMaxWidth()
-                        .height(if (coverGlance) 130.dp else 220.dp)
-                        .clip(RoundedCornerShape(18.dp))
-                        .onGloballyPositioned { mapOriginBounds = Rect(it.positionOnScreen(), it.size.toSize()) },
-                    deviceLocation = state.deviceLocation,
-                    onExpand = { showMapSheet = true },
-                )
-                if (showMapSheet) {
-                    CarMapSheet(loc, v.name, state.deviceLocation, mapOriginBounds) { showMapSheet = false }
+                // Expanding grows this SAME map into a full-screen overlay -- see CarMap's
+                // own onExpand doc and, for how "same" that really is, ExpandedMapState's.
+                // LocalExpandedMap is only provided by GarageScreen today; anywhere else
+                // (the flip-cover screen) falls back to the old, self-contained path: a
+                // genuinely separate CarMap/CarMapState inside a Dialog-based CarMapSheet.
+                val expandedMap = LocalExpandedMap.current
+                if (expandedMap != null) {
+                    val isExpanded = expandedMap.vin == v.vin
+                    CarMap(
+                        loc,
+                        Modifier
+                            .fillMaxWidth()
+                            .height(if (coverGlance) 130.dp else 220.dp)
+                            .clip(RoundedCornerShape(18.dp))
+                            .onGloballyPositioned {
+                                expandedMap.originBoundsFor(v.vin).value = Rect(it.positionOnScreen(), it.size.toSize())
+                            }
+                            // Hidden (not removed) while expanded -- the overlay drawn
+                            // elsewhere in GarageScreen's own tree is what's actually
+                            // visible growing out of this slot; keeping this composed
+                            // (rather than an `if (!isExpanded)`) means it's still here,
+                            // still measured, the instant the overlay collapses back.
+                            .graphicsLayer { alpha = if (isExpanded) 0f else 1f },
+                        state = expandedMap.mapStateFor(v.vin),
+                        deviceLocation = state.deviceLocation,
+                        onExpand = { expandedMap.vin = v.vin },
+                    )
+                } else {
+                    var showMapSheet by remember { mutableStateOf(false) }
+                    // This map's own on-SCREEN bounds, in ABSOLUTE display coordinates
+                    // (positionOnScreen(), not a window-relative boundsInWindow()) --
+                    // CarMapSheet's own map area grows FROM this rect rather than just
+                    // appearing, regardless of whether the sheet ends up sharing this
+                    // Activity's window or opening its own (screen-absolute coordinates
+                    // are correct either way, so this doesn't have to know or care).
+                    var mapOriginBounds by remember { mutableStateOf<Rect?>(null) }
+                    CarMap(
+                        loc,
+                        Modifier
+                            .fillMaxWidth()
+                            .height(if (coverGlance) 130.dp else 220.dp)
+                            .clip(RoundedCornerShape(18.dp))
+                            .onGloballyPositioned { mapOriginBounds = Rect(it.positionOnScreen(), it.size.toSize()) },
+                        deviceLocation = state.deviceLocation,
+                        onExpand = { showMapSheet = true },
+                    )
+                    if (showMapSheet) {
+                        CarMapSheet(loc, v.name, state.deviceLocation, mapOriginBounds) { showMapSheet = false }
+                    }
                 }
                 // Same reasoning as the cover hero above: a resolved address is
                 // already the pebble's header/summary, so a permanent raw-coordinate
@@ -524,6 +557,49 @@ internal class CarMapState {
 
 @Composable
 internal fun rememberCarMapState(): CarMapState = remember { CarMapState() }
+
+/**
+ * Cross-composable state for expanding a Location pebble's own compact map
+ * "in place" -- when a host (currently only [GarageScreen]) provides one via
+ * [LocalExpandedMap], the SAME [CarMapState] (so the same pan, zoom and already-
+ * loaded tiles) and the compact map's own last on-screen rect carry across into
+ * a full-screen overlay drawn elsewhere in that host's own tree, instead of the
+ * expanded view starting over at a fresh state with a fresh tile fetch. That
+ * fresh-state approach -- a genuinely separate [CarMap] composable driving its
+ * own independent [CarMapState] inside a [CarMapSheet] Dialog -- is still what
+ * happens when this is null (no host has set one up): it works, but reads as a
+ * *copy* of the map fading in/growing rather than "literally that same
+ * component" continuing, reported directly against the version that shipped
+ * with only that path.
+ *
+ * Deliberately NOT `remember`ed inside [LocationPebble] itself: the compact map
+ * and the expanded overlay are still two separate composable call sites (one
+ * inline in this pebble's own layout slot, one in a full-screen overlay
+ * elsewhere in the tree) even when they share this, so the state they share has
+ * to live somewhere neither one owns exclusively -- the same reason
+ * [HotSeatDrag] lives outside any one pebble.
+ */
+internal class ExpandedMapState {
+    /** VIN of the car whose map is currently expanded, or null. */
+    var vin by mutableStateOf<String?>(null)
+    private val perVinMapState = mutableMapOf<String, CarMapState>()
+    private val perVinOrigin = mutableMapOf<String, MutableState<Rect?>>()
+
+    /** The one [CarMapState] a given car's compact map and expanded overlay both
+     *  read/write -- created once per VIN, on first use, and kept for as long as
+     *  this [ExpandedMapState] itself lives (its host's own lifetime). */
+    fun mapStateFor(vin: String): CarMapState = perVinMapState.getOrPut(vin) { CarMapState() }
+
+    /** The compact map's own last-measured on-screen rect for this VIN, kept
+     *  live (via the compact map's own `onGloballyPositioned`) whether or not
+     *  it's the currently-expanded one, so the moment it IS expanded there's
+     *  already a real, current origin to grow from -- not a stale one from
+     *  whenever this was last measured, or none at all. */
+    fun originBoundsFor(vin: String): MutableState<Rect?> = perVinOrigin.getOrPut(vin) { mutableStateOf(null) }
+}
+
+/** Null (the default) when no host has set one up. See [ExpandedMapState]'s own doc. */
+internal val LocalExpandedMap = staticCompositionLocalOf<ExpandedMapState?> { null }
 
 /**
  * A small slippy map centred on the car, assembled from key-free OpenStreetMap raw
@@ -896,6 +972,126 @@ internal fun CarMapSheet(
     originBounds: Rect?,
     onDismiss: () -> Unit,
 ) {
+    // The Dialog-based fallback for hosts that don't provide a LocalExpandedMap
+    // (the flip-cover screen) -- see ExpandedMapState's own doc. A genuinely
+    // separate CarMap/CarMapState of its own, not the compact map's, since there's
+    // no shared state to reach here.
+    Dialog(
+        // A fallback only -- CarMapSheetBody's own BackHandler intercepts system
+        // back first and runs its animated close() before this ever fires. Direct,
+        // with no animation, since close() itself lives inside CarMapSheetBody and
+        // isn't reachable from here.
+        onDismissRequest = onDismiss,
+        // false: a full-screen canvas, not a Dialog sized/positioned by the
+        // platform's own adaptive rules -- see CarMapSheetBody's own doc for why
+        // ModalBottomSheet (itself a Dialog) couldn't avoid that. decorFitsSystemWindows
+        // = false so this draws genuinely edge-to-edge and positions its own content
+        // (the map area's own insets/padding already handle the status/nav bars)
+        // rather than having the window itself carve out a smaller content area.
+        properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false),
+    ) {
+        // As in GlassAlertDialog: this Dialog owns its own platform Window, entirely
+        // separate from the main Activity window, so the platform's own default
+        // dim/background behind it has to be turned off explicitly -- CarMapSheetBody
+        // draws its own scrim instead. Also why hazeState is null here: Haze can only
+        // blur content that's actually in the SAME window/composition as its source,
+        // and this Dialog's window is not that -- see ExpandedMapState's own doc.
+        val dialogView = LocalView.current
+        SideEffect {
+            val window = (dialogView.parent as? DialogWindowProvider)?.window
+            window?.setDimAmount(0f)
+            window?.setBackgroundDrawable(android.graphics.drawable.ColorDrawable(android.graphics.Color.TRANSPARENT))
+        }
+        CarMapSheetBody(
+            location, vehicleName, deviceLocation,
+            mapState = rememberCarMapState(),
+            originBounds = originBounds,
+            hazeState = null,
+            onDismiss = onDismiss,
+        )
+    }
+}
+
+/**
+ * The same map, expanded to fill most of the screen, WITHOUT a Dialog -- reached
+ * from a Location pebble's own compact map when its host provides an
+ * [ExpandedMapState] (currently only [GarageScreen]). Rendered as a plain overlay
+ * in that host's own composition (a sibling Box drawn last, so it's on top of
+ * everything else) instead of a system Dialog: being in the SAME window as the
+ * compact map is what lets it share that map's own [CarMapState] ([mapState] here
+ * is [ExpandedMapState.mapStateFor], not a fresh one) instead of starting over at
+ * a blank pan/zoom and re-fetching tiles Coil already has cached from the compact
+ * view -- reported directly as wanting "literally that same component" to expand,
+ * not a copy fading in. It also means [hazeState] can give the visible strip of
+ * app above the sheet a REAL blur of the actual content behind it (the same
+ * technique [StatusBarScrim] already uses) -- something a separate Dialog window
+ * has no access to at all, so [CarMapSheet]'s own Dialog fallback above still just
+ * dims that strip instead.
+ */
+@Composable
+internal fun CarMapExpandedOverlay(
+    location: GeoLocation,
+    vehicleName: String,
+    deviceLocation: GeoLocation?,
+    mapState: CarMapState,
+    originBounds: Rect?,
+    hazeState: HazeState?,
+    onDismiss: () -> Unit,
+) {
+    CarMapSheetBody(location, vehicleName, deviceLocation, mapState, originBounds, hazeState, onDismiss)
+}
+
+/**
+ * The map, expanded into a bottom sheet -- reached from [CarMap]'s own corner button,
+ * either via [CarMapSheet] (a Dialog, for hosts with no [ExpandedMapState]) or
+ * [CarMapExpandedOverlay] (an in-tree overlay, for [GarageScreen]). Shared body for
+ * both: everything about the sheet itself -- its slide-in/out, scrim, drag-to-
+ * dismiss, chrome -- is identical either way; only how it's HOSTED (a separate
+ * Dialog window vs. a plain overlay in the same composition) differs between the
+ * two callers, and that's entirely their own concern, not this one's.
+ *
+ * A hand-rolled overlay, NOT [androidx.compose.material3.ModalBottomSheet] -- that
+ * was the second attempt here (the first was a hand-rolled [Dialog] driving its own
+ * `graphicsLayer` scale/translate from a captured on-screen rect, reported as not
+ * actually seamless, not full screen, and covering its own close button).
+ * `ModalBottomSheet` fixed all of that, but turned out to have a problem of its own
+ * that no configuration can reach: it is *itself* implemented as a `Dialog` under the
+ * hood, and Android/Compose Dialogs adapt to large screens by centering themselves
+ * and capping their width (`sheetMaxWidth`) -- so on a tablet or unfolded foldable
+ * this rendered as a boxed, dialog-shaped card floating in the middle of the screen
+ * with the app visible on all four sides, including BELOW its own bottom edge.
+ * Reported directly from a screenshot: "why does it float like that? That's wrong."
+ * `ModalBottomSheetProperties` exposes no override for that adaptive centering --
+ * it's baked into the Dialog underneath, not a configurable behaviour of the sheet.
+ *
+ * [visible] (an [Animatable] the sheet's whole lifecycle runs on, 0 = slid fully off
+ * the bottom edge, 1 = at rest) drives the slide-in/out and the scrim's fade
+ * together, a tap on the scrim dismisses, and the drag handle (not the whole sheet
+ * -- the map area already owns pan/pinch of its own) supports drag-to-dismiss via
+ * [dragPx]. [CarMap] itself still grows in from [originBounds] so opening reads as
+ * the map continuing to expand rather than a flat cut.
+ *
+ * The bottom [MapFeatureRow] is deliberately sparse today (recentre, open in the
+ * system Maps app) -- see [MapFeature]'s own doc. This sheet, not a new screen in the
+ * app's own navigation, is the FRAMEWORK request this shipped alongside: a
+ * self-contained expanded surface future map features can build against (a drawn
+ * route, live traffic, nearby search, saved places) without first having to plumb a
+ * new destination through the rest of the app.
+ */
+@Composable
+private fun CarMapSheetBody(
+    location: GeoLocation,
+    vehicleName: String,
+    deviceLocation: GeoLocation?,
+    mapState: CarMapState,
+    originBounds: Rect?,
+    /** Non-null (only from [CarMapExpandedOverlay]) blurs the visible strip of app
+     *  above the sheet for real -- see this function's own doc. Null (the Dialog
+     *  path) falls back to a plain darkened scrim, since Haze cannot reach across
+     *  windows. */
+    hazeState: HazeState?,
+    onDismiss: () -> Unit,
+) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val density = LocalDensity.current
@@ -907,9 +1103,8 @@ internal fun CarMapSheet(
     // 0 = fully hidden (slid off the bottom of the screen, or -- while there's an
     // origin to grow from -- sitting exactly over originBounds, what the small map
     // looked like the instant this opened), 1 = at rest / grown to this map area's
-    // own natural size and position. One value now drives BOTH the sheet's own
-    // slide-in/out (this no longer gets ModalBottomSheet's enter/exit state machine
-    // for free) and the map's grow-from-the-pebble morph, so the two read as one
+    // own natural size and position. One value drives BOTH the sheet's own
+    // slide-in/out and the map's grow-from-the-pebble morph, so the two read as one
     // continuous motion instead of two separately-timed animations.
     val visible = remember { Animatable(0f) }
     var closing by remember { mutableStateOf(false) }
@@ -924,100 +1119,74 @@ internal fun CarMapSheet(
         if (closing) return
         closing = true
         scope.launch {
-            // Both play at once (this used to be ModalBottomSheet's own hide
-            // animation) so a mid-drag dismiss doesn't visibly snap dragPx back to
-            // 0 before the slide-out starts.
+            // Both play at once so a mid-drag dismiss doesn't visibly snap dragPx
+            // back to 0 before the slide-out starts.
             val a = scope.launch { visible.animateTo(0f, tween(220)) }
             val b = scope.launch { dragPx.animateTo(0f, tween(220)) }
             a.join(); b.join()
             onDismiss()
         }
     }
+    // System back plays the same animated close as the scrim tap/drag handle,
+    // rather than [CarMapSheet]'s Dialog wrapper tearing this down immediately
+    // with no animation at all via its own onDismissRequest (which still calls
+    // onDismiss directly, as a fallback -- see its own doc).
+    BackHandler(enabled = true) { close() }
 
     LaunchedEffect(originBounds) {
         if (originBounds != null) snapshotFlow { fullBounds }.filterNotNull().first()
         visible.animateTo(1f, spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessMediumLow))
     }
 
-    Dialog(
-        onDismissRequest = { close() },
-        // false: a full-screen canvas, not a Dialog sized/positioned by the
-        // platform's own adaptive rules -- see this function's own doc for why
-        // ModalBottomSheet (itself a Dialog) couldn't avoid that. decorFitsSystemWindows
-        // = false so this draws genuinely edge-to-edge and positions its own content
-        // (the map area's own insets/padding already handle the status/nav bars)
-        // rather than having the window itself carve out a smaller content area.
-        properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false),
-    ) {
-        // As in GlassAlertDialog: this Dialog owns its own platform Window, entirely
-        // separate from the main Activity window, so the platform's own default
-        // dim/background behind it has to be turned off explicitly -- both are
-        // replaced by this composable's own scrim Box below, which fades with
-        // [visible] instead of snapping in at a flat platform default the instant
-        // the window appears.
-        val dialogView = LocalView.current
-        SideEffect {
-            val window = (dialogView.parent as? DialogWindowProvider)?.window
-            window?.setDimAmount(0f)
-            window?.setBackgroundDrawable(android.graphics.drawable.ColorDrawable(android.graphics.Color.TRANSPARENT))
-        }
-
-        val sheetMapState = rememberCarMapState()
-        Box(Modifier.fillMaxSize()) {
-            // The scrim -- dims the app behind the sheet, and (like ModalBottomSheet's
-            // own scrim) a tap on it dismisses. Fades in/out with [visible] rather
-            // than being either fully on or fully off the instant the Dialog appears.
-            Box(
-                Modifier
-                    .fillMaxSize()
-                    .background(Color.Black.copy(alpha = 0.5f * visible.value))
-                    .clickable(
-                        interactionSource = remember { MutableInteractionSource() },
-                        indication = null,
-                    ) { close() },
-            )
-            // The sheet itself: bottom-anchored and full-width on EVERY screen size
-            // -- see this function's own doc for why that's the whole point of not
-            // being a Dialog-backed ModalBottomSheet anymore. `translationY` (not a
-            // plain offset) so the same graphicsLayer that slides it in from fully
-            // off-screen at [visible] == 0 also carries the live drag-to-dismiss
-            // gesture (`dragPx`) without the two ever fighting over which owns the
-            // sheet's position.
-            Box(
-                Modifier
-                    .align(Alignment.BottomCenter)
-                    .fillMaxWidth()
-                    // 85% of the SCREEN (not counting the status bar). Sizing the
-                    // SHEET itself here, not the content inside it, was the lesson
-                    // from the ModalBottomSheet era: constraining only the content
-                    // left a gap of whatever sat above it unaccounted for. Here
-                    // there's no separate container to get that wrong -- this Box
-                    // IS the sheet.
-                    .fillMaxHeight(0.85f)
-                    .graphicsLayer { translationY = (1f - visible.value) * size.height + dragPx.value }
-                    .clip(RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp))
-                    // Deliberately no background/Surface fill here. ModalBottomSheet's
-                    // own container Surface -- a solid tonal rectangle painted behind
-                    // the sheet's ENTIRE bounds regardless of what content sat on top
-                    // -- was the actual source of the "boxed dialog card" look,
-                    // compounding its width-capping on large screens into something
-                    // that read as a floating card rather than a sheet. The map below
-                    // fills this box edge to edge on its own; nothing else here needs
-                    // a background to sit on, and removing it is exactly the "no
-                    // background behind it, it should be floating" fix reported
-                    // directly against the screenshot.
-                    .clickable(
-                        interactionSource = remember { MutableInteractionSource() },
-                        indication = null,
-                        onClick = {}, // swallow taps so they don't fall through to the scrim behind
-                    ),
-            ) {
+    Box(Modifier.fillMaxSize()) {
+        // The scrim -- dims (and, with a real hazeState, blurs) the app behind the
+        // sheet, and a tap on it dismisses. Fades in/out with [visible] rather than
+        // being either fully on or fully off the instant this composes.
+        Box(
+            Modifier
+                .fillMaxSize()
+                // Real backdrop blur of the actual app content -- see this
+                // function's own `hazeState` doc for when this is/isn't available.
+                // A lighter tint (0.35, down from the Dialog path's flat 0.5) since
+                // the blur itself is now doing real legibility work underneath it,
+                // not asking one flat darken to carry the whole job alone.
+                .then(if (hazeState != null) Modifier.hazeEffect(state = hazeState) else Modifier)
+                .background(Color.Black.copy(alpha = (if (hazeState != null) 0.35f else 0.5f) * visible.value))
+                .clickable(
+                    interactionSource = remember { MutableInteractionSource() },
+                    indication = null,
+                ) { close() },
+        )
+        // The sheet itself: bottom-anchored and full-width on EVERY screen size --
+        // see this function's own doc for why. `translationY` (not a plain offset)
+        // so the same graphicsLayer that slides it in from fully off-screen at
+        // [visible] == 0 also carries the live drag-to-dismiss gesture (`dragPx`)
+        // without the two ever fighting over which owns the sheet's position.
+        Box(
+            Modifier
+                .align(Alignment.BottomCenter)
+                .fillMaxWidth()
+                // 85% of the SCREEN (not counting the status bar). Sizing the SHEET
+                // itself here, not the content inside it: this Box IS the sheet.
+                .fillMaxHeight(0.85f)
+                .graphicsLayer { translationY = (1f - visible.value) * size.height + dragPx.value }
+                .clip(RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp))
+                // Deliberately no background/Surface fill here -- painting a solid
+                // tonal rectangle behind the sheet's ENTIRE bounds regardless of
+                // content is what made a boxed dialog card read as a floating card
+                // rather than a sheet. The map below fills this box edge to edge on
+                // its own; nothing else here needs a background to sit on.
+                .clickable(
+                    interactionSource = remember { MutableInteractionSource() },
+                    indication = null,
+                    onClick = {}, // swallow taps so they don't fall through to the scrim behind
+                ),
+        ) {
             // The map fills the WHOLE sheet, edge to edge -- no boxed-in margin --
             // with the header and toolbar floating semi-transparently ON TOP of it
             // instead of splitting the sheet into three stacked, non-overlapping
-            // bands. Reported directly as wanting the map to run behind the chrome,
-            // the same "content flows behind floating elements" relationship the
-            // rest of the app already gives its own scrolling content.
+            // bands, the same "content flows behind floating elements" relationship
+            // the rest of the app already gives its own scrolling content.
             Box(
                 Modifier
                     .fillMaxSize()
@@ -1052,34 +1221,40 @@ internal fun CarMapSheet(
                 CarMap(
                     location,
                     Modifier.fillMaxSize(),
-                    state = sheetMapState,
+                    state = mapState,
                     deviceLocation = deviceLocation,
                     onExpand = null,
                 )
             }
-            // No background band behind the name -- just the map and the floating
-            // buttons, reported directly as wanting no opaque/dark backing between
-            // them. A drop shadow on the text itself carries the legibility job a
-            // solid band used to, the same trick a photo-backed hero title uses
-            // elsewhere in the app.
-            Text(
-                vehicleName,
-                style = MaterialTheme.typography.titleMedium.copy(
-                    shadow = Shadow(Color.Black.copy(alpha = 0.6f), blurRadius = 8f),
-                ),
-                fontWeight = FontWeight.Bold,
-                color = Color.White,
+            // The vehicle name, as its own small floating pill -- the same
+            // translucent glass chrome every other floating control in the app
+            // uses ([FloatingIcon]'s own colour/rim/shadow), not bare text with a
+            // drop shadow. Reported directly as wanting it "in some sort of
+            // floating element" rather than text alone sitting on the map.
+            Surface(
+                shape = RoundedCornerShape(50),
+                color = MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = glassContainerAlpha()),
+                contentColor = Color.White,
                 modifier = Modifier
                     .align(Alignment.TopStart)
-                    .padding(horizontal = 20.dp, vertical = 12.dp)
-                    .graphicsLayer { alpha = visible.value },
-            )
+                    .padding(horizontal = 16.dp, vertical = 12.dp)
+                    .graphicsLayer { alpha = visible.value }
+                    .dropShadow(RoundedCornerShape(50))
+                    .appGlassRim(RoundedCornerShape(50)),
+            ) {
+                Text(
+                    vehicleName,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                )
+            }
             // No close (X) button -- swipe-to-dismiss (or tapping the scrim above the
             // sheet) is already how this closes; a second, redundant affordance for
             // the same action was reported directly as unwanted clutter.
             MapFeatureRow(
                 features = listOf(
-                    MapFeature(Icons.Filled.MyLocation, "Recentre") { sheetMapState.recenter() },
+                    MapFeature(Icons.Filled.MyLocation, "Recentre") { mapState.recenter() },
                     MapFeature(Icons.Filled.Map, "Open in Maps") {
                         openInExternalMaps(context, location, vehicleName)
                     },
@@ -1099,19 +1274,20 @@ internal fun CarMapSheet(
                     .navigationBarsPadding()
                     .graphicsLayer { alpha = visible.value },
             )
-            // The drag handle -- and, now that this isn't a ModalBottomSheet with a
-            // built-in swipe gesture of its own, the ONLY thing on this sheet a user
-            // can pull down to dismiss (see [dragPx]'s own doc up top for why that's
-            // deliberately scoped to just this handle rather than the whole sheet).
-            // A generous 48dp touch target around a slim visible pill, the same
-            // "small glyph, big hit area" shape every other icon-only control in the
-            // app already uses -- the pill alone would be a needle-thin target to
-            // grab reliably with a thumb.
+            // The drag handle -- and, with no ModalBottomSheet swipe gesture of its
+            // own underneath this, the ONLY thing on this sheet a user can pull down
+            // to dismiss (see [dragPx]'s own doc up top). A generous 48dp touch
+            // target around a slim visible pill, the same "small glyph, big hit
+            // area" shape every other icon-only control in the app already uses.
+            // Slimmer and dimmer than the first version here (28dp wide, 0.4 alpha,
+            // down from 32dp/0.6) -- reported directly as "a bit obtuse": a heavy,
+            // high-contrast bar read as its own UI element rather than the quiet
+            // affordance a drag handle is supposed to be.
             Box(
                 Modifier
                     .align(Alignment.TopCenter)
                     .fillMaxWidth()
-                    .height(48.dp)
+                    .height(40.dp)
                     .pointerInput(Unit) {
                         detectVerticalDragGestures(
                             onVerticalDrag = { change, amount ->
@@ -1119,10 +1295,9 @@ internal fun CarMapSheet(
                                 scope.launch { dragPx.snapTo((dragPx.value + amount).coerceAtLeast(0f)) }
                             },
                             onDragEnd = {
-                                // Distance, not velocity -- ModalBottomSheet's own
-                                // fling-to-dismiss doesn't have an equivalent here,
-                                // and a fixed 96dp pull is a close enough stand-in
-                                // for "the user clearly meant to close this".
+                                // Distance, not velocity -- a fixed 96dp pull is a
+                                // close enough stand-in for "the user clearly meant
+                                // to close this".
                                 val thresholdPx = with(density) { 96.dp.toPx() }
                                 if (dragPx.value > thresholdPx) {
                                     close()
@@ -1141,12 +1316,11 @@ internal fun CarMapSheet(
             ) {
                 Box(
                     Modifier
-                        .padding(top = 10.dp)
-                        .size(width = 32.dp, height = 4.dp)
-                        .background(Color.White.copy(alpha = 0.6f), RoundedCornerShape(2.dp)),
+                        .padding(top = 8.dp)
+                        .size(width = 28.dp, height = 4.dp)
+                        .background(Color.White.copy(alpha = 0.4f), RoundedCornerShape(2.dp)),
                 )
             }
-        }
         }
     }
 }

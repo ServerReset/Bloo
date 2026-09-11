@@ -185,10 +185,12 @@ internal fun StatusBarScrim(
     Box(
         Modifier
             .fillMaxWidth()
-            // 20dp, down from 28dp -- reported directly as "too tall", reaching far
-            // enough into the content below it to visibly overlap floating chrome
-            // (a segmented toggle, page dots) that sits just past its own edge.
-            .height(topInset + 20.dp)
+            // The status bar's own real height, not that plus an extra margin --
+            // 20dp (and 28dp before that) was still reported as "too thick", reaching
+            // past the icons it exists to back into content below (a segmented
+            // toggle, page dots). Basing this directly on the actual inset means it
+            // covers exactly the status bar and nothing past it, on every device.
+            .height(topInset)
             .then(
                 if (hazeState != null && canBlur && active) {
                     // The actual fix: blurs whatever is really drawn behind this scrim, via
