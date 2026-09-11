@@ -473,9 +473,15 @@ internal fun CarMap(location: GeoLocation, modifier: Modifier = Modifier) {
         val xTileF = MapTiles.tileX(location.longitude, zoom)
         val yTileF = MapTiles.tileY(location.latitude, zoom)
         // World-pixel of the box's top-left: car-centred, then shifted by whatever the
-        // user has panned away from that centre.
-        val originX = (xTileF * tilePx - wPx / 2f - panX)
-        val originY = (yTileF * tilePx - hPx / 2f - panY)
+        // user has panned away from that centre. .toFloat() matters here, not just
+        // style: xTileF/yTileF are Double (MapTiles.tileX/Y), so without it originX/Y
+        // silently promote to Double via Kotlin's numeric-tower rules -- fine for the
+        // arithmetic a few lines down, but Double has no .toDp() extension, only
+        // Float/Int, so every offX.toDp()/offY.toDp() call below stopped resolving
+        // at all. Caught by CI, not by this compiling clean before the pan/zoom work
+        // (originX/Y used to end in an explicit .toFloat() of the whole expression).
+        val originX = (xTileF * tilePx - wPx / 2f - panX).toFloat()
+        val originY = (yTileF * tilePx - hPx / 2f - panY).toFloat()
         val firstX = floor(originX / tilePx).toInt()
         val firstY = floor(originY / tilePx).toInt()
         val lastX = floor((originX + wPx) / tilePx).toInt()
