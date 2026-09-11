@@ -647,25 +647,26 @@ internal fun CoverActionButton(
             // No weight(1f): its parent here is SafeExpansiveButton's own layout, not the row,
             // so it was silently doing nothing. The equal share now comes from the group.
             //
-            // heightIn(min = max = ...), not just a floor: `fillMaxHeight()` fills whatever
-            // height ITS PARENT (this ExpressiveButtonRow) reports needing, and this button's
-            // row sits inside CoverTile's bottom band -- a plain Column, bottom-aligned inside
-            // a Box that fills the WHOLE tile. A Box hands every child (including a bottom-
-            // aligned one) the SAME max-height constraint it was given itself, so a row with
-            // room to fill up to the box's max would fillMaxHeight() into it -- reported from a
-            // real screenshot as one lone action button (a Charge tile's single "Stop", no
-            // identity pill sibling narrow enough to visually hide the effect) ballooning to
-            // cover most of the tile, overlapping the readout above it. A fixed exact height
-            // (not just a minimum) matches what this button was always meant to be -- a small,
-            // constant-height action row, identical whether it is one button or four -- and
-            // caps fillMaxHeight() back down to it regardless of how much room the row itself
-            // was handed.
+            // `.height(...)`, with NO `.fillMaxHeight()` before it -- an earlier attempt at
+            // this fix kept `.fillMaxHeight().heightIn(min = max = X)`, which does NOT work:
+            // Modifier chains apply outer-to-inner, so `.fillMaxHeight()` (outer) ALREADY
+            // locks the incoming constraint to `minHeight = maxHeight = parent's max` before
+            // `.heightIn` (inner) ever runs -- and `.heightIn`'s own max cannot go below an
+            // incoming min that's already fixed higher, so the "cap" silently had no effect
+            // at all. Confirmed still broken after that first attempt.
+            //
+            // The real problem `.fillMaxHeight()` was chasing: this button's row sits inside
+            // CoverTile's bottom band -- a plain Column, bottom-aligned inside a Box that
+            // fills the WHOLE tile. A Box hands every child (including a bottom-aligned one)
+            // the SAME max-height constraint it was given itself, so `.fillMaxHeight()` filled
+            // all the way up into that full-tile max -- reported from a real screenshot as one
+            // lone action button (a Charge tile's single "Stop", with no identity-pill sibling
+            // narrow enough to visually mask the effect) ballooning to cover most of the tile,
+            // overlapping the readout above it. `.height(X)` measures this button at exactly
+            // X regardless of what the parent offers -- no `fillMaxHeight()` in the chain
+            // means there's nothing left to override.
             modifier = Modifier
-                .fillMaxHeight()
-                .heightIn(
-                    min = if (compact) 44.dp else 56.dp,
-                    max = if (compact) 44.dp else 56.dp,
-                )
+                .height(if (compact) 44.dp else 56.dp)
                 .alpha(if (enabled) 1f else 0.45f),
         ) {
         val glyph: @Composable () -> Unit = {
