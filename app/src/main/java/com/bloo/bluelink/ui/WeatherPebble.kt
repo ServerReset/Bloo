@@ -1238,9 +1238,10 @@ private fun CarMapSheetBody(
         closing = true
         scope.launch {
             // Both play at once so a mid-drag dismiss doesn't visibly snap dragPx
-            // back to 0 before the slide-out starts.
-            val a = scope.launch { visible.animateTo(0f, tween(220)) }
-            val b = scope.launch { dragPx.animateTo(0f, tween(220)) }
+            // back to 0 before the slide-out starts. Use a spring for close to match
+            // the bouncy open, but with much more damping so it settles quickly.
+            val a = scope.launch { visible.animateTo(0f, spring(dampingRatio = 0.95f, stiffness = Spring.StiffnessMedium)) }
+            val b = scope.launch { dragPx.animateTo(0f, spring(dampingRatio = 0.95f, stiffness = Spring.StiffnessMedium)) }
             a.join(); b.join()
             onDismiss()
         }
@@ -1376,7 +1377,11 @@ private fun CarMapSheetBody(
                         val origin = originBounds
                         val full = fullBounds
                         if (origin != null && full != null && full.width > 0f && full.height > 0f) {
-                            val t = visible.value
+                            // Clamp t to [0, 1] so overshoot from the spring damping doesn't
+                            // cause the scale to exceed 1.0 or the translation to reverse.
+                            // This keeps the morphing feeling smooth and natural even as the
+                            // spring overshoots on open.
+                            val t = visible.value.coerceIn(0f, 1f)
                             val originScaleX = origin.width / full.width
                             val originScaleY = origin.height / full.height
                             scaleX = originScaleX + (1f - originScaleX) * t
@@ -1387,7 +1392,7 @@ private fun CarMapSheetBody(
                             // No origin to grow from (a caller that passed null) --
                             // the old fallback: a plain scale-in from a touch under
                             // full size rather than nothing at all.
-                            val t = visible.value
+                            val t = visible.value.coerceIn(0f, 1f)
                             scaleX = 0.92f + 0.08f * t
                             scaleY = 0.92f + 0.08f * t
                         }
