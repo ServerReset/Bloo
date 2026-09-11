@@ -1080,12 +1080,23 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         val lastVin = settingsStore.lastVehicleVin(prefs)
         val index = vehicles.indexOfFirst { it.vin == lastVin }.let { if (it < 0) 0 else it }
         val screen = resolveScreen(vehicles, prefs)
+        // Folded into this SAME update rather than seedDefaultClimatePresets()'s own
+        // separate _state.update a few lines down (see that function's remaining call
+        // site inside bootstrapDriveSync for why it still exists there) -- this was one
+        // of three back-to-back UiState emissions landing in the first couple of frames
+        // right as Screen.Loading flips to Screen.Garage, each one a full recomposition
+        // pass over the newly-visible screen (UiState is diffed by its generated
+        // equals(), so any one changed field invalidates every pebble taking the whole
+        // object). vehicles/prefs are already both in scope here, so there's no reason
+        // this needs its own trip through the StateFlow at all on the cold-start path.
+        val defaultPresets = vehicles.associate { v -> v.vin to (settingsStore.defaultClimatePreset(v.vin, prefs) ?: "smart") }
         _state.update {
             // Shared config first, then the fields only the full garage load owns.
             cfg.apply(it).copy(
                 vehicles = vehicles,
                 screen = screen,
                 garageLoadError = null,
+                defaultClimatePresets = defaultPresets,
             )
         }
         val shortcutSet = cfg.shortcutSet
@@ -1124,11 +1135,15 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         // the status fields forward inside its own edit transaction, which has no race
         // against the separately-launched cache restore. That reasoning was already right.
         snapshotStore.saveVehiclesKeepingStatus(vehicles.map { snapshotOf(it, null, _state.value) })
-        // Per-load, and it must run whether or not bootstrapDriveSync below does any work: on a
-        // cold start whose FIRST garage load returned nothing, that guard was already consumed by
-        // the empty path, so its call here is a no-op and this is the only thing that fills the
-        // per-car default climate presets.
-        seedDefaultClimatePresets()
+        // seedDefaultClimatePresets() used to be called here too, on EVERY non-empty garage
+        // load -- folded into the main _state.update above instead (vehicles/prefs were
+        // already in scope there, so it's the identical computation, just written into the
+        // same emission instead of a second one), so this path no longer pays for a second
+        // UiState emission. bootstrapDriveSync's own call to the same function, a few lines
+        // into the coroutine below, is unrelated to this and untouched: it runs once per
+        // PROCESS (guarded), specifically to cover a cold start whose very first garage
+        // load returned nothing at all (Screen.Empty, an early return above this point) --
+        // this fold does not affect that path since it never reaches this line either.
         // One-time: start the Drive auto-sync bootstrap + collector.
         bootstrapDriveSync()
         // Keep the app-icon long-press shortcuts in sync with the current cars.
