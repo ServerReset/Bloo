@@ -115,6 +115,7 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.compose.ui.window.DialogWindowProvider
 import dev.chrisbanes.haze.HazeState
+import dev.chrisbanes.haze.HazeProgressive
 import dev.chrisbanes.haze.hazeEffect
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
@@ -1248,28 +1249,72 @@ private fun CarMapSheetBody(
 
     LaunchedEffect(originBounds) {
         if (originBounds != null) snapshotFlow { fullBounds }.filterNotNull().first()
-        visible.animateTo(1f, spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessMediumLow))
+        // Bouncier than the rest of the app's own SoftDamping default, specifically
+        // for opening: the origin->full scale/position interpolation below (and the
+        // sheet's own slide-in translation) is driven directly off this value with
+        // no clamp, so letting the spring genuinely overshoot past 1 here is what
+        // makes the map actually POP out of the pebble -- growing slightly past its
+        // final size/position and settling back -- rather than smoothly easing into
+        // place. Reported directly as wanting it to "pop out of the little map".
+        visible.animateTo(1f, spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMediumLow))
     }
-
     Box(Modifier.fillMaxSize()) {
         // The scrim -- dims (and, with a real hazeState, blurs) the app behind the
-        // sheet, and a tap on it dismisses. Fades in/out with [visible] rather than
-        // being either fully on or fully off the instant this composes.
-        Box(
-            Modifier
-                .fillMaxSize()
-                // Real backdrop blur of the actual app content -- see this
-                // function's own `hazeState` doc for when this is/isn't available.
-                // A lighter tint (0.35, down from the Dialog path's flat 0.5) since
-                // the blur itself is now doing real legibility work underneath it,
-                // not asking one flat darken to carry the whole job alone.
-                .then(if (hazeState != null) Modifier.hazeEffect(state = hazeState) else Modifier)
-                .background(Color.Black.copy(alpha = (if (hazeState != null) 0.35f else 0.5f) * visible.value))
-                .clickable(
-                    interactionSource = remember { MutableInteractionSource() },
-                    indication = null,
-                ) { close() },
-        )
+        // sheet, and a tap on it dismisses.
+        Box(Modifier.fillMaxSize()) {
+            // The flat tint alone, present from the first frame -- fades in/out
+            // with [visible] rather than being either fully on or fully off the
+            // instant this composes. Clamped to [0, 1]: unlike the scale/
+            // translation elsewhere in this function, an overshoot past 1 from
+            // the open spring's own bounce (see its own doc) has no sensible
+            // meaning for an alpha, which both Color and graphicsLayer expect in
+            // that range regardless.
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .background(Color.Black.copy(alpha = (if (hazeState != null) 0.35f else 0.5f) * visible.value.coerceIn(0f, 1f))),
+            )
+            // The real blur, layered on top and CROSSFADED in over the flat tint
+            // above via its own alpha -- Haze's own blur intensity has no
+            // reliably animatable hook on this pinned 1.7.0 (the same library
+            // version whose `hazeEffect(state=, style=)` two-arg overload already
+            // hit a compile-time "overload ambiguity" once), so rather than
+            // gamble on a second uncertain API surface, the ALREADY fully-blurred
+            // layer simply fades in as a whole, the same graphicsLayer-alpha
+            // technique every other reveal in this file already uses. Reported
+            // directly as wanting the blur's own opening/closing refined, not
+            // just popping fully blurred in on the first frame.
+            if (hazeState != null) {
+                Box(
+                    Modifier
+                        .fillMaxSize()
+                        // Read inside the lambda (layout/draw-phase), not hoisted
+                        // to a composable-scope val -- the latter would force a
+                        // full recomposition of this whole sheet on every single
+                        // animation frame instead of a cheap draw-phase update,
+                        // the same mistake the map's OWN pan/zoom code was just
+                        // fixed for.
+                        .graphicsLayer { alpha = visible.value.coerceIn(0f, 1f) }
+                        .hazeEffect(state = hazeState) {
+                            // Same "strong at the top, none by the bottom" gradient
+                            // StatusBarScrim uses, for the same reason: this scrim
+                            // covers a much taller strip of app than that one does,
+                            // and a flat blur across all of it read as a uniform
+                            // smear with a hard edge at the sheet's own top corner
+                            // rather than a soft transition into it.
+                            progressive = HazeProgressive.verticalGradient(startIntensity = 1f, endIntensity = 0f)
+                        },
+                )
+            }
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null,
+                    ) { close() },
+            )
+        }
         // The sheet itself: bottom-anchored and full-width on EVERY screen size --
         // see this function's own doc for why. `translationY` (not a plain offset)
         // so the same graphicsLayer that slides it in from fully off-screen at
@@ -1351,7 +1396,7 @@ private fun CarMapSheetBody(
                 modifier = Modifier
                     .align(Alignment.TopStart)
                     .padding(horizontal = 16.dp, vertical = 12.dp)
-                    .graphicsLayer { alpha = visible.value }
+                    .graphicsLayer { alpha = visible.value.coerceIn(0f, 1f) }
                     .dropShadow(RoundedCornerShape(50))
                     .appGlassRim(RoundedCornerShape(50)),
             ) {
@@ -1385,7 +1430,7 @@ private fun CarMapSheetBody(
                     .align(Alignment.BottomCenter)
                     .fillMaxWidth()
                     .navigationBarsPadding()
-                    .graphicsLayer { alpha = visible.value },
+                    .graphicsLayer { alpha = visible.value.coerceIn(0f, 1f) },
             )
             // The drag handle -- and, with no ModalBottomSheet swipe gesture of its
             // own underneath this, the ONLY thing on this sheet a user can pull down

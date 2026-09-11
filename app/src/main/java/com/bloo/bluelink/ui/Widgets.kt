@@ -9,6 +9,7 @@ package com.bloo.bluelink.ui
 
 import android.os.Build
 import dev.chrisbanes.haze.HazeState
+import dev.chrisbanes.haze.HazeProgressive
 import dev.chrisbanes.haze.hazeEffect
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.fadeIn
@@ -202,7 +203,17 @@ internal fun StatusBarScrim(
                     // hit an "overload resolution ambiguity" at compile time against this
                     // pinned 1.7.0 (caught by CI); "a bit less strong" is carried entirely
                     // by the gradient's own reduced alpha below instead.
-                    Modifier.hazeEffect(state = hazeState)
+                    //
+                    // `progressive`, not a flat blur: reported directly as wanting the
+                    // blur itself to actually be strong right at the status bar and taper
+                    // to none by this Box's own bottom edge, "like a gradient of blur" --
+                    // a flat blur applied over the whole height read as a uniform smear
+                    // with a hard edge where the Box ended, however soft the TINT above it
+                    // faded. startIntensity/endIntensity is Haze's own blur-radius
+                    // gradient, independent of (and layered under) the tint gradient below.
+                    Modifier.hazeEffect(state = hazeState) {
+                        progressive = HazeProgressive.verticalGradient(startIntensity = 1f, endIntensity = 0f)
+                    }
                 } else {
                     Modifier
                 },
