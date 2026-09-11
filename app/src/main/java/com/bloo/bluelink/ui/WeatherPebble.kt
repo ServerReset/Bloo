@@ -90,6 +90,7 @@ import androidx.compose.ui.layout.layout
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.ColorMatrix
+import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
@@ -739,49 +740,23 @@ internal fun CarMap(
             )
         }
         } // close the scaled tiles/pin/dot layer
+        // FloatingIcon, not a bespoke one-off circle -- the same translucent chrome
+        // every other floating corner button in the app already uses (Guard.kt's
+        // Reload/Settings, the cover screen's own headers), so this reads as "the
+        // app's floating button" rather than a control invented just for the map.
+        // Reported directly as wanting this "more integrated". A smaller outerPadding
+        // than FloatingIcon's own 12dp default keeps its footprint compact enough for
+        // the small cover-screen map tile, which FloatingIcon's usual 72dp corner
+        // clearance was never sized for.
         if (onExpand != null) {
-            MapOverlayIconButton(
+            FloatingIcon(
                 Icons.Filled.Fullscreen,
                 "Expand map",
-                modifier = Modifier.align(Alignment.TopEnd).padding(8.dp),
-                onClick = onExpand,
+                onExpand,
+                modifier = Modifier.align(Alignment.TopEnd),
+                outerPadding = 4.dp,
             )
         }
-    }
-}
-
-/**
- * One small round chrome button floating over the map -- today, just the expand
- * corner button (zoom is pinch-only; see CarMap's own doc). Not [MorphIconButton]:
- * that one is deliberately containerless chrome (see its own doc), which reads fine
- * against a card's flat background but disappears against a map whose colour
- * underneath it is whatever terrain happens to be there. A filled, semi-opaque circle
- * behind the glyph keeps it legible over any tile.
- */
-@Composable
-private fun MapOverlayIconButton(
-    icon: ImageVector,
-    contentDescription: String,
-    modifier: Modifier = Modifier,
-    enabled: Boolean = true,
-    onClick: () -> Unit,
-) {
-    val haptics = LocalHaptics.current
-    Box(
-        modifier
-            .size(32.dp)
-            .alpha(if (enabled) 1f else 0.4f)
-            .clip(CircleShape)
-            .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.85f))
-            .clickable(enabled = enabled) { haptics?.click(); onClick() },
-        contentAlignment = Alignment.Center,
-    ) {
-        Icon(
-            icon,
-            contentDescription = contentDescription,
-            tint = MaterialTheme.colorScheme.onSurface,
-            modifier = Modifier.size(18.dp),
-        )
     }
 }
 
@@ -884,18 +859,11 @@ internal fun CarMapSheet(
     onDismiss: () -> Unit,
 ) {
     val context = LocalContext.current
+    // No close (X) button anymore -- see the header's own comment below -- so this no
+    // longer needs its own "hide, then dismiss" wrapper; ModalBottomSheet's own
+    // onDismissRequest already runs the identical hide animation for a swipe or a
+    // scrim tap, and that is now the only way this closes.
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-    val scope = rememberCoroutineScope()
-    // Runs the sheet's own hide animation (a slide back down, same motion a drag-to-
-    // dismiss ends in) before actually dismissing, so the close button matches
-    // whatever a swipe already does rather than snapping the sheet away instantly.
-    val dismissAnimated = {
-        scope.launch {
-            sheetState.hide()
-            onDismiss()
-        }
-        Unit
-    }
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
@@ -980,23 +948,26 @@ internal fun CarMapSheet(
                     onExpand = null,
                 )
             }
-            Row(
-                Modifier
-                    .align(Alignment.TopCenter)
-                    .fillMaxWidth()
-                    .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.85f))
-                    .padding(horizontal = 20.dp, vertical = 4.dp)
+            // No background band behind the name -- just the map and the floating
+            // buttons, reported directly as wanting no opaque/dark backing between
+            // them. A drop shadow on the text itself carries the legibility job a
+            // solid band used to, the same trick a photo-backed hero title uses
+            // elsewhere in the app.
+            Text(
+                vehicleName,
+                style = MaterialTheme.typography.titleMedium.copy(
+                    shadow = Shadow(Color.Black.copy(alpha = 0.6f), blurRadius = 8f),
+                ),
+                fontWeight = FontWeight.Bold,
+                color = Color.White,
+                modifier = Modifier
+                    .align(Alignment.TopStart)
+                    .padding(horizontal = 20.dp, vertical = 12.dp)
                     .graphicsLayer { alpha = morph.value },
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text(
-                    vehicleName,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier.weight(1f),
-                )
-                FloatingIcon(Icons.Filled.Close, "Close", dismissAnimated)
-            }
+            )
+            // No close (X) button -- swipe-to-dismiss (or tapping the scrim above the
+            // sheet) is already how this closes; a second, redundant affordance for
+            // the same action was reported directly as unwanted clutter.
             MapFeatureRow(
                 features = listOf(
                     MapFeature(Icons.Filled.MyLocation, "Recentre") { sheetMapState.recenter() },
@@ -1010,10 +981,12 @@ internal fun CarMapSheet(
                     //   MapFeature(Icons.Filled.Search, "Nearby") { ... }
                     //   MapFeature(Icons.Filled.Share, "Share location") { ... }
                 ),
+                // No background band here either -- each pill already carries its own
+                // opaque chrome (MorphButton's own container fill), which is plenty of
+                // legibility on its own without a second, full-width tint behind them.
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
                     .fillMaxWidth()
-                    .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.85f))
                     .navigationBarsPadding()
                     .graphicsLayer { alpha = morph.value },
             )

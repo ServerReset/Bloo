@@ -661,14 +661,28 @@ fun ExpressiveButtonGroup(
                     val a = memberIdx[k]; val b = memberIdx[k + 1]
                     // Bilateral, not a shared pooled seam: each side can only ever GIVE what it
                     // holds as its OWN half of this seam's reserve (see seamReserve's own doc for
-                    // why that half is sized off its own content, not its neighbour's). `a`
-                    // pressing draws on `b`'s own half, up to all of it at full press; `b`
-                    // pressing draws on `a`'s own half the other way. At rest (both 0) neither
-                    // side has taken anything from the other yet, so nothing here moves -- each
-                    // side is still just sitting on the half it already reserved for itself.
+                    // why that half is sized off its own content, not its neighbour's). At rest
+                    // (both 0) neither side has taken anything from the other yet, so nothing
+                    // here moves -- each side is still just sitting on the half it already
+                    // reserved for itself.
                     val bHalf = (ExpressivePressGrowth * basis[b]) / 2.0
                     val aHalf = (ExpressivePressGrowth * basis[a]) / 2.0
-                    val delta = press[a] * bHalf - press[b] * aHalf
+                    // The amount EITHER side can gain from this seam is capped by the SMALLER of
+                    // the two halves, not by the size of whichever neighbour happens to be giving.
+                    // `a` pressing used to draw on `b`'s own half outright, and `b` pressing on
+                    // `a`'s -- fine when the two members are close in size, but for a small
+                    // icon-only chevron sitting next to a much LARGER labelled action, pressing
+                    // the small chevron let it draw on the action's own (much bigger) half and
+                    // grow by an amount scaled to the ACTION's size, not its own -- ballooning
+                    // far past what the chevron's own footprint would ever ask for. Reported
+                    // directly on the AI pebble's "Summarize" action + chevron, the longest
+                    // header-action label in the app: pressing the chevron visibly overshot.
+                    // Capping both directions at the smaller half keeps typical same-sized pairs
+                    // (the overwhelming majority) identical to before, since their two halves are
+                    // already close, and bounds the size-mismatched case to the smaller member's
+                    // own comfortable growth instead of its bigger neighbour's.
+                    val seamCapacity = minOf(aHalf, bHalf)
+                    val delta = press[a] * seamCapacity - press[b] * seamCapacity
                     exact[a] += delta
                     exact[b] -= delta
                 }

@@ -185,7 +185,10 @@ internal fun StatusBarScrim(
     Box(
         Modifier
             .fillMaxWidth()
-            .height(topInset + 28.dp)
+            // 20dp, down from 28dp -- reported directly as "too tall", reaching far
+            // enough into the content below it to visibly overlap floating chrome
+            // (a segmented toggle, page dots) that sits just past its own edge.
+            .height(topInset + 20.dp)
             .then(
                 if (hazeState != null && canBlur && active) {
                     // The actual fix: blurs whatever is really drawn behind this scrim, via
