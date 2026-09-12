@@ -504,29 +504,30 @@ internal fun rememberRelativeTime(millis: Long?): String? {
  * Small pill-shaped fact badge -- [CarHeaderRow]'s own model/powertrain and
  * "updated x ago" facts, which used to be two stacked plain caption lines
  * with no container of their own, reading as an afterthought next to the
- * rest of the app's chip/pill chrome. A muted [surfaceContainerHigh] fill,
- * not the floating pills' glass treatment -- this sits on the app's own
- * ordinary surface, not over an unpredictable photo, so it doesn't need
- * that treatment's guaranteed contrast, just enough of a container to read
- * as a distinct fact rather than body text bleeding into the row beside it.
+ * rest of the app's chip/pill chrome.
  *
- * A thin [appGlassRim] outline now goes with that fill -- reported directly
- * as effectively invisible ("the refresh icon has no background") on the
- * wide/dual-car layout's header row, which floats these directly over the
- * app's plain black background rather than a themed surface: a flat
- * `surfaceContainerHigh` fill with no edge of its own can end up close
- * enough in luminance to plain black to read as no container at all. A rim
- * guarantees a visible edge regardless of what's actually behind it, the
- * same reasoning every OTHER floating pill in the app (the map's own name
- * pill, FloatingIcon) already uses.
+ * Now uses the SAME floating-pill glass treatment as everything else that
+ * has to stay legible over unpredictable content (the map's own name pill,
+ * FloatingIcon): [glassContainerAlpha]'s tinted, mostly-opaque fill plus
+ * [appGlassRim]'s rim and a [dropShadow]. A flat, un-rimmed
+ * `surfaceContainerHigh` (this composable's original design, on the theory
+ * it only ever sits on the app's own ordinary surface) was reported TWICE
+ * as effectively invisible -- "no background", then "no background circle"
+ * -- on the wide/dual-car layout's header row, which floats these directly
+ * over the app's plain black background: that flat fill's luminance can
+ * land close enough to black to read as no container at all, and a thin
+ * rim alone (the first attempted fix here) still wasn't a strong enough
+ * signal on its own. This is the same fill/rim/shadow combination the map
+ * sheet's own vehicle-name pill already uses successfully for exactly this
+ * "floats over anything, must always read as a chip" requirement.
  */
 @Composable
 internal fun MetaChip(text: String, modifier: Modifier = Modifier, icon: ImageVector? = null) {
     Surface(
         shape = RoundedCornerShape(50),
-        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        color = MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = glassContainerAlpha()),
         contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
-        modifier = modifier.appGlassRim(RoundedCornerShape(50)),
+        modifier = modifier.dropShadow(RoundedCornerShape(50)).appGlassRim(RoundedCornerShape(50)),
     ) {
         Row(
             Modifier.padding(horizontal = 10.dp, vertical = 5.dp),

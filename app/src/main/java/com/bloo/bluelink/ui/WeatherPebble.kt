@@ -131,9 +131,12 @@ import com.bloo.bluelink.data.WeatherCode
 import com.bloo.bluelink.data.coordString
 import com.bloo.bluelink.data.links
 import com.bloo.bluelink.data.formatSpeed
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlin.math.floor
 import kotlin.math.roundToInt
@@ -852,44 +855,70 @@ internal fun CarMap(
             }
         }
 
-        // Warms Coil's cache for the NEXT whole zoom level in either direction, every
-        // time this one settles -- reported directly as pinching in/out being "pretty
-        // slow" because it "has to refresh all the tiles". Crossing an octave boundary
-        // (see CarMapState.pinch) always needs genuinely different tiles; the tiles
-        // AREN'T cached yet is the actual latency, not anything about how they're
-        // requested. Keyed on zoom alone (not the live pinch scale, which changes every
-        // gesture frame): this fires once per whole level actually entered, prefetching
-        // its two immediate neighbours so pinching one step further -- overwhelmingly
-        // the common case, a user zooming past where they started rather than jumping
-        // straight to some level three away -- is a cache hit instead of a fresh fetch.
-        // Fire-and-forget via the ImageLoader directly (Coil dedupes an identical
-        // in-flight request against this CarMap's own AsyncImage calls, so this never
-        // fetches anything twice); nothing here is ever displayed on its own.
+        // Warms Coil's cache for the NEXT whole zoom level in either direction, once
+        // this one has been settled on for a moment -- reported directly as pinching
+        // in/out being "pretty slow" because it "has to refresh all the tiles".
+        // Crossing an octave boundary (see CarMapState.pinch) always needs genuinely
+        // different tiles; the tiles AREN'T cached yet is the actual latency, not
+        // anything about how they're requested.
+        //
+        // Two things this got wrong the first time, both reported directly as making
+        // rapid pinching feel SLOWER than before this existed at all:
+        //  1. loader.enqueue() starts its network fetch immediately and doesn't tie
+        //     its own lifecycle to the calling coroutine -- cancelling this
+        //     LaunchedEffect (which a fast zoom change does constantly, since it's
+        //     keyed on `zoom`) stopped the FOR LOOP from enqueueing further tiles,
+        //     but every request already handed to Coil kept running regardless.
+        //     Someone "poking in or out really quickly" crosses several octaves in
+        //     under a second, and each one fired off a fresh batch that never
+        //     actually got cancelled -- competing with the VISIBLE tiles' own
+        //     requests for the same small pool of OkHttp connections. `delay(300)`
+        //     up front fixes this the same way any other debounce does: a rapid
+        //     sequence of zoom changes just keeps restarting this delay, and only
+        //     the level the gesture actually settles on ever reaches the code below.
+        //  2. Even the delayed batch could still outlive its own usefulness if the
+        //     user moves on before it finishes -- now explicitly disposed in a
+        //     `finally` the moment a newer zoom supersedes it, so a superseded
+        //     prefetch stops actively competing for bandwidth instead of finishing
+        //     as though it still mattered.
         LaunchedEffect(zoom, xTileF, yTileF, wPx, hPx) {
             if (wPx <= 0f || hPx <= 0f) return@LaunchedEffect
+            delay(300)
             val loader = context.imageLoader
             val halfTilesX = wPx / tilePx / 2f + 1f
             val halfTilesY = hPx / tilePx / 2f + 1f
-            for (targetZoom in intArrayOf(zoom - 1, zoom + 1)) {
-                if (targetZoom < CarMapMinZoom || targetZoom > CarMapMaxZoom) continue
-                val cx = MapTiles.tileX(location.longitude, targetZoom)
-                val cy = MapTiles.tileY(location.latitude, targetZoom)
-                val span = MapTiles.span(targetZoom)
-                val firstX = floor(cx - halfTilesX).toInt()
-                val lastX = floor(cx + halfTilesX).toInt()
-                val firstY = floor(cy - halfTilesY).toInt().coerceAtLeast(0)
-                val lastY = floor(cy + halfTilesY).toInt().coerceAtMost(span - 1)
-                for (tx in firstX..lastX) {
-                    for (ty in firstY..lastY) {
-                        val wrappedX = MapTiles.wrapX(tx, targetZoom)
-                        loader.enqueue(
-                            ImageRequest.Builder(context)
-                                .data(MapTiles.tileUrl(targetZoom, wrappedX, ty))
-                                .setHeader("User-Agent", MapTiles.userAgent("Android"))
-                                .build(),
-                        )
+            val disposables = mutableListOf<coil.request.Disposable>()
+            try {
+                for (targetZoom in intArrayOf(zoom - 1, zoom + 1)) {
+                    if (targetZoom < CarMapMinZoom || targetZoom > CarMapMaxZoom) continue
+                    val cx = MapTiles.tileX(location.longitude, targetZoom)
+                    val cy = MapTiles.tileY(location.latitude, targetZoom)
+                    val span = MapTiles.span(targetZoom)
+                    val firstX = floor(cx - halfTilesX).toInt()
+                    val lastX = floor(cx + halfTilesX).toInt()
+                    val firstY = floor(cy - halfTilesY).toInt().coerceAtLeast(0)
+                    val lastY = floor(cy + halfTilesY).toInt().coerceAtMost(span - 1)
+                    for (tx in firstX..lastX) {
+                        for (ty in firstY..lastY) {
+                            // A plain enqueue() call has no suspension point of its own
+                            // for cancellation to interrupt -- without this explicit
+                            // check, a whole tight loop of them runs to completion
+                            // regardless of a newer zoom superseding this effect the
+                            // instant it starts, defeating the debounce above for
+                            // anything already past its `delay(300)`.
+                            currentCoroutineContext().ensureActive()
+                            val wrappedX = MapTiles.wrapX(tx, targetZoom)
+                            disposables += loader.enqueue(
+                                ImageRequest.Builder(context)
+                                    .data(MapTiles.tileUrl(targetZoom, wrappedX, ty))
+                                    .setHeader("User-Agent", MapTiles.userAgent("Android"))
+                                    .build(),
+                            )
+                        }
                     }
                 }
+            } finally {
+                if (!currentCoroutineContext().isActive) disposables.forEach { it.dispose() }
             }
         }
 
