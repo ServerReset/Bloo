@@ -5,6 +5,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ripple
@@ -14,8 +15,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.graphicsLayer
 import com.bloo.uicommon.dropShadow
 import dev.chrisbanes.haze.HazeState
 import dev.chrisbanes.haze.hazeEffect
@@ -166,5 +169,48 @@ internal fun GlassSurface(
         CompositionLocalProvider(LocalContentColor provides contentColor) {
             content()
         }
+    }
+}
+
+/**
+ * The full-screen dim+blur scrim behind an expanded map sheet -- shared by
+ * [ExpandableMapLayer] and [CarMapSheetBody] (WeatherPebble.kt), which used to each
+ * carry a byte-for-byte identical copy of this exact two-Box chain, right down to
+ * the same 0.35/0.5 alpha constants.
+ *
+ * [progress] is a LAMBDA, not a plain `Float`, on purpose: every read of it here
+ * happens inside `drawBehind`/`graphicsLayer` blocks, i.e. at DRAW time, not
+ * composition time. A plain `Float` parameter would still type-check, but passing
+ * one computed from `someAnimatable.value` at the CALL SITE reads that value at
+ * composition time to build the argument -- which is exactly the mistake both
+ * original copies of this code were once fixed for (see either call site's own
+ * history): it recomposed the entire sheet -- the map's tile loop, every button --
+ * on every single frame of the open/close spring. Taking a lambda instead makes
+ * that mistake impossible to reintroduce by accident at a future call site: there
+ * is no way to pass one without wrapping the read in `{ }`.
+ *
+ * Deliberately its own thing rather than a [GlassSurface] mode: a full-screen scrim
+ * has no shape to clip to, no rim/shadow edge (there's no edge, it fills the
+ * screen), and no content slot -- fusing it into [GlassSurface] would mean adding
+ * parameters to that function that only ever make sense for this one shape.
+ */
+@Composable
+internal fun ScrimBlur(hazeState: HazeState?, progress: () -> Float, modifier: Modifier = Modifier) {
+    Box(
+        modifier
+            .fillMaxSize()
+            .drawBehind {
+                drawRect(Color.Black, alpha = (if (hazeState != null) 0.35f else 0.5f) * progress().coerceIn(0f, 1f))
+            },
+    )
+    if (hazeState != null) {
+        Box(
+            modifier
+                .fillMaxSize()
+                .graphicsLayer { alpha = progress().coerceIn(0f, 1f) }
+                .hazeEffect(state = hazeState) {
+                    progressive = StandardBlurProgressive
+                },
+        )
     }
 }

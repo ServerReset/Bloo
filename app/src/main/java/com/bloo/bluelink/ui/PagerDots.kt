@@ -38,8 +38,6 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
-import androidx.compose.material3.surfaceColorAtElevation
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -63,7 +61,6 @@ import androidx.compose.foundation.gestures.awaitLongPressOrCancellation
 import androidx.compose.foundation.gestures.verticalDrag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import com.bloo.uicommon.dropShadow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
@@ -201,16 +198,25 @@ internal fun VerticalPagerDots(
             },
         contentAlignment = Alignment.CenterEnd,
     ) {
-        Surface(
+        // GlassSurface (GlassChrome.kt), not a plain Surface: `surfaceColorAtElevation`
+        // blends `surface` toward `primary` by an elevation-based fraction -- it reads as
+        // MORE hue-independent than `surfaceContainerHighest` at low elevations, but it is
+        // the exact same family of bug already fixed everywhere else this session (a
+        // "neutral"-sounding token that is not actually hue-independent under this app's
+        // dynamic palette), just a subtler version of it on a pill that floats over the
+        // same unpredictable car-photo backgrounds every other piece of glass chrome does.
+        // No HazeState in scope on this screen yet (a real blur here is a future follow-up,
+        // not a regression) -- glassTint's flat fallback, scaled by the same "a bit more
+        // solid while actively scrubbing" boost the original alpha animation gave it.
+        val baseTint = glassTint(blurred = false)
+        GlassSurface(
+            shape = RoundedCornerShape(cornerRadius),
             modifier = Modifier
                 // Same gap as PagerDots below -- only ever had Material's own weak
                 // tonal shadowElevation, no real shadow or rim, on a pill that
                 // floats over the same unpredictable car-photo backgrounds.
-                .ambientRing(RoundedCornerShape(cornerRadius))
-                .dropShadow(RoundedCornerShape(cornerRadius))
-                .frostedRim(RoundedCornerShape(cornerRadius)),
-            shape = RoundedCornerShape(cornerRadius),
-            color = MaterialTheme.colorScheme.surfaceColorAtElevation(6.dp).copy(alpha = surfaceAlpha),
+                .ambientRing(RoundedCornerShape(cornerRadius)),
+            tint = baseTint.copy(alpha = (baseTint.alpha * (surfaceAlpha / 0.7f)).coerceIn(0f, 1f)),
         ) {
             Column(
                 Modifier.padding(horizontal = hPad, vertical = vPad),
@@ -324,7 +330,12 @@ internal fun PagerDotsFor(
         inactive = MaterialTheme.colorScheme.outlineVariant,
         ringTrack = MaterialTheme.colorScheme.surfaceVariant,
         ringFill = MaterialTheme.colorScheme.primary,
-        pill = MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = glassContainerAlpha()),
+        // glassTint(blurred = false): same neutral, hue-independent fallback fill as
+        // every other glass chip in the app, not the flatly-blue surfaceContainerHighest
+        // token -- this pill is a plain Color parameter into :uicommon's own PagerDots,
+        // so it can't host GlassSurface itself (same reason as Pebbles.kt's own PTR
+        // indicator).
+        pill = glassTint(blurred = false),
     )
     com.bloo.uicommon.PagerDots(
         current = real(pager.currentPage),

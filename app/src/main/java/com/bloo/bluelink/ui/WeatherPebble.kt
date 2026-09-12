@@ -90,7 +90,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
-import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.graphics.Color
@@ -1398,23 +1397,7 @@ internal fun ExpandableMapLayer(
         // screen, not just the sheet: this is what shows through the top 15%
         // strip the sheet itself doesn't reach.
         if (isExpanded) {
-            Box(
-                Modifier
-                    .fillMaxSize()
-                    .drawBehind {
-                        drawRect(Color.Black, alpha = (if (hazeState != null) 0.35f else 0.5f) * expandFraction.value.coerceIn(0f, 1f))
-                    }
-            )
-            if (hazeState != null) {
-                Box(
-                    Modifier
-                        .fillMaxSize()
-                        .graphicsLayer { alpha = expandFraction.value.coerceIn(0f, 1f) }
-                        .hazeEffect(state = hazeState) {
-                            progressive = StandardBlurProgressive
-                        }
-                )
-            }
+            ScrimBlur(hazeState = hazeState, progress = { expandFraction.value })
             Box(
                 Modifier
                     .fillMaxSize()
@@ -1730,63 +1713,13 @@ private fun CarMapSheetBody(
         // The scrim -- dims (and, with a real hazeState, blurs) the app behind the
         // sheet, and a tap on it dismisses.
         Box(Modifier.fillMaxSize()) {
-            // The flat tint alone, present from the first frame -- fades in/out
-            // with [visible] rather than being either fully on or fully off the
-            // instant this composes. Clamped to [0, 1]: unlike the scale/
-            // translation elsewhere in this function, an overshoot past 1 from
-            // the open spring's own bounce (see its own doc) has no sensible
-            // meaning for an alpha, which both Color and graphicsLayer expect in
-            // that range regardless.
-            //
-            // drawBehind, NOT `.background(Color.Black.copy(alpha = ...))`: the
-            // latter takes a plain Color, computed while building the Modifier
-            // chain -- i.e. read at COMPOSITION time, not draw time -- so reading
-            // `visible.value` there recomposed this entire sheet (the map's own
-            // tile loop, the button row, everything) on every single frame of
-            // the open/close spring, real and reported directly as bad
-            // performance/a broken-looking animation. drawBehind's lambda is a
-            // draw-phase read, same as the graphicsLayer{} blocks everywhere else
-            // in this function: the colour updates every frame without ever
-            // triggering a recomposition.
-            Box(
-                Modifier
-                    .fillMaxSize()
-                    .drawBehind {
-                        drawRect(Color.Black, alpha = (if (hazeState != null) 0.35f else 0.5f) * visible.value.coerceIn(0f, 1f))
-                    },
-            )
-            // The real blur, layered on top and CROSSFADED in over the flat tint
-            // above via its own alpha -- Haze's own blur intensity has no
-            // reliably animatable hook on this pinned 1.7.0 (the same library
-            // version whose `hazeEffect(state=, style=)` two-arg overload already
-            // hit a compile-time "overload ambiguity" once), so rather than
-            // gamble on a second uncertain API surface, the ALREADY fully-blurred
-            // layer simply fades in as a whole, the same graphicsLayer-alpha
-            // technique every other reveal in this file already uses. Reported
-            // directly as wanting the blur's own opening/closing refined, not
-            // just popping fully blurred in on the first frame.
-            if (hazeState != null) {
-                Box(
-                    Modifier
-                        .fillMaxSize()
-                        // Read inside the lambda (layout/draw-phase), not hoisted
-                        // to a composable-scope val -- the latter would force a
-                        // full recomposition of this whole sheet on every single
-                        // animation frame instead of a cheap draw-phase update,
-                        // the same mistake the map's OWN pan/zoom code was just
-                        // fixed for.
-                        .graphicsLayer { alpha = visible.value.coerceIn(0f, 1f) }
-                        .hazeEffect(state = hazeState) {
-                            // Same "strong at the top, none by the bottom" gradient
-                            // StatusBarScrim uses, for the same reason: this scrim
-                            // covers a much taller strip of app than that one does,
-                            // and a flat blur across all of it read as a uniform
-                            // smear with a hard edge at the sheet's own top corner
-                            // rather than a soft transition into it.
-                            progressive = StandardBlurProgressive
-                        },
-                )
-            }
+            // ScrimBlur (GlassChrome.kt): the exact same dim+blur scrim
+            // ExpandableMapLayer's own full-screen overlay uses -- this sheet used to
+            // carry a byte-for-byte identical copy of that Box chain, right down to
+            // reading `visible`/`expandFraction` inside a draw-phase lambda instead
+            // of at composition time (see ScrimBlur's own doc for why that distinction
+            // is load-bearing here, not stylistic).
+            ScrimBlur(hazeState = hazeState, progress = { visible.value })
             Box(
                 Modifier
                     .fillMaxSize()

@@ -350,7 +350,14 @@ internal fun CompactGarage(state: UiState, vm: AppViewModel, appearance: Setting
                     .offset(x = band.xDp.dp, y = band.yDp.dp)
                     .width(band.widthDp.dp)
                     .height(band.heightDp.dp)
-                    .background(MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = glassContainerAlpha()), bandShape)
+                    // glassTint(blurred = false), not surfaceContainerHighest: this cover
+                    // screen has no HazeState of its own to blur (a real blur here is a
+                    // future follow-up, not a regression), but the flat fallback fill
+                    // should still be the same hue-independent black/white every other
+                    // glass chip in the app already uses -- see MetaChip's own doc for
+                    // why a "neutral" tonal role isn't actually hue-independent under
+                    // this app's dynamic palette.
+                    .background(glassTint(blurred = false), bandShape)
                     .ambientRing(bandShape)
                     .dropShadow(bandShape)
                     .frostedRim(bandShape)
