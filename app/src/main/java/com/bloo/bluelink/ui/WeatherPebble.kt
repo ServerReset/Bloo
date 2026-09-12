@@ -120,6 +120,7 @@ import dev.chrisbanes.haze.HazeState
 import dev.chrisbanes.haze.hazeEffect
 import dev.chrisbanes.haze.hazeSource
 import coil.compose.AsyncImage
+import coil.imageLoader
 import coil.request.ImageRequest
 import com.bloo.uicommon.dropShadow
 import com.bloo.bluelink.data.GeoLocation
@@ -851,6 +852,47 @@ internal fun CarMap(
             }
         }
 
+        // Warms Coil's cache for the NEXT whole zoom level in either direction, every
+        // time this one settles -- reported directly as pinching in/out being "pretty
+        // slow" because it "has to refresh all the tiles". Crossing an octave boundary
+        // (see CarMapState.pinch) always needs genuinely different tiles; the tiles
+        // AREN'T cached yet is the actual latency, not anything about how they're
+        // requested. Keyed on zoom alone (not the live pinch scale, which changes every
+        // gesture frame): this fires once per whole level actually entered, prefetching
+        // its two immediate neighbours so pinching one step further -- overwhelmingly
+        // the common case, a user zooming past where they started rather than jumping
+        // straight to some level three away -- is a cache hit instead of a fresh fetch.
+        // Fire-and-forget via the ImageLoader directly (Coil dedupes an identical
+        // in-flight request against this CarMap's own AsyncImage calls, so this never
+        // fetches anything twice); nothing here is ever displayed on its own.
+        LaunchedEffect(zoom, xTileF, yTileF, wPx, hPx) {
+            if (wPx <= 0f || hPx <= 0f) return@LaunchedEffect
+            val loader = context.imageLoader
+            val halfTilesX = wPx / tilePx / 2f + 1f
+            val halfTilesY = hPx / tilePx / 2f + 1f
+            for (targetZoom in intArrayOf(zoom - 1, zoom + 1)) {
+                if (targetZoom < CarMapMinZoom || targetZoom > CarMapMaxZoom) continue
+                val cx = MapTiles.tileX(location.longitude, targetZoom)
+                val cy = MapTiles.tileY(location.latitude, targetZoom)
+                val span = MapTiles.span(targetZoom)
+                val firstX = floor(cx - halfTilesX).toInt()
+                val lastX = floor(cx + halfTilesX).toInt()
+                val firstY = floor(cy - halfTilesY).toInt().coerceAtLeast(0)
+                val lastY = floor(cy + halfTilesY).toInt().coerceAtMost(span - 1)
+                for (tx in firstX..lastX) {
+                    for (ty in firstY..lastY) {
+                        val wrappedX = MapTiles.wrapX(tx, targetZoom)
+                        loader.enqueue(
+                            ImageRequest.Builder(context)
+                                .data(MapTiles.tileUrl(targetZoom, wrappedX, ty))
+                                .setHeader("User-Agent", MapTiles.userAgent("Android"))
+                                .build(),
+                        )
+                    }
+                }
+            }
+        }
+
         // Everything below (tiles, pin, device dot) sits inside its own scaled layer --
         // NOT the outer Box, which also hosts the expand button (CarMap's own doc) and
         // must stay at 1x regardless of how far a pinch has scaled the map itself.
@@ -895,7 +937,22 @@ internal fun CarMap(
                             // i.e. still shaped like the string that gets blocked, while
                             // the widget and watch had already been fixed.
                             .setHeader("User-Agent", MapTiles.userAgent("Android"))
-                            .crossfade(true)
+                            // No crossfade. Coil only skips its own crossfade animation
+                            // for an exact MEMORY cache hit -- a DISK cache hit (or a
+                            // genuinely fresh fetch) still fades in. That mattered a lot
+                            // here specifically: the pebble's compact map and the full-
+                            // screen sheet are two SEPARATE CarMap composables (see
+                            // ExpandedMapState's own doc), so expanding mounts a second,
+                            // brand-new grid of AsyncImage tiles requesting the exact
+                            // same URLs the pebble was already showing -- reported
+                            // directly as pinch-zoom and the expand/collapse transition
+                            // both feeling like the map "has to refresh" rather than
+                            // being instant/seamless. A flat, no-fade appearance means a
+                            // cache hit (memory OR disk -- the overwhelmingly common case
+                            // here) is visually indistinguishable from "was already
+                            // there", and a genuine new fetch just pops in the moment
+                            // it's ready instead of visibly announcing itself.
+                            .crossfade(false)
                             .build()
                     }
                     AsyncImage(
