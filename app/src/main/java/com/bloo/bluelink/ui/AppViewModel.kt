@@ -2790,13 +2790,14 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                     ),
                 )
             }
+            // Hands this SAME fused-location fix to the weather-follows-device path
+            // (its own persisted flag, checked inside) rather than letting it do its
+            // own separate LocationManager fetch -- see
+            // WeatherController.refreshDeviceLocationForWeather's own doc for why:
+            // reported directly as the map's device dot, the home weather card and
+            // "distance to car" not agreeing on where "here" is.
+            weather.refreshDeviceLocationForWeather(loc)
         }
-        // Separate from the fetch above -- a different location API path
-        // (LocationManager, via SettingsStore.setWeatherFromDeviceLocation) and its
-        // own persisted "follows device" flag, but the same three call sites and
-        // the same underlying bug report: see WeatherController.refreshDeviceLocationForWeather's
-        // own doc.
-        weather.refreshDeviceLocationForWeather()
     }
 
     fun locate(v: Vehicle) = runCommand(v.vin, "locate", "Location updated", optimistic = null) {

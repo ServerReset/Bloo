@@ -870,6 +870,13 @@ internal fun GarageScreen(state: State<UiState>, vm: AppViewModel) {
                 deviceLocation = state.value.deviceLocation,
                 mapState = expandedMap.mapStateFor(expandedVehicle.vin),
                 hazeState = hazeState,
+                lastFetchedAt = state.value.fetchedAt(expandedVehicle),
+                // Same entry point the pebble's own "Locate" button uses --
+                // refreshes the car's position AND (see AppViewModel.
+                // refreshDeviceLocation's own doc) the device's, from the one
+                // fused-location fix both the map's dot and the weather
+                // pebble now share.
+                onRefreshLocation = { vm.locate(expandedVehicle) },
                 onDismiss = { expandedMap.vin = null },
             )
         }

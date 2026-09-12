@@ -2610,27 +2610,41 @@ class SettingsStore(private val context: Context) {
      *  screen's "My location" action and the watch's equivalent (relayed
      *  through WearPhoneService, since the watch has no weather fetch of its
      *  own). Returns false when no location is available (e.g. permission
-     *  never granted on this device) so the caller can report that clearly. */
-    suspend fun setWeatherFromDeviceLocation(): Boolean {
-        // GetLastKnownLocation requires an active location grant; fail fast and
-        // explicitly instead of relying on the SecurityException throw inside
-        // the runCatching below to do the same thing. Keep the runCatching
-        // anyway -- TIME is revoked mid-call by the user sometimes, and a
-        // missed weather label must never crash a settings click.
-        if (androidx.core.app.ActivityCompat.checkSelfPermission(
-                context, android.Manifest.permission.ACCESS_COARSE_LOCATION,
-            ) != android.content.pm.PackageManager.PERMISSION_GRANTED
-        ) {
-            return false
+     *  never granted on this device) so the caller can report that clearly.
+     *
+     *  [preloaded], when given, is used AS-IS instead of this function doing
+     *  its own LocationManager fetch -- specifically so AppViewModel's periodic
+     *  device-location refresh (fused location, the same fix that becomes
+     *  [com.bloo.bluelink.ui.UiState.deviceLocation] and the dot drawn on the
+     *  car map) and the weather-follows-device location are the SAME reading,
+     *  not two independently-fetched ones that can legitimately disagree by
+     *  city blocks. Reported directly: the map's device dot, the home weather
+     *  card and "how far is the car from me" could each show a different spot
+     *  for "here". Callers with no pre-fetched location (the Settings screen's
+     *  manual "My location" button, the watch's own relayed request) still get
+     *  the original LocationManager-based fetch below. */
+    suspend fun setWeatherFromDeviceLocation(preloaded: android.location.Location? = null): Boolean {
+        val loc = preloaded ?: run {
+            // GetLastKnownLocation requires an active location grant; fail fast and
+            // explicitly instead of relying on the SecurityException throw inside
+            // the runCatching below to do the same thing. Keep the runCatching
+            // anyway -- TIME is revoked mid-call by the user sometimes, and a
+            // missed weather label must never crash a settings click.
+            if (androidx.core.app.ActivityCompat.checkSelfPermission(
+                    context, android.Manifest.permission.ACCESS_COARSE_LOCATION,
+                ) != android.content.pm.PackageManager.PERMISSION_GRANTED
+            ) {
+                return false
+            }
+            runCatching {
+                val lm = context.getSystemService(android.content.Context.LOCATION_SERVICE) as android.location.LocationManager
+                listOf(
+                    android.location.LocationManager.GPS_PROVIDER,
+                    android.location.LocationManager.NETWORK_PROVIDER,
+                    android.location.LocationManager.PASSIVE_PROVIDER,
+                ).firstNotNullOfOrNull { p -> runCatching { lm.getLastKnownLocation(p) }.getOrNull() }
+            }.getOrNull() ?: return false
         }
-        val loc = runCatching {
-            val lm = context.getSystemService(android.content.Context.LOCATION_SERVICE) as android.location.LocationManager
-            listOf(
-                android.location.LocationManager.GPS_PROVIDER,
-                android.location.LocationManager.NETWORK_PROVIDER,
-                android.location.LocationManager.PASSIVE_PROVIDER,
-            ).firstNotNullOfOrNull { p -> runCatching { lm.getLastKnownLocation(p) }.getOrNull() }
-        }.getOrNull() ?: return false
         val label = runCatching {
             android.location.Geocoder(context, java.util.Locale.getDefault())
                 .getFromLocation(loc.latitude, loc.longitude, 1)?.firstOrNull()?.let { a ->

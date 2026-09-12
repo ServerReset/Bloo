@@ -75,10 +75,17 @@ internal class WeatherController(
      * step on the same schedule. Fails soft and silently (no `state.message`) on a
      * missing fix: this is a background refresh nobody explicitly asked for right now,
      * not a user-initiated action that deserves an error toast.
+     *
+     * [preloaded] is that same-schedule guarantee made literal: AppViewModel passes the
+     * exact fused-location fix it just used for [UiState.deviceLocation] (the one drawn
+     * as the dot on the car map), so this ends up storing THE SAME reading as the
+     * weather location instead of a second, independently-fetched one that could
+     * legitimately disagree with it -- reported directly as the map dot, the home
+     * weather card and "distance to car" not agreeing on where "here" is.
      */
-    fun refreshDeviceLocationForWeather() = scope.launch {
+    fun refreshDeviceLocationForWeather(preloaded: android.location.Location? = null) = scope.launch {
         if (!settingsStore.appearance.first().weatherFollowsDevice) return@launch
-        if (withContext(Dispatchers.IO) { settingsStore.setWeatherFromDeviceLocation() }) {
+        if (withContext(Dispatchers.IO) { settingsStore.setWeatherFromDeviceLocation(preloaded) }) {
             loadHomeWeather(force = true)
         }
     }

@@ -28,6 +28,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.material3.ripple
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -1130,9 +1131,21 @@ internal fun CarMapSheet(
 
 /**
  * THE single CarMap instance, repositionable between pebble and full-screen.
- * Literally one Box growing from the pebble location to fill the screen.
- * Not two separate maps or a morphing animation -- the actual component
- * expanding with smooth size/position animation.
+ * Literally one Box growing from the pebble location to a SHEET -- the bottom
+ * 85% of the screen, not the whole thing -- with the top 15% left showing the
+ * blurred/dimmed app behind it, same shape [CarMapSheetBody] always used.
+ * Reported directly: the sheet was covering the entire screen edge to edge,
+ * and its drag handle sat glued to the literal top of the screen instead of
+ * near the top of the sheet itself.
+ *
+ * Getting the "grow from the pebble, no distortion" morph right against a
+ * TARGET smaller than the full screen means the map's own Box must already,
+ * for real (not via a graphicsLayer trick), be laid out at that final 85%-
+ * height/bottom-anchored size -- exactly [CarMapSheetBody]'s own technique.
+ * A graphicsLayer scale toward a box whose OWN natural size is the full
+ * screen (this composable's very first version) can only ever reach 1.0,
+ * i.e. the full screen, at rest -- there is no way to "scale down" to a
+ * smaller resting size without visibly squashing the map along the way.
  */
 @Composable
 internal fun ExpandableMapLayer(
@@ -1143,36 +1156,52 @@ internal fun ExpandableMapLayer(
     deviceLocation: GeoLocation?,
     mapState: CarMapState,
     hazeState: HazeState?,
+    lastFetchedAt: Long?,
+    onRefreshLocation: () -> Unit,
     onDismiss: () -> Unit,
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    val density = LocalDensity.current
     val mapHazeState = remember { HazeState() }
 
-    // Animate from pebble size to full screen
-    val expandFraction = remember { Animatable(if (isExpanded) 1f else 0f) }
+    // Animate from pebble size to full screen. Always starts at 0f: GarageScreen
+    // only ever composes this with isExpanded=true (it stops rendering the whole
+    // composable on close, rather than passing false) -- so `isExpanded` never
+    // actually changes across this composable's lifetime, and initializing the
+    // Animatable from it (`Animatable(if (isExpanded) 1f else 0f)`, the previous
+    // version here) meant it started AT 1f on every mount, skipping the pop-out-
+    // of-the-pebble open animation entirely. LaunchedEffect(Unit), not
+    // keyed on isExpanded, for the same reason: that key never changes, so this
+    // still runs exactly once per mount -- i.e. once per expand -- which is
+    // exactly the intent.
+    val expandFraction = remember { Animatable(0f) }
 
-    LaunchedEffect(isExpanded) {
+    LaunchedEffect(Unit) {
         expandFraction.animateTo(
-            if (isExpanded) 1f else 0f,
+            1f,
             animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMediumLow)
         )
     }
 
-    // Captured at full-screen layout
-    var fullBounds by remember { mutableStateOf<Rect?>(null) }
-
-    // Back handler for closing
-    BackHandler(enabled = isExpanded) {
+    fun close() {
         scope.launch {
             expandFraction.animateTo(0f, animationSpec = spring(dampingRatio = 0.95f, stiffness = Spring.StiffnessMedium))
             onDismiss()
         }
     }
 
+    // Captured at the SHEET's own real layout -- 85% height, bottom-anchored,
+    // full width -- not the whole screen. This is the "full" target the morph
+    // below scales the pebble up to.
+    var sheetBounds by remember { mutableStateOf<Rect?>(null) }
+
+    // Back handler for closing
+    BackHandler(enabled = isExpanded) { close() }
+
     Box(Modifier.fillMaxSize()) {
-        // Scrim background (dims/blurs content behind)
+        // Scrim background (dims/blurs content behind) -- covers the WHOLE
+        // screen, not just the sheet: this is what shows through the top 15%
+        // strip the sheet itself doesn't reach.
         if (isExpanded) {
             Box(
                 Modifier
@@ -1197,140 +1226,164 @@ internal fun ExpandableMapLayer(
                     .clickable(
                         interactionSource = remember { MutableInteractionSource() },
                         indication = null,
-                    ) {
-                        scope.launch {
-                            expandFraction.animateTo(0f, animationSpec = spring(dampingRatio = 0.95f, stiffness = Spring.StiffnessMedium))
-                            onDismiss()
-                        }
-                    }
+                    ) { close() }
             )
         }
 
-        // The map container - single Box that animates from pebble to full-screen
-        // Using graphicsLayer to scale and position, creating the visual effect
-        // of the same Box growing without morphing or scale tricks
+        // The sheet: bottom-anchored, full-width, 85% of the screen's height --
+        // its OWN real layout size (not a graphicsLayer trick), so the morph
+        // below scales toward a target that's actually this size instead of
+        // the whole screen. Everything belonging to "the sheet" (map, name
+        // pill, buttons, drag handle) lives inside it now, so their alignments
+        // anchor to the SHEET's own edges, not the screen's.
         Box(
             Modifier
-                .fillMaxSize()
+                .align(Alignment.BottomCenter)
+                .fillMaxWidth()
+                .fillMaxHeight(0.85f)
+                .onGloballyPositioned { sheetBounds = Rect(it.positionOnScreen(), it.size.toSize()) }
                 .graphicsLayer {
+                    val full = sheetBounds
                     val t = expandFraction.value.coerceIn(0f, 1f)
-                    // Calculate scale from pebble size to full-screen
-                    val scaleX = originBounds.width / this@graphicsLayer.size.width
-                    val scaleY = originBounds.height / this@graphicsLayer.size.height
-                    this.scaleX = scaleX + (1f - scaleX) * t
-                    this.scaleY = scaleY + (1f - scaleY) * t
-                    // Calculate translation from pebble center to screen center
-                    val screenCenterX = this@graphicsLayer.size.width / 2f
-                    val screenCenterY = this@graphicsLayer.size.height / 2f
-                    val pebbleCenterX = originBounds.center.x
-                    val pebbleCenterY = originBounds.center.y
-                    this.translationX = (pebbleCenterX - screenCenterX) * (1f - t)
-                    this.translationY = (pebbleCenterY - screenCenterY) * (1f - t)
+                    if (full != null && full.width > 0f && full.height > 0f) {
+                        val originScaleX = originBounds.width / full.width
+                        val originScaleY = originBounds.height / full.height
+                        scaleX = originScaleX + (1f - originScaleX) * t
+                        scaleY = originScaleY + (1f - originScaleY) * t
+                        translationX = (originBounds.center.x - full.center.x) * (1f - t)
+                        translationY = (originBounds.center.y - full.center.y) * (1f - t)
+                    } else {
+                        scaleX = 0.92f + 0.08f * t
+                        scaleY = 0.92f + 0.08f * t
+                    }
                 }
-                .clip(
-                    // Clip corners: 18dp when collapsed, 0dp when expanded
-                    RoundedCornerShape(18.dp * (1f - expandFraction.value.coerceIn(0f, 1f)))
-                )
-                .clipToBounds()
+                .clip(RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp))
+                .clipToBounds(),
         ) {
-            // The actual map content
-            Box(
-                Modifier
-                    .fillMaxSize()
-                    .onGloballyPositioned { fullBounds = Rect(it.positionOnScreen(), it.size.toSize()) }
-            ) {
-                CarMap(
-                    location,
-                    Modifier.fillMaxSize().hazeSource(mapHazeState),
-                    state = mapState,
-                    deviceLocation = deviceLocation,
-                    onExpand = null,
-                )
-            }
-        }
-
-        // Vehicle name pill (appears when expanded)
-        if (isExpanded && expandFraction.value > 0.1f) {
-            Surface(
-                shape = RoundedCornerShape(50),
-                color = MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = glassContainerAlpha()),
-                contentColor = Color.White,
-                modifier = Modifier
-                    .align(Alignment.TopStart)
-                    .padding(horizontal = 16.dp, vertical = 12.dp)
-                    .graphicsLayer { alpha = expandFraction.value.coerceIn(0f, 1f) }
-                    .dropShadow(RoundedCornerShape(50))
-                    .appGlassRim(RoundedCornerShape(50)),
-            ) {
-                Text(
-                    vehicleName,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-                )
-            }
-        }
-
-        // Bottom buttons (appear when expanded)
-        if (isExpanded && expandFraction.value > 0.1f) {
-            MapFeatureRow(
-                features = listOf(
-                    MapFeature(Icons.Filled.MyLocation, "Recentre") { mapState.recenter() },
-                    MapFeature(Icons.Filled.Map, "Open in Maps") {
-                        openInExternalMaps(context, location, vehicleName)
-                    },
-                ),
-                modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .fillMaxWidth()
-                    .navigationBarsPadding()
-                    .graphicsLayer { alpha = expandFraction.value.coerceIn(0f, 1f) },
+            CarMap(
+                location,
+                Modifier.fillMaxSize().hazeSource(mapHazeState),
+                state = mapState,
+                deviceLocation = deviceLocation,
+                onExpand = null,
             )
-        }
 
-        // Drag handle (appears when expanded)
-        if (isExpanded && expandFraction.value > 0.1f) {
-            Box(
-                Modifier
-                    .align(Alignment.TopCenter)
-                    .fillMaxWidth()
-                    .height(40.dp)
-                    .pointerInput(Unit) {
-                        detectVerticalDragGestures(
-                            onVerticalDrag = { _, _ -> },
-                            onDragEnd = {
-                                scope.launch {
-                                    expandFraction.animateTo(0f, animationSpec = spring(dampingRatio = 0.95f, stiffness = Spring.StiffnessMedium))
-                                    onDismiss()
-                                }
-                            }
+            // Vehicle name pill (appears when expanded) -- top-left of the
+            // SHEET, not the screen, same as everything else below.
+            if (isExpanded && expandFraction.value > 0.1f) {
+                Surface(
+                    shape = RoundedCornerShape(50),
+                    color = MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = glassContainerAlpha()),
+                    contentColor = Color.White,
+                    modifier = Modifier
+                        .align(Alignment.TopStart)
+                        .padding(start = 16.dp, top = 40.dp)
+                        .graphicsLayer { alpha = expandFraction.value.coerceIn(0f, 1f) }
+                        .dropShadow(RoundedCornerShape(50))
+                        .appGlassRim(RoundedCornerShape(50)),
+                ) {
+                    Text(
+                        vehicleName,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                    )
+                }
+            }
+
+            // "Last refreshed" + a button to refresh the car's (and device's)
+            // location right now -- reported directly as wanting both. Top-
+            // right of the sheet, mirroring the name pill on the top-left.
+            if (isExpanded && expandFraction.value > 0.1f) {
+                val rel = rememberRelativeTime(lastFetchedAt)
+                Surface(
+                    shape = RoundedCornerShape(50),
+                    color = MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = glassContainerAlpha()),
+                    contentColor = Color.White,
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(end = 16.dp, top = 40.dp)
+                        .graphicsLayer { alpha = expandFraction.value.coerceIn(0f, 1f) }
+                        .dropShadow(RoundedCornerShape(50))
+                        .appGlassRim(RoundedCornerShape(50))
+                        .clickable(
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = ripple(),
+                            onClick = onRefreshLocation,
+                        ),
+                ) {
+                    Row(
+                        Modifier.padding(start = 14.dp, end = 10.dp, top = 8.dp, bottom = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    ) {
+                        Text(
+                            if (rel != null) "Updated $rel" else "Refresh",
+                            style = MaterialTheme.typography.labelMedium,
                         )
-                    },
-                contentAlignment = Alignment.TopCenter,
-            ) {
-                // A small frosted chip behind the handle pill, same pattern as
-                // CarMapSheetBody's own drag handle -- blurs the map on API 31+
-                // (where Haze's RenderEffect backing exists), or just darkens on
-                // older devices, so the pill stays visible over any tile content.
-                val canBlurHandle = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
+                        Icon(Icons.Filled.Refresh, contentDescription = "Refresh location", modifier = Modifier.size(16.dp))
+                    }
+                }
+            }
+
+            // Bottom buttons (appear when expanded)
+            if (isExpanded && expandFraction.value > 0.1f) {
+                MapFeatureRow(
+                    features = listOf(
+                        MapFeature(Icons.Filled.MyLocation, "Recentre") { mapState.recenter() },
+                        MapFeature(Icons.Filled.Map, "Open in Maps") {
+                            openInExternalMaps(context, location, vehicleName)
+                        },
+                    ),
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .fillMaxWidth()
+                        .navigationBarsPadding()
+                        .graphicsLayer { alpha = expandFraction.value.coerceIn(0f, 1f) },
+                )
+            }
+
+            // Drag handle (appears when expanded) -- top of the SHEET, i.e.
+            // 15% of the screen's height down from the top of the SCREEN, not
+            // glued to the screen's own top edge. Reported directly.
+            if (isExpanded && expandFraction.value > 0.1f) {
                 Box(
                     Modifier
-                        .padding(top = 8.dp)
-                        .size(width = 56.dp, height = 20.dp)
-                        .clip(RoundedCornerShape(50))
-                        .then(
-                            if (canBlurHandle) Modifier.hazeEffect(state = mapHazeState)
-                            else Modifier,
-                        )
-                        .background(Color.Black.copy(alpha = if (canBlurHandle) 0.2f else 0.35f))
-                        .graphicsLayer { alpha = expandFraction.value.coerceIn(0f, 1f) },
-                    contentAlignment = Alignment.Center,
+                        .align(Alignment.TopCenter)
+                        .fillMaxWidth()
+                        .height(40.dp)
+                        .pointerInput(Unit) {
+                            detectVerticalDragGestures(
+                                onVerticalDrag = { _, _ -> },
+                                onDragEnd = { close() },
+                            )
+                        },
+                    contentAlignment = Alignment.TopCenter,
                 ) {
+                    // A small frosted chip behind the handle pill, same pattern as
+                    // CarMapSheetBody's own drag handle -- blurs the map on API 31+
+                    // (where Haze's RenderEffect backing exists), or just darkens on
+                    // older devices, so the pill stays visible over any tile content.
+                    val canBlurHandle = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
                     Box(
                         Modifier
-                            .size(width = 28.dp, height = 4.dp)
-                            .background(Color.White.copy(alpha = 0.8f), RoundedCornerShape(2.dp)),
-                    )
+                            .padding(top = 8.dp)
+                            .size(width = 56.dp, height = 20.dp)
+                            .clip(RoundedCornerShape(50))
+                            .then(
+                                if (canBlurHandle) Modifier.hazeEffect(state = mapHazeState)
+                                else Modifier,
+                            )
+                            .background(Color.Black.copy(alpha = if (canBlurHandle) 0.2f else 0.35f))
+                            .graphicsLayer { alpha = expandFraction.value.coerceIn(0f, 1f) },
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Box(
+                            Modifier
+                                .size(width = 28.dp, height = 4.dp)
+                                .background(Color.White.copy(alpha = 0.8f), RoundedCornerShape(2.dp)),
+                        )
+                    }
                 }
             }
         }
