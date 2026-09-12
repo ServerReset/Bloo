@@ -37,11 +37,13 @@ jobs:
       - name: Make gradlew executable
         run: chmod +x ./gradlew
 
-      # Debug builds/artifacts are gone entirely -- release (below) is now the
-      # only variant this job builds and uploads, so tests run against it
-      # too rather than pulling in a debug compile nothing else here needs.
+      # Still runs against the debug variant -- testReleaseUnitTest isn't a
+      # task this project actually has (CI: "Task 'testReleaseUnitTest' not
+      # found"), and this doesn't build or upload a debug APK either way; it
+      # only compiles/runs test sources, an internal step with no artifact of
+      # its own. Debug build/artifacts are gone from everything below this.
       - name: Run unit tests
-        run: ./gradlew testReleaseUnitTest --stacktrace
+        run: ./gradlew testDebugUnitTest --stacktrace
 
       # The release variant is the ONLY thing that runs R8. Both modules shipped
       # `isMinifyEnabled = false` alongside declared proguardFiles for the whole life of
