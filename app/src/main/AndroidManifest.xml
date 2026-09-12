@@ -90,8 +90,8 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.Bloo">
 
-        <!-- Shown by BlooApplication's uncaught-exception handler in place of a
-             silent crash -- see its own doc. exported=false: only ever launched
+        <!-- Shown by BlooApplication's uncaught exception handler in place of a
+             silent crash; see its own doc. exported=false: only ever launched
              from inside this app's own process, right after it crashes. -->
         <activity
             android:name=".CrashActivity"
