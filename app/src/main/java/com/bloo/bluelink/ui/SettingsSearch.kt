@@ -16,7 +16,6 @@ import androidx.compose.animation.togetherWith
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.BorderStroke
@@ -348,7 +347,7 @@ internal fun SearchLayer(
         // bounce but by measurably different amounts read as two different
         // design systems, not one. Reusing the literal shared tokens is what
         // makes this ACTUALLY the same spring, not just a similar-looking one.
-        val sizeSpec = spring<Dp>(dampingRatio = PebbleBounceDamping, stiffness = PebbleBounceStiffness)
+        val sizeSpec = lowPowerAwareSpring<Dp>(dampingRatio = PebbleBounceDamping, stiffness = PebbleBounceStiffness)
         // A spring is right for the morph and WRONG for a drag: routing the
         // finger's position through one meant the bubble trailed behind the
         // touch for the whole gesture and then coasted past it on release --
@@ -363,7 +362,7 @@ internal fun SearchLayer(
             // makes it read as physical contact -- it bounced off the edge --
             // rather than a UI correcting a number. Same shared bounce spring as
             // `sizeSpec` above, for the same "one system" reason.
-            spring<Dp>(dampingRatio = PebbleBounceDamping, stiffness = PebbleBounceStiffness)
+            lowPowerAwareSpring<Dp>(dampingRatio = PebbleBounceDamping, stiffness = PebbleBounceStiffness)
         }
         // key(compact) so entering or leaving flip mode RESTARTS these
         // animations at their new target rather than animating to it. The cover
@@ -606,12 +605,12 @@ internal fun SearchPill(
     // feeling like noise, and it no longer compounds with the entrance spring above it.
     val entrance by animateFloatAsState(
         targetValue = if (appeared) 1f else 0.55f,
-        animationSpec = spring(dampingRatio = PebbleBounceDamping, stiffness = PebbleBounceStiffness),
+        animationSpec = lowPowerAwareSpring(dampingRatio = PebbleBounceDamping, stiffness = PebbleBounceStiffness),
         label = "searchEntrance",
     )
     val pressScale by animateFloatAsState(
         targetValue = if (pressed) 0.94f else 1f,
-        animationSpec = spring(dampingRatio = PebbleCloseDamping, stiffness = Spring.StiffnessHigh),
+        animationSpec = lowPowerAwareSpring(dampingRatio = PebbleCloseDamping, stiffness = Spring.StiffnessHigh),
         label = "searchPress",
     )
     // No ambient glow. This used to carry a travelling-hotspot bloom that

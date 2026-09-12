@@ -379,9 +379,9 @@ internal fun PebbleShell(
         // screen, not a settle-into-place motion, so it wants the livelier of
         // the two springs this card already had rather than a third one.
         animationSpec = if (expanded || chevronPressed) {
-            spring(dampingRatio = PebbleBounceDamping, stiffness = PebbleBounceStiffness)
+            lowPowerAwareSpring(dampingRatio = PebbleBounceDamping, stiffness = PebbleBounceStiffness)
         } else {
-            spring(dampingRatio = PebbleCloseDamping, stiffness = PebbleBounceStiffness)
+            lowPowerAwareSpring(dampingRatio = PebbleCloseDamping, stiffness = PebbleBounceStiffness)
         },
         label = "pebbleCorner",
     )
@@ -616,9 +616,9 @@ internal fun PebbleShell(
                             val headerTState = animateFloatAsState(
                                 targetValue = if (expandingTitle) 1f else 0f,
                                 animationSpec = if (expandingTitle) {
-                                    spring(dampingRatio = 0.62f, stiffness = Spring.StiffnessVeryLow)
+                                    lowPowerAwareSpring(dampingRatio = 0.62f, stiffness = Spring.StiffnessVeryLow)
                                 } else {
-                                    spring(dampingRatio = 1f, stiffness = PebbleBounceStiffness)
+                                    lowPowerAwareSpring(dampingRatio = 1f, stiffness = PebbleBounceStiffness)
                                 },
                                 label = "pebbleHeaderGrow",
                             )

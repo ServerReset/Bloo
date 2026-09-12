@@ -217,6 +217,32 @@ internal fun isBatterySaverOn(): Boolean {
 internal fun CanBlurBackdrops(): Boolean =
     android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S && !isBatterySaverOn()
 
+/**
+ * Battery-saver-aware replacement for a bouncy [spring]: the real spring when battery saver
+ * is off, a short, critically-damped [tween] (no overshoot, no settle-jitter) when it's on.
+ *
+ * Reported directly alongside the blur ask, in the same message: "standardize all the low
+ * power controls to reduce animations." [collapseEnter]/[collapseExit]/[PopVisible] below are
+ * the single shared spring behind the app's pebble expand/collapse motion -- their own doc
+ * describes 14 call sites that used to each hand-roll a slightly different spring/tween before
+ * being migrated onto these two functions -- so gating THIS one spot under battery saver is
+ * what turns every one of those sites calm without touching any of them individually, the
+ * same leverage [CanBlurBackdrops] already gets from every blur site sharing it.
+ *
+ * A spring isn't just slower under low power, it is MORE work per frame than a tween for the
+ * same visual distance: an underdamped spring overshoots and keeps re-evaluating position/
+ * velocity for several extra frames settling back to rest, where a critically-damped tween
+ * arrives once and stops. 140ms is short enough to still read as a deliberate transition
+ * rather than a hard cut, without the bounce's extra settle tail.
+ */
+@Composable
+internal fun <T> lowPowerAwareSpring(dampingRatio: Float, stiffness: Float) =
+    if (isBatterySaverOn()) {
+        tween<T>(durationMillis = 140, easing = androidx.compose.animation.core.FastOutSlowInEasing)
+    } else {
+        spring<T>(dampingRatio = dampingRatio, stiffness = stiffness)
+    }
+
 /** The one shape every full-height scrim's blur uses: strong right at the edge
  *  it grows from, tapering to none by its own far edge -- "like a gradient of
  *  blur", not a flat smear with a hard cutoff. Shared by StatusBarScrim and the
@@ -368,7 +394,7 @@ internal const val WizardStepFadeInDurationMs = 220
 internal fun collapseEnter(expandFrom: Alignment.Vertical = Alignment.Top): EnterTransition =
     fadeIn(MaterialTheme.motionScheme.defaultEffectsSpec<Float>()) +
         expandVertically(
-            spring(dampingRatio = PebbleBounceDamping, stiffness = PebbleBounceStiffness),
+            lowPowerAwareSpring(dampingRatio = PebbleBounceDamping, stiffness = PebbleBounceStiffness),
             expandFrom = expandFrom,
         )
 
@@ -389,7 +415,7 @@ internal fun collapseEnter(expandFrom: Alignment.Vertical = Alignment.Top): Ente
 @Composable
 internal fun collapseExit(shrinkTowards: Alignment.Vertical = Alignment.Top, fade: Boolean = true): ExitTransition {
     val shrink = shrinkVertically(
-        spring(dampingRatio = PebbleCloseDamping, stiffness = PebbleBounceStiffness),
+        lowPowerAwareSpring(dampingRatio = PebbleCloseDamping, stiffness = PebbleBounceStiffness),
         shrinkTowards = shrinkTowards,
     )
     return if (fade) fadeOut(MaterialTheme.motionScheme.defaultEffectsSpec<Float>()) + shrink else shrink
@@ -446,13 +472,13 @@ internal fun PopVisible(
         modifier = modifier,
         enter = fadeIn(MaterialTheme.motionScheme.defaultEffectsSpec<Float>()) +
             scaleIn(
-                spring(dampingRatio = PebbleBounceDamping, stiffness = PebbleBounceStiffness),
+                lowPowerAwareSpring(dampingRatio = PebbleBounceDamping, stiffness = PebbleBounceStiffness),
                 initialScale = 0.8f,
             ) +
-            (if (sizeAnimated) expandVertically(spring(dampingRatio = PebbleBounceDamping, stiffness = PebbleBounceStiffness)) else EnterTransition.None),
+            (if (sizeAnimated) expandVertically(lowPowerAwareSpring(dampingRatio = PebbleBounceDamping, stiffness = PebbleBounceStiffness)) else EnterTransition.None),
         exit = fadeOut(MaterialTheme.motionScheme.defaultEffectsSpec<Float>()) +
             scaleOut(MaterialTheme.motionScheme.defaultSpatialSpec<Float>(), targetScale = 0.8f) +
-            (if (sizeAnimated) shrinkVertically(spring(dampingRatio = PebbleBounceDamping, stiffness = PebbleBounceStiffness)) else ExitTransition.None),
+            (if (sizeAnimated) shrinkVertically(lowPowerAwareSpring(dampingRatio = PebbleBounceDamping, stiffness = PebbleBounceStiffness)) else ExitTransition.None),
         content = content,
     )
 }

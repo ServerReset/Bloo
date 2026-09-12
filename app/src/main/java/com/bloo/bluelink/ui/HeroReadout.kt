@@ -697,7 +697,13 @@ internal fun ChargeSegmentBar(
     // during a gesture: for as long as the car is plugged in. Everything else in this file was
     // moved into draw scope for exactly this reason; the shimmer was the one that leaked.
     // Read inside the Canvas below instead, where it invalidates draw and nothing more.
-    val shimmerX: State<Float>? = if (charging) {
+    // Also gated on battery saver, same reasoning as the idle-car case just above but for a
+    // different resource: this is the one INDEFINITELY-repeating animation in the whole phone
+    // UI, ticking every frame for as long as the car stays plugged in -- which, overnight,
+    // is hours. Every other animation in this app plays once and stops; this is the one where
+    // "reduce animations under low power" has a real, continuous frame budget to actually give
+    // back, not just a shorter one-shot transition.
+    val shimmerX: State<Float>? = if (charging && !isBatterySaverOn()) {
         val shimmer = rememberInfiniteTransition(label = "chargeShimmer")
         shimmer.animateFloat(
             initialValue = -0.6f,
