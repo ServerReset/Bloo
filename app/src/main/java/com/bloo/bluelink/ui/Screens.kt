@@ -466,7 +466,20 @@ fun BlooApp(vm: AppViewModel) {
         // reaching Settings this exists to prevent.
         val effectivelyInSettings = target == Screen.Settings || state.onSettingsPageSlot
         if (searchable && !state.locked && (appearance.showSearch || effectivelyInSettings)) {
-            Box(Modifier.fillMaxSize().padding(padding)) {
+            // fillMaxSize() alone, no `.padding(padding)` -- SearchLayer already
+            // reads WindowInsets itself for every edge it cares about (its own
+            // `bottomInset`, `insetTopDp` for the compact docked band), the same
+            // "edge-to-edge, self-managed insets" pattern the Garage/Settings
+            // screens right above already use with no `.padding(padding)` of
+            // their own either. Applying the Scaffold's own default
+            // `contentWindowInsets` (WindowInsets.systemBars) HERE as well meant
+            // this Box's own measured height was already shrunk by the
+            // navigation bar before SearchLayer's BoxWithConstraints ever saw
+            // it, and SearchLayer's own `bottomInset` then subtracted that same
+            // navigation-bar height a SECOND time computing where "the bottom"
+            // is -- reported directly as the search bubble sitting noticeably
+            // higher than its own bottom-anchored formula should ever place it.
+            Box(Modifier.fillMaxSize()) {
                 SearchLayer(
                     vm = vm,
                     state = state,
