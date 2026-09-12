@@ -4,6 +4,7 @@ import android.app.Application
 import android.content.Intent
 import android.util.Log
 import androidx.work.Configuration
+import com.bloo.bluelink.ui.BatterySaverState
 
 /**
  * Installs a process-wide uncaught exception handler as the very first thing this
@@ -32,6 +33,12 @@ import androidx.work.Configuration
  * from this Configuration the first time ANY caller -- ours or the library's own internal
  * ones -- asks for an instance, which is the officially supported replacement for the
  * removed auto-initializer, not just a same-process convenience.
+ *
+ * Also starts [BatterySaverState]'s one process-wide broadcast receiver here,
+ * for the same reason as everything else on this list: exactly once, up front,
+ * rather than one receiver per composable that happens to call
+ * [com.bloo.bluelink.ui.isBatterySaverOn] -- which is now dozens of them per
+ * screen (every glass surface, every battery-saver-aware spring).
  */
 class BlooApplication : Application(), Configuration.Provider {
     override val workManagerConfiguration: Configuration
@@ -39,6 +46,7 @@ class BlooApplication : Application(), Configuration.Provider {
 
     override fun onCreate() {
         super.onCreate()
+        BatterySaverState.ensureInitialized(this)
         Thread.setDefaultUncaughtExceptionHandler { thread, throwable ->
             val trace = Log.getStackTraceString(throwable)
             Log.e("BlooCrash", "Uncaught exception on ${thread.name}:\n$trace")

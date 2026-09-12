@@ -187,10 +187,18 @@ internal fun GlassSurface(
             ),
         contentAlignment = contentAlignment,
     ) {
-        if (canBlur) {
-            Box(Modifier.matchParentSize().clip(shape).hazeEffect(state = hazeState!!))
-        }
-        Box(Modifier.matchParentSize().clip(shape).background(tint))
+        // One node for blur+tint, not two -- the blur and the fill draw in the same
+        // Box's own modifier chain (blur first, tint layered on top of it, same as
+        // stacking two separate Boxes would), the same single-node pattern the
+        // map's own drag-handle chip already used successfully. Every call site of
+        // this function gets that one fewer layout node for free.
+        Box(
+            Modifier
+                .matchParentSize()
+                .clip(shape)
+                .then(if (canBlur) Modifier.hazeEffect(state = hazeState!!) else Modifier)
+                .background(tint),
+        )
         CompositionLocalProvider(LocalContentColor provides contentColor) {
             content()
         }
@@ -221,19 +229,25 @@ internal fun GlassSurface(
  */
 @Composable
 internal fun ScrimBlur(hazeState: HazeState?, progress: () -> Float, modifier: Modifier = Modifier) {
+    // Both call sites always pass a real, non-null HazeState (each screen builds
+    // one unconditionally via `remember { HazeState() }`), so `hazeState != null`
+    // alone was never actually gating anything -- the blur ran unconditionally,
+    // battery saver or not. CanBlurBackdrops() is the real gate, same as every
+    // other blur site in the app.
+    val canBlur = hazeState != null && CanBlurBackdrops()
     Box(
         modifier
             .fillMaxSize()
             .drawBehind {
-                drawRect(Color.Black, alpha = (if (hazeState != null) 0.35f else 0.5f) * progress().coerceIn(0f, 1f))
+                drawRect(Color.Black, alpha = (if (canBlur) 0.35f else 0.5f) * progress().coerceIn(0f, 1f))
             },
     )
-    if (hazeState != null) {
+    if (canBlur) {
         Box(
             modifier
                 .fillMaxSize()
                 .graphicsLayer { alpha = progress().coerceIn(0f, 1f) }
-                .hazeEffect(state = hazeState) {
+                .hazeEffect(state = hazeState!!) {
                     progressive = StandardBlurProgressive
                 },
         )

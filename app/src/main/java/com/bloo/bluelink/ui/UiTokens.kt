@@ -26,13 +26,12 @@ import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 // and defaultSpatialSpec on MotionScheme. Screens.kt imports none of them either.
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.remember
+import androidx.compose.runtime.collectAsState
 // State<T>'s `by` delegate isn't a member -- it resolves to this file-scope operator
 // extension, which the compiler will not find without an explicit import (unlike most of
 // this file's other extension functions, which show up as unresolved-reference errors
 // instead of this one's more oblique "has no method getValue... cannot serve as a delegate").
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -166,40 +165,68 @@ internal val SettingsCardGap = 10.dp
 // app: pulled here so every site shares the same instances instead of four
 // separately-typed, easy-to-drift copies.
 
-/** Live, reactive battery-saver state -- [android.os.PowerManager.isPowerSaveMode]
- *  read once at first composition and then kept current via
- *  [android.os.PowerManager.ACTION_POWER_SAVE_MODE_CHANGED], so toggling it while
- *  the app is already open (Quick Settings, the battery-saver notification) takes
- *  effect immediately rather than only on the next cold start. [CanBlurBackdrops]
- *  is this value's only consumer today, but it's a plain top-level composable
- *  precisely so anything else wanting to drop expensive visual effects under
- *  battery saver -- not just blur -- can read it the same way. */
+/**
+ * Single, app-wide source of truth for [android.os.PowerManager.isPowerSaveMode],
+ * kept live via exactly ONE [android.content.BroadcastReceiver] for the whole
+ * process -- [BlooApplication] calls [ensureInitialized] once, at startup, the
+ * same place it installs its own uncaught-exception handler.
+ *
+ * [isBatterySaverOn] used to register its OWN receiver inline, every time it was
+ * called -- fine when [CanBlurBackdrops] had a couple of call sites, but between
+ * every [GlassSurface] in the app and every [lowPowerAwareSpring], that function
+ * is now read from dozens of places on a single screen. Each one registering its
+ * own receiver for the exact same system broadcast, each keeping its own separate
+ * copy of the same boolean, is pure waste this object collapses to one.
+ */
+internal object BatterySaverState {
+    private fun current(context: android.content.Context) =
+        (context.getSystemService(android.content.Context.POWER_SERVICE) as? android.os.PowerManager)
+            ?.isPowerSaveMode == true
+
+    private val _isOn = kotlinx.coroutines.flow.MutableStateFlow(false)
+    val isOn: kotlinx.coroutines.flow.StateFlow<Boolean> = _isOn
+
+    @Volatile
+    private var initialized = false
+
+    fun ensureInitialized(context: android.content.Context) {
+        if (initialized) return
+        synchronized(this) {
+            if (initialized) return
+            val appContext = context.applicationContext
+            _isOn.value = current(appContext)
+            val receiver = object : android.content.BroadcastReceiver() {
+                override fun onReceive(ctx: android.content.Context?, intent: android.content.Intent?) {
+                    _isOn.value = current(appContext)
+                }
+            }
+            // ContextCompat, not Context.registerReceiver directly: this app's targetSdk (36)
+            // is well past the API 33 cutover where a context-registered receiver MUST say
+            // whether other apps can send it broadcasts, and the plain 2-arg platform call
+            // throws SecurityException at runtime on 34+ once targetSdk requires that flag
+            // instead of just warning about its absence. NOT_EXPORTED is correct here
+            // specifically -- this only ever needs the system's OWN battery-saver broadcast,
+            // never one from another app.
+            androidx.core.content.ContextCompat.registerReceiver(
+                appContext, receiver,
+                android.content.IntentFilter(android.os.PowerManager.ACTION_POWER_SAVE_MODE_CHANGED),
+                androidx.core.content.ContextCompat.RECEIVER_NOT_EXPORTED,
+            )
+            initialized = true
+        }
+    }
+}
+
+/** Live, reactive battery-saver state, read from the one shared [BatterySaverState]
+ *  -- so toggling it while the app is already open (Quick Settings, the battery-
+ *  saver notification) takes effect immediately everywhere at once, rather than
+ *  only on the next cold start. [CanBlurBackdrops] is this value's biggest
+ *  consumer today, but it's a plain top-level composable precisely so anything
+ *  else wanting to drop expensive visual effects under battery saver -- not just
+ *  blur -- can read it the same way. */
 @Composable
 internal fun isBatterySaverOn(): Boolean {
-    val context = androidx.compose.ui.platform.LocalContext.current
-    fun current() = (context.getSystemService(android.content.Context.POWER_SERVICE) as? android.os.PowerManager)
-        ?.isPowerSaveMode == true
-    var active by remember { androidx.compose.runtime.mutableStateOf(current()) }
-    androidx.compose.runtime.DisposableEffect(context) {
-        val receiver = object : android.content.BroadcastReceiver() {
-            override fun onReceive(ctx: android.content.Context?, intent: android.content.Intent?) {
-                active = current()
-            }
-        }
-        // ContextCompat, not Context.registerReceiver directly: this app's targetSdk (36)
-        // is well past the API 33 cutover where a context-registered receiver MUST say
-        // whether other apps can send it broadcasts, and the plain 2-arg platform call
-        // throws SecurityException at runtime on 34+ once targetSdk requires that flag
-        // instead of just warning about its absence. NOT_EXPORTED is correct here
-        // specifically -- this only ever needs the system's OWN battery-saver broadcast,
-        // never one from another app.
-        androidx.core.content.ContextCompat.registerReceiver(
-            context, receiver,
-            android.content.IntentFilter(android.os.PowerManager.ACTION_POWER_SAVE_MODE_CHANGED),
-            androidx.core.content.ContextCompat.RECEIVER_NOT_EXPORTED,
-        )
-        onDispose { context.unregisterReceiver(receiver) }
-    }
+    val active by BatterySaverState.isOn.collectAsState()
     return active
 }
 

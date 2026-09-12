@@ -817,6 +817,18 @@ internal fun AuroraBackground(
     paused: Boolean = false,
 ) {
     val scheme = MaterialTheme.colorScheme
+    // Under battery saver (or pre-S, where the RenderEffect blur below can't run
+    // anyway -- see CanBlurBackdrops' own doc), skip the entire animated blob
+    // system: no accelerometer listener, no 12fps drift LaunchedEffect, no
+    // full-screen blur. Just this backdrop's own base surface tone as one flat,
+    // static fill -- the cheapest possible frame, and the same "flat color
+    // instead of a blur" fallback every other piece of glass chrome in the app
+    // already uses under battery saver, applied here too since this backdrop was
+    // never actually gated on it before.
+    if (!CanBlurBackdrops()) {
+        Box(modifier.fillMaxSize().background(scheme.surface))
+        return
+    }
     val motionMode = appearance?.auroraMotion ?: "static"
     val colorMode = appearance?.auroraColorMode ?: "complementary"
     val customHex = appearance?.auroraCustomColor
