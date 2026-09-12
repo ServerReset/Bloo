@@ -2352,6 +2352,7 @@ internal fun SettingsScreen(
             }
         }
   }
+}
 
 /** One entry in the Credits card -- see [CreditRow]. */
 private data class CreditEntry(
@@ -2419,5 +2420,4 @@ private fun CreditRow(entry: CreditEntry) {
             }
         }
     }
-}
 }
