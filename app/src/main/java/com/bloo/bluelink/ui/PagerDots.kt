@@ -136,13 +136,13 @@ internal fun VerticalPagerDots(
     // fifth of the app's 48dp min target. The invisible gesture Box already spans
     // 48dp wide (below); this widens the VISIBLE rail so it reads as tappable too.
     val hPad by animateDpAsState(if (scrubbing) 18.dp else 9.dp,
-        spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessMediumLow), "scrubHPad")
+        lowPowerAwareSpring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessMediumLow), "scrubHPad")
     val vPad by animateDpAsState(if (scrubbing) 18.dp else 12.dp,
-        spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessMediumLow), "scrubVPad")
+        lowPowerAwareSpring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessMediumLow), "scrubVPad")
     val itemSpacing by animateDpAsState(if (scrubbing) 14.dp else 8.dp,
-        spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessMediumLow), "scrubSpacing")
+        lowPowerAwareSpring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessMediumLow), "scrubSpacing")
     val cornerRadius by animateDpAsState(if (scrubbing) 20.dp else 100.dp,
-        spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessMediumLow), "scrubCorner")
+        lowPowerAwareSpring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessMediumLow), "scrubCorner")
     val surfaceAlpha by animateFloatAsState(if (scrubbing) 0.92f else 0.7f, label = "scrubAlpha")
 
     Box(
@@ -232,12 +232,12 @@ internal fun VerticalPagerDots(
                     val highlight = selected || scrubSelected
                     val dotH by animateDpAsState(
                         if (highlight) 28.dp else 9.dp,
-                        spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessMediumLow),
+                        lowPowerAwareSpring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessMediumLow),
                         label = "vdotH",
                     )
                     val dotW by animateDpAsState(
                         if (scrubbing) 10.dp else 9.dp,
-                        spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessMediumLow),
+                        lowPowerAwareSpring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessMediumLow),
                         label = "vdotW",
                     )
                     val color by androidx.compose.animation.animateColorAsState(

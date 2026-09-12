@@ -35,7 +35,6 @@ import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
@@ -1020,7 +1019,7 @@ internal fun PebbleShell(
                             // loading) still jumped the card's height. This
                             // animates those in place too.
                             modifier = Modifier.animateContentSize(
-                                spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessMediumLow),
+                                lowPowerAwareSpring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessMediumLow),
                             ).padding(start = 16.dp, end = 16.dp, bottom = 16.dp, top = 4.dp),
                             verticalGap = 8.dp,
                             content = content,
@@ -1078,7 +1077,7 @@ internal fun SplitExpandButton(
     val haptics = LocalHaptics.current
     val rotation by animateFloatAsState(
         targetValue = if (expanded) 180f else 0f,
-        animationSpec = spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessLow),
+        animationSpec = lowPowerAwareSpring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessLow),
         label = "splitChevron",
     )
 
@@ -1089,7 +1088,7 @@ internal fun SplitExpandButton(
     var easterEggTriggered by remember { mutableStateOf(false) }
     val easterEggSpin by animateFloatAsState(
         targetValue = if (easterEggTriggered) 360f else 0f,
-        animationSpec = if (easterEggTriggered) spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessLow) else snap(),
+        animationSpec = if (easterEggTriggered) lowPowerAwareSpring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessLow) else snap(),
         label = "easterEggSpin",
         finishedListener = { if (easterEggTriggered) easterEggTriggered = false },
     )
@@ -1131,7 +1130,7 @@ internal fun SplitExpandButton(
     // outer corner, which stays exactly the press-only shape it always was.
     val expandedMorph by animateFloatAsState(
         targetValue = if (expanded) 1f else 0f,
-        animationSpec = spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessLow),
+        animationSpec = lowPowerAwareSpring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessLow),
         label = "splitExpandCorner",
     )
     // Each half gets its own shape: the OUTER corner morphs (pill when idle, rounded square
@@ -1190,6 +1189,10 @@ internal fun SplitExpandButton(
     // Bounce animation for the location button's icon.
     val bounceY = remember { Animatable(0f) }
     val bounceScope = rememberCoroutineScope()
+    // Read here, at composable scope, not inline inside bounceScope.launch{} below --
+    // lowPowerAwareSpring is itself @Composable, so it can't be called from a suspend lambda.
+    val bounceUpSpring = lowPowerAwareSpring<Float>(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = Spring.StiffnessHigh)
+    val bounceDownSpring = lowPowerAwareSpring<Float>(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium)
     var bouncing by remember { mutableStateOf(false) }
 
     // The climate icon's own spin now comes from MorphButtonLabel's `spinning` param below --
@@ -1230,8 +1233,8 @@ internal fun SplitExpandButton(
                 onClick = {
                     if (action.bounceIcon) bounceScope.launch {
                         bouncing = true
-                        bounceY.animateTo(-9f, spring(stiffness = Spring.StiffnessHigh))
-                        bounceY.animateTo(0f, spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium))
+                        bounceY.animateTo(-9f, bounceUpSpring)
+                        bounceY.animateTo(0f, bounceDownSpring)
                         bouncing = false
                     }
                     action.onClick()

@@ -14,7 +14,6 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.FastOutLinearInEasing
 import androidx.compose.animation.core.LinearOutSlowInEasing
-import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.BorderStroke
@@ -221,7 +220,7 @@ fun MorphButton(
                             Modifier
                         } else {
                             Modifier.animateContentSize(
-                                spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium),
+                                lowPowerAwareSpring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium),
                             )
                         },
                     )
@@ -429,7 +428,7 @@ fun MorphIconButton(
     // deferred, nothing to do). This site is the second kind.
     val scale by animateFloatAsState(
         targetValue = if (pressed) 0.88f else 1f,
-        animationSpec = spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessMedium),
+        animationSpec = lowPowerAwareSpring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessMedium),
         label = "morphIconPress",
     )
     val body: @Composable () -> Unit = {
@@ -717,7 +716,7 @@ internal fun MorphExpandButton(
     val haptics = LocalHaptics.current
     val rotation by animateFloatAsState(
         targetValue = if (expanded) 180f else 0f,
-        animationSpec = spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessLow),
+        animationSpec = lowPowerAwareSpring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessLow),
         label = "morphChevron",
     )
 
@@ -725,7 +724,7 @@ internal fun MorphExpandButton(
     var easterEggTriggered by remember { mutableStateOf(false) }
     val easterEggSpin by animateFloatAsState(
         targetValue = if (easterEggTriggered) 360f else 0f,
-        animationSpec = if (easterEggTriggered) spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessLow) else snap(),
+        animationSpec = if (easterEggTriggered) lowPowerAwareSpring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessLow) else snap(),
         label = "easterEggMorphSpin",
         finishedListener = { if (easterEggTriggered) easterEggTriggered = false },
     )

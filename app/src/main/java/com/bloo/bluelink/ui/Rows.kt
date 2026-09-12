@@ -19,7 +19,6 @@ import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateDpAsState
-import androidx.compose.animation.core.spring
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
@@ -534,12 +533,12 @@ private fun ToggleRowControl(label: String, checked: Boolean, onChange: (Boolean
 internal fun MorphToggleTrack(checked: Boolean) {
     val trackColor by androidx.compose.animation.animateColorAsState(
         if (checked) MaterialTheme.colorScheme.primary else buttonContainer(),
-        animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
+        animationSpec = lowPowerAwareSpring(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = Spring.StiffnessMediumLow),
         label = "toggleTrackBg",
     )
     val thumbColor by androidx.compose.animation.animateColorAsState(
         if (checked) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
-        animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
+        animationSpec = lowPowerAwareSpring(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = Spring.StiffnessMediumLow),
         label = "toggleThumbFg",
     )
     val trackWidth = 44.dp
@@ -547,12 +546,12 @@ internal fun MorphToggleTrack(checked: Boolean) {
     val inset = 3.dp
     val thumbSize by animateDpAsState(
         if (checked) 20.dp else 16.dp,
-        animationSpec = spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessMediumLow),
+        animationSpec = lowPowerAwareSpring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessMediumLow),
         label = "toggleThumbSize",
     )
     val thumbOffset by animateDpAsState(
         if (checked) trackWidth - thumbSize - inset else inset,
-        animationSpec = spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessMediumLow),
+        animationSpec = lowPowerAwareSpring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessMediumLow),
         label = "toggleThumbOffset",
     )
     Box(

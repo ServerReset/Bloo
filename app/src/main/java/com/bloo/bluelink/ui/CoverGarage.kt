@@ -17,7 +17,6 @@ import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.background
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
@@ -88,7 +87,6 @@ import androidx.compose.ui.unit.dp
 import com.bloo.bluelink.data.brand
 import com.bloo.bluelink.data.SettingsStore
 import com.bloo.bluelink.data.Vehicle
-import com.bloo.uicommon.dropShadow
 import com.bloo.bluelink.data.isGen5W
 import kotlinx.coroutines.flow.first
 import kotlin.math.abs
@@ -344,56 +342,65 @@ internal fun CompactGarage(state: UiState, vm: AppViewModel, appearance: Setting
             // basis is already the shorter side of the actual box, the same "true pill" language
             // MorphButton's own pillCornerPercent speaks everywhere else in the app.
             val bandShape = RoundedCornerShape(percent = 50)
-            Row(
-                Modifier
+            // GlassSurface (GlassChrome.kt): the same shared fill/rim/shadow every
+            // other floating chip in the app goes through now, instead of this one
+            // hand-chaining ambientRing/dropShadow/frostedRim/background separately.
+            // No HazeState in scope on this screen yet (a real blur here is still its
+            // own future follow-up, not a regression) -- GlassSurface's own flat-tint
+            // fallback is exactly the glassTint(blurred = false) this used to call
+            // directly.
+            GlassSurface(
+                shape = bandShape,
+                modifier = Modifier
                     .align(Alignment.TopStart)
                     .offset(x = band.xDp.dp, y = band.yDp.dp)
                     .width(band.widthDp.dp)
                     .height(band.heightDp.dp)
-                    // glassTint(blurred = false), not surfaceContainerHighest: this cover
-                    // screen has no HazeState of its own to blur (a real blur here is a
-                    // future follow-up, not a regression), but the flat fallback fill
-                    // should still be the same hue-independent black/white every other
-                    // glass chip in the app already uses -- see MetaChip's own doc for
-                    // why a "neutral" tonal role isn't actually hue-independent under
-                    // this app's dynamic palette.
-                    .background(glassTint(blurred = false), bandShape)
-                    .ambientRing(bandShape)
-                    .dropShadow(bandShape)
-                    .frostedRim(bandShape)
-                    .padding(horizontal = 8.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                // Grouped flush against whichever end is next to the camera,
-                // not spread across the whole band -- a short name spread
-                // full-width by weight(1f) used to leave a dead gap between
-                // the text and the island it should read as belonging next
-                // to. weight(1f, fill = false) still bounds FittedText enough
-                // to shrink-fit inside a narrow band, it just no longer
-                // forces the box to fill space the text isn't using.
-                horizontalArrangement = Arrangement.spacedBy(
-                    4.dp,
-                    if (band.nearCameraAtEnd) Alignment.End else Alignment.Start,
-                ),
+                    .ambientRing(bandShape),
             ) {
-                val current = vehicles.getOrNull(currentIndex.coerceIn(0, count - 1))
-                // Order follows which end is near the camera, so the dock
-                // reservation always lands flush against it regardless of
-                // which side of the island this band happens to be on.
-                if (!band.nearCameraAtEnd && searchInBand) {
-                    Spacer(Modifier.width(CoverBandSearchDock))
-                }
-                if (current != null) {
-                    com.bloo.uicommon.FittedText(
-                        text = current.name,
-                        style = MaterialTheme.typography.labelLarge.copy(
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onSurface,
-                        ),
-                        modifier = Modifier.weight(1f, fill = false),
-                    )
-                }
-                if (band.nearCameraAtEnd && searchInBand) {
-                    Spacer(Modifier.width(CoverBandSearchDock))
+                Row(
+                    // fillMaxSize, not wrap-content: this Row used to BE the glass
+                    // surface (sized to the full band directly), so its own
+                    // horizontalArrangement could pack content flush against
+                    // whichever end is near the camera across the FULL band width.
+                    // Nested inside GlassSurface's content slot now, it needs its
+                    // own explicit full size or GlassSurface's default centering
+                    // would shrink-wrap and center this Row instead, losing that
+                    // flush-to-one-end packing entirely.
+                    Modifier.fillMaxSize().padding(horizontal = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    // Grouped flush against whichever end is next to the camera,
+                    // not spread across the whole band -- a short name spread
+                    // full-width by weight(1f) used to leave a dead gap between
+                    // the text and the island it should read as belonging next
+                    // to. weight(1f, fill = false) still bounds FittedText enough
+                    // to shrink-fit inside a narrow band, it just no longer
+                    // forces the box to fill space the text isn't using.
+                    horizontalArrangement = Arrangement.spacedBy(
+                        4.dp,
+                        if (band.nearCameraAtEnd) Alignment.End else Alignment.Start,
+                    ),
+                ) {
+                    val current = vehicles.getOrNull(currentIndex.coerceIn(0, count - 1))
+                    // Order follows which end is near the camera, so the dock
+                    // reservation always lands flush against it regardless of
+                    // which side of the island this band happens to be on.
+                    if (!band.nearCameraAtEnd && searchInBand) {
+                        Spacer(Modifier.width(CoverBandSearchDock))
+                    }
+                    if (current != null) {
+                        com.bloo.uicommon.FittedText(
+                            text = current.name,
+                            style = MaterialTheme.typography.labelLarge.copy(
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurface,
+                            ),
+                            modifier = Modifier.weight(1f, fill = false),
+                        )
+                    }
+                    if (band.nearCameraAtEnd && searchInBand) {
+                        Spacer(Modifier.width(CoverBandSearchDock))
+                    }
                 }
             }
         }

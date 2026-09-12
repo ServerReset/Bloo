@@ -18,7 +18,6 @@ import android.widget.Toast
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.spring
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
@@ -113,7 +112,7 @@ internal fun CarTilesHeader(name: String, img: String?, assignedCount: Int, tota
             Spacer(Modifier.height(6.dp))
             val fill by animateFloatAsState(
                 targetValue = if (totalTiles > 0) assignedCount / totalTiles.toFloat() else 0f,
-                animationSpec = spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessMediumLow),
+                animationSpec = lowPowerAwareSpring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessMediumLow),
                 label = "tileCapacityFill",
             )
             Box(
@@ -385,7 +384,7 @@ internal fun UpdateStatusChip(state: UiState) {
         // Sprung rather than snapped -- "up to date" turning tertiary the instant
         // a check lands is the one moment this card actually has news, and a cut
         // read as flat next to how much of the rest of the app now springs.
-        animationSpec = spring(
+        animationSpec = lowPowerAwareSpring(
             dampingRatio = SoftDamping,
             stiffness = androidx.compose.animation.core.Spring.StiffnessLow,
         ),

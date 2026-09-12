@@ -23,7 +23,6 @@ import androidx.compose.animation.scaleOut
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.FastOutLinearInEasing
 import androidx.compose.animation.core.LinearOutSlowInEasing
-import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
@@ -623,7 +622,7 @@ internal fun SeatControl(
     // through neutral between cooling (blues) and heating (reds).
     val tint by androidx.compose.animation.animateColorAsState(
         targetValue = seatTint(current),
-        animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
+        animationSpec = lowPowerAwareSpring(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = Spring.StiffnessMediumLow),
         label = "seatTint",
     )
     Column {
@@ -653,7 +652,7 @@ internal fun WheelHeatControl(level: WheelHeatLevel, onChange: (WheelHeatLevel) 
     val index = range.indexOf(level).coerceAtLeast(0)
     val tint by androidx.compose.animation.animateColorAsState(
         targetValue = wheelHeatTint(level),
-        animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
+        animationSpec = lowPowerAwareSpring(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = Spring.StiffnessMediumLow),
         label = "wheelHeatTint",
     )
     Column {

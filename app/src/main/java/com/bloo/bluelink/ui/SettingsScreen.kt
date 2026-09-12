@@ -132,7 +132,6 @@ import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import dev.chrisbanes.haze.HazeState
-import dev.chrisbanes.haze.hazeEffect
 import dev.chrisbanes.haze.hazeSource
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
@@ -2274,31 +2273,26 @@ internal fun SettingsScreen(
             // names the OTHER mode) so the CURRENT mode is always obvious at a
             // glance -- the old single-label button was easy to misread as "the
             // mode you're already in" and tap the wrong way.
-            Box(
-                Modifier
+            // GlassSurface (GlassChrome.kt), not a hand-chained
+            // ambientRing/dropShadow/frostedRim/hazeEffect -- one shared call for the
+            // edge treatment and the real blur, matching the "Settings" title pill/
+            // FloatingIcon right next to it in the same row (same glass treatment,
+            // same track height) instead of the ordinary button-track color/size
+            // every other MorphSegmented uses. `tint = Color.Transparent`: MorphSegmented
+            // has no backdrop slot of its own, so it paints ITS OWN containerColor as
+            // the actual visible fill, on top of GlassSurface's blur -- GlassSurface's
+            // own tint stays invisible here rather than doubling up with it.
+            GlassSurface(
+                shape = RoundedCornerShape(16.dp),
+                modifier = Modifier
                     .width(172.dp)
                     // Was 20.dp -- MorphSegmented's own track corner is 16.dp,
                     // so the outline ring drawn here never actually matched
                     // the pill's real corners underneath it.
-                    .ambientRing(RoundedCornerShape(16.dp))
-                    .dropShadow(RoundedCornerShape(16.dp))
-                    .frostedRim(RoundedCornerShape(16.dp)),
+                    .ambientRing(RoundedCornerShape(16.dp)),
+                hazeState = hazeState,
+                tint = Color.Transparent,
             ) {
-                // Match the "Settings" title pill/FloatingIcon right next to it (same
-                // glass treatment, same track height) instead of the ordinary
-                // button-track color/size every other MorphSegmented uses -- they're
-                // both floating chrome in the same row. MorphSegmented has no backdrop
-                // slot of its own to draw a real blur into, so the blur is drawn here,
-                // in this wrapping Box, directly BEHIND where MorphSegmented paints its
-                // own (now-translucent) containerColor at the same corner radius --
-                // this Box's comment already said that was the intent, but only the
-                // rim/shadow above were ever actually built; there was no hazeEffect
-                // layer here and containerColor was still the flatly-blue
-                // `surfaceContainerHighest` token already fixed everywhere else this
-                // session, not [glassTint].
-                if (CanBlurBackdrops()) {
-                    Box(Modifier.matchParentSize().clip(RoundedCornerShape(16.dp)).hazeEffect(state = hazeState))
-                }
                 MorphSegmented(
                     options = listOf(
                         SegmentOption("simple", "Simple", null),

@@ -16,7 +16,6 @@ import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
-import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
@@ -189,7 +188,7 @@ internal fun chargeReadoutOf(
 internal fun animatedChargeFrac(target: Float): Float {
     val frac by animateFloatAsState(
         targetValue = target,
-        animationSpec = spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessLow),
+        animationSpec = lowPowerAwareSpring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessLow),
         label = "chargeFill",
     )
     return frac
@@ -664,12 +663,12 @@ internal fun ChargeSegmentBar(
     // that moment an actual transition instead of a colour popping mid-draw.
     val fillDark by androidx.compose.animation.animateColorAsState(
         targetValue = if (stuckAtLimit) ChargeBlueDark else ChargeGreenDark,
-        animationSpec = spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessLow),
+        animationSpec = lowPowerAwareSpring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessLow),
         label = "chargeFillDark",
     )
     val fillLight by androidx.compose.animation.animateColorAsState(
         targetValue = if (stuckAtLimit) ChargeBlue else ChargeGreen,
-        animationSpec = spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessLow),
+        animationSpec = lowPowerAwareSpring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessLow),
         label = "chargeFillLight",
     )
     // Animatable, not animateFloatAsState, for the same reason the old marker's slide
@@ -677,10 +676,13 @@ internal fun ChargeSegmentBar(
     // limit first appears), spring for every change after that.
     val limitAnim = remember { Animatable(0f) }
     var limitSeen by remember { mutableStateOf(false) }
+    // Read here, at composable scope, not inline inside the LaunchedEffect below --
+    // lowPowerAwareSpring is itself @Composable, so it can't be called from a suspend lambda.
+    val limitSpring = lowPowerAwareSpring<Float>(dampingRatio = SoftDamping, stiffness = Spring.StiffnessLow)
     LaunchedEffect(limit) {
         val target = (limit ?: return@LaunchedEffect) / 100f
         if (limitSeen) {
-            limitAnim.animateTo(target, spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessLow))
+            limitAnim.animateTo(target, limitSpring)
         } else {
             limitSeen = true
             limitAnim.snapTo(target)

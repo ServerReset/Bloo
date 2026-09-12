@@ -20,7 +20,6 @@ import androidx.browser.customtabs.CustomTabsIntent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.spring
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -1352,12 +1351,15 @@ internal fun ExpandableMapLayer(
     // still runs exactly once per mount -- i.e. once per expand -- which is
     // exactly the intent.
     val expandFraction = remember { Animatable(0f) }
+    // Read here, at composable scope, not inside the LaunchedEffect below --
+    // lowPowerAwareSpring is itself @Composable, so it can't be called from a
+    // suspend lambda. Under battery saver this also means the sheet's own
+    // signature "pop out of the pebble" overshoot is replaced by the same quick,
+    // non-bouncy tween every other spring in the app falls back to.
+    val openSpring = lowPowerAwareSpring<Float>(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMediumLow)
 
     LaunchedEffect(Unit) {
-        expandFraction.animateTo(
-            1f,
-            animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMediumLow)
-        )
+        expandFraction.animateTo(1f, animationSpec = openSpring)
     }
 
     // How far the drag handle has actually been pulled down, in px -- the SAME
@@ -1369,6 +1371,12 @@ internal fun ExpandableMapLayer(
     // previous version here ignored the drag delta entirely and closed on ANY
     // touch-up on the handle, including a tiny accidental tap.
     val dragPx = remember { Animatable(0f) }
+    // Read here, at composable scope, not inline inside the scope.launch{} blocks below --
+    // lowPowerAwareSpring is itself @Composable (it reads battery-saver state), so it can't
+    // be called from inside a suspend lambda. Captured once and referenced from both.
+    val dragSpring = lowPowerAwareSpring<Float>(dampingRatio = SoftDamping, stiffness = Spring.StiffnessMedium)
+    // Same reason as dragSpring above -- read here, not inside the scope.launch{} in close().
+    val closeSpring = lowPowerAwareSpring<Float>(dampingRatio = 0.95f, stiffness = Spring.StiffnessMedium)
     var closing by remember { mutableStateOf(false) }
 
     fun close() {
@@ -1377,8 +1385,8 @@ internal fun ExpandableMapLayer(
         scope.launch {
             // Both play at once so a mid-drag dismiss doesn't visibly snap dragPx
             // back to 0 before the sheet itself starts shrinking away.
-            val a = scope.launch { expandFraction.animateTo(0f, animationSpec = spring(dampingRatio = 0.95f, stiffness = Spring.StiffnessMedium)) }
-            val b = scope.launch { dragPx.animateTo(0f, animationSpec = spring(dampingRatio = 0.95f, stiffness = Spring.StiffnessMedium)) }
+            val a = scope.launch { expandFraction.animateTo(0f, animationSpec = closeSpring) }
+            val b = scope.launch { dragPx.animateTo(0f, animationSpec = closeSpring) }
             a.join(); b.join()
             onDismiss()
         }
@@ -1548,12 +1556,12 @@ internal fun ExpandableMapLayer(
                                         close()
                                     } else {
                                         scope.launch {
-                                            dragPx.animateTo(0f, spring(dampingRatio = SoftDamping))
+                                            dragPx.animateTo(0f, dragSpring)
                                         }
                                     }
                                 },
                                 onDragCancel = {
-                                    scope.launch { dragPx.animateTo(0f, spring(dampingRatio = SoftDamping)) }
+                                    scope.launch { dragPx.animateTo(0f, dragSpring) }
                                 },
                             )
                         },
@@ -1678,6 +1686,17 @@ private fun CarMapSheetBody(
     // large: the map area already owns pan/pinch gestures of its own, and a
     // whole-sheet drag-to-dismiss would fight it for every downward pan.
     val dragPx = remember { Animatable(0f) }
+    // Read here, at composable scope, not inline inside the scope.launch{} blocks below --
+    // lowPowerAwareSpring is itself @Composable (it reads battery-saver state), so it can't
+    // be called from inside a suspend lambda. Captured once and referenced from both.
+    val dragSpring = lowPowerAwareSpring<Float>(dampingRatio = SoftDamping, stiffness = Spring.StiffnessMedium)
+    // Same reason as dragSpring above -- read here, not inside the scope.launch{} in close().
+    val closeSpring = lowPowerAwareSpring<Float>(dampingRatio = 0.95f, stiffness = Spring.StiffnessMedium)
+    // Same reason again -- read here, not inside the LaunchedEffect further down. Under
+    // battery saver this also replaces the sheet's own signature overshoot-and-settle
+    // "pop out of the pebble" open with the same quick, non-bouncy tween every other
+    // spring in the app falls back to.
+    val openSpring = lowPowerAwareSpring<Float>(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMediumLow)
 
     fun close() {
         if (closing) return
@@ -1686,8 +1705,8 @@ private fun CarMapSheetBody(
             // Both play at once so a mid-drag dismiss doesn't visibly snap dragPx
             // back to 0 before the slide-out starts. Use a spring for close to match
             // the bouncy open, but with much more damping so it settles quickly.
-            val a = scope.launch { visible.animateTo(0f, spring(dampingRatio = 0.95f, stiffness = Spring.StiffnessMedium)) }
-            val b = scope.launch { dragPx.animateTo(0f, spring(dampingRatio = 0.95f, stiffness = Spring.StiffnessMedium)) }
+            val a = scope.launch { visible.animateTo(0f, closeSpring) }
+            val b = scope.launch { dragPx.animateTo(0f, closeSpring) }
             a.join(); b.join()
             onDismiss()
         }
@@ -1707,7 +1726,7 @@ private fun CarMapSheetBody(
         // makes the map actually POP out of the pebble -- growing slightly past its
         // final size/position and settling back -- rather than smoothly easing into
         // place. Reported directly as wanting it to "pop out of the little map".
-        visible.animateTo(1f, spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMediumLow))
+        visible.animateTo(1f, openSpring)
     }
     Box(Modifier.fillMaxSize()) {
         // The scrim -- dims (and, with a real hazeState, blurs) the app behind the
@@ -1877,12 +1896,12 @@ private fun CarMapSheetBody(
                                     close()
                                 } else {
                                     scope.launch {
-                                        dragPx.animateTo(0f, spring(dampingRatio = SoftDamping))
+                                        dragPx.animateTo(0f, dragSpring)
                                     }
                                 }
                             },
                             onDragCancel = {
-                                scope.launch { dragPx.animateTo(0f, spring(dampingRatio = SoftDamping)) }
+                                scope.launch { dragPx.animateTo(0f, dragSpring) }
                             },
                         )
                     },
