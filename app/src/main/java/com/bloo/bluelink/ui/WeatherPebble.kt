@@ -27,7 +27,6 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.material3.ripple
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -65,7 +64,6 @@ import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.isSystemInDarkTheme
@@ -122,7 +120,6 @@ import dev.chrisbanes.haze.hazeSource
 import coil.compose.AsyncImage
 import coil.imageLoader
 import coil.request.ImageRequest
-import com.bloo.uicommon.dropShadow
 import com.bloo.bluelink.data.GeoLocation
 import com.bloo.bluelink.data.MapTiles
 import com.bloo.bluelink.data.Vehicle
@@ -1231,6 +1228,102 @@ internal fun CarMapSheet(
  * i.e. the full screen, at rest -- there is no way to "scale down" to a
  * smaller resting size without visibly squashing the map along the way.
  */
+/**
+ * The vehicle-name pill floating over the top-left of an expanded map sheet -- shared
+ * by [ExpandableMapLayer] and [CarMapSheetBody], which used to each hand-roll their
+ * own identical copy (right down to the same hardcoded padding). Wired to [mapHazeState]
+ * for a real blur of the map tiles behind it, same as [MapDragHandle] below already
+ * was -- the map's own name/refresh chrome was the one remaining spot in the app still
+ * missing a real blur layer, still on the flatly-blue `surfaceContainerHighest` fill
+ * already fixed everywhere else this session.
+ */
+@Composable
+private fun MapNamePill(vehicleName: String, mapHazeState: HazeState, modifier: Modifier = Modifier) {
+    // Position/offset is the caller's own concern (passed via [modifier]) -- the two
+    // call sites anchor this at different offsets from their sheet's own top edge.
+    GlassSurface(
+        shape = RoundedCornerShape(50),
+        modifier = modifier,
+        hazeState = mapHazeState,
+        contentColor = Color.White,
+    ) {
+        Text(
+            vehicleName,
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+        )
+    }
+}
+
+/**
+ * The "last refreshed" + refresh-now chip at the top-right of an expanded map sheet.
+ * Only [ExpandableMapLayer] has this one ([CarMapSheetBody] has no refresh action of
+ * its own), but it's pulled out alongside [MapNamePill] for the same reason: one
+ * definition instead of a hand-rolled `Surface` at the call site, and a real blur
+ * of [mapHazeState] it didn't have before.
+ */
+@Composable
+private fun MapRefreshChip(
+    lastFetchedAt: Long?,
+    onRefreshLocation: () -> Unit,
+    mapHazeState: HazeState,
+    modifier: Modifier = Modifier,
+) {
+    val rel = rememberRelativeTime(lastFetchedAt)
+    GlassSurface(
+        shape = RoundedCornerShape(50),
+        modifier = modifier.padding(end = 16.dp, top = 40.dp),
+        hazeState = mapHazeState,
+        contentColor = Color.White,
+        contentDescription = "Refresh location",
+        onClick = onRefreshLocation,
+    ) {
+        Row(
+            Modifier.padding(start = 14.dp, end = 10.dp, top = 8.dp, bottom = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            Text(
+                if (rel != null) "Updated $rel" else "Refresh",
+                style = MaterialTheme.typography.labelMedium,
+            )
+            Icon(Icons.Filled.Refresh, contentDescription = null, modifier = Modifier.size(16.dp))
+        }
+    }
+}
+
+/**
+ * The small frosted pill behind the map sheet's own drag handle -- shared by
+ * [ExpandableMapLayer] and [CarMapSheetBody], which used to each carry a byte-for-byte
+ * identical copy of this exact Box chain. Deliberately NOT built on [GlassSurface]:
+ * this one has always used a flat black tint regardless of the app's own light/dark
+ * theme (right, since it sits on a map, not a themed app surface) rather than
+ * [glassTint]'s theme-aware black/white, and its own inner bar is drawn directly
+ * rather than through a generic `content` slot -- close to but not quite the same
+ * shape as every other floating chip, so it stays its own small composable instead
+ * of forcing an extra "flat vs theme-aware tint" parameter onto the shared one.
+ */
+@Composable
+private fun MapDragHandle(mapHazeState: HazeState, modifier: Modifier = Modifier) {
+    val canBlurHandle = CanBlurBackdrops()
+    Box(
+        modifier
+            .padding(top = 8.dp)
+            .size(width = 56.dp, height = 20.dp)
+            .clip(RoundedCornerShape(50))
+            .then(if (canBlurHandle) Modifier.hazeEffect(state = mapHazeState) else Modifier)
+            .background(Color.Black.copy(alpha = if (canBlurHandle) 0.2f else 0.35f)),
+        contentAlignment = Alignment.Center,
+    ) {
+        Box(
+            Modifier
+                .size(width = 28.dp, height = 4.dp)
+                .background(Color.White.copy(alpha = 0.8f), RoundedCornerShape(2.dp)),
+        )
+    }
+}
+
 @Composable
 internal fun ExpandableMapLayer(
     isExpanded: Boolean,
@@ -1406,59 +1499,28 @@ internal fun ExpandableMapLayer(
             // Vehicle name pill (appears when expanded) -- top-left of the
             // SHEET, not the screen, same as everything else below.
             if (isExpanded && expandFraction.value > 0.1f) {
-                Surface(
-                    shape = RoundedCornerShape(50),
-                    color = MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = glassContainerAlpha()),
-                    contentColor = Color.White,
+                MapNamePill(
+                    vehicleName = vehicleName,
+                    mapHazeState = mapHazeState,
                     modifier = Modifier
                         .align(Alignment.TopStart)
                         .padding(start = 16.dp, top = 40.dp)
-                        .graphicsLayer { alpha = expandFraction.value.coerceIn(0f, 1f) }
-                        .dropShadow(RoundedCornerShape(50))
-                        .appGlassRim(RoundedCornerShape(50)),
-                ) {
-                    Text(
-                        vehicleName,
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-                    )
-                }
+                        .graphicsLayer { alpha = expandFraction.value.coerceIn(0f, 1f) },
+                )
             }
 
             // "Last refreshed" + a button to refresh the car's (and device's)
             // location right now -- reported directly as wanting both. Top-
             // right of the sheet, mirroring the name pill on the top-left.
             if (isExpanded && expandFraction.value > 0.1f) {
-                val rel = rememberRelativeTime(lastFetchedAt)
-                Surface(
-                    shape = RoundedCornerShape(50),
-                    color = MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = glassContainerAlpha()),
-                    contentColor = Color.White,
+                MapRefreshChip(
+                    lastFetchedAt = lastFetchedAt,
+                    onRefreshLocation = onRefreshLocation,
+                    mapHazeState = mapHazeState,
                     modifier = Modifier
                         .align(Alignment.TopEnd)
-                        .padding(end = 16.dp, top = 40.dp)
-                        .graphicsLayer { alpha = expandFraction.value.coerceIn(0f, 1f) }
-                        .dropShadow(RoundedCornerShape(50))
-                        .appGlassRim(RoundedCornerShape(50))
-                        .clickable(
-                            interactionSource = remember { MutableInteractionSource() },
-                            indication = ripple(),
-                            onClick = onRefreshLocation,
-                        ),
-                ) {
-                    Row(
-                        Modifier.padding(start = 14.dp, end = 10.dp, top = 8.dp, bottom = 8.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    ) {
-                        Text(
-                            if (rel != null) "Updated $rel" else "Refresh",
-                            style = MaterialTheme.typography.labelMedium,
-                        )
-                        Icon(Icons.Filled.Refresh, contentDescription = "Refresh location", modifier = Modifier.size(16.dp))
-                    }
-                }
+                        .graphicsLayer { alpha = expandFraction.value.coerceIn(0f, 1f) },
+                )
             }
 
             // Bottom buttons (appear when expanded)
@@ -1514,30 +1576,10 @@ internal fun ExpandableMapLayer(
                         },
                     contentAlignment = Alignment.TopCenter,
                 ) {
-                    // A small frosted chip behind the handle pill, same pattern as
-                    // CarMapSheetBody's own drag handle -- blurs the map on API 31+
-                    // (where Haze's RenderEffect backing exists), or just darkens on
-                    // older devices, so the pill stays visible over any tile content.
-                    val canBlurHandle = CanBlurBackdrops()
-                    Box(
-                        Modifier
-                            .padding(top = 8.dp)
-                            .size(width = 56.dp, height = 20.dp)
-                            .clip(RoundedCornerShape(50))
-                            .then(
-                                if (canBlurHandle) Modifier.hazeEffect(state = mapHazeState)
-                                else Modifier,
-                            )
-                            .background(Color.Black.copy(alpha = if (canBlurHandle) 0.2f else 0.35f))
-                            .graphicsLayer { alpha = expandFraction.value.coerceIn(0f, 1f) },
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        Box(
-                            Modifier
-                                .size(width = 28.dp, height = 4.dp)
-                                .background(Color.White.copy(alpha = 0.8f), RoundedCornerShape(2.dp)),
-                        )
-                    }
+                    MapDragHandle(
+                        mapHazeState = mapHazeState,
+                        modifier = Modifier.graphicsLayer { alpha = expandFraction.value.coerceIn(0f, 1f) },
+                    )
                 }
             }
         }
@@ -1840,24 +1882,14 @@ private fun CarMapSheetBody(
             // uses ([FloatingIcon]'s own colour/rim/shadow), not bare text with a
             // drop shadow. Reported directly as wanting it "in some sort of
             // floating element" rather than text alone sitting on the map.
-            Surface(
-                shape = RoundedCornerShape(50),
-                color = MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = glassContainerAlpha()),
-                contentColor = Color.White,
+            MapNamePill(
+                vehicleName = vehicleName,
+                mapHazeState = mapHazeState,
                 modifier = Modifier
                     .align(Alignment.TopStart)
                     .padding(horizontal = 16.dp, vertical = 12.dp)
-                    .graphicsLayer { alpha = visible.value.coerceIn(0f, 1f) }
-                    .dropShadow(RoundedCornerShape(50))
-                    .appGlassRim(RoundedCornerShape(50)),
-            ) {
-                Text(
-                    vehicleName,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-                )
-            }
+                    .graphicsLayer { alpha = visible.value.coerceIn(0f, 1f) },
+            )
             // No close (X) button -- swipe-to-dismiss (or tapping the scrim above the
             // sheet) is already how this closes; a second, redundant affordance for
             // the same action was reported directly as unwanted clutter.
@@ -1923,39 +1955,7 @@ private fun CarMapSheetBody(
                     },
                 contentAlignment = Alignment.TopCenter,
             ) {
-                // A small frosted chip behind the pill itself, blurring the map
-                // (via mapHazeState -- see its own doc for why this one, not the
-                // sheet's own [hazeState]) -- reported directly as wanting the
-                // handle "more visible": a bare translucent bar sitting directly on
-                // the map read fine over open sky but vanished over a light road or
-                // a bright building roof right under it. Blurring (on API 31+,
-                // where Haze's RenderEffect backing actually exists -- same
-                // canBlur guard StatusBarScrim uses) or, on older devices, just
-                // darkening the map immediately behind this one small area
-                // guarantees contrast for the pill regardless of what's drawn
-                // under it.
-                val canBlurHandle = CanBlurBackdrops()
-                Box(
-                    Modifier
-                        .padding(top = 8.dp)
-                        .size(width = 56.dp, height = 20.dp)
-                        .clip(RoundedCornerShape(50))
-                        .then(
-                            if (canBlurHandle) {
-                                Modifier.hazeEffect(state = mapHazeState)
-                            } else {
-                                Modifier
-                            },
-                        )
-                        .background(Color.Black.copy(alpha = if (canBlurHandle) 0.2f else 0.35f)),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Box(
-                        Modifier
-                            .size(width = 28.dp, height = 4.dp)
-                            .background(Color.White.copy(alpha = 0.8f), RoundedCornerShape(2.dp)),
-                    )
-                }
+                MapDragHandle(mapHazeState = mapHazeState)
             }
         }
     }

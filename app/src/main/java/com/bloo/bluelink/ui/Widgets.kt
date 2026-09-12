@@ -21,7 +21,6 @@ import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -58,7 +57,6 @@ import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -95,7 +93,6 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import com.bloo.bluelink.data.SettingsStore
-import com.bloo.uicommon.dropShadow
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import com.bloo.uicommon.coldStartIntroPlayed
@@ -305,46 +302,30 @@ internal fun FloatingIcon(
         animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium),
         label = "floatIconScale",
     )
-    // The blur (when hazeState is given) sits in its OWN Box behind the Surface,
-    // not as a modifier on the Surface itself: Surface paints its own `color`
-    // fill internally as part of the same modifier chain, so there's no reliable
-    // way to slot a blur BETWEEN that fill and whatever's behind it from inside
-    // Surface's own modifier parameter -- the same reason the map sheet's scrim/
-    // drag-handle chip use a plain Box for this rather than Surface.
-    Box(
-        modifier = modifier.padding(outerPadding).size(HeaderButtonSize),
-        contentAlignment = Alignment.Center,
-    ) {
-        if (hazeState != null && CanBlurBackdrops()) {
-            Box(Modifier.matchParentSize().clip(CircleShape).hazeEffect(state = hazeState))
-        }
-        // Plain semi-transparent fill (see GlassChrome.kt) -- more transparent
-        // than the original flat version per feedback that it read as too opaque.
-        // The ambient halo/shadow frame it over car photos. Layers over the blur
-        // Box above exactly like StatusBarScrim's own tint layers over its blur.
-        Surface(
-            onClick = { haptics?.click(); onClick() },
-            shape = CircleShape,
-            color = containerColor ?: MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = glassContainerAlpha()),
-            contentColor = contentColor,
-            interactionSource = interaction,
-            modifier = Modifier
-                .fillMaxSize()
-                // Lambda form: the press spring is read at DRAW time, so the animation
-                // never recomposes this button (the arg-taking overload reads it in
-                // composition instead -- see ExpressiveButtons.kt for the same fix).
-                .graphicsLayer {
-                    scaleX = scale
-                    scaleY = scale
-                }
-                .ambientRing(CircleShape)
-                .dropShadow(CircleShape)
-                .appGlassRim(CircleShape),
-        ) {
-            Box(contentAlignment = Alignment.Center) {
-                Icon(icon, contentDescription = description)
+    // GlassSurface (GlassChrome.kt) is the shared layered fill/blur/rim/shadow
+    // every floating pill/circle/chip in the app now goes through -- see its own
+    // doc for why this used to be its own hand-rolled Box+Surface here.
+    GlassSurface(
+        shape = CircleShape,
+        modifier = modifier
+            .padding(outerPadding)
+            .size(HeaderButtonSize)
+            // Lambda form: the press spring is read at DRAW time, so the animation
+            // never recomposes this button (the arg-taking overload reads it in
+            // composition instead -- see ExpressiveButtons.kt for the same fix).
+            .graphicsLayer {
+                scaleX = scale
+                scaleY = scale
             }
-        }
+            .ambientRing(CircleShape),
+        hazeState = hazeState,
+        tint = containerColor ?: glassTint(hazeState != null && CanBlurBackdrops()),
+        contentColor = contentColor,
+        contentDescription = description,
+        interactionSource = interaction,
+        onClick = { haptics?.click(); onClick() },
+    ) {
+        Icon(icon, contentDescription = null)
     }
 }
 
@@ -524,12 +505,13 @@ internal fun rememberRelativeTime(millis: Long?): String? {
  */
 @Composable
 internal fun MetaChip(text: String, modifier: Modifier = Modifier, icon: ImageVector? = null) {
-    val dark = isSystemInDarkTheme()
-    Surface(
+    // GlassSurface (GlassChrome.kt): no hazeState in scope at this composable's own
+    // call sites today, so this still falls back to the same plain tint it always
+    // had -- but now through the one shared implementation instead of its own copy.
+    GlassSurface(
         shape = RoundedCornerShape(50),
-        color = if (dark) Color.Black.copy(alpha = 0.55f) else Color.White.copy(alpha = 0.75f),
+        modifier = modifier,
         contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
-        modifier = modifier.dropShadow(RoundedCornerShape(50)).appGlassRim(RoundedCornerShape(50)),
     ) {
         Row(
             Modifier.padding(horizontal = 10.dp, vertical = 5.dp),

@@ -20,7 +20,6 @@ import androidx.compose.animation.core.tween
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -103,7 +102,6 @@ import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.IntOffset
@@ -311,13 +309,15 @@ internal fun Refreshable(
             // screenshot, right after the SAME root cause was already fixed once for
             // MetaChip and the grid layout's own refresh circle ("it should be a neutral
             // colour... not a primary") -- this is the third spot the identical theme-vs-
-            // neutral mismatch showed up in. Plain black/white by theme, matching those
-            // two fixes exactly, not a MaterialTheme.colorScheme token.
-            val dark = isSystemInDarkTheme()
+            // neutral mismatch showed up in. [glassTint] (GlassChrome.kt), the same shared
+            // fill every other floating glass chip in the app resolves through -- this is
+            // the one call site that can't be [GlassSurface] itself (this whole indicator,
+            // shape and all, belongs to `PullToRefreshDefaults`, which only takes a plain
+            // `Color`, not a composable layering), so it calls the tint half directly.
             PullToRefreshDefaults.LoadingIndicator(
                 state = ptrState,
                 isRefreshing = refreshing,
-                containerColor = if (dark) Color.Black.copy(alpha = 0.55f) else Color.White.copy(alpha = 0.75f),
+                containerColor = glassTint(blurred = false),
                 modifier = Modifier
                     .align(Alignment.TopCenter)
                     .offset {

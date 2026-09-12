@@ -9,7 +9,6 @@ package com.bloo.bluelink.ui
 
 import android.os.Build
 import dev.chrisbanes.haze.HazeState
-import dev.chrisbanes.haze.hazeEffect
 import dev.chrisbanes.haze.hazeSource
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
@@ -24,7 +23,6 @@ import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.ui.graphics.Color
 import androidx.compose.animation.core.snap
 import androidx.compose.foundation.layout.Box
@@ -54,7 +52,6 @@ import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.Surface
 import androidx.compose.foundation.shape.CircleShape
-import com.bloo.uicommon.dropShadow
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
@@ -74,7 +71,6 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.graphicsLayer
@@ -816,39 +812,16 @@ internal fun GarageScreen(state: State<UiState>, vm: AppViewModel) {
                             // shape-morphing indicator was floating bare over whatever
                             // content happened to be underneath.
                             //
-                            // A REAL blur now, not just a tint -- reported directly ("it's not
-                            // actual glass") after the first fix here (a flat, un-blurred
-                            // neutral fill) landed. Same layered pattern FloatingIcon's own
-                            // hazeState path already uses: a hazeEffect Box first (this
-                            // screen's own hazeState -- its own `hazeSource` marks the actual
-                            // background behind this whole screen as blurrable), a
-                            // semi-transparent neutral tint OVER that (lighter than a flat
-                            // fill needs to be, since the blur itself already does most of the
-                            // legibility work), then the rim/shadow every other floating icon
-                            // on this screen uses. Plain black/white by theme for the tint,
-                            // not a MaterialTheme.colorScheme token -- see MetaChip's own doc
-                            // for why a "neutral" tonal role isn't actually hue-independent
-                            // under this app's dynamic/custom palette.
-                            val dark = isSystemInDarkTheme()
-                            Box(
-                                modifier = Modifier
-                                    .size(HeaderButtonSize)
-                                    .dropShadow(CircleShape)
-                                    .appGlassRim(CircleShape),
-                                contentAlignment = Alignment.Center,
+                            // GlassSurface (GlassChrome.kt): the shared layered blur/tint/rim/
+                            // shadow every floating pill/circle/chip in the app now goes
+                            // through, this screen's own hazeState (its `hazeSource` marks the
+                            // actual background behind this whole screen as blurrable) giving
+                            // this a REAL blur instead of just a flat tint.
+                            GlassSurface(
+                                shape = CircleShape,
+                                modifier = Modifier.size(HeaderButtonSize),
+                                hazeState = hazeState,
                             ) {
-                                if (CanBlurBackdrops()) {
-                                    Box(Modifier.matchParentSize().clip(CircleShape).hazeEffect(state = hazeState))
-                                }
-                                Box(
-                                    Modifier
-                                        .matchParentSize()
-                                        .clip(CircleShape)
-                                        .background(
-                                            if (dark) Color.Black.copy(alpha = if (CanBlurBackdrops()) 0.25f else 0.55f)
-                                            else Color.White.copy(alpha = if (CanBlurBackdrops()) 0.35f else 0.75f),
-                                        ),
-                                )
                                 LoadingIndicator()
                             }
                         }
