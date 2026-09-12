@@ -32,6 +32,7 @@ import androidx.compose.runtime.remember
 // this file's other extension functions, which show up as unresolved-reference errors
 // instead of this one's more oblique "has no method getValue... cannot serve as a delegate").
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
