@@ -28,7 +28,6 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.material3.ripple
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -228,48 +227,32 @@ internal fun LocationPebble(v: Vehicle, state: UiState, vm: AppViewModel, dragHa
                     // headline. This tile rendered the address three times at once -- headline,
                     // hero and the map stripe's caption.
                 }
-                // The ACTUAL CarMap is now rendered at the screen level as a single,
-                // repositionable instance. This pebble just provides a placeholder that
-                // captures its position and location data. When collapsed, the map at
-                // screen level is positioned here and clipped to pebble size. When
-                // expanded, the same map grows to fill the screen. No morphing, no
-                // illusion -- literally the same Box growing.
+                // A live CarMap, visible in the pebble at all times -- NOT a
+                // placeholder. Sharing expandedMap.mapStateFor(v.vin) with the
+                // full-screen overlay (ExpandableMapLayer, in GarageScreen) means
+                // both read/write the exact same pan/zoom/tile cache; this one is
+                // simply hidden (alpha 0, not removed -- it stays composed and
+                // measured so onGloballyPositioned keeps reporting a live,
+                // current originBounds) for the moment its OWN vehicle is the one
+                // expanded full-screen.
                 val expandedMap = LocalExpandedMap.current
                 if (expandedMap != null) {
                     val isExpanded = expandedMap.vin == v.vin
-                    // Placeholder: captures pebble bounds and location. The real
-                    // CarMap is drawn at GarageScreen level as an overlay.
-                    Box(
+                    CarMap(
+                        loc,
                         Modifier
                             .fillMaxWidth()
                             .height(if (coverGlance) 130.dp else 220.dp)
                             .clip(RoundedCornerShape(18.dp))
-                            .background(
-                                // Dark bg so it's visible while the map loads/transitions
-                                MaterialTheme.colorScheme.surfaceContainerHigh
-                            )
                             .onGloballyPositioned {
                                 expandedMap.originBoundsFor(v.vin).value = Rect(it.positionOnScreen(), it.size.toSize())
-                                // Also track the location for the map
                                 expandedMap.locationFor(v.vin).value = loc
                             }
-                            .clickable(
-                                interactionSource = remember { MutableInteractionSource() },
-                                indication = ripple(),
-                            ) {
-                                if (!isExpanded) expandedMap.vin = v.vin
-                            },
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        if (!isExpanded) {
-                            Icon(
-                                Icons.Filled.Map,
-                                contentDescription = "Expand map",
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.size(48.dp),
-                            )
-                        }
-                    }
+                            .graphicsLayer { alpha = if (isExpanded) 0f else 1f },
+                        state = expandedMap.mapStateFor(v.vin),
+                        deviceLocation = state.deviceLocation,
+                        onExpand = { expandedMap.vin = v.vin },
+                    )
                 } else {
                     var showMapSheet by remember { mutableStateOf(false) }
                     var mapOriginBounds by remember { mutableStateOf<Rect?>(null) }
