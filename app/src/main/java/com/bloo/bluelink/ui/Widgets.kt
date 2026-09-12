@@ -21,6 +21,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
@@ -167,7 +168,15 @@ internal fun StatusBarScrim(
 ) {
     if (inMultiWindowMode) return
     val topInset = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
-    val scheme = MaterialTheme.colorScheme
+    // Plain black/white by theme, not scheme.surface -- the one glass tint left in the
+    // app still reading a MaterialTheme.colorScheme token instead of the same neutral
+    // fill every other glass surface uses. `surface` is one of Material3's LEAST tinted
+    // roles, but it is still a token this app's dynamic/custom palette can feed a slice
+    // of the seed colour, same root cause as every other spot this was already fixed at
+    // (see MetaChip's own doc) -- this scrim just hadn't been swept yet. Its own alpha
+    // pair (0.45/0.7) is kept as-is; only the hue source changes.
+    val dark = isSystemInDarkTheme()
+    val scrimBase = if (dark) Color.Black else Color.White
     // Modifier.blur (the hazeState == null fallback path below) is backed by
     // RenderEffect, which the Android framework only implements from API 31 (S)
     // onward -- Compose has no software fallback for it, and neither does Haze's own
@@ -219,7 +228,7 @@ internal fun StatusBarScrim(
                     // 0.45/0.7, down from 0.55/0.8 -- the same "a bit less strong" request,
                     // applied to this gradient's own tint (which layers over the blur
                     // above, or stands alone on the pre-S/no-hazeState fallback path).
-                    listOf(scheme.surface.copy(alpha = if (canBlur) 0.45f else 0.7f), Color.Transparent),
+                    listOf(scrimBase.copy(alpha = if (canBlur) 0.45f else 0.7f), Color.Transparent),
                 ),
             )
             .then(
