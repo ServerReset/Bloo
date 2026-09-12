@@ -16,7 +16,6 @@ package com.bloo.bluelink.ui
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
-import android.os.Build
 import androidx.browser.customtabs.CustomTabsIntent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Animatable
@@ -118,7 +117,6 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.compose.ui.window.DialogWindowProvider
 import dev.chrisbanes.haze.HazeState
-import dev.chrisbanes.haze.HazeProgressive
 import dev.chrisbanes.haze.hazeEffect
 import dev.chrisbanes.haze.hazeSource
 import coil.compose.AsyncImage
@@ -1162,6 +1160,7 @@ internal fun ExpandableMapLayer(
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+    val density = LocalDensity.current
     val mapHazeState = remember { HazeState() }
 
     // Animate from pebble size to full screen. Always starts at 0f: GarageScreen
@@ -1183,9 +1182,26 @@ internal fun ExpandableMapLayer(
         )
     }
 
+    // How far the drag handle has actually been pulled down, in px -- the SAME
+    // real drag-to-dismiss CarMapSheetBody's own handle uses (its own `dragPx`;
+    // see that doc). The handle's own pointerInput below is the only thing that
+    // feeds this: the map area already owns pan/pinch of its own, and a whole-
+    // sheet drag-to-dismiss would fight it on every downward pan. Reported
+    // directly as wanting the handle to be "genuinely a pull-down" -- the
+    // previous version here ignored the drag delta entirely and closed on ANY
+    // touch-up on the handle, including a tiny accidental tap.
+    val dragPx = remember { Animatable(0f) }
+    var closing by remember { mutableStateOf(false) }
+
     fun close() {
+        if (closing) return
+        closing = true
         scope.launch {
-            expandFraction.animateTo(0f, animationSpec = spring(dampingRatio = 0.95f, stiffness = Spring.StiffnessMedium))
+            // Both play at once so a mid-drag dismiss doesn't visibly snap dragPx
+            // back to 0 before the sheet itself starts shrinking away.
+            val a = scope.launch { expandFraction.animateTo(0f, animationSpec = spring(dampingRatio = 0.95f, stiffness = Spring.StiffnessMedium)) }
+            val b = scope.launch { dragPx.animateTo(0f, animationSpec = spring(dampingRatio = 0.95f, stiffness = Spring.StiffnessMedium)) }
+            a.join(); b.join()
             onDismiss()
         }
     }
@@ -1216,7 +1232,7 @@ internal fun ExpandableMapLayer(
                         .fillMaxSize()
                         .graphicsLayer { alpha = expandFraction.value.coerceIn(0f, 1f) }
                         .hazeEffect(state = hazeState) {
-                            progressive = HazeProgressive.verticalGradient(startIntensity = 1f, endIntensity = 0f)
+                            progressive = StandardBlurProgressive
                         }
                 )
             }
@@ -1251,10 +1267,11 @@ internal fun ExpandableMapLayer(
                         scaleX = originScaleX + (1f - originScaleX) * t
                         scaleY = originScaleY + (1f - originScaleY) * t
                         translationX = (originBounds.center.x - full.center.x) * (1f - t)
-                        translationY = (originBounds.center.y - full.center.y) * (1f - t)
+                        translationY = (originBounds.center.y - full.center.y) * (1f - t) + dragPx.value
                     } else {
                         scaleX = 0.92f + 0.08f * t
                         scaleY = 0.92f + 0.08f * t
+                        translationY = dragPx.value
                     }
                 }
                 .clip(RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp))
@@ -1354,8 +1371,27 @@ internal fun ExpandableMapLayer(
                         .height(40.dp)
                         .pointerInput(Unit) {
                             detectVerticalDragGestures(
-                                onVerticalDrag = { _, _ -> },
-                                onDragEnd = { close() },
+                                onVerticalDrag = { change, amount ->
+                                    change.consume()
+                                    scope.launch { dragPx.snapTo((dragPx.value + amount).coerceAtLeast(0f)) }
+                                },
+                                onDragEnd = {
+                                    // Distance, not velocity -- a fixed 96dp pull is a
+                                    // close enough stand-in for "the user clearly meant
+                                    // to close this". Same threshold CarMapSheetBody's
+                                    // own handle uses.
+                                    val thresholdPx = with(density) { 96.dp.toPx() }
+                                    if (dragPx.value > thresholdPx) {
+                                        close()
+                                    } else {
+                                        scope.launch {
+                                            dragPx.animateTo(0f, spring(dampingRatio = SoftDamping))
+                                        }
+                                    }
+                                },
+                                onDragCancel = {
+                                    scope.launch { dragPx.animateTo(0f, spring(dampingRatio = SoftDamping)) }
+                                },
                             )
                         },
                     contentAlignment = Alignment.TopCenter,
@@ -1364,7 +1400,7 @@ internal fun ExpandableMapLayer(
                     // CarMapSheetBody's own drag handle -- blurs the map on API 31+
                     // (where Haze's RenderEffect backing exists), or just darkens on
                     // older devices, so the pill stays visible over any tile content.
-                    val canBlurHandle = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
+                    val canBlurHandle = CanBlurBackdrops
                     Box(
                         Modifier
                             .padding(top = 8.dp)
@@ -1587,7 +1623,7 @@ private fun CarMapSheetBody(
                             // and a flat blur across all of it read as a uniform
                             // smear with a hard edge at the sheet's own top corner
                             // rather than a soft transition into it.
-                            progressive = HazeProgressive.verticalGradient(startIntensity = 1f, endIntensity = 0f)
+                            progressive = StandardBlurProgressive
                         },
                 )
             }
@@ -1780,7 +1816,7 @@ private fun CarMapSheetBody(
                 // darkening the map immediately behind this one small area
                 // guarantees contrast for the pill regardless of what's drawn
                 // under it.
-                val canBlurHandle = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
+                val canBlurHandle = CanBlurBackdrops
                 Box(
                     Modifier
                         .padding(top = 8.dp)

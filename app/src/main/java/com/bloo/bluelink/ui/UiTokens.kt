@@ -153,6 +153,30 @@ internal val SettingsGapSection = 16.dp
 
 internal val SettingsCardGap = 10.dp
 
+// ---- Blur -----------------------------------------------------------------------
+//
+// Every real Haze backdrop-blur site in the app (StatusBarScrim, the map sheet's
+// scrim, FloatingIcon, the map's drag-handle chip) had drifted into its own
+// hand-copied `Build.VERSION.SDK_INT >= Build.VERSION_CODES.S` gate and, for the
+// two full-height scrims, its own literal `HazeProgressive.verticalGradient(
+// startIntensity = 1f, endIntensity = 0f)` call -- three copies of the exact same
+// expression. Reported directly as wanting the blur "standardized" across the
+// app: pulled here so every site shares the same instances instead of four
+// separately-typed, easy-to-drift copies.
+
+/** True on API 31+, where Haze's real RenderEffect-backed blur exists at all --
+ *  below that it silently no-ops, so call sites gate on this to fall back to a
+ *  plain darkened/tinted layer instead of asking for a blur that won't render. */
+internal val CanBlurBackdrops: Boolean = android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S
+
+/** The one shape every full-height scrim's blur uses: strong right at the edge
+ *  it grows from, tapering to none by its own far edge -- "like a gradient of
+ *  blur", not a flat smear with a hard cutoff. Shared by StatusBarScrim and the
+ *  map sheet's own scrim; anything single-value/flat (FloatingIcon, the drag-
+ *  handle chip) has no shape to standardize and doesn't use this. */
+internal val StandardBlurProgressive
+    get() = dev.chrisbanes.haze.HazeProgressive.verticalGradient(startIntensity = 1f, endIntensity = 0f)
+
 // ---- Motion -------------------------------------------------------------------
 
 // Aliases onto :uicommon so the phone and the watch read as the same controls.

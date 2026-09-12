@@ -7,9 +7,7 @@
 
 package com.bloo.bluelink.ui
 
-import android.os.Build
 import dev.chrisbanes.haze.HazeState
-import dev.chrisbanes.haze.HazeProgressive
 import dev.chrisbanes.haze.hazeEffect
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.fadeIn
@@ -183,7 +181,7 @@ internal fun StatusBarScrim(
     // stronger gradient (blur's whole job, legibility under the status bar icons,
     // otherwise falls entirely on a fairly light 0.55 alpha fade) instead of
     // silently doing less than intended.
-    val canBlur = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
+    val canBlur = CanBlurBackdrops
     Box(
         Modifier
             .fillMaxWidth()
@@ -213,7 +211,7 @@ internal fun StatusBarScrim(
                     // faded. startIntensity/endIntensity is Haze's own blur-radius
                     // gradient, independent of (and layered under) the tint gradient below.
                     Modifier.hazeEffect(state = hazeState) {
-                        progressive = HazeProgressive.verticalGradient(startIntensity = 1f, endIntensity = 0f)
+                        progressive = StandardBlurProgressive
                     }
                 } else {
                     Modifier
@@ -316,7 +314,7 @@ internal fun FloatingIcon(
         modifier = modifier.padding(outerPadding).size(HeaderButtonSize),
         contentAlignment = Alignment.Center,
     ) {
-        if (hazeState != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+        if (hazeState != null && CanBlurBackdrops) {
             Box(Modifier.matchParentSize().clip(CircleShape).hazeEffect(state = hazeState))
         }
         // Plain semi-transparent fill (see GlassChrome.kt) -- more transparent

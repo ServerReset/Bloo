@@ -63,6 +63,9 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.foundation.layout.wrapContentWidth
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Pin
 import androidx.compose.material.icons.filled.LockReset
@@ -82,6 +85,14 @@ import androidx.compose.material.icons.filled.CloudSync
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.SystemUpdate
 import androidx.compose.material.icons.filled.OpenInNew
+import androidx.compose.material.icons.filled.Map
+import androidx.compose.material.icons.filled.BlurOn
+import androidx.compose.material.icons.filled.Image
+import androidx.compose.material.icons.filled.Widgets
+import androidx.compose.material.icons.filled.Code
+import androidx.compose.material.icons.filled.AdminPanelSettings
+import androidx.compose.material.icons.filled.DataObject
+import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.LockOpen
@@ -2126,40 +2137,71 @@ internal fun SettingsScreen(
                 // a visible attribution; this is that, even if it isn't literally overlaid
                 // on the map itself.
                 SettingsCard("Credits", Icons.Filled.Info, vm) {
-                    Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
-                        listOf(
-                            Triple(
-                                "OpenStreetMap",
-                                "Map tiles for the car's and device's location, on the phone, the flip cover, the home-screen widget, and the watch.",
-                                "© OpenStreetMap contributors · openstreetmap.org",
-                            ),
-                            Triple(
-                                "Haze",
-                                "Real backdrop blur behind the status bar.",
-                                "github.com/chrisbanes/haze",
-                            ),
-                            Triple(
-                                "Coil",
-                                "Image loading throughout the app.",
-                                "github.com/coil-kt/coil",
-                            ),
-                            Triple(
-                                "i5-AutoLock",
-                                "AutoLock ported from Vel-San's reference implementation.",
-                                "github.com/Vel-San/i5-AutoLock",
-                            ),
-                        ).forEach { (name, description, link) ->
-                            Column {
-                                Text(name, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
-                                Text(
-                                    description,
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                )
-                                Text(
-                                    link,
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    Column {
+                        val credits = remember {
+                            listOf(
+                                CreditEntry(
+                                    "OpenStreetMap",
+                                    "Map tiles for the car's and device's location, on the phone, the flip cover, the home-screen widget, and the watch. © OpenStreetMap contributors.",
+                                    "https://www.openstreetmap.org/copyright",
+                                    Icons.Filled.Map,
+                                ),
+                                CreditEntry(
+                                    "Haze",
+                                    "Real backdrop blur behind the status bar and the full-screen map sheet.",
+                                    "https://github.com/chrisbanes/haze",
+                                    Icons.Filled.BlurOn,
+                                ),
+                                CreditEntry(
+                                    "Coil",
+                                    "Image loading throughout the app -- car photos, map tiles, everything.",
+                                    "https://github.com/coil-kt/coil",
+                                    Icons.Filled.Image,
+                                ),
+                                CreditEntry(
+                                    "i5-AutoLock",
+                                    "AutoLock ported from Vel-San's original reference implementation.",
+                                    "https://github.com/Vel-San/i5-AutoLock",
+                                    Icons.Filled.Lock,
+                                ),
+                                CreditEntry(
+                                    "Jetpack Compose",
+                                    "The UI toolkit this entire app -- every screen, every pebble, every animation -- is built with.",
+                                    "https://developer.android.com/jetpack/compose",
+                                    Icons.Filled.Widgets,
+                                ),
+                                CreditEntry(
+                                    "Kotlin",
+                                    "The language everything here, front to back, is written in.",
+                                    "https://kotlinlang.org",
+                                    Icons.Filled.Code,
+                                ),
+                                CreditEntry(
+                                    "kotlinx.serialization",
+                                    "Every persisted setting, cached response and the whole phone ↔ watch sync protocol.",
+                                    "https://github.com/Kotlin/kotlinx.serialization",
+                                    Icons.Filled.DataObject,
+                                ),
+                                CreditEntry(
+                                    "OkHttp",
+                                    "Every network request this app makes.",
+                                    "https://square.github.io/okhttp",
+                                    Icons.Filled.Language,
+                                ),
+                                CreditEntry(
+                                    "Shizuku",
+                                    "Optional silent-install path for updates, skipping the manual \"Install anyway\" prompt.",
+                                    "https://github.com/RikkaApps/Shizuku",
+                                    Icons.Filled.AdminPanelSettings,
+                                ),
+                            )
+                        }
+                        credits.forEachIndexed { index, entry ->
+                            CreditRow(entry)
+                            if (index != credits.lastIndex) {
+                                HorizontalDivider(
+                                    modifier = Modifier.padding(vertical = 10.dp),
+                                    color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f),
                                 )
                             }
                         }
@@ -2310,4 +2352,72 @@ internal fun SettingsScreen(
             }
         }
   }
+
+/** One entry in the Credits card -- see [CreditRow]. */
+private data class CreditEntry(
+    val name: String,
+    val description: String,
+    val url: String,
+    val icon: ImageVector,
+)
+
+/**
+ * One row of the Credits card: a small icon chip, the project's name/description,
+ * and its actual URL as a tappable link (opened via [openUrl] in a Custom Tab) --
+ * replacing what used to be three plain, uncoloured, unclickable Text lines with no
+ * visual distinction between them at all. Reported directly as wanting this whole
+ * section "beefed out" with real links, not a flat wall of tiny grey text.
+ */
+@Composable
+private fun CreditRow(entry: CreditEntry) {
+    val context = LocalContext.current
+    Row(
+        Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(14.dp),
+    ) {
+        Surface(
+            shape = CircleShape,
+            color = MaterialTheme.colorScheme.secondaryContainer,
+            contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+        ) {
+            Icon(entry.icon, contentDescription = null, modifier = Modifier.padding(10.dp).size(20.dp))
+        }
+        Column(Modifier.weight(1f)) {
+            Text(entry.name, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
+            Spacer(Modifier.height(2.dp))
+            Text(
+                entry.description,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Spacer(Modifier.height(6.dp))
+            // The actual link, styled and tappable -- not a caption-coloured, inert
+            // copy of the URL. clip+clickable (not the whole Row, which would make
+            // the icon/name/description look tappable too when only the link is)
+            // sized to just this Row's own content via wrapContentWidth, so the tap
+            // target doesn't stretch across empty space to the card's far edge.
+            Row(
+                Modifier
+                    .clip(RoundedCornerShape(6.dp))
+                    .clickable { openUrl(context, entry.url, inApp = true) }
+                    .wrapContentWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+                Text(
+                    entry.url.removePrefix("https://").removePrefix("http://"),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.primary,
+                    textDecoration = TextDecoration.Underline,
+                )
+                Icon(
+                    Icons.Filled.OpenInNew,
+                    contentDescription = "Open link",
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(12.dp),
+                )
+            }
+        }
+    }
+}
 }
