@@ -20,9 +20,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
@@ -110,7 +108,6 @@ import androidx.compose.ui.unit.dp
 import com.bloo.bluelink.data.brand
 import com.bloo.bluelink.data.Vehicle
 import com.bloo.uicommon.connectedGroupShape
-import com.bloo.uicommon.dropShadow
 import com.bloo.bluelink.data.Weather
 import com.bloo.bluelink.data.supportsHornLights
 import com.bloo.bluelink.data.isGen5W
@@ -412,12 +409,7 @@ internal fun ControlsPebble(v: Vehicle, state: UiState, vm: AppViewModel, dragHa
                     ) { showHistory = !showHistory; true },
                 )
             }
-            .dropShadow(shape, blurRadius = 12.dp, offsetY = 4.dp)
-            .then(
-                if (pebbleOutline) {
-                    Modifier.border(BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.55f)), shape)
-                } else Modifier,
-            ),
+            .pebbleCardEdge(shape, pebbleOutline),
         shape = shape,
         color = MaterialTheme.colorScheme.surfaceVariant,
         contentColor = MaterialTheme.colorScheme.onSurface,

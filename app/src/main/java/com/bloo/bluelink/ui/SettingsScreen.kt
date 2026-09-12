@@ -923,7 +923,10 @@ internal fun SettingsScreen(
                                 Modifier
                                     .fillMaxWidth()
                                     .clip(RoundedCornerShape(16.dp))
-                                    .background(MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.5f))
+                                    // glassTint, not a one-off surfaceContainerHighest/0.5f literal --
+                                    // the same shared neutral fill every other glass surface in the
+                                    // app uses, not a fourth slightly-different copy of the same idea.
+                                    .background(glassTint(blurred = false))
                                     .padding(horizontal = 14.dp, vertical = 12.dp),
                                 verticalArrangement = Arrangement.spacedBy(8.dp),
                             ) {

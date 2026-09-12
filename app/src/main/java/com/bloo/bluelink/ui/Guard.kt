@@ -14,7 +14,6 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -57,7 +56,6 @@ import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -290,14 +288,14 @@ internal fun LockOverlay(vm: AppViewModel) {
                 }
             } else if (appState.appPinSet) {
                 // --- PIN prompt (device has no biometrics, or user chose PIN) --
-                Surface(
+                // GlassSurface (GlassChrome.kt): the same fill/rim/shadow every other
+                // floating surface in the app shares, replacing this card's own
+                // one-off near-opaque fill and its own separately-hand-rolled flat
+                // BorderStroke rim (a THIRD, divergent rim treatment next to
+                // appGlassRim's shared gradient one and Ambient.kt's now-removed
+                // dialog override) -- no more per-site exceptions.
+                GlassSurface(
                     shape = RoundedCornerShape(if (compact) 20.dp else 28.dp),
-                    color = MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = glassContainerAlpha(0.97f)),
-                    contentColor = MaterialTheme.colorScheme.onSurface,
-                    border = BorderStroke(
-                        1.dp,
-                        MaterialTheme.colorScheme.outline.copy(alpha = 0.25f),
-                    ),
                     modifier = Modifier.fillMaxWidth(),
                 ) {
                     Column(Modifier.padding(horizontal = 24.dp, vertical = 20.dp)) {

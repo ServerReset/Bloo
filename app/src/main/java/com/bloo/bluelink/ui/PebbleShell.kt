@@ -38,9 +38,7 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.animation.core.snap
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -120,7 +118,6 @@ import androidx.compose.ui.unit.lerp
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.bloo.bluelink.data.Vehicle
-import com.bloo.uicommon.dropShadow
 import com.bloo.uicommon.seamCorner
 import com.bloo.bluelink.data.Weather
 import kotlinx.coroutines.flow.first
@@ -444,19 +441,13 @@ internal fun PebbleShell(
             Modifier
                 .fillMaxWidth()
                 .then(if (fillHeight) Modifier.fillMaxHeight() else Modifier)
-                .dropShadow(pebbleShape, blurRadius = 12.dp, offsetY = 4.dp)
-                // frostedRim's alpha (0.10-0.24) is tuned for chrome floating
-                // over an unpredictable car photo, where it only has to beat
-                // that photo's contrast -- against a flat dark pebble
-                // background it was nearly imperceptible, reading as "this
-                // setting does nothing" even though it was working. A
-                // dedicated, considerably bolder border here instead, so
-                // toggling this is actually visible.
-                .then(
-                    if (pebbleOutline) {
-                        Modifier.border(BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.55f)), pebbleShape)
-                    } else Modifier,
-                ),
+                // pebbleCardEdge (GlassChrome.kt): frostedRim's alpha (0.10-0.24) is
+                // tuned for chrome floating over an unpredictable car photo, where it
+                // only has to beat that photo's contrast -- against a flat dark pebble
+                // background it was nearly imperceptible, reading as "this setting
+                // does nothing" even though it was working. The dedicated, considerably
+                // bolder border this shares instead is what makes toggling it visible.
+                .pebbleCardEdge(pebbleShape, pebbleOutline),
             shape = pebbleShape,
             colors = CardDefaults.cardColors(
                 containerColor = containerColor,

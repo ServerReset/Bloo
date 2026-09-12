@@ -837,9 +837,9 @@ internal fun SyncDeviceRow(
     val shape = RoundedCornerShape(18.dp)
     val container =
         if (isPrimary) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.55f)
-        // Shared default, not its own 0.9 -- see glassContainerAlpha's own doc
-        // for why every frosted surface takes the one value now.
-        else MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = glassContainerAlpha())
+        // glassTint (GlassChrome.kt), not surfaceContainerHigh -- the same shared
+        // neutral fill every other glass surface in the app uses now, no exceptions.
+        else glassTint(blurred = false)
     Row(
         Modifier
             .fillMaxWidth()

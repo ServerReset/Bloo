@@ -410,14 +410,13 @@ internal fun SearchLayer(
                 .padding(bottom = barH + edge + bottomInset + 10.dp),
         ) {
             val panelShape = RoundedCornerShape(if (compact) 20.dp else 28.dp)
-            Surface(
+            // GlassSurface (GlassChrome.kt): the one shared fill/rim/shadow, replacing
+            // this panel's own one-off alpha and its own separately-hand-rolled flat
+            // BorderStroke rim (yet another divergent one, next to appGlassRim's shared
+            // gradient rim) -- no more per-site variations.
+            GlassSurface(
                 shape = panelShape,
-                // Shared default, not its own 0.98 -- see glassContainerAlpha's own
-                // doc for why every frosted surface takes the one value now.
-                color = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = glassContainerAlpha()),
-                contentColor = MaterialTheme.colorScheme.onSurface,
-                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)),
-                modifier = Modifier.width(barW).dropShadow(panelShape, blurRadius = 16.dp, offsetY = 6.dp),
+                modifier = Modifier.width(barW),
             ) {
                 Column(
                     Modifier
@@ -637,25 +636,15 @@ internal fun SearchPill(
         Surface(
             onClick = { if (!expanded) onFocusChange(true) },
             shape = RoundedCornerShape(50),
-            // Nearly opaque on the cover screen. A translucent 40dp circle over
-            // a photo hero picks up whatever is behind it and stops looking
-            // like a control at all; at this size there is not enough of it for
-            // the glass effect to read as glass.
-            //
-            // The Settings-screen collapsed pill (form == PILL && !expanded) used to
-            // get its own opaque tonal container (secondaryContainer/onSecondaryContainer,
-            // no border) instead of this standard frosted fill -- reported as an
-            // inconsistent, different-looking search control on that one screen.
-            // The original reason for the override no longer applies: it was fixed
-            // there because a near-transparent surface with a hairline and
-            // onSurfaceVariant text read as "indistinguishable from a disabled
-            // control", but the standard treatment below already reads onSurface
-            // (not the dimmer onSurfaceVariant) with a visible gradient-lit border --
-            // the same legibility fix, just applied consistently instead of as a
-            // one-screen special case.
-            color = scheme.surfaceContainerHighest.copy(
-                alpha = if (compact) glassContainerAlpha(0.97f) else glassContainerAlpha(),
-            ),
+            // glassTint (GlassChrome.kt): the one shared neutral fill every other
+            // glass surface in the app uses -- no more one-off compact/non-compact
+            // alpha split. The Settings-screen collapsed pill (form == PILL &&
+            // !expanded) used to get its own opaque tonal container
+            // (secondaryContainer/onSecondaryContainer, no border) instead of this
+            // fill -- reported as an inconsistent, different-looking search control
+            // on that one screen; fixed by dropping that override in favour of the
+            // one shared fill everywhere, the same direction this goes further in.
+            color = glassTint(blurred = false),
             contentColor = scheme.onSurface,
             tonalElevation = if (expanded) 10.dp else 6.dp,
             border = BorderStroke(

@@ -8,9 +8,7 @@
 package com.bloo.bluelink.ui
 
 import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.aspectRatio
@@ -80,7 +78,6 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.bloo.bluelink.data.brand
 import com.bloo.bluelink.data.Vehicle
-import com.bloo.uicommon.dropShadow
 import com.bloo.bluelink.data.supportsHornLights
 import com.bloo.bluelink.data.isPluggedOrCharging
 import kotlinx.coroutines.flow.first
@@ -269,12 +266,7 @@ internal fun CoverTile(
     Card(
         modifier = modifier
             .fillMaxSize()
-            .dropShadow(shape, blurRadius = 12.dp, offsetY = 4.dp)
-            .then(
-                if (outline) {
-                    Modifier.border(BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.55f)), shape)
-                } else Modifier,
-            ),
+            .pebbleCardEdge(shape, outline),
         shape = shape,
         colors = CardDefaults.cardColors(
             containerColor = containerColor,

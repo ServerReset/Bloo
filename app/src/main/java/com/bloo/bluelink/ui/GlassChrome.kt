@@ -1,6 +1,8 @@
 package com.bloo.bluelink.ui
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.isSystemInDarkTheme
@@ -19,6 +21,7 @@ import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.unit.dp
 import com.bloo.uicommon.dropShadow
 import dev.chrisbanes.haze.HazeState
 import dev.chrisbanes.haze.hazeEffect
@@ -33,13 +36,12 @@ import com.bloo.uicommon.ambientRing as sharedAmbientRing
  * the platform Material is the one thing the shared module deliberately
  * does NOT depend on, so the wrapper passes onSurface in.
  *
- * - glassContainerAlpha: identical to the shared one (no color needed).
- * - frostedRim / ambientRing: thin alias wrappers.
+ * frostedRim / ambientRing: thin alias wrappers. There used to be a third,
+ * `glassContainerAlpha` -- every one of its call sites is gone now (each was
+ * its own slightly-different alpha override on the exact fill [GlassSurface]/
+ * [glassTint] now compute once, shared, below), so the wrapper itself is gone
+ * too rather than left behind as a stale, now-uncalled indirection.
  */
-
-/** See [com.bloo.uicommon.glassContainerAlpha] -- identical value. */
-fun glassContainerAlpha(frosted: Float = 0.68f): Float =
-    com.bloo.uicommon.glassContainerAlpha(frosted)
 
 /**
  * The phone's default rim: the shared [com.bloo.uicommon.frostedRim] with
@@ -54,6 +56,29 @@ fun Modifier.frostedRim(shape: Shape): Modifier =
 /** See [com.bloo.uicommon.ambientRing]. */
 fun Modifier.ambientRing(shape: Shape): Modifier =
     this.sharedAmbientRing(shape)
+
+/**
+ * The standard opaque pebble/card edge: a drop shadow, plus -- only when the user
+ * has turned on the "pebble outline" appearance setting -- a bolder solid border.
+ * Shared by every pebble-shaped card in the app (PebbleShell's own card, the
+ * single-column pull-to-refresh content in Pebbles.kt, the cover screen's hero
+ * tile in Cover.kt), which used to each carry an identical, separately copy-pasted
+ * three-line block -- literally the same code, typed three times.
+ *
+ * Distinct from [GlassSurface]: this is for opaque, themed card content (a pebble
+ * IS its own content, not a translucent overlay on top of something else), so it
+ * has no fill or blur of its own to standardize -- just the shadow/outline pairing
+ * every pebble already shares.
+ */
+@Composable
+internal fun Modifier.pebbleCardEdge(shape: Shape, outline: Boolean): Modifier =
+    this.dropShadow(shape, blurRadius = 12.dp, offsetY = 4.dp).then(
+        if (outline) {
+            Modifier.border(BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.55f)), shape)
+        } else {
+            Modifier
+        },
+    )
 
 // ---- One floating-glass surface, everywhere -------------------------------
 

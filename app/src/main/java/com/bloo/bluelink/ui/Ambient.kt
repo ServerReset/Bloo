@@ -70,7 +70,6 @@ import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogWindowProvider
@@ -111,7 +110,6 @@ import androidx.compose.ui.unit.dp
 import com.bloo.bluelink.data.Brand
 import com.bloo.bluelink.data.brand
 import com.bloo.bluelink.data.SettingsStore
-import com.bloo.uicommon.dropShadow
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlin.math.max
@@ -726,23 +724,14 @@ internal fun GlassAlertDialog(
                 }
             }
         }
-        // Near-opaque fill -- this card sits over the scrim, framed by the
-        // app's frosted edge (appGlassRim). Kept as its own override rather than
-        // folded into the shared default the rest of the app's frosted chrome now
-        // uses uniformly: a modal dialog is a different category from a pill or a
-        // pebble card floating over live content -- it always sits over its own
-        // dedicated scrim, never directly over an unpredictable photo, and its
-        // job is paragraphs of body text and buttons a user has to read and act
-        // on, not a glanceable control. The general "everything shares one
-        // transparency" rule is about the floating chrome that DOES sit over
-        // content; this is the one deliberate exception, not a leftover.
-        Surface(
+        // GlassSurface (GlassChrome.kt) -- the same fill/rim/shadow every other
+        // floating surface in the app now shares, no per-site override. This used
+        // to run its own near-opaque 0.97-alpha fill, reasoned as a deliberate
+        // exception for a modal dialog; there are no exceptions now, only one
+        // shared implementation.
+        GlassSurface(
             shape = shape,
-            color = scheme.surfaceContainerHigh.copy(alpha = glassContainerAlpha(0.97f)),
-            modifier = Modifier
-                .fillMaxWidth()
-                .dropShadow(shape, blurRadius = 22.dp, offsetY = 8.dp)
-                .appGlassRim(shape),
+            modifier = Modifier.fillMaxWidth(),
         ) {
             Column(Modifier.padding(24.dp)) {
                 if (icon != null) {
