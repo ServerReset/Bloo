@@ -509,6 +509,16 @@ internal fun rememberRelativeTime(millis: Long?): String? {
  * ordinary surface, not over an unpredictable photo, so it doesn't need
  * that treatment's guaranteed contrast, just enough of a container to read
  * as a distinct fact rather than body text bleeding into the row beside it.
+ *
+ * A thin [appGlassRim] outline now goes with that fill -- reported directly
+ * as effectively invisible ("the refresh icon has no background") on the
+ * wide/dual-car layout's header row, which floats these directly over the
+ * app's plain black background rather than a themed surface: a flat
+ * `surfaceContainerHigh` fill with no edge of its own can end up close
+ * enough in luminance to plain black to read as no container at all. A rim
+ * guarantees a visible edge regardless of what's actually behind it, the
+ * same reasoning every OTHER floating pill in the app (the map's own name
+ * pill, FloatingIcon) already uses.
  */
 @Composable
 internal fun MetaChip(text: String, modifier: Modifier = Modifier, icon: ImageVector? = null) {
@@ -516,7 +526,7 @@ internal fun MetaChip(text: String, modifier: Modifier = Modifier, icon: ImageVe
         shape = RoundedCornerShape(50),
         color = MaterialTheme.colorScheme.surfaceContainerHigh,
         contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
-        modifier = modifier,
+        modifier = modifier.appGlassRim(RoundedCornerShape(50)),
     ) {
         Row(
             Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
