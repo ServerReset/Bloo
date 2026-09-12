@@ -182,7 +182,7 @@ internal fun StatusBarScrim(
     // stronger gradient (blur's whole job, legibility under the status bar icons,
     // otherwise falls entirely on a fairly light 0.55 alpha fade) instead of
     // silently doing less than intended.
-    val canBlur = CanBlurBackdrops
+    val canBlur = CanBlurBackdrops()
     Box(
         Modifier
             .fillMaxWidth()
@@ -315,7 +315,7 @@ internal fun FloatingIcon(
         modifier = modifier.padding(outerPadding).size(HeaderButtonSize),
         contentAlignment = Alignment.Center,
     ) {
-        if (hazeState != null && CanBlurBackdrops) {
+        if (hazeState != null && CanBlurBackdrops()) {
             Box(Modifier.matchParentSize().clip(CircleShape).hazeEffect(state = hazeState))
         }
         // Plain semi-transparent fill (see GlassChrome.kt) -- more transparent

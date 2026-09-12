@@ -1518,7 +1518,7 @@ internal fun ExpandableMapLayer(
                     // CarMapSheetBody's own drag handle -- blurs the map on API 31+
                     // (where Haze's RenderEffect backing exists), or just darkens on
                     // older devices, so the pill stays visible over any tile content.
-                    val canBlurHandle = CanBlurBackdrops
+                    val canBlurHandle = CanBlurBackdrops()
                     Box(
                         Modifier
                             .padding(top = 8.dp)
@@ -1934,7 +1934,7 @@ private fun CarMapSheetBody(
                 // darkening the map immediately behind this one small area
                 // guarantees contrast for the pill regardless of what's drawn
                 // under it.
-                val canBlurHandle = CanBlurBackdrops
+                val canBlurHandle = CanBlurBackdrops()
                 Box(
                     Modifier
                         .padding(top = 8.dp)

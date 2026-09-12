@@ -9,6 +9,7 @@ package com.bloo.bluelink.ui
 
 import android.os.Build
 import dev.chrisbanes.haze.HazeState
+import dev.chrisbanes.haze.hazeEffect
 import dev.chrisbanes.haze.hazeSource
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
@@ -814,26 +815,40 @@ internal fun GarageScreen(state: State<UiState>, vm: AppViewModel) {
                             // shape-morphing indicator was floating bare over whatever
                             // content happened to be underneath.
                             //
-                            // Genuinely neutral fill (plain black/white by theme), NOT
-                            // surfaceContainerHighest -- that Material3 "neutral" tonal role
-                            // still inherits a slice of this app's own dynamic/custom
-                            // palette's seed colour, and MetaChip picked exactly that token
-                            // for its own background first, reported directly right after as
-                            // "it should be a neutral colour... not a primary" once the seed
-                            // was blue. Same rim/shadow every other floating icon on this
-                            // screen already uses (FloatingIcon's own), sized to match.
+                            // A REAL blur now, not just a tint -- reported directly ("it's not
+                            // actual glass") after the first fix here (a flat, un-blurred
+                            // neutral fill) landed. Same layered pattern FloatingIcon's own
+                            // hazeState path already uses: a hazeEffect Box first (this
+                            // screen's own hazeState -- its own `hazeSource` marks the actual
+                            // background behind this whole screen as blurrable), a
+                            // semi-transparent neutral tint OVER that (lighter than a flat
+                            // fill needs to be, since the blur itself already does most of the
+                            // legibility work), then the rim/shadow every other floating icon
+                            // on this screen uses. Plain black/white by theme for the tint,
+                            // not a MaterialTheme.colorScheme token -- see MetaChip's own doc
+                            // for why a "neutral" tonal role isn't actually hue-independent
+                            // under this app's dynamic/custom palette.
                             val dark = isSystemInDarkTheme()
-                            Surface(
-                                shape = CircleShape,
-                                color = if (dark) Color.Black.copy(alpha = 0.55f) else Color.White.copy(alpha = 0.75f),
+                            Box(
                                 modifier = Modifier
                                     .size(HeaderButtonSize)
                                     .dropShadow(CircleShape)
                                     .appGlassRim(CircleShape),
+                                contentAlignment = Alignment.Center,
                             ) {
-                                Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
-                                    LoadingIndicator()
+                                if (CanBlurBackdrops()) {
+                                    Box(Modifier.matchParentSize().clip(CircleShape).hazeEffect(state = hazeState))
                                 }
+                                Box(
+                                    Modifier
+                                        .matchParentSize()
+                                        .clip(CircleShape)
+                                        .background(
+                                            if (dark) Color.Black.copy(alpha = if (CanBlurBackdrops()) 0.25f else 0.55f)
+                                            else Color.White.copy(alpha = if (CanBlurBackdrops()) 0.35f else 0.75f),
+                                        ),
+                                )
+                                LoadingIndicator()
                             }
                         }
                     }

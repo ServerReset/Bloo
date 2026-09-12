@@ -26,6 +26,7 @@ import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 // and defaultSpatialSpec on MotionScheme. Screens.kt imports none of them either.
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 // State<T>'s `by` delegate isn't a member -- it resolves to this file-scope operator
 // extension, which the compiler will not find without an explicit import (unlike most of
 // this file's other extension functions, which show up as unresolved-reference errors
@@ -164,10 +165,56 @@ internal val SettingsCardGap = 10.dp
 // app: pulled here so every site shares the same instances instead of four
 // separately-typed, easy-to-drift copies.
 
-/** True on API 31+, where Haze's real RenderEffect-backed blur exists at all --
- *  below that it silently no-ops, so call sites gate on this to fall back to a
- *  plain darkened/tinted layer instead of asking for a blur that won't render. */
-internal val CanBlurBackdrops: Boolean = android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S
+/** Live, reactive battery-saver state -- [android.os.PowerManager.isPowerSaveMode]
+ *  read once at first composition and then kept current via
+ *  [android.os.PowerManager.ACTION_POWER_SAVE_MODE_CHANGED], so toggling it while
+ *  the app is already open (Quick Settings, the battery-saver notification) takes
+ *  effect immediately rather than only on the next cold start. [CanBlurBackdrops]
+ *  is this value's only consumer today, but it's a plain top-level composable
+ *  precisely so anything else wanting to drop expensive visual effects under
+ *  battery saver -- not just blur -- can read it the same way. */
+@Composable
+internal fun isBatterySaverOn(): Boolean {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    fun current() = (context.getSystemService(android.content.Context.POWER_SERVICE) as? android.os.PowerManager)
+        ?.isPowerSaveMode == true
+    var active by remember { androidx.compose.runtime.mutableStateOf(current()) }
+    androidx.compose.runtime.DisposableEffect(context) {
+        val receiver = object : android.content.BroadcastReceiver() {
+            override fun onReceive(ctx: android.content.Context?, intent: android.content.Intent?) {
+                active = current()
+            }
+        }
+        // ContextCompat, not Context.registerReceiver directly: this app's targetSdk (36)
+        // is well past the API 33 cutover where a context-registered receiver MUST say
+        // whether other apps can send it broadcasts, and the plain 2-arg platform call
+        // throws SecurityException at runtime on 34+ once targetSdk requires that flag
+        // instead of just warning about its absence. NOT_EXPORTED is correct here
+        // specifically -- this only ever needs the system's OWN battery-saver broadcast,
+        // never one from another app.
+        androidx.core.content.ContextCompat.registerReceiver(
+            context, receiver,
+            android.content.IntentFilter(android.os.PowerManager.ACTION_POWER_SAVE_MODE_CHANGED),
+            androidx.core.content.ContextCompat.RECEIVER_NOT_EXPORTED,
+        )
+        onDispose { context.unregisterReceiver(receiver) }
+    }
+    return active
+}
+
+/** True on API 31+ (where Haze's real RenderEffect-backed blur exists at all --
+ *  below that it silently no-ops) AND battery saver is off. Call sites gate on
+ *  this to fall back to a plain darkened/tinted layer instead of asking for a
+ *  blur that either can't render, or that shouldn't be spending the GPU/battery
+ *  cost it has even when it can. Reported directly: "when it's on battery saver,
+ *  all of [the blur] should get disabled or turned into solid colors" -- since
+ *  every real blur site in the app already gates on this ONE flag (see this
+ *  section's own doc for why), turning it off here turns every one of them into
+ *  their own already-existing solid-colour fallback, with nothing further to
+ *  change at each individual site. */
+@Composable
+internal fun CanBlurBackdrops(): Boolean =
+    android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S && !isBatterySaverOn()
 
 /** The one shape every full-height scrim's blur uses: strong right at the edge
  *  it grows from, tapering to none by its own far edge -- "like a gradient of

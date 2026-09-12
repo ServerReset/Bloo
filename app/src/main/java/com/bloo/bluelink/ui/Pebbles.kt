@@ -20,6 +20,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -304,9 +305,19 @@ internal fun Refreshable(
         // the layout phase, so a live drag now costs one indicator relayout
         // per frame instead of a full recomposition of the car's content.
         if (!hideIndicator) {
+            // containerColor explicit, not this API's own default -- that default is
+            // theme-derived (a primary-family tone), which reads as a flatly BLUE circle
+            // under this app's own dynamic/custom palette. Reported directly, with a
+            // screenshot, right after the SAME root cause was already fixed once for
+            // MetaChip and the grid layout's own refresh circle ("it should be a neutral
+            // colour... not a primary") -- this is the third spot the identical theme-vs-
+            // neutral mismatch showed up in. Plain black/white by theme, matching those
+            // two fixes exactly, not a MaterialTheme.colorScheme token.
+            val dark = isSystemInDarkTheme()
             PullToRefreshDefaults.LoadingIndicator(
                 state = ptrState,
                 isRefreshing = refreshing,
+                containerColor = if (dark) Color.Black.copy(alpha = 0.55f) else Color.White.copy(alpha = 0.75f),
                 modifier = Modifier
                     .align(Alignment.TopCenter)
                     .offset {
