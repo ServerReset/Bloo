@@ -57,6 +57,20 @@
     public <init>(android.content.Context, androidx.work.WorkerParameters);
 }
 
+# WorkManager's OWN internal Room database (WorkDatabase) hit the same problem from
+# the other direction: this app's first real release run crashed cold on
+# "Failed to create an instance of class androidx.work.impl.WorkDatabase" the moment
+# anything first touched WorkManager (WorkManagerInit.of(), on a background thread --
+# see that class's own doc for why the automatic androidx.startup initializer is
+# disabled here). Room resolves its generated `WorkDatabase_Impl` implementation via a
+# `Class.forName(...)` call built from a STRING at runtime, not a static reference R8's
+# analysis can see -- so plain shrinking strips the generated class as apparently
+# unreferenced. work-runtime's own consumer rules normally cover this for the default
+# auto-init path; they evidently don't reliably survive this app's manual/deferred one,
+# and this was never actually exercised before now (see the file-level comment on
+# -dontobfuscate above -- assembleRelease succeeding was never proof of this).
+-keep class androidx.work.impl.** { *; }
+
 # --- Optional / reflective third parties ----------------------------------------
 # Shizuku is OPTIONAL, gated at runtime behind Shizuku.pingBinder(), and its
 # provider reaches hidden platform constructors. R8 must not fail the build over
