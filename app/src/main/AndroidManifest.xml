@@ -82,12 +82,21 @@
     </queries>
 
     <application
+        android:name=".BlooApplication"
         android:allowBackup="false"
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
         android:roundIcon="@mipmap/ic_launcher"
         android:supportsRtl="true"
         android:theme="@style/Theme.Bloo">
+
+        <!-- Shown by BlooApplication's uncaught-exception handler in place of a
+             silent crash -- see its own doc. exported=false: only ever launched
+             from inside this app's own process, right after it crashes. -->
+        <activity
+            android:name=".CrashActivity"
+            android:exported="false"
+            android:theme="@style/Theme.Bloo" />
 
         <activity
             android:name=".MainActivity"
