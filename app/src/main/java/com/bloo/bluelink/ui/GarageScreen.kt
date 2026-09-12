@@ -49,6 +49,9 @@ import androidx.compose.ui.semantics.selected
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.LoadingIndicator
+import androidx.compose.material3.Surface
+import androidx.compose.foundation.shape.CircleShape
+import com.bloo.uicommon.dropShadow
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
@@ -800,7 +803,28 @@ internal fun GarageScreen(state: State<UiState>, vm: AppViewModel) {
                             modifier = Modifier.align(Alignment.TopCenter).statusBarsPadding().padding(top = HeaderCornerGap)
                                 .floatingOverlay(FloatingIds.RefreshIndicator, fade = false),
                         ) {
-                            LoadingIndicator()
+                            // A bare LoadingIndicator() has no container of its own -- the
+                            // single-column path's own pull-to-refresh indicator
+                            // (Pebbles.kt's PullToRefreshDefaults.LoadingIndicator) gets a
+                            // circular backdrop for free from that API; this generic M3
+                            // Expressive one doesn't. Reported directly as "no circle behind"
+                            // it specifically on the grid/wide layout this covers -- the
+                            // shape-morphing indicator was floating bare over whatever
+                            // content happened to be underneath. Same circular glass
+                            // treatment every other floating icon in this screen already
+                            // uses (FloatingIcon's own), sized to match.
+                            Surface(
+                                shape = CircleShape,
+                                color = MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = glassContainerAlpha()),
+                                modifier = Modifier
+                                    .size(HeaderButtonSize)
+                                    .dropShadow(CircleShape)
+                                    .appGlassRim(CircleShape),
+                            ) {
+                                Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
+                                    LoadingIndicator()
+                                }
+                            }
                         }
                     }
                     // No floating name badge here at all any more -- removed as unwanted UI.
