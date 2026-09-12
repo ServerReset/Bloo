@@ -1,16 +1,16 @@
 pluginManagement {
     repositories {
-        // Try Gradle plugin portal first (often caches Android plugins)
-        gradlePluginPortal()
-        // Maven Central usually has AGP cached
-        mavenCentral()
-        // Aliyun mirror often has cached artifacts
-        maven { url = uri("https://maven.aliyun.com/repository/public") }
-        // JCenter often has cached Android artifacts
-        maven { url = uri("https://jcenter.bintray.com/") }
-        // Sonatype snapshots
+        // Sonatype OSS Repository (often has cached Android artifacts)
         maven { url = uri("https://oss.sonatype.org/content/repositories/snapshots/") }
-        // Google as last resort
+        maven { url = uri("https://oss.sonatype.org/content/repositories/releases/") }
+        // JCenter (legacy but may have cached artifacts)
+        maven { url = uri("https://jcenter.bintray.com/") }
+        // Maven Central mirrors
+        maven { url = uri("https://repo1.maven.org/maven2/") }
+        maven { url = uri("https://repo.maven.apache.org/maven2/") }
+        mavenCentral()
+        gradlePluginPortal()
+        // Google repo - may be blocked by proxy
         google {
             content {
                 includeGroupByRegex("com\\.android.*")

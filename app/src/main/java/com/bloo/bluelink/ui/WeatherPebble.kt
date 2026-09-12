@@ -28,7 +28,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.material.ripple.ripple
+import androidx.compose.material3.ripple
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -118,7 +118,6 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.compose.ui.window.DialogWindowProvider
 import dev.chrisbanes.haze.HazeState
-import dev.chrisbanes.haze.HazeStyle
 import dev.chrisbanes.haze.HazeProgressive
 import dev.chrisbanes.haze.hazeEffect
 import dev.chrisbanes.haze.hazeSource
@@ -1323,24 +1322,33 @@ internal fun ExpandableMapLayer(
                                 }
                             }
                         )
-                    }
+                    },
+                contentAlignment = Alignment.TopCenter,
             ) {
-                // Drag handle pill
+                // A small frosted chip behind the handle pill, same pattern as
+                // CarMapSheetBody's own drag handle -- blurs the map on API 31+
+                // (where Haze's RenderEffect backing exists), or just darkens on
+                // older devices, so the pill stays visible over any tile content.
+                val canBlurHandle = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
                 Box(
                     Modifier
-                        .align(Alignment.Center)
-                        .width(28.dp)
-                        .height(4.dp)
-                        .clip(RoundedCornerShape(2.dp))
-                        .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f))
-                        .graphicsLayer { alpha = expandFraction.value.coerceIn(0f, 1f) }
-                        .hazeEffect(
-                            state = mapHazeState,
-                            shape = RoundedCornerShape(2.dp),
-                            style = HazeStyle(blurRadius = 4.dp)
+                        .padding(top = 8.dp)
+                        .size(width = 56.dp, height = 20.dp)
+                        .clip(RoundedCornerShape(50))
+                        .then(
+                            if (canBlurHandle) Modifier.hazeEffect(state = mapHazeState)
+                            else Modifier,
                         )
-                        .dropShadow(RoundedCornerShape(2.dp))
-                )
+                        .background(Color.Black.copy(alpha = if (canBlurHandle) 0.2f else 0.35f))
+                        .graphicsLayer { alpha = expandFraction.value.coerceIn(0f, 1f) },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Box(
+                        Modifier
+                            .size(width = 28.dp, height = 4.dp)
+                            .background(Color.White.copy(alpha = 0.8f), RoundedCornerShape(2.dp)),
+                    )
+                }
             }
         }
     }
