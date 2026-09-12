@@ -173,6 +173,23 @@ class CarWidget : GlanceAppWidget() {
     }
 
     override suspend fun provideGlance(context: Context, id: GlanceId) {
+        // Self-healing safety net, not just belt-and-braces: CarWidgetReceiver.onEnabled
+        // -- the ONLY other place WidgetRefreshWorker.schedule() was ever called -- fires
+        // exactly once, the moment a widget is first added, and does nothing to retry if
+        // that one call fails. Before the WorkManager R8 fix (see app/proguard-rules.pro),
+        // it always did fail: WorkManagerInit.of() -- which schedule() calls -- threw
+        // "Failed to create an instance of class androidx.work.impl.WorkDatabase" on
+        // every single invocation, silently, inside a BroadcastReceiver callback with no
+        // visible error surface. Anyone who had already added this widget before that fix
+        // shipped is left with a periodic refresh that was NEVER scheduled at all -- the
+        // widget renders exactly once (whatever provideGlance's own one-shot data read
+        // produces) and then never again, which is indistinguishable from "stuck showing
+        // Bloo" once that first render has nothing to show yet. enqueueUniquePeriodicWork's
+        // own ExistingPeriodicWorkPolicy.UPDATE makes calling schedule() again here
+        // completely safe on every OTHER render too -- it replaces the existing unique
+        // work if one's already scheduled, so this is a no-op cost for everyone whose
+        // widget was already working correctly.
+        runCatching { WidgetRefreshWorker.schedule(context) }
         val appWidgetId = GlanceAppWidgetManager(context).getAppWidgetId(id)
         val config = WidgetConfigStore(context).get(appWidgetId)
         val snapshots = SnapshotStore(context)
