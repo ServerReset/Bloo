@@ -37,11 +37,11 @@ jobs:
       - name: Make gradlew executable
         run: chmod +x ./gradlew
 
-      - name: Build debug APK
-        run: ./gradlew assembleDebug --stacktrace
-
+      # Debug builds/artifacts are gone entirely -- release (below) is now the
+      # only variant this job builds and uploads, so tests run against it
+      # too rather than pulling in a debug compile nothing else here needs.
       - name: Run unit tests
-        run: ./gradlew testDebugUnitTest --stacktrace
+        run: ./gradlew testReleaseUnitTest --stacktrace
 
       # The release variant is the ONLY thing that runs R8. Both modules shipped
       # `isMinifyEnabled = false` alongside declared proguardFiles for the whole life of
@@ -74,30 +74,20 @@ jobs:
             wear/build/reports/lint-results-*.txt
           if-no-files-found: ignore
 
+      # Release (R8-shrunk) APKs only -- two artifacts, one per module, instead
+      # of a debug pair plus a combined release bundle.
       - name: Upload phone APK
         uses: actions/upload-artifact@v4
         with:
           name: bloo-phone-apk
-          path: app/build/outputs/apk/debug/*.apk
+          path: app/build/outputs/apk/release/*.apk
           if-no-files-found: error
 
       - name: Upload Wear OS APK
         uses: actions/upload-artifact@v4
         with:
           name: bloo-wear-apk
-          path: wear/build/outputs/apk/debug/*.apk
-          if-no-files-found: error
-
-      # The shrunk APKs, so the release build can actually be installed and exercised --
-      # which is the only way to confirm no keep is missing. Separate artifacts from the
-      # debug ones above; those stay the default download for day-to-day sideloading.
-      - name: Upload release APKs (R8-shrunk, for on-device verification)
-        uses: actions/upload-artifact@v4
-        with:
-          name: bloo-release-apks
-          path: |
-            app/build/outputs/apk/release/*.apk
-            wear/build/outputs/apk/release/*.apk
+          path: wear/build/outputs/apk/release/*.apk
           if-no-files-found: error
 
       # GitHub's own generate_release_notes only lists merged PRs since the
@@ -147,8 +137,8 @@ jobs:
           prerelease: true
           body_path: release_notes.md
           files: |
-            app/build/outputs/apk/debug/Bloo.apk
-            wear/build/outputs/apk/debug/Bloo-Wear.apk
+            app/build/outputs/apk/release/Bloo.apk
+            wear/build/outputs/apk/release/Bloo-Wear.apk
 
   # A separate, manually-tagged Release ("vN") for anyone who wants a stable
   # build instead of the rolling "build-<run number>" pre-release the build
