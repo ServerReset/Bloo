@@ -253,6 +253,15 @@ internal fun CoverTile(
      */
     titleColor: Color = contentColorFor(containerColor),
     iconTint: Color = MaterialTheme.colorScheme.primary,
+    /** False drops [icon] from the identity pill specifically (its only actual use site --
+     *  see below), leaving just the text. [icon] itself stays required: every OTHER tile
+     *  still wants it there, identifying what kind of tile this is next to its own car
+     *  name. [CoverMainTile] is the one exception -- its own hero card IS the car, so a
+     *  car glyph next to its own name repeated the exact same information the tile is
+     *  already about, and cost real horizontal room the action buttons needed on a
+     *  ~1-inch cover. Reported directly, with a screenshot: "remove the car icon... so it
+     *  all fits on one row." */
+    showIdentityIcon: Boolean = true,
     body: @Composable ColumnScope.() -> Unit,
 ) {
     val shape = RoundedCornerShape(PebbleCornerExpanded)
@@ -403,7 +412,7 @@ internal fun CoverTile(
             ) {
                 if (identityText.isNotBlank()) {
                     CoverIdentityPill(
-                        icon = icon,
+                        icon = if (showIdentityIcon) icon else null,
                         text = identityText,
                         iconTint = iconTint,
                     )
@@ -473,6 +482,12 @@ internal fun CoverMainTile(v: Vehicle, state: UiState, vm: AppViewModel) {
     CoverTile(
         title = v.name,
         icon = Icons.Filled.DirectionsCar,
+        // This hero tile's identity pill drops its own car glyph (see showIdentityIcon's own
+        // doc) -- the tile itself IS the car, named right there in the pill's own text, so
+        // the icon repeated information already on screen while costing width the action
+        // row needed. `icon` above stays required/unused here rather than made optional
+        // tile-wide: every OTHER CoverTile still wants its icon shown.
+        showIdentityIcon = false,
         // Lock/climate state rides the END of the header row rather than a second line beneath
         // it -- the same slot a section tile uses for the car's name, which the home tile does
         // not need because its headline IS the car. One line instead of two, and the state a
@@ -527,9 +542,16 @@ internal fun CoverActionBar(v: Vehicle, state: UiState, vm: AppViewModel) {
     val plugged = ev.isPluggedOrCharging
     val climateOn = status?.airCtrlOn == true
     val enabled = !state.loading
+    // iconOnly on all four: this row sits beside the identity pill (which just lost its
+    // own icon for the same reason -- see CoverTile's showIdentityIcon doc), and the
+    // labels wrapping it onto a second line on a ~1-inch cover is exactly what was
+    // reported directly, with a screenshot -- "remove the button names... so it all
+    // fits on one row." label itself stays the button's accessible name regardless
+    // (CoverActionButton's own iconOnly doc).
     CoverActionButton(
         icon = if (locked == true) Icons.Filled.LockOpen else Icons.Filled.Lock,
         label = if (locked == true) "Unlock" else "Lock",
+        iconOnly = true,
         // Attention, not confirmation: an unlocked car is the state worth
         // colouring, matching StateControl's own highlightWhenOff.
         attention = locked == false,
@@ -540,6 +562,7 @@ internal fun CoverActionBar(v: Vehicle, state: UiState, vm: AppViewModel) {
     CoverActionButton(
         icon = Icons.Filled.Thermostat,
         label = if (climateOn) "Stop" else "Climate",
+        iconOnly = true,
         active = climateOn,
         pending = state.isPending(v.vin, "climate"),
         enabled = enabled,
@@ -549,6 +572,7 @@ internal fun CoverActionBar(v: Vehicle, state: UiState, vm: AppViewModel) {
         CoverActionButton(
             icon = Icons.Filled.Bolt,
             label = if (charging) "Stop" else "Charge",
+            iconOnly = true,
             active = charging,
             pending = state.isPending(v.vin, "charge"),
             // The car can't start a charge it isn't plugged into, and the
@@ -570,6 +594,7 @@ internal fun CoverActionBar(v: Vehicle, state: UiState, vm: AppViewModel) {
         CoverActionButton(
             icon = Icons.Filled.Campaign,
             label = "Horn",
+            iconOnly = true,
             // Both flashLights and hornAndLights run under the same "hornLights"
             // pending key (AppViewModel), so one check covers either.
             pending = state.isPending(v.vin, "hornLights"),
@@ -598,6 +623,14 @@ internal fun CoverActionButton(
      * action already uses, so it also reads as the same control in both places.
      */
     compact: Boolean = false,
+    /** True hides [label]'s own Text entirely, showing just the glyph -- [label] stays
+     *  required regardless, now carrying the button's `contentDescription` instead of its
+     *  visible text, so a screen reader still hears what tapping it does. Reported
+     *  directly, with a screenshot: the hero tile's own action row (this button's most
+     *  common caller) was wrapping onto a second line on a ~1-inch cover once its
+     *  identity pill plus four full icon+label buttons ran out of width -- "remove the
+     *  button names... so it all fits on one row." */
+    iconOnly: Boolean = false,
     active: Boolean = false,
     attention: Boolean = false,
     pending: Boolean = false,
@@ -677,7 +710,10 @@ internal fun CoverActionButton(
                     color = LocalContentColor.current,
                 )
             } else {
-                Icon(icon, contentDescription = null, modifier = Modifier.size(22.dp))
+                // iconOnly moves `label` here as the contentDescription instead of null --
+                // with no visible text anywhere on the button, this glyph is the ONLY node
+                // left for a screen reader to describe it by.
+                Icon(icon, contentDescription = if (iconOnly) label else null, modifier = Modifier.size(22.dp))
             }
         }
         val text: @Composable () -> Unit = {
@@ -689,7 +725,14 @@ internal fun CoverActionButton(
                 ),
             )
         }
-        if (compact) {
+        if (iconOnly) {
+            // Genuinely icon-only -- not icon-plus-hidden-label -- same "skip the layout for
+            // the half that isn't there" rule every other icon-only path in this app follows
+            // (MorphButtonLabel's own, CoverIdentityPill's new one above).
+            Box(Modifier.fillMaxHeight(), contentAlignment = Alignment.Center) {
+                glyph()
+            }
+        } else if (compact) {
             Row(
                 // fillMaxHEIGHT, not fillMaxSize. MorphButtonCore sizes itself from its content,
                 // and its own doc spells out the consequence of a content child that fills:
@@ -745,7 +788,7 @@ internal fun CoverActionButton(
  */
 @Composable
 private fun CoverIdentityPill(
-    icon: ImageVector,
+    icon: ImageVector?,
     text: String,
     iconTint: Color,
 ) {
@@ -761,9 +804,22 @@ private fun CoverIdentityPill(
             contentAlignment = Alignment.Center,
         ) {
             CompositionLocalProvider(LocalContentColor provides MaterialTheme.colorScheme.onSurface) {
-                // The glyph keeps its accent -- it is carrying state the words are not (a
-                // charging bolt, a snowflake) -- while the text takes the pill's content tone.
-                MorphButtonLabel(icon, text, pending = false, iconTint = iconTint)
+                if (icon != null) {
+                    // The glyph keeps its accent -- it is carrying state the words are not (a
+                    // charging bolt, a snowflake) -- while the text takes the pill's content tone.
+                    MorphButtonLabel(icon, text, pending = false, iconTint = iconTint)
+                } else {
+                    // No icon, genuinely -- not icon-plus-empty-space -- same "skip the glyph
+                    // layout entirely rather than reserve a gap for nothing" rule
+                    // MorphButtonLabel's own icon-only path already follows in reverse.
+                    Text(
+                        text,
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = FontWeight.SemiBold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
             }
         }
     }
