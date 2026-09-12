@@ -11,7 +11,15 @@ permissions:
   contents: write
 
 jobs:
+  # Skipped on a version-tag push: the `release` job below already does a full
+  # build+publish for that case, on the exact same commit. Before this guard,
+  # tagging "vN" fired BOTH jobs -- two complete assembleRelease runs (Android
+  # SDK setup, full Gradle build, R8) back to back on identical source, plus a
+  # confusing rolling "build-N" prerelease published side-by-side with the
+  # real "vN" release nobody asked for. Ordinary branch pushes and PRs are
+  # unaffected; only a tag push skips this job now.
   build:
+    if: "!startsWith(github.ref, 'refs/tags/v')"
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -37,27 +45,34 @@ jobs:
       - name: Make gradlew executable
         run: chmod +x ./gradlew
 
-      # Still runs against the debug variant -- testReleaseUnitTest isn't a
+      # One Gradle invocation, not two: every separate `./gradlew` call repeats
+      # the whole project's CONFIGURATION phase (evaluating every build.gradle.kts
+      # in :app/:wear/:shared/:uicommon/:hidden-api-stub) before it schedules a
+      # single task, regardless of which task was asked for -- so running unit
+      # tests and the release build as two invocations paid that cost twice for
+      # no benefit. Gradle happily schedules both task graphs from one command
+      # line and runs whichever of their shared dependencies only need building
+      # once.
+      #
+      # Still testDebugUnitTest, not testReleaseUnitTest -- the latter isn't a
       # task this project actually has (CI: "Task 'testReleaseUnitTest' not
-      # found"), and this doesn't build or upload a debug APK either way; it
-      # only compiles/runs test sources, an internal step with no artifact of
-      # its own. Debug build/artifacts are gone from everything below this.
-      - name: Run unit tests
-        run: ./gradlew testDebugUnitTest --stacktrace
-
-      # The release variant is the ONLY thing that runs R8. Both modules shipped
+      # found"), and running it doesn't build or upload a debug APK either way;
+      # it only compiles/runs test sources, an internal step with no artifact
+      # of its own. Debug build/artifacts are gone from everything below this.
+      #
+      # assembleRelease is the ONLY thing that runs R8. Both modules shipped
       # `isMinifyEnabled = false` alongside declared proguardFiles for the whole life of
       # the project, so every keep rule in them was dead configuration that read like
       # protection -- and nothing here would have noticed. With shrinking now on, this
-      # step is what turns "the rules parse and R8 resolves every reference it keeps"
-      # into a build-time answer instead of a runtime surprise.
+      # is what turns "the rules parse and R8 resolves every reference it keeps" into
+      # a build-time answer instead of a runtime surprise.
       #
       # It is NOT a proof the release APK works: there is no emulator here, so nothing
       # ever RUNS it. That gap is why renaming stays off (-dontobfuscate) -- see
-      # app/proguard-rules.pro. Verifying behaviour still needs a human installing the
-      # artifact below.
-      - name: Build release APKs (runs R8 -- the only check on proguard-rules.pro)
-        run: ./gradlew assembleRelease --stacktrace
+      # app/proguard-rules.pro. Verifying behaviour still needs a human installing
+      # the release actually published below.
+      - name: Run unit tests and build release APKs (runs R8 -- the only check on proguard-rules.pro)
+        run: ./gradlew testDebugUnitTest assembleRelease --stacktrace
 
       # assembleRelease also runs lintVitalRelease (AGP does this for release variants
       # only), whose FATAL-severity findings abort the build. Those reports are the one
@@ -76,22 +91,18 @@ jobs:
             wear/build/reports/lint-results-*.txt
           if-no-files-found: ignore
 
-      # Release (R8-shrunk) APKs only -- two artifacts, one per module, instead
-      # of a debug pair plus a combined release bundle.
-      - name: Upload phone APK
-        uses: actions/upload-artifact@v4
-        with:
-          name: bloo-phone-apk
-          path: app/build/outputs/apk/release/*.apk
-          if-no-files-found: error
-
-      - name: Upload Wear OS APK
-        uses: actions/upload-artifact@v4
-        with:
-          name: bloo-wear-apk
-          path: wear/build/outputs/apk/release/*.apk
-          if-no-files-found: error
-
+      # No actions/upload-artifact for the APKs themselves -- that was reported
+      # directly as a real problem, not just an inconvenience: GitHub Actions
+      # artifacts are ALWAYS served zipped (a single-file artifact still comes
+      # down as a .zip you have to open before you can install it) AND require
+      # a signed-in GitHub session to download at all. The GitHub Release
+      # published a few steps down (direct, unzipped .apk assets, no auth) is
+      # the only APK-delivery path left, and has been the only one the in-app
+      # updater (UpdateApi, in :shared) has ever actually read -- confirmed:
+      # it parses release.assets[].browser_download_url, never the Actions
+      # artifacts API. Removing this saves two uploads (and their zip/upload
+      # time) on every single push for a delivery path nothing was using.
+      #
       # GitHub's own generate_release_notes only lists merged PRs since the
       # last release -- this repo pushes straight to its branch with no PRs,
       # so that feature was silently producing an empty "## What's Changed"
@@ -122,14 +133,10 @@ jobs:
             fi
           } > release_notes.md
 
-      # actions/upload-artifact above is what the in-app update flow used to
-      # point at, but Actions artifacts are always served zipped AND require
-      # a signed-in GitHub session to download at all -- fine for a human
-      # browsing the Actions tab, useless for "tap a button in the app and
-      # get an installable APK." A GitHub Release's assets are plain public
-      # files (no auth, no zip): tapping the download link goes straight to
-      # the raw .apk. One rolling pre-release per push, tagged by run number
-      # so nothing collides with the tag-triggered release job below.
+      # See the comment above "No actions/upload-artifact for the APKs" for why
+      # this Release, not an Actions artifact, is the one and only APK-delivery
+      # path. One rolling pre-release per push, tagged by run number so nothing
+      # collides with the tag-triggered release job below.
       - name: Publish build as a GitHub Release (direct APK downloads)
         if: github.event_name == 'push'
         uses: softprops/action-gh-release@v2
@@ -148,9 +155,16 @@ jobs:
   # on ordinary branch pushes or PRs. The in-app update checker (UpdateApi)
   # ignores these — it only reads "build-" tagged releases, which exist for
   # every ordinary push and carry a comparable run number.
+  #
+  # No `needs: build` -- the build job above now explicitly SKIPS on a tag
+  # push (see its own `if`), specifically so a tag doesn't trigger two full
+  # rebuilds of the same commit. A `needs` on a job that never runs on this
+  # trigger would make GitHub Actions skip this one too (a skipped dependency
+  # doesn't satisfy `needs` by default), silently breaking every tagged
+  # release. This job already does its own complete build; it never
+  # depended on the other job's outputs anyway.
   release:
     if: startsWith(github.ref, 'refs/tags/v')
-    needs: build
     runs-on: ubuntu-latest
     permissions:
       contents: write
