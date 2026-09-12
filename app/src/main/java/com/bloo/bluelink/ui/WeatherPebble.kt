@@ -1252,38 +1252,70 @@ internal fun ExpandableMapLayer(
         // the whole screen. Everything belonging to "the sheet" (map, name
         // pill, buttons, drag handle) lives inside it now, so their alignments
         // anchor to the SHEET's own edges, not the screen's.
+        //
+        // Two graphicsLayer transforms, on two nested boxes, not one -- reported
+        // directly as the open animation being "janky... hits a hard limit on
+        // the outside of how big it can go". That was this OUTER box and the
+        // pebble-to-full scale morph both being driven by the same clamped `t`
+        // on a single layer: a bouncy spring overshoots past its target and
+        // then dips back below it before settling (that dip is the actual
+        // bounce), but clamping scale to [0, 1] hides the overshoot half of
+        // that motion entirely while still fully showing the undershoot half --
+        // so it read as "grows to full size, hits a wall, visibly shrinks back
+        // a little, grows again to settle". Splitting it the way
+        // CarMapSheetBody's own (working) sheet always has fixes this: THIS
+        // outer box carries the sheet's own entrance -- an UNCLAMPED slide up
+        // from fully below-screen, free to genuinely overshoot past rest and
+        // settle back, which is what actually sells "pop" -- with no
+        // `clipToBounds()`, so the whole sheet (its rounded-corner shape
+        // included) moves as one rigid unit with nothing to hit a wall
+        // against. The pebble-to-full SCALE morph moves to a separate INNER
+        // box below, still clamped to [0, 1] (scale over 100% would still
+        // need somewhere to go), but now decoupled from this entrance --
+        // the two motions layer together instead of fighting over one value.
         Box(
             Modifier
                 .align(Alignment.BottomCenter)
                 .fillMaxWidth()
                 .fillMaxHeight(0.85f)
-                .onGloballyPositioned { sheetBounds = Rect(it.positionOnScreen(), it.size.toSize()) }
                 .graphicsLayer {
-                    val full = sheetBounds
-                    val t = expandFraction.value.coerceIn(0f, 1f)
-                    if (full != null && full.width > 0f && full.height > 0f) {
-                        val originScaleX = originBounds.width / full.width
-                        val originScaleY = originBounds.height / full.height
-                        scaleX = originScaleX + (1f - originScaleX) * t
-                        scaleY = originScaleY + (1f - originScaleY) * t
-                        translationX = (originBounds.center.x - full.center.x) * (1f - t)
-                        translationY = (originBounds.center.y - full.center.y) * (1f - t) + dragPx.value
-                    } else {
-                        scaleX = 0.92f + 0.08f * t
-                        scaleY = 0.92f + 0.08f * t
-                        translationY = dragPx.value
-                    }
+                    translationY = (1f - expandFraction.value) * size.height + dragPx.value
                 }
-                .clip(RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp))
-                .clipToBounds(),
+                .clip(RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)),
         ) {
-            CarMap(
-                location,
-                Modifier.fillMaxSize().hazeSource(mapHazeState),
-                state = mapState,
-                deviceLocation = deviceLocation,
-                onExpand = null,
-            )
+            // The map itself: fills the whole sheet, clamped pebble-to-full morph,
+            // clipped to its own bounds so the GROWING-from-pebble content never
+            // spills past the sheet's edges on the way up -- independent of the
+            // outer sheet's own entrance bounce above.
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .onGloballyPositioned { sheetBounds = Rect(it.positionOnScreen(), it.size.toSize()) }
+                    .clipToBounds()
+                    .graphicsLayer {
+                        val full = sheetBounds
+                        val t = expandFraction.value.coerceIn(0f, 1f)
+                        if (full != null && full.width > 0f && full.height > 0f) {
+                            val originScaleX = originBounds.width / full.width
+                            val originScaleY = originBounds.height / full.height
+                            scaleX = originScaleX + (1f - originScaleX) * t
+                            scaleY = originScaleY + (1f - originScaleY) * t
+                            translationX = (originBounds.center.x - full.center.x) * (1f - t)
+                            translationY = (originBounds.center.y - full.center.y) * (1f - t)
+                        } else {
+                            scaleX = 0.92f + 0.08f * t
+                            scaleY = 0.92f + 0.08f * t
+                        }
+                    },
+            ) {
+                CarMap(
+                    location,
+                    Modifier.fillMaxSize().hazeSource(mapHazeState),
+                    state = mapState,
+                    deviceLocation = deviceLocation,
+                    onExpand = null,
+                )
+            }
 
             // Vehicle name pill (appears when expanded) -- top-left of the
             // SHEET, not the screen, same as everything else below.
