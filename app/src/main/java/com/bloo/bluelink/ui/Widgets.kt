@@ -21,6 +21,7 @@ import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -506,26 +507,27 @@ internal fun rememberRelativeTime(millis: Long?): String? {
  * with no container of their own, reading as an afterthought next to the
  * rest of the app's chip/pill chrome.
  *
- * Now uses the SAME floating-pill glass treatment as everything else that
+ * Uses the SAME floating-pill rim/shadow treatment as everything else that
  * has to stay legible over unpredictable content (the map's own name pill,
- * FloatingIcon): [glassContainerAlpha]'s tinted, mostly-opaque fill plus
- * [appGlassRim]'s rim and a [dropShadow]. A flat, un-rimmed
- * `surfaceContainerHigh` (this composable's original design, on the theory
- * it only ever sits on the app's own ordinary surface) was reported TWICE
- * as effectively invisible -- "no background", then "no background circle"
- * -- on the wide/dual-car layout's header row, which floats these directly
- * over the app's plain black background: that flat fill's luminance can
- * land close enough to black to read as no container at all, and a thin
- * rim alone (the first attempted fix here) still wasn't a strong enough
- * signal on its own. This is the same fill/rim/shadow combination the map
- * sheet's own vehicle-name pill already uses successfully for exactly this
- * "floats over anything, must always read as a chip" requirement.
+ * FloatingIcon), but a genuinely NEUTRAL fill -- plain black/white by theme,
+ * not `surfaceContainerHighest`. That token is a Material3 tonal "neutral"
+ * role, which is only ever a near-hueless gray for a plain, undynamic
+ * theme; this app's own custom/dynamic palette feeds it a seed colour, and
+ * a "neutral" tone that inherits even a little of a blue seed reads as a
+ * flatly blue chip -- reported directly ("it should be a neutral colour...
+ * not a primary") after an earlier fix here picked exactly that token. A
+ * flat, un-rimmed `surfaceContainerHigh` (this composable's ORIGINAL
+ * design) was ALSO reported, twice, as effectively invisible over the
+ * wide/dual-car header's plain black background -- so this needs to be
+ * both hue-independent AND definitely visible regardless of theme, which a
+ * theme-role color token can't promise on its own either way.
  */
 @Composable
 internal fun MetaChip(text: String, modifier: Modifier = Modifier, icon: ImageVector? = null) {
+    val dark = isSystemInDarkTheme()
     Surface(
         shape = RoundedCornerShape(50),
-        color = MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = glassContainerAlpha()),
+        color = if (dark) Color.Black.copy(alpha = 0.55f) else Color.White.copy(alpha = 0.75f),
         contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
         modifier = modifier.dropShadow(RoundedCornerShape(50)).appGlassRim(RoundedCornerShape(50)),
     ) {

@@ -23,6 +23,8 @@ import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.ui.graphics.Color
 import androidx.compose.animation.core.snap
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
@@ -810,12 +812,20 @@ internal fun GarageScreen(state: State<UiState>, vm: AppViewModel) {
                             // Expressive one doesn't. Reported directly as "no circle behind"
                             // it specifically on the grid/wide layout this covers -- the
                             // shape-morphing indicator was floating bare over whatever
-                            // content happened to be underneath. Same circular glass
-                            // treatment every other floating icon in this screen already
-                            // uses (FloatingIcon's own), sized to match.
+                            // content happened to be underneath.
+                            //
+                            // Genuinely neutral fill (plain black/white by theme), NOT
+                            // surfaceContainerHighest -- that Material3 "neutral" tonal role
+                            // still inherits a slice of this app's own dynamic/custom
+                            // palette's seed colour, and MetaChip picked exactly that token
+                            // for its own background first, reported directly right after as
+                            // "it should be a neutral colour... not a primary" once the seed
+                            // was blue. Same rim/shadow every other floating icon on this
+                            // screen already uses (FloatingIcon's own), sized to match.
+                            val dark = isSystemInDarkTheme()
                             Surface(
                                 shape = CircleShape,
-                                color = MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = glassContainerAlpha()),
+                                color = if (dark) Color.Black.copy(alpha = 0.55f) else Color.White.copy(alpha = 0.75f),
                                 modifier = Modifier
                                     .size(HeaderButtonSize)
                                     .dropShadow(CircleShape)
