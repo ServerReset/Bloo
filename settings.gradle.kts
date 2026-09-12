@@ -4,7 +4,13 @@ pluginManagement {
         gradlePluginPortal()
         // Maven Central usually has AGP cached
         mavenCentral()
-        // Google as fallback
+        // Aliyun mirror often has cached artifacts
+        maven { url = uri("https://maven.aliyun.com/repository/public") }
+        // JCenter often has cached Android artifacts
+        maven { url = uri("https://jcenter.bintray.com/") }
+        // Sonatype snapshots
+        maven { url = uri("https://oss.sonatype.org/content/repositories/snapshots/") }
+        // Google as last resort
         google {
             content {
                 includeGroupByRegex("com\\.android.*")
