@@ -58,8 +58,6 @@ value class FloatingId(val name: String)
 /** The app's own floaters. Anything may define its own id; these are just the ones that
  *  currently negotiate with each other. */
 object FloatingIds {
-    /** The centered page-dot indicator. */
-    val PagerDots = FloatingId("pagerDots")
     /** The Settings cog in the top-right corner. */
     val SettingsIcon = FloatingId("settingsIcon")
     /** The flip-columns button, beside the cog while a car is expanded. */

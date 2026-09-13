@@ -143,14 +143,12 @@ internal fun Modifier.pebbleCardEdge(shape: Shape, outline: Boolean): Modifier =
  * by theme was redundant: the THEME only needs to change the base colour (black or white),
  * not how transparent it is. Literally one set of numbers now, referenced everywhere.
  *
- * History: lowered four times (0.65/0.3 → 0.4/0.12 → 0.28/0.06 → 0.16/0.02) after user
- * feedback wanting more transparency. Then 0.16/0.02 went too far, came back as "a little
- * less transparent" — this is the first raise, small and intentional to restore neutral
- * cast without reversing the transparency direction. The blurred alpha stays lowest because
- * the real blur behind it does most of the legibility work; the tint just adds neutral cast.
+ * History: lowered four times (0.65/0.3 → 0.4/0.12 → 0.28/0.06 → 0.16/0.02), raised
+ * once to 0.22/0.05 to restore neutral cast, now lowered again to 0.15/0.03 for more
+ * transparency while maintaining visibility behind the glass.
  */
-internal const val GlassTintAlpha = 0.22f
-internal const val GlassBlurredTintAlpha = 0.05f
+internal const val GlassTintAlpha = 0.15f
+internal const val GlassBlurredTintAlpha = 0.03f
 
 /**
  * Resolves [GlassSurface]'s own fill color -- also called directly by the one place

@@ -391,19 +391,7 @@ internal fun GarageScreen(
                     // there. Accepted tradeoff: a live drag now pays Haze's per-frame
                     // recomposite cost the same as an idle frame does.
                     StatusBarScrim(active = true, hazeState = hazeState)
-                    if (count > 1 && !LocalReorderActive.current) {
-                        PagerDotsFor(
-                            pager = exPager,
-                            real = { exWrap.real(it) },
-                            count = count,
-                            modifier = Modifier.align(Alignment.TopCenter).statusBarsPadding().padding(top = HeaderCornerGap)
-                                .floatingOverlay(FloatingIds.PagerDots),
-                            // Published by the modifier above -- the node that carries the inset and the
-                            // refresh shift -- so the dots must not also publish under the same id.
-                            registerBounds = false,
-                            onRefresh = { vm.refreshStatus(vehicles[exWrap.settledReal]) },
-                        )
-                    }
+                    // Pager dots removed: user requested no page indicators at the top of the screen
                 }
             } else {
                 val pageCount = (count + perPage - 1) / perPage
@@ -747,10 +735,8 @@ internal fun GarageScreen(
                                             // no reason once nothing was actually competing
                                             // with it.
                                             reserveHeaderEnd = canExpand && i == end - 1 && !appearance.settingsAsPage,
-                                            // Same condition PagerDotsFor itself uses to
-                                            // decide whether it's showing at all -- see
-                                            // reserveTopForDots's own doc.
-                                            reserveTopForDots = totalBlocks > 1,
+                                            // Pager dots removed: always false now
+                                            reserveTopForDots = false,
                                             // Only hide the per-car pull indicator in the
                                             // multi-car grid (perPage > 1) -- a prior fix
                                             // meant for the grid only ended up applying here
@@ -770,28 +756,7 @@ internal fun GarageScreen(
                     // made it disappear while swiping between cars, reported directly as
                     // wanting it to always be there.
                     StatusBarScrim(active = true, hazeState = hazeState)
-                    // Floating animated page indicator (no thin top bar). totalBlocks,
-                    // not pageCount -- the dots include the Settings slot (one more,
-                    // trailing dot) when settingsAsPage is on, same as any other page.
-                    if (totalBlocks > 1 && !LocalReorderActive.current) {
-                        PagerDotsFor(
-                            pager = pager,
-                            real = { realBlock(it) },
-                            count = totalBlocks,
-                            modifier = Modifier.align(Alignment.TopCenter).statusBarsPadding().padding(top = HeaderCornerGap)
-                                .floatingOverlay(FloatingIds.PagerDots),
-                            // Published by the modifier above -- the node that carries the inset and the
-                            // refresh shift -- so the dots must not also publish under the same id.
-                            registerBounds = false,
-                            // Guarded like every other currentIndex read in this
-                            // function (currentVehicle above, etc.) -- currentIndex
-                            // is its own StateFlow, independent of `vehicles`, so a
-                            // resync/removal shrinking the list can leave it briefly
-                            // out of range; an unguarded vehicles[currentIndex] here
-                            // would crash the screen on a mistimed pull-to-refresh.
-                            onRefresh = { vehicles.getOrNull(currentIndex)?.let { vm.refreshStatus(it) } },
-                        )
-                    }
+                    // Pager dots removed: user requested no page indicators at the top of the screen
                     // Grid mode (perPage > 1, wide/large screens) hides each
                     // card's own pull-to-refresh indicator above -- state.value.refreshing
                     // is one app-wide flag, not per-car, so leaving them unhidden

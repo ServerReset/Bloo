@@ -298,34 +298,9 @@ internal fun CompactGarage(state: UiState, vm: AppViewModel, appearance: Setting
                 .align(Alignment.TopCenter)
                 .statusBarsPadding()
                 .padding(top = HeaderCornerGap, start = HeaderCornerGap, end = HeaderCornerGap)
-                // PagerDots, not Title: with the name gone this overlay IS the dots, and this
-                // is the node that carries their real position (status-bar inset and corner
-                // gap), so it publishes and PagerDotsFor below opts out.
-                // shift = false: the cover has no pull-to-refresh shift of its own -- its
-                // refresh is the edge-trace gesture -- so only the fade applies here.
-                //
-                // active mirrors the dots' OWN condition below. This Column publishes the dots'
-                // bounds, but its child is conditional, so with a single car -- or while
-                // reordering -- it was publishing a padding-sized rectangle at top-centre for
-                // dots that were not there. Nothing reads PagerDots except the dots themselves
-                // today, so it was invisible; it is still a lie in the registry, and the whole
-                // point of the registry is that other elements can trust what is in it.
-                .floatingOverlay(FloatingIds.PagerDots, active = dotsShowing, shift = false),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            if (dotsShowing) {
-                PagerDotsFor(
-                    pager = pager,
-                    real = { realCar(it) },
-                    count = count,
-                    // No hold-to-refresh here -- the cover screen's own
-                    // edge-trace gesture (drag down from the top edge) is
-                    // already the refresh affordance in this mode; the dots
-                    // are display-only.
-                    onRefresh = null,
-                    registerBounds = false,
-                )
-            }
+            // Pager dots removed: user requested no page indicators at the top of the screen
         }
         if (band != null) {
             // Search is available here whenever it's available on the cover
@@ -743,28 +718,6 @@ internal fun CompactCar(
                 }
             }
         }
-        // Vertical page dots on the right edge - show which pebble tile is visible.
-        // (Car-switching dots are hoisted up to CompactGarage -- see there.)
-        if (tiles.size > 1 && !LocalReorderActive.current) {
-            VerticalPagerDots(
-                current = currentTile,
-                count = tiles.size,
-                tiles = tiles,
-                onPageJump = { targetTile ->
-                    vWrap.snapToReal(targetTile)
-                },
-                modifier = Modifier
-                    .align(Alignment.CenterEnd)
-                    // Clear a right-edge / bottom-right-corner camera bump: the
-                    // scrubber sits flush to the physical right edge, so on a device
-                    // whose cutout intrudes from the right it used to sit under the
-                    // bump. Native displayCutout (End side only) floats it inboard;
-                    // it's a no-op when the cutout doesn't touch the right edge.
-                    .windowInsetsPadding(WindowInsets.displayCutout.only(WindowInsetsSides.End))
-                    .padding(end = 4.dp)
-                    .floatingOverlay(FloatingIds.TileRail, shift = false)
-                    .onGloballyPositioned { dotsBounds = it.boundsInParent() },
-            )
-        }
+        // Vertical page dots removed: user requested no page indicators
     }
 }
