@@ -29,33 +29,60 @@ import com.bloo.uicommon.frostedRim as sharedFrostedRim
 import com.bloo.uicommon.ambientRing as sharedAmbientRing
 
 /**
- * UNIFIED GLASS & BLUR SYSTEM
+ * UNIFIED GLASS & BLUR SYSTEM — One Set of Numbers, Referenced Everywhere
  *
- * This file contains the complete, unified glass styling system used by every
- * floating surface in the app (search results, dialogs, overlays, status bar).
- * ONE set of numbers, referenced everywhere — change here, everything changes.
+ * This file contains the COMPLETE, UNIFIED glass styling system for every
+ * floating surface in the app: search results, dialogs, overlays, status bar,
+ * drag handles, pills, chips. ONE place controls all glass/blur — change here,
+ * everything changes together. NO scattered alpha values, NO per-site overrides.
  *
- * Core components:
- * - [GlassTintAlpha] (0.22f) & [GlassBlurredTintAlpha] (0.05f): fill transparencies
- * - [glassTint()]: resolves the actual tint color (black/white by theme)
- * - [appHazeEffect()]: applies the unified blur effect
- * - [GlassSurface]: main composable for all floating glass surfaces (with content)
- * - [ScrimBlur]: full-screen scrim (no shape, no content slot)
- * - [appGlassRim()]: the frosted rim shared by all glass edges
- * - [pebbleCardEdge()]: for opaque cards (distinct from glass)
+ * THE NUMBERS (All Floating Surfaces Share These):
+ * ────────────────────────────────────────────────
+ * [GlassTintAlpha] = 0.22f        // No blur fallback (pre-S, battery saver)
+ * [GlassBlurredTintAlpha] = 0.05f // With real Haze blur (API 31+)
  *
- * For floating surfaces (search results, dialogs, pills, chips):
- *   Use [GlassSurface] with optional hazeState for blur
+ * These are the ONLY two alpha values the entire app uses for glass. Everything
+ * else (dark/light theme, blurred/unblurred) is computed from these two numbers
+ * and the device's actual capabilities. No separate overrides per-component.
  *
- * For full-screen dim scrims (map sheets, overlays):
- *   Use [ScrimBlur] for progressive entrance/exit
+ * COMPONENT REFERENCE (Pick One):
+ * ─────────────────────────────
+ * 1. [GlassSurface] — Main floating surface (search pills, dialogs, chips)
+ *    - Takes shape, modifier, hazeState, content
+ *    - Handles blur, tint, rim, shadow automatically
+ *    - Use this for: search results, dialogs, floating pills, alert dialogs
  *
- * For opaque card edges (pebbles, standard cards):
- *   Use [pebbleCardEdge] instead — this is NOT glass
+ * 2. [ScrimBlur] — Full-screen dim + blur (map sheets, expandable overlays)
+ *    - Takes hazeState, progress lambda, modifier
+ *    - No shape, no content slot (full-screen only)
+ *    - Use this for: dimming backdrop behind expanded sheets
  *
- * The phone app's floating-chrome helpers are now ONE shared kit in :uicommon
- * (see com.bloo.uicommon.GlassChrome), usable by watch and widget surfaces too.
- * This file re-supplies the theme tint the shared module can't depend on.
+ * 3. [pebbleCardEdge] — Opaque card edges (pebbles, standard Material cards)
+ *    - NOT glass (not translucent)
+ *    - Takes shape, outline toggle
+ *    - Use this for: pebble shells, standard cards, opaque containers
+ *
+ * LOW-LEVEL FUNCTIONS (For Specialized Cases):
+ * ────────────────────────────────────────────
+ * - [glassTint(blurred)] — Gets the actual tint Color for this state
+ * - [appHazeEffect(state, progressive)] — Applies the blur modifer
+ * - [appGlassRim(shape)] — Frosted rim that all glass edges share
+ * - [frostedRim(shape)] — Platform-aware rim wrapper
+ * - [ambientRing(shape)] — Ambient ring effect wrapper
+ *
+ * WHY THIS STRUCTURE:
+ * ──────────────────
+ * Before: Five places with glass (FloatingIcon, MetaChip, pull-refresh circle,
+ * map name pill, drag handle chip), each with slightly different alphas and
+ * blur/rim/shadow — impossible to change all at once, easy to drift.
+ *
+ * After: One system everywhere. Change alpha here, ALL floating surfaces change.
+ * Change blur strength here, entire app changes. One function call, one place
+ * to check, one place to fix.
+ *
+ * The phone app's floating-chrome helpers are shared in :uicommon
+ * (com.bloo.uicommon.GlassChrome) for watch and widget reuse. This file
+ * re-supplies Material theme tint the shared module can't depend on.
  */
 
 /**
