@@ -1203,7 +1203,7 @@ internal fun SettingsScreen(
                 // again. One control, the outer one.
                 val lineCount = logs.size
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Filled.Info, contentDescription = null, modifier = Modifier.size(18.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                    ThemedIcon(Icons.Filled.Info, tint = MaterialTheme.colorScheme.onSurfaceVariant, size = 18.dp)
                     Spacer(Modifier.width(8.dp))
                     Text(
                         "Activity log  ·  $lineCount lines",
@@ -1403,7 +1403,7 @@ internal fun SettingsScreen(
             AnimatedVisibility(visibleState = advTransition5, enter = collapseEnter(), exit = collapseExit()) {
             SettingsCard("Quick tiles", Icons.Filled.Dashboard, vm) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Filled.Bolt, contentDescription = null, modifier = Modifier.size(20.dp), tint = MaterialTheme.colorScheme.primary)
+                    ThemedIcon(Icons.Filled.Bolt, tint = MaterialTheme.colorScheme.primary, size = 20.dp)
                     Spacer(Modifier.width(8.dp))
                     Text(
                         "Each car can have up to 12 tiles in your Quick Settings shade. " +
@@ -2079,7 +2079,7 @@ internal fun SettingsScreen(
                     // ballooning the whole card's height. Same class of bug StatusRow's
                     // own doc warns about; maxLines/ellipsis added as the same guard.
                     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Filled.LocationOn, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
+                        ThemedIcon(Icons.Filled.LocationOn, tint = MaterialTheme.colorScheme.primary, size = 18.dp)
                         Spacer(Modifier.width(6.dp))
                         Text(
                             appearance.weatherLabel.orEmpty(),
