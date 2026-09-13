@@ -1181,6 +1181,11 @@ internal fun StateControl(
                 }
             }
         }
+        // Weighted spacer on the right to balance the left boundary (state column with
+        // weight(1f)). This forces buttons to stay centered/compressed toward the middle
+        // instead of pushed to the far right. With both sides having weight, buttons can
+        // expand/compress symmetrically when SafeExpansiveButton animates on press.
+        Spacer(Modifier.weight(1f))
     }
 }
 
