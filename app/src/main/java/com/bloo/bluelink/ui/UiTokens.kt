@@ -779,3 +779,35 @@ internal fun ThemedIcon(
         tint = tint,
     )
 }
+
+/**
+ * Full-width row with standard spacing. Consolidates Row + fillMaxWidth() + spacing pattern.
+ */
+@Composable
+internal fun StandardRow(
+    modifier: Modifier = Modifier,
+    horizontalArrangement: androidx.compose.foundation.layout.Arrangement.Horizontal = androidx.compose.foundation.layout.Arrangement.spacedBy(12.dp),
+    content: @Composable androidx.compose.foundation.layout.RowScope.() -> Unit,
+) {
+    androidx.compose.foundation.layout.Row(
+        modifier = modifier.fillMaxWidth(),
+        horizontalArrangement = horizontalArrangement,
+        content = content,
+    )
+}
+
+/**
+ * Full-width column with standard spacing. Consolidates Column + fillMaxWidth() + spacing pattern.
+ */
+@Composable
+internal fun StandardColumn(
+    modifier: Modifier = Modifier,
+    verticalArrangement: androidx.compose.foundation.layout.Arrangement.Vertical = androidx.compose.foundation.layout.Arrangement.spacedBy(8.dp),
+    content: @Composable androidx.compose.foundation.layout.ColumnScope.() -> Unit,
+) {
+    androidx.compose.foundation.layout.Column(
+        modifier = modifier.fillMaxWidth(),
+        verticalArrangement = verticalArrangement,
+        content = content,
+    )
+}
