@@ -161,6 +161,22 @@ class CarWidget : GlanceAppWidget() {
         appWidgetId: Int,
         throwable: Throwable,
     ) {
+        renderError(context, appWidgetId, throwable)
+    }
+
+    /**
+     * The actual RemoteViews-building logic behind [onCompositionError] -- pulled out
+     * so [provideGlance] can call it directly too. [onCompositionError] only ever
+     * fires for a failure Glance itself catches around composing the CONTENT lambda;
+     * an exception thrown earlier, inside provideGlance's own suspend body (data
+     * loading, before provideContent is ever reached), was never guaranteed to route
+     * there at all -- and reported directly, after the first version of this crash
+     * screen shipped, as the widget STILL showing nothing, not even this screen. The
+     * try/catch around this whole function's body (see provideGlance) is the actual
+     * fix for that: it calls this exact same renderer itself, directly, rather than
+     * hoping Glance's own plumbing forwards a pre-content failure here for it.
+     */
+    private fun renderError(context: Context, appWidgetId: Int, throwable: Throwable) {
         val trace = android.util.Log.getStackTraceString(throwable)
         android.util.Log.e("BlooWidget", "Widget composition failed:\n$trace")
         val views = RemoteViews(context.packageName, R.layout.car_widget_error)
@@ -215,111 +231,123 @@ class CarWidget : GlanceAppWidget() {
         // widget was already working correctly.
         runCatching { WidgetRefreshWorker.schedule(context) }
         val appWidgetId = GlanceAppWidgetManager(context).getAppWidgetId(id)
-        val config = WidgetConfigStore(context).get(appWidgetId)
-        val snapshots = SnapshotStore(context)
-        val data = snapshots.current()
-        // A pinned widget shows ITS car or nothing — never silently swap to another.
-        // Only a "follow" widget (null vin) tracks the app's currently-selected car.
-        val car = if (config.vin != null) {
-            data.vehicles.firstOrNull { it.vin == config.vin }
-        } else {
-            data.selected
-        }
-        val appearance = runCatching { SettingsStore(context).appearance.first() }.getOrNull()
-            ?: SettingsStore.Appearance()
-        val metric = appearance.unitSystem == "metric"
-        val theme = WidgetTheme.resolve(context, appearance, config, car?.vin)
-        val stale = car?.fetchedAt?.takeIf { it > 0 }?.let {
-            System.currentTimeMillis() - it > com.bloo.bluelink.data.STALE_STATUS_MS
-        } ?: false
-        // The location map is fetched here (suspend) — not in the composables, which
-        // can't do I/O — when the user enabled it and the car has coordinates. Sized
-        // generously; the Image just scales it down for smaller layout slots.
-        val mapBitmap = if (config.showMap && car?.lat != null && car.lon != null) {
-            val density = context.resources.displayMetrics.density
-            val edge = (150 * density).toInt()
-            runCatching { WidgetMap.render(context, car.lat!!, car.lon!!, edge, theme.accentArgb, dark = theme.isDark) }.getOrNull()
-        } else null
-        // No-ops gracefully to the themed background when the car has no photo
-        // set (SettingsStore.imageUrl is only ever a local file path here --
-        // "/..." -- never a remote URL, matching how the app's own photo
-        // picker stores it).
-        val photoBitmap = if (config.photoBackground && car != null) {
-            val path = runCatching { SettingsStore(context).imageUrl(car.vin) }.getOrNull()
-            if (path != null && path.startsWith("/")) {
-                WidgetPhoto.decodeCached(path)?.let { WidgetPhoto.blurredCached(it, path) }
-            } else null
-        } else null
-        val render = Render(
-            car = car,
-            config = config,
-            theme = theme,
-            metric = metric,
-            multiCar = data.vehicles.size > 1,
-            stale = stale,
-            mapBitmap = mapBitmap,
-            photoBitmap = photoBitmap,
-        )
-        provideContent {
-            // Observe the snapshot store INSIDE the composition, which is what
-            // GlanceAppWidget's own KDoc instructs: "load initial data before calling
-            // provideContent, and then observe your sources of data within the composition
-            // (e.g. collectAsState). This ensures that your widget will continue to update
-            // while the composition is active."
-            //
-            // Without this, `updateAll()` on a data change could silently do nothing.
-            // update() only calls session.updateGlance() when a session was already running,
-            // and updateGlance() merely re-reads GLANCE STATE -- the content flow is held as
-            // `remember { widget.runGlance(...) }`, so the suspend body above is never
-            // re-invoked. Every value it computed stays frozen for the life of the session.
-            //
-            // That is not theoretical here. Tapping a widget action writes an optimistic
-            // snapshot and calls updateAll(), then the real status lands seconds later and
-            // calls updateAll() again -- inside the same session (~45s after provideContent,
-            // ~5s on a dozing device). The SECOND update was the one carrying the truth, and
-            // it was the one dropped. Symptom: "I sent a command from the widget and it never
-            // updated."
-            // Narrowed to just what THIS widget's own render actually needs -- not the raw
-            // whole-account flow. snapshots.payload holds every car; without this, a status
-            // poll, weather push, or AI-summary write for ANY OTHER car in the account still
-            // emitted here, and since Render carries two platform Bitmap fields (Compose-
-            // unstable, no equals/hashCode to skip on), that meant a full Content()
-            // recomposition -- including ChargeRing re-rendering its own bitmap arc from
-            // scratch -- for every widget on the home screen, on every unrelated car's update.
-            // distinctUntilChanged() on the narrowed (car, multiCar) pair means this widget
-            // only ever recomposes when ITS OWN displayed data actually changed.
-            val liveSlice by snapshots.payload
-                .map { live ->
-                    val liveCar = if (config.vin != null) {
-                        live.vehicles.firstOrNull { it.vin == config.vin }
-                    } else {
-                        live.selected
-                    }
-                    liveCar to (live.vehicles.size > 1)
-                }
-                .distinctUntilChanged()
-                .collectAsState(initial = car to (data.vehicles.size > 1))
-            val (liveCar, liveMultiCar) = liveSlice
-            // Staleness is recomputed from the live fetchedAt, not carried over: the whole
-            // point of a live update is that the age changed.
-            val liveStale = liveCar?.fetchedAt?.takeIf { it > 0 }?.let {
+        // Everything from here through provideContent's own call, wrapped -- not
+        // relying on onCompositionError to catch a failure in THIS suspend body, only
+        // in the composable Glance calls afterward. Reported directly as the widget
+        // still showing nothing (not even the crash screen) after that screen first
+        // shipped: whatever was actually failing was failing HERE, before
+        // provideContent ever ran, which onCompositionError has no documented
+        // guarantee of ever seeing. Catching it here and rendering the exact same
+        // crash screen directly removes that guesswork entirely.
+        try {
+            val config = WidgetConfigStore(context).get(appWidgetId)
+            val snapshots = SnapshotStore(context)
+            val data = snapshots.current()
+            // A pinned widget shows ITS car or nothing — never silently swap to another.
+            // Only a "follow" widget (null vin) tracks the app's currently-selected car.
+            val car = if (config.vin != null) {
+                data.vehicles.firstOrNull { it.vin == config.vin }
+            } else {
+                data.selected
+            }
+            val appearance = runCatching { SettingsStore(context).appearance.first() }.getOrNull()
+                ?: SettingsStore.Appearance()
+            val metric = appearance.unitSystem == "metric"
+            val theme = WidgetTheme.resolve(context, appearance, config, car?.vin)
+            val stale = car?.fetchedAt?.takeIf { it > 0 }?.let {
                 System.currentTimeMillis() - it > com.bloo.bluelink.data.STALE_STATUS_MS
             } ?: false
-            GlanceTheme {
-                // theme, mapBitmap and photoBitmap deliberately keep their cold-path values.
-                // All three need I/O, which Glance composables cannot do, and all three are
-                // keyed to the car's IDENTITY rather than its data -- which does not change
-                // within a session (switching cars goes through WidgetSwitchCarAction, and
-                // that starts a new one). What changes live is the numbers, and those are
-                // exactly what this passes through.
-                Content(
-                    render.copy(
-                        car = liveCar ?: render.car,
-                        stale = liveStale,
-                        multiCar = liveMultiCar,
-                    ),
-                )
+            // The location map is fetched here (suspend) — not in the composables, which
+            // can't do I/O — when the user enabled it and the car has coordinates. Sized
+            // generously; the Image just scales it down for smaller layout slots.
+            val mapBitmap = if (config.showMap && car?.lat != null && car.lon != null) {
+                val density = context.resources.displayMetrics.density
+                val edge = (150 * density).toInt()
+                runCatching { WidgetMap.render(context, car.lat!!, car.lon!!, edge, theme.accentArgb, dark = theme.isDark) }.getOrNull()
+            } else null
+            // No-ops gracefully to the themed background when the car has no photo
+            // set (SettingsStore.imageUrl is only ever a local file path here --
+            // "/..." -- never a remote URL, matching how the app's own photo
+            // picker stores it).
+            val photoBitmap = if (config.photoBackground && car != null) {
+                val path = runCatching { SettingsStore(context).imageUrl(car.vin) }.getOrNull()
+                if (path != null && path.startsWith("/")) {
+                    WidgetPhoto.decodeCached(path)?.let { WidgetPhoto.blurredCached(it, path) }
+                } else null
+            } else null
+            val render = Render(
+                car = car,
+                config = config,
+                theme = theme,
+                metric = metric,
+                multiCar = data.vehicles.size > 1,
+                stale = stale,
+                mapBitmap = mapBitmap,
+                photoBitmap = photoBitmap,
+            )
+            provideContent {
+                // Observe the snapshot store INSIDE the composition, which is what
+                // GlanceAppWidget's own KDoc instructs: "load initial data before calling
+                // provideContent, and then observe your sources of data within the composition
+                // (e.g. collectAsState). This ensures that your widget will continue to update
+                // while the composition is active."
+                //
+                // Without this, `updateAll()` on a data change could silently do nothing.
+                // update() only calls session.updateGlance() when a session was already running,
+                // and updateGlance() merely re-reads GLANCE STATE -- the content flow is held as
+                // `remember { widget.runGlance(...) }`, so the suspend body above is never
+                // re-invoked. Every value it computed stays frozen for the life of the session.
+                //
+                // That is not theoretical here. Tapping a widget action writes an optimistic
+                // snapshot and calls updateAll(), then the real status lands seconds later and
+                // calls updateAll() again -- inside the same session (~45s after provideContent,
+                // ~5s on a dozing device). The SECOND update was the one carrying the truth, and
+                // it was the one dropped. Symptom: "I sent a command from the widget and it never
+                // updated."
+                // Narrowed to just what THIS widget's own render actually needs -- not the raw
+                // whole-account flow. snapshots.payload holds every car; without this, a status
+                // poll, weather push, or AI-summary write for ANY OTHER car in the account still
+                // emitted here, and since Render carries two platform Bitmap fields (Compose-
+                // unstable, no equals/hashCode to skip on), that meant a full Content()
+                // recomposition -- including ChargeRing re-rendering its own bitmap arc from
+                // scratch -- for every widget on the home screen, on every unrelated car's update.
+                // distinctUntilChanged() on the narrowed (car, multiCar) pair means this widget
+                // only ever recomposes when ITS OWN displayed data actually changed.
+                val liveSlice by snapshots.payload
+                    .map { live ->
+                        val liveCar = if (config.vin != null) {
+                            live.vehicles.firstOrNull { it.vin == config.vin }
+                        } else {
+                            live.selected
+                        }
+                        liveCar to (live.vehicles.size > 1)
+                    }
+                    .distinctUntilChanged()
+                    .collectAsState(initial = car to (data.vehicles.size > 1))
+                val (liveCar, liveMultiCar) = liveSlice
+                // Staleness is recomputed from the live fetchedAt, not carried over: the whole
+                // point of a live update is that the age changed.
+                val liveStale = liveCar?.fetchedAt?.takeIf { it > 0 }?.let {
+                    System.currentTimeMillis() - it > com.bloo.bluelink.data.STALE_STATUS_MS
+                } ?: false
+                GlanceTheme {
+                    // theme, mapBitmap and photoBitmap deliberately keep their cold-path values.
+                    // All three need I/O, which Glance composables cannot do, and all three are
+                    // keyed to the car's IDENTITY rather than its data -- which does not change
+                    // within a session (switching cars goes through WidgetSwitchCarAction, and
+                    // that starts a new one). What changes live is the numbers, and those are
+                    // exactly what this passes through.
+                    Content(
+                        render.copy(
+                            car = liveCar ?: render.car,
+                            stale = liveStale,
+                            multiCar = liveMultiCar,
+                        ),
+                    )
+                }
             }
+        } catch (t: Throwable) {
+            renderError(context, appWidgetId, t)
         }
     }
 
