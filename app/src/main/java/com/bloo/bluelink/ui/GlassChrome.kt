@@ -83,18 +83,17 @@ internal fun Modifier.pebbleCardEdge(shape: Shape, outline: Boolean): Modifier =
 // ---- One floating-glass surface, everywhere -------------------------------
 
 /**
- * The four alphas every neutral glass fill in the app shares: how opaque the tint
- * needs to be to stay legible entirely on its own (no real blur behind it -- pre-S
- * devices, or battery saver) versus how much lighter it can get once a real blur is
- * already doing most of the legibility work underneath. These used to be four
- * literals retyped identically at every call site that grew its own glass chip
- * (GarageScreen's refresh circle, MetaChip, the single-column pull-to-refresh
- * indicator) -- one shared pair each, now.
+ * The two alphas every neutral glass fill in the app shares -- one number for "no
+ * real blur behind this" (pre-S devices, or battery saver), a lighter second number
+ * for "a real blur is already doing most of the legibility work underneath." Used to
+ * be four: a separate pair for dark and light theme, on top of the blurred/unblurred
+ * split. Splitting by theme brightness never had a real reason behind it -- the
+ * THEME only ever needs to change which base colour (black or white) this tints
+ * with, not how transparent that colour is -- so it was really the same two numbers,
+ * typed twice. Literally one set of numbers now, referenced by both branches below.
  */
-private const val GlassTintAlphaDark = 0.55f
-private const val GlassTintAlphaLight = 0.75f
-private const val GlassBlurredTintAlphaDark = 0.25f
-private const val GlassBlurredTintAlphaLight = 0.35f
+private const val GlassTintAlpha = 0.65f
+private const val GlassBlurredTintAlpha = 0.3f
 
 /**
  * Resolves [GlassSurface]'s own fill color -- also called directly by the one place
@@ -114,11 +113,8 @@ private const val GlassBlurredTintAlphaLight = 0.35f
 @Composable
 internal fun glassTint(blurred: Boolean): Color {
     val dark = isSystemInDarkTheme()
-    return if (dark) {
-        Color.Black.copy(alpha = if (blurred) GlassBlurredTintAlphaDark else GlassTintAlphaDark)
-    } else {
-        Color.White.copy(alpha = if (blurred) GlassBlurredTintAlphaLight else GlassTintAlphaLight)
-    }
+    val alpha = if (blurred) GlassBlurredTintAlpha else GlassTintAlpha
+    return if (dark) Color.Black.copy(alpha = alpha) else Color.White.copy(alpha = alpha)
 }
 
 /**
