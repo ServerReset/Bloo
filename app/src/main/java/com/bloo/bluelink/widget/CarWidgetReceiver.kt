@@ -101,21 +101,24 @@ class CarWidgetReceiver : GlanceAppWidgetReceiver() {
 
     override fun onDeleted(context: Context, appWidgetIds: IntArray) {
         super.onDeleted(context, appWidgetIds)
-        // Best-effort clear. Used to run inside runBlocking on whatever thread
-        // dispatched onDeleted (the main thread, in the common case), blocking
-        // it on the DataStore's disk write for every removed id -- a home
-        // screen wipe with several car widgets meant several sequential
-        // blocking writes back to back. goAsync() extends the receiver's
-        // lifetime past this call returning, so the actual suspend work can
-        // run on a background dispatcher instead of blocking the caller.
+        // Best-effort clear, fire-and-forget -- NOT goAsync() here, for the same reason
+        // onUpdate above avoids a second one: GlanceAppWidgetReceiver's own onReceive()
+        // dispatch already manages its own async lifecycle for this broadcast, and a
+        // second goAsync() call for the same dispatch is not something this callback can
+        // rely on. onUpdate's own doc predicted this as an IllegalStateException risk;
+        // what actually happened, crash-reported from a real device, was worse and
+        // silent at the call site -- goAsync() returned null instead of throwing, and
+        // pending.finish() on that null crashed the receiver with a bare
+        // NullPointerException. Matches onUpdate's already-proven pattern: a plain
+        // CoroutineScope carries the same small "cut off if the process dies the instant
+        // this method returns" risk that doc already accepts, which is the right trade
+        // for a best-effort disk clear that must never crash the receiver.
         val appContext = context.applicationContext
-        val pending = goAsync()
         CoroutineScope(Dispatchers.IO).launch {
             runCatching {
                 val store = WidgetConfigStore(appContext)
                 appWidgetIds.forEach { store.clear(it) }
             }
-            pending.finish()
         }
     }
 
