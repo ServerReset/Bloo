@@ -8,7 +8,6 @@
 package com.bloo.bluelink.ui
 
 import dev.chrisbanes.haze.HazeState
-import dev.chrisbanes.haze.hazeEffect
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -21,7 +20,6 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
@@ -168,15 +166,6 @@ internal fun StatusBarScrim(
 ) {
     if (inMultiWindowMode) return
     val topInset = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
-    // Plain black/white by theme, not scheme.surface -- the one glass tint left in the
-    // app still reading a MaterialTheme.colorScheme token instead of the same neutral
-    // fill every other glass surface uses. `surface` is one of Material3's LEAST tinted
-    // roles, but it is still a token this app's dynamic/custom palette can feed a slice
-    // of the seed colour, same root cause as every other spot this was already fixed at
-    // (see MetaChip's own doc) -- this scrim just hadn't been swept yet. Its own alpha
-    // pair (0.45/0.7) is kept as-is; only the hue source changes.
-    val dark = isSystemInDarkTheme()
-    val scrimBase = if (dark) Color.Black else Color.White
     // Modifier.blur (the hazeState == null fallback path below) is backed by
     // RenderEffect, which the Android framework only implements from API 31 (S)
     // onward -- Compose has no software fallback for it, and neither does Haze's own
@@ -188,6 +177,12 @@ internal fun StatusBarScrim(
     // otherwise falls entirely on a fairly light 0.55 alpha fade) instead of
     // silently doing less than intended.
     val canBlur = CanBlurBackdrops()
+    // glassTint, not this scrim's own separately-tuned alpha pair or scheme.surface --
+    // the exact same fill (colour AND alpha) every other glass surface in the app
+    // resolves to for this canBlur state. There is now exactly one function in the
+    // whole app that decides what a "not blurred, fall back to solid" (or "blurred,
+    // go lighter") tint actually looks like.
+    val tint = glassTint(canBlur)
     Box(
         Modifier
             .fillMaxWidth()
@@ -209,26 +204,23 @@ internal fun StatusBarScrim(
                     // pinned 1.7.0 (caught by CI); "a bit less strong" is carried entirely
                     // by the gradient's own reduced alpha below instead.
                     //
-                    // `progressive`, not a flat blur: reported directly as wanting the
-                    // blur itself to actually be strong right at the status bar and taper
-                    // to none by this Box's own bottom edge, "like a gradient of blur" --
-                    // a flat blur applied over the whole height read as a uniform smear
-                    // with a hard edge where the Box ended, however soft the TINT above it
-                    // faded. startIntensity/endIntensity is Haze's own blur-radius
-                    // gradient, independent of (and layered under) the tint gradient below.
-                    Modifier.hazeEffect(state = hazeState) {
-                        progressive = StandardBlurProgressive
-                    }
+                    // appHazeEffect: the one shared Haze configuration (see its own doc)
+                    // every blurred surface in the app now goes through, `progressive`
+                    // included -- reported directly, once, as wanting the blur itself to
+                    // actually be strong right at the status bar and taper to none by this
+                    // Box's own bottom edge, "like a gradient of blur", and now the same
+                    // gradient every full-height scrim in the app applies.
+                    Modifier.appHazeEffect(hazeState)
                 } else {
                     Modifier
                 },
             )
             .background(
                 Brush.verticalGradient(
-                    // 0.45/0.7, down from 0.55/0.8 -- the same "a bit less strong" request,
-                    // applied to this gradient's own tint (which layers over the blur
-                    // above, or stands alone on the pre-S/no-hazeState fallback path).
-                    listOf(scrimBase.copy(alpha = if (canBlur) 0.45f else 0.7f), Color.Transparent),
+                    // The gradient's own tint (which layers over the blur above, or
+                    // stands alone on the pre-S/no-hazeState fallback path) fades from
+                    // the one shared glassTint down to fully transparent.
+                    listOf(tint, Color.Transparent),
                 ),
             )
             .then(

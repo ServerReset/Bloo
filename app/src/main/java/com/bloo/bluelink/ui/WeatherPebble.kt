@@ -113,7 +113,6 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.compose.ui.window.DialogWindowProvider
 import dev.chrisbanes.haze.HazeState
-import dev.chrisbanes.haze.hazeEffect
 import dev.chrisbanes.haze.hazeSource
 import coil.compose.AsyncImage
 import coil.imageLoader
@@ -1295,12 +1294,13 @@ private fun MapRefreshChip(
  * The small frosted pill behind the map sheet's own drag handle -- shared by
  * [ExpandableMapLayer] and [CarMapSheetBody], which used to each carry a byte-for-byte
  * identical copy of this exact Box chain. Deliberately NOT built on [GlassSurface]:
- * this one has always used a flat black tint regardless of the app's own light/dark
- * theme (right, since it sits on a map, not a themed app surface) rather than
- * [glassTint]'s theme-aware black/white, and its own inner bar is drawn directly
- * rather than through a generic `content` slot -- close to but not quite the same
- * shape as every other floating chip, so it stays its own small composable instead
- * of forcing an extra "flat vs theme-aware tint" parameter onto the shared one.
+ * its own inner bar is drawn directly rather than through a generic `content` slot --
+ * close to but not quite the same shape as every other floating chip, so it stays its
+ * own small composable instead of forcing an extra parameter onto the shared one. The
+ * FILL, though, is the same [glassTint] every other glass surface in the app uses --
+ * this used to be its own flat-black-regardless-of-theme special case, reasoned as
+ * "it sits on a map, not a themed app surface", but there are no per-surface tint
+ * exceptions left in the app now, this one included.
  */
 @Composable
 private fun MapDragHandle(mapHazeState: HazeState, modifier: Modifier = Modifier) {
@@ -1310,8 +1310,8 @@ private fun MapDragHandle(mapHazeState: HazeState, modifier: Modifier = Modifier
             .padding(top = 8.dp)
             .size(width = 56.dp, height = 20.dp)
             .clip(RoundedCornerShape(50))
-            .then(if (canBlurHandle) Modifier.hazeEffect(state = mapHazeState) else Modifier)
-            .background(Color.Black.copy(alpha = if (canBlurHandle) 0.2f else 0.35f)),
+            .then(if (canBlurHandle) Modifier.appHazeEffect(mapHazeState) else Modifier)
+            .background(glassTint(canBlurHandle)),
         contentAlignment = Alignment.Center,
     ) {
         Box(

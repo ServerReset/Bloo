@@ -122,6 +122,22 @@ internal fun glassTint(blurred: Boolean): Color {
 }
 
 /**
+ * The one Haze configuration every blurred surface in the app uses -- literally the
+ * same function call, not a same-looking copy of one. Before this, three different
+ * spots each built their own `hazeEffect(state = ...) { ... }` block: [GlassSurface]
+ * called it completely plain (Haze's own default style), [ScrimBlur] and
+ * `StatusBarScrim` (Widgets.kt) each separately set `progressive = StandardBlurProgressive`,
+ * and the map's own drag-handle chip (WeatherPebble.kt) called it plain again -- three
+ * different-looking blurs on three different classes of surface, none of them actually
+ * wrong on their own, but never actually the same call. Every one of those now goes
+ * through this, so there is exactly one place that decides what "the app's blur" looks
+ * like, at any radius, style or intensity -- change it here and every surface in the
+ * app changes together, and no future call site can quietly drift onto its own version.
+ */
+internal fun Modifier.appHazeEffect(state: HazeState): Modifier =
+    this.hazeEffect(state = state) { progressive = StandardBlurProgressive }
+
+/**
  * The app's one floating-glass surface: a real Haze backdrop blur of [hazeState]
  * when one is given and [CanBlurBackdrops] allows it (API 31+, battery saver off),
  * layered under a neutral [tint], inside the shared [dropShadow]/[appGlassRim] edge
@@ -196,7 +212,7 @@ internal fun GlassSurface(
             Modifier
                 .matchParentSize()
                 .clip(shape)
-                .then(if (canBlur) Modifier.hazeEffect(state = hazeState!!) else Modifier)
+                .then(if (canBlur) Modifier.appHazeEffect(hazeState!!) else Modifier)
                 .background(tint),
         )
         CompositionLocalProvider(LocalContentColor provides contentColor) {
@@ -208,8 +224,9 @@ internal fun GlassSurface(
 /**
  * The full-screen dim+blur scrim behind an expanded map sheet -- shared by
  * [ExpandableMapLayer] and [CarMapSheetBody] (WeatherPebble.kt), which used to each
- * carry a byte-for-byte identical copy of this exact two-Box chain, right down to
- * the same 0.35/0.5 alpha constants.
+ * carry a byte-for-byte identical copy of this exact two-Box chain. Its fill is now
+ * [glassTint] and its blur [appHazeEffect] -- the same two calls every other glass
+ * surface in the app makes, not a scrim-specific alpha/style of its own.
  *
  * [progress] is a LAMBDA, not a plain `Float`, on purpose: every read of it here
  * happens inside `drawBehind`/`graphicsLayer` blocks, i.e. at DRAW time, not
@@ -235,11 +252,19 @@ internal fun ScrimBlur(hazeState: HazeState?, progress: () -> Float, modifier: M
     // battery saver or not. CanBlurBackdrops() is the real gate, same as every
     // other blur site in the app.
     val canBlur = hazeState != null && CanBlurBackdrops()
+    // glassTint, not a literal Color.Black -- the exact same fill (colour AND alpha)
+    // every other glass surface in the app resolves to for this canBlur state, read
+    // once here at composable scope (glassTint is itself @Composable) rather than
+    // inside the drawBehind block below. `drawRect`'s own `alpha` parameter multiplies
+    // with this color's already-baked-in alpha, so the entrance/exit fraction still
+    // animates purely at draw time exactly as it did before -- nothing about the
+    // performance property this function's own doc describes changes.
+    val tint = glassTint(canBlur)
     Box(
         modifier
             .fillMaxSize()
             .drawBehind {
-                drawRect(Color.Black, alpha = (if (canBlur) 0.35f else 0.5f) * progress().coerceIn(0f, 1f))
+                drawRect(tint, alpha = progress().coerceIn(0f, 1f))
             },
     )
     if (canBlur) {
@@ -247,9 +272,7 @@ internal fun ScrimBlur(hazeState: HazeState?, progress: () -> Float, modifier: M
             modifier
                 .fillMaxSize()
                 .graphicsLayer { alpha = progress().coerceIn(0f, 1f) }
-                .hazeEffect(state = hazeState!!) {
-                    progressive = StandardBlurProgressive
-                },
+                .appHazeEffect(hazeState!!),
         )
     }
 }
