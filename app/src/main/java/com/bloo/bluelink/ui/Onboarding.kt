@@ -845,7 +845,7 @@ internal fun OnboardingSetupCard(
                 }
                 Column(Modifier.weight(1f)) {
                     Text(title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = scheme.onSurface)
-                    Text(body, style = MaterialTheme.typography.bodySmall, color = scheme.onSurfaceVariant)
+                    MutedText(body)
                 }
             }
             content()
@@ -888,7 +888,7 @@ internal fun OnboardingTipCard(icon: ImageVector, title: String, body: String) {
             }
             Column {
                 Text(title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
-                Text(body, style = MaterialTheme.typography.bodySmall, color = scheme.onSurfaceVariant)
+                MutedText(body)
             }
         }
     }
@@ -1512,7 +1512,7 @@ internal fun WizardFeatureToggle(
     ) {
         Column(Modifier.weight(1f)) {
             Text(title, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.SemiBold)
-            Text(body, style = MaterialTheme.typography.bodySmall, color = scheme.onSurfaceVariant)
+            MutedText(body)
         }
         // MorphToggleTrack, not a stock Switch. ToggleRow's docstring calls itself
         // "the app's one toggle control for boolean settings", built specifically so

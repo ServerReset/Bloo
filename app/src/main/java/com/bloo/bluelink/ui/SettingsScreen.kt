@@ -1001,7 +1001,7 @@ internal fun SettingsScreen(
                     HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
                     Spacer(Modifier.height(SettingsGapGroup))
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Filled.Description, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(20.dp))
+                        ThemedIcon(Icons.Filled.Description, tint = MaterialTheme.colorScheme.onSurfaceVariant, size = 20.dp)
                         Spacer(Modifier.width(8.dp))
                         Text("Manual backup", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
                     }

@@ -410,7 +410,7 @@ internal fun ClimatePebble(
             exit = collapseExit(),
         ) {
             Row(Modifier.fillMaxWidth().padding(bottom = 6.dp), horizontalArrangement = Arrangement.SpaceBetween) {
-                Text("Set temperature", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                MutedText("Set temperature")
                 // color resolved explicitly to onSurface -- same fix, same reason as
                 // the update pebble's own AnimatedValue calls: BasicText (which this
                 // renders through) doesn't fall back to LocalContentColor the way a
@@ -439,7 +439,7 @@ internal fun ClimatePebble(
         // AnimatedValue this had: it rolls the DIRECTION the value actually moved (up
         // when dragged warmer, down when cooler) instead of always sliding one way.
         Row(Modifier.fillMaxWidth().padding(vertical = 2.dp), horizontalArrangement = Arrangement.SpaceBetween) {
-            Text("Temperature", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            MutedText("Temperature")
             RollingNumber(
                 text = degLabel(tempF.toString(), fahrenheit),
                 style = MaterialTheme.typography.bodySmall,
