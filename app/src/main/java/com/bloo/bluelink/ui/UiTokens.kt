@@ -728,3 +728,34 @@ internal fun StaggeredRevealColumn(
         }
     }
 }
+
+// ---- Common Composable Helpers -----------------------------------------------
+
+/**
+ * Body text styling (bodySmall, onSurfaceVariant) for secondary/muted content.
+ * Use this instead of `Text(text, style = MaterialTheme.typography.bodySmall, color = ...)`
+ * to consolidate the most-repeated text pattern in the app (27+ sites).
+ */
+@Composable
+internal fun MutedText(text: String, modifier: Modifier = Modifier) {
+    Text(
+        text,
+        modifier = modifier,
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
+}
+
+/**
+ * Label text styling (labelMedium) for subtle secondary text.
+ * Consolidates another common text pattern.
+ */
+@Composable
+internal fun LabelText(text: String, modifier: Modifier = Modifier) {
+    Text(
+        text,
+        modifier = modifier,
+        style = MaterialTheme.typography.labelMedium,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
+}
