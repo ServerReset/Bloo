@@ -15,7 +15,6 @@ import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
@@ -71,7 +70,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
@@ -497,14 +495,21 @@ internal fun EmptyScreen(vm: AppViewModel) {
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(horizontal = 32.dp, vertical = 24.dp),
+                    .padding(horizontal = 20.dp, vertical = 24.dp),
                 contentAlignment = Alignment.Center,
             ) {
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(16.dp),
+                // GlassSurface (GlassChrome.kt): this used to be bare Icon+Text+Button
+                // floating directly on the Aurora backdrop with no card under it at all --
+                // the one major piece of content in the app with no glass chrome around it,
+                // next to Garage's pebbles, Settings' cards and the lock overlay's own PIN
+                // card above, all of which live inside one. Reported as not fitting the rest
+                // of the app; this puts it in the same card every other piece of content sits
+                // on top of, blurring the real Aurora behind it like everything else does.
+                GlassSurface(
+                    shape = RoundedCornerShape(28.dp),
                     modifier = Modifier
-                        .widthIn(max = 360.dp)
+                        .widthIn(max = 400.dp)
+                        .fillMaxWidth()
                         .graphicsLayer {
                             alpha = contentAlpha.value
                             // .dp.toPx(), not the raw Animatable value:
@@ -515,26 +520,29 @@ internal fun EmptyScreen(vm: AppViewModel) {
                             // (same idiom ReorderColumn's intro slide already uses).
                             translationY = contentOffset.value.dp.toPx()
                         },
+                    hazeState = hazeState,
                 ) {
-                    // A soft glow behind the icon instead of a bare, flat glyph
-                    // floating on empty space -- the same halo technique the
-                    // search bar uses for its own icon treatment.
-                    Box(contentAlignment = Alignment.Center) {
-                        Box(
-                            Modifier
-                                .size(96.dp)
-                                .background(
-                                    Brush.radialGradient(
-                                        listOf(scheme.primary.copy(alpha = 0.16f), Color.Transparent),
-                                    ),
-                                    CircleShape,
-                                ),
-                        )
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(16.dp),
+                    modifier = Modifier.padding(horizontal = 28.dp, vertical = 32.dp),
+                ) {
+                    // Same tonal icon-badge every SettingsCard header uses (StatusHeaderRow,
+                    // SettingsHeader.kt) instead of this screen's own one-off radial-gradient
+                    // glow -- one badge treatment for "an icon summarizing this card's state,"
+                    // not two different-looking ones depending which screen you're on.
+                    val badgeTint = if (loadFailed) scheme.error else scheme.onSurfaceVariant
+                    Box(
+                        Modifier
+                            .size(64.dp)
+                            .background(badgeTint.copy(alpha = 0.15f), CircleShape),
+                        contentAlignment = Alignment.Center,
+                    ) {
                         Icon(
                             icon,
                             contentDescription = null,
-                            modifier = Modifier.size(56.dp),
-                            tint = if (loadFailed) scheme.error.copy(alpha = 0.85f) else scheme.onSurfaceVariant.copy(alpha = 0.7f),
+                            modifier = Modifier.size(32.dp),
+                            tint = badgeTint,
                         )
                     }
                     Text(
@@ -551,6 +559,10 @@ internal fun EmptyScreen(vm: AppViewModel) {
                     )
                     Spacer(Modifier.height(8.dp))
                     if (state.accounts.isEmpty()) {
+                        // Just the one CTA here -- "Account Settings" below used to repeat
+                        // it as a second button doing the exact same vm.openSettings() call,
+                        // which is what a not-signed-in screen with no other action to offer
+                        // does not need: two buttons to the same place.
                         val settingsSource = remember { MutableInteractionSource() }
                         SafeExpansiveButton(
                             interactionSource = settingsSource,
@@ -578,19 +590,20 @@ internal fun EmptyScreen(vm: AppViewModel) {
                                 MorphButtonLabel(Icons.Filled.Refresh, if (loadFailed) "Try again" else "Reload", pending = false)
                             }
                         }
-                    }
-                    val accountSource = remember { MutableInteractionSource() }
-                    SafeExpansiveButton(
-                        interactionSource = accountSource,
-                        enabled = true,
-                    ) {
-                        MorphTextButton(
-                            "Account Settings",
-                            onClick = { vm.openSettings() },
+                        val accountSource = remember { MutableInteractionSource() }
+                        SafeExpansiveButton(
                             interactionSource = accountSource,
-                            modifier = Modifier.fillMaxWidth()
-                        )
+                            enabled = true,
+                        ) {
+                            MorphTextButton(
+                                "Account Settings",
+                                onClick = { vm.openSettings() },
+                                interactionSource = accountSource,
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                        }
                     }
+                }
                 }
             }
         }
