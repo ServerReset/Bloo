@@ -290,7 +290,7 @@ internal fun QuickTileCard(index: Int, vin: String, state: UiState, vm: AppViewM
             onClick = { addTileToQuickSettings(context, index, cmd, title, unlocked = status?.doorLock == false) },
         ),
     ) {
-        Text("Action", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        LabelText("Action")
         Spacer(Modifier.height(4.dp))
         MorphSegmented(
             options = TileActions.map { (key, label, icon) ->
@@ -317,7 +317,7 @@ internal fun QuickTileCard(index: Int, vin: String, state: UiState, vm: AppViewM
 
         if (cmd == "climate") {
             Spacer(Modifier.height(10.dp))
-            Text("Runs", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            LabelText("Runs")
             Spacer(Modifier.height(4.dp))
             MorphSegmented(
                 options = buildList {

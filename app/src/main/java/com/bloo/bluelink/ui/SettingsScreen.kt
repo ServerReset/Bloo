@@ -1758,7 +1758,7 @@ internal fun SettingsScreen(
                     ) {
                         Column {
                             Spacer(Modifier.height(SettingsGapRow))
-                            Text("Built-in palettes", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            LabelText("Built-in palettes")
                             Spacer(Modifier.height(SettingsGapHairline))
                             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                                 ColorPalette.entries.forEach { palette ->
@@ -1774,7 +1774,7 @@ internal fun SettingsScreen(
                             // no entry point anywhere in the UI after the old Color
                             // card was merged into this Theme card -- restore it here.
                             Spacer(Modifier.height(SettingsGapRow))
-                            Text("Custom palettes", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            LabelText("Custom palettes")
                             Spacer(Modifier.height(SettingsGapHairline))
                             var editingPalette by remember { mutableStateOf<CustomPaletteData?>(null) }
                             var showPaletteEditor by remember { mutableStateOf(false) }

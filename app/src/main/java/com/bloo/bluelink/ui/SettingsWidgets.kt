@@ -205,7 +205,7 @@ internal fun InlineSegmentedRow(
     onSelect: (String) -> Unit,
 ) {
     Row(verticalAlignment = Alignment.CenterVertically) {
-        Text(label, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.width(60.dp))
+        LabelText(label, modifier = Modifier.width(60.dp))
         Spacer(Modifier.width(8.dp))
         MorphSegmented(
             modifier = Modifier.weight(1f),
