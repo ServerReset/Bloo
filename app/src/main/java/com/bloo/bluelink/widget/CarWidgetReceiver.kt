@@ -127,16 +127,32 @@ class CarWidgetReceiver : GlanceAppWidgetReceiver() {
 }
 
 /**
- * Repaints every currently-placed [CarWidget] by calling [updateAll], same as
- * everywhere else in the app uses it (MainToSecondarySync.kt, MainToMainSyncWorker.kt).
+ * Repaints every currently-placed [CarWidget] by manually iterating appWidgetIds
+ * and calling the widget's own update() method directly for each, bypassing
+ * updateAll()'s broken registry dependency.
  *
  * Shared by [CarWidgetReceiver.onUpdate] (fires on add/resize) and
  * [WidgetRefreshWorker] (fires every 30 minutes).
  */
 private suspend fun updateAllCarWidgetsDirectly(context: Context, logPrefix: String) {
-    AppLog.log("$logPrefix calling updateAll()")
-    CarWidget().updateAll(context)
-    AppLog.log("$logPrefix updateAll() returned")
+    val appWidgetIds = AppWidgetManager.getInstance(context)
+        .getAppWidgetIds(ComponentName(context, CarWidgetReceiver::class.java))
+    if (appWidgetIds.isEmpty()) {
+        AppLog.log("$logPrefix no widgets found")
+        return
+    }
+    val widget = CarWidget()
+    appWidgetIds.forEach { appWidgetId ->
+        try {
+            AppLog.log("$logPrefix updating widget $appWidgetId")
+            // Try the Int overload directly - bypass GlanceId entirely
+            widget.javaClass.getMethod("update", Context::class.java, Int::class.java)
+                .invoke(widget, context, appWidgetId)
+            AppLog.log("$logPrefix widget $appWidgetId updated")
+        } catch (e: Exception) {
+            AppLog.log("$logPrefix widget $appWidgetId failed: ${e::class.simpleName}: ${e.message}")
+        }
+    }
 }
 
 /**
