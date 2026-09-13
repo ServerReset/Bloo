@@ -238,7 +238,7 @@ internal fun GarageScreen(
         // They agreed only by accident -- the compact path returns before LocalPullFraction is
         // provided, so `pulling` was always false here and both reduced to `refreshing`. One
         // change to either expression and it becomes last-writer-wins flicker.
-        CompactGarage(state.value, vm, appearance)
+        CompactGarage(state.value, vm, appearance, hazeState = hazeState)
         return
     }
     val chromeHidden = state.value.refreshing || pulling

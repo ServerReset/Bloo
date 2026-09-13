@@ -165,7 +165,7 @@ internal fun CoverSettingsGate(vm: AppViewModel) {
  */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-internal fun CompactGarage(state: UiState, vm: AppViewModel, appearance: SettingsStore.Appearance) {
+internal fun CompactGarage(state: UiState, vm: AppViewModel, appearance: SettingsStore.Appearance, hazeState: HazeState = remember { HazeState() }) {
     val vehicles = state.vehicles
     val count = vehicles.size
     // count - 1 goes negative with zero cars, and coerceIn(0, -1) throws
