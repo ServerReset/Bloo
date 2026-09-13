@@ -759,3 +759,23 @@ internal fun LabelText(text: String, modifier: Modifier = Modifier) {
         color = MaterialTheme.colorScheme.onSurfaceVariant,
     )
 }
+
+/**
+ * Icon with a single color and size. Consolidates the most-repeated icon pattern.
+ * Used for: status icons, nav icons, control icons throughout the app.
+ */
+@Composable
+internal fun ThemedIcon(
+    imageVector: androidx.compose.ui.graphics.vector.ImageVector,
+    contentDescription: String?,
+    modifier: Modifier = Modifier,
+    tint: Color = MaterialTheme.colorScheme.onSurface,
+    size: Dp = 24.dp,
+) {
+    androidx.compose.material3.Icon(
+        imageVector,
+        contentDescription = contentDescription,
+        modifier = modifier.size(size),
+        tint = tint,
+    )
+}
