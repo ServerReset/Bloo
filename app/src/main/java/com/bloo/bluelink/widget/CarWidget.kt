@@ -254,51 +254,102 @@ class CarWidget : GlanceAppWidget() {
         // guarantee of ever seeing. Catching it here and rendering the exact same
         // crash screen directly removes that guesswork entirely.
         try {
-            val config = WidgetConfigStore(context).get(appWidgetId)
+            AppLog.log("Widget: Loading config for appWidgetId=$appWidgetId")
+            val config = try {
+                WidgetConfigStore(context).get(appWidgetId)
+            } catch (t: Throwable) {
+                AppLog.log("Widget: Failed to load config: ${t.message}")
+                throw t
+            }
+
+            AppLog.log("Widget: Loading snapshots")
             val snapshots = SnapshotStore(context)
             val data = snapshots.current()
+            AppLog.log("Widget: Loaded ${data.vehicles.size} vehicles")
+
             // A pinned widget shows ITS car or nothing — never silently swap to another.
             // Only a "follow" widget (null vin) tracks the app's currently-selected car.
             val car = if (config.vin != null) {
-                data.vehicles.firstOrNull { it.vin == config.vin }
+                data.vehicles.firstOrNull { it.vin == config.vin }.also {
+                    AppLog.log("Widget: Pinned to ${config.vin}, found=${it != null}")
+                }
             } else {
-                data.selected
+                data.selected.also {
+                    AppLog.log("Widget: Following selected car, found=${it != null}")
+                }
             }
-            val appearance = runCatching { SettingsStore(context).appearance.first() }.getOrNull()
-                ?: SettingsStore.Appearance()
+
+            AppLog.log("Widget: Loading appearance settings")
+            val appearance = try {
+                runCatching { SettingsStore(context).appearance.first() }.getOrNull()
+                    ?: SettingsStore.Appearance()
+            } catch (t: Throwable) {
+                AppLog.log("Widget: Failed to load appearance: ${t.message}")
+                SettingsStore.Appearance()
+            }
+
             val metric = appearance.unitSystem == "metric"
-            val theme = WidgetTheme.resolve(context, appearance, config, car?.vin)
+            AppLog.log("Widget: Resolving theme")
+            val theme = try {
+                WidgetTheme.resolve(context, appearance, config, car?.vin)
+            } catch (t: Throwable) {
+                AppLog.log("Widget: Failed to resolve theme: ${t.message}")
+                throw t
+            }
+
             val stale = car?.fetchedAt?.takeIf { it > 0 }?.let {
                 System.currentTimeMillis() - it > com.bloo.bluelink.data.STALE_STATUS_MS
             } ?: false
+
             // The location map is fetched here (suspend) — not in the composables, which
             // can't do I/O — when the user enabled it and the car has coordinates. Sized
             // generously; the Image just scales it down for smaller layout slots.
+            AppLog.log("Widget: Preparing map (showMap=${config.showMap}, hasCoords=${car?.lat != null})")
             val mapBitmap = if (config.showMap && car?.lat != null && car.lon != null) {
                 val density = context.resources.displayMetrics.density
                 val edge = (150 * density).toInt()
-                runCatching { WidgetMap.render(context, car.lat!!, car.lon!!, edge, theme.accentArgb, dark = theme.isDark) }.getOrNull()
+                try {
+                    runCatching { WidgetMap.render(context, car.lat!!, car.lon!!, edge, theme.accentArgb, dark = theme.isDark) }.getOrNull()
+                } catch (t: Throwable) {
+                    AppLog.log("Widget: Failed to render map: ${t.message}")
+                    null
+                }
             } else null
+
             // No-ops gracefully to the themed background when the car has no photo
             // set (SettingsStore.imageUrl is only ever a local file path here --
             // "/..." -- never a remote URL, matching how the app's own photo
             // picker stores it).
+            AppLog.log("Widget: Preparing photo (photoBackground=${config.photoBackground}, hasCar=${car != null})")
             val photoBitmap = if (config.photoBackground && car != null) {
-                val path = runCatching { SettingsStore(context).imageUrl(car.vin) }.getOrNull()
-                if (path != null && path.startsWith("/")) {
-                    WidgetPhoto.decodeCached(path)?.let { WidgetPhoto.blurredCached(it, path) }
-                } else null
+                try {
+                    val path = runCatching { SettingsStore(context).imageUrl(car.vin) }.getOrNull()
+                    if (path != null && path.startsWith("/")) {
+                        WidgetPhoto.decodeCached(path)?.let { WidgetPhoto.blurredCached(it, path) }
+                    } else null
+                } catch (t: Throwable) {
+                    AppLog.log("Widget: Failed to load photo: ${t.message}")
+                    null
+                }
             } else null
-            val render = Render(
-                car = car,
-                config = config,
-                theme = theme,
-                metric = metric,
-                multiCar = data.vehicles.size > 1,
-                stale = stale,
-                mapBitmap = mapBitmap,
-                photoBitmap = photoBitmap,
-            )
+            AppLog.log("Widget: Creating render object")
+            val render = try {
+                Render(
+                    car = car,
+                    config = config,
+                    theme = theme,
+                    metric = metric,
+                    multiCar = data.vehicles.size > 1,
+                    stale = stale,
+                    mapBitmap = mapBitmap,
+                    photoBitmap = photoBitmap,
+                )
+            } catch (t: Throwable) {
+                AppLog.log("Widget: Failed to create render: ${t.message}")
+                throw t
+            }
+
+            AppLog.log("Widget: Calling provideContent")
             provideContent {
                 // Observe the snapshot store INSIDE the composition, which is what
                 // GlanceAppWidget's own KDoc instructs: "load initial data before calling

@@ -905,12 +905,10 @@ internal fun StateControl(
             .height(ControlHeight)
             .onSizeChanged { rowWidthDp = with(density) { it.width.toDp() } },
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spaceBetween,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         // Fill the button's height so the status reads as one tall control.
-        // The Column naturally takes only its intrinsic width; spaceBetween pushes
-        // the button group to the right, creating a natural balance instead of both
-        // pushing rightward due to the column's weight(1f) consuming space.
+        // Standard spacing between label and buttons, matching other pebble controls.
         Column(Modifier.fillMaxHeight().widthIn(min = 120.dp), verticalArrangement = Arrangement.Center) {
             if (name.isNotBlank()) {
                 Text(name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)

@@ -1036,22 +1036,27 @@ internal fun CarMap(
             )
         }
         } // close the scaled tiles/pin/dot layer
-        // FloatingIcon, not a bespoke one-off circle -- the same translucent chrome
-        // every other floating corner button in the app already uses (Guard.kt's
-        // Reload/Settings, the cover screen's own headers), so this reads as "the
-        // app's floating button" rather than a control invented just for the map.
-        // Reported directly as wanting this "more integrated". A smaller outerPadding
-        // than FloatingIcon's own 12dp default keeps its footprint compact enough for
-        // the small cover-screen map tile, which FloatingIcon's usual 72dp corner
-        // clearance was never sized for.
+        // Expand button integrated into the map UI -- positioned in the top-right corner
+        // as a proper button control rather than a floating overlay, so it reads as part
+        // of the map interface rather than a separate floating button.
         if (onExpand != null) {
-            FloatingIcon(
-                Icons.Filled.Fullscreen,
-                "Expand map",
-                onExpand,
-                modifier = Modifier.align(Alignment.TopEnd),
-                outerPadding = 4.dp,
-            )
+            Box(
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(8.dp)
+            ) {
+                val interactionSource = remember { MutableInteractionSource() }
+                SafeExpansiveButton(interactionSource = interactionSource) {
+                    MorphButton(
+                        onClick = onExpand,
+                        interactionSource = interactionSource,
+                        contentPadding = PaddingValues(8.dp),
+                        modifier = Modifier.size(40.dp),
+                    ) {
+                        Icon(Icons.Filled.Fullscreen, contentDescription = "Expand map", modifier = Modifier.size(24.dp))
+                    }
+                }
+            }
         }
     }
 }
