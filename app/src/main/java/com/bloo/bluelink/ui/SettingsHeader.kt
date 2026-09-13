@@ -125,6 +125,33 @@ internal fun rememberAdvancedVisibility(advanced: Boolean, count: Int): List<Boo
 }
 
 /**
+ * Drives one advanced-only grid item's [AnimatedVisibility] AND decides whether the caller's
+ * `if (...) item { ... }` should still emit that item at all -- the two used to be the same
+ * raw boolean ([rememberAdvancedVisibility]'s own per-index flag), gating the grid `item {}`
+ * directly while an inner `AnimatedVisibility(visibleState = rememberAppearedState(), ...)`
+ * sat inside it purely for its enter spring.
+ *
+ * That was the bug behind "expanding/collapsing is entirely broken, the animations don't
+ * work": [rememberAppearedState] only ever goes false -> true, once, and nothing inside the
+ * card ever set it back to false -- its `exit` spec was dead code. The actual disappearance was
+ * the OUTER `if` flipping false and tearing the whole item out of the grid on the very next
+ * recomposition, same frame, with no transition able to run at all. Advanced -> simple didn't
+ * play a broken collapse; it played no collapse, which reads exactly as "the animation doesn't
+ * work" -- the grid item, and everything on it, was just gone.
+ *
+ * The transition returned here is both the [AnimatedVisibility]'s own `visibleState` (so its
+ * enter/exit specs are what actually plays, in both directions) and the item-emission gate:
+ * `transition.targetState || !transition.isIdle` stays true for as long as an exit is still
+ * mid-flight, so the grid keeps the item mounted until the shrink/fade genuinely finishes, and
+ * only then lets it fall away -- preserving the "no phantom gap" reason the item was skipped
+ * entirely in the first place ([rememberAdvancedVisibility]'s own doc), just no longer skipping
+ * the one animation the whole flip is supposed to show.
+ */
+@Composable
+internal fun rememberGridItemVisibility(visible: Boolean): MutableTransitionState<Boolean> =
+    remember { MutableTransitionState(visible) }.apply { targetState = visible }
+
+/**
  * An [AnimatedVisibility] state that starts hidden and animates itself in on first composition.
  *
  * Needed by anything only COMPOSED once it should already be visible (see

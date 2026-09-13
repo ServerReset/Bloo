@@ -350,6 +350,16 @@ internal fun SettingsScreen(
         // an empty item is not free (it keeps its slot, and the grid's verticalItemSpacing with
         // it, which is the gap left behind all over simple mode).
         val advVisible = rememberAdvancedVisibility(state.settingsMode == "advanced", ADVANCED_CARD_COUNT)
+        // Same reason advVisible itself lives out here and not in the grid content below:
+        // rememberGridItemVisibility calls remember(), so it needs a real composable scope,
+        // which LazyStaggeredGridScope's content lambda is not. One transition per gated
+        // card, hoisted together so none of the six item{} sites below has to break that rule.
+        val advTransition0 = rememberGridItemVisibility(advVisible[0])
+        val advTransition1 = rememberGridItemVisibility(advVisible[1])
+        val advTransition2 = rememberGridItemVisibility(advVisible[2])
+        val advTransition3 = rememberGridItemVisibility(advVisible[3])
+        val advTransition4 = rememberGridItemVisibility(advVisible[4])
+        val advTransition5 = rememberGridItemVisibility(advVisible[5])
         LazyVerticalStaggeredGrid(
             columns = StaggeredGridCells.Adaptive(minSize = 380.dp),
             state = settingsGridState,
@@ -656,7 +666,7 @@ internal fun SettingsScreen(
                 }
             }
             }
-            if (advVisible[0]) item {
+            if (advTransition0.targetState || !advTransition0.isIdle) item {
 
             // Announcements -- currently sourced from the one real signal this
             // app has for it (an available build, same state.updateAvailable
@@ -668,7 +678,7 @@ internal fun SettingsScreen(
             // of bug the Logs card's heightIn(max = 300.dp) guards
             // against, just via Modifier.verticalScroll there instead of a
             // second lazy layout).
-            AnimatedVisibility(visibleState = rememberAppearedState(), enter = collapseEnter(), exit = collapseExit()) {
+            AnimatedVisibility(visibleState = advTransition0, enter = collapseEnter(), exit = collapseExit()) {
             SettingsCard("Announcements", Icons.Filled.Campaign, vm) {
                 val update = state.updateAvailable
                 val announcements = remember(update) {
@@ -703,13 +713,13 @@ internal fun SettingsScreen(
             }
             }
             }
-            if (advVisible[1]) item {
+            if (advTransition1.targetState || !advTransition1.isIdle) item {
 
             // (The "Updates" card now lives after Notifications — its natural home —
             // ungated so its controls show with or without Shizuku. See below.)
 
             // App-icon shortcuts (long-press the launcher icon)
-            AnimatedVisibility(visibleState = rememberAppearedState(), enter = collapseEnter(), exit = collapseExit()) {
+            AnimatedVisibility(visibleState = advTransition1, enter = collapseEnter(), exit = collapseExit()) {
                 SettingsCard("App shortcuts", Icons.Filled.Bolt, vm) {
                     // No inner MorphExpandButton any more -- this used to have its
                     // own second chevron gating the per-vehicle toggles below,
@@ -1030,12 +1040,12 @@ internal fun SettingsScreen(
                 }
             }
             }
-            if (advVisible[2]) item {
+            if (advTransition2.targetState || !advTransition2.isIdle) item {
 
             // Debug -- app/device diagnostics for support troubleshooting. A power-user
             // diagnostic card like Logs, and it takes its OWN slot in this screen's stagger
             // sequence rather than sharing Logs': the two animate independently.
-            AnimatedVisibility(visibleState = rememberAppearedState(), enter = collapseEnter(), exit = collapseExit()) {
+            AnimatedVisibility(visibleState = advTransition2, enter = collapseEnter(), exit = collapseExit()) {
             SettingsCard("Debug", Icons.Filled.BugReport, vm) {
                 DebugSettingsPanel(
                     onCopyToClipboard = { text -> clipboard.setText(AnnotatedString(text)) },
@@ -1156,10 +1166,10 @@ internal fun SettingsScreen(
                 }
             }
             }
-            if (advVisible[3]) item {
+            if (advTransition3.targetState || !advTransition3.isIdle) item {
 
             // Links
-            AnimatedVisibility(visibleState = rememberAppearedState(), enter = collapseEnter(), exit = collapseExit()) {
+            AnimatedVisibility(visibleState = advTransition3, enter = collapseEnter(), exit = collapseExit()) {
             // One control, so it renders on the title row with no chevron -- the same treatment
             // Sounds & vibration gets. The row's own "Open links" label went with it: inside a
             // card already titled "Links" it restated the card, and the choice reads fine as
@@ -1181,10 +1191,10 @@ internal fun SettingsScreen(
             ) {}
             }
             }
-            if (advVisible[4]) item {
+            if (advTransition4.targetState || !advTransition4.isIdle) item {
 
             // Logs
-            AnimatedVisibility(visibleState = rememberAppearedState(), enter = collapseEnter(), exit = collapseExit()) {
+            AnimatedVisibility(visibleState = advTransition4, enter = collapseEnter(), exit = collapseExit()) {
             SettingsCard("Logs", Icons.Filled.Info, vm) {
                 // No local expand state any more. The card's OWN chevron (PebbleShell's, via
                 // SettingsCard) already governs this body -- nothing inside a collapsed card is
@@ -1386,11 +1396,11 @@ internal fun SettingsScreen(
                 )
             }
             }
-            if (advVisible[5]) item {
+            if (advTransition5.targetState || !advTransition5.isIdle) item {
 
             // Quick Settings tiles -- per-tile config is power-user territory,
             // same tier as App shortcuts/Cars above.
-            AnimatedVisibility(visibleState = rememberAppearedState(), enter = collapseEnter(), exit = collapseExit()) {
+            AnimatedVisibility(visibleState = advTransition5, enter = collapseEnter(), exit = collapseExit()) {
             SettingsCard("Quick tiles", Icons.Filled.Dashboard, vm) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(Icons.Filled.Bolt, contentDescription = null, modifier = Modifier.size(20.dp), tint = MaterialTheme.colorScheme.primary)
