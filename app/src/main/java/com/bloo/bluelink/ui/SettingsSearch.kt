@@ -693,7 +693,7 @@ internal fun SearchPill(
                 // is what made this read as a smudge rather than a button. The
                 // border below plus the glow behind carry it there.
                 .then(if (compact) Modifier else Modifier.dropShadow(pillShape))
-                .then(if (compact) Modifier else Modifier.appGlassRim(pillShape))
+                .then(if (compact) Modifier else Modifier.glassRim(pillShape))
                 // appHazeEffect, clipped to pillShape explicitly -- this whole
                 // modifier chain runs BEFORE Surface's own internal shape-clip
                 // (Surface appends that itself, after everything the caller

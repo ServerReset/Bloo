@@ -849,7 +849,7 @@ internal fun ChargeFuelBar(
 // Colours, sizes and motion specs shared across screens live in UiTokens.kt.
 
 /**
- * The shared floating/card edge: the app's default frosted rim ([frostedRim]).
+ * The shared floating/card edge: the app's default glass rim ([glassRim]).
  * Call sites keep their normal [glassContainerAlpha] frosted fill. The [tint]
  * param is retained for call-site compatibility but is no longer used.
  */

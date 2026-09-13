@@ -62,13 +62,12 @@ import com.bloo.uicommon.ambientRing as sharedAmbientRing
  *    - Takes shape, outline toggle
  *    - Use this for: pebble shells, standard cards, opaque containers
  *
- * LOW-LEVEL FUNCTIONS (For Specialized Cases):
- * ────────────────────────────────────────────
- * - [glassTint(blurred)] — Gets the actual tint Color for this state
- * - [appHazeEffect(state, progressive)] — Applies the blur modifer
- * - [appGlassRim(shape)] — Frosted rim that all glass edges share
- * - [frostedRim(shape)] — Platform-aware rim wrapper
- * - [ambientRing(shape)] — Ambient ring effect wrapper
+ * CORE FUNCTIONS (Called by above, or for manual glass styling):
+ * ──────────────────────────────────────────────────────────
+ * - [glassTint(blurred)] — Compute the tint Color (black/white by theme)
+ * - [appHazeEffect(state, progressive)] — Apply blur modifier
+ * - [glassRim(shape)] — Apply frosted rim (used by GlassSurface)
+ * - [ambientRing(shape)] — Ambient ring effect (specialized cases only)
  *
  * WHY THIS STRUCTURE:
  * ──────────────────
@@ -86,30 +85,20 @@ import com.bloo.uicommon.ambientRing as sharedAmbientRing
  */
 
 /**
- * The phone's default rim: the shared [com.bloo.uicommon.frostedRim] with
- * this platform's onSurface (the watch reads its own; a widget reads its
- * own). The tint passed here is what makes the rim follow the theme's
- * light/dark state.
+ * Rim for glass surfaces: the shared frosted rim with Material's onSurface color.
+ * Used by [GlassSurface] and all floating glass elements. This is the ONLY rim
+ * function for glass in the app — all glass edges call this.
  */
 @Composable
-fun Modifier.frostedRim(shape: Shape): Modifier =
+internal fun Modifier.glassRim(shape: Shape): Modifier =
     this.sharedFrostedRim(shape, MaterialTheme.colorScheme.onSurface)
 
-/** See [com.bloo.uicommon.ambientRing]. */
+/**
+ * Ambient ring effect (not used for glass, kept for specialized cases).
+ * See [com.bloo.uicommon.ambientRing].
+ */
 fun Modifier.ambientRing(shape: Shape): Modifier =
     this.sharedAmbientRing(shape)
-
-/**
- * The shared floating/glass surface rim: the app's default frosted rim
- * ([frostedRim]). Every floating glass surface uses this for consistent
- * edge styling. The [tint] parameter is retained for compatibility but
- * is no longer used.
- */
-@Composable
-internal fun Modifier.appGlassRim(
-    shape: Shape,
-    @Suppress("UNUSED_PARAMETER") tint: Color = MaterialTheme.colorScheme.surfaceContainer,
-): Modifier = this.frostedRim(shape)
 
 /**
  * The standard opaque pebble/card edge: a drop shadow, plus -- only when the user
@@ -254,7 +243,7 @@ internal fun GlassSurface(
     Box(
         modifier = modifier
             .dropShadow(shape)
-            .appGlassRim(shape)
+            .glassRim(shape)
             .then(
                 if (onClick != null) {
                     Modifier
