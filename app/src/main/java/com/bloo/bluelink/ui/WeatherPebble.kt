@@ -1559,7 +1559,7 @@ internal fun ExpandableMapLayer(
                     },
                     modifier = Modifier
                         .align(Alignment.TopCenter)
-                        .padding(horizontal = 16.dp, top = 16.dp)
+                        .padding(start = 16.dp, end = 16.dp, top = 16.dp)
                         .graphicsLayer { alpha = expandFraction.value.coerceIn(0f, 1f) },
                 )
             }
@@ -1872,7 +1872,7 @@ private fun CarMapSheetBody(
                 },
                 modifier = Modifier
                     .align(Alignment.TopCenter)
-                    .padding(horizontal = 16.dp, top = 12.dp)
+                    .padding(start = 16.dp, end = 16.dp, top = 12.dp)
                     .graphicsLayer { alpha = visible.value.coerceIn(0f, 1f) },
             )
             // No close (X) button -- swipe-to-dismiss (or tapping the scrim above the
