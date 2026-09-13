@@ -84,6 +84,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.blur
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
@@ -104,6 +105,7 @@ import androidx.compose.ui.composed
 import androidx.compose.ui.unit.dp
 import com.bloo.bluelink.data.SettingsStore
 import com.bloo.uicommon.dropShadow
+import dev.chrisbanes.haze.HazeState
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlin.math.max
@@ -147,6 +149,13 @@ internal fun SearchLayer(
      *  ambient blurred aurora behind it pauses while this is true, so the
      *  keyboard/typing frames don't contend with a full-screen blur redraw. */
     onOpenChanged: ((Boolean) -> Unit)? = null,
+    /** Screens.kt's own shared instance -- the same one whichever of
+     *  GarageScreen/SettingsScreen is actually showing underneath marks its own
+     *  content with. Null (the old, silent default here) meant the bar/panel's own
+     *  glass fill had no real blur source to ask for regardless of which screen was
+     *  showing, so it fell back to a flat, more opaque tint that visibly didn't
+     *  match every other piece of glass chrome in the app -- reported directly. */
+    hazeState: HazeState? = null,
 ) {
     var query by rememberSaveable { mutableStateOf("") }
     var submitted by rememberSaveable { mutableStateOf("") }
@@ -417,6 +426,7 @@ internal fun SearchLayer(
             GlassSurface(
                 shape = panelShape,
                 modifier = Modifier.width(barW),
+                hazeState = hazeState,
             ) {
                 Column(
                     Modifier
@@ -532,6 +542,7 @@ internal fun SearchLayer(
                 haptics?.click()
             },
             modifier = Modifier.align(Alignment.TopStart).offset(x = x, y = y),
+            hazeState = hazeState,
         )
     }
 }
@@ -560,6 +571,7 @@ internal fun SearchPill(
     onDragStart: () -> Unit = {},
     onDragEnd: () -> Unit = {},
     modifier: Modifier = Modifier,
+    hazeState: HazeState? = null,
 ) {
     val scheme = MaterialTheme.colorScheme
     val focusRequester = remember { FocusRequester() }
@@ -633,18 +645,26 @@ internal fun SearchPill(
             // using it. Attached after .size so the rect is the pill's real one.
             .floatingElement(FloatingIds.Search),
     ) {
+        // canBlur/pillShape hoisted above the Surface call so both the fill colour
+        // and the blur layer chained onto its modifier agree on the same values --
+        // see the modifier chain below for why this needed its own explicit clip
+        // rather than relying on Surface's own (which applies AFTER this whole
+        // caller-supplied modifier, too late to bound a blur added inside it).
+        val pillShape = RoundedCornerShape(50)
+        val canBlur = hazeState != null && CanBlurBackdrops()
         Surface(
             onClick = { if (!expanded) onFocusChange(true) },
-            shape = RoundedCornerShape(50),
+            shape = pillShape,
             // glassTint (GlassChrome.kt): the one shared neutral fill every other
-            // glass surface in the app uses -- no more one-off compact/non-compact
-            // alpha split. The Settings-screen collapsed pill (form == PILL &&
-            // !expanded) used to get its own opaque tonal container
+            // glass surface in the app uses, blurred or not exactly like every one
+            // of them -- no more hardcoded `blurred = false`, no one-off compact/
+            // non-compact alpha split. The Settings-screen collapsed pill (form ==
+            // PILL && !expanded) used to get its own opaque tonal container
             // (secondaryContainer/onSecondaryContainer, no border) instead of this
             // fill -- reported as an inconsistent, different-looking search control
             // on that one screen; fixed by dropping that override in favour of the
             // one shared fill everywhere, the same direction this goes further in.
-            color = glassTint(blurred = false),
+            color = glassTint(blurred = canBlur),
             contentColor = scheme.onSurface,
             tonalElevation = if (expanded) 10.dp else 6.dp,
             border = BorderStroke(
@@ -672,8 +692,15 @@ internal fun SearchPill(
                 // stacked on a shape barely wider than the two of them, which
                 // is what made this read as a smudge rather than a button. The
                 // border below plus the glow behind carry it there.
-                .then(if (compact) Modifier else Modifier.dropShadow(RoundedCornerShape(50)))
-                .then(if (compact) Modifier else Modifier.appGlassRim(RoundedCornerShape(50)))
+                .then(if (compact) Modifier else Modifier.dropShadow(pillShape))
+                .then(if (compact) Modifier else Modifier.appGlassRim(pillShape))
+                // appHazeEffect, clipped to pillShape explicitly -- this whole
+                // modifier chain runs BEFORE Surface's own internal shape-clip
+                // (Surface appends that itself, after everything the caller
+                // passes in), so a blur added here without its own clip would
+                // render as a soft-edged rectangle poking past the pill's actual
+                // rounded/stadium outline instead of stopping at it.
+                .then(if (canBlur) Modifier.clip(pillShape).appHazeEffect(hazeState!!) else Modifier)
                 .then(
                     if (onDrag != null) {
                         Modifier.pointerInput(Unit) {

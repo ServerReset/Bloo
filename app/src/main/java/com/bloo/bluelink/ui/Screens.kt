@@ -75,6 +75,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.State
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.SideEffect
+import dev.chrisbanes.haze.HazeState
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
@@ -126,6 +127,13 @@ import kotlin.math.roundToInt
 fun BlooApp(vm: AppViewModel) {
     val state by vm.state.collectAsStateWithLifecycle()
     val appearance by vm.appearance.collectAsStateWithLifecycle()
+    // Shared by GarageScreen, SettingsScreen and SearchLayer below -- see either
+    // screen's own `hazeState` parameter doc for why: SearchLayer floats above
+    // whichever of the two is actually showing, so its own glass fill needs ONE
+    // real blur source that works no matter which screen that turns out to be,
+    // instead of each screen's own previously-private, unshared HazeState leaving
+    // search with nothing to blur regardless of which one was on screen.
+    val searchHazeState = remember { HazeState() }
     val snackbar = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
     val clipboard = LocalClipboardManager.current
@@ -426,7 +434,7 @@ fun BlooApp(vm: AppViewModel) {
                         // redrawing the blurred backdrop underneath at ~12fps --
                         // real contention on exactly the frames search is using.
                         if (appearance.auroraBackground) AuroraBackground(Modifier.matchParentSize(), appearance, refreshing = state.refreshing, paused = searchOpen)
-                        GarageScreen(rememberUpdatedState(state), vm)
+                        GarageScreen(rememberUpdatedState(state), vm, hazeState = searchHazeState)
                     }
                 }
                 // The full phone Settings (search + keyboard, photo pickers, crop,
@@ -442,7 +450,7 @@ fun BlooApp(vm: AppViewModel) {
                         // screen built for a tall display -- say so once, then let
                         // them use it anyway.
                         CoverSettingsGate(vm)
-                    } else SettingsScreen(vm)
+                    } else SettingsScreen(vm, hazeState = searchHazeState)
             }
         }
         // Search lives HERE, above the screen-switching AnimatedContent and
@@ -488,6 +496,7 @@ fun BlooApp(vm: AppViewModel) {
                     onSettings = effectivelyInSettings && !cover,
                     compact = cover,
                     onOpenChanged = { searchOpen = it },
+                    hazeState = searchHazeState,
                 )
             }
         }

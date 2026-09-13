@@ -115,7 +115,16 @@ import com.bloo.uicommon.LocalReorderActive
  */
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
-internal fun GarageScreen(state: State<UiState>, vm: AppViewModel) {
+internal fun GarageScreen(
+    state: State<UiState>,
+    vm: AppViewModel,
+    /** Defaults to a fresh one for every existing caller's exact prior behavior.
+     *  Screens.kt passes its own shared instance instead, so the floating search
+     *  bar/results panel it hosts ABOVE this screen (see SearchLayer's own doc for
+     *  why it lives there) can mark ITS glass fill as a real blur of whichever car
+     *  page is actually showing, instead of a flat tint with nothing to blur. */
+    hazeState: HazeState = remember { HazeState() },
+) {
     val vehicles = state.value.vehicles
     if (vehicles.isEmpty()) return
     val appearance = LocalAppearance.current
@@ -255,12 +264,12 @@ internal fun GarageScreen(state: State<UiState>, vm: AppViewModel) {
     DisposableEffect(floatingRegistry) {
         onDispose { floatingRegistry.resetChrome() }
     }
-    // Backs both StatusBarScrim calls below (expanded and collapsed pager alike --
-    // only one is ever composed at a time, so one shared instance is enough) with a
-    // REAL backdrop blur: Modifier.hazeSource on whichever pager is actually visible
+    // hazeState is now a parameter (see this function's own doc) -- backs both
+    // StatusBarScrim calls below (expanded and collapsed pager alike -- only one is
+    // ever composed at a time, so one shared instance is enough) with a REAL
+    // backdrop blur: Modifier.hazeSource on whichever pager is actually visible
     // marks it as the content to blur, StatusBarScrim's own hazeState param reads it
     // back. See StatusBarScrim's doc for why plain Modifier.blur never worked here.
-    val hazeState = remember { HazeState() }
     // Backs every Location pebble's map-expand button on this screen -- see its own
     // doc for why a shared, hoisted instance (not local state inside the pebble
     // itself) is what lets the expanded view be "literally that same" map/component

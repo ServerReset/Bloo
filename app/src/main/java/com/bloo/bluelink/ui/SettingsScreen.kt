@@ -244,6 +244,13 @@ internal fun SettingsScreen(
      *  scrolls exactly as it does on the phone -- compactness here is
      *  density, not reachability. */
     compact: Boolean = false,
+    /** Defaults to a fresh one for every existing caller's exact prior behavior
+     *  (embedded/cover callers still get their own). Screens.kt's standalone
+     *  Settings route passes its own shared instance instead, the same one
+     *  GarageScreen gets -- see GarageScreen's own doc for why: the floating
+     *  search bar/results panel hosted ABOVE both screens needs one real blur
+     *  source it can use regardless of which of the two is actually showing. */
+    hazeState: HazeState = remember { HazeState() },
 ) {
     val appearance = LocalAppearance.current
     val notif by vm.notifications.collectAsStateWithLifecycle()
@@ -316,12 +323,10 @@ internal fun SettingsScreen(
           }
       }
   }
-  // Backs the StatusBarScrim call far below with a REAL backdrop blur of the
-  // settings grid -- same pattern GarageScreen.kt uses for its own two pagers.
-  // Declared here (not inside the Box below) so it stays in scope all the way
-  // down to that StatusBarScrim call, well outside that Box's own closing brace.
-  // See StatusBarScrim's own doc for why plain Modifier.blur never worked here.
-  val hazeState = remember { HazeState() }
+  // hazeState is now a parameter (see this function's own doc) -- backs the
+  // StatusBarScrim call far below with a REAL backdrop blur of the settings grid,
+  // same pattern GarageScreen.kt uses for its own two pagers. See StatusBarScrim's
+  // own doc for why plain Modifier.blur never worked here.
   BackdropHost {
         // A real multi-column grid on wide screens (tablets, landscape, foldables
         // unfolded) instead of one narrow centred column with empty space on
