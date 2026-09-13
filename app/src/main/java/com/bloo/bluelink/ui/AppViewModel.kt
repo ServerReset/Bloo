@@ -3622,6 +3622,23 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    /**
+     * "Kick" [id] out of the synced-devices list -- see [SettingsStore.removeSyncedDevice]'s
+     * own doc for why this is a courtesy prune (a device that syncs again simply
+     * reappears in the list, the same way a stale one would after 90 days) rather
+     * than a permanent ban. Persists locally for instant UI feedback (the row
+     * disappears before any round trip completes) and writes the removal into the
+     * Drive file on the sync pass that follows -- same shape as setPrimaryDevice
+     * and renameThisDevice above.
+     */
+    fun removeSyncedDevice(id: String) {
+        viewModelScope.launch {
+            settingsStore.removeSyncedDevice(id)
+            _state.update { it.copy(syncDevices = it.syncDevices.filterNot { d -> d.id == id }) }
+            runDriveSyncNow()
+        }
+    }
+
     /** Settings "Test sync" diagnostic: runs a non-destructive end-to-end
      *  round-trip against the real Drive file (permission → read → write →
      *  verify) and reports pass/fail as a snackbar, so the user can confirm

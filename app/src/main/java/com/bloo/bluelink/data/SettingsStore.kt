@@ -1416,6 +1416,44 @@ class SettingsStore(private val context: Context) {
         setSyncPullPrimary(true)
     }
 
+    /** Device ids queued for removal from the registry, not yet uploaded -- the same
+     *  "pending write intent" shape [syncPrimaryPending] uses, so "kick this device"
+     *  survives an app restart before the next sync pass gets to enact it. Unlike
+     *  [setPrimaryDevice] this is a SET, not a single value: several devices could be
+     *  kicked before the next sync runs. */
+    suspend fun syncPendingRemovedDeviceIds(): Set<String> {
+        val raw = context.settingsDataStore.data.first()[stringPreferencesKey("sync_pending_removed_device_ids")]
+        return raw?.split(',')?.filter { it.isNotBlank() }?.toSet() ?: emptySet()
+    }
+
+    private suspend fun setSyncPendingRemovedDeviceIds(ids: Set<String>) {
+        context.settingsDataStore.edit {
+            val k = stringPreferencesKey("sync_pending_removed_device_ids")
+            if (ids.isEmpty()) it.remove(k) else it[k] = ids.joinToString(",")
+        }
+    }
+
+    /**
+     * "Kick" a device out of the synced-devices list. NOT a permanent ban: this is
+     * exactly the same pruning [SyncMerge.mergeDevices] already does automatically
+     * for a device that hasn't been seen in 90 days, just requested NOW instead of
+     * waited-for -- a device that syncs again after being kicked simply reappears,
+     * the same way a stale one would if it ever came back online. That is a
+     * deliberate safety property, not a limitation: kicking a device you don't
+     * recognise can never permanently lock out one that is still genuinely in use.
+     *
+     * Recorded twice, same shape as [setPrimaryDevice]: as a pending write intent
+     * (consumed by the next successful upload, which is what actually keeps it out
+     * of the registry the OTHER devices see) and stripped from the display cache
+     * immediately, so Settings reflects the tap right away rather than after a
+     * round trip to Drive and back.
+     */
+    suspend fun removeSyncedDevice(id: String) {
+        if (id.isBlank() || id == syncDeviceId()) return
+        setSyncPendingRemovedDeviceIds(syncPendingRemovedDeviceIds() + id)
+        setSyncedDevicesCache(syncedDevices().filterNot { it.id == id })
+    }
+
     /** Reset all per-file sync gate state — MUST be called when the sync target URI
      *  changes, or stale hash/synced-ever/lastSync/dirty from the OLD file would
      *  block adoption of and convergence with the NEW file. */
@@ -1432,6 +1470,10 @@ class SettingsStore(private val context: Context) {
             // registry, and re-asserting it against a different file's registry is exactly
             // the stale-state bug this function exists to prevent.
             it.remove(stringPreferencesKey("sync_primary_pending"))
+            // Same reasoning as the pending primary above: a removal intent named a
+            // device id in the OLD file's own registry, which means nothing against a
+            // different file's.
+            it.remove(stringPreferencesKey("sync_pending_removed_device_ids"))
             // Drop the cached file id too — the new file has its own (or will mint
             // one). Keeping the old id would show a stale/mismatched File ID.
             it.remove(stringPreferencesKey("sync_file_id"))
@@ -1624,9 +1666,16 @@ class SettingsStore(private val context: Context) {
         val now = System.currentTimeMillis()
         var uploadError: String? = null
         val uploaded: Boolean
+        // Devices queued locally for removal (see removeSyncedDevice's own doc) are
+        // filtered out of whatever the file itself says HERE, once, so every use of
+        // the remote registry below -- the immediate outcome, the merge, and the
+        // upload body -- agrees on the same filtered list rather than three separate
+        // reads that could drift if this pref changed between them.
+        val pendingRemovedIds = syncPendingRemovedDeviceIds()
+        val remoteDevices = (remoteMeta?.devices ?: emptyList()).filterNot { it.id in pendingRemovedIds }
         // Best-available registry/primary for the outcome even if the upload half
         // doesn't run (failed download) — the UI still updates from what we read.
-        var outcomeDevices: List<SyncMerge.SyncDevice> = remoteMeta?.devices ?: emptyList()
+        var outcomeDevices: List<SyncMerge.SyncDevice> = remoteDevices
         // Precedence, and the order matters: an un-uploaded designation made HERE wins, then
         // whatever the file says, and only then this device's cached copy.
         //
@@ -1675,7 +1724,7 @@ class SettingsStore(private val context: Context) {
                 prefsMap, uploadedDirtyKeys, photos, priorRemoved = carriedTombstones,
             )
             val self = selfSyncDevice(now)
-            outcomeDevices = SyncMerge.mergeDevices(remoteMeta?.devices ?: emptyList(), self, now)
+            outcomeDevices = SyncMerge.mergeDevices(remoteDevices, self, now)
             val driveBody = SyncMerge.buildExportForMainToMain(
                 prefs = prefsMap,
                 dirtyKeys = uploadedDirtyKeys,
@@ -1683,7 +1732,7 @@ class SettingsStore(private val context: Context) {
                 hash = localHash,
                 primaryDeviceId = primaryToWrite,
                 selfDevice = self,
-                knownDevices = remoteMeta?.devices ?: emptyList(),
+                knownDevices = remoteDevices,
                 nowMs = now,
                 fileId = resolvedFileId,
                 // Carry the remote file's OWN tombstones forward. Without this a `_removed`
@@ -1752,6 +1801,15 @@ class SettingsStore(private val context: Context) {
                 // would drop the user's choice on the floor without it ever reaching the
                 // file; from the next pass on, the file's own value governs.
                 if (pendingPrimary != null) setSyncPrimaryPending(null)
+                // Same reasoning, same place: a kicked device is only truly gone once
+                // THIS upload -- the one that actually wrote a registry without it --
+                // has verifiably landed. Set difference, not a blanket clear, in case a
+                // fresh removal was requested from Settings while this pass was in
+                // flight (removeSyncedDevice writes directly, without this function's
+                // own mutex).
+                if (pendingRemovedIds.isNotEmpty()) {
+                    setSyncPendingRemovedDeviceIds(syncPendingRemovedDeviceIds() - pendingRemovedIds)
+                }
             }
         }
         val error = uploadError ?: downloadError?.takeIf { remoteContent == null }

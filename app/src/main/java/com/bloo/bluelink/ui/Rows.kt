@@ -54,6 +54,7 @@ import androidx.compose.material.icons.filled.Cloud
 import androidx.compose.material.icons.filled.CreateNewFolder
 import androidx.compose.material.icons.filled.FileOpen
 import androidx.compose.material.icons.filled.ErrorOutline
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Smartphone
 import androidx.compose.material.icons.filled.Star
@@ -111,6 +112,7 @@ import androidx.compose.ui.unit.dp
 import com.bloo.uicommon.dropShadow
 import com.bloo.bluelink.data.Weather
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -733,6 +735,7 @@ internal fun SyncDevicesSection(state: UiState, vm: AppViewModel) {
             dragging = dragging,
             dragHandle = dragHandle,
             onRename = { renaming = true },
+            onRemove = { vm.removeSyncedDevice(device.id) },
         )
     }
 
@@ -839,6 +842,11 @@ internal fun SyncDeviceRow(
     dragging: Boolean,
     dragHandle: Modifier,
     onRename: () -> Unit,
+    /** Kick this device out of the registry -- never offered for [isSelf] (see
+     *  SettingsStore.removeSyncedDevice's own doc for why this can't remove
+     *  yourself: it's a courtesy prune of a stale/unrecognised peer, not a way
+     *  to leave sync on the device you're actually holding). */
+    onRemove: () -> Unit,
 ) {
     val shape = RoundedCornerShape(18.dp)
     val container =
@@ -910,6 +918,39 @@ internal fun SyncDeviceRow(
         if (isSelf) {
             MorphIconButton(onClick = onRename) {
                 Icon(Icons.Filled.Edit, contentDescription = "Rename this device", modifier = Modifier.size(18.dp))
+            }
+        } else {
+            // Tap-again-to-confirm, same 4s-auto-reset pattern as every other
+            // destructive action in the app (account sign-out, palette/preset
+            // delete) -- one accidental tap on a device you use daily should
+            // never kick it, but a real kick shouldn't need a whole dialog either.
+            var confirmRemove by remember(device.id) { mutableStateOf(false) }
+            LaunchedEffect(confirmRemove) {
+                if (confirmRemove) {
+                    delay(4000)
+                    confirmRemove = false
+                }
+            }
+            MorphIconButton(
+                onClick = {
+                    if (confirmRemove) {
+                        onRemove()
+                        confirmRemove = false
+                    } else {
+                        confirmRemove = true
+                    }
+                },
+            ) {
+                Icon(
+                    Icons.Filled.Close,
+                    contentDescription = if (confirmRemove) {
+                        "Tap again to remove ${device.name.ifBlank { "this device" }}"
+                    } else {
+                        "Remove ${device.name.ifBlank { "this device" }} from synced devices"
+                    },
+                    tint = if (confirmRemove) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(18.dp),
+                )
             }
         }
     }
