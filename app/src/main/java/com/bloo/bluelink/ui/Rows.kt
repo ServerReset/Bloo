@@ -289,7 +289,16 @@ internal fun StatusRow(label: String, value: String) {
     ) {
         Text(
             label,
-            Modifier.weight(1f),
+            // NOT weight(1f) any more. A flat 50/50 split between label and value gave
+            // every label -- "Email", "VIN", "Doors", all short, static, developer-written
+            // strings -- exactly HALF the row regardless of how little of that it actually
+            // needed, which starved the other half (the value, the one side whose length
+            // varies and is often the longest thing in the row) into wrapping to two lines
+            // even on a row with plenty of total width to spare -- reported directly on
+            // the Email row, whose value is the row's only genuinely long content.
+            // Natural width instead: the label takes only what its own text needs, and
+            // the value below (still the row's one weighted child) gets everything that
+            // labelled width didn't use.
             style = MaterialTheme.typography.bodyMedium,
             // MutedContentAlpha (0.7) on the phone, where LocalContentColor is usually
             // full onSurface and 0.7 reads as a deliberately secondary label. On the
@@ -302,23 +311,21 @@ internal fun StatusRow(label: String, value: String) {
             color = LocalContentColor.current.copy(
                 alpha = if (LocalForceExpanded.current) 0.92f else MutedContentAlpha,
             ),
-            // Without a cap, at a large display size the value cell (below) used to
-            // take its full intrinsic width first, starving this weighted label into
-            // a sliver — and a single-word label ("Coordinates", "Email", "VIN")
-            // with no room to break at a space then wrapped CHARACTER-by-character
-            // ("Coordin/ates"). One line + ellipsis keeps the label intact; giving
-            // the value its own weight (below) stops it from crushing the label in
-            // the first place. Mirrors the correctly-built SyncInfoRow.
+            // Still capped defensively -- these labels are short, static, developer-
+            // written strings today, but a future one that isn't should still clip
+            // to one line rather than wrap CHARACTER-by-character ("Coordin/ates").
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
         )
         Spacer(Modifier.width(8.dp))
-        // Right-aligning Box that OWNS half the row (weight(1f), which fills its
-        // allocation) with the value end-aligned inside it. This keeps the classic
-        // label-left / value-right column: a SHORT value ("Off", "90%", "Locked")
-        // sits flush to the row's right edge, while a LONG value (coordinates, VIN,
-        // email) is bounded to this half and wraps to a 2nd line instead of crushing
-        // the label into character-by-character wrapping. (An earlier version put
+        // Right-aligning Box that owns whatever the label's natural width left over
+        // (weight(1f), the row's only remaining weighted child, now that the label
+        // above measures at its own content width instead of a forced half-share)
+        // with the value end-aligned inside it. This keeps the classic label-left /
+        // value-right column: a SHORT value ("Off", "90%", "Locked") sits flush to
+        // the row's right edge, while a LONG value (coordinates, VIN, email) gets
+        // the label's now-unclaimed width too, and only wraps to a 2nd line if it
+        // still doesn't fit the row's actual total width. (An earlier version put
         // weight(1f, fill = false) directly on the value; because AnimatedValue's
         // leaf text hugs its content, fill=false made a short value measure to its
         // intrinsic width and pack just past row-center — floating in the middle

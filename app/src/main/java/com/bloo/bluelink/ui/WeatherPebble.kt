@@ -250,6 +250,7 @@ internal fun LocationPebble(v: Vehicle, state: UiState, vm: AppViewModel, dragHa
                         state = expandedMap.mapStateFor(v.vin),
                         deviceLocation = state.deviceLocation,
                         onExpand = { expandedMap.vin = v.vin },
+                        onOpenInMaps = { openInExternalMaps(context, loc, v.name) },
                     )
                 } else {
                     var showMapSheet by remember { mutableStateOf(false) }
@@ -264,6 +265,7 @@ internal fun LocationPebble(v: Vehicle, state: UiState, vm: AppViewModel, dragHa
                         state = remember { CarMapState() },
                         deviceLocation = state.deviceLocation,
                         onExpand = { showMapSheet = true },
+                        onOpenInMaps = { openInExternalMaps(context, loc, v.name) },
                     )
                     if (showMapSheet) {
                         CarMapSheet(loc, v.name, state.deviceLocation, mapOriginBounds) { showMapSheet = false }
@@ -289,9 +291,11 @@ internal fun LocationPebble(v: Vehicle, state: UiState, vm: AppViewModel, dragHa
                 PopVisible(visible = carWeather != null) {
                     if (carWeather != null) WeatherStripe(carWeather, fahrenheit, place ?: "At the car")
                 }
-                CommandButton("Open in maps", Icons.Filled.Map, Modifier.fillMaxWidth(), true) {
-                    openInExternalMaps(context, loc, v.name)
-                }
+                // "Open in maps" used to be its own full-width CommandButton here,
+                // disconnected from the map above it. It's now one of the two
+                // buttons integrated directly onto the map's own top-right corner
+                // (see CarMap's onOpenInMaps) -- consolidated onto the surface it
+                // actually acts on instead of duplicated as a separate row.
                 }
             }
         }
@@ -716,6 +720,13 @@ internal fun CarMap(
      *  hides the button entirely; the full-screen map itself passes null, since
      *  it has nowhere further to expand to. */
     onExpand: (() -> Unit)? = null,
+    /** A second button beside [onExpand], opening the car's location in the
+     *  device's own Maps app ([openInExternalMaps]). Consolidated here instead
+     *  of living as its own separate full-width button below the map -- both
+     *  are "do something with this map" actions and now sit together on the
+     *  map itself. Null hides it (the full-screen map has its own "Open in
+     *  maps" entry in its bottom toolbar instead -- see MapFeature). */
+    onOpenInMaps: (() -> Unit)? = null,
 ) {
     val context = LocalContext.current
 
@@ -1037,24 +1048,44 @@ internal fun CarMap(
             )
         }
         } // close the scaled tiles/pin/dot layer
-        // Expand button integrated into the map UI -- positioned in the top-right corner
-        // as a proper button control rather than a floating overlay, so it reads as part
-        // of the map interface rather than a separate floating button.
-        if (onExpand != null) {
-            Box(
+        // Map controls integrated into the map UI, top-right corner -- proper button
+        // controls rather than floating overlays, so they read as part of the map
+        // interface itself. Two buttons, not one: "Open in maps" used to be a
+        // separate full-width CommandButton stacked below the whole map (its own
+        // call site removed the duplicate), disconnected from the map it acted on;
+        // it now sits right where the expand action does, since both are "do
+        // something with this map" controls and belong together.
+        if (onExpand != null || onOpenInMaps != null) {
+            Row(
                 modifier = Modifier
                     .align(Alignment.TopEnd)
-                    .padding(8.dp)
+                    .padding(8.dp),
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
             ) {
-                val interactionSource = remember { MutableInteractionSource() }
-                SafeExpansiveButton(interactionSource = interactionSource) {
-                    MorphButton(
-                        onClick = onExpand,
-                        interactionSource = interactionSource,
-                        contentPadding = PaddingValues(8.dp),
-                        modifier = Modifier.size(40.dp),
-                    ) {
-                        Icon(Icons.Filled.Fullscreen, contentDescription = "Expand map", modifier = Modifier.size(24.dp))
+                if (onOpenInMaps != null) {
+                    val openMapsSource = remember { MutableInteractionSource() }
+                    SafeExpansiveButton(interactionSource = openMapsSource) {
+                        MorphButton(
+                            onClick = onOpenInMaps,
+                            interactionSource = openMapsSource,
+                            contentPadding = PaddingValues(8.dp),
+                            modifier = Modifier.size(40.dp),
+                        ) {
+                            Icon(Icons.Filled.Map, contentDescription = "Open in maps", modifier = Modifier.size(22.dp))
+                        }
+                    }
+                }
+                if (onExpand != null) {
+                    val expandSource = remember { MutableInteractionSource() }
+                    SafeExpansiveButton(interactionSource = expandSource) {
+                        MorphButton(
+                            onClick = onExpand,
+                            interactionSource = expandSource,
+                            contentPadding = PaddingValues(8.dp),
+                            modifier = Modifier.size(40.dp),
+                        ) {
+                            Icon(Icons.Filled.Fullscreen, contentDescription = "Expand map", modifier = Modifier.size(24.dp))
+                        }
                     }
                 }
             }
