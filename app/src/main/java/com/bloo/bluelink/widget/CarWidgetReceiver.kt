@@ -1,10 +1,11 @@
 package com.bloo.bluelink.widget
 
 import android.appwidget.AppWidgetManager
+import android.content.ComponentName
 import android.content.Context
+import androidx.glance.appwidget.GlanceAppWidgetManager
 import androidx.glance.appwidget.GlanceAppWidget
 import androidx.glance.appwidget.GlanceAppWidgetReceiver
-import androidx.glance.appwidget.updateAll
 import com.bloo.bluelink.data.AppLog
 import androidx.work.Constraints
 import androidx.work.CoroutineWorker
@@ -54,14 +55,28 @@ class CarWidgetReceiver : GlanceAppWidgetReceiver() {
      * something inside androidx.glance.appwidget between onUpdate and
      * provideGlance, not anything this app's own code does.
      *
-     * The explicit updateAll() call below is the actual fix attempt, not just more
-     * diagnosis: [WidgetRefreshWorker]'s periodic job already calls exactly this
-     * same function successfully every 30 minutes (that path was never in doubt --
-     * only whether it ever got 30 uninterrupted minutes to prove it, which testing
-     * by repeatedly removing/re-adding the widget never actually gave it, since
-     * onDisabled cancels the periodic schedule on every removal). Calling it here
-     * too, immediately, exercises the SAME working code path Glance's own onUpdate
-     * session was apparently failing to reach on its own, without waiting on it.
+     * A first fix attempt called `updateAll` directly here instead of waiting on
+     * Glance's own onUpdate/session chain -- and made things WORSE in a way that
+     * only real AppLog evidence caught: confirmed via a fresh remove-and-re-add on
+     * that build, "Widget: onUpdate calling updateAll() directly" was immediately
+     * followed by "...returned", same millisecond, with "provideGlance started"
+     * STILL never appearing. `updateAll` iterates
+     * `GlanceAppWidgetManager(context).getGlanceIds(CarWidget::class.java)` --
+     * Glance's own INTERNAL id registry, populated by the exact same
+     * onUpdate-to-session machinery that has been silently failing to complete
+     * this whole time. Called this soon after `super.onUpdate()` returns (which
+     * only ever kicks that registration off asynchronously, per its own
+     * documented behaviour, not synchronously before returning), that registry is
+     * still empty, so `updateAll` looped over zero ids and returned instantly --
+     * a silent no-op with nothing to catch, not a fix.
+     *
+     * [GlanceAppWidgetManager.getGlanceId] sidesteps that registry entirely: it
+     * wraps a raw Android [appWidgetId] the OS already guarantees is valid the
+     * moment onUpdate is called with it (this is the plain [AppWidgetManager]'s
+     * own id list, not Glance's), with no dependency on whatever is stuck inside
+     * Glance's own session bootstrapping. [CarWidget.update] then runs
+     * provideGlance for that id directly, the same way `updateAll` would have if
+     * its lookup had ever actually found it.
      */
     override fun onUpdate(context: Context, appWidgetManager: AppWidgetManager, appWidgetIds: IntArray) {
         AppLog.log("Widget: onUpdate for ${appWidgetIds.size} widget(s)")
@@ -76,11 +91,7 @@ class CarWidgetReceiver : GlanceAppWidgetReceiver() {
         // that's a far smaller risk than guaranteed-crashing on every update.
         val appContext = context.applicationContext
         CoroutineScope(Dispatchers.IO).launch {
-            runCatching {
-                AppLog.log("Widget: onUpdate calling updateAll() directly")
-                CarWidget().updateAll(appContext)
-                AppLog.log("Widget: onUpdate's updateAll() returned")
-            }.onFailure { AppLog.log("Widget: onUpdate's updateAll() threw: ${it::class.simpleName}: ${it.message}") }
+            updateAllCarWidgetsDirectly(appContext, "Widget: onUpdate")
         }
     }
 
@@ -108,6 +119,46 @@ class CarWidgetReceiver : GlanceAppWidgetReceiver() {
         super.onDisabled(context)
         // Last widget removed — stop the background refresh.
         WidgetRefreshWorker.cancel(context)
+    }
+}
+
+/**
+ * Repaints every currently-placed [CarWidget] by resolving each raw Android
+ * appWidgetId straight through [GlanceAppWidgetManager.getGlanceId] and calling
+ * [CarWidget.update] for it directly -- not [androidx.glance.appwidget.updateAll],
+ * which instead iterates Glance's own INTERNAL id registry
+ * (`getGlanceIds(CarWidget::class.java)`). See [CarWidgetReceiver.onUpdate]'s own
+ * doc for the real evidence behind why that matters: that registry is populated
+ * by the same onUpdate-to-session machinery that has been silently failing to
+ * complete on some devices, so `updateAll` can silently iterate zero widgets and
+ * return having done nothing, with nothing to catch. `getGlanceId(appWidgetId)`
+ * instead wraps the id the OS's own [AppWidgetManager] already guarantees is
+ * valid the moment it's in [appWidgetIds] here, independent of whatever is stuck
+ * inside Glance's own bootstrapping.
+ *
+ * Shared by [CarWidgetReceiver.onUpdate] (fires on add/resize) and
+ * [WidgetRefreshWorker] (fires every 30 minutes) so both the immediate and the
+ * periodic repaint go through the one path actually confirmed to reach
+ * provideGlance, rather than each independently trusting `updateAll` to.
+ */
+private suspend fun updateAllCarWidgetsDirectly(context: Context, logPrefix: String) {
+    val appWidgetIds = AppWidgetManager.getInstance(context)
+        .getAppWidgetIds(ComponentName(context, CarWidgetReceiver::class.java))
+    val manager = GlanceAppWidgetManager(context)
+    val widget = CarWidget()
+    appWidgetIds.forEach { appWidgetId ->
+        runCatching {
+            val glanceId = manager.getGlanceId(appWidgetId)
+            if (glanceId != null) {
+                AppLog.log("$logPrefix calling update() for appWidgetId=$appWidgetId")
+                widget.update(context, glanceId)
+                AppLog.log("$logPrefix update() returned for appWidgetId=$appWidgetId")
+            } else {
+                AppLog.log("$logPrefix got a null GlanceId for appWidgetId=$appWidgetId")
+            }
+        }.onFailure {
+            AppLog.log("$logPrefix update() threw for appWidgetId=$appWidgetId: ${it::class.simpleName}: ${it.message}")
+        }
     }
 }
 
@@ -146,7 +197,15 @@ class WidgetRefreshWorker(ctx: Context, params: WorkerParameters) : CoroutineWor
         // Always repaint, fetch or no fetch: relative timestamps ("updated 12 min ago")
         // and the stale treatment both drift with wall-clock time even when nothing new
         // has arrived, and a repaint is local work.
-        runCatching { CarWidget().updateAll(applicationContext) }
+        //
+        // updateAllCarWidgetsDirectly, not updateAll -- see its own doc. This periodic
+        // job was the thing this session's earlier fix leaned on as "the known-working
+        // path" (it runs independently of onUpdate/onEnabled entirely), but that was
+        // never actually confirmed with a log line either -- only assumed, because
+        // nothing had run for the 30 minutes a real test window would need to prove it.
+        // If Glance's own id registry is failing to populate at all rather than just
+        // slowly, this call would have been silently doing nothing every 30 minutes too.
+        runCatching { updateAllCarWidgetsDirectly(applicationContext, "Widget: periodic refresh") }
         return Result.success()
     }
 
