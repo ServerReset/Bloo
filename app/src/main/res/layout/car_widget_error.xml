@@ -9,6 +9,12 @@
   needs suspending DataStore reads, so this follows ?android:attr/* exactly as
   car_widget_loading.xml does: correct in light and dark with no values-night, and
   no risk of composing a theme while composition is the thing that just failed.
+
+  widget_error_text and widget_error_copy: the actual exception, and a way to get
+  it off the device, so a widget that's stuck showing this isn't a dead end. Just a
+  maxLines TextView and a Button, not a ScrollView (not on the small, historical
+  AppWidget-safe view allow-list); see onCompositionError's own doc for why a
+  truncated, non-scrolling trace is a deliberate tradeoff, not an oversight.
 -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/widget_error_root"
@@ -34,4 +40,30 @@
         android:textColor="?android:attr/textColorSecondary"
         android:textSize="11sp"
         android:maxLines="1" />
+    <TextView
+        android:id="@+id/widget_error_text"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="6dp"
+        android:textColor="?android:attr/textColorSecondary"
+        android:textSize="9sp"
+        android:fontFamily="monospace"
+        android:maxLines="6"
+        android:ellipsize="end"
+        android:visibility="gone" />
+    <Button
+        android:id="@+id/widget_error_copy"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="4dp"
+        android:minWidth="0dp"
+        android:minHeight="0dp"
+        android:paddingStart="12dp"
+        android:paddingEnd="12dp"
+        android:paddingTop="4dp"
+        android:paddingBottom="4dp"
+        android:text="@string/widget_error_copy"
+        android:textAllCaps="false"
+        android:textSize="11sp"
+        android:visibility="gone" />
 </LinearLayout>

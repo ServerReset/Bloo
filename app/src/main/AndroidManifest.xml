@@ -335,6 +335,13 @@
                 android:resource="@xml/car_widget_info" />
         </receiver>
 
+        <!-- The "Copy error" button's click target on the widget's own crash screen
+             (car_widget_error.xml / CarWidget.onCompositionError). Never launched
+             from outside this app's own PendingIntent, so not exported. -->
+        <receiver
+            android:name=".widget.WidgetErrorCopyReceiver"
+            android:exported="false" />
+
         <!-- Widget setup (on first drop AND launcher long-press → settings).
              Its option set adapts to the app's simple/advanced mode. -->
         <activity

@@ -131,8 +131,9 @@ class CarWidget : GlanceAppWidget() {
 
     /**
      * Replaces Glance's default composition-failure UI, a bare "Can't show content"
-     * that offers the user nothing to do about it, with a themed panel that at least
-     * opens the app on tap.
+     * that offers the user nothing to do about it, with a themed panel that shows
+     * the actual exception, a button to copy it, and still opens the app on tap
+     * (of the root, not the text/button, both of which claim their own tap).
      *
      * Deliberately plain [RemoteViews]: this is not a composable and not a suspend
      * function, so neither Glance content nor the per-car [WidgetTheme] (which needs
@@ -145,11 +146,14 @@ class CarWidget : GlanceAppWidget() {
      * private final field with only an internal getter, so it cannot be overridden --
      * verified against the resolved 1.1.1 artifact, not the docs.
      *
-     * The [throwable] is intentionally dropped rather than logged: there is not one
-     * `android.util.Log` call anywhere in `:app` or `:shared`, and quietly starting a
-     * logging convention inside an error handler is not the place to make that call.
-     * It does mean a composition crash stays undiagnosable, which is a real cost --
-     * this is the line to add a log to if that ever needs chasing.
+     * The [throwable] used to be dropped entirely rather than shown or logged --
+     * reported directly as "the widget still doesn't work" with nothing else to go
+     * on, since a widget stuck on this screen (or on car_widget_loading.xml's static
+     * placeholder, if the crash happened even earlier, inside provideGlance's own
+     * suspend body before this ever ran) gave nobody, including this session, any way
+     * to see WHY. `Log.getStackTraceString` still lands in logcat too, same as any
+     * other uncaught exception, but logcat needs adb already attached; this is the
+     * copy-and-paste path that doesn't.
      */
     override fun onCompositionError(
         context: Context,
@@ -157,6 +161,8 @@ class CarWidget : GlanceAppWidget() {
         appWidgetId: Int,
         throwable: Throwable,
     ) {
+        val trace = android.util.Log.getStackTraceString(throwable)
+        android.util.Log.e("BlooWidget", "Widget composition failed:\n$trace")
         val views = RemoteViews(context.packageName, R.layout.car_widget_error)
         views.setOnClickPendingIntent(
             R.id.widget_error_root,
@@ -166,6 +172,24 @@ class CarWidget : GlanceAppWidget() {
                 // one another's PendingIntent.
                 appWidgetId,
                 Intent(context, MainActivity::class.java),
+                PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
+            ),
+        )
+        // Truncated defensively -- this rides inside a PendingIntent's extras, which
+        // share the same per-transaction Binder size limit as everything else crossing
+        // a process boundary. A widget crash message is never anywhere close to this,
+        // but there is no reason to risk TransactionTooLargeException over it.
+        val shown = trace.take(4000)
+        views.setTextViewText(R.id.widget_error_text, shown)
+        views.setViewVisibility(R.id.widget_error_text, android.view.View.VISIBLE)
+        views.setViewVisibility(R.id.widget_error_copy, android.view.View.VISIBLE)
+        views.setOnClickPendingIntent(
+            R.id.widget_error_copy,
+            PendingIntent.getBroadcast(
+                context,
+                appWidgetId,
+                Intent(context, WidgetErrorCopyReceiver::class.java)
+                    .putExtra(WidgetErrorCopyReceiver.EXTRA_TEXT, shown),
                 PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
             ),
         )
