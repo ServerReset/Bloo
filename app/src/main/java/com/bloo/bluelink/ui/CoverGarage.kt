@@ -18,6 +18,8 @@ import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Canvas
+import dev.chrisbanes.haze.HazeState
+import dev.chrisbanes.haze.hazeSource
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -222,6 +224,10 @@ internal fun CompactGarage(state: UiState, vm: AppViewModel, appearance: Setting
     DisposableEffect(coverFloatingRegistry) {
         onDispose { coverFloatingRegistry.resetChrome() }
     }
+    // The band chip (below) floats over whatever car page is currently showing --
+    // this is what gives it a REAL blur of that content instead of just a flat tint,
+    // the same hazeSource/hazeEffect pairing GarageScreen's own pagers already use.
+    val hazeState = remember { HazeState() }
     Box(Modifier.fillMaxSize()) {
         // Measured once and shared by every reader below: the tiles' car-name label, the band
         // itself, and the search dock. Hoisted ABOVE the pager because the tiles need to know
@@ -229,7 +235,7 @@ internal fun CompactGarage(state: UiState, vm: AppViewModel, appearance: Setting
         val band = coverCutoutBand()
         HorizontalPager(
             state = pager,
-            modifier = Modifier.fillMaxSize(),
+            modifier = Modifier.fillMaxSize().hazeSource(hazeState),
             userScrollEnabled = !scrubbing.value,
             beyondViewportPageCount = 1,
         ) { page ->
@@ -357,6 +363,7 @@ internal fun CompactGarage(state: UiState, vm: AppViewModel, appearance: Setting
                     .width(band.widthDp.dp)
                     .height(band.heightDp.dp)
                     .ambientRing(bandShape),
+                hazeState = hazeState,
             ) {
                 Row(
                     // fillMaxSize, not wrap-content: this Row used to BE the glass
