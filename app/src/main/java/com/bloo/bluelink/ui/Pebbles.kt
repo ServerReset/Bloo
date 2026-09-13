@@ -905,10 +905,13 @@ internal fun StateControl(
             .height(ControlHeight)
             .onSizeChanged { rowWidthDp = with(density) { it.width.toDp() } },
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        horizontalArrangement = Arrangement.spaceBetween,
     ) {
         // Fill the button's height so the status reads as one tall control.
-        Column(Modifier.weight(1f).fillMaxHeight().widthIn(min = 120.dp), verticalArrangement = Arrangement.Center) {
+        // The Column naturally takes only its intrinsic width; spaceBetween pushes
+        // the button group to the right, creating a natural balance instead of both
+        // pushing rightward due to the column's weight(1f) consuming space.
+        Column(Modifier.fillMaxHeight().widthIn(min = 120.dp), verticalArrangement = Arrangement.Center) {
             if (name.isNotBlank()) {
                 Text(name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
             }
