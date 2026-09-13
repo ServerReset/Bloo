@@ -207,6 +207,7 @@ internal fun CoverTile(
     subtitleColor: Color? = null,
     containerColor: Color = MaterialTheme.colorScheme.surfaceVariant,
     scrollState: ScrollState? = null,
+    hazeState: dev.chrisbanes.haze.HazeState? = null,
     /**
      * A short secondary label pinned to the END of the title row -- in practice the car's name on
      * a section tile ("Charge          Kona").
@@ -263,15 +264,13 @@ internal fun CoverTile(
 ) {
     val shape = RoundedCornerShape(PebbleCornerExpanded)
     val outline = LocalAppearance.current.pebbleOutline
-    Card(
+    // Glass tile with unified blur styling instead of plain card surface
+    GlassSurface(
         modifier = modifier
             .fillMaxSize()
             .pebbleCardEdge(shape, outline),
         shape = shape,
-        colors = CardDefaults.cardColors(
-            containerColor = containerColor,
-            contentColor = contentColorFor(containerColor),
-        ),
+        hazeState = hazeState,
     ) {
       Box(Modifier.fillMaxSize()) {
         background?.invoke(this)
