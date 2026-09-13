@@ -418,18 +418,15 @@ internal fun SettingsSearchResults(
         }
         scored.sortedByDescending { it.second }.map { it.first }
     }.let { if (it.size > limit) it.take(limit) else it }
-    // Floating above busy/aurora content needs real separation -- a plain
-    // default Card blends into whatever's behind it. Elevated container +
-    // actual shadow (not just tonal elevation) so results clearly pop.
+    // Floating search results use GlassSurface, the same unified glass chrome
+    // as every other floating surface (dialogs, overlays, status bar).
+    // This replaces the old plain Card + tonal elevation approach.
     val resultCardShape = RoundedCornerShape(16.dp)
-    val resultCardColors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh)
-    // These float over busy/aurora content the same way the search bar and
-    // "Try asking" panel above them do, but were left on plain tonal-
-    // elevation Cards -- the one inconsistency in an otherwise unified
-    // floating-chrome look within this exact panel.
-    val resultCardModifier = Modifier.fillMaxWidth().dropShadow(resultCardShape, blurRadius = 10.dp, offsetY = 3.dp).frostedRim(resultCardShape)
     if (results.isEmpty()) {
-        Card(resultCardModifier, shape = resultCardShape, colors = resultCardColors) {
+        GlassSurface(
+            shape = resultCardShape,
+            modifier = Modifier.fillMaxWidth(),
+        ) {
             Text(
                 "No matches for \"$query\"",
                 Modifier.padding(16.dp),
@@ -444,7 +441,10 @@ internal fun SettingsSearchResults(
         val resultsKey = results.joinToString("|") { it.title }
         results.forEachIndexed { i, e ->
             PopVisible(visible = staggeredResultVisible(resultsKey, i)) {
-                Card(resultCardModifier, shape = resultCardShape, colors = resultCardColors) {
+                GlassSurface(
+                    shape = resultCardShape,
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
                     Row(Modifier.padding(16.dp)) {
                         // A small icon badge per result, the same "leading circle" language
                         // the update pebble and settings hero stats use -- these cards used
