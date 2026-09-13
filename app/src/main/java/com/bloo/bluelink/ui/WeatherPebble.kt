@@ -1310,8 +1310,7 @@ private fun MapDragHandle(mapHazeState: HazeState, modifier: Modifier = Modifier
             .padding(top = 8.dp)
             .size(width = 56.dp, height = 20.dp)
             .clip(RoundedCornerShape(50))
-            .then(if (canBlurHandle) Modifier.appHazeEffect(mapHazeState) else Modifier)
-            .background(glassTint(canBlurHandle)),
+            .glassEffect(if (canBlurHandle) mapHazeState else null),
         contentAlignment = Alignment.Center,
     ) {
         Box(
