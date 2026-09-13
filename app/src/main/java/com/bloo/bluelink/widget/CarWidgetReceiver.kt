@@ -48,13 +48,40 @@ class CarWidgetReceiver : GlanceAppWidgetReceiver() {
      * either -- meaning either provideGlance is throwing somewhere neither this
      * session's try/catch nor onCompositionError catches, or Glance's OWN
      * onUpdate/session machinery (this override's super call) never successfully
-     * starts a session at all. This line existing (or not) in AppLog after a
-     * fresh add is what tells those two apart. Not otherwise behavior-changing --
-     * super.onUpdate does everything GlanceAppWidgetReceiver's default already did.
+     * starts a session at all. Confirmed the latter, waiting 13 minutes with the
+     * "Widget: provideGlance started" line never once appearing: super.onUpdate's
+     * own session-starting path silently never gets there, on THIS device --
+     * something inside androidx.glance.appwidget between onUpdate and
+     * provideGlance, not anything this app's own code does.
+     *
+     * The explicit updateAll() call below is the actual fix attempt, not just more
+     * diagnosis: [WidgetRefreshWorker]'s periodic job already calls exactly this
+     * same function successfully every 30 minutes (that path was never in doubt --
+     * only whether it ever got 30 uninterrupted minutes to prove it, which testing
+     * by repeatedly removing/re-adding the widget never actually gave it, since
+     * onDisabled cancels the periodic schedule on every removal). Calling it here
+     * too, immediately, exercises the SAME working code path Glance's own onUpdate
+     * session was apparently failing to reach on its own, without waiting on it.
      */
     override fun onUpdate(context: Context, appWidgetManager: AppWidgetManager, appWidgetIds: IntArray) {
         AppLog.log("Widget: onUpdate for ${appWidgetIds.size} widget(s)")
         super.onUpdate(context, appWidgetManager, appWidgetIds)
+        // Deliberately NOT another goAsync() here -- super.onUpdate() (Glance's own
+        // implementation) almost certainly already calls it once, to run its own
+        // composition asynchronously past this method returning, and a SECOND
+        // goAsync() call from the same onReceive() dispatch throws
+        // IllegalStateException immediately, which would crash every single widget
+        // update. A plain fire-and-forget scope carries a small theoretical risk of
+        // being cut off if the process dies the instant this method returns, but
+        // that's a far smaller risk than guaranteed-crashing on every update.
+        val appContext = context.applicationContext
+        CoroutineScope(Dispatchers.IO).launch {
+            runCatching {
+                AppLog.log("Widget: onUpdate calling updateAll() directly")
+                CarWidget().updateAll(appContext)
+                AppLog.log("Widget: onUpdate's updateAll() returned")
+            }.onFailure { AppLog.log("Widget: onUpdate's updateAll() threw: ${it::class.simpleName}: ${it.message}") }
+        }
     }
 
     override fun onDeleted(context: Context, appWidgetIds: IntArray) {
