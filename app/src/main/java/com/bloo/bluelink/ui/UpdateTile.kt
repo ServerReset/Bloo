@@ -100,7 +100,12 @@ import kotlin.math.roundToInt
  * APK directly instead of opening a browser page.
  */
 @Composable
-internal fun UpdateAvailableTile(state: UiState, vm: AppViewModel, dragHandle: Modifier = Modifier) {
+internal fun UpdateAvailableTile(
+    state: UiState,
+    vm: AppViewModel,
+    dragHandle: Modifier = Modifier,
+    hazeState: dev.chrisbanes.haze.HazeState? = null,
+) {
     val info = state.updateAvailable
     // Stays visible during the pending-dismiss (undo) window — only the committed
     // updateTileDismissed truly hides it.
@@ -204,15 +209,12 @@ internal fun UpdateAvailableTile(state: UiState, vm: AppViewModel, dragHandle: M
             // the static word was animating right along with the number that actually changed.
             // Only the percent itself is a moving target now (rendered with its own
             // AnimatedValue below), and the sentence around it stays put.
-        // Own tonal Surface now, matching the release-notes/install-help panels right below it
-        // (same corner radius, same fill) -- it used to sit bare on the card's own background
-        // while everything else in the body was boxed, which made it read as an odd one out
-        // rather than the first of a consistent stack of sections.
-        Surface(
+        // Glass surface instead of tonal -- matches the unified glass styling throughout the app.
+        // Now has real blur when available, instead of a plain tonal fill.
+        GlassSurface(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(12.dp),
-            color = scheme.surfaceContainerHighest,
-            contentColor = scheme.onSurface,
+            hazeState = hazeState,
         ) {
             // Column, not Box: UpdateStatusLine emits two top-level siblings of its own (the
             // icon+status Row, then the PopVisible progress bar) with no Column of its own
@@ -233,7 +235,7 @@ internal fun UpdateAvailableTile(state: UiState, vm: AppViewModel, dragHandle: M
             // release page when there's more than we show. One shared block -- see
             // UpdateReleaseNotes for why the Settings card no longer keeps its own copy.
             PopVisible(visible = info.run.releaseNotes != null) {
-                UpdateReleaseNotes(info, maxLines = 5)
+                UpdateReleaseNotes(info, maxLines = 5, hazeState = hazeState)
             }
             // Progressive install help: only in the tap-through (non-seamless) path, and
             // only as an opt-in disclosure — the Play-Protect steps are scaffolding, not
@@ -252,14 +254,12 @@ internal fun UpdateAvailableTile(state: UiState, vm: AppViewModel, dragHandle: M
                     )
                 }
                 PopVisible(visible = showHelp) {
-                    // fillMaxWidth() to match the release-notes Surface right above --
-                    // without it this panel wrap-contents to its widest line instead of
-                    // matching its sibling's full-card width.
-                    Surface(
+                    // Glass surface instead of tonal -- unified styling with glass blur.
+                    // fillMaxWidth() to match sibling panels.
+                    GlassSurface(
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(12.dp),
-                        color = scheme.surfaceContainerHighest,
-                        contentColor = scheme.onSurface,
+                        hazeState = hazeState,
                     ) {
                         Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                             Text(
@@ -385,16 +385,16 @@ internal fun UpdateReleaseNotes(
     info: UpdateInfo,
     /** 5 in the pebble, which has the room; 3 in the Settings card, which does not. */
     maxLines: Int = 5,
+    hazeState: dev.chrisbanes.haze.HazeState? = null,
 ) {
     val notes = info.run.releaseNotes?.trim().orEmpty()
     if (notes.isBlank()) return
     val context = LocalContext.current
-    val scheme = MaterialTheme.colorScheme
-    Surface(
+    // Glass surface with unified blur styling
+    GlassSurface(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(12.dp),
-        color = scheme.surfaceContainerHighest,
-        contentColor = scheme.onSurface,
+        hazeState = hazeState,
     ) {
         Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             // "Full notes" rides in the section header rather than taking a whole row of its

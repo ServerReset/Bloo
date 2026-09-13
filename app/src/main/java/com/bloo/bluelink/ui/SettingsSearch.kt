@@ -453,6 +453,7 @@ internal fun SearchLayer(
                                 keyboardUp -> 4
                                 else -> Int.MAX_VALUE
                             },
+                            hazeState = hazeState,
                         )
                     } else {
                         SearchSuggestions(state, compact = compact || keyboardUp) { picked ->

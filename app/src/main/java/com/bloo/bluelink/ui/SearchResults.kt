@@ -111,6 +111,7 @@ internal fun SettingsSearchResults(
      *  up there is no room for a long list, and ranking is what makes taking
      *  the top few the right answer rather than an arbitrary one. */
     limit: Int = Int.MAX_VALUE,
+    hazeState: dev.chrisbanes.haze.HazeState? = null,
 ) {
     val tokens = query.lowercase().split(RxSearchTokens)
         .filter { it.isNotBlank() && it !in SearchStopwords }
@@ -522,10 +523,10 @@ internal fun SettingsSearchResults(
                 vm.refreshStatus(targetVehicle)
             }
         }
-        Card(
+        GlassSurface(
             resultCardModifier,
             shape = resultCardShape,
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer),
+            hazeState = hazeState,
         ) {
             Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -576,10 +577,10 @@ internal fun SettingsSearchResults(
         val p = proposal
         if (p != null) {
             val car = state.vehicles.firstOrNull { it.vin == p.second }
-            Card(
+            GlassSurface(
                 resultCardModifier,
                 shape = resultCardShape,
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.tertiaryContainer),
+                hazeState = hazeState,
             ) {
                 Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
@@ -658,10 +659,10 @@ internal fun SettingsSearchResults(
             enter = collapseEnter(Alignment.Bottom),
             exit = collapseExit(Alignment.Bottom),
         ) {
-            Card(
+            GlassSurface(
                 resultCardModifier,
                 shape = resultCardShape,
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.tertiaryContainer),
+                hazeState = hazeState,
             ) {
                 Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
