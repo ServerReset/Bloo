@@ -102,6 +102,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.onSizeChanged
@@ -1263,98 +1264,94 @@ internal fun CarMapSheet(
  * smaller resting size without visibly squashing the map along the way.
  */
 /**
- * The vehicle-name pill floating over the top-left of an expanded map sheet -- shared
- * by [ExpandableMapLayer] and [CarMapSheetBody], which used to each hand-roll their
- * own identical copy (right down to the same hardcoded padding). Wired to [mapHazeState]
- * for a real blur of the map tiles behind it, same as [MapDragHandle] below already
- * was -- the map's own name/refresh chrome was the one remaining spot in the app still
- * missing a real blur layer, still on the flatly-blue `surfaceContainerHighest` fill
- * already fixed everywhere else this session.
+ * Everything that used to float over the top of an expanded map sheet as three
+ * separate glass pills -- the vehicle-name pill (top-left), the drag handle
+ * (top-center), and the refresh chip (top-right) -- consolidated into ONE bar
+ * with one shared floating pill background. They used to each carry their own
+ * hand-rolled (or near-identical) [GlassSurface], each with its own blur, its
+ * own shadow, its own rim -- three separate pieces of glass chrome doing what
+ * reads, and should always have read, as a single control strip. Giving up on
+ * making that strip feel "uniform" with every other floating surface in the
+ * app in some deeper sense and just building it as one plain bar was the
+ * actual ask: a name on the left, a drag handle centered above a divider, and
+ * a refresh action on the right, all inside one rounded rect.
+ *
+ * [onRefreshLocation]/[lastFetchedAt] are null together at [CarMapSheet]'s call
+ * site (that sheet has no refresh action of its own) -- the bar simply omits
+ * that side entirely rather than showing a dead button.
+ *
+ * [dragModifier] carries the vertical-drag-to-dismiss gesture -- built by the
+ * caller, since the two call sites each close over their own [dragPx]/`scope`/
+ * `close()`, and passing the finished modifier in is simpler than exporting a
+ * matching set of callback params for the same thing.
  */
 @Composable
-private fun MapNamePill(vehicleName: String, mapHazeState: HazeState, modifier: Modifier = Modifier) {
-    // Position/offset is the caller's own concern (passed via [modifier]) -- the two
-    // call sites anchor this at different offsets from their sheet's own top edge.
-    GlassSurface(
-        shape = RoundedCornerShape(50),
-        modifier = modifier,
-        hazeState = mapHazeState,
-        contentColor = Color.White,
-    ) {
-        Text(
-            vehicleName,
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.Bold,
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-        )
-    }
-}
-
-/**
- * The "last refreshed" + refresh-now chip at the top-right of an expanded map sheet.
- * Only [ExpandableMapLayer] has this one ([CarMapSheetBody] has no refresh action of
- * its own), but it's pulled out alongside [MapNamePill] for the same reason: one
- * definition instead of a hand-rolled `Surface` at the call site, and a real blur
- * of [mapHazeState] it didn't have before.
- */
-@Composable
-private fun MapRefreshChip(
-    lastFetchedAt: Long?,
-    onRefreshLocation: () -> Unit,
+private fun MapTopBar(
+    vehicleName: String,
     mapHazeState: HazeState,
+    dragModifier: Modifier,
     modifier: Modifier = Modifier,
+    lastFetchedAt: Long? = null,
+    onRefreshLocation: (() -> Unit)? = null,
 ) {
-    val rel = rememberRelativeTime(lastFetchedAt)
+    val rel = if (onRefreshLocation != null) rememberRelativeTime(lastFetchedAt) else null
     GlassSurface(
-        shape = RoundedCornerShape(50),
-        modifier = modifier.padding(end = 16.dp, top = 40.dp),
+        shape = RoundedCornerShape(24.dp),
+        modifier = modifier.fillMaxWidth(),
         hazeState = mapHazeState,
         contentColor = Color.White,
-        contentDescription = "Refresh location",
-        onClick = onRefreshLocation,
     ) {
-        Row(
-            Modifier.padding(start = 14.dp, end = 10.dp, top = 8.dp, bottom = 8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
-        ) {
-            Text(
-                if (rel != null) "Updated $rel" else "Refresh",
-                style = MaterialTheme.typography.labelMedium,
-            )
-            Icon(Icons.Filled.Refresh, contentDescription = null, modifier = Modifier.size(16.dp))
+        Column(Modifier.fillMaxWidth().then(dragModifier)) {
+            // The drag handle nub -- a slim, quiet affordance rather than its own
+            // separate pill, now that it lives inside the bar's own glass instead
+            // of needing a second one behind it. The whole bar is the drag target
+            // (dragModifier is on this Column, not just this nub's row), matching
+            // every other bottom-sheet convention where the entire header drags.
+            Box(Modifier.fillMaxWidth().height(20.dp), contentAlignment = Alignment.Center) {
+                Box(
+                    Modifier
+                        .size(width = 32.dp, height = 4.dp)
+                        .background(Color.White.copy(alpha = 0.5f), RoundedCornerShape(2.dp)),
+                )
+            }
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .padding(start = 16.dp, end = 12.dp, bottom = 10.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
+            ) {
+                Text(
+                    vehicleName,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    // fill = false: a short name should not stretch and shove the
+                    // refresh action to the far edge -- only a genuinely long one
+                    // claims more room, at the refresh side's expense.
+                    modifier = Modifier.weight(1f, fill = false),
+                )
+                if (onRefreshLocation != null) {
+                    Spacer(Modifier.width(8.dp))
+                    Row(
+                        Modifier
+                            .clip(RoundedCornerShape(50))
+                            .clickable(onClick = onRefreshLocation)
+                            .padding(horizontal = 8.dp, vertical = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    ) {
+                        Text(
+                            if (rel != null) "Updated $rel" else "Refresh",
+                            style = MaterialTheme.typography.labelMedium,
+                            maxLines = 1,
+                        )
+                        Icon(Icons.Filled.Refresh, contentDescription = "Refresh location", modifier = Modifier.size(16.dp))
+                    }
+                }
+            }
         }
-    }
-}
-
-/**
- * The small frosted pill behind the map sheet's own drag handle -- shared by
- * [ExpandableMapLayer] and [CarMapSheetBody], which used to each carry a byte-for-byte
- * identical copy of this exact Box chain. Deliberately NOT built on [GlassSurface]:
- * its own inner bar is drawn directly rather than through a generic `content` slot --
- * close to but not quite the same shape as every other floating chip, so it stays its
- * own small composable instead of forcing an extra parameter onto the shared one. The
- * FILL, though, is the same [glassTint] every other glass surface in the app uses --
- * this used to be its own flat-black-regardless-of-theme special case, reasoned as
- * "it sits on a map, not a themed app surface", but there are no per-surface tint
- * exceptions left in the app now, this one included.
- */
-@Composable
-private fun MapDragHandle(mapHazeState: HazeState, modifier: Modifier = Modifier) {
-    val canBlurHandle = CanBlurBackdrops()
-    Box(
-        modifier
-            .padding(top = 8.dp)
-            .size(width = 56.dp, height = 20.dp)
-            .clip(RoundedCornerShape(50))
-            .glassEffect(if (canBlurHandle) mapHazeState else null),
-        contentAlignment = Alignment.Center,
-    ) {
-        Box(
-            Modifier
-                .size(width = 28.dp, height = 4.dp)
-                .background(Color.White.copy(alpha = 0.8f), RoundedCornerShape(2.dp)),
-        )
     }
 }
 
@@ -1523,29 +1520,46 @@ internal fun ExpandableMapLayer(
                 )
             }
 
-            // Vehicle name pill (appears when expanded) -- top-left of the
-            // SHEET, not the screen, same as everything else below.
+            // One consolidated top bar -- name, drag handle, and refresh, all inside
+            // one shared floating pill background instead of three separate glass
+            // pieces (see MapTopBar's own doc). Positioned close to the sheet's own
+            // top edge (16dp) rather than the old name pill's 40dp -- the drag
+            // handle's nub now lives INSIDE this same bar instead of needing its
+            // own 40dp-tall floating strip above it.
             if (isExpanded && expandFraction.value > 0.1f) {
-                MapNamePill(
+                MapTopBar(
                     vehicleName = vehicleName,
                     mapHazeState = mapHazeState,
-                    modifier = Modifier
-                        .align(Alignment.TopStart)
-                        .padding(start = 16.dp, top = 40.dp)
-                        .graphicsLayer { alpha = expandFraction.value.coerceIn(0f, 1f) },
-                )
-            }
-
-            // "Last refreshed" + a button to refresh the car's (and device's)
-            // location right now -- reported directly as wanting both. Top-
-            // right of the sheet, mirroring the name pill on the top-left.
-            if (isExpanded && expandFraction.value > 0.1f) {
-                MapRefreshChip(
                     lastFetchedAt = lastFetchedAt,
                     onRefreshLocation = onRefreshLocation,
-                    mapHazeState = mapHazeState,
+                    dragModifier = Modifier.pointerInput(Unit) {
+                        detectVerticalDragGestures(
+                            onVerticalDrag = { change, amount ->
+                                change.consume()
+                                scope.launch { dragPx.snapTo((dragPx.value + amount).coerceAtLeast(0f)) }
+                            },
+                            onDragEnd = {
+                                // Distance, not velocity -- a fixed 96dp pull is a
+                                // close enough stand-in for "the user clearly meant
+                                // to close this". Same threshold CarMapSheetBody's
+                                // own handle uses.
+                                val thresholdPx = with(density) { 96.dp.toPx() }
+                                if (dragPx.value > thresholdPx) {
+                                    close()
+                                } else {
+                                    scope.launch {
+                                        dragPx.animateTo(0f, dragSpring)
+                                    }
+                                }
+                            },
+                            onDragCancel = {
+                                scope.launch { dragPx.animateTo(0f, dragSpring) }
+                            },
+                        )
+                    },
                     modifier = Modifier
-                        .align(Alignment.TopEnd)
+                        .align(Alignment.TopCenter)
+                        .padding(horizontal = 16.dp, top = 16.dp)
                         .graphicsLayer { alpha = expandFraction.value.coerceIn(0f, 1f) },
                 )
             }
@@ -1565,49 +1579,6 @@ internal fun ExpandableMapLayer(
                         .navigationBarsPadding()
                         .graphicsLayer { alpha = expandFraction.value.coerceIn(0f, 1f) },
                 )
-            }
-
-            // Drag handle (appears when expanded) -- top of the SHEET, i.e.
-            // 15% of the screen's height down from the top of the SCREEN, not
-            // glued to the screen's own top edge. Reported directly.
-            if (isExpanded && expandFraction.value > 0.1f) {
-                Box(
-                    Modifier
-                        .align(Alignment.TopCenter)
-                        .fillMaxWidth()
-                        .height(40.dp)
-                        .pointerInput(Unit) {
-                            detectVerticalDragGestures(
-                                onVerticalDrag = { change, amount ->
-                                    change.consume()
-                                    scope.launch { dragPx.snapTo((dragPx.value + amount).coerceAtLeast(0f)) }
-                                },
-                                onDragEnd = {
-                                    // Distance, not velocity -- a fixed 96dp pull is a
-                                    // close enough stand-in for "the user clearly meant
-                                    // to close this". Same threshold CarMapSheetBody's
-                                    // own handle uses.
-                                    val thresholdPx = with(density) { 96.dp.toPx() }
-                                    if (dragPx.value > thresholdPx) {
-                                        close()
-                                    } else {
-                                        scope.launch {
-                                            dragPx.animateTo(0f, dragSpring)
-                                        }
-                                    }
-                                },
-                                onDragCancel = {
-                                    scope.launch { dragPx.animateTo(0f, dragSpring) }
-                                },
-                            )
-                        },
-                    contentAlignment = Alignment.TopCenter,
-                ) {
-                    MapDragHandle(
-                        mapHazeState = mapHazeState,
-                        modifier = Modifier.graphicsLayer { alpha = expandFraction.value.coerceIn(0f, 1f) },
-                    )
-                }
             }
         }
     }
@@ -1865,17 +1836,43 @@ private fun CarMapSheetBody(
                     onExpand = null,
                 )
             }
-            // The vehicle name, as its own small floating pill -- the same
-            // translucent glass chrome every other floating control in the app
-            // uses ([FloatingIcon]'s own colour/rim/shadow), not bare text with a
-            // drop shadow. Reported directly as wanting it "in some sort of
-            // floating element" rather than text alone sitting on the map.
-            MapNamePill(
+            // One consolidated top bar -- name + drag handle, sharing one floating
+            // pill background instead of two separate pieces of glass (see
+            // MapTopBar's own doc). No refresh side here: this sheet has no refresh
+            // action of its own, so onRefreshLocation stays null and the bar simply
+            // omits that half. Also the ONLY thing on this sheet a user can pull
+            // down to dismiss (see [dragPx]'s own doc up top) -- the whole bar is
+            // now the drag target, not just a slim strip above it.
+            MapTopBar(
                 vehicleName = vehicleName,
                 mapHazeState = mapHazeState,
+                dragModifier = Modifier.pointerInput(Unit) {
+                    detectVerticalDragGestures(
+                        onVerticalDrag = { change, amount ->
+                            change.consume()
+                            scope.launch { dragPx.snapTo((dragPx.value + amount).coerceAtLeast(0f)) }
+                        },
+                        onDragEnd = {
+                            // Distance, not velocity -- a fixed 96dp pull is a
+                            // close enough stand-in for "the user clearly meant
+                            // to close this".
+                            val thresholdPx = with(density) { 96.dp.toPx() }
+                            if (dragPx.value > thresholdPx) {
+                                close()
+                            } else {
+                                scope.launch {
+                                    dragPx.animateTo(0f, dragSpring)
+                                }
+                            }
+                        },
+                        onDragCancel = {
+                            scope.launch { dragPx.animateTo(0f, dragSpring) }
+                        },
+                    )
+                },
                 modifier = Modifier
-                    .align(Alignment.TopStart)
-                    .padding(horizontal = 16.dp, vertical = 12.dp)
+                    .align(Alignment.TopCenter)
+                    .padding(horizontal = 16.dp, top = 12.dp)
                     .graphicsLayer { alpha = visible.value.coerceIn(0f, 1f) },
             )
             // No close (X) button -- swipe-to-dismiss (or tapping the scrim above the
@@ -1903,48 +1900,6 @@ private fun CarMapSheetBody(
                     .navigationBarsPadding()
                     .graphicsLayer { alpha = visible.value.coerceIn(0f, 1f) },
             )
-            // The drag handle -- and, with no ModalBottomSheet swipe gesture of its
-            // own underneath this, the ONLY thing on this sheet a user can pull down
-            // to dismiss (see [dragPx]'s own doc up top). A generous 48dp touch
-            // target around a slim visible pill, the same "small glyph, big hit
-            // area" shape every other icon-only control in the app already uses.
-            // Slimmer and dimmer than the first version here (28dp wide, 0.4 alpha,
-            // down from 32dp/0.6) -- reported directly as "a bit obtuse": a heavy,
-            // high-contrast bar read as its own UI element rather than the quiet
-            // affordance a drag handle is supposed to be.
-            Box(
-                Modifier
-                    .align(Alignment.TopCenter)
-                    .fillMaxWidth()
-                    .height(40.dp)
-                    .pointerInput(Unit) {
-                        detectVerticalDragGestures(
-                            onVerticalDrag = { change, amount ->
-                                change.consume()
-                                scope.launch { dragPx.snapTo((dragPx.value + amount).coerceAtLeast(0f)) }
-                            },
-                            onDragEnd = {
-                                // Distance, not velocity -- a fixed 96dp pull is a
-                                // close enough stand-in for "the user clearly meant
-                                // to close this".
-                                val thresholdPx = with(density) { 96.dp.toPx() }
-                                if (dragPx.value > thresholdPx) {
-                                    close()
-                                } else {
-                                    scope.launch {
-                                        dragPx.animateTo(0f, dragSpring)
-                                    }
-                                }
-                            },
-                            onDragCancel = {
-                                scope.launch { dragPx.animateTo(0f, dragSpring) }
-                            },
-                        )
-                    },
-                contentAlignment = Alignment.TopCenter,
-            ) {
-                MapDragHandle(mapHazeState = mapHazeState)
-            }
         }
     }
 }
