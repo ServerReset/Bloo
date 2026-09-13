@@ -148,8 +148,13 @@ internal fun rememberAdvancedVisibility(advanced: Boolean, count: Int): List<Boo
  * the one animation the whole flip is supposed to show.
  */
 @Composable
-internal fun rememberGridItemVisibility(visible: Boolean): MutableTransitionState<Boolean> =
-    remember { MutableTransitionState(visible) }.apply { targetState = visible }
+internal fun rememberGridItemVisibility(visible: Boolean): MutableTransitionState<Boolean> {
+    val transition = remember { MutableTransitionState(visible) }
+    LaunchedEffect(visible) {
+        transition.targetState = visible
+    }
+    return transition
+}
 
 /**
  * An [AnimatedVisibility] state that starts hidden and animates itself in on first composition.
