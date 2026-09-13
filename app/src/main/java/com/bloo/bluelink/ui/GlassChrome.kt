@@ -28,19 +28,34 @@ import dev.chrisbanes.haze.hazeEffect
 import com.bloo.uicommon.frostedRim as sharedFrostedRim
 import com.bloo.uicommon.ambientRing as sharedAmbientRing
 
-/*
- * The phone app's floating-chrome helpers are now ONE shared kit in
- * :uicommon (see com.bloo.uicommon.GlassChrome), usable by the watch and
- * widget surfaces too. This file keeps the app's original call sites
- * unchanged by re-supplying the theme tint they used to read internally:
- * the platform Material is the one thing the shared module deliberately
- * does NOT depend on, so the wrapper passes onSurface in.
+/**
+ * UNIFIED GLASS & BLUR SYSTEM
  *
- * frostedRim / ambientRing: thin alias wrappers. There used to be a third,
- * `glassContainerAlpha` -- every one of its call sites is gone now (each was
- * its own slightly-different alpha override on the exact fill [GlassSurface]/
- * [glassTint] now compute once, shared, below), so the wrapper itself is gone
- * too rather than left behind as a stale, now-uncalled indirection.
+ * This file contains the complete, unified glass styling system used by every
+ * floating surface in the app (search results, dialogs, overlays, status bar).
+ * ONE set of numbers, referenced everywhere — change here, everything changes.
+ *
+ * Core components:
+ * - [GlassTintAlpha] (0.22f) & [GlassBlurredTintAlpha] (0.05f): fill transparencies
+ * - [glassTint()]: resolves the actual tint color (black/white by theme)
+ * - [appHazeEffect()]: applies the unified blur effect
+ * - [GlassSurface]: main composable for all floating glass surfaces (with content)
+ * - [ScrimBlur]: full-screen scrim (no shape, no content slot)
+ * - [appGlassRim()]: the frosted rim shared by all glass edges
+ * - [pebbleCardEdge()]: for opaque cards (distinct from glass)
+ *
+ * For floating surfaces (search results, dialogs, pills, chips):
+ *   Use [GlassSurface] with optional hazeState for blur
+ *
+ * For full-screen dim scrims (map sheets, overlays):
+ *   Use [ScrimBlur] for progressive entrance/exit
+ *
+ * For opaque card edges (pebbles, standard cards):
+ *   Use [pebbleCardEdge] instead — this is NOT glass
+ *
+ * The phone app's floating-chrome helpers are now ONE shared kit in :uicommon
+ * (see com.bloo.uicommon.GlassChrome), usable by watch and widget surfaces too.
+ * This file re-supplies the theme tint the shared module can't depend on.
  */
 
 /**
@@ -56,6 +71,18 @@ fun Modifier.frostedRim(shape: Shape): Modifier =
 /** See [com.bloo.uicommon.ambientRing]. */
 fun Modifier.ambientRing(shape: Shape): Modifier =
     this.sharedAmbientRing(shape)
+
+/**
+ * The shared floating/glass surface rim: the app's default frosted rim
+ * ([frostedRim]). Every floating glass surface uses this for consistent
+ * edge styling. The [tint] parameter is retained for compatibility but
+ * is no longer used.
+ */
+@Composable
+internal fun Modifier.appGlassRim(
+    shape: Shape,
+    @Suppress("UNUSED_PARAMETER") tint: Color = MaterialTheme.colorScheme.surfaceContainer,
+): Modifier = this.frostedRim(shape)
 
 /**
  * The standard opaque pebble/card edge: a drop shadow, plus -- only when the user
@@ -85,24 +112,20 @@ internal fun Modifier.pebbleCardEdge(shape: Shape, outline: Boolean): Modifier =
 /**
  * The two alphas every neutral glass fill in the app shares -- one number for "no
  * real blur behind this" (pre-S devices, or battery saver), a lighter second number
- * for "a real blur is already doing most of the legibility work underneath." Used to
- * be four: a separate pair for dark and light theme, on top of the blurred/unblurred
- * split. Splitting by theme brightness never had a real reason behind it -- the
- * THEME only ever needs to change which base colour (black or white) this tints
- * with, not how transparent that colour is -- so it was really the same two numbers,
- * typed twice. Literally one set of numbers now, referenced by both branches below.
+ * for "a real blur is already doing most of the legibility work underneath."
+ *
+ * Used to be four separate pairs (dark/light theme × blurred/unblurred), but splitting
+ * by theme was redundant: the THEME only needs to change the base colour (black or white),
+ * not how transparent it is. Literally one set of numbers now, referenced everywhere.
+ *
+ * History: lowered four times (0.65/0.3 → 0.4/0.12 → 0.28/0.06 → 0.16/0.02) after user
+ * feedback wanting more transparency. Then 0.16/0.02 went too far, came back as "a little
+ * less transparent" — this is the first raise, small and intentional to restore neutral
+ * cast without reversing the transparency direction. The blurred alpha stays lowest because
+ * the real blur behind it does most of the legibility work; the tint just adds neutral cast.
  */
-// Lowered four times -- 0.65/0.3, then 0.4/0.12, then 0.28/0.06, then 0.16/0.02 -- reported
-// each time as wanting the glass more transparent still, until 0.16/0.02 went a step too far
-// the other way and came back as "a little less transparent." First raise after four straight
-// lowers, and a small one on purpose: enough to give the fill back a bit of the neutral cast
-// it lost, not a reversal of the whole direction the last four rounds were headed in. The
-// blurred number stays lowest: the whole point of a real blur behind it is that it does most
-// of the legibility work itself, so the tint on top of it only needs to be enough to keep a
-// consistent neutral cast over whatever's showing through, not to carry contrast on its own
-// the way the no-blur fallback still has to.
-private const val GlassTintAlpha = 0.22f
-private const val GlassBlurredTintAlpha = 0.05f
+internal const val GlassTintAlpha = 0.22f
+internal const val GlassBlurredTintAlpha = 0.05f
 
 /**
  * Resolves [GlassSurface]'s own fill color -- also called directly by the one place

@@ -854,8 +854,3 @@ internal fun ChargeFuelBar(
  * param is retained for call-site compatibility but is no longer used.
  */
 @Composable
-internal fun Modifier.appGlassRim(
-    shape: Shape,
-    @Suppress("UNUSED_PARAMETER") tint: Color = MaterialTheme.colorScheme.surfaceContainer,
-): Modifier = this.frostedRim(shape)
-
