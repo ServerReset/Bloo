@@ -177,9 +177,8 @@ internal fun GarageScreen(
     // Narrowed to the boolean flip rather than reading the continuous fraction
     // directly: pullFractionState changes on every pixel of a pull gesture, and a
     // composition-scope read of it here would recompose GarageScreen (the car
-    // pager's parent -- see PagerDotsFor's doc comment for why that's expensive)
-    // on every one of those pixels, for a target value that's already saturated
-    // the moment the pull passes 1%.
+    // pager's parent) on every one of those pixels, which is expensive. Use boolean
+    // derivedStateOf instead for a stable result that only changes at threshold.
     val pulling by remember { derivedStateOf { pullFractionState.value > 0.01f } }
     // Published to the floating registry instead of animated here. The fade and the pull shift
     // are behaviours of floating CHROME, not of the dots or the corner buttons individually --
@@ -371,16 +370,10 @@ internal fun GarageScreen(
                                     state,
                                     vm,
                                     flipped = appearance.columnsFlipped,
-                                    // Feeds this same PagerDotsFor's collision dodge
-                                    // below. Wired unconditionally per page rather than
-                                    // gated to "only the settled page" -- doing that
-                                    // gate here would mean reading exPager.currentPage
-                                    // in this scope, which is exactly the per-frame,
-                                    // whole-pager-invalidating read this file's own
-                                    // PagerDotsFor doc above warns against. Harmless
-                                    // either way: only one page is ever actually
-                                    // composed here (beyondViewportPageCount = 0), so
-                                    // there's no simultaneous writer to race against.
+                                    // Wired unconditionally per page. Pager dots (which previously
+                                    // needed per-page notification) were removed, but the structure
+                                    // remains for consistency. Only one page is ever actually
+                                    // composed here (beyondViewportPageCount = 0) anyway.
                                 )
                             }
                         }

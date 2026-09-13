@@ -97,15 +97,8 @@ internal fun VehicleDetailContent(
     onExpand: (() -> Unit)? = null,
     reserveHeaderEnd: Boolean = false,
     hideIndicator: Boolean = false,
-    // True whenever GarageScreen's own PagerDotsFor is showing (totalBlocks
-    // > 1 there) -- that indicator floats fixed at TopCenter, independent of
-    // this car's own scroll position, so it can sit directly over this
-    // car's fact-chip row the instant the car is scrolled to its own top.
-    // Reported from a real device: with exactly two cars the dots -- one
-    // small circle, one elongated into a bar -- read as a toggle switch
-    // sitting half behind the chips. Same idea as reserveHeaderEnd already
-    // dodging the Settings gear; this reserves the analogous clearance at
-    // the top instead of the end.
+    // DEPRECATED: Pager dots were removed. This parameter is no longer used
+    // but kept for API compatibility. Always false.
     reserveTopForDots: Boolean = false,
 ) {
     val topInset = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
