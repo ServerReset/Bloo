@@ -205,12 +205,14 @@ internal fun StatusBarScrim(
                     // by the gradient's own reduced alpha below instead.
                     //
                     // appHazeEffect: the one shared Haze configuration (see its own doc)
-                    // every blurred surface in the app now goes through, `progressive`
-                    // included -- reported directly, once, as wanting the blur itself to
-                    // actually be strong right at the status bar and taper to none by this
-                    // Box's own bottom edge, "like a gradient of blur", and now the same
-                    // gradient every full-height scrim in the app applies.
-                    Modifier.appHazeEffect(hazeState)
+                    // every blurred surface in the app now goes through. progressive = true
+                    // here specifically -- reported directly, once, as wanting the blur
+                    // itself to actually be strong right at the status bar and taper to
+                    // none by this Box's own bottom edge, "like a gradient of blur" -- the
+                    // one shape this scrim actually needs, unlike a small floating chip
+                    // (appHazeEffect's own default), which reads better with a flat,
+                    // uniformly full-strength blur instead.
+                    Modifier.appHazeEffect(hazeState, progressive = true)
                 } else {
                     Modifier
                 },

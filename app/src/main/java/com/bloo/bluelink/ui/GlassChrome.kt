@@ -125,19 +125,32 @@ internal fun glassTint(blurred: Boolean): Color {
 
 /**
  * The one Haze configuration every blurred surface in the app uses -- literally the
- * same function call, not a same-looking copy of one. Before this, three different
- * spots each built their own `hazeEffect(state = ...) { ... }` block: [GlassSurface]
- * called it completely plain (Haze's own default style), [ScrimBlur] and
- * `StatusBarScrim` (Widgets.kt) each separately set `progressive = StandardBlurProgressive`,
- * and the map's own drag-handle chip (WeatherPebble.kt) called it plain again -- three
- * different-looking blurs on three different classes of surface, none of them actually
- * wrong on their own, but never actually the same call. Every one of those now goes
- * through this, so there is exactly one place that decides what "the app's blur" looks
- * like, at any radius, style or intensity -- change it here and every surface in the
- * app changes together, and no future call site can quietly drift onto its own version.
+ * same function call, not a same-looking copy of one. Every hazeEffect call in the
+ * app goes through this, so there is exactly one place that decides what "the app's
+ * blur" looks like -- change it here and every surface in the app changes together.
+ *
+ * [progressive] defaults OFF: a flat, full-intensity blur across the whole shape,
+ * the SAME strength as the strongest point of [StandardBlurProgressive]'s own
+ * gradient. It used to be forced on unconditionally for every call site, including
+ * small floating chips (the map's drag handle/name pill, the cover screen's camera
+ * band) -- reported directly as looking visibly weaker than the status bar's own
+ * blur, and for a real reason: [StandardBlurProgressive] fades from full intensity
+ * to none across whatever height it's applied to, which reads as "strong right at
+ * the edge it grows from, soft by the far edge" on a TALL scrim (the status bar, a
+ * map sheet's full-screen dim) -- the shape that gradient was actually designed for
+ * -- but on a chip only 20-48dp tall, that exact same fade means the bottom half of
+ * the chip is barely blurred at all, next to the status bar's own uniformly-strong
+ * blur at its own (comparably small) height. Only the two full-height scrims
+ * ([ScrimBlur], `StatusBarScrim` in Widgets.kt) opt into the gradient now; every
+ * chip-shaped surface gets the same flat, full-strength blur the status bar's own
+ * TOP edge -- its most blurred point -- already has.
  */
-internal fun Modifier.appHazeEffect(state: HazeState): Modifier =
-    this.hazeEffect(state = state) { progressive = StandardBlurProgressive }
+internal fun Modifier.appHazeEffect(state: HazeState, progressive: Boolean = false): Modifier =
+    this.hazeEffect(state = state) {
+        if (progressive) {
+            this.progressive = StandardBlurProgressive
+        }
+    }
 
 /**
  * The app's one floating-glass surface: a real Haze backdrop blur of [hazeState]
@@ -274,7 +287,7 @@ internal fun ScrimBlur(hazeState: HazeState?, progress: () -> Float, modifier: M
             modifier
                 .fillMaxSize()
                 .graphicsLayer { alpha = progress().coerceIn(0f, 1f) }
-                .appHazeEffect(hazeState!!),
+                .appHazeEffect(hazeState!!, progressive = true),
         )
     }
 }

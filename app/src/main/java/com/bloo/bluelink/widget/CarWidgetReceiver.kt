@@ -26,7 +26,16 @@ class CarWidgetReceiver : GlanceAppWidgetReceiver() {
 
     override fun onEnabled(context: Context) {
         super.onEnabled(context)
-        WidgetRefreshWorker.schedule(context)
+        // Guarded, not a bare call -- this is a BroadcastReceiver callback with no
+        // crash screen of its own to fall back to (unlike CarWidget.provideGlance,
+        // which now catches and shows exactly this same class of failure). An
+        // uncaught exception here doesn't just skip scheduling the periodic
+        // refresh, it crashes the receiver itself with nothing visible anywhere.
+        // CarWidget.provideGlance's own self-healing runCatching{} call to this
+        // exact function is what actually recovers a widget that got added before
+        // this was guarded; this stops the same failure from ever reaching here
+        // unguarded on a FRESH widget add in the first place.
+        runCatching { WidgetRefreshWorker.schedule(context) }
     }
 
     override fun onDeleted(context: Context, appWidgetIds: IntArray) {
