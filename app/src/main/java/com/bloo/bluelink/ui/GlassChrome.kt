@@ -62,12 +62,14 @@ import com.bloo.uicommon.ambientRing as sharedAmbientRing
  *    - Takes shape, outline toggle
  *    - Use this for: pebble shells, standard cards, opaque containers
  *
- * CORE FUNCTIONS (Called by above, or for manual glass styling):
- * ──────────────────────────────────────────────────────────
- * - [glassTint(blurred)] — Compute the tint Color (black/white by theme)
- * - [appHazeEffect(state, progressive)] — Apply blur modifier
- * - [glassRim(shape)] — Apply frosted rim (used by GlassSurface)
- * - [ambientRing(shape)] — Ambient ring effect (specialized cases only)
+ * CORE MODIFIERS (Combine into larger patterns or used directly):
+ * ───────────────────────────────────────────────────────────
+ * - [glassEdge(shape)] — Shadow + frosted rim (used by GlassSurface)
+ * - [glassEffect(hazeState)] — Blur + tint combined (for manual styling)
+ * - [glassTint(blurred)] — Just the tint color (compute or pass to background)
+ * - [glassRim(shape)] — Just the frosted rim (rare specialized cases)
+ * - [appHazeEffect(state)] — Just the blur (low-level, rarely needed)
+ * - [ambientRing(shape)] — Glow ring effect (specialized cases only)
  *
  * WHY THIS STRUCTURE:
  * ──────────────────
@@ -85,9 +87,16 @@ import com.bloo.uicommon.ambientRing as sharedAmbientRing
  */
 
 /**
+ * Apply glass edge treatment: shadow + frosted rim. Used by all glass surfaces.
+ * This is the ONLY glass edge styling in the app.
+ */
+@Composable
+internal fun Modifier.glassEdge(shape: Shape): Modifier =
+    this.dropShadow(shape).glassRim(shape)
+
+/**
  * Rim for glass surfaces: the shared frosted rim with Material's onSurface color.
- * Used by [GlassSurface] and all floating glass elements. This is the ONLY rim
- * function for glass in the app — all glass edges call this.
+ * Called by [glassEdge]. Separated for special cases needing just the rim.
  */
 @Composable
 internal fun Modifier.glassRim(shape: Shape): Modifier =
@@ -187,6 +196,24 @@ internal fun glassTint(blurred: Boolean): Color {
  * chip-shaped surface gets the same flat, full-strength blur the status bar's own
  * TOP edge -- its most blurred point -- already has.
  */
+/**
+ * Apply glass effect: combines blur (if possible) and tint in one modifier.
+ * Used by specialized glass surfaces that can't use [GlassSurface] directly.
+ * [progressive] controls whether the blur fades across the shape (full-screen scrims)
+ * or stays uniform (small floating elements).
+ */
+@Composable
+internal fun Modifier.glassEffect(
+    hazeState: HazeState?,
+    progressive: Boolean = false,
+): Modifier {
+    val canBlur = hazeState != null && CanBlurBackdrops()
+    val tint = glassTint(canBlur)
+    return this
+        .then(if (canBlur) Modifier.appHazeEffect(hazeState!!, progressive) else Modifier)
+        .background(tint)
+}
+
 internal fun Modifier.appHazeEffect(state: HazeState, progressive: Boolean = false): Modifier =
     this.hazeEffect(state = state) {
         if (progressive) {
@@ -242,8 +269,7 @@ internal fun GlassSurface(
     val interaction = interactionSource ?: remember { MutableInteractionSource() }
     Box(
         modifier = modifier
-            .dropShadow(shape)
-            .glassRim(shape)
+            .glassEdge(shape)
             .then(
                 if (onClick != null) {
                     Modifier
