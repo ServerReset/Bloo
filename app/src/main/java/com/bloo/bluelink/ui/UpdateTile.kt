@@ -86,17 +86,6 @@ import com.bloo.bluelink.data.Weather
 import kotlin.math.roundToInt
 
 /**
- * Rounds a live download-progress fraction (0f..1f) to the nearest 5% for
- * display, e.g. 0.71f -> 70, 0.73f -> 75. Nearest-5 rather than floor-to-5:
- * "increments of 5" reads as normal rounding to the viewer, and floor would
- * make the number visibly lag a few points behind the bar's own smooth fill.
- * Only the TEXT is rounded -- the underlying [Float] progress (see
- * AppViewModel.updateDownloadProgress) stays full precision so the progress
- * bar itself keeps filling smoothly rather than jumping in 5% steps.
- */
-private fun roundedDownloadPercent(p: Float): Int = ((p * 100).roundToInt() / 5) * 5
-
-/**
  * Bloo isn't on the Play Store, so this is its own update surface: a
  * standalone tile pinned directly below the hero tile whenever the checker
  * has found a newer build, animating in/out instead of interrupting with a
@@ -619,26 +608,21 @@ internal fun UpdateStatusLine(
         // screenshot (text wrapped one character per line).
         Column(Modifier.fillMaxWidth()) {
             Spacer(Modifier.height(8.dp))
-            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                val p = downloadProgress
-                Surface(
-                    modifier = Modifier.weight(1f).height(8.dp),
-                    shape = CircleShape,
-                    color = scheme.onSurface.copy(alpha = 0.12f),
-                ) {
-                    if (p != null) {
-                        LinearProgressIndicator(progress = { p }, modifier = Modifier.fillMaxSize(), trackColor = Color.Transparent)
-                    } else {
-                        LinearProgressIndicator(modifier = Modifier.fillMaxSize(), trackColor = Color.Transparent)
-                    }
+            // No trailing percentage beside the bar -- this doc's own note above already
+            // says that copy was removed as a redundant third place the same number showed
+            // (with the header pill and the "Downloading" line), but the Text survived here.
+            // The header pill (PebbleHeaderAction, above) is the one place it's shown.
+            val p = downloadProgress
+            Surface(
+                modifier = Modifier.fillMaxWidth().height(8.dp),
+                shape = CircleShape,
+                color = scheme.onSurface.copy(alpha = 0.12f),
+            ) {
+                if (p != null) {
+                    LinearProgressIndicator(progress = { p }, modifier = Modifier.fillMaxSize(), trackColor = Color.Transparent)
+                } else {
+                    LinearProgressIndicator(modifier = Modifier.fillMaxSize(), trackColor = Color.Transparent)
                 }
-                // Show the percentage next to the progress bar
-                Text(
-                    downloadProgress?.let { "${roundedDownloadPercent(it)}%" } ?: "—",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = scheme.onSurfaceVariant,
-                    modifier = Modifier.width(28.dp),
-                )
             }
         }
     }

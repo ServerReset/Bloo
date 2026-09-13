@@ -1983,12 +1983,28 @@ internal fun SettingsScreen(
                     } else newLabel
                     val seamless = appearance.seamlessInstallShizuku && state.shizukuAvailable
                     Spacer(Modifier.height(SettingsGapHairline))
-                    UpdateStatusLine(
-                        deltaLabel, seamless, state, vm,
-                        // The card's own heading two rows up is "Update available", not the
-                        // delta, so unlike the pebble this surface always has room for it.
-                        showDelta = true,
-                    )
+                    // Same tonal Surface the update PEBBLE wraps this exact shared composable
+                    // in (UpdateTile.kt) -- this card used to drop UpdateStatusLine bare onto
+                    // its own outlined container with no fill of its own, while
+                    // UpdateReleaseNotes right below it (and every status line anywhere else
+                    // in the app) got the carved-out surfaceContainerHighest treatment. Same
+                    // shared composable, same chrome around it, in both places now.
+                    Surface(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(12.dp),
+                        color = MaterialTheme.colorScheme.surfaceContainerHighest,
+                        contentColor = MaterialTheme.colorScheme.onSurface,
+                    ) {
+                        Column(Modifier.padding(12.dp)) {
+                            UpdateStatusLine(
+                                deltaLabel, seamless, state, vm,
+                                // The card's own heading two rows up is "Update available", not
+                                // the delta, so unlike the pebble this surface always has room
+                                // for it.
+                                showDelta = true,
+                            )
+                        }
+                    }
                     Spacer(Modifier.height(SettingsGapGroup))
                     // Label, glyph and branch all come from the shared updateAction /
                     // runUpdateAction, so this button and the pebble's header action cannot
