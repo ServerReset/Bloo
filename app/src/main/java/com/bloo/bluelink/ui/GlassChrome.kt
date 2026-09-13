@@ -92,14 +92,17 @@ internal fun Modifier.pebbleCardEdge(shape: Shape, outline: Boolean): Modifier =
  * with, not how transparent that colour is -- so it was really the same two numbers,
  * typed twice. Literally one set of numbers now, referenced by both branches below.
  */
-// Lowered four times now -- 0.65/0.3, then 0.4/0.12, then 0.28/0.06, then 0.16/0.02 --
-// reported each time as wanting the glass more transparent still. The blurred number goes
-// lowest: the whole point of a real blur behind it is that it does most of the
-// legibility work itself, so the tint on top of it only needs to be enough to
-// keep a consistent neutral cast over whatever's showing through, not to carry
-// contrast on its own the way the no-blur fallback still has to.
-private const val GlassTintAlpha = 0.16f
-private const val GlassBlurredTintAlpha = 0.02f
+// Lowered four times -- 0.65/0.3, then 0.4/0.12, then 0.28/0.06, then 0.16/0.02 -- reported
+// each time as wanting the glass more transparent still, until 0.16/0.02 went a step too far
+// the other way and came back as "a little less transparent." First raise after four straight
+// lowers, and a small one on purpose: enough to give the fill back a bit of the neutral cast
+// it lost, not a reversal of the whole direction the last four rounds were headed in. The
+// blurred number stays lowest: the whole point of a real blur behind it is that it does most
+// of the legibility work itself, so the tint on top of it only needs to be enough to keep a
+// consistent neutral cast over whatever's showing through, not to carry contrast on its own
+// the way the no-blur fallback still has to.
+private const val GlassTintAlpha = 0.22f
+private const val GlassBlurredTintAlpha = 0.05f
 
 /**
  * Resolves [GlassSurface]'s own fill color -- also called directly by the one place
