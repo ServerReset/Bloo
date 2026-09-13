@@ -117,10 +117,8 @@ internal fun VehicleDetailContent(
         ) {
             // Inset spacer (not padding) so content scrolls *behind* the bars --
             // topInset alone, no extra breathing room, so the name sits right at
-            // the status bar's own edge instead of noticeably below it. Plus
-            // PagerDotClearance when the dots are showing -- see
-            // reserveTopForDots's own doc.
-            Spacer(Modifier.height(topInset + if (reserveTopForDots) PagerDotClearance else 0.dp))
+            // the status bar's own edge instead of noticeably below it.
+            Spacer(Modifier.height(topInset))
             CarHeaderRow(v, state, onExpand, reserveHeaderEnd, hideName = true)
             // summary (image+gauge) and controls are reorderable pebbles too. The full
             // pebble column always renders while swiping; smoothness comes from

@@ -20,7 +20,10 @@ import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.size
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.Text
 // No `motionScheme` import: it is a member of the MaterialTheme object (verified as
 // MaterialTheme.getMotionScheme in the resolved material3 AAR), as are defaultEffectsSpec
 // and defaultSpatialSpec on MotionScheme. Screens.kt imports none of them either.
@@ -767,7 +770,7 @@ internal fun LabelText(text: String, modifier: Modifier = Modifier) {
 @Composable
 internal fun ThemedIcon(
     imageVector: androidx.compose.ui.graphics.vector.ImageVector,
-    contentDescription: String?,
+    contentDescription: String? = null,
     modifier: Modifier = Modifier,
     tint: Color = MaterialTheme.colorScheme.onSurface,
     size: Dp = 24.dp,

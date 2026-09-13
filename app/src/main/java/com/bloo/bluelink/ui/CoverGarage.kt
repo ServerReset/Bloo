@@ -292,16 +292,7 @@ internal fun CompactGarage(state: UiState, vm: AppViewModel, appearance: Setting
         // The name now rides each tile's own title row instead (CoverTile.trailingLabel), where
         // it costs no height and cannot collide with anything. What is left here is the dots,
         // which are chrome about the pager rather than about the page.
-        val dotsShowing = count > 1 && !LocalReorderActive.current
-        Column(
-            modifier = Modifier
-                .align(Alignment.TopCenter)
-                .statusBarsPadding()
-                .padding(top = HeaderCornerGap, start = HeaderCornerGap, end = HeaderCornerGap)
-            horizontalAlignment = Alignment.CenterHorizontally,
-        ) {
-            // Pager dots removed: user requested no page indicators at the top of the screen
-        }
+        // Pager dots removed: user requested no page indicators at the top of the screen
         if (band != null) {
             // Search is available here whenever it's available on the cover
             // at all -- same gate BlooApp itself uses to decide whether to

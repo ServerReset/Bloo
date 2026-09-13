@@ -524,8 +524,8 @@ internal fun SettingsSearchResults(
             }
         }
         GlassSurface(
-            resultCardModifier,
             shape = resultCardShape,
+            modifier = Modifier.fillMaxWidth(),
             hazeState = hazeState,
         ) {
             Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -578,8 +578,8 @@ internal fun SettingsSearchResults(
         if (p != null) {
             val car = state.vehicles.firstOrNull { it.vin == p.second }
             GlassSurface(
-                resultCardModifier,
                 shape = resultCardShape,
+                modifier = Modifier.fillMaxWidth(),
                 hazeState = hazeState,
             ) {
                 Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -660,8 +660,8 @@ internal fun SettingsSearchResults(
             exit = collapseExit(Alignment.Bottom),
         ) {
             GlassSurface(
-                resultCardModifier,
                 shape = resultCardShape,
+                modifier = Modifier.fillMaxWidth(),
                 hazeState = hazeState,
             ) {
                 Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {

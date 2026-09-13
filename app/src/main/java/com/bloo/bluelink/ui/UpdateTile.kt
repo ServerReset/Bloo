@@ -405,7 +405,7 @@ internal fun UpdateReleaseNotes(
                     "What's new",
                     style = MaterialTheme.typography.labelSmall,
                     fontWeight = FontWeight.Bold,
-                    color = scheme.onSurfaceVariant,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.weight(1f),
                 )
                 val notesSource = remember { MutableInteractionSource() }
@@ -427,7 +427,7 @@ internal fun UpdateReleaseNotes(
             Text(
                 notes,
                 style = MaterialTheme.typography.bodySmall,
-                color = scheme.onSurfaceVariant,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = maxLines,
                 overflow = TextOverflow.Ellipsis,
             )
