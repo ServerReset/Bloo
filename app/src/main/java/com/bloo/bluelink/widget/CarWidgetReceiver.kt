@@ -5,6 +5,7 @@ import android.content.ComponentName
 import android.content.Context
 import androidx.glance.appwidget.GlanceAppWidget
 import androidx.glance.appwidget.GlanceAppWidgetReceiver
+import androidx.glance.appwidget.updateAll
 import com.bloo.bluelink.data.AppLog
 import androidx.work.Constraints
 import androidx.work.CoroutineWorker
@@ -126,35 +127,16 @@ class CarWidgetReceiver : GlanceAppWidgetReceiver() {
 }
 
 /**
- * Repaints every currently-placed [CarWidget] by calling [CarWidget.update]'s
- * raw-appWidgetId overload directly -- not [androidx.glance.appwidget.updateAll],
- * which instead iterates Glance's own INTERNAL id registry
- * (`GlanceAppWidgetManager(context).getGlanceIds(CarWidget::class.java)`). See
- * [CarWidgetReceiver.onUpdate]'s own doc for the real evidence behind why that
- * matters: that registry is populated by the same onUpdate-to-session machinery
- * that has been silently failing to complete on some devices, so `updateAll` can
- * silently iterate zero widgets and return having done nothing, with nothing to
- * catch. The raw ids here instead come from the OS's own [AppWidgetManager],
- * independent of whatever is stuck inside Glance's own bootstrapping.
+ * Repaints every currently-placed [CarWidget] by calling [updateAll], same as
+ * everywhere else in the app uses it (MainToSecondarySync.kt, MainToMainSyncWorker.kt).
  *
  * Shared by [CarWidgetReceiver.onUpdate] (fires on add/resize) and
- * [WidgetRefreshWorker] (fires every 30 minutes) so both the immediate and the
- * periodic repaint go through the one path actually confirmed to reach
- * provideGlance, rather than each independently trusting `updateAll` to.
+ * [WidgetRefreshWorker] (fires every 30 minutes).
  */
 private suspend fun updateAllCarWidgetsDirectly(context: Context, logPrefix: String) {
-    val appWidgetIds = AppWidgetManager.getInstance(context)
-        .getAppWidgetIds(ComponentName(context, CarWidgetReceiver::class.java))
-    val widget = CarWidget()
-    appWidgetIds.forEach { appWidgetId ->
-        runCatching {
-            AppLog.log("$logPrefix calling update() for appWidgetId=$appWidgetId")
-            widget.update(context, appWidgetId)
-            AppLog.log("$logPrefix update() returned for appWidgetId=$appWidgetId")
-        }.onFailure {
-            AppLog.log("$logPrefix update() threw for appWidgetId=$appWidgetId: ${it::class.simpleName}: ${it.message}")
-        }
-    }
+    AppLog.log("$logPrefix calling updateAll()")
+    CarWidget().updateAll(context)
+    AppLog.log("$logPrefix updateAll() returned")
 }
 
 /**
