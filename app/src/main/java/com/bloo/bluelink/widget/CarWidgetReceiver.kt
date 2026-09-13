@@ -1,9 +1,11 @@
 package com.bloo.bluelink.widget
 
+import android.appwidget.AppWidgetManager
 import android.content.Context
 import androidx.glance.appwidget.GlanceAppWidget
 import androidx.glance.appwidget.GlanceAppWidgetReceiver
 import androidx.glance.appwidget.updateAll
+import com.bloo.bluelink.data.AppLog
 import androidx.work.Constraints
 import androidx.work.CoroutineWorker
 import androidx.work.ExistingPeriodicWorkPolicy
@@ -25,6 +27,7 @@ class CarWidgetReceiver : GlanceAppWidgetReceiver() {
     override val glanceAppWidget: GlanceAppWidget = CarWidget()
 
     override fun onEnabled(context: Context) {
+        AppLog.log("Widget: onEnabled")
         super.onEnabled(context)
         // Guarded, not a bare call -- this is a BroadcastReceiver callback with no
         // crash screen of its own to fall back to (unlike CarWidget.provideGlance,
@@ -36,6 +39,22 @@ class CarWidgetReceiver : GlanceAppWidgetReceiver() {
         // this was guarded; this stops the same failure from ever reaching here
         // unguarded on a FRESH widget add in the first place.
         runCatching { WidgetRefreshWorker.schedule(context) }
+    }
+
+    /**
+     * Logged (AppLog, Settings' own in-app log) purely as a diagnostic: reported
+     * directly as a widget stuck on its static initial layout even after a full
+     * remove-and-re-add, which never reaches provideGlance's own crash screen
+     * either -- meaning either provideGlance is throwing somewhere neither this
+     * session's try/catch nor onCompositionError catches, or Glance's OWN
+     * onUpdate/session machinery (this override's super call) never successfully
+     * starts a session at all. This line existing (or not) in AppLog after a
+     * fresh add is what tells those two apart. Not otherwise behavior-changing --
+     * super.onUpdate does everything GlanceAppWidgetReceiver's default already did.
+     */
+    override fun onUpdate(context: Context, appWidgetManager: AppWidgetManager, appWidgetIds: IntArray) {
+        AppLog.log("Widget: onUpdate for ${appWidgetIds.size} widget(s)")
+        super.onUpdate(context, appWidgetManager, appWidgetIds)
     }
 
     override fun onDeleted(context: Context, appWidgetIds: IntArray) {

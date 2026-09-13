@@ -42,6 +42,7 @@ import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import com.bloo.bluelink.MainActivity
 import com.bloo.bluelink.R
+import com.bloo.bluelink.data.AppLog
 import com.bloo.bluelink.data.BlooColors
 import com.bloo.bluelink.data.SettingsStore
 import com.bloo.bluelink.data.SnapshotStore
@@ -179,6 +180,12 @@ class CarWidget : GlanceAppWidget() {
     private fun renderError(context: Context, appWidgetId: Int, throwable: Throwable) {
         val trace = android.util.Log.getStackTraceString(throwable)
         android.util.Log.e("BlooWidget", "Widget composition failed:\n$trace")
+        // Also into AppLog (Settings' own in-app log, shared/AppLog.kt) -- logcat needs
+        // adb already attached; this is visible from inside the app itself, on whatever
+        // device this is actually failing on. In-memory only, so it only survives if the
+        // process isn't killed between the crash and opening Settings, but that's still
+        // strictly more diagnosable than nothing.
+        AppLog.log("Widget crashed: ${throwable::class.simpleName}: ${throwable.message}")
         val views = RemoteViews(context.packageName, R.layout.car_widget_error)
         views.setOnClickPendingIntent(
             R.id.widget_error_root,
@@ -213,6 +220,13 @@ class CarWidget : GlanceAppWidget() {
     }
 
     override suspend fun provideGlance(context: Context, id: GlanceId) {
+        // First line, deliberately -- before anything that could itself throw. If
+        // provideGlance is never actually being invoked at all (as opposed to being
+        // invoked and then crashing somewhere inside it), this line is what tells the
+        // difference: its absence from AppLog after adding/refreshing a widget means
+        // Glance itself never called in, which points at the widget's OWN registration/
+        // session machinery rather than anything this function's body does.
+        AppLog.log("Widget: provideGlance started")
         // Self-healing safety net, not just belt-and-braces: CarWidgetReceiver.onEnabled
         // -- the ONLY other place WidgetRefreshWorker.schedule() was ever called -- fires
         // exactly once, the moment a widget is first added, and does nothing to retry if

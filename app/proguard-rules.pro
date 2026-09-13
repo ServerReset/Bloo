@@ -71,6 +71,23 @@
 # -dontobfuscate above -- assembleRelease succeeding was never proof of this).
 -keep class androidx.work.impl.** { *; }
 
+# --- Glance (home-screen widget) -------------------------------------------------
+# Speculative, added while chasing a widget reported as stuck on its static
+# car_widget_loading.xml placeholder forever -- even a full remove-and-re-add never
+# reaches EITHER of this app's own two failure points (provideGlance's own try/catch,
+# or onCompositionError), which is the same symptom shape as the WorkManager keep
+# rule above: something Glance itself needs is being resolved reflectively (Glance
+# runs its own composition session through WorkManager internally, via a worker/
+# session class this app never references by type, exactly the pattern that already
+# bit WorkManager's OWN internal database above) and R8's shrinker has no static
+# reference telling it that class is live. No confirmed stack trace pointing at a
+# specific class yet -- AppLog.log() calls were added at CarWidgetReceiver.onEnabled/
+# onUpdate and CarWidget.provideGlance specifically to get one -- so this keeps the
+# whole package rather than guessing at one class name, the same tradeoff already
+# made for androidx.work.impl above and just as cheap: -dontobfuscate means nothing
+# here was going to be renamed either way, only (maybe) stripped.
+-keep class androidx.glance.** { *; }
+
 # --- Optional / reflective third parties ----------------------------------------
 # Shizuku is OPTIONAL, gated at runtime behind Shizuku.pingBinder(), and its
 # provider reaches hidden platform constructors. R8 must not fail the build over
