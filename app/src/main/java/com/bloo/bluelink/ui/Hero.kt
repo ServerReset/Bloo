@@ -622,8 +622,23 @@ internal fun HeroHeader(
 /** The tonal primary→tertiary→secondary gradient used as the fallback fill
  *  behind car photos across the garage/settings surfaces. Callers apply their
  *  own `.alpha(...)` where they want it dimmed -- this returns only the brush. */
-internal fun carTonalBrush(scheme: ColorScheme): Brush =
-    Brush.linearGradient(listOf(scheme.primary, scheme.tertiary, scheme.secondary))
+@Composable
+internal fun carTonalBrush(scheme: ColorScheme): Brush {
+    val dark = androidx.compose.foundation.isSystemInDarkTheme()
+    // In light mode, primary/tertiary/secondary are too light for the hero card background.
+    // Darken them significantly to provide contrast with text while maintaining visual appeal.
+    val colors = if (dark) {
+        listOf(scheme.primary, scheme.tertiary, scheme.secondary)
+    } else {
+        // Light mode: darken the colors for better contrast. Use darker tones of the theme.
+        listOf(
+            scheme.primaryContainer,  // Darker than primary
+            scheme.tertiaryContainer,  // Darker than tertiary
+            scheme.secondaryContainer   // Darker than secondary
+        )
+    }
+    return Brush.linearGradient(colors)
+}
 
 /** The clipped square thumbnail used for a car: the set photo if there is one,
  *  else the [carTonalBrush] fallback with a centered car icon. [cornerRadius]
