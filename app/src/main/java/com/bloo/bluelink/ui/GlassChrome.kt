@@ -144,11 +144,12 @@ internal fun Modifier.pebbleCardEdge(shape: Shape, outline: Boolean): Modifier =
  * not how transparent it is. Literally one set of numbers now, referenced everywhere.
  *
  * History: lowered four times (0.65/0.3 → 0.4/0.12 → 0.28/0.06 → 0.16/0.02), raised
- * once to 0.22/0.05 to restore neutral cast, now lowered again to 0.15/0.03 for more
- * transparency while maintaining visibility behind the glass.
+ * once to 0.22/0.05 to restore neutral cast, lowered again to 0.15/0.03, and now
+ * lowered once more to 0.10/0.02 -- reported directly as still wanting more of the
+ * background to show through the glass.
  */
-internal const val GlassTintAlpha = 0.15f
-internal const val GlassBlurredTintAlpha = 0.03f
+internal const val GlassTintAlpha = 0.10f
+internal const val GlassBlurredTintAlpha = 0.02f
 
 /**
  * Resolves [GlassSurface]'s own fill color -- also called directly by the one place
