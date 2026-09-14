@@ -168,9 +168,12 @@ internal const val GlassBlurredTintAlpha = 0.02f
  */
 @Composable
 internal fun glassTint(blurred: Boolean): Color {
-    val dark = isSystemInDarkTheme()
     val alpha = if (blurred) GlassBlurredTintAlpha else GlassTintAlpha
-    return if (dark) Color.Black.copy(alpha = alpha) else Color.White.copy(alpha = alpha)
+    val dark = isSystemInDarkTheme()
+    // Use the theme's onSurface color in both light and dark modes for proper contrast.
+    // This ensures the glass surface is visible and readable in all theme variants.
+    val tintColor = MaterialTheme.colorScheme.onSurface
+    return tintColor.copy(alpha = if (dark) alpha else alpha * 0.6f)
 }
 
 /**
