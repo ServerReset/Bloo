@@ -71,6 +71,15 @@
 # -dontobfuscate above -- assembleRelease succeeding was never proof of this).
 -keep class androidx.work.impl.** { *; }
 
+# --- Glance (home-screen widget) -------------------------------------------------
+# Glance runs its own composition session through WorkManager internally, via a
+# worker/session class this app never references by type -- the same
+# reflectively-resolved pattern that already bit WorkManager's own internal
+# database above, and R8's shrinker has no static reference telling it those
+# Glance classes are live. Keeping the whole package is the same cheap tradeoff
+# already made for androidx.work.impl above.
+-keep class androidx.glance.** { *; }
+
 # --- Optional / reflective third parties ----------------------------------------
 # Shizuku is OPTIONAL, gated at runtime behind Shizuku.pingBinder(), and its
 # provider reaches hidden platform constructors. R8 must not fail the build over
