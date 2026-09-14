@@ -1085,20 +1085,31 @@ internal data class MapFeature(
  */
 @Composable
 private fun MapFeatureRow(features: List<MapFeature>, modifier: Modifier = Modifier) {
-    ExpressiveButtonRow(
+    // Icon-only buttons to avoid label overflow. Both icons are clear (fullscreen =
+    // expand, map = open externally) so text redundancy isn't a loss. If tooltips or
+    // accessibility hints are needed later, they can be added to the button's own
+    // semantics without affecting layout.
+    Row(
         modifier = modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp),
-        spacing = 10.dp,
-        wrap = true,
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         features.forEach { feature ->
             val source = remember { MutableInteractionSource() }
-            SafeExpansiveButton(interactionSource = source, enabled = feature.enabled) {
-                MorphButton(
+            SafeExpansiveButton(
+                interactionSource = source,
+                enabled = feature.enabled,
+                modifier = Modifier.weight(1f),
+            ) {
+                MorphIconButton(
                     onClick = feature.onClick,
                     interactionSource = source,
                     enabled = feature.enabled,
                 ) {
-                    MorphButtonLabel(feature.icon, feature.label, pending = false)
+                    Icon(
+                        imageVector = feature.icon,
+                        contentDescription = feature.label,
+                        modifier = Modifier.size(ButtonIconOnlySize),
+                    )
                 }
             }
         }
