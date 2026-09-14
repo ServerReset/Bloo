@@ -5,7 +5,7 @@
   can be dropped tiny (CarWidget.Content falls back to a compact one-row
   layout below ~80dp tall) and grown into a large dashboard-style tile.
   targetCellWidth/Height (Android 12+) give a sensible 3x1 default drop size.
-  No android:configure -- this widget has no per-instance settings screen.
+  No android:configure attribute: this widget has no per-instance settings screen.
 -->
 <appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
     android:minWidth="40dp"

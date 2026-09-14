@@ -2,8 +2,8 @@
 <!--
   The widget's initial layout: the single frame shown before Glance's own
   composition session has produced real content (and, if that session never
-  completes on some devices, potentially the only frame ever shown -- see
-  CarWidgetReceiver's own doc on the direct-by-id update fix for that history).
+  completes on some devices, potentially the only frame ever shown; see
+  CarWidgetReceiver's own doc on the direct-by-id update fix for that history.
   Deliberately plain XML/RemoteViews, not Compose: Glance itself hasn't run
   yet at the point this is inflated.
 
