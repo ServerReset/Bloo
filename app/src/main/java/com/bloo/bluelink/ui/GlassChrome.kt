@@ -171,9 +171,9 @@ internal fun glassTint(blurred: Boolean): Color {
     val alpha = if (blurred) GlassBlurredTintAlpha else GlassTintAlpha
     val dark = isSystemInDarkTheme()
     // Use the theme's onSurface color in both light and dark modes for proper contrast.
-    // This ensures the glass surface is visible and readable in all theme variants.
+    // Light mode gets increased opacity (0.8x instead of 0.6x) for better visibility.
     val tintColor = MaterialTheme.colorScheme.onSurface
-    return tintColor.copy(alpha = if (dark) alpha else alpha * 0.6f)
+    return tintColor.copy(alpha = if (dark) alpha else alpha * 0.8f)
 }
 
 /**
@@ -337,14 +337,9 @@ internal fun ScrimBlur(hazeState: HazeState?, progress: () -> Float, modifier: M
     // battery saver or not. CanBlurBackdrops() is the real gate, same as every
     // other blur site in the app.
     val canBlur = hazeState != null && CanBlurBackdrops()
-    // glassTint, not a literal Color.Black -- the exact same fill (colour AND alpha)
-    // every other glass surface in the app resolves to for this canBlur state, read
-    // once here at composable scope (glassTint is itself @Composable) rather than
-    // inside the drawBehind block below. `drawRect`'s own `alpha` parameter multiplies
-    // with this color's already-baked-in alpha, so the entrance/exit fraction still
-    // animates purely at draw time exactly as it did before -- nothing about the
-    // performance property this function's own doc describes changes.
-    val tint = glassTint(canBlur)
+    // Full-screen scrim needs strong dimming in both light and dark modes.
+    // Use black with appropriate alpha for proper contrast and readability.
+    val tint = if (canBlur) Color.Black.copy(alpha = 0.05f) else Color.Black.copy(alpha = 0.22f)
     Box(
         modifier
             .fillMaxSize()
