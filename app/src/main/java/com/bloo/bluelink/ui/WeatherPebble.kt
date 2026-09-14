@@ -1267,7 +1267,10 @@ private fun MapTopBar(
             // of needing a second one behind it. The whole bar is the drag target
             // (dragModifier is on this Column, not just this nub's row), matching
             // every other bottom-sheet convention where the entire header drags.
-            Box(Modifier.fillMaxWidth().height(20.dp), contentAlignment = Alignment.Center) {
+            // 14dp, not 20 -- reported directly as the bar reading "too thick";
+            // this alone trims a visible slice off the top with the nub still
+            // easy to grab.
+            Box(Modifier.fillMaxWidth().height(14.dp), contentAlignment = Alignment.Center) {
                 Box(
                     Modifier
                         .size(width = 32.dp, height = 4.dp)
@@ -1277,10 +1280,14 @@ private fun MapTopBar(
             Row(
                 Modifier
                     .fillMaxWidth()
-                    .padding(start = 16.dp, end = 12.dp, bottom = 10.dp),
+                    .padding(start = 16.dp, end = 14.dp, bottom = 8.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween,
             ) {
+                // Name and refresh now share ONE type scale (titleMedium, weight the
+                // only difference) instead of the name at titleMedium/Bold beside a
+                // visibly smaller labelMedium refresh chip -- reported directly as
+                // the two sides reading as mismatched sizes rather than one bar.
                 Text(
                     vehicleName,
                     style = MaterialTheme.typography.titleMedium,
@@ -1304,10 +1311,11 @@ private fun MapTopBar(
                     ) {
                         Text(
                             if (rel != null) "Updated $rel" else "Refresh",
-                            style = MaterialTheme.typography.labelMedium,
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Medium,
                             maxLines = 1,
                         )
-                        Icon(Icons.Filled.Refresh, contentDescription = "Refresh location", modifier = Modifier.size(16.dp))
+                        Icon(Icons.Filled.Refresh, contentDescription = "Refresh location", modifier = Modifier.size(18.dp))
                     }
                 }
             }
@@ -1346,10 +1354,10 @@ internal fun ExpandableMapLayer(
     val expandFraction = remember { Animatable(0f) }
     // Read here, at composable scope, not inside the LaunchedEffect below --
     // lowPowerAwareSpring is itself @Composable, so it can't be called from a
-    // suspend lambda. Under battery saver this also means the sheet's own
-    // signature "pop out of the pebble" overshoot is replaced by the same quick,
-    // non-bouncy tween every other spring in the app falls back to.
-    val openSpring = lowPowerAwareSpring<Float>(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMediumLow)
+    // suspend lambda. NoBouncy (critically damped, no overshoot) -- reported
+    // directly as wanting the sheet to pull up "like a normal card... nice and
+    // smooth", not with the springy pop this used to have.
+    val openSpring = lowPowerAwareSpring<Float>(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = Spring.StiffnessMediumLow)
 
     LaunchedEffect(Unit) {
         expandFraction.animateTo(1f, animationSpec = openSpring)
@@ -1658,11 +1666,11 @@ private fun CarMapSheetBody(
     val dragSpring = lowPowerAwareSpring<Float>(dampingRatio = SoftDamping, stiffness = Spring.StiffnessMedium)
     // Same reason as dragSpring above -- read here, not inside the scope.launch{} in close().
     val closeSpring = lowPowerAwareSpring<Float>(dampingRatio = 0.95f, stiffness = Spring.StiffnessMedium)
-    // Same reason again -- read here, not inside the LaunchedEffect further down. Under
-    // battery saver this also replaces the sheet's own signature overshoot-and-settle
-    // "pop out of the pebble" open with the same quick, non-bouncy tween every other
-    // spring in the app falls back to.
-    val openSpring = lowPowerAwareSpring<Float>(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMediumLow)
+    // Same reason again -- read here, not inside the LaunchedEffect further down.
+    // NoBouncy (critically damped, no overshoot) -- reported directly as wanting
+    // the sheet to pull up "like a normal card... nice and smooth", not with the
+    // springy pop this used to have.
+    val openSpring = lowPowerAwareSpring<Float>(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = Spring.StiffnessMediumLow)
 
     fun close() {
         if (closing) return
