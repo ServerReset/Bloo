@@ -78,6 +78,11 @@ data class WidgetConfig(
     val accent: String? = null,
     /** Theme override for this widget: "auto" (system), "light", or "dark". */
     val theme: String = THEME_AUTO,
+    /** Widget layout variant: one of [LAYOUT_ADAPTIVE], [LAYOUT_COMPACT], [LAYOUT_STRIP],
+     *  [LAYOUT_MINIMAL]. ADAPTIVE is the current smart-tiering layout that chooses
+     *  what to show based on available space. COMPACT, STRIP, and MINIMAL are explicit
+     *  fixed-layout choices. */
+    val layout: String = LAYOUT_ADAPTIVE,
 ) {
     companion object {
         const val THEME_AUTO = "auto"
@@ -87,6 +92,11 @@ data class WidgetConfig(
 
         const val PRIORITY_INFO = "info"
         const val PRIORITY_CONTROLS = "controls"
+
+        const val LAYOUT_ADAPTIVE = "adaptive"  // Current smart-tier system
+        const val LAYOUT_COMPACT = "compact"    // Icon + status, minimal
+        const val LAYOUT_STRIP = "strip"        // Horizontal: name + status, then buttons
+        const val LAYOUT_MINIMAL = "minimal"    // Single line: name + one stat, one button
 
         const val CORNER_SHARP = "sharp"
         const val CORNER_SOFT = "soft"
