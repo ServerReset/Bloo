@@ -2175,22 +2175,16 @@ internal fun SettingsScreen(
                         val credits = remember {
                             listOf(
                                 CreditEntry(
-                                    "OpenStreetMap",
-                                    "Map tiles for the car's and device's location, on the phone, the flip cover, the home-screen widget, and the watch. © OpenStreetMap contributors.",
-                                    "https://www.openstreetmap.org/copyright",
-                                    Icons.Filled.Map,
+                                    "Coil",
+                                    "Image loading throughout the app -- car photos, map tiles, everything.",
+                                    "https://github.com/coil-kt/coil",
+                                    Icons.Filled.Image,
                                 ),
                                 CreditEntry(
                                     "Haze",
                                     "Real backdrop blur behind the status bar and the full-screen map sheet.",
                                     "https://github.com/chrisbanes/haze",
                                     Icons.Filled.BlurOn,
-                                ),
-                                CreditEntry(
-                                    "Coil",
-                                    "Image loading throughout the app -- car photos, map tiles, everything.",
-                                    "https://github.com/coil-kt/coil",
-                                    Icons.Filled.Image,
                                 ),
                                 CreditEntry(
                                     "i5-AutoLock",
@@ -2221,6 +2215,12 @@ internal fun SettingsScreen(
                                     "Every network request this app makes.",
                                     "https://square.github.io/okhttp",
                                     Icons.Filled.Language,
+                                ),
+                                CreditEntry(
+                                    "OpenStreetMap",
+                                    "Map tiles for the car's and device's location, on the phone, the flip cover, the home-screen widget, and the watch. © OpenStreetMap contributors.",
+                                    "https://www.openstreetmap.org/copyright",
+                                    Icons.Filled.Map,
                                 ),
                                 CreditEntry(
                                     "Shizuku",
