@@ -194,10 +194,6 @@ dependencies {
     implementation("androidx.work:work-runtime-ktx:2.9.1")
     implementation("androidx.security:security-crypto:1.1.0-alpha06")
 
-    // Home-screen widgets (Jetpack Glance)
-    implementation("androidx.glance:glance-appwidget:1.1.1")
-    implementation("androidx.glance:glance-material3:1.1.1")
-
     // Real car photos (URL or the system photo picker)
     implementation("io.coil-kt:coil-compose:2.7.0")
 

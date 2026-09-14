@@ -151,64 +151,7 @@ internal fun ColorScheme.applyPalette(palette: ColorPalette): ColorScheme {
  * Reads system dark-mode state from the [context] configuration; also handles dynamic
  * color, per-car palette overrides, and the global custom palette.
  */
-/**
- * The dark/light call [resolveWidgetAccent] itself uses — split out so callers
- * that need BOTH the accent color AND whether the surface should be dark
- * (background/text roles) share exactly one computation instead of
- * re-deriving it. [forceDark] lets a caller override the app's own theme
- * setting (e.g. a per-widget "Light"/"Dark" config override); null defers to
- * the app's real setting, same as before this parameter existed.
- */
-internal fun resolveWidgetIsDark(
-    context: Context,
-    appearance: com.bloo.bluelink.data.SettingsStore.Appearance,
-    forceDark: Boolean? = null,
-): Boolean {
-    if (forceDark != null) return forceDark
-    // Honour the user's themeMode override (LIGHT→false, DARK/AMOLED→true) and
-    // only fall back to the system uiMode for SYSTEM/SYSTEM_AMOLED — so the
-    // widget accent always matches the app.
-    return when (appearance.themeMode) {
-        ThemeMode.LIGHT -> false
-        ThemeMode.DARK, ThemeMode.AMOLED -> true
-        ThemeMode.SYSTEM, ThemeMode.SYSTEM_AMOLED ->
-            (context.resources.configuration.uiMode and android.content.res.Configuration.UI_MODE_NIGHT_MASK) ==
-                android.content.res.Configuration.UI_MODE_NIGHT_YES
-    }
-}
-
-internal fun resolveWidgetAccent(
-    context: Context,
-    appearance: com.bloo.bluelink.data.SettingsStore.Appearance,
-    vin: String? = null,
-    forceDark: Boolean? = null,
-): Color {
-    val isDark = resolveWidgetIsDark(context, appearance, forceDark)
-    val base = if (isDark) DarkExpressive else LightExpressive
-
-    // Apply the same vibrancy saturation scale [blooColorScheme] applies to the
-    // primary role (no-op when vibrancy == 1f), so the accent's "punch" matches.
-    fun Color.withVibrancy() = saturate(appearance.vibrancy)
-
-    // Per-car custom palette takes highest priority.
-    val carCustomId = vin?.let { appearance.carCustomPaletteIds[it] }
-    carCustomId?.let { id -> appearance.customPalettes.firstOrNull { it.id == id } }
-        ?.let { return base.applyCustomPalette(it).primary.withVibrancy() }
-
-    // Global custom palette.
-    appearance.activeCustomPaletteId
-        ?.let { id -> appearance.customPalettes.firstOrNull { it.id == id } }
-        ?.let { return base.applyCustomPalette(it).primary.withVibrancy() }
-
-    // Dynamic color (Material You) — API 31+.
-    if (appearance.dynamicColor && Build.VERSION.SDK_INT >= 31) {
-        return (if (isDark) dynamicDarkColorScheme(context).primary
-                else dynamicLightColorScheme(context).primary).withVibrancy()
-    }
-
-    // Built-in enum palette.
-    return base.applyPalette(appearance.colorPalette).primary.withVibrancy()
-}
+// Widget theme functions removed - widget system deleted
 
 // --- Expressive color palettes -------------------------------------------
 // A vibrant, high-emphasis Material 3 palette used when dynamic color
