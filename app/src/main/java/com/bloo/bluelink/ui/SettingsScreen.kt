@@ -408,6 +408,11 @@ internal fun SettingsScreen(
             // used to be one plain Column instead of grid items. PebbleShell documents the
             // identical trap; this was the same mistake, once, here.
             //
+            // Each card below is its own `item {}` rather than a bare child of a Column --
+            // see the LazyVerticalStaggeredGrid this whole sequence now lives in, above --
+            // so the grid can place it in whichever column has room, independent of every
+            // other card's height. `advanced`, declared here in this enclosing `run {}`,
+            // stays in scope for all of them exactly as it did before.
             item {
             // Accounts (one per brand; Hyundai + Genesis can both be signed in).
             SettingsCard("Accounts", Icons.Filled.Person, vm) {
@@ -742,122 +747,8 @@ internal fun SettingsScreen(
                     }
                 }
             }
-            }item {
-
-            // Announcements -- currently sourced from the one real signal this
-            // app has for it (an available build, same state.updateAvailable
-            // the Updates card renders) rather than a synthetic feed.
-            // AnnouncementHistory's LazyColumn needs an explicit height cap:
-            // it's placed inside this screen's own LazyVerticalStaggeredGrid
-            // item{}, an unbounded-height vertical container, and a nested
-            // LazyColumn with no height constraint crashes there (same class
-            // of bug the Logs card's heightIn(max = 300.dp) guards
-            // against, just via Modifier.verticalScroll there instead of a
-            // second lazy layout).
-            AnimatedVisibility(visibleState = advTransition0, enter = collapseEnter(), exit = collapseExit()) {
-            SettingsCard("Announcements", Icons.Filled.Campaign, vm) {
-                val update = state.updateAvailable
-                val announcements = remember(update) {
-                    if (update == null) {
-                        emptyList()
-                    } else {
-                        listOf(
-                            Announcement(
-                                id = "update-${update.run.runNumber}",
-                                title = "Build #${update.run.runNumber} available",
-                                message = update.run.releaseNotes?.trim().takeUnless { it.isNullOrBlank() }
-                                    ?: "A new build is ready to view.",
-                                severity = if (state.updateApkReady) AnnouncementSeverity.WARNING else AnnouncementSeverity.INFO,
-                                timestamp = java.time.Instant.now().toString(),
-                                actionLabel = "View",
-                                onAction = {
-                                    runCatching {
-                                        context.startActivity(
-                                            Intent(Intent.ACTION_VIEW, Uri.parse(update.run.htmlUrl))
-                                                .apply { addFlags(Intent.FLAG_ACTIVITY_NEW_TASK) },
-                                        )
-                                    }
-                                },
-                            ),
-                        )
-                    }
-                }
-                AnnouncementHistory(
-                    announcements = announcements,
-                    modifier = Modifier.heightIn(max = 300.dp),
-                )
             }
-            }
-            }
-            if (advTransition1.targetState || !advTransition1.isIdle) item {
-
-            // (The "Updates" card now lives after Notifications — its natural home —
-            // ungated so its controls show with or without Shizuku. See below.)
-
-            // App-icon shortcuts (long-press the launcher icon)
-            AnimatedVisibility(visibleState = advTransition1, enter = collapseEnter(), exit = collapseExit()) {
-                SettingsCard("App shortcuts", Icons.Filled.Bolt, vm) {
-                    // No inner MorphExpandButton any more -- this used to have its
-                    // own second chevron gating the per-vehicle toggles below,
-                    // stacked directly under the card's own PebbleShell chevron
-                    // (which didn't exist yet when this was written; SettingsCard
-                    // was a static, always-open Card back then, and the inner
-                    // toggle was the ONLY way to fold this away). Now that the
-                    // card itself opens and closes, a second tap just to see the
-                    // toggles it opened FOR was two controls doing one job.
-                    Text(
-                        "Quick-access shortcuts from the launcher icon",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    Spacer(Modifier.height(SettingsGapRow))
-                    state.vehicles.forEach { v ->
-                        Spacer(Modifier.height(SettingsGapHairline))
-                        Text(v.name, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
-                        com.bloo.bluelink.Shortcuts.ACTIONS.forEach { cmd ->
-                            ToggleRow(
-                                com.bloo.bluelink.Shortcuts.actionLabel(cmd),
-                                state.isShortcutEnabled(v.vin, cmd),
-                            ) { vm.setShortcutEnabled(v.vin, cmd, it) }
-                        }
-                    }
-                }
-            }
-            }item {
-
-            // (The "Updates" card now lives after Notifications — its natural home —
-            // ungated so its controls show with or without Shizuku. See below.)
-
-            // App-icon shortcuts (long-press the launcher icon)
-            AnimatedVisibility(visibleState = advTransition1, enter = collapseEnter(), exit = collapseExit()) {
-                SettingsCard("App shortcuts", Icons.Filled.Bolt, vm) {
-                    // No inner MorphExpandButton any more -- this used to have its
-                    // own second chevron gating the per-vehicle toggles below,
-                    // stacked directly under the card's own PebbleShell chevron
-                    // (which didn't exist yet when this was written; SettingsCard
-                    // was a static, always-open Card back then, and the inner
-                    // toggle was the ONLY way to fold this away). Now that the
-                    // card itself opens and closes, a second tap just to see the
-                    // toggles it opened FOR was two controls doing one job.
-                    Text(
-                        "Quick-access shortcuts from the launcher icon",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    Spacer(Modifier.height(SettingsGapRow))
-                    state.vehicles.forEach { v ->
-                        Spacer(Modifier.height(SettingsGapHairline))
-                        Text(v.name, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
-                        com.bloo.bluelink.Shortcuts.ACTIONS.forEach { cmd ->
-                            ToggleRow(
-                                com.bloo.bluelink.Shortcuts.actionLabel(cmd),
-                                state.isShortcutEnabled(v.vin, cmd),
-                            ) { vm.setShortcutEnabled(v.vin, cmd, it) }
-                        }
-                    }
-                }
-            }
-            }item {
+            item {
 
             // Backup / Sync
             SettingsCard("Backup & sync", Icons.Filled.CloudSync, vm) {
@@ -1161,248 +1052,146 @@ internal fun SettingsScreen(
                 )
             }
             }
-            }item {
-                // Every third-party project/API this app draws on, in one place -- moved
-                // here from a Surface+Text that used to sit inside AutoLock's own settings
-                // (see AutoLockSettingsUi.kt's own comment), which was the ONLY place any
-                // of them were credited and only showed up while that one feature happened
-                // to be enabled. OpenStreetMap's own tile usage policy in particular expects
-                // a visible attribution; this is that, even if it isn't literally overlaid
-                // on the map itself.
-                SettingsCard("Credits", Icons.Filled.Info, vm) {
-                    Column {
-                        val credits = remember {
-                            listOf(
-                                CreditEntry(
-                                    "Coil",
-                                    "Image loading throughout the app -- car photos, map tiles, everything.",
-                                    "https://github.com/coil-kt/coil",
-                                    Icons.Filled.Image,
-                                ),
-                                CreditEntry(
-                                    "Haze",
-                                    "Real backdrop blur behind the status bar and the full-screen map sheet.",
-                                    "https://github.com/chrisbanes/haze",
-                                    Icons.Filled.BlurOn,
-                                ),
-                                CreditEntry(
-                                    "i5-AutoLock",
-                                    "AutoLock ported from Vel-San's original reference implementation.",
-                                    "https://github.com/Vel-San/i5-AutoLock",
-                                    Icons.Filled.Lock,
-                                ),
-                                CreditEntry(
-                                    "Jetpack Compose",
-                                    "The UI toolkit this entire app -- every screen, every pebble, every animation -- is built with.",
-                                    "https://developer.android.com/jetpack/compose",
-                                    Icons.Filled.Widgets,
-                                ),
-                                CreditEntry(
-                                    "Kotlin",
-                                    "The language everything here, front to back, is written in.",
-                                    "https://kotlinlang.org",
-                                    Icons.Filled.Code,
-                                ),
-                                CreditEntry(
-                                    "kotlinx.serialization",
-                                    "Every persisted setting, cached response and the whole phone ↔ watch sync protocol.",
-                                    "https://github.com/Kotlin/kotlinx.serialization",
-                                    Icons.Filled.DataObject,
-                                ),
-                                CreditEntry(
-                                    "OkHttp",
-                                    "Every network request this app makes.",
-                                    "https://square.github.io/okhttp",
-                                    Icons.Filled.Language,
-                                ),
-                                CreditEntry(
-                                    "OpenStreetMap",
-                                    "Map tiles for the car's and device's location, on the phone, the flip cover, the home-screen widget, and the watch. © OpenStreetMap contributors.",
-                                    "https://www.openstreetmap.org/copyright",
-                                    Icons.Filled.Map,
-                                ),
-                                CreditEntry(
-                                    "Shizuku",
-                                    "Optional silent-install path for updates, skipping the manual \"Install anyway\" prompt.",
-                                    "https://github.com/RikkaApps/Shizuku",
-                                    Icons.Filled.AdminPanelSettings,
-                                ),
-                            )
-                        }
-                        credits.forEachIndexed { index, entry ->
-                            CreditRow(entry)
-                            if (index != credits.lastIndex) {
-                                HorizontalDivider(
-                                    modifier = Modifier.padding(vertical = 10.dp),
-                                    color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f),
-                                )
-                            }
-                        }
-                    }
-                }
             }
-          // Full-line, same reason as the leading spacer above: this is the
-          // grid's own trailing footer, not a card.
-          item(span = StaggeredGridItemSpan.FullLine) {
-          Column {
-          // About / installed build — the one place the phone shows which build it's
-          // running (the update tile shows the AVAILABLE build; this shows the current
-          // one). Based on the GitHub Actions run number baked in at CI build time;
-          // "dev build" for a local build. buildLabel is the canonical formatter shared
-          // with the watch About footer and the update tile's delta.
-          Spacer(Modifier.height(SettingsGapRow))
-          Text(
-              "Bloo · " + com.bloo.bluelink.data.buildLabel(vm.currentBuildNumber, com.bloo.bluelink.BuildConfig.BUILD_BRANCH),
-              style = MaterialTheme.typography.labelSmall,
-              color = MaterialTheme.colorScheme.onSurfaceVariant,
-              textAlign = TextAlign.Center,
-              modifier = Modifier.fillMaxWidth(),
-          )
-          // The search bar itself now floats fixed to the screen's bottom
-          // edge (see below, outside this scrolling column) -- reserve exactly as much
-          // space as its own live reported bounds say it needs, not a flat guess.
-          Spacer(Modifier.height(searchBarClearance(fallback = bottomInset + 132.dp)))
-          }
-          }
-        }
-        } // Box (wide-screen centering)
-        // Same blurred scrim GarageScreen uses behind the system clock/battery
-        // icons -- this content scrolls behind the status bar too (see the
-        // comment above the Column's top spacer). Skipped on a folding
-        // phone's compact cover screen, matching GarageScreen/LockOverlay:
-        // that tiny layout doesn't draw content under the status bar at all.
-        // Also skipped when embedded: this page sits inside GarageScreen's own
-        // HorizontalPager, which already draws its own StatusBarScrim on top of
-        // every page in it (cars included) -- drawing a second one here stacked
-        // the same scrim twice for exactly this one page, reading as a subtly
-        // darker/hazier status-bar band than every car page beside it.
-        if (!isCompactCoverScreen() && !embedded) StatusBarScrim(hazeState = hazeState)
-        // No more floating "Settings" corner badge -- removed as unwanted UI (see the floating
-        // car-name pill's own removal). The "Settings" title is real, static content on
-        // SettingsHeaderRow now; it just scrolls off with the rest of the grid.
-        // Floating back-arrow + "Settings" label + simple/advanced button.
-        Row(
-            Modifier.fillMaxWidth().align(Alignment.TopStart).statusBarsPadding()
-                // FloatingIcon's own 12dp outer padding is what has always kept
-                // the "Settings" pill clear of the true screen edge -- but that
-                // Icon is skipped entirely when embedded, and this Row has no
-                // start padding of its own to fall back on, so the pill sat
-                // flush against the edge (and the device's own rounded corner/
-                // cutout) with nothing reserving room for it. Reproduces the
-                // same 12dp by hand only when there's no FloatingIcon here to
-                // provide it for free.
-                .then(if (embedded) Modifier.padding(start = HeaderCornerGap) else Modifier),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            // No back arrow when embedded -- there's no separate screen it would be
-            // returning FROM (swiping to a car does that), and "Back to the app"
-            // literally isn't true here: this already is the app's main screen.
-            if (!embedded) FloatingIcon(Icons.Filled.ArrowBack, "Back to the app", { vm.closeSettings() }, hazeState = hazeState)
-            Spacer(Modifier.weight(1f))
-            // A real segmented control (not a single button that only ever
-            // names the OTHER mode) so the CURRENT mode is always obvious at a
-            // glance -- the old single-label button was easy to misread as "the
-            // mode you're already in" and tap the wrong way.
-            // GlassSurface (GlassChrome.kt), not a hand-chained
-            // ambientRing/dropShadow/frostedRim/hazeEffect -- one shared call for the
-            // edge treatment and the real blur, matching the "Settings" title pill/
-            // FloatingIcon right next to it in the same row (same glass treatment,
-            // same track height) instead of the ordinary button-track color/size
-            // every other MorphSegmented uses. `tint = Color.Transparent`: MorphSegmented
-            // has no backdrop slot of its own, so it paints ITS OWN containerColor as
-            // the actual visible fill, on top of GlassSurface's blur -- GlassSurface's
-            // own tint stays invisible here rather than doubling up with it.
-            GlassSurface(
-                shape = RoundedCornerShape(16.dp),
-                modifier = Modifier
-                    .width(172.dp)
-                    // Was 20.dp -- MorphSegmented's own track corner is 16.dp,
-                    // so the outline ring drawn here never actually matched
-                    // the pill's real corners underneath it.
-                    .ambientRing(RoundedCornerShape(16.dp)),
-                hazeState = hazeState,
-                tint = Color.Transparent,
+            item {
+
+            // Display scale
+            SettingsCard(
+                "Display",
+                Icons.Filled.Straighten,
+                vm,
+                status = if (appearance.unitSystem == "metric") "Metric" else "Imperial",
             ) {
-                MorphSegmented(
-                    options = listOf(
-                        SegmentOption("simple", "Simple", null),
-                        SegmentOption("advanced", "Advanced", null),
-                    ),
-                    selectedKey = state.settingsMode,
-                    onSelect = { vm.setSettingsMode(it) },
-                    containerColor = glassTint(blurred = CanBlurBackdrops()),
-                    // HeaderButtonSize (48dp), not its own one-off 44dp -- the
-                    // comment above already says this is meant to match the
-                    // "Settings" pill/FloatingIcon's own height in the same
-                    // row; it just hadn't actually been set to the same value.
-                    trackHeight = HeaderButtonSize,
-                )
-            }
-            Spacer(Modifier.width(8.dp))
-        }
-        // First-run coach mark pointing at the back arrow.
-        if (state.showSettingsCoach) {
-            val coachAlpha = remember { Animatable(0f) }
-            val coachOffset = remember { Animatable(-20f) }
-            LaunchedEffect(Unit) {
-                launch { coachAlpha.animateTo(1f, tween(500, easing = FastOutSlowInEasing)) }
-                launch { coachOffset.animateTo(0f, spring(dampingRatio = 0.7f, stiffness = Spring.StiffnessMediumLow)) }
-            }
-            Surface(
-                onClick = { vm.dismissSettingsCoach() },
-                shape = RoundedCornerShape(16.dp),
-                color = MaterialTheme.colorScheme.primaryContainer,
-                contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                modifier = Modifier
-                    .align(Alignment.TopStart)
-                    .statusBarsPadding()
-                    .padding(start = 12.dp, top = 60.dp, end = 12.dp)
-                    .graphicsLayer {
-                        alpha = coachAlpha.value
-                        // .dp.toPx() -- see EmptyScreen's own note; the raw -20f
-                        // was 20 PIXELS, not 20dp.
-                        translationY = coachOffset.value.dp.toPx()
-                    }
-                    .dropShadow(RoundedCornerShape(16.dp)),
-            ) {
-                Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Filled.ArrowBack, contentDescription = null, modifier = Modifier.size(18.dp))
-                    Spacer(Modifier.width(8.dp))
-                    Text(
-                        "That arrow takes you into the app when you're done here. Tap to dismiss.",
-                        style = MaterialTheme.typography.bodyMedium,
-                        modifier = Modifier.weight(1f),
+                // Advanced-only: a power-user knob, unlike the Units picker
+                // below it which every user needs regardless of mode. PopVisible,
+                // not a bare `if` -- was snapping in/out with the mode switch.
+                PopVisible(visible = advanced) {
+                  Column {
+                    var uiScaleDraft by remember(appearance.uiScale) { mutableFloatStateOf(appearance.uiScale) }
+                    StepRow("Text & layout scale", "${(uiScaleDraft * 100).roundToInt()}%")
+                    AnimatedSlider(
+                        value = uiScaleDraft,
+                        onValueChange = { uiScaleDraft = it },
+                        valueRange = 0.8f..1.3f,
+                        steps = 4,
+                        onValueSettled = { uiScaleDraft = (it * 10).roundToInt() / 10f; vm.setUiScaleSoon(uiScaleDraft) },
                     )
+                    Spacer(Modifier.height(SettingsGapGroup))
+                  }
+                }
+                // SIMPLE, not advanced: this changes what is on the car screen
+                // every time you open the app, which is the test for whether a
+                // switch belongs in the small set. The text-scale slider above
+                // it is advanced by the same test -- it is a knob you set once.
+                ToggleRow(
+                    "Search on the car screen",
+                    appearance.showSearch,
+                    description = "A search bubble at the bottom of the car screen and the cover screen. " +
+                        "Ask about the car (\"battery level\"), run a command (\"lock my car\"), " +
+                        "or jump to a setting. Settings always has it.",
+                ) { vm.setShowSearch(it) }
+                // SIMPLE, not advanced -- same test as Search above: this changes
+                // how you get to Settings every single time, not a knob set once.
+                //
+                // Flipping this while actually standing in Settings used to leave
+                // you exactly where you were until the NEXT time you left and came
+                // back -- turn it on from the standalone route and nothing visibly
+                // happened; turn it off from the embedded page and the pager's own
+                // correction (see Screens.kt) stranded you on whichever car the
+                // block math now resolved to. Both branches below follow Settings
+                // to its new presentation immediately instead, so the switch reads
+                // as "Settings just changed shape" rather than "go find it again":
+                // turning on from the standalone route closes it landing straight
+                // on the pager's new Settings slot (closeSettings' own
+                // landOnSettingsPage, consumed once by GarageScreen); turning off
+                // from the embedded page opens the standalone route in its place,
+                // back arrow included, before the pager gets a chance to bounce
+                // you to a car instead.
+                ToggleRow(
+                    "Settings as a swipeable page",
+                    appearance.settingsAsPage,
+                    description = "Reach Settings by swiping past your last car instead of the gear " +
+                        "button -- one continuous pager, with Settings as its own page at " +
+                        "the end instead of a separate screen.",
+                ) { turningOn ->
+                    vm.setSettingsAsPage(turningOn)
+                    if (turningOn && !embedded) {
+                        vm.closeSettings(landOnSettingsPage = true)
+                    } else if (!turningOn && embedded) {
+                        vm.openSettings()
+                    }
+                }
+                // Unit system: controls temperature, distance, and speed display.
+                SettingsSegmentedRow(
+                    label = "Units",
+                    options = listOf(
+                        SegmentOption("imperial", "Imperial", null),
+                        SegmentOption("metric", "Metric", null),
+                    ),
+                    selectedKey = appearance.unitSystem,
+                    onSelect = { vm.setUnitSystem(it) },
+                )
+            }
+            }
+            item {
+
+            // Font
+            // SIMPLE, not advanced. This card is where Atkinson Hyperlegible
+            // lives -- a typeface designed for low vision -- and an
+            // accessibility choice behind a mode called "advanced" is a
+            // choice the people who need it are least likely to find. The
+            // rest of the card costs nothing to show alongside it.
+            SettingsCard(
+                "Font",
+                Icons.Filled.TextFields,
+                vm,
+                // Only cards WITHOUT a StatusHeaderRow of their own get a title-row status --
+                // on the ones that have one it would be the same fact twice, ten dp apart,
+                // which is exactly the duplication the cover tiles were just cured of.
+                status = when (appearance.fontChoice) {
+                    FontChoice.ATKINSON -> "Atkinson"
+                    FontChoice.GOOGLE_SANS -> "Google Sans"
+                    else -> "System"
+                },
+            ) {
+                val labels = mapOf(
+                    FontChoice.SYSTEM to "System default",
+                    FontChoice.ATKINSON to "Atkinson Hyperlegible",
+                    FontChoice.GOOGLE_SANS to "Google Sans",
+                )
+                Column(verticalArrangement = Arrangement.spacedBy(SettingsGapRow)) {
+                    FontChoice.entries.forEach { choice ->
+                        ChoiceRow(labels.getValue(choice), appearance.fontChoice == choice) { vm.setFontChoice(choice) }
+                    }
                 }
             }
-        }
-        cropUri?.let { uri ->
-            val target = pickTarget
-            if (target != null) {
-                CropScreen(
-                    vin = target,
-                    uriString = uri.toString(),
-                    onCancel = { cropUri = null; pickTarget = null },
-                    onSave = { path -> vm.setVehicleImage(target, path); cropUri = null; pickTarget = null },
-                )
             }
-        }
-  }
-}
+            if (advTransition3.targetState || !advTransition3.isIdle) item {
 
-item {
-
-            // Debug -- app/device diagnostics for support troubleshooting. A power-user
-            // diagnostic card like Logs, and it takes its OWN slot in this screen's stagger
-            // sequence rather than sharing Logs': the two animate independently.
-            AnimatedVisibility(visibleState = advTransition2, enter = collapseEnter(), exit = collapseExit()) {
-            SettingsCard("Debug", Icons.Filled.BugReport, vm) {
-                DebugSettingsPanel(
-                    onCopyToClipboard = { text -> clipboard.setText(AnnotatedString(text)) },
-                )
+            // Links
+            AnimatedVisibility(visibleState = advTransition3, enter = collapseEnter(), exit = collapseExit()) {
+            // One control, so it renders on the title row with no chevron -- the same treatment
+            // Sounds & vibration gets. The row's own "Open links" label went with it: inside a
+            // card already titled "Links" it restated the card, and the choice reads fine as
+            // "Links: In app / Browser".
+            SettingsCard(
+                "Links",
+                Icons.Filled.OpenInNew,
+                vm,
+                inlineSetting = {
+                    MorphSegmented(
+                        options = listOf(
+                            SegmentOption("app", "In app", null),
+                            SegmentOption("browser", "Browser", null),
+                        ),
+                        selectedKey = if (appearance.linksInApp) "app" else "browser",
+                        onSelect = { vm.setLinksInApp(it == "app") },
+                    )
+                },
+            ) {}
             }
             }
-            }item {
+            if (advTransition4.targetState || !advTransition4.isIdle) item {
 
             // Logs
             AnimatedVisibility(visibleState = advTransition4, enter = collapseEnter(), exit = collapseExit()) {
@@ -1481,7 +1270,8 @@ item {
                     }
                 }
             }
-            }item {
+            }
+            item {
 
             // Notifications
             SettingsCard("Notifications", Icons.Filled.Notifications, vm) {
@@ -1652,53 +1442,8 @@ item {
                 QuickTilesManager(state, vm)
             }
             }
-            }item {
-
-            // Quick Settings tiles -- per-tile config is power-user territory,
-            // same tier as App shortcuts/Cars above.
-            AnimatedVisibility(visibleState = advTransition5, enter = collapseEnter(), exit = collapseExit()) {
-            SettingsCard("Quick tiles", Icons.Filled.Dashboard, vm) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    ThemedIcon(Icons.Filled.Bolt, tint = MaterialTheme.colorScheme.primary, size = 20.dp)
-                    Spacer(Modifier.width(8.dp))
-                    Text(
-                        "Each car can have up to 12 tiles in your Quick Settings shade. " +
-                            "Configure below, then tap \"Add to Quick Settings\" to place each one.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.weight(1f),
-                    )
-                }
-                Spacer(Modifier.height(SettingsGapGroup))
-
-                InlineSegmentedRow(
-                    label = "On tap:",
-                    caption = if (state.tileBackground) "Tiles fire the command directly and show a confirmation."
-                        else "Tiles briefly open Bloo to send the command, then close.",
-                    options = listOf(
-                        SegmentOption("background", "Run in background", Icons.Filled.Bolt),
-                        SegmentOption("open", "Open the app", Icons.Filled.OpenInNew),
-                    ),
-                    selectedKey = if (state.tileBackground) "background" else "open",
-                    onSelect = { vm.setTileBackground(it == "background") },
-                )
-
-                Spacer(Modifier.height(SettingsGapGroup))
-                InlineSegmentedRow(
-                    label = "Refresh:",
-                    caption = "Pulls the car's latest state when the tile appears (throttled to once a minute per car).",
-                    options = listOf(
-                        SegmentOption("off", "Off", null),
-                        SegmentOption("on", "On", Icons.Filled.Refresh),
-                    ),
-                    selectedKey = if (state.tileLiveRefresh) "on" else "off",
-                    onSelect = { vm.setTileLiveRefresh(it == "on") },
-                )
-                Spacer(Modifier.height(SettingsGapGroup))
-                QuickTilesManager(state, vm)
             }
-            }
-            }item {
+            item {
 
             // Security
             SettingsCard("Security", Icons.Filled.Lock, vm) {
@@ -1870,7 +1615,21 @@ item {
                     canBio = canBio,
                 )
             }
-            }item {
+            }
+            item {
+
+            // Sounds & vibration
+            // The whole card is one switch, so it renders as one row: title on the left, the
+            // switch on the right, no chevron and nothing to expand into. See SettingsCard's
+            // inlineSetting.
+            SettingsCard(
+                "Sounds & vibration",
+                Icons.Filled.Vibration,
+                vm,
+                inlineSetting = { InlineToggle(appearance.hapticsEnabled) { vm.setHapticsEnabled(it) } },
+            ) {}
+            }
+            item {
 
             // Theme
             SettingsCard("Theme", Icons.Filled.Palette, vm) {
@@ -2060,7 +1819,8 @@ item {
                   }
                 }
             }
-            }item {
+            }
+            item {
 
             // Updates — always shown (the update tile still auto-appears under the
             // hero, but this is the manual home: which build you're on, a force-check,
@@ -2295,7 +2055,8 @@ item {
                     }
                 }
             }
-            }item {
+            }
+            item {
 
             // Weather
             SettingsCard("Weather", Icons.Filled.WbSunny, vm) {
@@ -2400,7 +2161,237 @@ item {
                 }
             }
             }
-        }/** One entry in the Credits card -- see [CreditRow]. */
+        }
+            item {
+                // Every third-party project/API this app draws on, in one place -- moved
+                // here from a Surface+Text that used to sit inside AutoLock's own settings
+                // (see AutoLockSettingsUi.kt's own comment), which was the ONLY place any
+                // of them were credited and only showed up while that one feature happened
+                // to be enabled. OpenStreetMap's own tile usage policy in particular expects
+                // a visible attribution; this is that, even if it isn't literally overlaid
+                // on the map itself.
+                SettingsCard("Credits", Icons.Filled.Info, vm) {
+                    Column {
+                        val credits = remember {
+                            listOf(
+                                CreditEntry(
+                                    "Coil",
+                                    "Image loading throughout the app -- car photos, map tiles, everything.",
+                                    "https://github.com/coil-kt/coil",
+                                    Icons.Filled.Image,
+                                ),
+                                CreditEntry(
+                                    "Haze",
+                                    "Real backdrop blur behind the status bar and the full-screen map sheet.",
+                                    "https://github.com/chrisbanes/haze",
+                                    Icons.Filled.BlurOn,
+                                ),
+                                CreditEntry(
+                                    "i5-AutoLock",
+                                    "AutoLock ported from Vel-San's original reference implementation.",
+                                    "https://github.com/Vel-San/i5-AutoLock",
+                                    Icons.Filled.Lock,
+                                ),
+                                CreditEntry(
+                                    "Jetpack Compose",
+                                    "The UI toolkit this entire app -- every screen, every pebble, every animation -- is built with.",
+                                    "https://developer.android.com/jetpack/compose",
+                                    Icons.Filled.Widgets,
+                                ),
+                                CreditEntry(
+                                    "Kotlin",
+                                    "The language everything here, front to back, is written in.",
+                                    "https://kotlinlang.org",
+                                    Icons.Filled.Code,
+                                ),
+                                CreditEntry(
+                                    "kotlinx.serialization",
+                                    "Every persisted setting, cached response and the whole phone ↔ watch sync protocol.",
+                                    "https://github.com/Kotlin/kotlinx.serialization",
+                                    Icons.Filled.DataObject,
+                                ),
+                                CreditEntry(
+                                    "OkHttp",
+                                    "Every network request this app makes.",
+                                    "https://square.github.io/okhttp",
+                                    Icons.Filled.Language,
+                                ),
+                                CreditEntry(
+                                    "OpenStreetMap",
+                                    "Map tiles for the car's and device's location, on the phone, the flip cover, the home-screen widget, and the watch. © OpenStreetMap contributors.",
+                                    "https://www.openstreetmap.org/copyright",
+                                    Icons.Filled.Map,
+                                ),
+                                CreditEntry(
+                                    "Shizuku",
+                                    "Optional silent-install path for updates, skipping the manual \"Install anyway\" prompt.",
+                                    "https://github.com/RikkaApps/Shizuku",
+                                    Icons.Filled.AdminPanelSettings,
+                                ),
+                            )
+                        }
+                        credits.forEachIndexed { index, entry ->
+                            CreditRow(entry)
+                            if (index != credits.lastIndex) {
+                                HorizontalDivider(
+                                    modifier = Modifier.padding(vertical = 10.dp),
+                                    color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f),
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+          // Full-line, same reason as the leading spacer above: this is the
+          // grid's own trailing footer, not a card.
+          item(span = StaggeredGridItemSpan.FullLine) {
+          Column {
+          // About / installed build — the one place the phone shows which build it's
+          // running (the update tile shows the AVAILABLE build; this shows the current
+          // one). Based on the GitHub Actions run number baked in at CI build time;
+          // "dev build" for a local build. buildLabel is the canonical formatter shared
+          // with the watch About footer and the update tile's delta.
+          Spacer(Modifier.height(SettingsGapRow))
+          Text(
+              "Bloo · " + com.bloo.bluelink.data.buildLabel(vm.currentBuildNumber, com.bloo.bluelink.BuildConfig.BUILD_BRANCH),
+              style = MaterialTheme.typography.labelSmall,
+              color = MaterialTheme.colorScheme.onSurfaceVariant,
+              textAlign = TextAlign.Center,
+              modifier = Modifier.fillMaxWidth(),
+          )
+          // The search bar itself now floats fixed to the screen's bottom
+          // edge (see below, outside this scrolling column) -- reserve exactly as much
+          // space as its own live reported bounds say it needs, not a flat guess.
+          Spacer(Modifier.height(searchBarClearance(fallback = bottomInset + 132.dp)))
+          }
+          }
+        }
+        } // Box (wide-screen centering)
+        // Same blurred scrim GarageScreen uses behind the system clock/battery
+        // icons -- this content scrolls behind the status bar too (see the
+        // comment above the Column's top spacer). Skipped on a folding
+        // phone's compact cover screen, matching GarageScreen/LockOverlay:
+        // that tiny layout doesn't draw content under the status bar at all.
+        // Also skipped when embedded: this page sits inside GarageScreen's own
+        // HorizontalPager, which already draws its own StatusBarScrim on top of
+        // every page in it (cars included) -- drawing a second one here stacked
+        // the same scrim twice for exactly this one page, reading as a subtly
+        // darker/hazier status-bar band than every car page beside it.
+        if (!isCompactCoverScreen() && !embedded) StatusBarScrim(hazeState = hazeState)
+        // No more floating "Settings" corner badge -- removed as unwanted UI (see the floating
+        // car-name pill's own removal). The "Settings" title is real, static content on
+        // SettingsHeaderRow now; it just scrolls off with the rest of the grid.
+        // Floating back-arrow + "Settings" label + simple/advanced button.
+        Row(
+            Modifier.fillMaxWidth().align(Alignment.TopStart).statusBarsPadding()
+                // FloatingIcon's own 12dp outer padding is what has always kept
+                // the "Settings" pill clear of the true screen edge -- but that
+                // Icon is skipped entirely when embedded, and this Row has no
+                // start padding of its own to fall back on, so the pill sat
+                // flush against the edge (and the device's own rounded corner/
+                // cutout) with nothing reserving room for it. Reproduces the
+                // same 12dp by hand only when there's no FloatingIcon here to
+                // provide it for free.
+                .then(if (embedded) Modifier.padding(start = HeaderCornerGap) else Modifier),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            // No back arrow when embedded -- there's no separate screen it would be
+            // returning FROM (swiping to a car does that), and "Back to the app"
+            // literally isn't true here: this already is the app's main screen.
+            if (!embedded) FloatingIcon(Icons.Filled.ArrowBack, "Back to the app", { vm.closeSettings() }, hazeState = hazeState)
+            Spacer(Modifier.weight(1f))
+            // A real segmented control (not a single button that only ever
+            // names the OTHER mode) so the CURRENT mode is always obvious at a
+            // glance -- the old single-label button was easy to misread as "the
+            // mode you're already in" and tap the wrong way.
+            // GlassSurface (GlassChrome.kt), not a hand-chained
+            // ambientRing/dropShadow/frostedRim/hazeEffect -- one shared call for the
+            // edge treatment and the real blur, matching the "Settings" title pill/
+            // FloatingIcon right next to it in the same row (same glass treatment,
+            // same track height) instead of the ordinary button-track color/size
+            // every other MorphSegmented uses. `tint = Color.Transparent`: MorphSegmented
+            // has no backdrop slot of its own, so it paints ITS OWN containerColor as
+            // the actual visible fill, on top of GlassSurface's blur -- GlassSurface's
+            // own tint stays invisible here rather than doubling up with it.
+            GlassSurface(
+                shape = RoundedCornerShape(16.dp),
+                modifier = Modifier
+                    .width(172.dp)
+                    // Was 20.dp -- MorphSegmented's own track corner is 16.dp,
+                    // so the outline ring drawn here never actually matched
+                    // the pill's real corners underneath it.
+                    .ambientRing(RoundedCornerShape(16.dp)),
+                hazeState = hazeState,
+                tint = Color.Transparent,
+            ) {
+                MorphSegmented(
+                    options = listOf(
+                        SegmentOption("simple", "Simple", null),
+                        SegmentOption("advanced", "Advanced", null),
+                    ),
+                    selectedKey = state.settingsMode,
+                    onSelect = { vm.setSettingsMode(it) },
+                    containerColor = glassTint(blurred = CanBlurBackdrops()),
+                    // HeaderButtonSize (48dp), not its own one-off 44dp -- the
+                    // comment above already says this is meant to match the
+                    // "Settings" pill/FloatingIcon's own height in the same
+                    // row; it just hadn't actually been set to the same value.
+                    trackHeight = HeaderButtonSize,
+                )
+            }
+            Spacer(Modifier.width(8.dp))
+        }
+        // First-run coach mark pointing at the back arrow.
+        if (state.showSettingsCoach) {
+            val coachAlpha = remember { Animatable(0f) }
+            val coachOffset = remember { Animatable(-20f) }
+            LaunchedEffect(Unit) {
+                launch { coachAlpha.animateTo(1f, tween(500, easing = FastOutSlowInEasing)) }
+                launch { coachOffset.animateTo(0f, spring(dampingRatio = 0.7f, stiffness = Spring.StiffnessMediumLow)) }
+            }
+            Surface(
+                onClick = { vm.dismissSettingsCoach() },
+                shape = RoundedCornerShape(16.dp),
+                color = MaterialTheme.colorScheme.primaryContainer,
+                contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                modifier = Modifier
+                    .align(Alignment.TopStart)
+                    .statusBarsPadding()
+                    .padding(start = 12.dp, top = 60.dp, end = 12.dp)
+                    .graphicsLayer {
+                        alpha = coachAlpha.value
+                        // .dp.toPx() -- see EmptyScreen's own note; the raw -20f
+                        // was 20 PIXELS, not 20dp.
+                        translationY = coachOffset.value.dp.toPx()
+                    }
+                    .dropShadow(RoundedCornerShape(16.dp)),
+            ) {
+                Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Filled.ArrowBack, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        "That arrow takes you into the app when you're done here. Tap to dismiss.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        modifier = Modifier.weight(1f),
+                    )
+                }
+            }
+        }
+        cropUri?.let { uri ->
+            val target = pickTarget
+            if (target != null) {
+                CropScreen(
+                    vin = target,
+                    uriString = uri.toString(),
+                    onCancel = { cropUri = null; pickTarget = null },
+                    onSave = { path -> vm.setVehicleImage(target, path); cropUri = null; pickTarget = null },
+                )
+            }
+        }
+  }
+}
+
+/** One entry in the Credits card -- see [CreditRow]. */
 private data class CreditEntry(
     val name: String,
     val description: String,
