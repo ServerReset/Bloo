@@ -4,9 +4,7 @@ import android.content.Context
 import android.content.res.Configuration
 import androidx.compose.ui.graphics.toArgb
 import kotlinx.coroutines.flow.first
-import androidx.glance.appwidget.updateAll
 import com.bloo.bluelink.data.SettingsStore
-import com.bloo.bluelink.widget.CarWidget
 import com.bloo.bluelink.data.WearColorRoles
 import com.bloo.bluelink.data.WearSeatConfig
 import com.bloo.bluelink.data.WearSettingsPayload
@@ -164,10 +162,7 @@ object MainToSecondarySync {
         }
         // The home widget. This function's own KDoc has always promised a fan-out to "home
         // widget, QS tiles, and the watch" and only ever did the watch -- WidgetTheme.resolve
-        // derives the widget's whole palette from Appearance, so an appearance change left
-        // every placed widget on the old colours until its own 30-minute refresh. Its own
-        // runCatching so a failing widget update cannot swallow the publishes above.
-        runCatching { CarWidget().updateAll(context) }
+        // Widget update removed - widget system deleted
     }
 
     /**
@@ -478,11 +473,7 @@ object MainToSecondarySync {
             val outcome = store.performMainToMainSync()
             val appearance = store.appearance.first()
             publishSettingsNow(context, appearance)
-            // Was `updateAllSurfaces(context)`, a private function with a LITERALLY EMPTY
-            // body -- so importing settings from Drive published them to the watch (above) and
-            // then fanned out to nothing. Only the widget is needed here: a settings import
-            // does not change vehicle state, so publishNow has nothing new to say.
-            runCatching { CarWidget().updateAll(context) }
+            // Widget update removed - widget system deleted
             outcome
         }.getOrElse { e ->
             // Fall back to the real last-known sync time (not 0L/"never") on a

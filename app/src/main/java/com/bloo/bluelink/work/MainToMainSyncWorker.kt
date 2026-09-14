@@ -7,8 +7,6 @@ import androidx.work.ExistingPeriodicWorkPolicy
 import androidx.work.NetworkType
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkerParameters
-import androidx.glance.appwidget.updateAll
-import com.bloo.bluelink.widget.CarWidget
 import com.bloo.bluelink.data.AppLog
 import com.bloo.bluelink.data.SettingsStore
 import com.bloo.bluelink.wear.MainToSecondarySync
@@ -79,13 +77,7 @@ class MainToMainSyncWorker(ctx: Context, params: WorkerParameters) : CoroutineWo
                     MainToSecondarySync.publishSettingsNow(ctx, store.appearance.first())
                 }
             }
-            // Restored. Step 3 of this class's KDoc has always promised it, and the
-            // orphaned `updateAll` import was its fossil. It matters: WidgetTheme.resolve
-            // derives the widget's whole palette from Appearance, so an imported theme
-            // change left every placed widget on the old colours until its own next
-            // 30-minute refresh. Its own runCatching, as the doc says, so a failing
-            // widget update cannot swallow the watch publish or fail the worker.
-            runCatching { CarWidget().updateAll(ctx) }
+            // Widget update removed - widget system deleted
         }
         if (outcome.error != null) {
             AppLog.log("⚠ Background Drive sync: ${outcome.error}")

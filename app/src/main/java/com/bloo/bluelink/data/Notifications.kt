@@ -14,7 +14,6 @@ import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
 import com.bloo.bluelink.R
-import com.bloo.bluelink.widget.WidgetPhoto
 
 /** Posts Bloo's local alerts (service due, door left open, car left running). */
 object Notifications {
@@ -522,14 +521,8 @@ object LiveCharge {
             return
         }
         if (runCatching { settings.liveChargeDismissed(vin) }.getOrDefault(false)) return
-        // The same photo the hero card shows, reused as the notification's large icon --
-        // ties the bar back to the actual car instead of a generic icon. Always a local
-        // file (see SettingsStore.imageUrl's own doc), so this is disk I/O, never a
-        // network fetch, and WidgetPhoto.decodeCached already downsamples + LRU-caches it
-        // for exactly this "decode a car photo outside Compose" job -- the widget's own
-        // photo background uses the same call. runCatching because a missing/corrupt file
-        // must never cost the bar itself; a null large icon is a graceful no-op.
-        val carPhoto = runCatching { settings.imageUrl(vin)?.let { WidgetPhoto.decodeCached(it) } }.getOrNull()
+        // Large icon removed - widget system deleted
+        val carPhoto = null
         update(
             context = context,
             vin = vin,
