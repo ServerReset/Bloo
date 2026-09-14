@@ -321,37 +321,6 @@
             </intent-filter>
         </service>
 
-        <!-- Adaptive home-screen car widget (Jetpack Glance). Scales 1x1 → 7x7,
-             showing progressively more of the car's status + quick controls. -->
-        <receiver
-            android:name=".widget.CarWidgetReceiver"
-            android:exported="true"
-            android:label="@string/app_name">
-            <intent-filter>
-                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
-            </intent-filter>
-            <meta-data
-                android:name="android.appwidget.provider"
-                android:resource="@xml/car_widget_info" />
-        </receiver>
-
-        <!-- The "Copy error" button's click target on the widget's own crash screen
-             (car_widget_error.xml / CarWidget.onCompositionError). Never launched
-             from outside this app's own PendingIntent, so not exported. -->
-        <receiver
-            android:name=".widget.WidgetErrorCopyReceiver"
-            android:exported="false" />
-
-        <!-- Widget setup (on first drop AND launcher long-press → settings).
-             Its option set adapts to the app's simple/advanced mode. -->
-        <activity
-            android:name=".widget.WidgetConfigActivity"
-            android:exported="true"
-            android:theme="@style/Theme.Bloo">
-            <intent-filter>
-                <action android:name="android.appwidget.action.APPWIDGET_CONFIGURE" />
-            </intent-filter>
-        </activity>
 
         <!-- Runs an alert notification's action button (e.g. Lock / Turn off),
              including taps bridged from the watch. -->
