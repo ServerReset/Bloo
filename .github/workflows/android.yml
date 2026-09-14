@@ -36,8 +36,16 @@ jobs:
           distribution: temurin
           java-version: '21'
 
-      - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
+      # No separate "Set up Android SDK" step: ubuntu-latest's own preinstalled
+      # SDK (ANDROID_HOME already set, common platforms/build-tools already
+      # present, licenses already accepted) is enough for AGP to build against,
+      # and any missing SDK component AGP needs is fetched under the license
+      # ubuntu-latest already accepted. `android-actions/setup-android@v3` used
+      # to run here, but its own internal `sdkmanager tools` call now fails
+      # unconditionally -- Google has fully removed the legacy standalone
+      # "tools" package the action still hardcodes installing, so every build
+      # using that action fails at this step regardless of anything in THIS
+      # repo's own config, confirmed by a same-commit retry failing identically.
 
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
@@ -178,8 +186,7 @@ jobs:
           distribution: temurin
           java-version: '21'
 
-      - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
+      # See the build job's own comment on this same removal.
 
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
