@@ -374,6 +374,7 @@ internal fun GarageScreen(
                                     // needed per-page notification) were removed, but the structure
                                     // remains for consistency. Only one page is ever actually
                                     // composed here (beyondViewportPageCount = 0) anyway.
+                                    hazeState = hazeState,
                                 )
                             }
                         }
@@ -736,6 +737,7 @@ internal fun GarageScreen(
                                             // unconditionally, silently killing the single-
                                             // car view's refresh feedback too.
                                             hideIndicator = perPage > 1,
+                                            hazeState = hazeState,
                                         )
                                     }
                                 }

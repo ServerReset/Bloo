@@ -67,6 +67,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import com.bloo.bluelink.data.Vehicle
+import dev.chrisbanes.haze.HazeState
 import kotlinx.coroutines.flow.first
 import kotlin.math.max
 
@@ -100,6 +101,8 @@ internal fun VehicleDetailContent(
     // DEPRECATED: Pager dots were removed. This parameter is no longer used
     // but kept for API compatibility. Always false.
     reserveTopForDots: Boolean = false,
+    /** See [CarHeaderRow]'s own doc -- forwarded through so its chips can blur. */
+    hazeState: HazeState? = null,
 ) {
     val topInset = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
     val bottomInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
@@ -119,7 +122,7 @@ internal fun VehicleDetailContent(
             // topInset alone, no extra breathing room, so the name sits right at
             // the status bar's own edge instead of noticeably below it.
             Spacer(Modifier.height(topInset))
-            CarHeaderRow(v, state, onExpand, reserveHeaderEnd, hideName = true)
+            CarHeaderRow(v, state, onExpand, reserveHeaderEnd, hideName = true, hazeState = hazeState)
             // summary (image+gauge) and controls are reorderable pebbles too. The full
             // pebble column always renders while swiping; smoothness comes from
             // PebbleList's own one-frame lazy-fill (filled/EAGER_PEBBLES) + the pager's
@@ -166,6 +169,8 @@ internal fun ExpandedCar(
     state: State<UiState>,
     vm: AppViewModel,
     flipped: Boolean,
+    /** See [CarHeaderRow]'s own doc -- forwarded through so its chips can blur. */
+    hazeState: HazeState? = null,
 ) {
     // All derived, so this view recomposes when the hotspot section or the refresh flag
     // actually changes -- not on every UiState emission for every car.
@@ -198,7 +203,7 @@ internal fun ExpandedCar(
     // everywhere else in the app. hideName = true here, matching
     // VehicleDetailContent's own CarHeaderRow call exactly.
     val controls: @Composable ColumnScope.() -> Unit = {
-        CarHeaderRow(v, state, onExpand = null, reserveEnd = false, hideName = true)
+        CarHeaderRow(v, state, onExpand = null, reserveEnd = false, hideName = true, hazeState = hazeState)
         CriticalContent(v, state, vm)
         HotspotSlot(v, hotspot, state, vm)
     }
@@ -316,6 +321,10 @@ internal fun CarHeaderRow(
     onExpand: (() -> Unit)?,
     reserveEnd: Boolean,
     hideName: Boolean = false,
+    /** The screen's own [HazeState] (see GarageScreen's own `hazeSource` doc) -- threaded
+     *  through so these chips get a real backdrop blur instead of the flat-tint fallback
+     *  every [GlassSurface] uses with no hazeState in scope. */
+    hazeState: HazeState? = null,
 ) {
     val meta by remember(v) { derivedStateOf { "${v.model} · ${state.value.powertrainLabel(v)}" } }
     val fetchedAt by remember(v) { derivedStateOf { state.value.fetchedAt(v) } }
@@ -339,8 +348,8 @@ internal fun CarHeaderRow(
                 horizontalArrangement = Arrangement.spacedBy(6.dp),
                 verticalArrangement = Arrangement.spacedBy(6.dp),
             ) {
-                MetaChip(meta)
-                LastUpdatedLabel(fetchedAt)
+                MetaChip(meta, hazeState = hazeState)
+                LastUpdatedLabel(fetchedAt, hazeState = hazeState)
             }
         }
         if (onExpand != null) {

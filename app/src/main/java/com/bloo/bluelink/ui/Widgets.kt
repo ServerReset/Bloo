@@ -506,13 +506,15 @@ internal fun rememberRelativeTime(millis: Long?): String? {
  * theme-role color token can't promise on its own either way.
  */
 @Composable
-internal fun MetaChip(text: String, modifier: Modifier = Modifier, icon: ImageVector? = null) {
-    // GlassSurface (GlassChrome.kt): no hazeState in scope at this composable's own
-    // call sites today, so this still falls back to the same plain tint it always
-    // had -- but now through the one shared implementation instead of its own copy.
+internal fun MetaChip(text: String, modifier: Modifier = Modifier, icon: ImageVector? = null, hazeState: HazeState? = null) {
+    // GlassSurface (GlassChrome.kt): hazeState is now threaded through from the hero
+    // header's own screen-level HazeState (see CarHeaderRow), so this chip gets a real
+    // backdrop blur wherever a caller can supply one -- callers with none in scope still
+    // fall back to the same plain tint this always had.
     GlassSurface(
         shape = RoundedCornerShape(50),
         modifier = modifier,
+        hazeState = hazeState,
         contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
     ) {
         Row(
@@ -536,9 +538,9 @@ internal fun MetaChip(text: String, modifier: Modifier = Modifier, icon: ImageVe
 /** "Updated x ago" fact, as a [MetaChip]. Null (renders nothing) until a
  *  first fetch has actually landed for [v]. */
 @Composable
-internal fun LastUpdatedLabel(fetchedAt: Long?, modifier: Modifier = Modifier) {
+internal fun LastUpdatedLabel(fetchedAt: Long?, modifier: Modifier = Modifier, hazeState: HazeState? = null) {
     val rel = rememberRelativeTime(fetchedAt) ?: return
-    MetaChip("Updated $rel", modifier, icon = Icons.Filled.Refresh)
+    MetaChip("Updated $rel", modifier, icon = Icons.Filled.Refresh, hazeState = hazeState)
 }
 
 
