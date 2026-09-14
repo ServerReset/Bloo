@@ -905,7 +905,7 @@ internal fun StateControl(
             .height(ControlHeight)
             .onSizeChanged { rowWidthDp = with(density) { it.width.toDp() } },
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        horizontalArrangement = Arrangement.Start,
     ) {
         // Fill the button's height so the status reads as one tall control.
         // Standard spacing between label and buttons, matching other pebble controls.
@@ -1013,6 +1013,8 @@ internal fun StateControl(
                 }
             }
         }
+        // 12dp spacing between text and buttons to match the previous spacedBy arrangement
+        Spacer(Modifier.width(12.dp))
         val haptics = LocalHaptics.current
         // Any extra icon actions (horn/lights) plus the lock/unlock button
         // form one Material 3 "connected" button group -- a single Row (one
