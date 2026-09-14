@@ -279,7 +279,12 @@ internal fun <T> lowPowerAwareSpring(dampingRatio: Float, stiffness: Float) =
  *  map sheet's own scrim; anything single-value/flat (FloatingIcon, the drag-
  *  handle chip) has no shape to standardize and doesn't use this. */
 internal val StandardBlurProgressive
-    get() = dev.chrisbanes.haze.HazeProgressive.verticalGradient(startIntensity = 1f, endIntensity = 0f)
+    get() = dev.chrisbanes.haze.HazeProgressive.verticalGradient(
+        // Progressive blur: fading from top to bottom
+        // Trying inverted: none at top, full at bottom - if this shows blur, direction was reversed
+        startIntensity = 0f,
+        endIntensity = 1f
+    )
 
 // ---- Motion -------------------------------------------------------------------
 
