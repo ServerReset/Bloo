@@ -3,6 +3,7 @@ package com.bloo.bluelink.widget
 import android.appwidget.AppWidgetManager
 import android.content.ComponentName
 import android.content.Context
+import androidx.glance.appwidget.AppWidgetId
 import androidx.glance.appwidget.GlanceAppWidget
 import androidx.glance.appwidget.GlanceAppWidgetReceiver
 import com.bloo.bluelink.data.AppLog
@@ -69,16 +70,12 @@ class CarWidgetReceiver : GlanceAppWidgetReceiver() {
      * still empty, so `updateAll` looped over zero ids and returned instantly --
      * a silent no-op with nothing to catch, not a fix.
      *
-     * The actual fix: [GlanceAppWidget.update] has a direct overload that takes a raw
-     * Android `appWidgetId: Int` with no dependency on Glance's own internal registry.
-     * `onUpdate` is handed the real, valid Android `appWidgetIds` directly by the platform;
-     * calling `glanceAppWidget.update(context, id)` per id (where id is an Int) starts a
-     * REAL composition session keyed on an id that is already known-good, sidestepping
-     * whatever is stuck inside Glance's own automatic bootstrapping entirely.
-     * (An earlier attempt reached for `GlanceAppWidgetManager.getGlanceIdBy(appWidgetId)`
-     * to wrap the id in a GlanceId -- that worked at compile time but did not actually fix
-     * the widget because the returned GlanceId did not trigger a real composition. The Int
-     * overload is the correct API for this use case.)
+     * The actual fix: use [AppWidgetId], Glance's public wrapper type, directly from raw
+     * Android widget ids, with no dependency on Glance's own internal registry. `onUpdate`
+     * is handed the real, valid Android `appWidgetIds` directly by the platform; wrapping
+     * each in `AppWidgetId(id)` and calling `glanceAppWidget.update(context, AppWidgetId(id))`
+     * per id starts a REAL composition session keyed on an id that is already known-good,
+     * sidestepping whatever is stuck inside Glance's own automatic bootstrapping entirely.
      */
     override fun onUpdate(context: Context, appWidgetManager: AppWidgetManager, appWidgetIds: IntArray) {
         AppLog.log("Widget: onUpdate for ${appWidgetIds.size} widget(s)")
@@ -97,7 +94,7 @@ class CarWidgetReceiver : GlanceAppWidgetReceiver() {
             AppLog.log("Widget: onUpdate updating ${ids.size} widget(s) directly by id")
             ids.forEach { id ->
                 runCatching {
-                    CarWidget().update(appContext, id)
+                    CarWidget().update(appContext, AppWidgetId(id))
                 }.onFailure {
                     AppLog.log("Widget: direct update of id=$id failed: ${it.message}")
                 }
@@ -140,7 +137,7 @@ class CarWidgetReceiver : GlanceAppWidgetReceiver() {
  * Repaints every currently-placed [CarWidget], the SAME way [CarWidgetReceiver.onUpdate]
  * does now -- by asking the platform's own [AppWidgetManager] for the real, currently-
  * placed widget ids for this provider and calling [GlanceAppWidget.update] directly per
- * id (using the Int overload), rather than `updateAll`, which walks Glance's OWN
+ * id (wrapped in [AppWidgetId]), rather than `updateAll`, which walks Glance's OWN
  * internal id registry.
  *
  * That registry only ever gets populated by the exact onUpdate-to-session machinery
@@ -157,7 +154,7 @@ private suspend fun updateAllCarWidgetsDirectly(context: Context, logPrefix: Str
     AppLog.log("$logPrefix updating ${ids.size} widget(s) directly by id")
     ids.forEach { id ->
         runCatching {
-            CarWidget().update(context, id)
+            CarWidget().update(context, AppWidgetId(id))
         }.onFailure {
             AppLog.log("$logPrefix direct update of id=$id failed: ${it.message}")
         }
