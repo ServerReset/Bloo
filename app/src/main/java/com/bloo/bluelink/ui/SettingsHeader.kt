@@ -39,7 +39,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.ui.semantics.contentDescription
@@ -280,35 +279,6 @@ internal fun SettingsHeaderRow(state: UiState, compact: Boolean = false) {
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-            }
-            // Simple/Advanced lives in the header now (it was a bare row of
-            // segmented options further down, easily lost) -- a small tonal
-            // chip carrying the current mode, standard surface treatment.
-            // CRITICAL: This must align vertically with the floating back button in the
-            // Row above it. Removed the top padding that was throwing off vertical
-            // alignment; this now centers naturally with Alignment.CenterVertically.
-            Spacer(Modifier.weight(1f))
-            Surface(
-                shape = RoundedCornerShape(50),
-                color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.75f),
-                contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
-            ) {
-                Row(
-                    Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                ) {
-                    Icon(
-                        Icons.Filled.Tune,
-                        contentDescription = null,
-                        modifier = Modifier.size(14.dp),
-                    )
-                    Text(
-                        if (state.settingsMode == "advanced") "Advanced" else "Simple",
-                        style = MaterialTheme.typography.labelMedium,
-                        fontWeight = FontWeight.SemiBold,
-                    )
-                }
             }
         }
     }
