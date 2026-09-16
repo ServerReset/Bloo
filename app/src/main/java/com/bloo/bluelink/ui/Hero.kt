@@ -630,9 +630,8 @@ internal fun carTonalBrush(scheme: ColorScheme): Brush {
         // Dark mode: vivid primary/tertiary/secondary with light text over them
         listOf(scheme.primary, scheme.tertiary, scheme.secondary)
     } else {
-        // Light mode: use the container variants (lighter, less saturated) for readability
-        // over dark (HeroOnPhoto) text
-        listOf(scheme.primaryContainer, scheme.tertiaryContainer, scheme.secondaryContainer)
+        // Light mode: use very light surface variants for minimal visual weight
+        listOf(scheme.surfaceContainerLowest, scheme.surfaceContainerLowest, scheme.surfaceContainer)
     }
     return Brush.linearGradient(colors)
 }
