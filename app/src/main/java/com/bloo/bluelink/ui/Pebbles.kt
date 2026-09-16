@@ -74,6 +74,7 @@ import androidx.compose.material3.pulltorefresh.PullToRefreshDefaults
 import androidx.compose.material3.pulltorefresh.pullToRefresh
 import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.material3.Surface
+import dev.chrisbanes.haze.HazeState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -268,6 +269,7 @@ internal fun Refreshable(
     refreshing: Boolean,
     vm: AppViewModel,
     hideIndicator: Boolean = false,
+    hazeState: HazeState? = null,
     content: @Composable BoxScope.() -> Unit,
 ) {
     val ptrState = rememberPullToRefreshState()
@@ -301,21 +303,10 @@ internal fun Refreshable(
         // the layout phase, so a live drag now costs one indicator relayout
         // per frame instead of a full recomposition of the car's content.
         if (!hideIndicator) {
-            // containerColor explicit, not this API's own default -- that default is
-            // theme-derived (a primary-family tone), which reads as a flatly BLUE circle
-            // under this app's own dynamic/custom palette. Reported directly, with a
-            // screenshot, right after the SAME root cause was already fixed once for
-            // MetaChip and the grid layout's own refresh circle ("it should be a neutral
-            // colour... not a primary") -- this is the third spot the identical theme-vs-
-            // neutral mismatch showed up in. [glassTint] (GlassChrome.kt), the same shared
-            // fill every other floating glass chip in the app resolves through -- this is
-            // the one call site that can't be [GlassSurface] itself (this whole indicator,
-            // shape and all, belongs to `PullToRefreshDefaults`, which only takes a plain
-            // `Color`, not a composable layering), so it calls the tint half directly.
-            PullToRefreshDefaults.LoadingIndicator(
+            FloatingPullRefreshIndicator(
                 state = ptrState,
-                isRefreshing = refreshing,
-                containerColor = glassTint(blurred = false),
+                refreshing = refreshing,
+                hazeState = hazeState,
                 modifier = Modifier
                     .align(Alignment.TopCenter)
                     .offset {

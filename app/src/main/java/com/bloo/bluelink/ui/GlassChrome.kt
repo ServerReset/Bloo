@@ -8,7 +8,9 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.LocalContentColor
+import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ripple
 import androidx.compose.runtime.Composable
@@ -175,6 +177,50 @@ internal fun glassTint(blurred: Boolean): Color {
     } else {
         // Light mode: very minimal tint (almost transparent), let the blur do the work
         Color.Black.copy(alpha = 0.01f)
+    }
+}
+
+/**
+ * Standardized floating refresh indicator with blur backdrop and fun shape.
+ * Used for grid and expanded view refresh indicators.
+ */
+@Composable
+internal fun FloatingRefreshIndicator(
+    isRefreshing: Boolean,
+    modifier: Modifier = Modifier,
+    hazeState: HazeState? = null,
+    content: @Composable () -> Unit = { LoadingIndicator() },
+) {
+    GlassSurface(
+        shape = CircleShape,
+        modifier = modifier.size(HeaderButtonSize),
+        hazeState = hazeState,
+    ) {
+        content()
+    }
+}
+
+/**
+ * Pull-to-refresh specific version that wraps PullToRefreshDefaults.LoadingIndicator
+ * with blur backdrop. Used for single-column/cover screen refresh indicators.
+ */
+@Composable
+internal fun FloatingPullRefreshIndicator(
+    state: androidx.compose.material3.pullrefresh.PullRefreshState,
+    refreshing: Boolean,
+    modifier: Modifier = Modifier,
+    hazeState: HazeState? = null,
+) {
+    GlassSurface(
+        shape = CircleShape,
+        modifier = modifier.size(HeaderButtonSize),
+        hazeState = hazeState,
+    ) {
+        androidx.compose.material3.PullToRefreshDefaults.LoadingIndicator(
+            state = state,
+            isRefreshing = refreshing,
+            containerColor = Color.Transparent,
+        )
     }
 }
 

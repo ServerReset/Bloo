@@ -772,27 +772,10 @@ internal fun GarageScreen(
                             modifier = Modifier.align(Alignment.TopCenter).statusBarsPadding().padding(top = HeaderCornerGap)
                                 .floatingOverlay(FloatingIds.RefreshIndicator, fade = false),
                         ) {
-                            // A bare LoadingIndicator() has no container of its own -- the
-                            // single-column path's own pull-to-refresh indicator
-                            // (Pebbles.kt's PullToRefreshDefaults.LoadingIndicator) gets a
-                            // circular backdrop for free from that API; this generic M3
-                            // Expressive one doesn't. Reported directly as "no circle behind"
-                            // it specifically on the grid/wide layout this covers -- the
-                            // shape-morphing indicator was floating bare over whatever
-                            // content happened to be underneath.
-                            //
-                            // GlassSurface (GlassChrome.kt): the shared layered blur/tint/rim/
-                            // shadow every floating pill/circle/chip in the app now goes
-                            // through, this screen's own hazeState (its `hazeSource` marks the
-                            // actual background behind this whole screen as blurrable) giving
-                            // this a REAL blur instead of just a flat tint.
-                            GlassSurface(
-                                shape = CircleShape,
-                                modifier = Modifier.size(HeaderButtonSize),
+                            FloatingRefreshIndicator(
+                                isRefreshing = state.value.refreshing,
                                 hazeState = hazeState,
-                            ) {
-                                LoadingIndicator()
-                            }
+                            )
                         }
                     }
                     // No floating name badge here at all any more -- removed as unwanted UI.

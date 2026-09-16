@@ -110,7 +110,7 @@ internal fun VehicleDetailContent(
     // Narrowed, not `state.value.refreshing`: a bare read here would subscribe this whole page
     // -- all three of them live at once in the pager -- to every UiState emission.
     val refreshing by remember { derivedStateOf { state.value.refreshing } }
-    Refreshable(v, refreshing, vm, hideIndicator = hideIndicator) {
+    Refreshable(v, refreshing, vm, hideIndicator = hideIndicator, hazeState = hazeState) {
         Column(
             Modifier
                 .fillMaxSize()
@@ -217,7 +217,7 @@ internal fun ExpandedCar(
     // view, unconditionally. This is a single car's own detail screen, not
     // the multi-car grid the flag was meant for, so the real M3 Expressive
     // indicator should show here too.
-    Refreshable(v, refreshing, vm) {
+    Refreshable(v, refreshing, vm, hazeState = hazeState) {
         Box(Modifier.fillMaxSize()) {
         // Animate the swap when the columns are flipped. Same spring the
         // expand/collapse transition (GarageScreen) and the collapsed
