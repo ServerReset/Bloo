@@ -22,6 +22,7 @@ import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.animation.core.snap
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.Box
@@ -623,16 +624,18 @@ internal fun HeroHeader(
  *  behind car photos across the garage/settings surfaces. Callers apply their
  *  own `.alpha(...)` where they want it dimmed -- this returns only the brush. */
 @Composable
-internal fun carTonalBrush(scheme: ColorScheme): Brush =
-    // Always the vivid primary/tertiary/secondary roles, in BOTH light and dark mode --
-    // not the *Container roles. Container colors are tuned to sit as flat, low-contrast
-    // fills behind on-surface text (a chip, a card body), and for a custom/dynamic
-    // palette they can resolve muddy or outright dark even in an otherwise light theme
-    // (reported directly: the hero card stayed a dark slate gradient in light mode).
-    // This gradient exists to be its OWN colorful surface with light (HeroOnPhoto) text
-    // over it -- the same job a car photo's scrim does -- so it needs the theme's
-    // actually-vivid roles, which stay vivid and readable-with-white-text in both themes.
-    Brush.linearGradient(listOf(scheme.primary, scheme.tertiary, scheme.secondary))
+internal fun carTonalBrush(scheme: ColorScheme): Brush {
+    val dark = isSystemInDarkTheme()
+    val colors = if (dark) {
+        // Dark mode: vivid primary/tertiary/secondary with light text over them
+        listOf(scheme.primary, scheme.tertiary, scheme.secondary)
+    } else {
+        // Light mode: use the container variants (lighter, less saturated) for readability
+        // over dark (HeroOnPhoto) text
+        listOf(scheme.primaryContainer, scheme.tertiaryContainer, scheme.secondaryContainer)
+    }
+    return Brush.linearGradient(colors)
+}
 
 /** The clipped square thumbnail used for a car: the set photo if there is one,
  *  else the [carTonalBrush] fallback with a centered car icon. [cornerRadius]
