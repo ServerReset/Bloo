@@ -1043,6 +1043,18 @@ internal fun StateControl(
         // seam appearing on the next line down would not be a control at all. Too narrow, and
         // the segments compact instead.
         val mainSource = remember { MutableInteractionSource() }
+        // Lock/unlock button content: reserves width for both "Lock" and "Unlock" labels
+        // so the button doesn't collapse during the optimistic state flip mid-release.
+        // See MorphButton call below for why this matters.
+        val lockContent: @Composable () -> Unit = {
+            Box(contentAlignment = Alignment.Center) {
+                val buttonIcon = if (isOn == true) (deactivateIcon ?: icon) else icon
+                MorphButtonLabel(buttonIcon, if (isOn == true) turnOff else turnOn, pending, iconSize = actionIconSize)
+                Box(Modifier.alpha(0f)) {
+                    MorphButtonLabel(icon, if (isOn == true) turnOn else turnOff, false, iconSize = actionIconSize)
+                }
+            }
+        }
         if (groupActions.isEmpty()) {
             // No ExpressiveButtonRow at all here -- most cars have no horn/lights support
             // (Kia's US API has none, see the doc above), so this is the common case, and it
@@ -1075,34 +1087,7 @@ internal fun StateControl(
                     contentPadding = PaddingValues(horizontal = 14.dp, vertical = 10.dp),
                     modifier = Modifier.heightIn(min = groupBtnSize),
                 ) {
-                    // Reserves ONE constant natural width for both "Lock" and "Unlock" --
-                    // an invisible copy of whichever label ISN'T showing, stacked in the
-                    // same Box, so the Box's own size is always the wider of the two
-                    // regardless of which is actually on screen. Without this, tapping
-                    // Lock/Unlock genuinely changed this button's own natural width mid-
-                    // gesture: onActivate()/onDeactivate() apply an OPTIMISTIC doorLock
-                    // flip (AppViewModel.lock/unlock's own runCommand call) essentially the
-                    // same frame the click fires, i.e. right as SafeExpansiveButton's
-                    // release spring starts chasing back toward rest -- but that spring's
-                    // own grow target is computed from a natural-width CACHE that only
-                    // ever refreshes once the press is fully back at 0 (see its own
-                    // "measure the same Measurable twice in a pass throws" doc), so a
-                    // width that changes mid-release stayed pinned to the OLD label's
-                    // size for the whole spring and only SNAPPED to the new, shorter
-                    // label's size in one frame right at the very end -- reported directly
-                    // as the button "collapsing" instead of smoothly settling; it should
-                    // still push out and then get smaller, not push out and then jump.
-                    // Reserving one fixed width for both states removes the conflict at
-                    // its source, scoped to this one call site, rather than reworking the
-                    // shared measure algorithm every other standalone button in the app
-                    // also depends on.
-                    Box(contentAlignment = Alignment.Center) {
-                        val buttonIcon = if (isOn == true) (deactivateIcon ?: icon) else icon
-                        MorphButtonLabel(buttonIcon, if (isOn == true) turnOff else turnOn, pending, iconSize = actionIconSize)
-                        Box(Modifier.alpha(0f)) {
-                            MorphButtonLabel(icon, if (isOn == true) turnOn else turnOff, false, iconSize = actionIconSize)
-                        }
-                    }
+                    lockContent()
                 }
             }
         } else {
@@ -1143,44 +1128,10 @@ internal fun StateControl(
                         activeContainerColor = highlightColor,
                         activeContentColor = highlightContentColor,
                         shapeForCorner = { morph, cp -> connectedGroupShape(segmentCount - 1, segmentCount, cp, morph) },
-                        // MorphButton's own default is ButtonDefaults.ContentPadding (24dp
-                        // horizontal) -- sized for a labelled pill, which is what this button
-                        // shows almost always. But it is still a member of the connected group
-                        // above (real here: this branch only runs when groupActions is
-                        // non-empty), and that group's own all-or-nothing fit rule can drop it
-                        // to icon-only on a narrow enough row -- with the same "car pebble too
-                        // narrow for the label" 24dp padding still wrapped around just the bare
-                        // glyph. That reads as a conspicuously oversized icon button ("the
-                        // Unlock button is still too big even though it's just an icon") next
-                        // to the group actions beside it, which use 0dp padding plus a floor
-                        // precisely so their own icon-only footprint stays tight. 14dp/10dp --
-                        // an existing value used for several other MorphButtons elsewhere in
-                        // this file/module (PebbleShell, SettingsScreen) -- keeps the labelled
-                        // case comfortable while landing this button's own compact footprint
-                        // (icon + 28dp total horizontal padding) close to the group actions'
-                        // own ~50dp square, rather than the ~70dp the default gave it. A single
-                        // fixed value on purpose, not one that reacts to which mode is showing:
-                        // reacting would reopen the same instability MorphButtonLabel's own
-                        // per-frame width check already causes during a press (see
-                        // ExpressivePressGrowth) -- this fixes the SIZE without adding a second
-                        // thing that changes based on live layout state.
                         contentPadding = PaddingValues(horizontal = 14.dp, vertical = 10.dp),
-                        // Same pill height as the pebble header actions (the row stays
-                        // ControlHeight tall, so the button is vertically centred in it);
-                        // taller on the cover for a thumb.
                         modifier = Modifier.heightIn(min = groupBtnSize),
                     ) {
-                        // Same fixed-width reservation as the solo (no groupActions) branch
-                        // above -- see its own doc for why the label's own optimistic
-                        // Lock<->Unlock flip needs this regardless of which branch renders
-                        // the button.
-                        Box(contentAlignment = Alignment.Center) {
-                            val buttonIcon = if (isOn == true) (deactivateIcon ?: icon) else icon
-                            MorphButtonLabel(buttonIcon, if (isOn == true) turnOff else turnOn, pending, iconSize = actionIconSize)
-                            Box(Modifier.alpha(0f)) {
-                                MorphButtonLabel(icon, if (isOn == true) turnOn else turnOff, false, iconSize = actionIconSize)
-                            }
-                        }
+                        lockContent()
                     }
                 }
             }
