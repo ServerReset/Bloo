@@ -273,9 +273,8 @@ internal fun SettingsHeaderRow(state: UiState, compact: Boolean = false) {
                 color = MaterialTheme.colorScheme.onSurface,
             )
             val carCount = state.vehicles.size
-            val modeLabel = if (state.settingsMode == "advanced") "Advanced" else "Simple"
             Text(
-                "$carCount car${if (carCount == 1) "" else "s"} · $modeLabel mode",
+                "$carCount car${if (carCount == 1) "" else "s"}",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
