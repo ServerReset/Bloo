@@ -280,10 +280,10 @@ internal fun <T> lowPowerAwareSpring(dampingRatio: Float, stiffness: Float) =
  *  handle chip) has no shape to standardize and doesn't use this. */
 internal val StandardBlurProgressive
     get() = dev.chrisbanes.haze.HazeProgressive.verticalGradient(
-        // Progressive blur: fading from top to bottom
-        // Trying inverted: none at top, full at bottom - if this shows blur, direction was reversed
-        startIntensity = 0f,
-        endIntensity = 1f
+        // Progressive blur: strong at top (status bar icons need legibility),
+        // fading to none at bottom (content below needs normal clarity)
+        startIntensity = 1f,
+        endIntensity = 0f
     )
 
 // ---- Motion -------------------------------------------------------------------
