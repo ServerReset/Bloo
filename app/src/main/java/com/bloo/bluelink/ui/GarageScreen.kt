@@ -409,25 +409,48 @@ internal fun GarageScreen(
                 // divide by perPage directly and never needed a car-only block
                 // count of their own -- they only mean "which car," never Settings.
                 val total = if (settingsAsPage) count + 1 else count
-                val totalBlocks = (total + perPage - 1) / perPage
+                // A SLIDING WINDOW, not a block grid: on a wide/multi-car screen
+                // (perPage > 1) each "page" still shows `perPage` items side by
+                // side, but consecutive pages overlap -- window N covers indices
+                // [N, N+perPage-1], so swiping shifts the visible set by exactly
+                // ONE car/item instead of jumping by a whole `perPage`-wide block.
+                // Reported directly as wanting one-car-per-swipe even when
+                // several are visible at once, the same way a phone (perPage==1)
+                // already swipes one at a time.
+                //
+                // This formula is a strict generalization of the old block math,
+                // not a separate perPage==1 case: with perPage==1 it reduces to
+                // totalWindows == total, i.e. one window per item, identical to
+                // the phone's existing one-car-per-page behaviour.
+                val totalWindows = (total - perPage + 1).coerceAtLeast(1)
+                // Where a given car index should land as a window -- shared by the
+                // initial seed below and every "snap back to currentIndex" effect
+                // further down, so they can't drift onto different windows for the
+                // same car. Clamped to the last valid window start so a car near
+                // the end still lands on a window that contains it (as its last
+                // visible item) rather than overflowing past totalWindows-1.
+                fun windowFor(index: Int) = index.coerceIn(0, count - 1).coerceAtMost(totalWindows - 1)
                 // Normally the car currentIndex was already parked on. The one
                 // exception is state.value.landOnSettingsPage (see its own doc): Settings
                 // itself just switched settingsAsPage on and asked to be followed,
-                // so this fresh mount seeds straight onto the block containing the
-                // just-created Settings slot (index `count`, the first index past
-                // every real car) instead of whichever car was selected before
-                // Settings was ever opened -- otherwise the user would land on a
-                // car for one frame before having to go find the page themselves.
+                // so this fresh mount seeds straight onto the LAST window -- by
+                // construction (totalWindows-1 = total-perPage) that window's
+                // final index is always `total-1`, which is exactly the just-
+                // created Settings slot -- instead of whichever car was selected
+                // before Settings was ever opened -- otherwise the user would land
+                // on a car for one frame before having to go find the page
+                // themselves.
                 val initialBlock = if (state.value.landOnSettingsPage && settingsAsPage) {
-                    count / perPage
+                    totalWindows - 1
                 } else {
-                    (currentIndex.coerceIn(0, count - 1)) / perPage
+                    windowFor(currentIndex)
                 }
-                // Infinite wrap-around: WrapPagerState.realCount is the BLOCK count
-                // here (ceil(total / perPage), Settings item folded into `total`
-                // when present), and the real vehicle index for a page is
-                // realBlock(page) * perPage.
-                val wrap = rememberWrapPager(totalBlocks, initialBlock)
+                // Infinite wrap-around: WrapPagerState.realCount is the WINDOW
+                // count here (totalWindows, Settings item folded into `total`
+                // when present), and the real starting vehicle index for a page
+                // is realBlock(page) itself (a window's own start, not
+                // window * perPage -- windows overlap by construction).
+                val wrap = rememberWrapPager(totalWindows, initialBlock)
                 val pager = wrap.pager
                 fun realBlock(virtualPage: Int) = wrap.real(virtualPage)
                 // Authoritative, not just a fire-and-hope seed: initialBlock above
@@ -444,16 +467,19 @@ internal fun GarageScreen(
                 // already there) and is the actual fix in the uncommon one.
                 LaunchedEffect(state.value.landOnSettingsPage) {
                     if (state.value.landOnSettingsPage) {
-                        if (settingsAsPage) wrap.snapToReal(count / perPage)
+                        // The last window always ends on index `total-1` -- the
+                        // just-created Settings slot -- same reasoning as
+                        // initialBlock's own doc above.
+                        if (settingsAsPage) wrap.snapToReal(totalWindows - 1)
                         vm.consumeLandOnSettingsPage()
                     }
                 }
-                // Keyed on totalBlocks too, not just pager/perPage: this effect's
+                // Keyed on totalWindows too, not just pager/perPage: this effect's
                 // own collect{} closes over realBlock/total/settingsAsPage as
                 // they were the moment it (re)started. Toggling Appearance.
                 // settingsAsPage from a search result while GarageScreen stays
                 // mounted the whole time (see that toggle's own comment -- it
-                // deliberately doesn't require a fresh mount) changes totalBlocks
+                // deliberately doesn't require a fresh mount) changes totalWindows
                 // without touching pager's identity or perPage, so without this
                 // key the running coroutine kept using a stale, pre-toggle
                 // settingsAsPage (permanently false, so onSettingsPageSlot could
@@ -464,19 +490,21 @@ internal fun GarageScreen(
                 // number and fire selectIndex with a bogus index. Restarting here
                 // rebinds the closure to the current values the instant the slot
                 // count changes.
-                LaunchedEffect(pager, perPage, totalBlocks) {
+                LaunchedEffect(pager, perPage, totalWindows) {
                     snapshotFlow { pager.settledPage }.collect { page ->
-                        val block = realBlock(page)
-                        val start = block * perPage
-                        // Guarded: a block past the last real car (only possible
+                        // A window's own start IS the real index -- windows
+                        // overlap by construction, so there is no `* perPage`
+                        // multiply here the way there was for blocks.
+                        val start = realBlock(page)
+                        // Guarded: a window past the last real car (only possible
                         // when settingsAsPage folded Settings in as the final
-                        // item and this block is Settings-only, e.g. an exact
-                        // multiple of perPage cars) isn't a car block at all, and
+                        // item and this window is Settings-only, i.e. count ==
+                        // totalWindows-1 exactly) isn't a car window at all, and
                         // selectIndex/currentIndex only ever mean "which car" --
                         // settling there should leave whatever car was last
                         // selected exactly as it was, so swiping back to a car
                         // lands where you left it instead of snapping to car 0.
-                        // A block that mixes leftover cars WITH Settings (the
+                        // A window that mixes leftover cars WITH Settings (the
                         // usual case once Settings is folded in) still selects
                         // the real car(s) it holds same as ever.
                         if (start < count) vm.selectIndex(start.coerceIn(0, count - 1))
@@ -508,7 +536,7 @@ internal fun GarageScreen(
                 // across a potentially large virtual-page delta) the instant
                 // currentIndex moves out from under the page actually shown.
                 //
-                // Both this and the totalBlocks effect below skip their own very
+                // Both this and the totalWindows effect below skip their own very
                 // first firing (each with its own remember'd flag -- two
                 // independent flags rather than one shared one, so there is no
                 // ordering to get right between separate LaunchedEffects racing to
@@ -534,14 +562,13 @@ internal fun GarageScreen(
                     // updating live even while AnimatedContent slides its ALREADY-
                     // STALE content off screen, so without this guard a snap here
                     // still visibly moves the pager underneath its own exit
-                    // animation -- see the totalBlocks effect below for the exact
+                    // animation -- see the totalWindows effect below for the exact
                     // trigger (settingsAsPage flipping mid-exit) and why it read as
                     // jank rather than a clean transition.
                     if (state.value.screen != Screen.Garage) return@LaunchedEffect
-                    val targetBlock = currentIndex.coerceIn(0, count - 1) / perPage
-                    wrap.snapToReal(targetBlock)
+                    wrap.snapToReal(windowFor(currentIndex))
                 }
-                // Toggling Appearance.settingsAsPage changes totalBlocks -- and
+                // Toggling Appearance.settingsAsPage changes totalWindows -- and
                 // therefore `wrap`'s realCount, the modulo divisor real() uses --
                 // out from under the pager's raw (unmoved) virtual position. That
                 // divisor changing while the position doesn't is exactly what a
@@ -563,22 +590,22 @@ internal fun GarageScreen(
                 // but appearance.settingsAsPage's own DataStore write can still
                 // land a beat or two INTO that slide, while this now-exiting
                 // composition is still live and still reacting to real state
-                // changes. totalBlocks changing at that exact moment used to fire
+                // changes. totalWindows changing at that exact moment used to fire
                 // this effect and snap the pager to a different page while its
                 // (already stale, already animating off screen) content was
                 // visibly sliding away -- the reported "janky" transition.
                 val skipFirstBlocksSnap = remember { mutableStateOf(true) }
-                LaunchedEffect(totalBlocks) {
+                LaunchedEffect(totalWindows) {
                     if (skipFirstBlocksSnap.value) { skipFirstBlocksSnap.value = false; return@LaunchedEffect }
                     if (state.value.screen != Screen.Garage) return@LaunchedEffect
                     // Toggling settingsAsPage ON from the standalone route
-                    // (SettingsScreen's own toggle) changes totalBlocks AND
+                    // (SettingsScreen's own toggle) changes totalWindows AND
                     // sets state.value.landOnSettingsPage in the very same
                     // transition -- this effect exists to snap back to
-                    // currentIndex's own block when totalBlocks changes for
+                    // currentIndex's own window when totalWindows changes for
                     // its OWN reasons (see the doc above), but that's
                     // exactly wrong here: it raced the landOnSettingsPage
-                    // effect above (both fire off the same totalBlocks
+                    // effect above (both fire off the same totalWindows
                     // change, in the same frame) and could snap to the
                     // CURRENT CAR right after that effect had already landed
                     // on the new Settings slot, silently undoing it --
@@ -588,8 +615,7 @@ internal fun GarageScreen(
                     // it's genuinely done, so deferring to it here is safe
                     // even if this effect happens to run first.
                     if (state.value.landOnSettingsPage) return@LaunchedEffect
-                    val targetBlock = currentIndex.coerceIn(0, count - 1) / perPage
-                    wrap.snapToReal(targetBlock)
+                    wrap.snapToReal(windowFor(currentIndex))
                 }
                 Box(Modifier.fillMaxSize()) {
                     HorizontalPager(
@@ -675,12 +701,13 @@ internal fun GarageScreen(
                         // screen's equivalent). This, the default view most people
                         // see swiping between cars day to day, previously had no
                         // per-page transform at all, just a plain flat scroll.
-                        val block = realBlock(page)
-                        val start = block * perPage
+                        // A window's own start IS the real index (see totalWindows'
+                        // own doc above) -- no `* perPage` multiply, windows overlap.
+                        val start = realBlock(page)
                         // `total`, not `count`: Settings, when settingsAsPage folded it
                         // in above, is item index `count` -- one past the last real
-                        // car -- and needs to be included in this block's own range so
-                        // it renders alongside whatever real cars share its block.
+                        // car -- and needs to be included in this window's own range so
+                        // it renders alongside whatever real cars share its window.
                         val end = minOf(start + perPage, total)
                         // The "is this the settled page" test used to live here, as
                         // `page == pager.settledPage`. Discrete, yes -- but it still
