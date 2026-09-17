@@ -46,6 +46,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AutoAwesome
@@ -70,7 +71,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.pulltorefresh.PullToRefreshDefaults
 import androidx.compose.material3.pulltorefresh.pullToRefresh
 import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.material3.Surface
@@ -116,6 +116,7 @@ import kotlin.math.abs
 import kotlin.math.roundToInt
 import com.bloo.uicommon.ReorderColumn
 import com.bloo.uicommon.animatePlacement
+import dev.chrisbanes.haze.HazeState
 
 /** A friendly label for a pebble/section id. */
 internal fun sectionLabel(section: String): String = when (section) {
@@ -285,15 +286,58 @@ internal fun HotspotSlot(
 internal val RefreshPullShift = 96.dp
 
 /**
+ * The one shared "refreshing" badge: a [GlassSurface] circle (real backdrop
+ * blur when [hazeState] is supplied, the same flat-tint fallback every other
+ * glass surface uses otherwise) holding a spinner, sliding down from fully
+ * off-screen above the content at `progress = 0` to just below the status bar
+ * at `progress = 1`. Used by both [Refreshable]'s per-car pull gesture
+ * (`progress` tracks the live pull distance, so it follows the user's finger)
+ * and the multi-car grid's own "still refreshing" badge (GarageScreen.kt,
+ * which has no pull gesture of its own and just animates `progress` between 0
+ * and 1 off the plain `refreshing` boolean) -- previously two independently
+ * hand-rolled indicators with different sizes, positioning math, and
+ * containers (one a flat-tinted `PullToRefreshDefaults` widget, the other a
+ * real-blur `GlassSurface`).
+ *
+ * [progress] is a LAMBDA, not a plain Float: [Refreshable] needs to read a
+ * live drag distance (`ptrState.distanceFraction`) on every frame of a pull
+ * gesture, and a plain parameter would be read at composition time -- which
+ * would recompose the whole caller (its entire `content()`, one whole car
+ * card) on every pixel of the drag. Deferring the read into this offset{}
+ * lambda keeps that a pure layout-phase relayout of just this small badge.
+ */
+@Composable
+internal fun RefreshIndicatorBadge(
+    hazeState: HazeState?,
+    modifier: Modifier = Modifier,
+    progress: () -> Float,
+) {
+    val topInset = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
+    GlassSurface(
+        shape = CircleShape,
+        hazeState = hazeState,
+        modifier = modifier
+            .size(HeaderButtonSize)
+            .offset {
+                val p = progress().coerceIn(0f, 1f)
+                val offScreenPx = -(topInset + 56.dp).roundToPx()
+                val onScreenPx = (topInset + 28.dp).roundToPx()
+                IntOffset(0, offScreenPx + ((onScreenPx - offScreenPx) * p).roundToInt())
+            },
+    ) {
+        LoadingIndicator()
+    }
+}
+
+/**
  * Wraps content with the pull-to-refresh gesture with an overlay indicator.
  * Delegates the actual gesture recognition/animation state to Material 3's
  * [rememberPullToRefreshState] (`ptrState`); this composable's own job is
  * publishing that pull distance out to [LocalPullFraction] (so sibling
  * overlays elsewhere in [GarageScreen] can react to the live pull, not just
- * the boolean `state.refreshing`), and manually positioning the loading
- * indicator by hand rather than letting Material lay it out, so it can
- * slide fully off-screen above the content when idle and only ease into
- * view as the user pulls.
+ * the boolean `state.refreshing`), and driving [RefreshIndicatorBadge] off
+ * that same distance so it can slide fully off-screen above the content when
+ * idle and only ease into view as the user pulls.
  */
 @Composable
 internal fun Refreshable(
@@ -305,11 +349,11 @@ internal fun Refreshable(
     refreshing: Boolean,
     vm: AppViewModel,
     hideIndicator: Boolean = false,
+    hazeState: HazeState? = null,
     content: @Composable BoxScope.() -> Unit,
 ) {
     val ptrState = rememberPullToRefreshState()
     val haptics = LocalHaptics.current
-    val topInset = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
 
     // Publish the pull distance so GarageScreen's overlays track the pull live.
     val pullFractionState = LocalPullFraction.current
@@ -328,40 +372,18 @@ internal fun Refreshable(
     ) {
         // Content stays full-size and edge-to-edge; never shifted down.
         content()
-        // Indicator floats above content as a z-elevated overlay. The whole
-        // indicatorProgress/indicatorY calc used to live directly in this
-        // composable's body, reading ptrState.distanceFraction on every frame
-        // of the drag -- that's a *composition*-phase read, so it recomposed
-        // this entire Box (and everything content() renders, the whole car
-        // card) on every pixel of the pull gesture, not just re-laid-out the
-        // small indicator. Moved into the offset{} lambda, which only runs in
-        // the layout phase, so a live drag now costs one indicator relayout
-        // per frame instead of a full recomposition of the car's content.
+        // Indicator floats above content as a z-elevated overlay. The
+        // progress read (ptrState.distanceFraction) happens inside
+        // RefreshIndicatorBadge's own offset{} lambda, which only runs in the
+        // layout phase -- reading it directly in THIS composable's body would
+        // recompose this entire Box (and everything content() renders, the
+        // whole car card) on every pixel of the pull gesture, not just
+        // re-layout the small indicator.
         if (!hideIndicator) {
-            // containerColor explicit, not this API's own default -- that default is
-            // theme-derived (a primary-family tone), which reads as a flatly BLUE circle
-            // under this app's own dynamic/custom palette. Reported directly, with a
-            // screenshot, right after the SAME root cause was already fixed once for
-            // MetaChip and the grid layout's own refresh circle ("it should be a neutral
-            // colour... not a primary") -- this is the third spot the identical theme-vs-
-            // neutral mismatch showed up in. [glassTint] (GlassChrome.kt), the same shared
-            // fill every other floating glass chip in the app resolves through -- this is
-            // the one call site that can't be [GlassSurface] itself (this whole indicator,
-            // shape and all, belongs to `PullToRefreshDefaults`, which only takes a plain
-            // `Color`, not a composable layering), so it calls the tint half directly.
-            PullToRefreshDefaults.LoadingIndicator(
-                state = ptrState,
-                isRefreshing = refreshing,
-                containerColor = glassTint(blurred = false),
-                modifier = Modifier
-                    .align(Alignment.TopCenter)
-                    .offset {
-                        val indicatorProgress = if (refreshing) 1f else ptrState.distanceFraction.coerceIn(0f, 1f)
-                        val offScreenPx = -(topInset + 56.dp).roundToPx()
-                        val onScreenPx = (topInset + 28.dp).roundToPx()
-                        IntOffset(0, offScreenPx + ((onScreenPx - offScreenPx) * indicatorProgress).roundToInt())
-                    },
-            )
+            RefreshIndicatorBadge(
+                hazeState = hazeState,
+                modifier = Modifier.align(Alignment.TopCenter),
+            ) { if (refreshing) 1f else ptrState.distanceFraction }
         }
     }
 }

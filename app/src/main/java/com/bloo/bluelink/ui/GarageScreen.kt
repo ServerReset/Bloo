@@ -12,13 +12,13 @@ import dev.chrisbanes.haze.HazeState
 import dev.chrisbanes.haze.hazeSource
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -36,8 +36,6 @@ import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.ui.semantics.onClick
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
-import androidx.compose.material3.LoadingIndicator
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
@@ -606,40 +604,24 @@ internal fun GarageScreen(
                     // count <= perPage (every car already fits on one page, common
                     // on tablets) meant PagerDots above never renders either, so
                     // pulling to refresh in the grid had *zero* visual feedback of
-                    // any kind. One shared, real M3 Expressive indicator here
-                    // covers every grid case, page dots or not.
+                    // any kind. RefreshIndicatorBadge (Pebbles.kt) -- the one shared
+                    // refresh badge every pull-to-refresh surface in the app now uses
+                    // -- covers every grid case, page dots or not. There's no drag
+                    // gesture to follow here, so its progress just animates 0->1 off
+                    // the plain `refreshing` boolean instead of a live pull distance.
                     if (perPage > 1) {
-                        AnimatedVisibility(
-                            visible = state.value.refreshing,
-                            enter = fadeIn(tween(150)),
-                            exit = fadeOut(tween(200)),
-                            // fade = false: this is the one piece of chrome that must stay visible exactly
-                            // when the rest of it fades out -- it IS the refresh.
-                            modifier = Modifier.align(Alignment.TopCenter).statusBarsPadding().padding(top = HeaderCornerGap)
+                        val gridRefreshProgress by animateFloatAsState(
+                            targetValue = if (state.value.refreshing) 1f else 0f,
+                            animationSpec = tween(if (state.value.refreshing) 150 else 200),
+                            label = "gridRefreshProgress",
+                        )
+                        RefreshIndicatorBadge(
+                            hazeState = hazeState,
+                            // fade = false: this is the one piece of chrome that must stay
+                            // visible exactly when the rest of it fades out -- it IS the refresh.
+                            modifier = Modifier.align(Alignment.TopCenter)
                                 .floatingOverlay(FloatingIds.RefreshIndicator, fade = false),
-                        ) {
-                            // A bare LoadingIndicator() has no container of its own -- the
-                            // single-column path's own pull-to-refresh indicator
-                            // (Pebbles.kt's PullToRefreshDefaults.LoadingIndicator) gets a
-                            // circular backdrop for free from that API; this generic M3
-                            // Expressive one doesn't. Reported directly as "no circle behind"
-                            // it specifically on the grid/wide layout this covers -- the
-                            // shape-morphing indicator was floating bare over whatever
-                            // content happened to be underneath.
-                            //
-                            // GlassSurface (GlassChrome.kt): the shared layered blur/tint/rim/
-                            // shadow every floating pill/circle/chip in the app now goes
-                            // through, this screen's own hazeState (its `hazeSource` marks the
-                            // actual background behind this whole screen as blurrable) giving
-                            // this a REAL blur instead of just a flat tint.
-                            GlassSurface(
-                                shape = CircleShape,
-                                modifier = Modifier.size(HeaderButtonSize),
-                                hazeState = hazeState,
-                            ) {
-                                LoadingIndicator()
-                            }
-                        }
+                        ) { gridRefreshProgress }
                     }
                     // No floating name badge here at all any more -- removed as unwanted UI.
                 }
