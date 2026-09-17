@@ -998,7 +998,24 @@ object CarAlerts {
         if (prefs.carStarted && status != null) {
             val engineOn = status.engine == true
             if (engineOn && !settings.engineStartNotificationSent(v.vin)) {
-                if (canDeliver) {
+                // Not while actually driving: on a coarse poll cadence, the FIRST
+                // time this notices the engine turned on can already be well into
+                // a drive, and "your car has been started" telling you something
+                // you're actively doing and already know is noise, not news --
+                // reported directly. Unlike the unlocked/running-too-long alerts
+                // above, this one does NOT fire late once driving stops either: it
+                // is a one-time "just turned on" notice, and one that shows up
+                // only after the drive already happened would be equally useless
+                // -- so the sent flag is set here even though nothing was posted,
+                // closing out this ON-episode for good. That's distinct from the
+                // canDeliver branch below it: a genuinely undelivered notification
+                // (no permission) still leaves the flag UNSET so it retries once
+                // delivery becomes possible, same as every other alert in this
+                // function -- "couldn't tell you" and "chose not to tell you"
+                // are different reasons and only one of them should ever retry.
+                if (status.isDriving) {
+                    settings.setEngineStartNotificationSent(v.vin, true)
+                } else if (canDeliver) {
                     out += Alert(
                         carStartedId(v),
                         "${v.name} has been started",
