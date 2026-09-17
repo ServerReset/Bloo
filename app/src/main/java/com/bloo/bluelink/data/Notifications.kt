@@ -969,6 +969,47 @@ object CarAlerts {
                 if (settings.alertFired(key)) settings.setAlertFired(key, false)
             }
         }
+
+        // Car started notification: detect transition from engine off to on
+        if (prefs.carStarted && status != null) {
+            val engineOn = status.engine == true
+            if (engineOn && !settings.engineStartNotificationSent(v.vin)) {
+                if (canDeliver) {
+                    out += Alert(
+                        carStartedId(v),
+                        "${v.name} has been started",
+                        "Your car's engine is now running.",
+                    )
+                    settings.setEngineStartNotificationSent(v.vin, true)
+                }
+            } else if (!engineOn) {
+                // Engine is off -- reset the notification flag so it fires again next time
+                if (settings.engineStartNotificationSent(v.vin)) settings.setEngineStartNotificationSent(v.vin, false)
+            }
+        }
+
+        // Charge complete notification: detect transition from charging to complete
+        if (prefs.chargeComplete && status != null) {
+            val isCharging = status.evStatus?.batteryCharge == true
+            if (!isCharging && settings.chargeCompleteNotificationSent(v.vin)) {
+                // Was charging before but no longer is -- already sent the start notification,
+                // so only send complete if we had previously sent the charging notification
+                if (canDeliver) {
+                    out += Alert(
+                        chargeCompleteId(v),
+                        "${v.name} charging is complete",
+                        "Your car has finished charging.",
+                    )
+                }
+                // Reset the flag so we're ready for the next charge cycle
+                settings.setChargeCompleteNotificationSent(v.vin, false)
+            } else if (isCharging) {
+                // Currently charging -- mark that we've started a charge session
+                if (!settings.chargeCompleteNotificationSent(v.vin)) {
+                    settings.setChargeCompleteNotificationSent(v.vin, true)
+                }
+            }
+        }
         return out
     }
 
@@ -979,4 +1020,6 @@ object CarAlerts {
     private fun doorId(v: Vehicle) = ("door" + v.vin).hashCode()
     private fun runningId(v: Vehicle) = ("run" + v.vin).hashCode()
     private fun unlockedId(v: Vehicle) = ("unlocked" + v.vin).hashCode()
+    private fun carStartedId(v: Vehicle) = ("started" + v.vin).hashCode()
+    private fun chargeCompleteId(v: Vehicle) = ("complete" + v.vin).hashCode()
 }

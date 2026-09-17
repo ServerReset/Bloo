@@ -1278,7 +1278,7 @@ internal fun SettingsScreen(
                 // Icon-badge + status-line header, matching Backup & sync/Updates --
                 // this card used to open straight into a wall of toggles with no
                 // at-a-glance read of how many alerts were actually live.
-                val alertToggles = listOf(notif.charging, notif.service, notif.doorOpen, notif.running, notif.unlocked)
+                val alertToggles = listOf(notif.charging, notif.service, notif.doorOpen, notif.running, notif.unlocked, notif.carStarted, notif.chargeComplete)
                 val alertsOn = alertToggles.count { it }
                 val notifTint = if (alertsOn > 0) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.onSurfaceVariant
                 // Icons.Filled.Notifications only -- NotificationsActive/Off aren't in
@@ -1387,6 +1387,8 @@ internal fun SettingsScreen(
                 PopVisible(visible = notif.unlocked) {
                     MinutesField(notif.unlockedMinutes, "Unlocked minutes", vm::setUnlockedMinutes)
                 }
+                ToggleRow("Car started notifications", notif.carStarted) { vm.setNotifyCarStarted(it) }
+                ToggleRow("Charge complete notifications", notif.chargeComplete) { vm.setNotifyChargeComplete(it) }
                 Text(
                     "Background checks run roughly every 30 minutes, so alerts may " +
                         "arrive a little after your set time. Door and running alerts " +

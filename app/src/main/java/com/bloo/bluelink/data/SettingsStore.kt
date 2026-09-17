@@ -464,6 +464,10 @@ class SettingsStore(private val context: Context) {
          *  [com.bloo.bluelink.data.LiveCharge]'s class doc for what that
          *  means precisely and how to verify it's actually working. */
         val charging: Boolean = true,
+        /** Notification when the car's engine is started. */
+        val carStarted: Boolean = true,
+        /** Notification when charging is complete. */
+        val chargeComplete: Boolean = true,
     )
 
     /** The single [NotificationPrefs] decode, shared by both the one-shot
@@ -479,6 +483,8 @@ class SettingsStore(private val context: Context) {
             unlocked = p[booleanPreferencesKey("notify_unlocked")] ?: true,
             unlockedMinutes = p[stringPreferencesKey("notify_unlocked_min")]?.toIntOrNull() ?: 10,
             charging = p[booleanPreferencesKey("notify_charging")] ?: true,
+            carStarted = p[booleanPreferencesKey("notify_start")] ?: true,
+            chargeComplete = p[booleanPreferencesKey("notify_charge_complete")] ?: true,
         )
 
     /** One-shot read of [NotificationPrefs] (vs. the [notifications] Flow below,
@@ -519,6 +525,12 @@ class SettingsStore(private val context: Context) {
 
     suspend fun setNotifyCharging(v: Boolean) =
         editTracked { it[booleanPreferencesKey("notify_charging")] = v }.let {}
+
+    suspend fun setNotifyCarStarted(v: Boolean) =
+        editTracked { it[booleanPreferencesKey("notify_start")] = v }.let {}
+
+    suspend fun setNotifyChargeComplete(v: Boolean) =
+        editTracked { it[booleanPreferencesKey("notify_charge_complete")] = v }.let {}
 
     // Transient alert bookkeeping (per car), used to fire each alert only once.
     // Mechanism: when AlertWorker (see work/AlertWorker.kt) first observes a
@@ -614,6 +626,22 @@ class SettingsStore(private val context: Context) {
 
     suspend fun setLiveChargeDismissed(vin: String, value: Boolean) {
         editTracked { it[booleanPreferencesKey("live_dismissed_$vin")] = value }
+    }
+
+    /** Track the previous engine state per VIN to detect "started" transitions. */
+    suspend fun engineStartNotificationSent(vin: String): Boolean =
+        context.settingsDataStore.data.first()[booleanPreferencesKey("notif_start_sent_$vin")] ?: false
+
+    suspend fun setEngineStartNotificationSent(vin: String, value: Boolean) {
+        editTracked { it[booleanPreferencesKey("notif_start_sent_$vin")] = value }
+    }
+
+    /** Track the previous charging state per VIN to detect "complete" transitions. */
+    suspend fun chargeCompleteNotificationSent(vin: String): Boolean =
+        context.settingsDataStore.data.first()[booleanPreferencesKey("notif_complete_sent_$vin")] ?: false
+
+    suspend fun setChargeCompleteNotificationSent(vin: String, value: Boolean) {
+        editTracked { it[booleanPreferencesKey("notif_complete_sent_$vin")] = value }
     }
 
     suspend fun setUiScale(value: Float) {

@@ -277,6 +277,9 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    fun setNotifyCarStarted(v: Boolean) = viewModelScope.launch { settingsStore.setNotifyCarStarted(v) }
+    fun setNotifyChargeComplete(v: Boolean) = viewModelScope.launch { settingsStore.setNotifyChargeComplete(v) }
+
     /** Write the current live status/location maps to disk (survives restart). */
     private fun persistCache() {
         val s = _state.value
