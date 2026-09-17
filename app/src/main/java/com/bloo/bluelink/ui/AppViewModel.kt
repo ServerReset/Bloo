@@ -2517,10 +2517,11 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     /** Enhance command parsing using Gemini Nano for ambiguous queries. */
-    suspend fun enhanceCommandParsing(
+    internal suspend fun enhanceCommandParsing(
         query: String,
         initialCommand: ParsedVehicleCommand?,
-    ): ParsedVehicleCommand? = enhanceCommandWithAi(query, initialCommand, ai)
+    ): ParsedVehicleCommand? =
+        enhanceCommandWithAi(query, initialCommand, ai)
 
 
     /**

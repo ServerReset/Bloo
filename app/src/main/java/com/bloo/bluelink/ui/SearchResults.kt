@@ -553,7 +553,8 @@ internal fun SettingsSearchResults(
             }
         }
     }
-    if (command != null) {
+    val resolvedCommand = command
+    if (resolvedCommand != null) {
         val ctx = LocalContext.current
         // Whole-word, longest-match car resolution -- NOT a bare substring test.
         // A plain `name in query` lets "Ioniq" match inside "lock my Ioniq 5",
@@ -579,7 +580,7 @@ internal fun SettingsSearchResults(
         LaunchedEffect(submittedQuery) {
             if (targetVehicle != null && !commandExecuted) {
                 actionRunning = true
-                val result = runCatching { TileCommandRunner.run(ctx, targetVehicle.vin, command.cmd, command.climateTarget) }.getOrNull()
+                val result = runCatching { TileCommandRunner.run(ctx, targetVehicle.vin, resolvedCommand.cmd, resolvedCommand.climateTarget) }.getOrNull()
                 actionResult = result?.message ?: "Command failed"
                 actionRunning = false
                 vm.refreshStatus(targetVehicle)
@@ -587,7 +588,7 @@ internal fun SettingsSearchResults(
 
                 // Track this command as recently used
                 try {
-                    RecentCommandsTracker(ctx).recordUsage(command.cmd)
+                    RecentCommandsTracker(ctx).recordUsage(resolvedCommand.cmd)
                 } catch (e: Exception) {
                     // Silently fail - tracking is not critical
                 }
@@ -608,11 +609,11 @@ internal fun SettingsSearchResults(
                     when {
                         targetVehicle == null -> {
                             val example = state.vehicles.firstOrNull()?.name ?: "car"
-                            "Which car? Mention its name, e.g. \"${command.label} my $example\"."
+                            "Which car? Mention its name, e.g. \"${resolvedCommand.label} my $example\"."
                         }
-                        actionRunning -> "${command.label} ${targetVehicle.name}…"
-                        actionResult != null -> actionResult ?: "${command.label} ${targetVehicle.name}"
-                        else -> "${command.label} ${targetVehicle.name}"
+                        actionRunning -> "${resolvedCommand.label} ${targetVehicle.name}…"
+                        actionResult != null -> actionResult ?: "${resolvedCommand.label} ${targetVehicle.name}"
+                        else -> "${resolvedCommand.label} ${targetVehicle.name}"
                     },
                     style = MaterialTheme.typography.bodyMedium,
                 )
