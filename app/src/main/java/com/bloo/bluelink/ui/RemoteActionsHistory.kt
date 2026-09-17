@@ -125,6 +125,13 @@ private fun shortTime(iso: String, use24Hour: Boolean): String = runCatching {
     // default to imperial.
     val clock = if (use24Hour) "HH:mm" else "h:mm a"
     val fmt = if (at.toLocalDate() == today) clock else "d MMM $clock"
+    // NOT hoisted to four file-scope DateTimeFormatters the way SettingsIndex.kt's Rx*
+    // patterns are, even though ofPattern() does parse its pattern on every construction.
+    // ofPattern() with no explicit Locale captures Locale.getDefault() AT CONSTRUCTION, so a
+    // file-scope formatter would freeze this row's month name and AM/PM marker to whatever
+    // locale the process started in -- a device language change recreates activities but not
+    // the process, so the stale text would survive until the app was killed. Six rows in a
+    // panel you have to press a pebble's background to reveal is not worth that.
     at.format(java.time.format.DateTimeFormatter.ofPattern(fmt))
 }.getOrDefault(iso)
 

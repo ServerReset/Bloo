@@ -788,34 +788,10 @@ internal fun ThemedIcon(
     )
 }
 
-/**
- * Full-width row with standard spacing. Consolidates Row + fillMaxWidth() + spacing pattern.
- */
-@Composable
-internal fun StandardRow(
-    modifier: Modifier = Modifier,
-    horizontalArrangement: androidx.compose.foundation.layout.Arrangement.Horizontal = androidx.compose.foundation.layout.Arrangement.spacedBy(12.dp),
-    content: @Composable androidx.compose.foundation.layout.RowScope.() -> Unit,
-) {
-    androidx.compose.foundation.layout.Row(
-        modifier = modifier.fillMaxWidth(),
-        horizontalArrangement = horizontalArrangement,
-        content = content,
-    )
-}
-
-/**
- * Full-width column with standard spacing. Consolidates Column + fillMaxWidth() + spacing pattern.
- */
-@Composable
-internal fun StandardColumn(
-    modifier: Modifier = Modifier,
-    verticalArrangement: androidx.compose.foundation.layout.Arrangement.Vertical = androidx.compose.foundation.layout.Arrangement.spacedBy(8.dp),
-    content: @Composable androidx.compose.foundation.layout.ColumnScope.() -> Unit,
-) {
-    androidx.compose.foundation.layout.Column(
-        modifier = modifier.fillMaxWidth(),
-        verticalArrangement = verticalArrangement,
-        content = content,
-    )
-}
+// StandardRow() and StandardColumn() were deleted here. Both claimed to "consolidate" the
+// Row/Column + fillMaxWidth() + spacedBy pattern, but neither ever gained a single call site
+// anywhere in the app -- unlike LabelText and ThemedIcon above them, which did and stay. They
+// also could not have been used as written: the whole point of the pattern they wrapped is
+// that each site picks its OWN spacing from the layout tokens, and a wrapper whose only
+// contribution is a DEFAULT spacing saves nothing at a site that has to pass its spacing
+// anyway. A helper nothing calls is not a token, it is a guess at one.

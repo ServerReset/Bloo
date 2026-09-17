@@ -98,9 +98,11 @@ internal fun VehicleDetailContent(
     onExpand: (() -> Unit)? = null,
     reserveHeaderEnd: Boolean = false,
     hideIndicator: Boolean = false,
-    // DEPRECATED: Pager dots were removed. This parameter is no longer used
-    // but kept for API compatibility. Always false.
-    reserveTopForDots: Boolean = false,
+    // reserveTopForDots was removed. It reserved room at the top for the pager dots; the dots
+    // are gone app-wide, so the body stopped reading it and its own comment had been reduced to
+    // "no longer used but kept for API compatibility. Always false." There is no API to be
+    // compatible with -- this is an `internal` composable with exactly one caller in the same
+    // module, which passed the literal `false`.
     /** See [CarHeaderRow]'s own doc -- forwarded through so its chips can blur. */
     hazeState: HazeState? = null,
 ) {

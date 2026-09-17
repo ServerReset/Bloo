@@ -8,7 +8,6 @@ import androidx.compose.material.icons.filled.VolumeUp
 import androidx.compose.material.icons.filled.AcUnit
 import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.vector.ImageVector
 import com.bloo.bluelink.data.Vehicle
 
@@ -202,6 +201,13 @@ internal val CommandCatalog = listOf(
     ),
 )
 
+/** The command index's own word splitter, compiled once -- the sibling of SettingsIndex.kt's
+ *  [RxSearchTokens] (which is the same pattern plus `%`, and is what tokenises the QUERY side
+ *  below). Separate rather than shared because the two genuinely differ: a percent sign is
+ *  meaningful in a typed query ("charge to 80%") and is not a word character in a command's
+ *  own title or aliases. */
+private val RxCommandWords = Regex("[^a-z0-9]+")
+
 /**
  * Command search scoring: how well a command matches a query.
  * Uses partial matching on title, keywords, and aliases.
@@ -234,9 +240,16 @@ internal fun commandSearchScore(query: String, command: CommandMetadata, fuzzy: 
     }
 
     // Word-boundary matching (e.g., "start" matches "start climate" but not "restart")
+    // RxCommandWords, not a fresh Regex(...) here: this is the innermost loop of the command
+    // search -- once per catalog entry per query token, so ~17 x n per keystroke -- and
+    // `Regex(...)` parses its pattern and builds a matcher on every CONSTRUCTION. Exactly the
+    // cost SettingsIndex.kt's own Rx* block was extracted to kill on the settings half of the
+    // same search bar; this file's copy of the same splitter had simply never been updated
+    // with it. See that block's doc for the full reasoning and for why file scope (the pattern
+    // is constant) rather than a `remember`.
     val words = (command.title + " " + command.keywords + " " + command.aliases.joinToString(" "))
         .lowercase()
-        .split(Regex("[^a-z0-9]+"))
+        .split(RxCommandWords)
 
     for (word in words) {
         if (word.startsWith(q) && word.length > q.length) return 300
@@ -269,7 +282,11 @@ internal fun getAvailableCommands(vehicles: List<Vehicle>): List<CommandMetadata
  */
 internal fun searchCommands(query: String, vehicles: List<Vehicle>, fuzzy: Boolean = false): List<CommandMetadata> {
     val available = getAvailableCommands(vehicles)
-    val tokens = query.lowercase().split(Regex("[^a-z0-9%]+"))
+    // RxSearchTokens (SettingsIndex.kt), not a fresh Regex: this is the exact same pattern,
+    // for the exact same job, as the settings half of this one search bar -- it had been
+    // re-declared inline here, so the file-scope compile that fixed it there never applied on
+    // this path at all.
+    val tokens = query.lowercase().split(RxSearchTokens)
         .filter { it.isNotBlank() && it !in SearchStopwords }
 
     if (tokens.isEmpty()) return available
@@ -297,31 +314,17 @@ internal fun Vehicle.canCharge(): Boolean {
     return true
 }
 
-/**
- * Get the category-specific icon and color for a command.
- */
-internal fun commandCategoryIcon(category: CommandCategory): ImageVector {
-    return when (category) {
-        CommandCategory.LOCK -> Icons.Filled.Lock
-        CommandCategory.CHARGING -> Icons.Filled.Bolt
-        CommandCategory.CLIMATE -> Icons.Filled.AcUnit
-        CommandCategory.LIGHTS, CommandCategory.HORN -> Icons.Filled.VolumeUp
-        CommandCategory.ENGINE -> Icons.Filled.Bolt
-        CommandCategory.TRUNK -> Icons.Filled.Lock
-        CommandCategory.INFO -> Icons.Filled.VolumeUp
-    }
-}
-
-/**
- * Format the category name for display.
- */
-internal fun CommandCategory.displayName(): String = when (this) {
-    CommandCategory.LOCK -> "Lock & Unlock"
-    CommandCategory.CHARGING -> "Charging"
-    CommandCategory.CLIMATE -> "Climate"
-    CommandCategory.LIGHTS -> "Lights"
-    CommandCategory.HORN -> "Sound & Signals"
-    CommandCategory.ENGINE -> "Engine"
-    CommandCategory.TRUNK -> "Trunk"
-    CommandCategory.INFO -> "Information"
-}
+// commandCategoryIcon() and CommandCategory.displayName() were deleted here, both with zero
+// call sites anywhere in the repo.
+//
+// commandCategoryIcon was a second, parallel icon mapping for something the data already
+// carries: every [CommandMetadata] declares its OWN `icon`, which is what the one place that
+// draws a command suggestion (SearchResults' `cmd.icon`) reads -- and a per-CATEGORY icon is
+// necessarily coarser than the per-command one, so it could only ever have disagreed with it
+// (LOCK and TRUNK both resolving to a padlock, HORN to a speaker). displayName was a set of
+// category headings for a grouped command palette that was never built; commands render as a
+// flat ranked list, the same as settings results.
+//
+// [CommandCategory] itself and [CommandMetadata.category] stay: the enum is the catalog's own
+// declared taxonomy and every entry sets it, so it is real (if currently unread) data, not a
+// leftover. It is only these two never-wired PRESENTATION mappings that go.

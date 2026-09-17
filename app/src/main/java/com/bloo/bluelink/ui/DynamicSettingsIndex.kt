@@ -1,7 +1,5 @@
 package com.bloo.bluelink.ui
 
-import com.bloo.bluelink.data.SettingsStore
-
 /**
  * Helpers to determine which settings are available in the current mode
  * (simple vs. advanced) and should appear in search results.
@@ -47,30 +45,13 @@ internal fun isSettingAvailableInMode(
     }
 }
 
-/**
- * Settings that show per-car data that should always be searchable
- * regardless of mode.
- */
-internal val PER_CAR_DATA_SETTINGS = setOf(
-    "License plate",
-    "Odometer",
-    "VIN",
-    "Range",
-    "Battery",
-    "Fuel",
-    "Last refreshed",
-    "Location",
-    "Powertrain",
-    "Head-unit generation",
-    "Last service",
-    "Service interval",
-)
-
-/**
- * Settings that are advanced-only and should be filtered out in simple mode.
- * These are typically climate defaults, customization options, etc.
- */
-internal val ADVANCED_FEATURES = setOf(
-    "Default climate start",
-    "Custom palette",
-)
+// PER_CAR_DATA_SETTINGS and ADVANCED_FEATURES were deleted here, both with zero references
+// anywhere in the repo.
+//
+// [ADVANCED_ONLY_SETTINGS] above, read by [isSettingAvailableInMode], is the one list this
+// file's gate actually consults. ADVANCED_FEATURES was a strict SUBSET of it ("Default climate
+// start", "Custom palette") declared a second time under a second name -- the exact duplicate
+// that turns a one-line policy change into a hunt for which of two lists is live.
+// PER_CAR_DATA_SETTINGS described an "always searchable regardless of mode" allowlist that
+// isSettingAvailableInMode never had: per-car rows are already mode-gated by the four
+// "<field> · " PREFIXES in ADVANCED_ONLY_SETTINGS, which is why nothing ever needed it.

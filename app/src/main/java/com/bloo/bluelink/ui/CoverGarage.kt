@@ -27,17 +27,13 @@ import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.displayCutout
 import androidx.compose.foundation.layout.union
-import androidx.compose.foundation.layout.windowInsetsPadding
-import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -76,13 +72,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.blur
-import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.layout.boundsInParent
-import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
@@ -95,7 +88,6 @@ import com.bloo.bluelink.data.isGen5W
 import kotlinx.coroutines.flow.first
 import kotlin.math.abs
 import kotlin.math.max
-import com.bloo.uicommon.LocalReorderActive
 
 /**
  * Flip-cover Settings: the REAL scrollable SettingsScreen (the settings grid
@@ -493,10 +485,11 @@ internal fun CompactCar(
     // makes the panel feel like it is wobbling.
     val vWrap = rememberWrapPager(tiles.size)
     val vPager = vWrap.pager
-    // NOT read here. Passing the live index as a lambda keeps the pager's mid-swipe position
-    // out of CompactCar's own scope -- reading it here recomposed the VerticalPager and every
-    // composed tile on the drag's critical path, to move a dot on the right edge.
-    val currentTile = { vWrap.currentReal }
+    // The `currentTile = { vWrap.currentReal }` lambda was removed. It existed to hand the
+    // live tile index to the right-edge dot rail WITHOUT reading it in this scope, and that
+    // rail is gone (see the bottom of this function). With no consumer it was a closure nobody
+    // called -- and the position it deliberately avoided reading is still not read here, which
+    // is the part that mattered.
     // Per-tile scroll states, keyed by tile name so position persists across
     // pager recycling AND reordering. Tall tiles scroll their own content; the
     // VerticalPager then nested-scrolls to the next/previous tile once a tile is
@@ -524,13 +517,13 @@ internal fun CompactCar(
     // cover-screen-only interaction (the normal phone layout doesn't use it).
     val edgeTraceProgress = remember { androidx.compose.animation.core.Animatable(0f) }
     var edgeTraceHolding by remember { mutableStateOf(false) }
-    // The tile-scrubber dots (VerticalPagerDots) are a sibling inside this same
-    // Box, so a press over them still reaches this pointerInput during the
-    // normal ancestor dispatch -- without carving out their bounds, holding
-    // the dots to scrub also started the edge-trace refresh ring underneath,
-    // since edge-trace begins timing on raw down regardless of what else the
-    // touch lands on. Populated by the dots' own onGloballyPositioned below.
-    var dotsBounds by remember { mutableStateOf<androidx.compose.ui.geometry.Rect?>(null) }
+    // `dotsBounds` was removed along with its guard in the gesture handler below. It carved the
+    // tile-scrubber dots' hit area out of the edge-trace hold, so holding the dots to scrub did
+    // not also start the refresh ring underneath them -- but the dots were removed (see the
+    // bottom of this function) and nothing has written to it since, so it was permanently null
+    // and the guard it fed could never fire. A write-only-shaped `var` with no writer is worse
+    // than nothing here: it reads as an active exclusion protecting a gesture that no longer
+    // has anything to collide with.
     LaunchedEffect(edgeTraceHolding) {
         if (edgeTraceHolding) {
             edgeTraceProgress.snapTo(0f)
@@ -569,11 +562,6 @@ internal fun CompactCar(
             .pointerInput(Unit) {
                 awaitEachGesture {
                     val down = awaitFirstDown(requireUnconsumed = false)
-                    // A press starting inside the tile-scrubber dots' own hit
-                    // area belongs entirely to their long-press-to-scrub
-                    // gesture -- don't also start timing an edge-trace hold
-                    // for it (see dotsBounds' declaration above).
-                    if (dotsBounds?.contains(down.position) == true) return@awaitEachGesture
                     // Only arm the edge-trace when the press starts near a screen
                     // EDGE — that's the whole metaphor ("trace around the rim"). It
                     // used to arm on ANY press anywhere, so a slow/stationary press on

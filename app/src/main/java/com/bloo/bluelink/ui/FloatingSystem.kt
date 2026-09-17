@@ -72,10 +72,12 @@ object FloatingIds {
     val Search = FloatingId("search")
     /** The pull-to-refresh spinner, which takes the page dots' place while a refresh runs. */
     val RefreshIndicator = FloatingId("refreshIndicator")
-    /** The cover screen's right-edge tile scrubber. Its own id, not the page dots': it is a
-     *  different control in a different place, and sharing an id would have two elements
-     *  overwriting each other's bounds. */
-    val TileRail = FloatingId("tileRail")
+    // TileRail was removed. It named the cover screen's right-edge tile scrubber, and that
+    // control is gone along with every page indicator in the app ("Vertical page dots removed:
+    // user requested no page indicators", CompactCar) -- so no element ever registered under
+    // it and nothing ever read its bounds. An id in here is a claim that two pieces of chrome
+    // currently negotiate over space, per this object's own doc; an id for chrome that does
+    // not exist is just a name.
 }
 
 @Stable

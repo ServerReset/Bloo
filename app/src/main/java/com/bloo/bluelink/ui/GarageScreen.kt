@@ -564,8 +564,6 @@ internal fun GarageScreen(
                                         // last car in this very pager, reached by
                                         // swiping.
                                         reserveHeaderEnd = false,
-                                        // Pager dots removed: always false now
-                                        reserveTopForDots = false,
                                         // Only hide the per-car pull indicator in the
                                         // multi-car grid (perPage > 1) -- state.refreshing
                                         // is one app-wide flag, not per-car, so leaving

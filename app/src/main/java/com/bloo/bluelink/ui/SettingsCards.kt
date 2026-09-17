@@ -390,21 +390,17 @@ internal fun CarSettingsCard(
             }
 
             SettingsGroup("Sections shown") {
-                val labels = mapOf(
-                    "charge" to "Charge / fuel",
-                    "climate" to "Climate",
-                    "location" to "Location",
-                    "weather" to "Weather",
-                    "trips" to "Trips",
-                    "info" to "Car info",
-                    "diagnostics" to "Diagnostics",
-                    "ai" to "AI summary",
-                )
+                // sectionLabel(), not a local `mapOf` of the same eight strings. That map was
+                // (a) a fresh 8-entry LinkedHashMap allocated on every recomposition of this
+                // per-car group, for a lookup table that is constant, and (b) a second place
+                // the user-facing name of a pebble was written down -- it already had to agree
+                // with sectionLabel() (the hot-spot slot's own label source) and did, string
+                // for string, purely by having been copied from it.
                 com.bloo.bluelink.data.HIDEABLE_SECTIONS
                     // The AI toggle only matters when AI is enabled for this device.
                     .filter { it != "ai" || state.aiEnabled }
                     .forEach { sec ->
-                        ToggleRow(labels[sec] ?: sec, !state.isPebbleHidden(v.vin, sec)) { show ->
+                        ToggleRow(sectionLabel(sec), !state.isPebbleHidden(v.vin, sec)) { show ->
                             vm.setSectionHidden(v, sec, !show)
                         }
                     }

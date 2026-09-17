@@ -610,32 +610,13 @@ internal fun SeatConfigRow(
     }
 }
 
-@Composable
-internal fun CommandButton(
-    label: String,
-    icon: ImageVector,
-    modifier: Modifier,
-    enabled: Boolean,
-    onClick: () -> Unit,
-) {
-    MorphButton(
-        onClick = onClick,
-        enabled = enabled,
-        // 64dp, not ButtonTargetHeight: this is the app's LARGE command button (Open in maps,
-        // the pebble command rows), deliberately taller than a settings button. Its type and
-        // glyph come from the shared tokens even so, so it stays a size variant of the one
-        // button rather than a second look -- ButtonLabelStyle is already what it was hand-
-        // writing as titleMedium, and the glyph matches the icon-only token for the same
-        // reason that one exists: at this size an 18dp icon reads as a speck.
-        modifier = modifier.height(64.dp),
-        contentPadding = PaddingValues(horizontal = 18.dp),
-    ) {
-        // The shared label, at this variant's larger glyph size. Hand-assembling it was the
-        // same three pieces in the same order, minus the fit rule -- so a command button in a
-        // narrow pebble had no way to fall back to its glyph.
-        MorphButtonLabel(icon, label, pending = false, iconSize = ButtonIconOnlySize)
-    }
-}
+// CommandButton() was deleted here. It was the app's LARGE (64dp) command-button variant, and
+// its own doc named its callers: "Open in maps" and the pebble command rows. Both of those
+// stopped being full-width stacked buttons in e0194e2, which replaced them with the shared
+// MapFeature/MapFeatureRow pills the full-screen map's toolbar already used -- leaving this
+// function with zero call sites and a comment describing a layout the app no longer has.
+// Nothing needs a 64dp button now; if something does, MorphButton + MorphButtonLabel is the
+// two-line body this was.
 
 /** A label/value row inside the sync status block: muted label on the left,
  *  emphasised value on the right (monospaced for the File ID so it reads as a

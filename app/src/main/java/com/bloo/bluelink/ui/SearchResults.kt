@@ -115,8 +115,16 @@ internal fun SettingsSearchResults(
     limit: Int = Int.MAX_VALUE,
     hazeState: dev.chrisbanes.haze.HazeState? = null,
 ) {
-    val tokens = query.lowercase().split(RxSearchTokens)
-        .filter { it.isNotBlank() && it !in SearchStopwords }
+    // remember(query), for the same reason `entries` below is remembered: this composable
+    // recomposes on every UiState emission (it takes the whole UiState), not just on a
+    // keystroke, and the token list only ever depends on `query`. The regex itself is already
+    // compiled once at file scope (RxSearchTokens); the split + filter it drives were still
+    // re-running per emission, and their result is the `results` memo's key below, so an
+    // equal-but-new list would have defeated that memo on every recomposition.
+    val tokens = remember(query) {
+        query.lowercase().split(RxSearchTokens)
+            .filter { it.isNotBlank() && it !in SearchStopwords }
+    }
     // Same source the main Settings screen uses for its own Security card gate.
     val canBio = remember { vm.canUseBiometrics() }
 
@@ -378,15 +386,24 @@ internal fun SettingsSearchResults(
     // strict one found nothing -- so a real match is never outranked by a
     // one-typo guess, and the cost of scanning every word of every entry is
     // only paid on a query that was going to show "no matches" otherwise.
-    val results = if (tokens.isEmpty()) {
-        entries
-    } else {
-        val strict = entries.mapNotNull { e -> searchScore(tokens, e, fuzzy = false)?.let { e to it } }
-        val scored = strict.ifEmpty {
-            entries.mapNotNull { e -> searchScore(tokens, e, fuzzy = true)?.let { e to it } }
-        }
-        scored.sortedByDescending { it.second }.map { it.first }
-    }.let { if (it.size > limit) it.take(limit) else it }
+    // remember(entries, tokens, limit) -- the exact same reasoning as the `entries` memo
+    // above, applied to the pass that CONSUMES it. Scoring is a full scan of every one of the
+    // ~50 entries' keyword strings (twice, when the strict pass finds nothing and the fuzzy
+    // fallback runs) plus a sort, and none of it depends on anything but these three values.
+    // It was re-running on every recomposition of this composable, which includes every
+    // unrelated UiState emission while the panel is open -- a car's status tick, a weather
+    // fetch, a log line -- not just the keystrokes it actually tracks.
+    val results = remember(entries, tokens, limit) {
+        if (tokens.isEmpty()) {
+            entries
+        } else {
+            val strict = entries.mapNotNull { e -> searchScore(tokens, e, fuzzy = false)?.let { e to it } }
+            val scored = strict.ifEmpty {
+                entries.mapNotNull { e -> searchScore(tokens, e, fuzzy = true)?.let { e to it } }
+            }
+            scored.sortedByDescending { it.second }.map { it.first }
+        }.let { if (it.size > limit) it.take(limit) else it }
+    }
     // Floating search results use GlassSurface, the same unified glass chrome
     // as every other floating surface (dialogs, overlays, status bar).
     // This replaces the old plain Card + tonal elevation approach.
@@ -527,16 +544,28 @@ internal fun SettingsSearchResults(
         // several still match at that longest length the query is genuinely
         // ambiguous, so refuse to dispatch and ask which car (targetVehicle
         // stays null → the "Which car?" branch below).
-        val q = submittedQuery.lowercase()
-        val nameMatches = state.vehicles.filter { v ->
-            v.name.isNotBlank() &&
-                Regex("\\b" + Regex.escape(v.name.lowercase()) + "\\b").containsMatchIn(q)
+        //
+        // remember(submittedQuery, state.vehicles): this is the one pattern SettingsIndex's
+        // own Rx* block explicitly could NOT hoist to file scope ("any pattern built from a
+        // runtime value (a vehicle's own name) is left where it is"), so it gets the other
+        // half of that fix instead -- memoized rather than constant. `Regex(...)` compiles
+        // its pattern on CONSTRUCTION, and this constructed ONE PER CAR inside a composable
+        // body that recomposes on every UiState emission while a submitted command is on
+        // screen (this branch is live for as long as the Action card shows, and the command
+        // it ran is exactly what makes the car's status start ticking). The resolution only
+        // depends on the submitted text and the car list, so those are the keys.
+        val targetVehicle = remember(submittedQuery, state.vehicles) {
+            val q = submittedQuery.lowercase()
+            val nameMatches = state.vehicles.filter { v ->
+                v.name.isNotBlank() &&
+                    Regex("\\b" + Regex.escape(v.name.lowercase()) + "\\b").containsMatchIn(q)
+            }
+            val longestMatchLen = nameMatches.maxOfOrNull { it.name.length }
+            val namedVehicle = nameMatches.filter { it.name.length == longestMatchLen }.singleOrNull()
+            // Only fall back to "the one car" when NO name matched at all; if a name
+            // matched but was ambiguous, do not silently pick a car.
+            namedVehicle ?: if (nameMatches.isEmpty()) state.vehicles.singleOrNull() else null
         }
-        val longestMatchLen = nameMatches.maxOfOrNull { it.name.length }
-        val namedVehicle = nameMatches.filter { it.name.length == longestMatchLen }.singleOrNull()
-        // Only fall back to "the one car" when NO name matched at all; if a name
-        // matched but was ambiguous, do not silently pick a car.
-        val targetVehicle = namedVehicle ?: if (nameMatches.isEmpty()) state.vehicles.singleOrNull() else null
         var actionResult by remember(submittedQuery) { mutableStateOf<String?>(null) }
         var actionRunning by remember(submittedQuery) { mutableStateOf(false) }
         var commandExecuted by remember(submittedQuery) { mutableStateOf(false) }

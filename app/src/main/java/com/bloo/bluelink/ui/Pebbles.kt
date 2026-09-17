@@ -127,6 +127,13 @@ internal fun sectionLabel(section: String): String = when (section) {
     "info" -> "Car info"
     "diagnostics" -> "Diagnostics"
     "controls" -> "Lock / climate"
+    // Was falling through to the generic capitalise, which renders "Ai" -- visible in the
+    // hot-spot slot's pin dropdown and its pinned-section caption, right next to a pebble
+    // whose own title is "AI summary". The name of a section belongs in this one `when`, so
+    // this is also where the SettingsCards copy of the exact same mapping (an 8-entry map
+    // allocated fresh on every recomposition of the per-car "Sections shown" group, with these
+    // same seven strings verbatim) now resolves through instead of re-declaring them.
+    "ai" -> "AI summary"
     else -> section.replaceFirstChar { it.uppercase() }
 }
 

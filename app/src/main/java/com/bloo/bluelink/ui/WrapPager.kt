@@ -84,7 +84,12 @@ internal fun wrapPageToward(currentPage: Int, pageCount: Int, realCount: Int, ta
 internal class WrapPagerState(val pager: PagerState, val realCount: Int) {
     fun real(page: Int): Int = wrapRealIndex(page, realCount)
     val currentReal: Int get() = real(pager.currentPage)
-    val settledReal: Int get() = real(pager.settledPage)
+    // settledReal was removed: zero readers. Both places that care about a SETTLE go through
+    // `snapshotFlow { pager.settledPage }.collect { real(it) }` instead (GarageScreen's and
+    // CompactGarage's pager-settle effects), because they need the settle as an EVENT, not as
+    // a value to read during composition -- and reading a settled page in composition scope is
+    // the exact subscription those pagers are built to avoid, so a convenience accessor for it
+    // was never going to be the right shape.
     /** Jump so the currently-shown page maps to [target], picking the nearest
      *  virtual page in the current direction (no long fly-through). */
     suspend fun snapToReal(target: Int) {
