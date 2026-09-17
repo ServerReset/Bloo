@@ -308,6 +308,14 @@ data class UiState(
      *  vehicles. Distinguishes a real failure from "not signed in" / "no
      *  vehicles" in [Screen.Empty]. Cleared by the next successful load. */
     val garageLoadError: String? = null,
+    /** Whether [garageLoadError] happened while the device had no real internet
+     *  connectivity, as opposed to a live network reporting an actual API/auth
+     *  failure. [Screen.Empty] uses this to show a plain "no connection" page
+     *  instead of surfacing a raw exception message for something the user can't
+     *  act on beyond "check your connection" -- and, just as importantly, to NOT
+     *  show it for a real API error while genuinely online. Meaningless when
+     *  [garageLoadError] is null. */
+    val garageLoadOffline: Boolean = false,
 ) {
     fun statusFor(v: Vehicle): VehicleStatus? = statuses[v.vin]
 

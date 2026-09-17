@@ -1020,6 +1020,21 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    /** Whether the device currently has a validated internet-capable network --
+     *  not just "some network interface is up", which is also true mid-captive-
+     *  portal or on a link with no actual internet behind it. Used to tell a real
+     *  API/auth failure (garageLoadError while genuinely online) apart from the
+     *  device simply having no connection at all, so [Screen.Empty] only shows
+     *  the plain "no connection" page for the latter. */
+    private fun isDeviceOnline(): Boolean {
+        val cm = getApplication<Application>()
+            .getSystemService(android.content.Context.CONNECTIVITY_SERVICE) as? android.net.ConnectivityManager
+            ?: return true
+        val caps = cm.getNetworkCapabilities(cm.activeNetwork) ?: return false
+        return caps.hasCapability(android.net.NetworkCapabilities.NET_CAPABILITY_INTERNET) &&
+            caps.hasCapability(android.net.NetworkCapabilities.NET_CAPABILITY_VALIDATED)
+    }
+
     private suspend fun loadGarageInner() {
         // Fire-and-forget, in parallel with the vehicle fetch below (its own
         // viewModelScope.launch, not awaited here) -- refreshes the DEVICE's own
@@ -1070,7 +1085,14 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             // session -- bootstrapDriveSync is idempotent (AtomicBoolean guard),
             // so the non-empty path below calling it again is a no-op.
             bootstrapDriveSync()
-            _state.update { it.copy(vehicles = emptyList(), screen = Screen.Empty, garageLoadError = lastError) }
+            _state.update {
+                it.copy(
+                    vehicles = emptyList(),
+                    screen = Screen.Empty,
+                    garageLoadError = lastError,
+                    garageLoadOffline = lastError != null && !isDeviceOnline(),
+                )
+            }
             return
         }
         // ONE Preferences read for every per-car setting below (including vehicleOrder,

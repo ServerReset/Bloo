@@ -424,17 +424,29 @@ internal fun EmptyScreen(vm: AppViewModel) {
     val haptics = LocalHaptics.current
     // Note: pull-to-refresh feature temporarily disabled due to Material 3 version compatibility
 
-    // Three distinct causes used to collapse into the same "No vehicles
-    // found" / "Not signed in" copy -- including a real network/API
-    // failure, which then looked exactly like the app had silently
-    // signed the user out. Each now gets its own icon, headline, and
-    // primary action so the actual cause is always clear.
+    // Four distinct causes used to collapse into the same "No vehicles found" /
+    // "Not signed in" copy -- including a real network/API failure, which then
+    // looked exactly like the app had silently signed the user out. Each now
+    // gets its own icon, headline, and primary action so the actual cause is
+    // always clear. A true connectivity failure (garageLoadOffline) gets its
+    // own plain "no connection" copy instead of a raw exception message --
+    // there's nothing actionable in that message beyond "check your
+    // connection", which the dedicated copy already says -- and, gated the
+    // other way, an error that happens while the device IS online (an auth
+    // failure, a 500, etc.) keeps the more specific message since that one
+    // might actually help.
     val loadFailed = state.accounts.isNotEmpty() && state.garageLoadError != null
+    val offline = loadFailed && state.garageLoadOffline
     val (icon, headline, body) = when {
         state.accounts.isEmpty() -> Triple(
             Icons.Filled.CloudOff,
             "Not signed in",
             "Sign in to your Hyundai, Kia, or Genesis account in Settings to get started.",
+        )
+        offline -> Triple(
+            Icons.Filled.WifiOff,
+            "No connection",
+            "Bloo can't reach the internet right now. You're still signed in -- check your connection and tap Reload.",
         )
         loadFailed -> Triple(
             Icons.Filled.WifiOff,
