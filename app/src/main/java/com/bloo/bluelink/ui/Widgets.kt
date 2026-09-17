@@ -264,10 +264,21 @@ internal fun SettingsModeTab(
     val haptics = LocalHaptics.current
     val scheme = MaterialTheme.colorScheme
 
+    // Starts at y = 0 -- genuinely UNDER the status bar icons, not merely
+    // butted up against where they end. The previous version's outer Box
+    // carried `padding(top = topInset)`, which pushed the WHOLE surface
+    // (fill, blur and all) to start exactly where the status bar's own
+    // scrim stops -- a real seam between two abutting-but-separate things,
+    // not a border/shadow mismatch, which is why fixing the border/shadow
+    // alone (an earlier pass) didn't read as "coming from the status bar."
+    // A physical file tab pokes out from BEHIND the folder edge, not from a
+    // clean break at it -- so this surface's own glass now runs continuously
+    // from the very top of the screen down through its own visible bottom,
+    // and only the CONTENT inside it (the segmented control) is inset below
+    // the status bar so the system clock/battery icons stay legible over it.
     Box(
         Modifier
             .fillMaxWidth()
-            .padding(top = topInset)
             .padding(end = HeaderCornerGap),
         contentAlignment = Alignment.TopEnd,
     ) {
@@ -281,22 +292,24 @@ internal fun SettingsModeTab(
             modifier = Modifier.width(172.dp),
             hazeState = hazeState,
         ) {
-            com.bloo.uicommon.MorphSegmented(
-                options = listOf(
-                    SegmentOption("simple", "Simple", null),
-                    SegmentOption("advanced", "Advanced", null),
-                ),
-                selectedKey = settingsMode,
-                onSelect = onSettingsModeChange,
-                containerColor = Color.Transparent,
-                indicatorColor = scheme.primary,
-                selectedTextColor = scheme.onPrimary,
-                unselectedTextColor = scheme.onSurfaceVariant,
-                textStyle = ButtonLabelStyle,
-                onTick = { haptics?.tick() },
-                trackHeight = HeaderButtonSize,
-                borderColor = null,
-            )
+            Box(Modifier.padding(top = topInset)) {
+                com.bloo.uicommon.MorphSegmented(
+                    options = listOf(
+                        SegmentOption("simple", "Simple", null),
+                        SegmentOption("advanced", "Advanced", null),
+                    ),
+                    selectedKey = settingsMode,
+                    onSelect = onSettingsModeChange,
+                    containerColor = Color.Transparent,
+                    indicatorColor = scheme.primary,
+                    selectedTextColor = scheme.onPrimary,
+                    unselectedTextColor = scheme.onSurfaceVariant,
+                    textStyle = ButtonLabelStyle,
+                    onTick = { haptics?.tick() },
+                    trackHeight = HeaderButtonSize,
+                    borderColor = null,
+                )
+            }
         }
     }
 }
