@@ -257,13 +257,35 @@ internal fun GarageScreen(
     val expandedMap = remember { ExpandedMapState() }
     // How many full-height cards fit side by side; pages advance by this many.
     val perPage = (widthDp / MIN_CARD_DP).coerceIn(1, count)
+    // Hoisted above the block-pager setup below (which also reads this) so
+    // singleLarge, just below, can gate on it too. See the "|| landOnSettingsPage"
+    // half's own doc further down, where the rest of this value's usage lives.
+    val settingsAsPage = appearance.settingsAsPage || state.value.landOnSettingsPage
     // Expanding to the dual-column view only makes sense on a wide screen.
     val canExpand = large && count > 1
-    val singleLarge = large && count == 1
+    // The lone car on a big screen skips the grid/pager entirely and goes
+    // straight to the full-screen dual-column view -- with only one car, the
+    // block-pager below would just be a single page with one car in it, so
+    // this is a shortcut to the same visual result, not a different feature.
+    // Gated on !settingsAsPage: when the user has opted into reaching Settings
+    // by swiping (Appearance.settingsAsPage), that swipe target is a second
+    // page on the BLOCK PAGER below, not on this expanded view's own pager
+    // (exWrap, a plain wrap over `count` cars with no Settings slot of its
+    // own and finger-swipe disabled entirely -- see its own doc). Without this
+    // guard, singleLarge unconditionally won the isExpanded fork below and
+    // silently made Settings unreachable by swipe for exactly this one
+    // combination (a single car on a wide screen) while working everywhere else.
+    val singleLarge = large && count == 1 && !settingsAsPage
     // A car expanded by the user (multi-car), or the lone car on a big screen.
     val expandedByUser = state.value.expandedIndex?.takeIf { it in vehicles.indices && canExpand }
     val expandedIdx = if (singleLarge) 0 else expandedByUser
 
+    // Deliberately excludes singleLarge: collapsing a lone car has nowhere
+    // to collapse TO (there is no grid behind it, just this same one car),
+    // so system back falls through to whatever the default is outside this
+    // screen instead of this screen intercepting it to do nothing useful.
+    // The "Back to all cars" button below is gated the same way for the
+    // same reason.
     BackHandler(enabled = expandedByUser != null) { vm.collapse() }
 
     CompositionLocalProvider(LocalPullFraction provides pullFractionState, LocalExpandedMap provides expandedMap) {
@@ -368,45 +390,43 @@ internal fun GarageScreen(
                     // Pager dots removed: user requested no page indicators at the top of the screen
                 }
             } else {
-                val pageCount = (count + perPage - 1) / perPage
-                // One extra real "block" tacked onto the end for Settings, when the
-                // user has opted into reaching it by swiping instead of the gear
-                // button (Appearance.settingsAsPage) -- WrapPagerState.realCount is
-                // already just "how many real things this cycles through," so it
-                // costs nothing else here to hand it one more than the car-block
-                // count and treat that extra index specially below and in the page
-                // renderer. block == pageCount (never a valid car block index, which
-                // only ever run 0 until pageCount-1) is what marks it as the
-                // Settings slot rather than a car.
-                // appearance.settingsAsPage || state.value.landOnSettingsPage, not
-                // appearance.settingsAsPage alone: the preference write behind that
-                // flag goes through DataStore, and DataStore is genuinely async --
-                // the frame right after closeSettings(landOnSettingsPage = true)
-                // (itself a synchronous UiState update) can still read the OLD
-                // value here for a beat, before the write finishes its round trip
-                // back through the Flow. Without the OR, totalBlocks below would
-                // stay at the OLD (no-Settings-slot) count on that first frame,
-                // making initialBlock's `pageCount` seed a few lines down point at
-                // a block that doesn't exist yet -- landOnSettingsPage is
-                // unambiguous proof the slot is about to exist regardless of
-                // which frame the DataStore write actually lands on.
-                val settingsAsPage = appearance.settingsAsPage || state.value.landOnSettingsPage
-                val totalBlocks = if (settingsAsPage) pageCount + 1 else pageCount
+                // settingsAsPage is hoisted above (see its own doc up there for why
+                // it's the OR and not appearance.settingsAsPage alone).
+                //
+                // Settings, when settingsAsPage is on, is appended as one more ITEM
+                // to the sequence this pager cycles through (index `count`, right
+                // after the last real car) rather than getting its own dedicated
+                // perPage-wide block. On a wide/multi-car screen (perPage > 1) that
+                // means Settings lands in the same block as whatever real cars are
+                // left over in the final partial block -- e.g. 3 cars at perPage 2
+                // puts car 2 alongside Settings, each rendered at the same single
+                // car-column width below -- instead of getting a whole extra block
+                // to itself that stretched SettingsScreen's own embedded content
+                // (its LazyVerticalStaggeredGrid) out to the full multi-car width.
+                // Reported directly as wanting Settings to never be wider than one
+                // car's column, however many cars share the screen with it.
+                // The two `currentIndex`-derived targetBlock calcs further down
+                // divide by perPage directly and never needed a car-only block
+                // count of their own -- they only mean "which car," never Settings.
+                val total = if (settingsAsPage) count + 1 else count
+                val totalBlocks = (total + perPage - 1) / perPage
                 // Normally the car currentIndex was already parked on. The one
                 // exception is state.value.landOnSettingsPage (see its own doc): Settings
                 // itself just switched settingsAsPage on and asked to be followed,
-                // so this fresh mount seeds straight onto the just-created Settings
-                // slot instead of whichever car was selected before Settings was
-                // ever opened -- otherwise the user would land on a car for one
-                // frame before having to go find the page themselves.
+                // so this fresh mount seeds straight onto the block containing the
+                // just-created Settings slot (index `count`, the first index past
+                // every real car) instead of whichever car was selected before
+                // Settings was ever opened -- otherwise the user would land on a
+                // car for one frame before having to go find the page themselves.
                 val initialBlock = if (state.value.landOnSettingsPage && settingsAsPage) {
-                    pageCount
+                    count / perPage
                 } else {
                     (currentIndex.coerceIn(0, count - 1)) / perPage
                 }
                 // Infinite wrap-around: WrapPagerState.realCount is the BLOCK count
-                // here (ceil(count / perPage), plus the Settings slot if enabled), and
-                // the real vehicle index for a page is realBlock(page) * perPage.
+                // here (ceil(total / perPage), Settings item folded into `total`
+                // when present), and the real vehicle index for a page is
+                // realBlock(page) * perPage.
                 val wrap = rememberWrapPager(totalBlocks, initialBlock)
                 val pager = wrap.pager
                 fun realBlock(virtualPage: Int) = wrap.real(virtualPage)
@@ -424,12 +444,12 @@ internal fun GarageScreen(
                 // already there) and is the actual fix in the uncommon one.
                 LaunchedEffect(state.value.landOnSettingsPage) {
                     if (state.value.landOnSettingsPage) {
-                        if (settingsAsPage) wrap.snapToReal(pageCount)
+                        if (settingsAsPage) wrap.snapToReal(count / perPage)
                         vm.consumeLandOnSettingsPage()
                     }
                 }
                 // Keyed on totalBlocks too, not just pager/perPage: this effect's
-                // own collect{} closes over realBlock/pageCount/settingsAsPage as
+                // own collect{} closes over realBlock/total/settingsAsPage as
                 // they were the moment it (re)started. Toggling Appearance.
                 // settingsAsPage from a search result while GarageScreen stays
                 // mounted the whole time (see that toggle's own comment -- it
@@ -438,7 +458,7 @@ internal fun GarageScreen(
                 // key the running coroutine kept using a stale, pre-toggle
                 // settingsAsPage (permanently false, so onSettingsPageSlot could
                 // never become true and the search bubble never morphed to a
-                // pill) AND a stale pageCount/realBlock pairing that no longer
+                // pill) AND a stale total/realBlock pairing that no longer
                 // matched the pager's own (live) virtual page count -- a
                 // mismatched modulus that could resolve `block` to an unrelated
                 // number and fire selectIndex with a bogus index. Restarting here
@@ -446,19 +466,28 @@ internal fun GarageScreen(
                 // count changes.
                 LaunchedEffect(pager, perPage, totalBlocks) {
                     snapshotFlow { pager.settledPage }.collect { page ->
-                        // Guarded: the Settings slot isn't a car block, and
+                        val block = realBlock(page)
+                        val start = block * perPage
+                        // Guarded: a block past the last real car (only possible
+                        // when settingsAsPage folded Settings in as the final
+                        // item and this block is Settings-only, e.g. an exact
+                        // multiple of perPage cars) isn't a car block at all, and
                         // selectIndex/currentIndex only ever mean "which car" --
                         // settling there should leave whatever car was last
                         // selected exactly as it was, so swiping back to a car
                         // lands where you left it instead of snapping to car 0.
-                        val block = realBlock(page)
-                        if (block < pageCount) vm.selectIndex((block * perPage).coerceIn(0, count - 1))
+                        // A block that mixes leftover cars WITH Settings (the
+                        // usual case once Settings is folded in) still selects
+                        // the real car(s) it holds same as ever.
+                        if (start < count) vm.selectIndex(start.coerceIn(0, count - 1))
                         // See UiState.onSettingsPageSlot's own doc -- this is what
                         // lets SearchLayer's floating bubble/pill morph track the
                         // embedded Settings page the same way it already tracks
                         // the standalone route, instead of staying a garage
-                        // "bubble" the whole time it's on screen.
-                        vm.setOnSettingsPageSlot(settingsAsPage && block == pageCount)
+                        // "bubble" the whole time it's on screen. True whenever
+                        // Settings' folded-in slot (index `count`) falls within
+                        // this settled block, mixed with cars or not.
+                        vm.setOnSettingsPageSlot(settingsAsPage && minOf(start + perPage, total) == total)
                     }
                 }
                 // Resets the flag above the moment this pager itself leaves
@@ -648,7 +677,11 @@ internal fun GarageScreen(
                         // per-page transform at all, just a plain flat scroll.
                         val block = realBlock(page)
                         val start = block * perPage
-                        val end = minOf(start + perPage, count)
+                        // `total`, not `count`: Settings, when settingsAsPage folded it
+                        // in above, is item index `count` -- one past the last real
+                        // car -- and needs to be included in this block's own range so
+                        // it renders alongside whatever real cars share its block.
+                        val end = minOf(start + perPage, total)
                         // The "is this the settled page" test used to live here, as
                         // `page == pager.settledPage`. Discrete, yes -- but it still
                         // subscribed this page's composition to settledPage, so every
@@ -677,59 +710,68 @@ internal fun GarageScreen(
                         // The transition this was meant to improve is not worth
                         // the gesture it happens during: a swipe that tracks the
                         // finger exactly IS the effect.
-                        if (settingsAsPage && block == pageCount) {
-                            // The extra slot: Settings itself, embedded rather than
-                            // navigated to -- see SettingsScreen's own `embedded` doc.
-                            SettingsScreen(vm, embedded = true)
-                        } else {
                         // No explicit horizontal gap here (no Arrangement.spacedBy): each
                         // car's own VehicleDetailContent already carries 16.dp of horizontal
                         // padding on both edges (see its Column), so two adjacent cars in this
                         // Row already sit 32.dp apart. An extra spacedBy() on top of that would
                         // double-count the gap and read as too much dead space between columns
-                        // on an already width-constrained (perPage > 1) screen.
+                        // on an already width-constrained (perPage > 1) screen. Settings, folded
+                        // into this same Row below, gets that identical 32.dp neighbour gap for
+                        // free too -- it never needed a gap rule of its own.
                         Row(Modifier.fillMaxSize()) {
                             for (i in start until end) {
-                                val gv = vehicles[i]
                                 Box(Modifier.weight(1f).fillMaxHeight()) {
-                                    CarThemeOverride(
-                                        paletteId = appearance.carCustomPaletteIds[gv.vin],
-                                        customPalettes = appearance.customPalettes,
-                                        themeMode = appearance.themeMode,
-                                        vibrancy = appearance.vibrancy,
-                                    ) {
-                                        VehicleDetailContent(
-                                            gv, state, vm,
-                                            onExpand = if (canExpand) ({ vm.expand(i) }) else null,
-                                            // Dynamic, not a flat "last car always leaves
-                                            // room": the persistent gear button this is
-                                            // dodging is itself hidden right here, in the
-                                            // collapsed grid, whenever settingsAsPage is on
-                                            // (see that button's own condition below --
-                                            // expandedIdx is always null in this branch, so
-                                            // its "|| expandedIdx != null" half never
-                                            // applies). Reserving the gap for a button
-                                            // that isn't there just left the last car's own
-                                            // expand button sitting noticeably further from
-                                            // the true corner than every other car's, for
-                                            // no reason once nothing was actually competing
-                                            // with it.
-                                            reserveHeaderEnd = canExpand && i == end - 1 && !appearance.settingsAsPage,
-                                            // Pager dots removed: always false now
-                                            reserveTopForDots = false,
-                                            // Only hide the per-car pull indicator in the
-                                            // multi-car grid (perPage > 1) -- a prior fix
-                                            // meant for the grid only ended up applying here
-                                            // unconditionally, silently killing the single-
-                                            // car view's refresh feedback too.
-                                            hideIndicator = perPage > 1,
-                                            hazeState = hazeState,
-                                        )
+                                    if (i == count) {
+                                        // The folded-in Settings item -- see `total`'s own doc
+                                        // above for why this is a same-width Row sibling now
+                                        // instead of a dedicated full-block branch. embedded,
+                                        // not navigated to -- see SettingsScreen's own `embedded`
+                                        // doc. Sized to exactly one car's column by the same
+                                        // weight(1f) every real car in this Row already uses, so
+                                        // its own LazyVerticalStaggeredGrid naturally collapses
+                                        // to a single column here instead of spreading across
+                                        // the whole multi-car width.
+                                        SettingsScreen(vm, embedded = true)
+                                    } else {
+                                        val gv = vehicles[i]
+                                        CarThemeOverride(
+                                            paletteId = appearance.carCustomPaletteIds[gv.vin],
+                                            customPalettes = appearance.customPalettes,
+                                            themeMode = appearance.themeMode,
+                                            vibrancy = appearance.vibrancy,
+                                        ) {
+                                            VehicleDetailContent(
+                                                gv, state, vm,
+                                                onExpand = if (canExpand) ({ vm.expand(i) }) else null,
+                                                // Dynamic, not a flat "last car always leaves
+                                                // room": the persistent gear button this is
+                                                // dodging is itself hidden right here, in the
+                                                // collapsed grid, whenever settingsAsPage is on
+                                                // (see that button's own condition below --
+                                                // expandedIdx is always null in this branch, so
+                                                // its "|| expandedIdx != null" half never
+                                                // applies). Reserving the gap for a button
+                                                // that isn't there just left the last car's own
+                                                // expand button sitting noticeably further from
+                                                // the true corner than every other car's, for
+                                                // no reason once nothing was actually competing
+                                                // with it.
+                                                reserveHeaderEnd = canExpand && i == end - 1 && !appearance.settingsAsPage,
+                                                // Pager dots removed: always false now
+                                                reserveTopForDots = false,
+                                                // Only hide the per-car pull indicator in the
+                                                // multi-car grid (perPage > 1) -- a prior fix
+                                                // meant for the grid only ended up applying here
+                                                // unconditionally, silently killing the single-
+                                                // car view's refresh feedback too.
+                                                hideIndicator = perPage > 1,
+                                                hazeState = hazeState,
+                                            )
+                                        }
                                     }
                                 }
                             }
                             repeat(perPage - (end - start)) { Spacer(Modifier.weight(1f)) }
-                        }
                         }
                     }
                     // Always active, even during this pager's real finger-swipe drags --
@@ -743,7 +785,7 @@ internal fun GarageScreen(
                     // is one app-wide flag, not per-car, so leaving them unhidden
                     // would light up every visible card's spinner for a refresh
                     // that only touched one of them. But that left a real gap:
-                    // pageCount == 1 (every car already fits on one page, common
+                    // count <= perPage (every car already fits on one page, common
                     // on tablets) meant PagerDots above never renders either, so
                     // pulling to refresh in the grid had *zero* visual feedback of
                     // any kind. One shared, real M3 Expressive indicator here
