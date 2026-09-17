@@ -228,22 +228,48 @@ internal fun OwnerLinks(v: Vehicle, state: UiState, context: Context, inApp: Boo
 
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         group("App & account") {
-            MorphActionButton("${links.appName} app", Icons.Filled.OpenInNew) {
-                openApp(context, listOf(links.appPackage), links.playStoreUrl, inApp)
-            }
-            MorphActionButton("Owners site", Icons.Filled.Person) { openUrl(context, links.ownersUrl, inApp) }
+            MorphActionButton(
+                label = "${links.appName} app",
+                icon = Icons.Filled.OpenInNew,
+                onClick = { openApp(context, listOf(links.appPackage), links.playStoreUrl, inApp) },
+            )
+            MorphActionButton(
+                label = "Owners site",
+                icon = Icons.Filled.Person,
+                onClick = { openUrl(context, links.ownersUrl, inApp) },
+            )
             // Features-on-Demand store (themes, lighting patterns…): ccNC-era
             // head units only - older Gen5W cars have nothing to buy. Honours
             // the user's own confirmed generation over the raw API guess.
             if (state.supportsConnectedStoreEffective(v)) {
-                MorphActionButton("Car store", Icons.Filled.Storefront) { openUrl(context, links.storeUrl, inApp) }
+                MorphActionButton(
+                    label = "Car store",
+                    icon = Icons.Filled.Storefront,
+                    onClick = { openUrl(context, links.storeUrl, inApp) },
+                )
             }
         }
         group("Service") {
-            MorphActionButton("Schedule service", Icons.Filled.Build) { openUrl(context, links.serviceScheduleUrl, inApp) }
-            MorphActionButton(links.dealerLabel, Icons.Filled.Place) { openUrl(context, links.dealerUrl, inApp) }
-            MorphActionButton("Manuals", Icons.Filled.MenuBook) { openUrl(context, links.manualsUrl, inApp) }
-            MorphActionButton("Roadside", Icons.Filled.Call) { dial(context, links.roadsidePhone) }
+            MorphActionButton(
+                label = "Schedule service",
+                icon = Icons.Filled.Build,
+                onClick = { openUrl(context, links.serviceScheduleUrl, inApp) },
+            )
+            MorphActionButton(
+                label = links.dealerLabel,
+                icon = Icons.Filled.Place,
+                onClick = { openUrl(context, links.dealerUrl, inApp) },
+            )
+            MorphActionButton(
+                label = "Manuals",
+                icon = Icons.Filled.MenuBook,
+                onClick = { openUrl(context, links.manualsUrl, inApp) },
+            )
+            MorphActionButton(
+                label = "Roadside",
+                icon = Icons.Filled.Call,
+                onClick = { dial(context, links.roadsidePhone) },
+            )
         }
         // Digital Key: Gen5W head units use DK1 (BLE/NFC dedicated app).
         // Gen3+ and all Kia models use DK2 (UWB via wallet).
@@ -253,38 +279,54 @@ internal fun OwnerLinks(v: Vehicle, state: UiState, context: Context, inApp: Boo
         group("Digital Car Key") {
             if (isGen5W) {
                 when (v.brand) {
-                    Brand.HYUNDAI -> MorphActionButton("Digital Key", Icons.Filled.VpnKey) {
-                        openApp(
-                            context,
-                            listOf("com.hyundaiusa.hyundai.digitalcarkey"),
-                            "https://play.google.com/store/apps/details?id=com.hyundaiusa.hyundai.digitalcarkey",
-                            inApp,
-                        )
-                    }
-                    Brand.GENESIS -> MorphActionButton("Digital Key", Icons.Filled.VpnKey) {
-                        openApp(
-                            context,
-                            listOf("com.genesisusa.genesis.digitalcarkey"),
-                            "https://play.google.com/store/apps/details?id=com.genesisusa.genesis.digitalcarkey",
-                            inApp,
-                        )
-                    }
+                    Brand.HYUNDAI -> MorphActionButton(
+                        label = "Digital Key",
+                        icon = Icons.Filled.VpnKey,
+                        onClick = {
+                            openApp(
+                                context,
+                                listOf("com.hyundaiusa.hyundai.digitalcarkey"),
+                                "https://play.google.com/store/apps/details?id=com.hyundaiusa.hyundai.digitalcarkey",
+                                inApp,
+                            )
+                        },
+                    )
+                    Brand.GENESIS -> MorphActionButton(
+                        label = "Digital Key",
+                        icon = Icons.Filled.VpnKey,
+                        onClick = {
+                            openApp(
+                                context,
+                                listOf("com.genesisusa.genesis.digitalcarkey"),
+                                "https://play.google.com/store/apps/details?id=com.genesisusa.genesis.digitalcarkey",
+                                inApp,
+                            )
+                        },
+                    )
                     Brand.KIA, Brand.HYUNDAI_CA, Brand.GENESIS_CA, Brand.KIA_CA, Brand.HYUNDAI_EU -> Unit
                 }
             } else {
                 if (isSamsung) {
-                    MorphActionButton("Digital Key", Icons.Filled.CreditCard) {
-                        openApp(context, listOf("com.samsung.android.spay"), "https://www.samsung.com/us/samsung-wallet/", inApp)
-                    }
+                    MorphActionButton(
+                        label = "Digital Key",
+                        icon = Icons.Filled.CreditCard,
+                        onClick = {
+                            openApp(context, listOf("com.samsung.android.spay"), "https://www.samsung.com/us/samsung-wallet/", inApp)
+                        },
+                    )
                 } else {
-                    MorphActionButton("Digital Key", Icons.Filled.AccountBalanceWallet) {
-                        openApp(
-                            context,
-                            listOf("com.google.android.apps.walletnfcrel", "com.google.android.apps.wallet"),
-                            "https://pay.google.com/",
-                            inApp,
-                        )
-                    }
+                    MorphActionButton(
+                        label = "Digital Key",
+                        icon = Icons.Filled.AccountBalanceWallet,
+                        onClick = {
+                            openApp(
+                                context,
+                                listOf("com.google.android.apps.walletnfcrel", "com.google.android.apps.wallet"),
+                                "https://pay.google.com/",
+                                inApp,
+                            )
+                        },
+                    )
                 }
             }
         }
