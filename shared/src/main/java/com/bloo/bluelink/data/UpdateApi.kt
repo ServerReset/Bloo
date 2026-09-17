@@ -11,6 +11,9 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import android.content.Context
 import android.content.Intent
+import android.net.Uri
+import android.os.Build
+import android.provider.Settings
 import androidx.core.content.FileProvider
 import java.io.File
 import java.util.concurrent.TimeUnit
@@ -240,8 +243,24 @@ object UpdateApi {
  * installs its own updates -- and the phone and watch copies of this were byte-identical
  * bar how each reached its Context. That is the same duplication UpdateGate and
  * UPDATE_SNOOZE_MS were pulled in here to end.
+ *
+ * Checks [android.content.pm.PackageManager.canRequestPackageInstalls] first: "install
+ * unknown apps" is a per-app, user-granted, restricted setting on modern Android, and
+ * launching the install intent without it doesn't fail loudly -- the system resolves it,
+ * shows nothing useful (or a bare refusal), and immediately finishes, which looked
+ * indistinguishable from "nothing happened" or "got bounced to home". When it's not
+ * granted, this sends the user straight to the one settings screen that grants it for
+ * THIS package instead of launching an install attempt the system will just refuse.
  */
 fun installDownloadedApk(context: Context, apk: File): Boolean = runCatching {
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && !context.packageManager.canRequestPackageInstalls()) {
+        val settingsIntent = Intent(
+            Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,
+            Uri.parse("package:${context.packageName}"),
+        ).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        context.startActivity(settingsIntent)
+        return@runCatching
+    }
     val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", apk)
     val intent = Intent(Intent.ACTION_VIEW).apply {
         setDataAndType(uri, "application/vnd.android.package-archive")
