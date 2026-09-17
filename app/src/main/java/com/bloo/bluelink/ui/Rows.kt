@@ -376,13 +376,11 @@ internal fun SectionLabel(text: String) {
 @Composable
 internal fun StepRow(label: String, value: String, valueColor: Color = Color.Unspecified) {
     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top) {
-        // Cap at 2 lines so a long label ("Text & layout scale") wraps cleanly at
-        // spaces instead of the value (short: "130%") crushing it mid-word at a
-        // large font size.
+        // Use bodySmall instead of bodyMedium to keep slider labels compact
         Text(
             label,
             Modifier.weight(1f),
-            style = MaterialTheme.typography.bodyMedium,
+            style = MaterialTheme.typography.bodySmall,
             maxLines = 2,
             overflow = TextOverflow.Ellipsis,
         )
@@ -394,7 +392,7 @@ internal fun StepRow(label: String, value: String, valueColor: Color = Color.Uns
                 (fadeIn() + slideInVertically { it / 2 }) togetherWith (fadeOut() + slideOutVertically { -it / 2 })
             },
             label = "stepValue",
-        ) { v -> Text(v, fontWeight = FontWeight.Medium, color = valueColor, maxLines = 1) }
+        ) { v -> Text(v, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Medium, color = valueColor, maxLines = 1) }
     }
 }
 
