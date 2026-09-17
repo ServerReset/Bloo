@@ -525,7 +525,12 @@ internal fun ClimatePebble(
         }
 
         val isGen5W = state.isGen5WEffective(v)
-        if (seats.any && !(isGen5W && v.isEv)) {
+        // state.powertrainOf(v), not the raw v.isEv -- the same "one shared
+        // powertrain rule" every other display decision in the app goes
+        // through (see resolvePowertrain's own doc, SettingsStore.kt), so a
+        // user's own powertrain override (e.g. correcting a PHEV the API
+        // reports as gas) is honoured here too, not just everywhere else.
+        if (seats.any && !(isGen5W && state.powertrainOf(v) == com.bloo.bluelink.data.Powertrain.EV)) {
             SectionLabel("Seats")
             if (seats.driverHeat || seats.driverCool) {
                 SeatControl("Driver seat", driver, seats.driverCool, seats.driverHeat) { driver = it }

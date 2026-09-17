@@ -797,6 +797,10 @@ object CarAlerts {
     ): List<Alert> {
         val prefs = prefs ?: settings.notificationPrefs()
         val out = mutableListOf<Alert>()
+        // The one shared powertrain rule (SettingsStore.kt) -- an EV has no
+        // "engine" to reference, so the running/car-started wording below reads
+        // from this instead of assuming every car burns fuel.
+        val powertrain = resolvePowertrain(v, settings.powertrain(v.vin))
 
         if (prefs.service) {
             // Odometer strings can arrive with thousands separators (e.g. "12,345")
@@ -861,7 +865,18 @@ object CarAlerts {
                 val since = settings.doorOpenSince(v.vin)
                 if (since == null) {
                     settings.setDoorOpenSince(v.vin, now)
-                } else if (canDeliver && now - since > prefs.doorOpenMinutes * 60_000L && !settings.alertFired(key)) {
+                } else if (
+                    canDeliver &&
+                    // Not while actually driving -- same exclusion the unlocked and
+                    // running-too-long checks below already apply, and for the same
+                    // reason: a window cracked or a trunk not yet latched while the
+                    // car is genuinely moving is expected the entire drive, not a
+                    // car left open and unattended. This check was the one of the
+                    // three missing it, an inconsistency rather than a deliberate
+                    // difference.
+                    !status.isDriving &&
+                    now - since > prefs.doorOpenMinutes * 60_000L && !settings.alertFired(key)
+                ) {
                     // Been open long enough and haven't already alerted for this
                     // open episode -- fire, offering a one-tap Lock action.
                     out += Alert(
@@ -957,7 +972,16 @@ object CarAlerts {
                     out += Alert(
                         runningId(v),
                         "${v.name} is running",
-                        "The engine/climate has been running for over ${prefs.runningMinutes} min.",
+                        // A pure EV has no engine at all to reference -- "engine/climate"
+                        // read as a hedge that didn't apply to it. Every other powertrain
+                        // (gas, hybrid, PHEV) keeps the hedge: airCtrlOn can be true from
+                        // either the engine or, on some of them, a battery-only remote
+                        // climate run, so "engine/climate" is the accurate answer there.
+                        if (powertrain == Powertrain.EV) {
+                            "The climate has been running for over ${prefs.runningMinutes} min."
+                        } else {
+                            "The engine/climate has been running for over ${prefs.runningMinutes} min."
+                        },
                         actions = listOf(Notifications.Action("Turn off", v.vin, WearAction.CLIMATE_OFF)),
                     )
                     settings.setAlertFired(key, true)
@@ -978,7 +1002,9 @@ object CarAlerts {
                     out += Alert(
                         carStartedId(v),
                         "${v.name} has been started",
-                        "Your car's engine is now running.",
+                        // Same reasoning as the running-too-long alert above: an EV
+                        // has no engine, so don't tell an EV owner theirs is "running".
+                        if (powertrain == Powertrain.EV) "Your car is now on." else "Your car's engine is now running.",
                     )
                     settings.setEngineStartNotificationSent(v.vin, true)
                 }

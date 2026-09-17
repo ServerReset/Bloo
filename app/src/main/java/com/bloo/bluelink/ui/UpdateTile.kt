@@ -211,10 +211,15 @@ internal fun UpdateAvailableTile(
             // AnimatedValue below), and the sentence around it stays put.
         // Glass surface instead of tonal -- matches the unified glass styling throughout the app.
         // Now has real blur when available, instead of a plain tonal fill.
+        // shadow = false: this sits INSIDE the pebble's own already-elevated card,
+        // not floating over the screen -- see glassEdge's own doc for why a second
+        // full-strength shadow on a small nested panel read as a harsh dark smudge,
+        // reported directly from a screenshot.
         GlassSurface(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(12.dp),
             hazeState = hazeState,
+            shadow = false,
         ) {
             // Column, not Box: UpdateStatusLine emits two top-level siblings of its own (the
             // icon+status Row, then the PopVisible progress bar) with no Column of its own
@@ -255,11 +260,14 @@ internal fun UpdateAvailableTile(
                 }
                 PopVisible(visible = showHelp) {
                     // Glass surface instead of tonal -- unified styling with glass blur.
-                    // fillMaxWidth() to match sibling panels.
+                    // fillMaxWidth() to match sibling panels. shadow = false -- see the
+                    // status panel's own comment above for why a nested panel doesn't
+                    // get a second full-strength drop shadow.
                     GlassSurface(
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(12.dp),
                         hazeState = hazeState,
+                        shadow = false,
                     ) {
                         Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                             Text(
@@ -390,11 +398,15 @@ internal fun UpdateReleaseNotes(
     val notes = info.run.releaseNotes?.trim().orEmpty()
     if (notes.isBlank()) return
     val context = LocalContext.current
-    // Glass surface with unified blur styling
+    // Glass surface with unified blur styling. shadow = false -- shared by the
+    // pebble body AND the Settings Updates card (this composable's own doc),
+    // both of which already nest this inside another elevated card/group; see
+    // glassEdge's own doc for why a nested panel skips the second shadow.
     GlassSurface(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(12.dp),
         hazeState = hazeState,
+        shadow = false,
     ) {
         Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             // "Full notes" rides in the section header rather than taking a whole row of its

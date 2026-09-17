@@ -110,6 +110,22 @@ internal fun VehicleDetailContent(
     // Narrowed, not `state.value.refreshing`: a bare read here would subscribe this whole page
     // -- all three of them live at once in the pager -- to every UiState emission.
     val refreshing by remember { derivedStateOf { state.value.refreshing } }
+    // Same hotspot computation ExpandedCar uses for its own dual-column HotspotSlot
+    // (see that composable's own doc) -- "controls" (lock/unlock/lights/horn) plus
+    // whatever the user pinned to the secondary slot. PebbleList unconditionally
+    // excludes both (it assumes SOMETHING else is rendering them -- true in the
+    // wide/dual-column layout, which calls HotspotSlot itself), so without this
+    // call here the single-column phone view -- the one nearly everyone actually
+    // uses -- silently lost lock/unlock/lights/horn entirely: PebbleList excluded
+    // "controls" from its reorderable list, and nothing on THIS layout ever took
+    // over rendering it. Reported directly as the controls pebble having vanished.
+    val hotspots by remember(v) {
+        derivedStateOf {
+            state.value.hotspotFor(v.vin).filter {
+                it in state.value.sectionsFor(v) && state.value.isSectionAvailable(v, it)
+            }
+        }
+    }
     Refreshable(v, refreshing, vm, hideIndicator = hideIndicator) {
         Column(
             Modifier
@@ -123,10 +139,16 @@ internal fun VehicleDetailContent(
             // the status bar's own edge instead of noticeably below it.
             Spacer(Modifier.height(topInset))
             CarHeaderRow(v, state, onExpand, reserveHeaderEnd, hideName = true, hazeState = hazeState)
-            // summary (image+gauge) and controls are reorderable pebbles too. The full
-            // pebble column always renders while swiping; smoothness comes from
-            // PebbleList's own one-frame lazy-fill (filled/EAGER_PEBBLES) + the pager's
-            // beyondViewportPageCount=1 pre-compose, not from an in-transit skeleton.
+            // Pinned "controls" (+ secondary, if the user chose one) -- see hotspots'
+            // own doc above for why this has to render here explicitly.
+            HotspotSlot(v, hotspots, state, vm)
+            // summary (image+gauge) is a reorderable pebble too; "controls" and any
+            // pinned secondary are NOT (they're pinned above via HotspotSlot) --
+            // PebbleList already excludes them on its own (see its own `pinnedPebbles`
+            // doc). The full pebble column always renders while swiping; smoothness
+            // comes from PebbleList's own one-frame lazy-fill (filled/EAGER_PEBBLES) +
+            // the pager's beyondViewportPageCount=1 pre-compose, not from an
+            // in-transit skeleton.
             PebbleList(v, state, vm)
             // Reserves exactly as much room as the floating search bubble (SearchLayer, mounted
             // globally for Screen.Garage -- see Screens.kt's `searchable` gate) actually needs,

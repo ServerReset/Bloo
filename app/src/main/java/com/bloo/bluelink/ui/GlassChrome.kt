@@ -89,10 +89,22 @@ import com.bloo.uicommon.ambientRing as sharedAmbientRing
 /**
  * Apply glass edge treatment: shadow + frosted rim. Used by all glass surfaces.
  * This is the ONLY glass edge styling in the app.
+ *
+ * [shadow] defaults to true (unchanged behaviour) for a surface genuinely
+ * FLOATING over the screen -- search results, the status bar, a floating
+ * icon button -- where a real drop shadow is what separates it from an
+ * arbitrary, unpredictable backdrop (a car photo, scrolled content). Pass
+ * false for a glass panel NESTED inside another already-elevated card (e.g.
+ * a status callout inside a pebble): that card already carries its own edge
+ * treatment, so stacking a second full-strength shadow (dropShadow's own
+ * default is a fairly heavy 0.38 alpha, 14dp blur) on a small sub-panel a
+ * few dp inside it read as a harsh, "baked-in" dark smudge rather than a
+ * second, subtler layer of depth -- reported directly from a screenshot.
+ * The frosted rim border still draws either way; only the shadow is optional.
  */
 @Composable
-internal fun Modifier.glassEdge(shape: Shape): Modifier =
-    this.dropShadow(shape).glassRim(shape)
+internal fun Modifier.glassEdge(shape: Shape, shadow: Boolean = true): Modifier =
+    (if (shadow) this.dropShadow(shape) else this).glassRim(shape)
 
 /**
  * Rim for glass surfaces: the shared frosted rim with Material's onSurface color.
@@ -308,13 +320,17 @@ internal fun GlassSurface(
     contentDescription: String? = null,
     interactionSource: MutableInteractionSource? = null,
     contentAlignment: Alignment = Alignment.Center,
+    /** See [glassEdge]'s own doc -- false for a glass panel nested inside
+     *  another already-elevated card instead of genuinely floating over the
+     *  screen. */
+    shadow: Boolean = true,
     content: @Composable () -> Unit = {},
 ) {
     val canBlur = hazeState != null && CanBlurBackdrops()
     val interaction = interactionSource ?: remember { MutableInteractionSource() }
     Box(
         modifier = modifier
-            .glassEdge(shape)
+            .glassEdge(shape, shadow = shadow)
             .then(
                 if (onClick != null) {
                     Modifier

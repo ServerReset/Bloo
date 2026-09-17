@@ -343,9 +343,13 @@ data class UiState(
 
     fun sectionsFor(v: Vehicle): List<String> = sectionOrders[v.vin] ?: DEFAULT_SECTIONS
 
-    /** Effective powertrain: user override, else EV/gas inferred from the API. */
+    /** Effective powertrain: user override, else EV/gas inferred from the API.
+     *  Delegates to [com.bloo.bluelink.data.resolvePowertrain], the one shared
+     *  rule every powertrain-dependent surface in the app (this, and the
+     *  background alert path in [com.bloo.bluelink.data.CarAlerts]) resolves
+     *  through -- see that function's own doc. */
     fun powertrainOf(v: Vehicle): Powertrain =
-        powertrains[v.vin] ?: if (v.isEv) Powertrain.EV else Powertrain.GAS
+        com.bloo.bluelink.data.resolvePowertrain(v, powertrains[v.vin])
 
     /** Has a high-voltage battery you can charge (EV or plug-in hybrid). */
     fun hasBattery(v: Vehicle): Boolean = powertrainOf(v) == Powertrain.EV || powertrainOf(v) == Powertrain.PHEV

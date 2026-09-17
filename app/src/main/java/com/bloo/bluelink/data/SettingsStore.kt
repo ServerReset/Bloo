@@ -87,6 +87,23 @@ data class SeatConfig(
 enum class Powertrain { GAS, HYBRID, PHEV, EV }
 
 /**
+ * The ONE powertrain resolution rule, used by every surface in the app that
+ * needs to know a vehicle's powertrain -- an explicit user override (stored
+ * per-VIN; [SettingsStore.powertrain]/[SettingsStore.setPowertrain] persist
+ * it, [UiState.powertrains] holds it in memory for the running app) always
+ * wins; otherwise infer from the API's own [Vehicle.isEv] flag, which only
+ * ever distinguishes EV from everything else.
+ *
+ * Before this, [UiState.powertrainOf] (in-memory, UI-facing) and the
+ * background alert path ([CarAlerts.evaluate], no UiState to read) each
+ * re-derived this same override-or-infer rule independently, and neither one
+ * could see a hybrid/PHEV override the other correctly honoured -- exactly
+ * the kind of drift a single shared rule is for. Both now call this.
+ */
+fun resolvePowertrain(v: Vehicle, override: Powertrain?): Powertrain =
+    override ?: if (v.isEv) Powertrain.EV else Powertrain.GAS
+
+/**
  * User-confirmed head-unit generation for a Hyundai/Genesis US vehicle --
  * the same GEN5W/ccNC split [com.bloo.bluelink.data.isGen5W] already infers
  * from the API's own `generation` field, made overridable the same way
