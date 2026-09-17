@@ -174,58 +174,10 @@ internal fun HotspotSlot(
     }
 
     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-        // PRIMARY SLOT (Top) - Default "controls" (lights/horn), but removable
-        // Show removal controls if there's a pinned primary pebble
-        if (hotspots.isNotEmpty()) {
-            var lifted by remember(primaryPebble) { mutableStateOf(false) }
-            var dragY by remember(primaryPebble) { mutableFloatStateOf(0f) }
-            val lift by animateFloatAsState(if (lifted) 1.03f else 1f, label = "unpinLift")
-
-            Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                Row(
-                    Modifier
-                        .fillMaxWidth()
-                        .height(32.dp)
-                        .padding(horizontal = 8.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Icon(
-                        Icons.Filled.PushPin,
-                        contentDescription = null,
-                        modifier = Modifier.size(12.dp),
-                        tint = if (lifted) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    Spacer(Modifier.width(6.dp))
-                    Text(
-                        if (lifted) "Release to unpin" else sectionLabel(primaryPebble),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = if (lifted) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.weight(1f),
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                    MorphTextButton("Remove", onClick = { vm.setHotspot(v, primaryPebble) })
-                }
-                CompositionLocalProvider(LocalForceExpanded provides true) {
-                    Box(
-                        Modifier
-                            .graphicsLayer { scaleX = lift; scaleY = lift }
-                            .pointerInput(primaryPebble) {
-                                detectDragGesturesAfterLongPress(
-                                    onDragStart = { dragY = 0f; lifted = true; haptics?.tick() },
-                                    onDrag = { change, amt -> change.consume(); dragY += abs(amt.x) + abs(amt.y) },
-                                    onDragEnd = {
-                                        lifted = false
-                                        if (dragY > 56f) { haptics?.heavy(); vm.setHotspot(v, primaryPebble) }
-                                    },
-                                    onDragCancel = { lifted = false },
-                                )
-                            },
-                    ) {
-                        SinglePebble(primaryPebble, v, stateSource, vm, Modifier)
-                    }
-                }
-            }
+        // PRIMARY SLOT (Top) - Always "controls" (lights/horn), permanently pinned
+        // No removal option - this slot is hardcoded and locked
+        CompositionLocalProvider(LocalForceExpanded provides true) {
+            SinglePebble(primaryPebble, v, stateSource, vm, Modifier)
         }
 
         // SECONDARY SLOT (Bottom) - User-selectable
