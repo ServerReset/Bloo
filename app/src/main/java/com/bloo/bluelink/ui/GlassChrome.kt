@@ -127,7 +127,19 @@ fun Modifier.ambientRing(shape: Shape): Modifier =
  */
 @Composable
 internal fun Modifier.pebbleCardEdge(shape: Shape, outline: Boolean): Modifier {
-    val dark = isSystemInDarkTheme()
+    // Matches BlooTheme's own dark resolution (Theme.kt) -- NOT a raw
+    // isSystemInDarkTheme() read. That was the bug: a user who explicitly set
+    // the app to Light while their SYSTEM was in dark mode got a light-themed
+    // app that still drew this shadow, because raw isSystemInDarkTheme() only
+    // ever sees the phone's setting, not the app's own override. LIGHT/DARK/
+    // AMOLED force their answer regardless of system; only SYSTEM/SYSTEM_AMOLED
+    // fall through to the system value, same as BlooTheme.
+    val themeMode = LocalAppearance.current.themeMode
+    val dark = when (themeMode) {
+        ThemeMode.LIGHT -> false
+        ThemeMode.DARK, ThemeMode.AMOLED -> true
+        ThemeMode.SYSTEM, ThemeMode.SYSTEM_AMOLED -> isSystemInDarkTheme()
+    }
     return (if (dark) this.dropShadow(shape, blurRadius = 12.dp, offsetY = 4.dp) else this).then(
         if (outline) {
             Modifier.border(BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.55f)), shape)

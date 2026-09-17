@@ -2293,6 +2293,9 @@ internal fun SettingsScreen(
         // car-name pill's own removal). The "Settings" title is real, static content on
         // SettingsHeaderRow now; it just scrolls off with the rest of the grid.
         // Floating back-arrow (remains separate and floating, not part of status bar).
+        // Only shown when Settings isn't embedded -- an embedded Settings page
+        // (folded into the car grid/pager) is reached by swiping, not a back
+        // arrow, and closeSettings() would fight the pager's own navigation.
         if (!embedded) {
             FloatingIcon(
                 icon = Icons.Filled.ArrowBack,
@@ -2301,14 +2304,19 @@ internal fun SettingsScreen(
                 hazeState = hazeState,
                 modifier = Modifier.align(Alignment.TopStart).statusBarsPadding(),
             )
-            // Settings mode toggle as a tab-like element below the status bar,
-            // positioned at the top-right, styled like it's hanging from the status bar.
-            SettingsModeTab(
-                settingsMode = state.settingsMode,
-                onSettingsModeChange = { vm.setSettingsMode(it) },
-                hazeState = hazeState,
-            )
         }
+        // Settings mode toggle as a tab-like element below the status bar,
+        // positioned at the top-right, styled like it's hanging from the status bar.
+        // NOT gated on `!embedded` -- unlike the back arrow above, this is the
+        // only way to switch Simple/Advanced mode, and it was previously tied
+        // to the same condition, so a user reaching Settings through the
+        // embedded/swipeable page (or the folded-into-grid layout) had no way
+        // to change modes at all.
+        SettingsModeTab(
+            settingsMode = state.settingsMode,
+            onSettingsModeChange = { vm.setSettingsMode(it) },
+            hazeState = hazeState,
+        )
         // First-run coach mark pointing at the back arrow.
         if (state.showSettingsCoach) {
             val coachAlpha = remember { Animatable(0f) }

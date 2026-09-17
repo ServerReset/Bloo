@@ -69,6 +69,8 @@ import com.bloo.bluelink.autolock.AutoLockConfig
 import com.bloo.bluelink.data.LockTiming
 import com.bloo.bluelink.data.Powertrain
 import com.bloo.bluelink.data.Vehicle
+import com.bloo.bluelink.data.brand
+import com.bloo.bluelink.data.links
 import com.bloo.bluelink.data.platformOverridable
 import com.bloo.bluelink.data.SettingsStore
 import com.bloo.bluelink.data.TileCommandRunner
@@ -579,12 +581,22 @@ internal fun SettingsSearchResults(
         var commandExecuted by remember(submittedQuery) { mutableStateOf(false) }
         LaunchedEffect(submittedQuery) {
             if (targetVehicle != null && !commandExecuted) {
-                actionRunning = true
-                val result = runCatching { TileCommandRunner.run(ctx, targetVehicle.vin, resolvedCommand.cmd, resolvedCommand.climateTarget) }.getOrNull()
-                actionResult = result?.message ?: "Command failed"
-                actionRunning = false
-                vm.refreshStatus(targetVehicle)
-                commandExecuted = true
+                if (resolvedCommand.cmd == "open_app") {
+                    // Not a car command -- launches the OEM companion app
+                    // (same action as OwnerLinks' own "<appName> app" button)
+                    // rather than going through TileCommandRunner.
+                    val links = targetVehicle.brand.links
+                    openApp(ctx, listOf(links.appPackage), links.playStoreUrl, appearance.linksInApp)
+                    actionResult = "Opening ${links.appName}"
+                    commandExecuted = true
+                } else {
+                    actionRunning = true
+                    val result = runCatching { TileCommandRunner.run(ctx, targetVehicle.vin, resolvedCommand.cmd, resolvedCommand.climateTarget) }.getOrNull()
+                    actionResult = result?.message ?: "Command failed"
+                    actionRunning = false
+                    vm.refreshStatus(targetVehicle)
+                    commandExecuted = true
+                }
 
                 // Track this command as recently used
                 try {

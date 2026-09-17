@@ -471,6 +471,16 @@ internal fun parseVehicleCommand(query: String, metric: Boolean = false): Parsed
     // unless the query also named one.
     val wantsDefrost = RxDefrost.containsMatchIn(q)
     return when {
+        // Checked first: "open Bluelink"/"open the app"/"open Kia Access" is a
+        // request to launch the OEM companion app (OwnerLinks' own "<appName>
+        // app" button, see InfoPebble.kt), not a car command -- it has no
+        // TileCommandRunner id at all, so it's dispatched separately in
+        // SearchResults.kt via openApp() using the target vehicle's own
+        // BrandLinks. Every brand's app name/aliases are matched generically
+        // rather than hard-coded per-brand, so a new brand only needs its
+        // BrandLinks entry, not a new regex here.
+        RxOpenApp.containsMatchIn(q) ->
+            ParsedVehicleCommand("open_app", label = "Opening the app for")
         // Unlock before lock: "unlock" contains "lock".
         RxUnlock.containsMatchIn(q) ->
             ParsedVehicleCommand("unlock", label = "Unlocking")
@@ -558,6 +568,16 @@ internal val RxWarmest = Regex("warmest|hottest|as (warm|hot) as|max(imum)? (hea
 internal val RxTempAtTo = Regex("\\b(?:at|to)\\s*(\\d{2,3})\\s*°?\\s*([fc])?\\b")
 internal val RxTempDegrees = Regex("\\b(\\d{2,3})\\s*°?\\s*(?:degrees?\\b|([fc])\\b)")
 internal val RxDefrost = Regex("defrost|defog|demist|clear (the )?(wind(screen|shield)|glass|ice)|de-ice")
+// "open" + a known companion-app name/alias, or the generic "the app"/"my app" --
+// deliberately NOT bare "open" (that would swallow "open the car"/"open the
+// doors", RxUnlock's own territory below) and NOT bare "app" (too broad).
+// Brand names are lowercase, matching how they're compared against `q` (also
+// lowercased) -- kept in sync with BrandLinks.appName (Brand.kt) by hand since
+// that list is a fixed, rarely-changing set of OEM brands, not per-vehicle data.
+internal val RxOpenApp = Regex(
+    "\\bopen\\b.*(bluelink|kia access|kia connect|uvo|genesis( app| connected)?|" +
+        "\\bthe app\\b|\\bmy app\\b|\\bowner('?s)? app\\b|\\bcar app\\b|\\bcompanion app\\b)",
+)
 internal val RxUnlock = Regex("\\bunlock\\b|\\bopen (the |my )?(car|doors?)\\b|let me in")
 internal val RxLock = Regex("\\block\\b|secure (the |my )?car|lock (it|up)\\b")
 internal val RxSmartClimate = Regex("smart climate|smart (ac|a/c|heat|clim)")
