@@ -123,10 +123,12 @@ internal fun SettingsSearchResults(
     // add(...) calls below read `query` at all -- only the scoring pass further down does --
     // so building this whole list (and every entry's own composable lambda) fresh on every
     // keystroke was pure waste. Now it only rebuilds when the underlying settings/vehicle data
-    // actually changes.
-    val entries = remember(state, appearance, notif, vm, canBio) {
+    // actually changes. Also include settingsMode so entries rebuild when simple/advanced mode changes.
+    val entries = remember(state, appearance, notif, vm, canBio, state.settingsMode) {
     val entries = ArrayList<SearchEntry>()
     fun add(title: String, keywords: String, content: @Composable () -> Unit) {
+        // Filter by mode: don't add advanced-only settings when in simple mode
+        if (!isSettingAvailableInMode(title, state.settingsMode)) return
         entries.add(SearchEntry(title, "$title $keywords".lowercase(), content))
     }
 
@@ -136,6 +138,8 @@ internal fun SettingsSearchResults(
     // comment for what does and doesn't fit this shape.
     ToggleSettings.forEach { spec ->
         if (!spec.visible(state)) return@forEach
+        // Additional mode filter for ToggleSettings
+        if (!isSettingAvailableInMode(spec.title, state.settingsMode)) return@forEach
         add(spec.title, spec.keywords) {
             ToggleRow(spec.label, spec.checked(appearance, notif, state)) { spec.onToggle(vm, it) }
         }
@@ -533,8 +537,21 @@ internal fun SettingsSearchResults(
     // a debounce timer. Typing "lock my car" used to run the lock the moment
     // the debounce elapsed, whether or not that's what the user meant to do.
     val metricUnits = appearance.unitSystem == "metric"
-    val command = remember(submittedQuery, metricUnits) {
-        if (submittedQuery.isBlank()) null else parseVehicleCommand(submittedQuery, metricUnits)
+    var command by remember(submittedQuery, metricUnits) {
+        mutableStateOf(if (submittedQuery.isBlank()) null else parseVehicleCommand(submittedQuery, metricUnits))
+    }
+    // When Gemini Nano is enabled, use it to enhance command parsing for ambiguous/unmatched queries
+    if (state.aiEnabled && command == null && submittedQuery.isNotBlank()) {
+        LaunchedEffect(submittedQuery) {
+            try {
+                val enhanced = vm.enhanceCommandParsing(submittedQuery, null)
+                if (enhanced != null) {
+                    command = enhanced
+                }
+            } catch (e: Exception) {
+                // Graceful fallback if AI enhancement fails
+            }
+        }
     }
     if (command != null) {
         val ctx = LocalContext.current

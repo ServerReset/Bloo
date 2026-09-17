@@ -583,3 +583,66 @@ internal val RxChargeStart = Regex("(start|begin|turn on|resume) (the )?charg|ch
 // sentence that happens to contain "heat" or "cool".
 internal val RxHeatCoolVerb = Regex("\\b(heat|cool|warm)\\b")
 internal val RxSearchTokens = Regex("[^a-z0-9%]+")
+
+/**
+ * Try to enhance command parsing using Gemini Nano when available. If the query
+ * is ambiguous or the initial parse didn't match, use AI to understand intent.
+ * Gracefully falls back if Gemini Nano is unavailable or fails.
+ */
+internal suspend fun enhanceCommandWithAi(
+    query: String,
+    initialCommand: ParsedVehicleCommand?,
+    ai: com.bloo.bluelink.data.Ai,
+): ParsedVehicleCommand? {
+    // If we already have a confident match, return it
+    if (initialCommand != null) return initialCommand
+
+    // Only try AI enhancement if the query didn't match regex patterns
+    if (query.isBlank()) return null
+
+    return try {
+        // Build a prompt asking the model to identify vehicle command intent
+        val availableCommands = listOf(
+            "lock - lock the car doors",
+            "unlock - unlock the car doors",
+            "charge_on - start charging the battery",
+            "charge_off - stop charging the battery",
+            "climate_on - start the climate control/AC",
+            "climate_off - stop the climate control/AC",
+            "lights - flash the lights",
+            "horn - sound the horn",
+        )
+        val commandsList = availableCommands.joinToString(", ")
+
+        val prompt = """User query: "$query"
+
+Available vehicle commands: $commandsList
+
+What is the user most likely trying to do? Answer with ONLY the command name (e.g., "lock", "unlock", "charge_on") or "none" if no clear command."""
+
+        // Pad to meet minimum character requirement
+        val paddedPrompt = if (prompt.length < 400) {
+            prompt + "\n\n" + prompt.repeat((400 / prompt.length) + 1)
+        } else {
+            prompt
+        }
+
+        val result = ai.summarize(paddedPrompt).trim().lowercase()
+
+        // Parse the AI's response
+        return when {
+            result.contains("lock") && !result.contains("unlock") -> ParsedVehicleCommand("lock", label = "Locking")
+            result.contains("unlock") -> ParsedVehicleCommand("unlock", label = "Unlocking")
+            result.contains("charge_on") || (result.contains("charge") && !result.contains("off")) -> ParsedVehicleCommand("charge_on", label = "Starting charge for")
+            result.contains("charge_off") || (result.contains("charge") && result.contains("off")) -> ParsedVehicleCommand("charge_off", label = "Stopping charge for")
+            result.contains("climate_on") || (result.contains("climate") && !result.contains("off")) -> ParsedVehicleCommand("climate_on", "default", "Starting climate for")
+            result.contains("climate_off") -> ParsedVehicleCommand("climate_off", label = "Stopping climate for")
+            result.contains("light") -> ParsedVehicleCommand("lights", label = "Flashing lights on")
+            result.contains("horn") -> ParsedVehicleCommand("horn", label = "Sounding horn on")
+            else -> null
+        }
+    } catch (e: Exception) {
+        // Graceful fallback - return original parse result
+        null
+    }
+}
