@@ -157,15 +157,20 @@ internal fun chargeReadoutOf(
         statusColor = when {
             charging -> ChargeGreen
             drivingLabel == "Driving" || drivingLabel == "Running" -> MaterialTheme.colorScheme.primary
-            // MutedContentAlpha compounds with the cover's already-dim default
-            // container content color (surfaceVariant -> onSurfaceVariant) the same
-            // way StatusRow's label and CoverHero's subline did -- this is the idle
-            // "Battery"/"Fuel" caption directly under the headline percentage on the
-            // Charge/Fuel cover tile, high-visibility real estate for how washed out
-            // it read.
-            else -> LocalContentColor.current.copy(
-                alpha = if (LocalForceExpanded.current) 0.92f else MutedContentAlpha,
-            )
+            else -> {
+                // In light mode, use full onSurface for better visibility on the "Parked" text.
+                // In dark mode, use muted alpha to avoid high contrast. LocalForceExpanded
+                // indicates the expanded state (cover vs. phone) and adjusts accordingly.
+                val dark = androidx.compose.foundation.isSystemInDarkTheme()
+                if (dark) {
+                    LocalContentColor.current.copy(
+                        alpha = if (LocalForceExpanded.current) 0.92f else MutedContentAlpha,
+                    )
+                } else {
+                    // Light mode: use onSurfaceVariant for readable muted text without being too dim
+                    MaterialTheme.colorScheme.onSurfaceVariant
+                }
+            }
         },
         charging = charging,
         emphasizeStatus = charging || drivingLabel == "Driving",
