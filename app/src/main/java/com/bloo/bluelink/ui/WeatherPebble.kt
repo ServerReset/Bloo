@@ -70,6 +70,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LoadingIndicator
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.activity.compose.BackHandler
@@ -1371,7 +1372,20 @@ private fun MapTopBar(
             }
             .graphicsLayer { scaleX = pillScale; scaleY = pillScale },
         hazeState = mapHazeState,
-        contentColor = Color.White,
+        // No contentColor override: [GlassSurface]'s own default (onSurface) is the
+        // right answer here, and the `Color.White` this used to force was wrong in
+        // light mode. This bar is glass over the MAP, and the map follows the app's
+        // theme -- CarMap dark-filters these same OSM tiles only when
+        // appIsDarkTheme() (see darkMapFilter's own doc), so in light mode the
+        // backdrop behind this pill is a BRIGHT raster map. Unlike the hero's photo,
+        // there is no dark scrim under it to make white legible: the only fill is
+        // glassTint, which in light mode is surfaceContainer at 0.08-0.12 alpha, so
+        // the car's name, the drag nub and the refresh glyph were near-white on
+        // near-white -- the bar read as empty. onSurface tracks the same theme the
+        // map filter does, so it is dark-on-light map and light-on-dark map by
+        // construction, and it honours a per-car CarThemeOverride palette the way
+        // the pin beside it already does. It is also what the map's own
+        // MapFeatureRow buttons below already use.
     ) {
         Box(
             Modifier
@@ -1414,7 +1428,16 @@ private fun MapTopBar(
                 Modifier
                     .align(Alignment.Center)
                     .size(width = 32.dp, height = 4.dp)
-                    .background(Color.White.copy(alpha = 0.5f), RoundedCornerShape(2.dp)),
+                    // The bar's own inherited content tone, halved -- not a fixed
+                    // white. It sits inside the GlassSurface above, whose
+                    // CompositionLocalProvider already resolved the one colour that
+                    // reads against this backdrop in both themes, so the nub cannot
+                    // disagree with the name and the refresh glyph either side of it
+                    // (a fixed white nub survived the contentColor fix above as a
+                    // pale smudge on a light map). Same idiom as ChargeSegmentBar's
+                    // own track tints (HeroReadout.kt): inherit the reader's colour
+                    // and mute it, rather than guessing a colour here.
+                    .background(LocalContentColor.current.copy(alpha = 0.5f), RoundedCornerShape(2.dp)),
             )
             if (onRefreshLocation != null) {
                 // Icon-only (was a text chip: "Updated Xm ago" / "Refresh" beside a
@@ -1447,7 +1470,10 @@ private fun MapTopBar(
                     hazeState = mapHazeState,
                     onClick = onRefreshLocation,
                     contentDescription = "Refresh location",
-                    contentColor = Color.White,
+                    // Same reason the bar around it dropped its own white override
+                    // (see the outer GlassSurface): this nested circle is over the
+                    // same theme-following map, and a forced white glyph vanished on
+                    // a light one. Inherits GlassSurface's onSurface default.
                     // Nested inside the bar's own already-elevated GlassSurface --
                     // see glassEdge's own doc for why a nested panel skips the second
                     // shadow (GlassChrome.kt).

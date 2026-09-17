@@ -583,8 +583,23 @@ internal fun HeroMorphReadout(
         // at this morph -- ChargeFuelBar has always drawn one, and "Fuel 40%" on its own reads
         // as another battery figure in a card that is otherwise all battery.
         data.fuelPct?.takeIf { statusAlpha > 0.01f }?.let { fuelPct ->
-            val fuelColor = MaterialTheme.colorScheme.onSurfaceVariant
-                .copy(alpha = statusAlpha)
+            // LocalContentColor, not colorScheme.onSurfaceVariant -- the SAME fault the
+            // "Parked"/"Battery"/"Fuel" state line above was just fixed for (see
+            // statusColor's own doc), and the comment right above here already said
+            // "same reasoning as the state line" while the code did the opposite.
+            // This row is expanded-only, which means it is always over the hero's car
+            // photo + dark scrim (the ChargeSegmentBar directly below it passes
+            // darkBackdrop = true for exactly that reason), and onSurfaceVariant is a
+            // SURFACE role: on a light-themed app it drew "Fuel 40%" and its pump glyph
+            // in near-black over a dark photo, invisible, while the percentage and range
+            // beside it -- both painted from the hero's LocalContentColor provider, which
+            // travels onSurface -> HeroOnPhoto as the card opens -- were near-white. Under
+            // a per-car CarThemeOverride it also picked up a slice of that car's seed
+            // colour, so it came out a tinted grey belonging to no backdrop at all.
+            // MutedContentAlpha keeps it subordinate to the numbers the way the muted
+            // variant role used to, and statusAlpha still carries the morph fade-in.
+            val fuelColor = LocalContentColor.current
+                .copy(alpha = statusAlpha * MutedContentAlpha)
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(
                     Icons.Filled.LocalGasStation,

@@ -168,9 +168,15 @@ fun MorphButton(
      *  nub) can land on its own exact corner radius. */
     pillCornerPercent: Float = PillCornerPercent,
     morphedCornerPercent: Float = MorphedCornerPercent,
-    /** 48dp is the minimum touch-target height M3 `Button` enforced implicitly;
-     *  pass 0.dp to let a short pill keep its natural height. */
-    minHeight: Dp = 48.dp,
+    /** [ButtonTargetHeight], the app's one button height -- not a re-typed `48.dp`,
+     *  which is what this default was even though [ButtonTargetHeight] is declared in
+     *  this same file for exactly this, two call sites below already pass it back in
+     *  explicitly ([MorphActionButton]'s own doc even claims "the shared 48dp
+     *  ButtonTargetHeight" for a button that reaches this default), and it is also the
+     *  minimum touch target M3 `Button` enforced implicitly. One name means a change to
+     *  the app's button height cannot leave the buttons that rely on the default behind.
+     *  Pass 0.dp to let a short pill keep its natural height. */
+    minHeight: Dp = ButtonTargetHeight,
     /**
      * Inside a button group, this button's share of the row's leftover space (0 = keep its
      * natural width). This is the group's replacement for Modifier.weight, which cannot reach
