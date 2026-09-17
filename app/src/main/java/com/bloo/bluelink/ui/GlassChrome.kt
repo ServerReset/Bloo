@@ -185,7 +185,22 @@ internal const val GlassBlurredTintAlpha = 0.02f
  */
 @Composable
 internal fun glassTint(blurred: Boolean): Color {
-    val dark = isSystemInDarkTheme()
+    // Same fix as pebbleCardEdge (GlassChrome.kt): resolve dark the way
+    // BlooTheme itself does (Theme.kt), not a raw isSystemInDarkTheme() read.
+    // That mismatch is what made floating glass (search results, the status
+    // bar, every GlassSurface) render as a near-solid black panel -- e.g. the
+    // app forced to Dark while the SYSTEM was in light mode read `dark` as
+    // false here, so this picked the "light mode" branch and tinted with
+    // colorScheme.surfaceContainer at low alpha -- but the actual color
+    // scheme in that case IS dark (the app is forced dark), so that low-alpha
+    // tint was a low-alpha DARK color layered over a blur that, without a
+    // real light backdrop to lighten it, read as flatly black.
+    val themeMode = LocalAppearance.current.themeMode
+    val dark = when (themeMode) {
+        ThemeMode.LIGHT -> false
+        ThemeMode.DARK, ThemeMode.AMOLED -> true
+        ThemeMode.SYSTEM, ThemeMode.SYSTEM_AMOLED -> isSystemInDarkTheme()
+    }
     return if (dark) {
         val alpha = if (blurred) GlassBlurredTintAlpha else GlassTintAlpha
         Color.White.copy(alpha = alpha)
