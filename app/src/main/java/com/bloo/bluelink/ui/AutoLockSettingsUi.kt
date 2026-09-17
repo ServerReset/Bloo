@@ -17,15 +17,12 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Bluetooth
 import androidx.compose.material.icons.filled.DirectionsWalk
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.Warning
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -40,6 +37,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -292,25 +290,23 @@ internal fun AutoLockSettingsGroup(v: Vehicle, vm: AppViewModel) {
                     )
                 }
 
-                // Live status display -- a filled pill rather than plain text, since this is
+                // Live status display -- a tinted pill rather than plain text, since this is
                 // the one piece of AutoLock's UI that changes while you're looking at it
                 // (once a second during the grace countdown) and deserves to read as "live",
                 // not as another static caption sitting among all the ones above it.
+                //
+                // The shared StatusChip (Widgets.kt), not this section's own Surface: the
+                // Updates card three cards down had hand-rolled the same live-status pill
+                // with a different fill and padding, and a detection state and an update
+                // state are the same kind of readout in the same kind of card.
                 val evalStates by vm.autoLockState.collectAsStateWithLifecycle()
                 evalStates[v.vin]?.takeIf { it.detection != DetectionState.IDLE }?.let { s ->
                     Spacer(Modifier.height(SettingsGapRow))
-                    Surface(
-                        color = MaterialTheme.colorScheme.primaryContainer,
-                        shape = MaterialTheme.shapes.extraLarge,
-                    ) {
-                        Text(
-                            "${s.detection.label()}" + if (s.detection == DetectionState.GRACE) " · ${s.graceRemaining}s" else "",
-                            style = MaterialTheme.typography.labelMedium,
-                            fontWeight = FontWeight.SemiBold,
-                            color = MaterialTheme.colorScheme.onPrimaryContainer,
-                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
-                        )
-                    }
+                    StatusChip(
+                        text = "${s.detection.label()}" +
+                            if (s.detection == DetectionState.GRACE) " · ${s.graceRemaining}s" else "",
+                        tint = MaterialTheme.colorScheme.primary,
+                    )
                 }
             }
         }
@@ -323,9 +319,16 @@ internal fun AutoLockSettingsGroup(v: Vehicle, vm: AppViewModel) {
 
     if (showDevicePicker) {
         val devices = remember { vm.pairedBluetoothDevices() }
-        AlertDialog(
+        // GlassAlertDialog (Ambient.kt), like every other dialog in the app. This was
+        // the last raw M3 AlertDialog left: a tonal M3 card with M3's own title/text
+        // slot split and 28dp-but-not-glass chrome, popping up two rows below a
+        // Settings screen where the PIN, preset, rename, palette, OTP, troubleshoot
+        // and Drive-sync dialogs all share one frosted shell. Nothing about picking a
+        // Bluetooth device needs its own dialog treatment.
+        GlassAlertDialog(
             onDismissRequest = { showDevicePicker = false },
-            title = { Text("Choose the car's Bluetooth device") },
+            icon = Icons.Filled.Bluetooth,
+            title = "Choose the car's Bluetooth device",
             text = {
                 if (devices.isEmpty()) {
                     Text(
@@ -334,29 +337,46 @@ internal fun AutoLockSettingsGroup(v: Vehicle, vm: AppViewModel) {
                         style = MaterialTheme.typography.bodyMedium,
                     )
                 } else {
-                    LazyColumn(Modifier.height((devices.size.coerceAtMost(6) * 56).dp)) {
-                        items(devices) { device ->
-                            androidx.compose.material3.ListItem(
-                                headlineContent = { Text(device.name) },
-                                supportingContent = { Text(device.address) },
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(vertical = 2.dp)
-                                    .clickable {
-                                        update(current.copy(deviceAddress = device.address, deviceName = device.name))
-                                        showDevicePicker = false
-                                    },
+                    // A plain Column, not the LazyColumn + fixed 56dp-per-row height this
+                    // used to compute: the shell's own `text` slot already scrolls (capped
+                    // at 360dp), so a second vertical scroller nested inside it meant a
+                    // short list padded to a fixed height and a long one scrolling inside
+                    // a scroller. The paired-device list is a handful of rows, not a feed.
+                    devices.forEach { device ->
+                        Column(
+                            Modifier
+                                .fillMaxWidth()
+                                .clip(MaterialTheme.shapes.small)
+                                .clickable {
+                                    update(current.copy(deviceAddress = device.address, deviceName = device.name))
+                                    showDevicePicker = false
+                                }
+                                .padding(horizontal = 12.dp, vertical = 10.dp),
+                        ) {
+                            // M3's ListItem drew its own surface fill and its own type scale
+                            // inside the dialog; the name/address pair is the same
+                            // label-over-caption rhythm every settings row in the app uses.
+                            Text(device.name, style = MaterialTheme.typography.bodyMedium)
+                            Text(
+                                device.address,
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
                         }
                     }
                 }
             },
-            confirmButton = {
+            buttons = {
                 // MorphTextButton, not M3's TextButton: the only bare Material button left in
                 // the app's own UI, and it rendered with stock M3 styling -- no morph, no
                 // haptic, none of the app's own button language -- next to dialogs whose
-                // dismiss action is always a MorphTextButton.
-                MorphTextButton("Close", onClick = { showDevicePicker = false })
+                // dismiss action is always a MorphTextButton. Full width, like every other
+                // GlassAlertDialog's own dismiss action (the shell stacks its buttons).
+                MorphTextButton(
+                    "Close",
+                    onClick = { showDevicePicker = false },
+                    modifier = Modifier.fillMaxWidth(),
+                )
             },
         )
     }

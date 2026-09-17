@@ -517,7 +517,14 @@ internal fun PinDialogs(
                         placeholder = { Text("Current PIN") },
                         singleLine = true,
                         shape = FieldShape,
-                        colors = androidx.compose.material3.TextFieldDefaults.colors(),
+                        // borderlessFieldColors(), like every other PIN entry in the app (the
+                        // lock screen's field, onboarding's set-a-PIN pair -- and, one stage
+                        // later in THIS dialog, OnboardingPinForm itself). It used to pass
+                        // TextFieldDefaults.colors(), i.e. the FILLED TextField palette handed
+                        // to an OutlinedTextField: a tonal container plus indicator-derived
+                        // borders, a fourth field look found nowhere else, and visibly not the
+                        // field the next stage of the same dialog draws.
+                        colors = borderlessFieldColors(),
                         visualTransformation = PasswordVisualTransformation(),
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword, imeAction = ImeAction.Done),
                         keyboardActions = KeyboardActions(onDone = {

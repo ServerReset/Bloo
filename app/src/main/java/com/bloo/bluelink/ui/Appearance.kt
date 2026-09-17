@@ -404,6 +404,11 @@ internal fun ColorPickerCanvas(
             onValueChange = { hexInput = it; hexError = false },
             label = { Text("Hex colour") },
             singleLine = true,
+            // FieldShape, like every other text field in the app -- this one was the
+            // single call site that never passed it, so it drew M3's default 4dp
+            // corners directly above the "Name" field of the very dialog it lives in
+            // (which does pass FieldShape). Same field, two corner radii, one dialog.
+            shape = FieldShape,
             isError = hexError,
             supportingText = if (hexError) { { Text("Not a valid colour") } } else null,
             keyboardOptions = KeyboardOptions(imeAction = androidx.compose.ui.text.input.ImeAction.Done),

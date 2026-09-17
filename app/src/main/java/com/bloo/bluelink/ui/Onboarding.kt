@@ -31,7 +31,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.Canvas
 import androidx.compose.animation.core.snap
-import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -73,7 +72,6 @@ import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.SwapHoriz
-import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.onClick
@@ -952,7 +950,12 @@ internal fun OnboardingCarPage(
         ) {
             SeatPositions.forEachIndexed { i, pos ->
                 if (i > 0) HorizontalDivider(color = scheme.outlineVariant.copy(alpha = 0.35f))
-                WizardSeatRow(pos.label, pos.heat(sc), pos.cool(sc),
+                // The shared SeatConfigRow (Rows.kt) -- the exact row, with the exact
+                // signature, that the per-car Settings card renders. The wizard used to keep
+                // its own copy (WizardSeatRow + WizardToggleChip): same label + Heat/Cool
+                // pair, but on half-height bespoke pills instead of MorphChip, and its "Cool"
+                // chip carried a ❄️ the Settings one never had. One row, two places.
+                SeatConfigRow(pos.label, pos.heat(sc), pos.cool(sc),
                     { vm.setSeatFlag(vehicle, pos.heatKey, it) }, { vm.setSeatFlag(vehicle, pos.coolKey, it) })
             }
         }
@@ -960,25 +963,14 @@ internal fun OnboardingCarPage(
 
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Text("Extras", style = MaterialTheme.typography.labelMedium, color = scheme.primary, fontWeight = FontWeight.SemiBold)
-        // Same MorphButton as the rest of the app: a filled pill that lights up
-        // secondaryContainer while the feature is on (for cars with it).
-        MorphButton(
-            onClick = { vm.setSeatFlag(vehicle, "sw", !sc.steeringWheel) },
-            active = sc.steeringWheel,
-            containerColor = scheme.surfaceContainerHighest,
-            contentColor = scheme.onSurface,
-            activeContainerColor = scheme.secondaryContainer,
-            activeContentColor = scheme.onSecondaryContainer,
-            border = BorderStroke(1.dp, scheme.outlineVariant),
-            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 7.dp),
-            minHeight = 0.dp,
-        ) {
-            if (sc.steeringWheel) {
-                Icon(Icons.Filled.Check, contentDescription = null, modifier = Modifier.size(14.dp))
-                Spacer(Modifier.width(5.dp))
-            }
-            Text("Steering wheel heat", style = MaterialTheme.typography.labelMedium)
-        }
+        // ToggleRow -- the app's one boolean-setting control, and the same row the
+        // per-car Settings card shows this exact flag on ("Heated steering wheel").
+        // This was a bespoke checkmark-pill MorphButton: a THIRD treatment of one
+        // boolean, next to Settings' ToggleRow and the wizard's own steering page
+        // (which hand-rolled a switch row of its own, see WizardSteeringPage). Same
+        // label as Settings too, so the wizard doesn't teach a name the app then
+        // stops using.
+        ToggleRow("Heated steering wheel", sc.steeringWheel) { vm.setSeatFlag(vehicle, "sw", it) }
     }
 }
 
@@ -1376,7 +1368,9 @@ internal fun WizardSeatsPage(
     ) {
         SeatPositions.forEachIndexed { i, pos ->
             if (i > 0) HorizontalDivider(color = scheme.outlineVariant.copy(alpha = 0.5f))
-            WizardSeatRow(pos.label, pos.heat(seats), pos.cool(seats),
+            // SeatConfigRow (Rows.kt), as on the car page above -- see its comment there
+            // for why the wizard no longer keeps its own copy of this row.
+            SeatConfigRow(pos.label, pos.heat(seats), pos.cool(seats),
                 { vm.setSeatFlag(vehicle, pos.heatKey, it) }, { vm.setSeatFlag(vehicle, pos.coolKey, it) })
         }
     }
@@ -1405,50 +1399,6 @@ internal val SeatPositions = listOf(
     SeatPosition("Rear right", "rrh", "rrc", { it.rearRightHeat }, { it.rearRightCool }),
 )
 
-@Composable
-internal fun WizardSeatRow(
-    label: String,
-    heat: Boolean,
-    cool: Boolean,
-    onHeat: (Boolean) -> Unit,
-    onCool: (Boolean) -> Unit,
-) {
-    Row(
-        Modifier.fillMaxWidth().padding(vertical = 6.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Text(label, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            WizardToggleChip(label = "Heat", selected = heat, onClick = { onHeat(!heat) })
-            WizardToggleChip(label = "Cool ❄️", selected = cool, onClick = { onCool(!cool) })
-        }
-    }
-}
-
-@Composable
-internal fun WizardToggleChip(label: String, selected: Boolean, onClick: () -> Unit) {
-    // The same MorphButton as everywhere: filled pill, secondaryContainer when
-    // selected, outline border only while unselected (the wrapper clears it on
-    // active). No second chip implementation left.
-    MorphButton(
-        onClick = { onClick() },
-        active = selected,
-        containerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
-        contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
-        activeContainerColor = MaterialTheme.colorScheme.secondaryContainer,
-        activeContentColor = MaterialTheme.colorScheme.onSecondaryContainer,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp),
-        minHeight = 0.dp,
-    ) {
-        Text(
-            label,
-            style = MaterialTheme.typography.labelMedium,
-            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
-        )
-    }
-}
-
 /** One wizard page for the single "heated steering wheel" flag; same
  *  direct-to-view-model wiring as the other wizard pages, just one row. */
 @Composable
@@ -1469,14 +1419,20 @@ internal fun WizardSteeringPage(
             .fillMaxWidth()
             .clip(RoundedCornerShape(16.dp))
             .background(scheme.surfaceContainerHigh)
-            .padding(vertical = 8.dp),
+            // The horizontal inset used to live on the hand-rolled row itself; ToggleRow
+            // (like every settings control) leaves its container to supply it.
+            .padding(horizontal = 16.dp, vertical = 12.dp),
     ) {
-        WizardFeatureToggle(
-            title = "Heated steering wheel",
-            body = "Warm the steering wheel via the remote climate command",
-            checked = seats.steeringWheel,
-            onChecked = { vm.setSeatFlag(vehicle, "sw", it) },
-        )
+        // ToggleRow with its own `description`, not the hand-rolled WizardFeatureToggle
+        // that used to live below this: that row already drew MorphToggleTrack and
+        // ToggleRow's own toggleable/haptics, so all it really contributed was a second
+        // label+caption type scale (bodyLarge + MutedText vs ToggleRow's bodyMedium +
+        // SettingsCaption) for the same setting the Settings card shows as a ToggleRow.
+        ToggleRow(
+            "Heated steering wheel",
+            seats.steeringWheel,
+            description = "Warm the steering wheel via the remote climate command",
+        ) { vm.setSeatFlag(vehicle, "sw", it) }
     }
     Text(
         "That's it for ${vehicle.name}. Tap Next to continue.",
@@ -1485,43 +1441,6 @@ internal fun WizardSteeringPage(
     )
 }
 
-@Composable
-internal fun WizardFeatureToggle(
-    title: String,
-    body: String,
-    checked: Boolean,
-    onChecked: (Boolean) -> Unit,
-) {
-    val scheme = MaterialTheme.colorScheme
-    val haptics = LocalHaptics.current
-    Row(
-        Modifier
-            .fillMaxWidth()
-            // Same fix as ToggleRow: toggleable + Role.Switch on the row, with the
-            // inner track's own semantics node cleared, so TalkBack sees one
-            // correctly-announced toggle instead of two focus stops.
-            .toggleable(value = checked, role = Role.Switch) { next ->
-                // ToggleRow fires these; this row did not, so the one toggle a new
-                // user meets during onboarding was also the only silent one.
-                if (next) haptics?.toggleOn() else haptics?.toggleOff()
-                onChecked(next)
-            }
-            .padding(horizontal = 16.dp, vertical = 12.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
-        Column(Modifier.weight(1f)) {
-            Text(title, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.SemiBold)
-            MutedText(body)
-        }
-        // MorphToggleTrack, not a stock Switch. ToggleRow's docstring calls itself
-        // "the app's one toggle control for boolean settings", built specifically so
-        // there is no "default-Material holdout in an otherwise fully custom UI" --
-        // and this row was that holdout. It clears its own semantics, so the
-        // clearAndSetSemantics the Switch needed here is gone with it.
-        MorphToggleTrack(checked)
-    }
-}
 internal class Burst(val x: Float, val y: Float, val start: Float, val life: Float, val hue: Float, val count: Int, val maxR: Float)
 /**
  * A short, lightweight particle-burst fireworks animation drawn on a Canvas.

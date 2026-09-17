@@ -773,9 +773,14 @@ internal fun SyncDevicesSection(state: UiState, vm: AppViewModel) {
                     style = MaterialTheme.typography.bodyMedium,
                     color = scheme.onSurfaceVariant,
                 )
-                // Styled to match every other text field in the app (18dp FieldShape,
-                // borderless surface fill) rather than a default outlined box, which
-                // looked generic against the frosted dialog.
+                // FieldShape with the DEFAULT outlined colours -- the same field
+                // ClimatePebble's "Save preset" and the palette editor's "Name" draw
+                // inside this identical glass shell. borderlessFieldColors() (which
+                // this used to pass) is the credential-over-glass treatment: the lock
+                // screen, onboarding's PIN pair and the PIN dialog, where the field
+                // sits on the aurora and needs its own opaque fill. "Name this device"
+                // is an ordinary form field, and it was the only one of those wearing
+                // the credential look.
                 OutlinedTextField(
                     value = draft,
                     onValueChange = { draft = it },
@@ -783,7 +788,6 @@ internal fun SyncDevicesSection(state: UiState, vm: AppViewModel) {
                     placeholder = { Text(Build.MODEL ?: "This device") },
                     singleLine = true,
                     shape = FieldShape,
-                    colors = borderlessFieldColors(),
                     keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Words),
                     modifier = Modifier.fillMaxWidth(),
                 )

@@ -36,7 +36,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Bolt
@@ -389,15 +388,15 @@ internal fun UpdateStatusChip(state: UiState) {
         ),
         label = "settingsUpdateTint",
     )
-    Row(
-        Modifier
-            .clip(CircleShape)
-            .background(updateTint.copy(alpha = 0.15f))
-            .padding(horizontal = 12.dp, vertical = 8.dp),
-        verticalAlignment = Alignment.CenterVertically,
+    // The shared StatusChip (Widgets.kt) rather than this composable's own Row/clip/
+    // background stack -- see that chip's doc: AutoLock's live detection pill was the
+    // same control at a different size and fill, and there is now one of them. The
+    // crossfade stays here, in the `label` slot, because the animating text is this
+    // card's own behaviour and not something every status chip wants.
+    StatusChip(
+        tint = updateTint,
+        icon = Icons.Filled.SystemUpdate,
     ) {
-        Icon(Icons.Filled.SystemUpdate, contentDescription = null, tint = updateTint, modifier = Modifier.size(16.dp))
-        Spacer(Modifier.width(6.dp))
         AnimatedContent(
             targetState = when {
                 state.updateChecking -> "Checking…"
@@ -405,8 +404,6 @@ internal fun UpdateStatusChip(state: UiState) {
                 else -> "Up to date"
             },
             label = "settingsUpdateChipText",
-        ) { text ->
-            Text(text, style = MaterialTheme.typography.labelMedium, color = updateTint, fontWeight = FontWeight.Bold)
-        }
+        ) { text -> Text(text) }
     }
 }

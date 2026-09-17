@@ -614,6 +614,64 @@ internal fun MetaChip(text: String, modifier: Modifier = Modifier, icon: ImageVe
     }
 }
 
+/**
+ * The tinted sibling of [MetaChip]: a small pill for a LIVE status readout -- something
+ * that changes while you are looking at it and whose colour carries meaning (AutoLock's
+ * detection state, the Updates card's check result).
+ *
+ * Separate from [MetaChip] rather than a `tint` parameter on it, because the two answer
+ * different questions. MetaChip is a static fact over unpredictable content (a photo, the
+ * map), so it is deliberately hue-free glass with a rim and a shadow -- see its own doc for
+ * how hard-won that is. This one always sits on a known settings card, carries no rim, and
+ * is tinted on purpose.
+ *
+ * It exists because two screens had hand-rolled the same pill at different sizes and fills:
+ * AutoLock's detection state as a solid `primaryContainer` [Surface] at 12/6 padding, the
+ * Updates card's status as a 0.15-alpha tint at 12/8. Same content, same place in the app
+ * (both are Settings cards), two chips -- so both route through this now. The 0.15-alpha
+ * fill is the one that survived: a status chip has to work in any of the tints a caller
+ * passes (tertiary, error, a muted onSurfaceVariant "nothing to report"), and only the
+ * alpha-of-the-tint form has a matching container tone for every one of them.
+ */
+@Composable
+internal fun StatusChip(text: String, tint: Color, modifier: Modifier = Modifier, icon: ImageVector? = null) {
+    StatusChip(tint = tint, modifier = modifier, icon = icon) { Text(text) }
+}
+
+/**
+ * [StatusChip] with the label as a slot, for the callers that animate the text itself (the
+ * Updates card crossfades between "Checking…" / "Build N ready" / "Up to date"). The style
+ * and the tint are still applied here, through LocalContentColor / LocalTextStyle, so an
+ * animating caller cannot drift away from a static one.
+ */
+@Composable
+internal fun StatusChip(
+    tint: Color,
+    modifier: Modifier = Modifier,
+    icon: ImageVector? = null,
+    label: @Composable () -> Unit,
+) {
+    Row(
+        modifier
+            .clip(CircleShape)
+            .background(tint.copy(alpha = 0.15f))
+            .padding(horizontal = 12.dp, vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        if (icon != null) {
+            Icon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(16.dp))
+            Spacer(Modifier.width(6.dp))
+        }
+        androidx.compose.runtime.CompositionLocalProvider(
+            androidx.compose.material3.LocalContentColor provides tint,
+            androidx.compose.material3.LocalTextStyle provides
+                MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold),
+        ) {
+            label()
+        }
+    }
+}
+
 /** "Updated x ago" fact, as a [MetaChip]. Null (renders nothing) until a
  *  first fetch has actually landed for [v]. */
 @Composable
