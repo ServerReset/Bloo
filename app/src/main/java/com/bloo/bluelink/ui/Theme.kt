@@ -474,6 +474,40 @@ fun BlooTheme(
 val LocalReduceMotion = staticCompositionLocalOf { false }
 
 /**
+ * "Is the APP dark right now?" -- the one answer, for any composable below [BlooTheme]
+ * that needs to branch on it.
+ *
+ * This exists because the same four-line `when (themeMode)` block was re-typed at every
+ * site that needed it, and the bug it exists to stop has now been reported and fixed
+ * FIVE separate times: a composable reading `isSystemInDarkTheme()` directly, which is
+ * the PHONE's setting and has nothing to say about the app's own Light/Dark/AMOLED
+ * override. Every one of those five rendered a dark-mode treatment inside a light-themed
+ * app (or the reverse) whenever the two disagreed -- [pebbleCardEdge]'s pebble shadow,
+ * [glassTint]'s near-solid-black floating glass, `CarMap`'s tile/pin palette
+ * (WeatherPebble.kt), `carTonalBrush`'s hero fallback gradient (Hero.kt) and
+ * `chargeReadoutOf`'s "Parked" line (HeroReadout.kt). Four of the five were the identical
+ * copy-paste of a rule that already had a correct implementation eight lines up in
+ * [BlooTheme].
+ *
+ * So: ONE implementation, and the call is short enough that copying the `when` back out
+ * is strictly more work than calling this. LIGHT/DARK/AMOLED force their answer
+ * regardless of the system; only SYSTEM/SYSTEM_AMOLED fall through to the phone -- byte
+ * for byte what [BlooTheme] itself does when it picks the colour scheme, which is the
+ * property that matters: anything branching on this agrees with the scheme it is drawing
+ * against, by construction rather than by two places happening to stay in step.
+ *
+ * NOT a `LocalIsDark` composition local, deliberately: [LocalAppearance] is already
+ * provided app-wide and already carries `themeMode`, so a second local holding a value
+ * derived from the first is one more thing that can be forgotten at a provider.
+ */
+@Composable
+internal fun appIsDarkTheme(): Boolean = when (LocalAppearance.current.themeMode) {
+    ThemeMode.LIGHT -> false
+    ThemeMode.DARK, ThemeMode.AMOLED -> true
+    ThemeMode.SYSTEM, ThemeMode.SYSTEM_AMOLED -> isSystemInDarkTheme()
+}
+
+/**
  * Overrides only the colour scheme for a per-car custom palette, inheriting
  * typography, shapes and motion from the surrounding [BlooTheme]. When
  * [paletteId] is null or unknown, [content] renders unchanged so cars without an

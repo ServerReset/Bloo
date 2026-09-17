@@ -104,6 +104,7 @@ import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.takeOrElse
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -228,8 +229,14 @@ internal fun PebbleShell(
      */
     titleTrailingAtEnd: Boolean = false,
     /**
-     * Overrides the colour of [title] and [summary]. [Color.Unspecified] (the default)
-     * inherits, which is what every pebble but the hero wants.
+     * Overrides the colour of [title] and of the leading [icon] beside it.
+     * [Color.Unspecified] (the default) inherits, which is what every pebble but the
+     * hero wants.
+     *
+     * The ICON is covered by this deliberately, and was the bug: it renders on the same
+     * row, over the same backdrop, 10dp from the first glyph of the title, so having it
+     * resolve its colour from somewhere else than the title is a guaranteed mismatch --
+     * and it was one, repeatedly reported on the hero.
      *
      * The hero needs it because its `background` slot puts a PHOTO behind the header,
      * and the header is drawn over that with the surface's own content colour -- so an
@@ -537,7 +544,33 @@ internal fun PebbleShell(
                             .padding(start = 16.dp, end = 12.dp, top = 6.dp, bottom = 6.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        Icon(icon, contentDescription = null, modifier = Modifier.size(20.dp))
+                        // Tinted with [titleColor], not left to inherit LocalContentColor.
+                        // This icon sits IMMEDIATELY before the title on the same row and on
+                        // the same backdrop, so the two must resolve their colour from the
+                        // same place -- and until now only the title did. That split is the
+                        // reported "the car icon before the car's name doesn't follow the
+                        // theme" bug, raised repeatedly: on the hero the header is drawn over
+                        // a scrimmed car photo and the title travels to HeroOnPhoto for it
+                        // (see titleColor's own doc), while this Icon kept inheriting the
+                        // CARD's content colour -- near-black in a light theme, and tinted by
+                        // whatever slice of the seed colour a per-car CarThemeOverride palette
+                        // feeds onSurfaceVariant. So the name was legible over the photo and
+                        // the glyph 10dp to its left was not, in the app's light theme AND in
+                        // any custom palette.
+                        //
+                        // takeOrElse, not a bare pass-through: titleColor defaults to
+                        // Color.Unspecified for every pebble but the hero, and Icon treats
+                        // Unspecified as "no ColorFilter at all" -- i.e. the raw vector's own
+                        // colour rather than the inherited content colour -- which would have
+                        // turned this fix into a regression on all ~10 other pebbles. Falling
+                        // back to LocalContentColor keeps them byte-identical to before and
+                        // leaves the hero as the one card that overrides.
+                        Icon(
+                            icon,
+                            contentDescription = null,
+                            tint = titleColor.takeOrElse { LocalContentColor.current },
+                            modifier = Modifier.size(20.dp),
+                        )
                         // ButtonIconGap, not a bespoke 10dp: this is the exact same "icon, then
                         // label" pair MorphButtonLabel standardises everywhere else in the app,
                         // and it was the one place still stating that gap by hand.

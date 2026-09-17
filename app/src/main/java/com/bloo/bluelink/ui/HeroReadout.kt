@@ -156,18 +156,46 @@ internal fun chargeReadoutOf(
             charging -> ChargeGreen
             drivingLabel == "Driving" || drivingLabel == "Running" -> MaterialTheme.colorScheme.primary
             else -> {
-                // In light mode, use full onSurface for better visibility on the "Parked" text.
-                // In dark mode, use muted alpha to avoid high contrast. LocalForceExpanded
-                // indicates the expanded state (cover vs. phone) and adjusts accordingly.
-                val dark = androidx.compose.foundation.isSystemInDarkTheme()
-                if (dark) {
-                    LocalContentColor.current.copy(
-                        alpha = if (LocalForceExpanded.current) 0.92f else MutedContentAlpha,
-                    )
-                } else {
-                    // Light mode: use onSurfaceVariant for readable muted text without being too dim
-                    MaterialTheme.colorScheme.onSurfaceVariant
-                }
+                // The inherited content colour, muted -- and NOTHING else. This is the
+                // "Parked"/"Battery"/"Fuel" line, and it was reported (many times) as the
+                // one bit of the hero that ignores the app's theme.
+                //
+                // Two separate faults, both removed here:
+                //
+                // 1. It branched on a raw `isSystemInDarkTheme()`, which is the PHONE's
+                //    setting and not the app's own ThemeMode override -- the exact bug
+                //    already fixed in pebbleCardEdge/glassTint (GlassChrome.kt) and CarMap
+                //    (WeatherPebble.kt). An app forced to Light on a dark phone took the
+                //    `dark` branch and vice versa, so the one thing this branch was meant
+                //    to decide was decided backwards whenever the two disagreed.
+                //
+                // 2. The light branch returned `colorScheme.onSurfaceVariant` -- a SURFACE
+                //    role -- for text that is not on a surface. Every other element of this
+                //    readout (the percentage, the range) and the car's name beside it are
+                //    painted from LocalContentColor, which the hero provides as
+                //    lerp(onSurface, HeroOnPhoto, heroT) so they travel from the card's
+                //    themed content colour onto the scrimmed photo as the card opens (see
+                //    Hero.kt's two CompositionLocalProvider blocks and HeroOnPhoto's own
+                //    doc in UiTokens.kt). This line opted out of that provider, so on a
+                //    light-themed app the expanded hero drew "Parked" in near-black over a
+                //    dark photo scrim -- invisible -- while the percentage directly above
+                //    it was near-white. With a per-car CarThemeOverride palette it was
+                //    worse: onSurfaceVariant carries a slice of that car's seed colour, so
+                //    it came out as a tinted grey belonging to no backdrop at all.
+                //
+                // Reading LocalContentColor means this now tracks the ACTIVE
+                // MaterialTheme.colorScheme -- including a CarThemeOverride palette, since
+                // the hero's provider derives from colorScheme.onSurface inside that scope
+                // -- in every theme mode, with no dark-mode test of its own to get wrong.
+                // Nothing here needs to know whether it is dark: the provider upstream
+                // already resolved that, once, the way BlooTheme did.
+                //
+                // The alpha split stays: the flip cover (LocalForceExpanded) shows this at
+                // a glance from across a room and wants it nearly solid; the phone hero
+                // wants it subordinate to the percentage above it.
+                LocalContentColor.current.copy(
+                    alpha = if (LocalForceExpanded.current) 0.92f else MutedContentAlpha,
+                )
             }
         },
         charging = charging,

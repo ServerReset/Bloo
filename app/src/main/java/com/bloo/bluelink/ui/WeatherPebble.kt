@@ -75,7 +75,6 @@ import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.activity.compose.BackHandler
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -761,12 +760,9 @@ internal fun CarMap(
     // the app's own ThemeMode override, not a raw isSystemInDarkTheme() read --
     // otherwise a user who forced Light/Dark against a differently-set system
     // theme got a map whose colour filter didn't match the rest of the app.
-    val themeMode = LocalAppearance.current.themeMode
-    val isDarkMode = when (themeMode) {
-        ThemeMode.LIGHT -> false
-        ThemeMode.DARK, ThemeMode.AMOLED -> true
-        ThemeMode.SYSTEM, ThemeMode.SYSTEM_AMOLED -> isSystemInDarkTheme()
-    }
+    // The `when` block this used to spell out in place is appIsDarkTheme() now
+    // (Theme.kt), so all five sites that need this answer share one.
+    val isDarkMode = appIsDarkTheme()
 
     // Adaptive map background: light map needs bright pins, dark needs adjustment
     // The map tiles themselves provide the visual theme, so minimal background needed

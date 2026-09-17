@@ -5,7 +5,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.LocalContentColor
@@ -101,10 +100,58 @@ import com.bloo.uicommon.ambientRing as sharedAmbientRing
  * few dp inside it read as a harsh, "baked-in" dark smudge rather than a
  * second, subtler layer of depth -- reported directly from a screenshot.
  * The frosted rim border still draws either way; only the shadow is optional.
+ *
+ * The shadow is also THEME-DEPENDENT now -- see [glassDropShadow]. That was the
+ * remaining "black shadow behind floating elements" bug, reported about five times
+ * and only partly addressed by the [pebbleCardEdge]/[glassTint] fixes: those two
+ * were reading the WRONG dark-mode source, while this one never looked at the theme
+ * at all.
  */
 @Composable
 internal fun Modifier.glassEdge(shape: Shape, shadow: Boolean = true): Modifier =
-    (if (shadow) this.dropShadow(shape) else this).glassRim(shape)
+    (if (shadow) this.glassDropShadow(shape) else this).glassRim(shape)
+
+/**
+ * The floating-glass drop shadow, at the weight the CURRENT theme can carry.
+ *
+ * This is the third and last "black smudge behind floating chrome" root cause, and it
+ * is a different one from the other two: [pebbleCardEdge] and [glassTint] were reading
+ * dark mode from the wrong SOURCE (raw `isSystemInDarkTheme()` instead of the app's own
+ * override -- now [appIsDarkTheme]); this drew `dropShadow(shape)` with its bare default
+ * -- black at 0.38 alpha, 14dp blur, offset 5dp down -- with no light/dark gate of ANY
+ * kind. Every [GlassSurface] in the app goes through here, so that one line put a heavy
+ * black silhouette under every floating chip, pill, dialog, status bar, refresh circle
+ * and [FloatingIcon] in both themes.
+ *
+ * Why that reads as a *smudge* specifically, rather than as depth, and why LIGHT mode is
+ * where it was reported: the glass FILL is deliberately almost nothing. [glassTint] is
+ * 0.10 alpha unblurred and 0.02 blurred (lowered five times, each time on a request for
+ * more of the background to show through), and in light mode it is a pale
+ * `surfaceContainer` at 0.08-0.12. On a device with no real backdrop blur -- pre-API-31,
+ * or battery saver on, i.e. [CanBlurBackdrops] false, which is also every screen that
+ * still passes no `hazeState` -- there is then nothing solid on the shape at all, and the
+ * single most opaque thing anywhere near a floating chip is this 0.38 black behind it.
+ * The chip reads as its own shadow. Dark mode hid it because the shadow lands on an
+ * already-dark backdrop; light mode is where 0.38 black on near-white is exactly the
+ * "flat black smudge" in the screenshots.
+ *
+ * Not dropped entirely in light mode, and that is the one thing this does differently
+ * from [pebbleCardEdge]. A pebble is an opaque themed card on the app's own background,
+ * so it can rely on its outline; this floats over an ARBITRARY backdrop -- a car photo,
+ * scrolled content -- and the shadow is what stops a translucent chip dissolving into a
+ * bright patch of photo (the same fact `ambientRing` exists for). So light mode keeps a
+ * shadow, as a soft contact shadow rather than a silhouette: a third of the alpha, a
+ * tighter blur and a much shorter offset, which still separates the shape from what is
+ * behind it without ever becoming the most solid thing on screen. Dark mode is unchanged
+ * (`dropShadow`'s own defaults), because nothing was ever wrong there.
+ */
+@Composable
+private fun Modifier.glassDropShadow(shape: Shape): Modifier =
+    if (appIsDarkTheme()) {
+        this.dropShadow(shape)
+    } else {
+        this.dropShadow(shape, color = Color.Black.copy(alpha = 0.12f), blurRadius = 10.dp, offsetY = 2.dp)
+    }
 
 /**
  * Rim for glass surfaces: the shared frosted rim with Material's onSurface color.
@@ -115,11 +162,41 @@ internal fun Modifier.glassRim(shape: Shape): Modifier =
     this.sharedFrostedRim(shape, MaterialTheme.colorScheme.onSurface)
 
 /**
- * Ambient ring effect (not used for glass, kept for specialized cases).
- * See [com.bloo.uicommon.ambientRing].
+ * The symmetric ambient halo, at the weight the CURRENT theme can carry --
+ * see [com.bloo.uicommon.ambientRing] for what it draws and why it has no offset.
+ *
+ * Same root cause as [glassDropShadow], and the two STACK, which is why this is the
+ * other half of the "black halo behind floating elements" report rather than a separate
+ * issue: [FloatingIcon] (Widgets.kt) and the cover screen's camera band
+ * (CoverGarage.kt) chain this ON a [GlassSurface], so a 48dp floating button was
+ * carrying 0.38-alpha black offset below it AND 0.30-alpha black on all four sides,
+ * neither gated on the theme, under a fill of 0.02-0.12 alpha. In light mode that is two
+ * black layers and no button. [HeaderContentClearance]'s own doc already describes the
+ * result from the layout side -- "a button's true on-screen silhouette is bigger than its
+ * logical box... those two halos can visibly eat into" the content below it.
+ *
+ * The shared :uicommon implementation stays exactly as it is, and is still what the watch
+ * and [com.bloo.uicommon.PagerDots] call: neither can see [LocalAppearance] (uicommon is
+ * Material- and app-state-free by design, see its own file doc), and both draw over their
+ * own always-dark backdrops anyway. This wrapper is the phone's theme-aware entry point,
+ * which is what the wrapper existed for in the first place -- it just wasn't adding
+ * anything yet.
+ *
+ * Light mode keeps a halo rather than dropping it (same reasoning as [glassDropShadow]:
+ * the thing this defends against is a bright patch of car photo, which happens in either
+ * theme) at a third of the alpha and a tighter radius, so it still darkens the backdrop
+ * around the shape without being the shape's most visible feature.
+ *
+ * @Composable now, where the shared one is a plain function. Both current call sites
+ * chain this inside a composable's modifier argument, so nothing had to move.
  */
+@Composable
 fun Modifier.ambientRing(shape: Shape): Modifier =
-    this.sharedAmbientRing(shape)
+    if (appIsDarkTheme()) {
+        this.sharedAmbientRing(shape)
+    } else {
+        this.dropShadow(shape, color = Color.Black.copy(alpha = 0.10f), blurRadius = 7.dp, offsetY = 0.dp, offsetX = 0.dp)
+    }
 
 /**
  * The standard opaque pebble/card edge: a drop shadow, plus -- only when the user
@@ -139,19 +216,15 @@ fun Modifier.ambientRing(shape: Shape): Modifier =
  */
 @Composable
 internal fun Modifier.pebbleCardEdge(shape: Shape, outline: Boolean): Modifier {
-    // Matches BlooTheme's own dark resolution (Theme.kt) -- NOT a raw
-    // isSystemInDarkTheme() read. That was the bug: a user who explicitly set
-    // the app to Light while their SYSTEM was in dark mode got a light-themed
-    // app that still drew this shadow, because raw isSystemInDarkTheme() only
-    // ever sees the phone's setting, not the app's own override. LIGHT/DARK/
-    // AMOLED force their answer regardless of system; only SYSTEM/SYSTEM_AMOLED
-    // fall through to the system value, same as BlooTheme.
-    val themeMode = LocalAppearance.current.themeMode
-    val dark = when (themeMode) {
-        ThemeMode.LIGHT -> false
-        ThemeMode.DARK, ThemeMode.AMOLED -> true
-        ThemeMode.SYSTEM, ThemeMode.SYSTEM_AMOLED -> isSystemInDarkTheme()
-    }
+    // [appIsDarkTheme], NOT a raw isSystemInDarkTheme() read. That was the bug: a
+    // user who explicitly set the app to Light while their SYSTEM was in dark mode
+    // got a light-themed app that still drew this shadow, because raw
+    // isSystemInDarkTheme() only ever sees the phone's setting, not the app's own
+    // override. The four-line `when` that fixed it in place here has moved into
+    // appIsDarkTheme() (Theme.kt) -- it had been re-typed at five sites by then,
+    // and that file's doc lists all five; a call is what keeps the sixth from
+    // being typed by hand too.
+    val dark = appIsDarkTheme()
     return (if (dark) this.dropShadow(shape, blurRadius = 12.dp, offsetY = 4.dp) else this).then(
         if (outline) {
             Modifier.border(BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.55f)), shape)
@@ -207,12 +280,8 @@ internal fun glassTint(blurred: Boolean): Color {
     // scheme in that case IS dark (the app is forced dark), so that low-alpha
     // tint was a low-alpha DARK color layered over a blur that, without a
     // real light backdrop to lighten it, read as flatly black.
-    val themeMode = LocalAppearance.current.themeMode
-    val dark = when (themeMode) {
-        ThemeMode.LIGHT -> false
-        ThemeMode.DARK, ThemeMode.AMOLED -> true
-        ThemeMode.SYSTEM, ThemeMode.SYSTEM_AMOLED -> isSystemInDarkTheme()
-    }
+    // (The `when` block that lived here is now appIsDarkTheme() -- see Theme.kt.)
+    val dark = appIsDarkTheme()
     return if (dark) {
         val alpha = if (blurred) GlassBlurredTintAlpha else GlassTintAlpha
         Color.White.copy(alpha = alpha)

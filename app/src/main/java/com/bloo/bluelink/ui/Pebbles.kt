@@ -15,6 +15,7 @@ import androidx.compose.animation.scaleOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.AnimatedVisibility
@@ -173,7 +174,15 @@ internal fun HotspotSlot(
         allAvailable.filter { it != primaryPebble && it != secondaryPebble }
     }
 
-    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+    // 12dp between the two slots, the SAME gap every other pair of pebbles in this view sits
+    // at (ReorderColumn's own default spacing for the pebble list, and ExpandedCar's
+    // `spacedBy(12.dp)` for the column this slot lives in). It was 2.dp, which is the one
+    // spacing in the multi-column layout that made the pinned pebbles read as a stuck-together
+    // pair of a different kind from the cards around them -- part of the same report that the
+    // controls pebble looks unlike every other pebble there. The INNER column below keeps its
+    // own 2dp: that gap is between the secondary slot's small pin/Remove label and the pebble
+    // that label belongs to, where tight is the point.
+    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         // PRIMARY SLOT (Top) - Always "controls" (lights/horn), permanently pinned
         // No removal option - this slot is hardcoded and locked
         CompositionLocalProvider(LocalForceExpanded provides true) {
@@ -367,14 +376,26 @@ internal fun CriticalContent(v: Vehicle, stateSource: State<UiState>, vm: AppVie
 }
 
 /**
- * The lock/unlock quick control. Deliberately *not* styled like the other
- * pebbles - it's just the morphing StateControl with its status on the left,
- * with no card, header or expand chevron. It can still be long-pressed and
- * dragged to reorder, like a pebble, even though it doesn't look like one.
+ * The lock/unlock quick control: the morphing [StateControl] with its status on
+ * the left, in a pebble-shaped card with no header row and no expand chevron.
+ *
+ * It CANNOT go through [Pebble]/[PebbleShell] -- everything that shell gives a
+ * pebble is a header row (icon + title + chevron/action) plus a body that
+ * discloses behind it, and this pebble has neither: its one control is always
+ * visible, and its recent-commands history is revealed by pressing the card's own
+ * background rather than by a chevron (see `showHistory` below). So it rolls its
+ * own Surface -- but every part of the shell's look that ISN'T the header is
+ * deliberately mirrored here, value for value, because it sits in the same column
+ * as cards that DO come from PebbleShell and any drift reads as a different kind
+ * of object: the same [pebbleCardEdge] treatment, the same containerColor and its
+ * matching content colour, the same 1dp card shadow, the same corner radii on the
+ * same springs, and the same content insets. Anything changed in PebbleShell's own
+ * card (not its header) wants changing here too.
+ *
+ * It can still be long-pressed and dragged to reorder, like any pebble.
  */
 @Composable
 internal fun ControlsPebble(v: Vehicle, state: UiState, vm: AppViewModel, dragHandle: Modifier) {
-    val shape = RoundedCornerShape(PebbleCornerCollapsed)
     // Was frostedRim unconditionally -- every other pebble instead gates a
     // bolder dedicated border on the pebbleOutline setting (see Pebble()),
     // frostedRim's alpha being tuned for chrome over a car photo and nearly
@@ -389,6 +410,34 @@ internal fun ControlsPebble(v: Vehicle, state: UiState, vm: AppViewModel, dragHa
     // was last revealed.
     var showHistory by remember(v.vin) { mutableStateOf(false) }
     val history = state.remoteActionHistory[v.vin].orEmpty()
+    // This pebble is "expanded" in exactly the two senses PebbleShell means it: a body is
+    // actually showing under the control (the revealed history), or it is in a context that
+    // force-expands every pebble in it (the wide layout's HotspotSlot, which wraps both its
+    // slots in LocalForceExpanded = true).
+    //
+    // The corner has to follow that, because it was the reported "the controls pebble looks
+    // different from every other pebble" in the multi-column layout: this was a FIXED
+    // PebbleCornerCollapsed (38dp) capsule, so in the hot-spot column it sat directly above a
+    // force-expanded pebble drawn at PebbleCornerExpanded (20dp) -- two cards, one column, two
+    // different silhouettes. Same two targets and the same two springs PebbleShell's own
+    // `corner` uses, so the two cards are the same shape at the same time, in the same motion.
+    //
+    // 38dp stays a plain constant rather than PebbleShell's measured headerRowHeightPx / 2: the
+    // reason that had to be measured is that a header row's height varies with its content, and
+    // this pebble's resting content is hard-pinned to ControlHeight below, so half of it is
+    // knowable up front and is exactly PebbleCornerCollapsed.
+    val forceExpanded = LocalForceExpanded.current
+    val expanded = forceExpanded || showHistory
+    val corner by animateDpAsState(
+        targetValue = if (expanded) PebbleCornerExpanded else PebbleCornerCollapsed,
+        animationSpec = if (expanded) {
+            lowPowerAwareSpring(dampingRatio = PebbleBounceDamping, stiffness = PebbleBounceStiffness)
+        } else {
+            lowPowerAwareSpring(dampingRatio = PebbleCloseDamping, stiffness = PebbleBounceStiffness)
+        },
+        label = "controlsPebbleCorner",
+    )
+    val shape = RoundedCornerShape(corner)
     Surface(
         modifier = Modifier
             .fillMaxWidth()
@@ -404,18 +453,39 @@ internal fun ControlsPebble(v: Vehicle, state: UiState, vm: AppViewModel, dragHa
             .pebbleCardEdge(shape, pebbleOutline),
         shape = shape,
         color = MaterialTheme.colorScheme.surfaceVariant,
-        contentColor = MaterialTheme.colorScheme.onSurface,
+        // contentColorFor(the container), exactly as PebbleShell's own
+        // CardDefaults.cardColors(...) resolves it -- so onSurfaceVariant, not the onSurface
+        // this used to hardcode. Every muted label in the app is LocalContentColor at
+        // MutedContentAlpha, so a card handing its content the WRONG base colour drifts every
+        // one of them: "Locked"/"Unlocked" and the horn/lights icons here were rendering off a
+        // brighter base than the identically-styled text one pebble below.
+        contentColor = contentColorFor(MaterialTheme.colorScheme.surfaceVariant),
+        // Material's Card carries 1dp of elevation by default (CardTokens.ContainerElevation),
+        // which every PebbleShell card therefore gets and a bare Surface does not -- and
+        // pebbleCardEdge deliberately draws NO shadow in light mode, so light mode was the one
+        // place nothing else was covering for it and this card read visibly flatter than its
+        // neighbours. Tonal elevation is left at 0 on purpose: it would be a no-op anyway
+        // (Surface only tints when the colour IS colorScheme.surface) and the shadow is the
+        // part Card actually contributes here.
+        shadowElevation = 1.dp,
     ) {
         Column(Modifier.fillMaxWidth()) {
             // Asymmetric padding to match pebble header alignment: more left, less right.
             // Height stays pinned here (not on the Surface) so the pebble keeps its exact
             // resting silhouette and only grows when the history is actually showing.
-            Box(Modifier.fillMaxWidth().height(ControlHeight).padding(start = 12.dp, end = 8.dp)) {
+            Box(Modifier.fillMaxWidth().height(ControlHeight).padding(start = 12.dp, end = 4.dp)) {
                 // PrimaryActions' own default start padding (26.dp) plus this
                 // Box's 12.dp put the lock icon noticeably further right than
                 // every other pebble's header icon (Charge, Climate, ...), which
                 // only ever get Pebble's flat PebbleContentInset row padding. The 4.dp here
                 // lines the two icons up: 4 + this Box's own 12 == PebbleContentInset.
+                //
+                // The end inset is split the same way and lands on 12dp (4 here + 8 below), not
+                // the 16dp it used to total: PebbleShell's header row is deliberately asymmetric
+                // -- `padding(start = 16.dp, end = 12.dp)` -- so a pebble's trailing control sits
+                // 12dp from the card edge. At 16dp this pebble's button group stopped 4dp short
+                // of where every other pebble's chevron/action stops, which reads as a narrower
+                // card rather than as a different inset.
                 PrimaryActions(
                     v, state, vm,
                     contentPadding = PaddingValues(start = PebbleContentInset - 12.dp, end = 8.dp),
@@ -1019,8 +1089,29 @@ internal fun StateControl(
         val segmentCount = groupActions.size + 1
         // Bigger, thumb-friendly hit targets on the cover screen (operated by a
         // thumb on a ~1-inch square) than on the phone (mouse-precise finger taps in
-        // a full pebble). LocalForceExpanded is true only on the cover.
-        val coverTargets = LocalForceExpanded.current
+        // a full pebble).
+        //
+        // Gated on LocalPebbleFillHeight, NOT LocalForceExpanded: the comment here used to
+        // claim LocalForceExpanded is "true only on the cover" and that was simply wrong --
+        // the wide layout's HotspotSlot provides it too, for both of its slots (see
+        // HotspotSlot). Only the cover provides LocalPebbleFillHeight (see its doc in
+        // Widgets.kt), so that is the one that actually means "cover".
+        //
+        // This was the reported "the controls pebble looks different and worse" in the
+        // multi-column layout, and it was visible ONLY there: ControlsPebble is this
+        // composable's only caller, and "controls" has no cover tile at all (see
+        // CompactCar's `tiles` mapping), so the cover-sized 58dp/26dp targets could never
+        // reach the cover and only ever fired in the hot-spot column -- an over-filled band
+        // of chunky buttons in a 76dp-tall card, 8dp taller and with 4dp bigger icons than
+        // the identical control renders at in the single-column list, and eating 24dp more
+        // of the row's width away from the "Locked"/"Unlocked" label beside it (see
+        // groupMaxWidth). The phone sizes are the right ones for a pebble in a column,
+        // which is what the hot-spot slot is.
+        //
+        // Kept as a branch rather than deleted: it is the correct treatment for a genuine
+        // cover tile, and the cover already renders pebbles through this same SinglePebble
+        // path, so a "controls" tile becoming available there needs no new plumbing.
+        val coverTargets = LocalPebbleFillHeight.current
         val groupBtnSize = if (coverTargets) 58.dp else 50.dp
         val actionIconSize = if (coverTargets) 26.dp else 22.dp
         // Standard gap between connected button elements (matches SplitExpandButton's

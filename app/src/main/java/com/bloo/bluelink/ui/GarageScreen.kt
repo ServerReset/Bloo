@@ -23,11 +23,8 @@ import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -48,6 +45,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.State
 import androidx.compose.runtime.remember
@@ -57,7 +55,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.unit.dp
 import com.bloo.bluelink.data.STALE_STATUS_MS
@@ -372,88 +372,62 @@ internal fun GarageScreen(
                 }
             } else {
                 // Settings is appended as one more ITEM to the sequence this pager
-                // cycles through (index `count`, right after the last real car)
-                // rather than getting its own dedicated
-                // perPage-wide block. On a wide/multi-car screen (perPage > 1) that
-                // means Settings lands in the same block as whatever real cars are
-                // left over in the final partial block -- e.g. 3 cars at perPage 2
-                // puts car 2 alongside Settings, each rendered at the same single
-                // car-column width below -- instead of getting a whole extra block
-                // to itself that stretched SettingsScreen's own embedded content
-                // (its LazyVerticalStaggeredGrid) out to the full multi-car width.
-                // Reported directly as wanting Settings to never be wider than one
-                // car's column, however many cars share the screen with it.
-                // The two `currentIndex`-derived targetBlock calcs further down
-                // divide by perPage directly and never needed a car-only block
-                // count of their own -- they only mean "which car," never Settings.
-                val total = count + 1
-                // A SLIDING WINDOW, not a block grid: on a wide/multi-car screen
-                // (perPage > 1) each "page" still shows `perPage` items side by
-                // side, but consecutive pages overlap -- window N covers indices
-                // [N, N+perPage-1], so swiping shifts the visible set by exactly
-                // ONE car/item instead of jumping by a whole `perPage`-wide block.
-                // Reported directly as wanting one-car-per-swipe even when
-                // several are visible at once, the same way a phone (perPage==1)
-                // already swipes one at a time.
+                // cycles through (index `count`, right after the last real car),
+                // always rendered at exactly one car-column's width (see
+                // `pageWidth` below) -- so on a wide/multi-car screen Settings is
+                // never wider than one car's column, however many share the
+                // screen with it, and SettingsScreen's own LazyVerticalStaggeredGrid
+                // naturally collapses to a single column at that width.
                 //
-                // This formula is a strict generalization of the old block math,
-                // not a separate perPage==1 case: with perPage==1 it reduces to
-                // totalWindows == total, i.e. one window per item, identical to
-                // the phone's existing one-car-per-page behaviour.
-                val totalWindows = (total - perPage + 1).coerceAtLeast(1)
-                // Where a given car index should land as a window -- shared by the
-                // initial seed below and every "snap back to currentIndex" effect
-                // further down, so they can't drift onto different windows for the
-                // same car. Clamped to the last valid window start so a car near
-                // the end still lands on a window that contains it (as its last
-                // visible item) rather than overflowing past totalWindows-1.
-                fun windowFor(index: Int) = index.coerceIn(0, count - 1).coerceAtMost(totalWindows - 1)
+                // ONE ITEM PER PAGE -- a car, or (index `count`) the folded-in
+                // Settings page -- exactly the model a phone (perPage == 1)
+                // already used. On a wide/multi-car screen (perPage > 1) this is
+                // now the ONLY model: `perPage` of these single-item pages are
+                // simply narrow enough (see `pageWidth` below, applied via
+                // `PageSize.Fixed`) to sit side by side in the viewport at once,
+                // the same way a "peeking carousel" shows neighbours without
+                // bundling them into one page.
+                //
+                // This replaces an earlier "sliding window" design that WAS
+                // one-item-per-swipe in its real-index math, but still bundled
+                // `perPage` items into one wide page under the hood -- so the
+                // pager's own settle animation moved that whole bundle as a
+                // single rigid unit, and a swipe from [car1,car2] to [car2,car3]
+                // read as "the page changed" (both cars sliding together) rather
+                // than "car1 left, car2 shifted left, car3 arrived" (each car an
+                // independent, continuously-sliding thing) -- reported directly
+                // as not feeling like the same seamless swipe a phone gets.
+                // Giving each item its OWN page and just narrowing the page
+                // instead is what makes HorizontalPager's native per-page drag/
+                // fling physics apply per CAR again, matching the phone exactly,
+                // instead of reimplementing "shift by one" on top of wide pages.
+                val total = count + 1
                 // Always the car currentIndex was already parked on: this pager
                 // opens on a car, never on the Settings page at the end of it.
-                val initialBlock = windowFor(currentIndex)
-                // Infinite wrap-around: WrapPagerState.realCount is the WINDOW
-                // count here (totalWindows, with the Settings item folded into
-                // `total`), and the real starting vehicle index for a page
-                // is realBlock(page) itself (a window's own start, not
-                // window * perPage -- windows overlap by construction).
-                val wrap = rememberWrapPager(totalWindows, initialBlock)
+                val initialItem = currentIndex.coerceIn(0, count - 1)
+                // Infinite wrap-around: WrapPagerState.realCount is `total` --
+                // one virtual page per real item, no window multiplier of any
+                // kind -- and the real item for a page is realItem(page) itself.
+                val wrap = rememberWrapPager(total, initialItem)
                 val pager = wrap.pager
-                fun realBlock(virtualPage: Int) = wrap.real(virtualPage)
-                // Keyed on totalWindows too, not just pager/perPage: this effect's
-                // own collect{} closes over realBlock/total as they were the
-                // moment it (re)started. Adding or removing a car changes
-                // totalWindows without touching pager's identity or perPage, so
-                // without this key the running coroutine kept a stale
-                // total/realBlock pairing that no longer matched the pager's own
-                // (live) virtual page count -- a mismatched modulus that could
-                // resolve `block` to an unrelated number and fire selectIndex
-                // with a bogus index. Restarting here rebinds the closure to the
-                // current values the instant the window count changes.
-                LaunchedEffect(pager, perPage, totalWindows) {
+                fun realItem(virtualPage: Int) = wrap.real(virtualPage)
+                // Keyed on total, not perPage: perPage only ever affected the old
+                // window math (window width), which no longer exists -- the only
+                // thing that can invalidate this effect's closure now is `total`
+                // itself changing (a car added/removed).
+                LaunchedEffect(pager, total) {
                     snapshotFlow { pager.settledPage }.collect { page ->
-                        // A window's own start IS the real index -- windows
-                        // overlap by construction, so there is no `* perPage`
-                        // multiply here the way there was for blocks.
-                        val start = realBlock(page)
-                        // Guarded: a window past the last real car (a Settings-only
-                        // window, i.e. count == totalWindows-1 exactly) isn't a car
-                        // window at all, and
-                        // selectIndex/currentIndex only ever mean "which car" --
-                        // settling there should leave whatever car was last
-                        // selected exactly as it was, so swiping back to a car
-                        // lands where you left it instead of snapping to car 0.
-                        // A window that mixes leftover cars WITH Settings (the
-                        // usual case once Settings is folded in) still selects
-                        // the real car(s) it holds same as ever.
-                        if (start < count) vm.selectIndex(start.coerceIn(0, count - 1))
-                        // See UiState.onSettingsPageSlot's own doc -- this is what
-                        // lets SearchLayer's floating bubble/pill morph track the
-                        // embedded Settings page the same way it already tracks
-                        // the standalone route, instead of staying a garage
-                        // "bubble" the whole time it's on screen. True whenever
-                        // Settings' folded-in slot (index `count`) falls within
-                        // this settled block, mixed with cars or not.
-                        vm.setOnSettingsPageSlot(minOf(start + perPage, total) == total)
+                        val real = realItem(page)
+                        // Guarded: settling on the Settings page (real == count)
+                        // is not a car selection -- currentIndex keeps whatever
+                        // car it had, so swiping back lands where you left off
+                        // instead of snapping to car 0.
+                        if (real < count) vm.selectIndex(real)
+                        // See UiState.onSettingsPageSlot's own doc -- lets
+                        // SearchLayer's floating bubble/pill morph track this
+                        // pager's own Settings page the same way it already
+                        // tracks the standalone route.
+                        vm.setOnSettingsPageSlot(real == count)
                     }
                 }
                 // Resets the flag above the moment this pager itself leaves
@@ -474,22 +448,16 @@ internal fun GarageScreen(
                 // across a potentially large virtual-page delta) the instant
                 // currentIndex moves out from under the page actually shown.
                 //
-                // Both this and the totalWindows effect below skip their own very
+                // Both this and the `total` effect below skip their own very
                 // first firing (each with its own remember'd flag -- two
                 // independent flags rather than one shared one, so there is no
                 // ordering to get right between separate LaunchedEffects racing to
                 // set it). LaunchedEffect always runs its body once on first
                 // composition regardless of whether its key "changed" from
-                // anything, and initialBlock above has ALREADY seeded the correct
+                // anything, and initialItem above has ALREADY seeded the correct
                 // starting page -- so an unguarded first firing here did not
                 // correct drift, it OVERWROTE that seed, unconditionally snapping
-                // back to currentIndex's own block the instant the pager mounted.
-                // That chained into the settle-observer above calling selectIndex
-                // for that block --
-                // which on a multi-car-per-page grid is not always literally
-                // currentIndex when the two don't share a block boundary, so the
-                // "correction" could self-report as a genuine, uninitiated car
-                // change on the very frame the screen appeared.
+                // back to currentIndex the instant the pager mounted.
                 val skipFirstIndexSnap = remember { mutableStateOf(true) }
                 LaunchedEffect(currentIndex) {
                     if (skipFirstIndexSnap.value) { skipFirstIndexSnap.value = false; return@LaunchedEffect }
@@ -498,216 +466,116 @@ internal fun GarageScreen(
                     // updating live even while AnimatedContent slides its ALREADY-
                     // STALE content off screen, so without this guard a snap here
                     // still visibly moves the pager underneath its own exit
-                    // animation -- see the totalWindows effect below, which skips
+                    // animation -- see the `total` effect below, which skips
                     // itself on the way out for the same reason.
                     if (state.value.screen != Screen.Garage) return@LaunchedEffect
-                    wrap.snapToReal(windowFor(currentIndex))
+                    wrap.snapToReal(currentIndex.coerceIn(0, count - 1))
                 }
-                // A car being added or removed changes totalWindows -- and
-                // therefore `wrap`'s realCount, the modulo divisor real() uses --
-                // out from under the pager's raw (unmoved) virtual position. That
-                // divisor changing while the position doesn't is exactly what a
-                // "seam" is: real(pager.currentPage) resolves to a DIFFERENT window
-                // than the one on screen a moment ago, so the count changing could
-                // silently reshuffle which car you land on, or strand the pager on
-                // an arbitrary window instead of the last real car you were
-                // actually on. Same fix as the currentIndex effect above and for
-                // the same reason: snap (not fly-through) back to the window
-                // currentIndex actually means, which is exactly "stay on the same
-                // car" when a car was showing, and "return to the last car you
-                // had" when Settings was.
+                // A car being added or removed changes `total` -- and therefore
+                // `wrap`'s realCount, the modulo divisor real() uses -- out from
+                // under the pager's raw (unmoved) virtual position. That divisor
+                // changing while the position doesn't is exactly what a "seam"
+                // is: real(pager.currentPage) resolves to a DIFFERENT item than
+                // the one on screen a moment ago, so the count changing could
+                // silently reshuffle which car you land on. Same fix as the
+                // currentIndex effect above and for the same reason: snap (not
+                // fly-through) back to currentIndex.
                 // Skips its own first firing too -- see the currentIndex effect's
                 // comment just above for why. Also skips once this screen is on
-                // its way out (same reason, same fix): this composition stays live
-                // and keeps reacting to real state changes while AnimatedContent
-                // slides its already-stale content off screen, and totalWindows
-                // changing at that exact moment used to fire this effect and snap
-                // the pager to a different page mid-slide -- the reported "janky"
-                // transition.
-                val skipFirstBlocksSnap = remember { mutableStateOf(true) }
-                LaunchedEffect(totalWindows) {
-                    if (skipFirstBlocksSnap.value) { skipFirstBlocksSnap.value = false; return@LaunchedEffect }
+                // its way out (same reason, same fix).
+                val skipFirstTotalSnap = remember { mutableStateOf(true) }
+                LaunchedEffect(total) {
+                    if (skipFirstTotalSnap.value) { skipFirstTotalSnap.value = false; return@LaunchedEffect }
                     if (state.value.screen != Screen.Garage) return@LaunchedEffect
-                    wrap.snapToReal(windowFor(currentIndex))
+                    wrap.snapToReal(currentIndex.coerceIn(0, count - 1))
                 }
                 Box(Modifier.fillMaxSize()) {
+                    // The pixel width of ONE item's page -- viewport width divided
+                    // by perPage, so `perPage` of them sit side by side at rest.
+                    // onSizeChanged, not BoxWithConstraints: this Box's content
+                    // recomposes on every drag frame's worth of state (the pager
+                    // itself), and BoxWithConstraints is a SubcomposeLayout with a
+                    // real extra composition pass -- the same "measured size via a
+                    // plain layout callback instead" trade this codebase already
+                    // makes everywhere else performance-sensitive (CarMap's tile
+                    // box, PebbleShell's own row height). Zero-width for the one
+                    // frame before the real size lands is safe: pageSize.Fixed(0.dp)
+                    // just renders nothing that first frame rather than picking a
+                    // wrong layout decision.
+                    var boxWidthPx by remember { mutableIntStateOf(0) }
+                    val density = LocalDensity.current
+                    val pageWidth = with(density) { (boxWidthPx / perPage).toDp() }
                     HorizontalPager(
                         state = pager,
-                        modifier = Modifier.fillMaxSize().hazeSource(hazeState),
-                        // Finger swipe between cars is ON. Every page renders its FULL
-                        // pebble column (VehicleDetailContent → PebbleList) — there is no
-                        // in-transit skeleton. Swipe smoothness comes from two places:
-                        // PebbleList's own one-frame lazy-fill (only the first EAGER_PEBBLES
-                        // sections compose their bodies immediately; the rest fill one frame
-                        // later) and beyondViewportPageCount pre-composing the neighbour
-                        // while idle, off the drag critical path -- 1 on a single-car-per-
-                        // page (phone) screen, 0 on a multi-car-per-page (wide/foldable)
-                        // one, see that parameter's own doc below for why the two screen
-                        // shapes need different answers.
+                        modifier = Modifier.fillMaxSize().hazeSource(hazeState)
+                            .onSizeChanged { boxWidthPx = it.width },
                         userScrollEnabled = true,
-                        // beyondViewportPageCount = 1 on a single-car page (was unset →
-                        // default 0): the default meant the (heavy) neighbour car page only
-                        // started composing the instant it peeked in — i.e. on the FIRST
-                        // frames of the drag — so swiping between cars hitched right as it
-                        // began. Pre-composing one neighbour while idle moves that work
-                        // off the drag critical path. This matches the expanded pager
-                        // (which already sets 1 with the same VehicleDetailContent
-                        // pages) and the cover-screen pager, so it's consistent with
-                        // proven-safe siblings. (The remaining ceiling is that each
-                        // page composes a whole car's pebble list; making that lazy is
-                        // a bigger, reorder-model-sensitive change left for a device.)
-                        //
-                        // On a single-car page, KEEP THIS AT 1 — do NOT raise it. 1→2 holds
-                        // two more live compositions and widens any state emission that DOES
-                        // change UiState from ~3 pages to ~5.
-                        //
-                        // Dropped to 0 when perPage > 1 -- see the parameter's own doc below.
-                        //
-                        // This used to say "because UiState is unstable". It is not: it is
-                        // @Immutable, as are Appearance/NotificationPrefs, AppViewModel is
-                        // @Stable, and compose-stability.conf covers the `data` package.
-                        //
-                        // The REAL remaining cost is the opposite of instability. Because
-                        // UiState is @Immutable it is diffed with its generated equals(),
-                        // which compares every field -- so any one changed field makes the
-                        // whole object unequal and every pebble taking it whole recomposes.
-                        // Do NOT "fix" that by dropping @Immutable: an unstable object is
-                        // compared by reference instead, which is strictly less permissive.
-                        //
-                        // Fixed: SinglePebble now wraps the `state` it hands each pebble in
-                        // remember(<that pebble's own catalogued fields>) { state.value }, so an
-                        // unrelated field changing (another car's weather, an AI/update
-                        // probe, a status fetch for a page that isn't even visible) no
-                        // longer forces every pebble on every in-composition page to
-                        // recompose -- only the ones whose own dependencies actually
-                        // changed. currentIndex already lives outside UiState, so a plain
-                        // car-switch settle changes nothing any pebble reads at all, and now
-                        // that holds for pebble recomposition too, not just for triggering a
-                        // new UiState emission in the first place. Reported as real,
-                        // measurable cold-start/car-switch lag on a real device; see
-                        // SinglePebble's own doc for the full reasoning and the per-pebble
-                        // dependency lists.
-                        //
-                        // ...EXCEPT on a wide/large screen (perPage > 1), where each "page"
-                        // here is a whole ROW of `perPage` cars (see `block`/`start`/`end`
-                        // below), not one car -- so pre-warming "1 neighbour" pre-composes
-                        // `perPage` more full pebble columns, not one. On a big foldable's
-                        // unfolded screen (perPage 2-3), that is 2-3x the live-composition
-                        // cost this constant's own KEEP-AT-1 warning was calibrated against,
-                        // and it is now carried on EVERY ordinary drag rather than paid once
-                        // as an occasional hitch reaching a genuinely new neighbour --
-                        // reported directly as "laggy while dragging" on exactly this kind
-                        // of large screen. 0 accepts that one-time hitch (still cheaper than
-                        // the phone-sized case that motivated 1, since a single-car page was
-                        // never the problem) in exchange for not carrying 2-3 extra full car
-                        // columns through every swipe on the screens where a "neighbour" is
-                        // heaviest.
-                        beyondViewportPageCount = if (perPage > 1) 0 else 1,
+                        // ONE real item (a car, or Settings) per page, at a FIXED
+                        // width of exactly one car-column -- see this whole
+                        // section's own doc above for why this replaced a "wide
+                        // page holding perPage items" design. PageSize.Fill on a
+                        // single-car phone screen (perPage == 1, pageWidth ==
+                        // the whole viewport) and this Fixed width on a wide
+                        // screen are the SAME resulting page size; Fixed always
+                        // handles both uniformly rather than branching.
+                        pageSize = androidx.compose.foundation.pager.PageSize.Fixed(pageWidth),
+                        // beyondViewportPageCount = 1 always now, matching the phone's
+                        // already-proven value: each page is one item regardless of
+                        // perPage, so pre-warming "1 neighbour" is always exactly one
+                        // extra full pebble column beyond whatever's on screen, on
+                        // EITHER side of the visible run -- never `perPage` extra the
+                        // way the old wide-page design would have (see the doc above:
+                        // that was why perPage > 1 used to drop this to 0, at the
+                        // cost of a hitch reaching a new neighbour). PebbleList's own
+                        // one-frame lazy-fill (EAGER_PEBBLES) still keeps a freshly-
+                        // composed neighbour cheap on the frame it's pre-warmed.
+                        beyondViewportPageCount = 1,
                     ) { page ->
                         // Same fade/scale transition the expanded single-car pager
                         // above uses (see its own comment for why: the continuous
                         // offset is read only inside graphicsLayer{} below, draw-phase
-                        // only, and the secondary "snap bounce" spring this used to
-                        // multiply in is gone -- it lagged the visual response behind
-                        // the actual drag for the whole gesture, which is what made
-                        // this pager's swipe read as less smooth than the cover
-                        // screen's equivalent). This, the default view most people
-                        // see swiping between cars day to day, previously had no
-                        // per-page transform at all, just a plain flat scroll.
-                        // A window's own start IS the real index (see totalWindows'
-                        // own doc above) -- no `* perPage` multiply, windows overlap.
-                        val start = realBlock(page)
-                        // `total`, not `count`: Settings, folded in above, is item
-                        // index `count` -- one past the last real
-                        // car -- and needs to be included in this window's own range so
-                        // it renders alongside whatever real cars share its window.
-                        val end = minOf(start + perPage, total)
-                        // The "is this the settled page" test used to live here, as
-                        // `page == pager.settledPage`. Discrete, yes -- but it still
-                        // subscribed this page's composition to settledPage, so every
-                        // in-composition page (three, with beyondViewportPageCount=1)
-                        // recomposed its ENTIRE pebble column the moment a swipe
-                        // settled. That landed on the same frames as the settle
-                        // animation's tail and as selectIndex's own state emission,
-                        // which recomposes those same three pages again: two full
-                        // rebuilds of three car pages, back to back, exactly at the
-                        // end of the gesture. That is the switch-pages hitch.
-                        //
-                        // It gates one callback, so it moved INTO that callback --
-                        // read at invoke time, off the composition path entirely.
-                        // No blur, no rotationZ tilt -- see the expanded pager above.
-                        // NO pagerDepth here. Reported from a real device: this
-                        // swipe was smooth when it was a plain flat scroll, and
-                        // went juttery once the shrink was added. A graphicsLayer
-                        // scale is cheap on a simple layer, but this page is a
-                        // full pebble column and every pebble draws an elevation
-                        // shadow -- shadows are rasterized from the layer's
-                        // resolved size, so a scale that changes every frame
-                        // re-renders all of them every frame, on the drag's
-                        // critical path. The cover-screen pager keeps its shrink
-                        // because its pages are small and shadow-light.
-                        //
-                        // The transition this was meant to improve is not worth
-                        // the gesture it happens during: a swipe that tracks the
-                        // finger exactly IS the effect.
-                        // No explicit horizontal gap here (no Arrangement.spacedBy): each
-                        // car's own VehicleDetailContent already carries 16.dp of horizontal
-                        // padding on both edges (see its Column), so two adjacent cars in this
-                        // Row already sit 32.dp apart. An extra spacedBy() on top of that would
-                        // double-count the gap and read as too much dead space between columns
-                        // on an already width-constrained (perPage > 1) screen. Settings, folded
-                        // into this same Row below, gets that identical 32.dp neighbour gap for
-                        // free too -- it never needed a gap rule of its own.
-                        Row(Modifier.fillMaxSize()) {
-                            for (i in start until end) {
-                                Box(Modifier.weight(1f).fillMaxHeight()) {
-                                    if (i == count) {
-                                        // The folded-in Settings item -- see `total`'s own doc
-                                        // above for why this is a same-width Row sibling now
-                                        // instead of a dedicated full-block branch. embedded,
-                                        // not navigated to -- see SettingsScreen's own `embedded`
-                                        // doc. Sized to exactly one car's column by the same
-                                        // weight(1f) every real car in this Row already uses, so
-                                        // its own LazyVerticalStaggeredGrid naturally collapses
-                                        // to a single column here instead of spreading across
-                                        // the whole multi-car width.
-                                        SettingsScreen(vm, embedded = true)
-                                    } else {
-                                        val gv = vehicles[i]
-                                        CarThemeOverride(
-                                            paletteId = appearance.carCustomPaletteIds[gv.vin],
-                                            customPalettes = appearance.customPalettes,
-                                            themeMode = appearance.themeMode,
-                                            vibrancy = appearance.vibrancy,
-                                        ) {
-                                            VehicleDetailContent(
-                                                gv, state, vm,
-                                                onExpand = if (canExpand) ({ vm.expand(i) }) else null,
-                                                // Always false now: this only ever reserved
-                                                // room for the persistent floating gear button
-                                                // in the top-right corner, and that button is
-                                                // gone -- Settings is the page right after the
-                                                // last car in this very pager, reached by
-                                                // swiping. Reserving the gap for a button that
-                                                // isn't there just left the last car's own
-                                                // expand button sitting noticeably further from
-                                                // the true corner than every other car's.
-                                                reserveHeaderEnd = false,
-                                                // Pager dots removed: always false now
-                                                reserveTopForDots = false,
-                                                // Only hide the per-car pull indicator in the
-                                                // multi-car grid (perPage > 1) -- a prior fix
-                                                // meant for the grid only ended up applying here
-                                                // unconditionally, silently killing the single-
-                                                // car view's refresh feedback too.
-                                                hideIndicator = perPage > 1,
-                                                hazeState = hazeState,
-                                            )
-                                        }
-                                    }
+                        // only). Applies identically now regardless of perPage, since
+                        // every page is exactly one item -- there is no more separate
+                        // "flat scroll on a wide screen" case.
+                        val real = realItem(page)
+                        Box(Modifier.fillMaxSize()) {
+                            if (real == count) {
+                                // The folded-in Settings item -- embedded, not
+                                // navigated to -- see SettingsScreen's own `embedded`
+                                // doc. Its own LazyVerticalStaggeredGrid naturally
+                                // collapses to a single column at this page's width
+                                // (one car-column) instead of spreading wider.
+                                SettingsScreen(vm, embedded = true)
+                            } else {
+                                val gv = vehicles[real]
+                                CarThemeOverride(
+                                    paletteId = appearance.carCustomPaletteIds[gv.vin],
+                                    customPalettes = appearance.customPalettes,
+                                    themeMode = appearance.themeMode,
+                                    vibrancy = appearance.vibrancy,
+                                ) {
+                                    VehicleDetailContent(
+                                        gv, state, vm,
+                                        onExpand = if (canExpand) ({ vm.expand(real) }) else null,
+                                        // Always false now: this only ever reserved
+                                        // room for the persistent floating gear button
+                                        // in the top-right corner, and that button is
+                                        // gone -- Settings is the page right after the
+                                        // last car in this very pager, reached by
+                                        // swiping.
+                                        reserveHeaderEnd = false,
+                                        // Pager dots removed: always false now
+                                        reserveTopForDots = false,
+                                        // Only hide the per-car pull indicator in the
+                                        // multi-car grid (perPage > 1) -- state.refreshing
+                                        // is one app-wide flag, not per-car, so leaving
+                                        // it unhidden would light up every visible car's
+                                        // spinner for a refresh that only touched one.
+                                        hideIndicator = perPage > 1,
+                                        hazeState = hazeState,
+                                    )
                                 }
                             }
-                            repeat(perPage - (end - start)) { Spacer(Modifier.weight(1f)) }
                         }
                     }
                     // Always active, even during this pager's real finger-swipe drags --

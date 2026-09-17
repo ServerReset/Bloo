@@ -22,7 +22,6 @@ import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.animation.core.snap
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.Box
@@ -625,7 +624,17 @@ internal fun HeroHeader(
  *  own `.alpha(...)` where they want it dimmed -- this returns only the brush. */
 @Composable
 internal fun carTonalBrush(scheme: ColorScheme): Brush {
-    val dark = isSystemInDarkTheme()
+    // appIsDarkTheme() (Theme.kt), not a raw isSystemInDarkTheme() read -- the same fix
+    // already made in pebbleCardEdge/glassTint (GlassChrome.kt) and CarMap
+    // (WeatherPebble.kt). isSystemInDarkTheme() only ever sees the PHONE's setting.
+    // This brush is the hero's whole backdrop for any car without a photo, and it picked
+    // its branch off the wrong source while the [scheme] it draws from is the app's real
+    // (possibly force-dark, possibly per-car CarThemeOverride) one: an app forced to Light
+    // on a dark phone got the "vivid primary/tertiary" branch under light-theme content,
+    // and an app forced to Dark on a light phone got the near-white surfaceContainerLowest
+    // branch -- the two cases where the hero's fallback fill and everything drawn on it
+    // disagreed about which theme they were in.
+    val dark = appIsDarkTheme()
     val colors = if (dark) {
         // Dark mode: vivid primary/tertiary/secondary with light text over them
         listOf(scheme.primary, scheme.tertiary, scheme.secondary)

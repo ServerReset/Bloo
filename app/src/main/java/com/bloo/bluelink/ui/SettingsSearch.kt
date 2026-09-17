@@ -91,6 +91,7 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.graphics.SolidColor
@@ -693,8 +694,17 @@ internal fun SearchPill(
                 // stacked on a shape barely wider than the two of them, which
                 // is what made this read as a smudge rather than a button. The
                 // border below plus the glow behind carry it there.
-                .then(if (compact) Modifier else Modifier.dropShadow(pillShape))
-                .then(if (compact) Modifier else Modifier.glassRim(pillShape))
+                //
+                // glassEdge, not a hand-chained dropShadow + glassRim: those two lines
+                // ARE glassEdge (GlassChrome.kt) -- it is literally defined as that pair,
+                // in that order -- and spelling them out here meant this pill silently
+                // opted OUT of the theme-aware shadow weight glassEdge grew when the
+                // "black shadow behind floating elements" report was finally tracked down
+                // (see glassDropShadow's own doc: bare dropShadow() is 0.38-alpha black
+                // with no light/dark gate, which on a light theme is the smudge in the
+                // screenshots). One call now, so the next change to what a floating edge
+                // looks like reaches this pill too instead of stopping one file short.
+                .then(if (compact) Modifier else Modifier.glassEdge(pillShape))
                 // appHazeEffect, clipped to pillShape explicitly -- this whole
                 // modifier chain runs BEFORE Surface's own internal shape-clip
                 // (Surface appends that itself, after everything the caller
@@ -882,7 +892,21 @@ internal fun SearchSuggestions(state: UiState, compact: Boolean = false, onPick:
                         contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
                         contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp),
                         minHeight = 0.dp,
-                        modifier = Modifier.dropShadow(RoundedCornerShape(50), blurRadius = 8.dp, offsetY = 3.dp),
+                        // Theme-weighted, not a bare dropShadow(). These chips float
+                        // over the aurora with nothing opaque behind them (see the
+                        // heading's own comment just above), so they do want a real
+                        // shadow -- but dropShadow's default colour is 0.38-alpha
+                        // black, and on a light theme that is the "black halo behind
+                        // a floating pill" this app has now been reported for from
+                        // three different surfaces. Same split, and the same reasoning,
+                        // as glassDropShadow (GlassChrome.kt): unchanged in dark, a
+                        // soft contact shadow in light.
+                        modifier = Modifier.dropShadow(
+                            RoundedCornerShape(50),
+                            color = Color.Black.copy(alpha = if (appIsDarkTheme()) 0.38f else 0.12f),
+                            blurRadius = 8.dp,
+                            offsetY = 3.dp,
+                        ),
                     ) {
                         Text(
                             example,
