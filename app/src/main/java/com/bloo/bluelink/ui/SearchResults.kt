@@ -52,6 +52,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -423,7 +424,18 @@ internal fun SettingsSearchResults(
     // as every other floating surface (dialogs, overlays, status bar).
     // This replaces the old plain Card + tonal elevation approach.
     val resultCardShape = RoundedCornerShape(16.dp)
-    if (results.isEmpty()) {
+
+    // Command suggestions from CommandIndex when available
+    val suggestedCommands = remember(query) {
+        if (query.isNotBlank()) {
+            searchCommands(query, state.vehicles, fuzzy = false)
+                .take(if (results.isNotEmpty()) 1 else 3) // Show fewer if settings results exist
+        } else {
+            emptyList()
+        }
+    }
+
+    if (results.isEmpty() && suggestedCommands.isEmpty()) {
         GlassSurface(
             shape = resultCardShape,
             modifier = Modifier.fillMaxWidth(),
@@ -476,6 +488,38 @@ internal fun SettingsSearchResults(
         }
     }
 
+    // Command suggestions from the command index, displayed inline
+    suggestedCommands.forEachIndexed { i, cmd ->
+        PopVisible(visible = staggeredResultVisible(suggestedCommands.joinToString("|") { it.id }, i + results.size)) {
+            GlassSurface(
+                shape = resultCardShape,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Row(Modifier.padding(16.dp)) {
+                    Box(
+                        Modifier
+                            .size(28.dp)
+                            .clip(CircleShape)
+                            .background(MaterialTheme.colorScheme.secondary.copy(alpha = 0.14f)),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(
+                            cmd.icon,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.secondary,
+                            modifier = Modifier.size(15.dp),
+                        )
+                    }
+                    Spacer(Modifier.width(12.dp))
+                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Text(cmd.title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                        Text(cmd.description, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
+            }
+        }
+    }
+
     // A recognised command ("lock my Ioniq", "start smart climate", "stop
     // charging") actually runs -- reuses TileCommandRunner, the same
     // execution path the Quick Settings tiles use, so this isn't a separate,
@@ -514,13 +558,22 @@ internal fun SettingsSearchResults(
         val targetVehicle = namedVehicle ?: if (nameMatches.isEmpty()) state.vehicles.singleOrNull() else null
         var actionResult by remember(submittedQuery) { mutableStateOf<String?>(null) }
         var actionRunning by remember(submittedQuery) { mutableStateOf(false) }
+        var commandExecuted by remember(submittedQuery) { mutableStateOf(false) }
         LaunchedEffect(submittedQuery) {
-            if (targetVehicle != null) {
+            if (targetVehicle != null && !commandExecuted) {
                 actionRunning = true
                 val result = runCatching { TileCommandRunner.run(ctx, targetVehicle.vin, command.cmd, command.climateTarget) }.getOrNull()
                 actionResult = result?.message ?: "Command failed"
                 actionRunning = false
                 vm.refreshStatus(targetVehicle)
+                commandExecuted = true
+
+                // Track this command as recently used
+                try {
+                    RecentCommandsTracker(ctx).recordUsage(command.cmd)
+                } catch (e: Exception) {
+                    // Silently fail - tracking is not critical
+                }
             }
         }
         GlassSurface(

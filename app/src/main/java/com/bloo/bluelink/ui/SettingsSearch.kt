@@ -764,7 +764,7 @@ internal fun SearchPill(
                                 decorationBox = { inner ->
                                     if (query.isEmpty()) {
                                         Text(
-                                            if (compact) "Search" else "Search settings & car data",
+                                            if (compact) "Search" else "Search settings, commands & data",
                                             style = MaterialTheme.typography.bodyLarge,
                                             color = scheme.onSurfaceVariant,
                                             maxLines = 1,
@@ -829,23 +829,29 @@ internal fun SearchSuggestions(state: UiState, compact: Boolean = false, onPick:
     // ones just have to fit and still work when tapped.
     val examples = buildList {
         if (compact) {
+            add("lock")
+            add("unlock")
+            add("start charging")
+            add("climate")
             add("odometer")
             add("battery")
-            add("lock my car")
-            add("haptics")
         } else {
+            // Commands (actions)
+            add("lock" + (carName?.let { " my $it" } ?: " my car"))
+            add("start charging" + (carName?.let { " $it" } ?: ""))
+            add("start climate")
+            add("flash lights")
+            // Data queries
             add("odometer" + (carName?.let { " for $it" } ?: ""))
             add("battery level")
-            add("lock" + (carName?.let { " my $it" } ?: " my car"))
-            // Teaches the temperature syntax, which is not guessable: nothing
-            // else on screen says a command can carry a value.
-            add("start climate at the coldest temperature" + (carName?.let { " on $it" } ?: ""))
+            // Settings
             add("haptic feedback")
-            if (state.vehicles.any { state.hasBattery(it) }) add("start smart climate")
+            if (state.vehicles.any { state.hasBattery(it) }) add("smart climate")
+            add("text scale")
         }
     }
     Text(
-        "Try asking",
+        "Try commands, settings, or ask about your car",
         style = MaterialTheme.typography.labelMedium,
         fontWeight = FontWeight.Bold,
         // Floating directly over the aurora/scrolling content behind it with
