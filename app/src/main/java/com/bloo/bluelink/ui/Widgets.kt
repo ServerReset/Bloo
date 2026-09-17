@@ -95,6 +95,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import com.bloo.uicommon.coldStartIntroPlayed
 import com.bloo.uicommon.animatePlacement
+import com.bloo.uicommon.SegmentOption
 
 /**
  * True while the Activity is in Android's multi-window/split-screen/freeform
@@ -163,17 +164,6 @@ internal fun StatusBarScrim(
      * whole job, and not something `Modifier.blur` alone can do without it.
      */
     hazeState: HazeState? = null,
-    /**
-     * Optional settings mode to display in the status bar. When provided along with
-     * [onSettingsModeChange], integrates the Simple/Advanced toggle into the status
-     * bar itself on the right side, nestled into the corner.
-     */
-    settingsMode: String? = null,
-    /**
-     * Callback when the settings mode toggle is changed. Should be provided when
-     * [settingsMode] is non-null.
-     */
-    onSettingsModeChange: ((String) -> Unit)? = null,
 ) {
     if (inMultiWindowMode) return
     val topInset = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
@@ -242,36 +232,53 @@ internal fun StatusBarScrim(
                     Modifier
                 },
             ),
+    )
+}
+
+/**
+ * Tab-like settings mode toggle positioned below the status bar.
+ * Styled as a separate element hanging from the bottom edge of the status bar,
+ * with glass treatment matching the status bar scrim.
+ */
+@Composable
+internal fun SettingsModeTab(
+    settingsMode: String,
+    onSettingsModeChange: (String) -> Unit,
+    hazeState: HazeState? = null,
+) {
+    val topInset = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
+    val canBlur = CanBlurBackdrops()
+
+    Box(
+        Modifier
+            .fillMaxWidth()
+            .padding(top = topInset)
+            .padding(end = HeaderCornerGap, bottom = 8.dp),
+        contentAlignment = Alignment.TopEnd,
     ) {
-        // Integrate settings mode toggle on the right side if provided
-        if (settingsMode != null && onSettingsModeChange != null) {
-            Box(
-                Modifier
-                    .align(Alignment.CenterEnd)
-                    .padding(end = HeaderCornerGap),
-            ) {
-                // Settings mode toggle nestled into the top right corner
-                // Same glass treatment as FloatingIcon but integrated into status bar
-                GlassSurface(
-                    shape = RoundedCornerShape(16.dp),
-                    modifier = Modifier
-                        .width(172.dp)
-                        .ambientRing(RoundedCornerShape(16.dp)),
-                    hazeState = hazeState,
-                    tint = Color.Transparent,
-                ) {
-                    MorphSegmented(
-                        options = listOf(
-                            SegmentOption("simple", "Simple", null),
-                            SegmentOption("advanced", "Advanced", null),
-                        ),
-                        selectedKey = settingsMode,
-                        onSelect = { onSettingsModeChange(it) },
-                        containerColor = glassTint(blurred = canBlur),
-                        trackHeight = HeaderButtonSize,
-                    )
-                }
-            }
+        GlassSurface(
+            shape = RoundedCornerShape(
+                topStart = 0.dp,
+                topEnd = 0.dp,
+                bottomStart = 16.dp,
+                bottomEnd = 16.dp,
+            ),
+            modifier = Modifier
+                .width(172.dp)
+                .ambientRing(RoundedCornerShape(16.dp)),
+            hazeState = hazeState,
+            tint = Color.Transparent,
+        ) {
+            MorphSegmented(
+                options = listOf(
+                    SegmentOption("simple", "Simple", null),
+                    SegmentOption("advanced", "Advanced", null),
+                ),
+                selectedKey = settingsMode,
+                onSelect = { onSettingsModeChange(it) },
+                containerColor = glassTint(blurred = canBlur),
+                trackHeight = HeaderButtonSize,
+            )
         }
     }
 }

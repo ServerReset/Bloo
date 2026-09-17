@@ -187,9 +187,10 @@ data class UiState(
     val collapsedPebbles: Set<String> = emptySet(),
     /** Hidden pebbles, keyed "vin:section". */
     val hiddenPebbles: Set<String> = emptySet(),
-    /** Per-VIN secondary pebble pinned to the dual-column "hot spot" (under car info).
-     *  Primary slot is always "controls" (lock/unlock). Secondary slot stores the selected pebble, or null if none. */
-    val hotspotSections: Map<String, String?> = emptyMap(),
+    /** Per-VIN pebbles pinned to the dual-column "hot spot" (under car info).
+     *  Stores a list of pinned section keys. Primary (first) defaults to "controls" (lights/horn),
+     *  secondary (second) is user-selectable. */
+    val hotspotSections: Map<String, List<String>> = emptyMap(),
     /** Quick-tile assignments: index -> (vin, command), or null if unassigned. */
     val tileConfigs: List<Pair<String, String>?> = List(12) { null },
     /** Optional per-tile custom names (index -> label or null). */
@@ -327,12 +328,13 @@ data class UiState(
     fun isPebbleHidden(vin: String, section: String): Boolean = "$vin:$section" in hiddenPebbles
 
     /** Pebbles pinned to the hotspot as a list for rendering.
-     *  Primary slot is always "controls" (lock/unlock).
-     *  Secondary slot contains the selected pebble if one is pinned, or null if empty.
-     *  Returns a list for easy iteration: ["controls"] or ["controls", selectedPebble] */
+     *  Primary slot defaults to "controls" (lights/horn).
+     *  Secondary slot contains the selected pebble if one is pinned, or empty if none.
+     *  Returns a list for easy iteration: ["controls"], ["controls", selectedPebble], or custom list */
     fun hotspotFor(vin: String): List<String> {
-        val secondary = hotspotSections[vin]
-        return if (secondary != null) listOf("controls", secondary) else listOf("controls")
+        val pinned = hotspotSections[vin]
+        // Default to "controls" if no pebbles are pinned, otherwise use the custom list
+        return if (pinned.isNullOrEmpty()) listOf("controls") else pinned
     }
 
     fun isShortcutEnabled(vin: String, cmd: String): Boolean =

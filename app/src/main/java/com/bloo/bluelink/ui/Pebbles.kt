@@ -130,9 +130,9 @@ internal fun sectionLabel(section: String): String = when (section) {
 }
 
 /**
- * The dual-column "hot spot": two fixed slots under the car-info column.
- * Slot 1 (Primary/Top): Always "controls" (lock/unlock buttons) - FORCED, cannot be unpinned
- * Slot 2 (Secondary/Bottom): User-selectable slot where they can choose any available pebble, or empty
+ * The dual-column "hot spot": slots under the car-info column for pinned pebbles.
+ * Slot 1: Primary pebble (defaulting to "controls" with lights/horn, but removable)
+ * Slot 2: Secondary user-selectable slot where they can pin additional pebbles
  */
 @Composable
 internal fun HotspotSlot(
@@ -152,29 +152,79 @@ internal fun HotspotSlot(
     val hotDrag = LocalHotSeatDrag.current
     val hovered = hotDrag?.overSlot == true
 
-    // Available pebbles for the secondary slot (excludes "summary", "controls", and hidden)
+    // Available pebbles for pinning (excludes "summary" and hidden pebbles)
     val allAvailable = remember(
         state.sectionOrders[v.vin], state.hiddenPebbles, state.aiEnabled, state.hasBattery(v),
         v.isGen5W, state.platforms[v.vin], state.updateAvailable, state.updateTileDismissed,
     ) {
         state.sectionsFor(v).filter {
-            it != "summary" && it != "controls" && state.isSectionAvailable(v, it)
+            it != "summary" && state.isSectionAvailable(v, it)
         }
     }
 
-    // Secondary slot pebble (if any)
-    val secondaryPebble = state.hotspotSections[v.vin]
+    // Primary slot pebble (defaults to "controls" with lights/horn)
+    val primaryPebble = hotspots.firstOrNull() ?: "controls"
 
-    // Available pebbles not yet pinned to the secondary slot
-    val unpinned = remember(secondaryPebble, allAvailable) {
-        allAvailable.filter { it != secondaryPebble }
+    // Secondary slot pebble (if any)
+    val secondaryPebble = hotspots.getOrNull(1)
+
+    // Available pebbles not yet pinned
+    val unpinned = remember(primaryPebble, secondaryPebble, allAvailable) {
+        allAvailable.filter { it != primaryPebble && it != secondaryPebble }
     }
 
     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-        // PRIMARY SLOT (Top) - Always "controls", locked
-        CompositionLocalProvider(LocalForceExpanded provides true) {
-            Box(Modifier.fillMaxWidth()) {
-                SinglePebble("controls", v, stateSource, vm, Modifier)
+        // PRIMARY SLOT (Top) - Default "controls" (lights/horn), but removable
+        // Show removal controls if there's a pinned primary pebble
+        if (hotspots.isNotEmpty()) {
+            var lifted by remember(primaryPebble) { mutableStateOf(false) }
+            var dragY by remember(primaryPebble) { mutableFloatStateOf(0f) }
+            val lift by animateFloatAsState(if (lifted) 1.03f else 1f, label = "unpinLift")
+
+            Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Row(
+                    Modifier
+                        .fillMaxWidth()
+                        .height(32.dp)
+                        .padding(horizontal = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Icon(
+                        Icons.Filled.PushPin,
+                        contentDescription = null,
+                        modifier = Modifier.size(12.dp),
+                        tint = if (lifted) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Spacer(Modifier.width(6.dp))
+                    Text(
+                        if (lifted) "Release to unpin" else sectionLabel(primaryPebble),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = if (lifted) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.weight(1f),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    MorphTextButton("Remove", onClick = { vm.setHotspot(v, primaryPebble) })
+                }
+                CompositionLocalProvider(LocalForceExpanded provides true) {
+                    Box(
+                        Modifier
+                            .graphicsLayer { scaleX = lift; scaleY = lift }
+                            .pointerInput(primaryPebble) {
+                                detectDragGesturesAfterLongPress(
+                                    onDragStart = { dragY = 0f; lifted = true; haptics?.tick() },
+                                    onDrag = { change, amt -> change.consume(); dragY += abs(amt.x) + abs(amt.y) },
+                                    onDragEnd = {
+                                        lifted = false
+                                        if (dragY > 56f) { haptics?.heavy(); vm.setHotspot(v, primaryPebble) }
+                                    },
+                                    onDragCancel = { lifted = false },
+                                )
+                            },
+                    ) {
+                        SinglePebble(primaryPebble, v, stateSource, vm, Modifier)
+                    }
+                }
             }
         }
 
@@ -439,11 +489,10 @@ internal fun PebbleList(v: Vehicle, state: State<UiState>, vm: AppViewModel, exc
     val sel = state.value
     val allSections = sel.sectionsFor(v)
     val hasBattery = sel.hasBattery(v)
-    // Exclude "controls" (always in primary hotspot slot) and the selected secondary pebble (if any)
-    val secondaryPebble = sel.hotspotSections[v.vin]
-    val allExclude = remember(exclude, secondaryPebble) {
-        val baseExclude = exclude + "controls"
-        if (secondaryPebble != null) baseExclude + secondaryPebble else baseExclude
+    // Exclude any pebbles pinned to the hotspot (both primary and secondary slots)
+    val pinnedPebbles = sel.hotspotSections[v.vin] ?: emptyList()
+    val allExclude = remember(exclude, pinnedPebbles) {
+        exclude + pinnedPebbles
     }
     val sections = remember(
         allSections, allExclude, sel.hiddenPebbles, sel.aiEnabled, hasBattery, v.isGen5W, sel.platforms[v.vin],
@@ -492,7 +541,7 @@ internal fun PebbleList(v: Vehicle, state: State<UiState>, vm: AppViewModel, exc
         keyOf = { it },
         onReorder = { newVisible ->
             // Merge the reordered visible items back into the full section order so
-            // excluded ones (the pinned hot-spot, summary, controls, hidden) keep
+            // excluded ones (the pinned hot-spot pebbles, summary, hidden) keep
             // their slots instead of being dropped.
             val visibleSet = sections.toSet()
             val full = (allSections + com.bloo.bluelink.data.DEFAULT_SECTIONS).distinct()

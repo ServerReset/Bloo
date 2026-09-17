@@ -2279,14 +2279,11 @@ internal fun SettingsScreen(
         // darker/hazier status-bar band than every car page beside it.
         if (!isCompactCoverScreen() && !embedded) StatusBarScrim(
             hazeState = hazeState,
-            settingsMode = state.settingsMode,
-            onSettingsModeChange = { vm.setSettingsMode(it) },
         )
         // No more floating "Settings" corner badge -- removed as unwanted UI (see the floating
         // car-name pill's own removal). The "Settings" title is real, static content on
         // SettingsHeaderRow now; it just scrolls off with the rest of the grid.
         // Floating back-arrow (remains separate and floating, not part of status bar).
-        // The Simple/Advanced toggle is now integrated into the status bar itself.
         if (!embedded) {
             FloatingIcon(
                 icon = Icons.Filled.ArrowBack,
@@ -2294,6 +2291,13 @@ internal fun SettingsScreen(
                 onClick = { vm.closeSettings() },
                 hazeState = hazeState,
                 modifier = Modifier.align(Alignment.TopStart).statusBarsPadding(),
+            )
+            // Settings mode toggle as a tab-like element below the status bar,
+            // positioned at the top-right, styled like it's hanging from the status bar.
+            SettingsModeTab(
+                settingsMode = state.settingsMode,
+                onSettingsModeChange = { vm.setSettingsMode(it) },
+                hazeState = hazeState,
             )
         }
         // First-run coach mark pointing at the back arrow.
