@@ -270,6 +270,7 @@ internal fun ExpandedCar(
             }
         }
     }
+    }
 }
 
 

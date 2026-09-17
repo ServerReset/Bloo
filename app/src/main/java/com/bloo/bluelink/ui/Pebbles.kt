@@ -1075,7 +1075,7 @@ internal fun StateControl(
                 modifier = Modifier.widthIn(max = groupMaxWidth),
                 spacing = 3.dp,
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalAlignment = Alignment.Center,
+                horizontalAlignment = Alignment.CenterHorizontally,
                 wrap = false,
             ) {
                 groupActions.forEachIndexed { i, action ->
