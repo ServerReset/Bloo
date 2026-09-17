@@ -301,7 +301,10 @@ internal fun GarageScreen(
                 val exWrap = rememberWrapPager(count, (expandedIdx ?: 0).coerceIn(0, count - 1))
                 val exPager = exWrap.pager
                 LaunchedEffect(exPager) {
-                    snapshotFlow { exPager.settledPage }.collect { vm.expand(exWrap.real(it)) }
+                    snapshotFlow { exPager.settledPage }.collect {
+                        vm.expand(exWrap.real(it))
+                        exWrap.recenterIfNearEdge()
+                    }
                 }
                 Box(Modifier.fillMaxSize()) {
                     HorizontalPager(
@@ -445,6 +448,7 @@ internal fun GarageScreen(
                         // "are we on Settings" signal now, there's no standalone route
                         // left to also track.
                         vm.setOnSettingsPageSlot(real == slots)
+                        wrap.recenterIfNearEdge()
                     }
                 }
                 // Resets the flag above the moment this pager itself leaves

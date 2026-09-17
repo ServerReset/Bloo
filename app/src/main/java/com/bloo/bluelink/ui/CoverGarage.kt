@@ -205,6 +205,7 @@ internal fun CompactGarage(state: UiState, vm: AppViewModel, appearance: Setting
             // GarageScreen's pager publishes, so SearchLayer's bubble/pill morph
             // tracks the cover's embedded Settings page too.
             vm.setOnSettingsPageSlot(real == slots)
+            wrap.recenterIfNearEdge()
         }
     }
     // Mirrors GarageScreen's own reset: nothing else clears this once this pager
@@ -501,6 +502,12 @@ internal fun CompactCar(
     // makes the panel feel like it is wobbling.
     val vWrap = rememberWrapPager(tiles.size)
     val vPager = vWrap.pager
+    // See the car pager's own matching effect above for why: recentering after
+    // every settle is what makes this wrap feel genuinely infinite (never a real
+    // dead end) while keeping the virtual page range small and bounded forever.
+    LaunchedEffect(vPager, tiles.size) {
+        snapshotFlow { vPager.settledPage }.collect { vWrap.recenterIfNearEdge() }
+    }
     // The `currentTile = { vWrap.currentReal }` lambda was removed. It existed to hand the
     // live tile index to the right-edge dot rail WITHOUT reading it in this scope, and that
     // rail is gone (see the bottom of this function). With no consumer it was a closure nobody
