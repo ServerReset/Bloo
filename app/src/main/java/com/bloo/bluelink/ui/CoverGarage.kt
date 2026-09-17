@@ -258,7 +258,19 @@ internal fun CompactGarage(state: UiState, vm: AppViewModel, appearance: Setting
             state = pager,
             modifier = Modifier.fillMaxSize().hazeSource(hazeState),
             userScrollEnabled = !scrubbing.value,
-            beyondViewportPageCount = 1,
+            // NOT a flat 1 -- see GarageScreen's own matching fix for the full
+            // reasoning (a real, reported crash: ArrayIndexOutOfBoundsException
+            // inside Compose's RememberEventDispatcher, surfacing through this
+            // pager's own folded-in SettingsScreen's LazyVerticalStaggeredGrid).
+            // This pager shows exactly one item per page (perPage is implicitly
+            // 1 here, never narrower), so pre-warming 1 neighbour on EACH side
+            // composes 3 virtual pages at once cycling through `total` real
+            // items -- for a single-car cover user, total = count+1 = 2, so a
+            // flat beyond=1 guarantees two of those three pages resolve to the
+            // SAME real item (the folded-in Settings page) and mount it TWICE
+            // at once. (total - 1) / 2, capped at 1, is the largest beyond that
+            // can never revisit an item within one full cycle.
+            beyondViewportPageCount = ((total - 1) / 2).coerceIn(0, 1),
         ) { page ->
             val real = realCar(page)
             if (real == count) {
@@ -611,7 +623,14 @@ internal fun CompactCar(
             // is a small DISPLAY, not a small device. It runs the same flagship SoC as the main
             // screen. And a tile is cheaper than it was -- no per-tile SubcomposeLayout and no
             // hero block any more.
-            beyondViewportPageCount = 1,
+            //
+            // Capped the same way the car pager beside this one is (see its own doc): a flat
+            // beyond=1 pre-warms a neighbour on EACH side, so a car with very few visible
+            // sections (tiles.size <= 2, e.g. most sections hidden) would compose the same
+            // tile twice at once through the exact wrap-collision this whole fix targets.
+            // Most cars have well more than 2 tiles, so this is a rare-but-real edge rather
+            // than the everyday case the horizontal car pager's own fix is.
+            beyondViewportPageCount = ((tiles.size - 1) / 2).coerceIn(0, 1),
         ) { page ->
             val i = vWrap.real(page)
             val tileScroll = tileScrollStates.getOrPut(tiles[i]) { ScrollState(0) }

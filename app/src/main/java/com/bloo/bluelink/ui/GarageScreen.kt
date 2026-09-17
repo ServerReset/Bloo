@@ -519,17 +519,33 @@ internal fun GarageScreen(
                         // screen are the SAME resulting page size; Fixed always
                         // handles both uniformly rather than branching.
                         pageSize = androidx.compose.foundation.pager.PageSize.Fixed(pageWidth),
-                        // beyondViewportPageCount = 1 always now, matching the phone's
-                        // already-proven value: each page is one item regardless of
-                        // perPage, so pre-warming "1 neighbour" is always exactly one
-                        // extra full pebble column beyond whatever's on screen, on
-                        // EITHER side of the visible run -- never `perPage` extra the
-                        // way the old wide-page design would have (see the doc above:
-                        // that was why perPage > 1 used to drop this to 0, at the
-                        // cost of a hitch reaching a new neighbour). PebbleList's own
-                        // one-frame lazy-fill (EAGER_PEBBLES) still keeps a freshly-
-                        // composed neighbour cheap on the frame it's pre-warmed.
-                        beyondViewportPageCount = 1,
+                        // NOT a flat 1. This is the actual cause of a real, reported crash
+                        // (ArrayIndexOutOfBoundsException inside Compose's own
+                        // RememberEventDispatcher/MutableScatterSet, surfacing through a
+                        // LazyStaggeredGrid measure pass -- i.e. SettingsScreen's own grid).
+                        //
+                        // The wrap pager maps each VIRTUAL page to a real item cyclically
+                        // (real = page mod total), and `perPage` visible pages plus `beyond`
+                        // pre-warmed on EACH side means perPage + 2*beyond virtual pages are
+                        // composed AT ONCE. A contiguous run of consecutive integers mod
+                        // `total` only visits every residue at most once while its length is
+                        // <= total -- once it's longer, the pigeonhole principle guarantees
+                        // two different virtual pages resolve to the SAME real item, so the
+                        // SAME stateful composable (most often the folded-in SettingsScreen,
+                        // since it's the one item every car-count sequence cycles back to)
+                        // gets mounted TWICE at once, each with its own remember/BackHandler/
+                        // LazyVerticalStaggeredGrid state racing the other's -- exactly the
+                        // shape of corruption that crash is.
+                        //
+                        // A single-car account is the sharpest case: total = count+1 = 2,
+                        // perPage is forced to 1 (coerceIn(1, count) above), so a flat
+                        // beyond=1 composes 1+2*1 = 3 virtual pages cycling through only 2
+                        // real items -- guaranteed collision, every single time that user
+                        // opens the app. Solving `perPage + 2*beyond <= total` for the
+                        // largest safe integer beyond (capped at 1, since 1 pre-warmed
+                        // neighbour is already all PebbleList's own lazy-fill needs to hide,
+                        // per this parameter's own history) gives the formula below.
+                        beyondViewportPageCount = ((total - perPage) / 2).coerceIn(0, 1),
                     ) { page ->
                         // Same fade/scale transition the expanded single-car pager
                         // above uses (see its own comment for why: the continuous
