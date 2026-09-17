@@ -121,16 +121,21 @@ fun Modifier.ambientRing(shape: Shape): Modifier =
  * IS its own content, not a translucent overlay on top of something else), so it
  * has no fill or blur of its own to standardize -- just the shadow/outline pairing
  * every pebble already shares.
+ *
+ * In light mode, skip the shadow entirely -- the outline provides sufficient visual
+ * separation and shadows read as too heavy on light backgrounds.
  */
 @Composable
-internal fun Modifier.pebbleCardEdge(shape: Shape, outline: Boolean): Modifier =
-    this.dropShadow(shape, blurRadius = 12.dp, offsetY = 4.dp).then(
+internal fun Modifier.pebbleCardEdge(shape: Shape, outline: Boolean): Modifier {
+    val dark = isSystemInDarkTheme()
+    return (if (dark) this.dropShadow(shape, blurRadius = 12.dp, offsetY = 4.dp) else this).then(
         if (outline) {
             Modifier.border(BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.55f)), shape)
         } else {
             Modifier
         },
     )
+}
 
 // ---- One floating-glass surface, everywhere -------------------------------
 
