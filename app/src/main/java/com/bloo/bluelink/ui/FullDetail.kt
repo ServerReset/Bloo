@@ -208,7 +208,9 @@ internal fun ExpandedCar(
         HotspotSlot(v, hotspot, state, vm)
     }
     val pebbles: @Composable ColumnScope.() -> Unit = {
-        PebbleList(v, state, vm, exclude = setOfNotNull("summary", "controls", hotspot))
+        // "controls" is now a standard pebble that can be reordered and pinned to the hotspot,
+        // so it's no longer excluded from the pebble list.
+        PebbleList(v, state, vm, exclude = setOfNotNull("summary", hotspot))
     }
     CompositionLocalProvider(LocalHotSeatDrag provides hotDrag) {
     // Was hardcoded hideIndicator = true -- the same "grid-only" flag that

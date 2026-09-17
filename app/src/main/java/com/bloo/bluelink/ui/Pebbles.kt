@@ -206,7 +206,7 @@ internal fun HotspotSlot(
             v.isGen5W, state.platforms[v.vin], state.updateAvailable, state.updateTileDismissed,
         ) {
             state.sectionsFor(v).filter {
-                it != "summary" && it != "controls" && state.isSectionAvailable(v, it)
+                it != "summary" && state.isSectionAvailable(v, it)
             }
         }
         val hotDrag = LocalHotSeatDrag.current
@@ -328,7 +328,7 @@ internal fun Refreshable(
         }
     }
 }
-/** Hero image + gauge, then the primary lock/charge controls (expanded view). */
+/** Hero image + gauge (expanded view). */
 @Composable
 internal fun CriticalContent(v: Vehicle, stateSource: State<UiState>, vm: AppViewModel) {
     // Read here rather than at the call site, for the same reason as HotspotSlot above: this
@@ -348,21 +348,8 @@ internal fun CriticalContent(v: Vehicle, stateSource: State<UiState>, vm: AppVie
         heroState.drivingLabel(v), metric = hMetric,
         photoExpanded = heroState.isPebbleExpanded(v.vin, com.bloo.bluelink.data.HERO_PHOTO_SECTION),
     )
-    // Update tile lives in the "pebbles" column's PebbleList as its own
-    // reorderable/pinnable "update" section now, not hardcoded into this
-    // fixed critical-info column -- see SinglePebble.
-    // PrimaryActions is called bare here, unlike its other callers (ControlsPebble,
-    // CompactMainTile) which always wrap it in a Surface that establishes a
-    // readable contentColor. StateControl's status label falls back to
-    // LocalContentColor when not highlighted/off-tinted, and Compose's own
-    // default for that (when nothing upstream ever sets it - the dual-column
-    // controls column isn't itself Surfaced) is opaque black, invisible against
-    // this app's dark theme. That's what read as "no status text next to the
-    // button" here even though the exact same StateControl shows it fine
-    // everywhere else.
-    CompositionLocalProvider(LocalContentColor provides MaterialTheme.colorScheme.onSurface) {
-        PrimaryActions(v, state, vm)
-    }
+    // Lock/unlock controls are now a standard pebble (ControlsPebble) in the pebbles column,
+    // where they can be reordered and pinned to the hotspot like any other pebble.
 }
 
 /**
