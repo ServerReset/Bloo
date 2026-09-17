@@ -60,7 +60,7 @@ object LocationHelper {
      * mid-collection since Android doesn't restart an in-flight collector for
      * that anyway.
      */
-    fun liveUpdates(context: Context, intervalMs: Long = 5_000L): Flow<android.location.Location> = callbackFlow {
+    fun liveUpdates(context: Context, intervalMs: Long = 90_000L): Flow<android.location.Location> = callbackFlow {
         if (!hasPermission(context)) {
             awaitClose {}
             return@callbackFlow

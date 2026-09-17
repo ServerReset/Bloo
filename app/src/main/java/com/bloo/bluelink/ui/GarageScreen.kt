@@ -386,7 +386,7 @@ internal fun GarageScreen(
                     // swiping between cars, reported directly as wanting it to always be
                     // there. Accepted tradeoff: a live drag now pays Haze's per-frame
                     // recomposite cost the same as an idle frame does.
-                    StatusBarScrim(active = true, hazeState = hazeState)
+                    StatusBarScrim(hazeState = hazeState)
                     // Pager dots removed: user requested no page indicators at the top of the screen
                 }
             } else {
@@ -805,7 +805,7 @@ internal fun GarageScreen(
                     // disabling it mid-scroll (the previous behaviour, a perf optimization)
                     // made it disappear while swiping between cars, reported directly as
                     // wanting it to always be there.
-                    StatusBarScrim(active = true, hazeState = hazeState)
+                    StatusBarScrim(hazeState = hazeState)
                     // Pager dots removed: user requested no page indicators at the top of the screen
                     // Grid mode (perPage > 1, wide/large screens) hides each
                     // card's own pull-to-refresh indicator above -- state.value.refreshing
@@ -917,13 +917,16 @@ internal fun GarageScreen(
                 deviceLocation = state.value.deviceLocation,
                 mapState = expandedMap.mapStateFor(expandedVehicle.vin),
                 hazeState = hazeState,
-                lastFetchedAt = state.value.fetchedAt(expandedVehicle),
                 // Same entry point the pebble's own "Locate" button uses --
                 // refreshes the car's position AND (see AppViewModel.
                 // refreshDeviceLocation's own doc) the device's, from the one
                 // fused-location fix both the map's dot and the weather
                 // pebble now share.
                 onRefreshLocation = { vm.locate(expandedVehicle) },
+                // The real command-pending flag, not a guessed timer -- see
+                // MapTopBar's own doc -- so the refresh icon's spin genuinely
+                // tracks the in-flight fetch this same button just kicked off.
+                refreshing = state.value.isPending(expandedVehicle.vin, "locate"),
                 onDismiss = { expandedMap.vin = null },
             )
         }

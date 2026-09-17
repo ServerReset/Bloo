@@ -129,22 +129,18 @@ internal var inMultiWindowMode by mutableStateOf(false)
  * since that check is already cheap and in scope at every call site; the
  * multi-window check lives HERE instead of being repeated at each one, since
  * it is a single process-wide flag every caller should honour identically.
+ *
+ * The blur is always active when [hazeState] and hardware capability
+ * ([CanBlurBackdrops]) allow it -- there used to be an `active: Boolean`
+ * escape hatch here (meant for pausing the blur during a pager fling to save
+ * a per-frame RenderEffect recomposite), but every real call site already
+ * passed `true` unconditionally, so the flag was dead flexibility that only
+ * risked a future caller accidentally turning the blur off. Removed rather
+ * than left unused -- reported directly as wanting this scrim's blur to
+ * always be on, with no path to disable it by mistake.
  */
 @Composable
 internal fun StatusBarScrim(
-    /**
-     * False drops just the blur for this composition, keeping the plain gradient.
-     * Both blur paths below attach a RenderEffect that the GPU recomposites on every
-     * frame this layer draws -- fine for a static screen, but this scrim sits as a
-     * persistent sibling drawn ON TOP of both car pagers (GarageScreen's own call
-     * sites), so during an active drag/fling it was paying that recomposite cost on
-     * every single swipe frame, every swipe, competing with the pager's own
-     * translation work for the same frame budget. Callers with a pager in scope pass
-     * `!pagerState.isScrollInProgress` so the blur is only actually installed while
-     * genuinely idle; every other caller (no pager in scope) leaves this at its
-     * default and keeps the blur exactly as before.
-     */
-    active: Boolean = true,
     /**
      * The [HazeState] whose matching [dev.chrisbanes.haze.hazeSource] marks the
      * content actually behind this scrim (the car photo, Aurora, scrolling list --
@@ -194,7 +190,7 @@ internal fun StatusBarScrim(
             // covers exactly the status bar and nothing past it, on every device.
             .height(topInset)
             .then(
-                if (hazeState != null && canBlur && active) {
+                if (hazeState != null && canBlur) {
                     // The actual fix: blurs whatever is really drawn behind this scrim, via
                     // the matching Modifier.hazeSource(hazeState) on that screen's own
                     // background -- not this Box's own gradient. That gradient (below,
@@ -226,7 +222,7 @@ internal fun StatusBarScrim(
                 ),
             )
             .then(
-                if (hazeState == null && canBlur && active) {
+                if (hazeState == null && canBlur) {
                     Modifier.blur(14.dp, edgeTreatment = BlurredEdgeTreatment.Unbounded)
                 } else {
                     Modifier

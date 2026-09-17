@@ -1027,6 +1027,13 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         // own doc; this is the "whenever the app... opened" half of that, refreshStatus
         // covers "whenever the app refreshed".
         refreshDeviceLocation()
+        // "Every minute or two while inside the app" -- reported directly, correcting
+        // the previous every-5-seconds design: started once per app open (this
+        // ViewModel's own lifetime is "inside the app"; there is no explicit stop,
+        // the same way refreshDeviceLocation's own one-shot fires have never needed
+        // one -- Android tears the subscription down with the process). See
+        // beginLiveDeviceLocation's own doc.
+        beginLiveDeviceLocation()
         // Merge vehicles from every signed-in brand; one brand failing shouldn't
         // hide the others. Track failures separately from "this account
         // genuinely has zero vehicles" -- collapsing both into the same empty
@@ -2813,30 +2820,20 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    // Ref-counted rather than a plain on/off flag: the map pebble/sheet and the
-    // weather card can each independently be on screen at once, and either one
-    // starting or leaving shouldn't stop the other's live tracking out from
-    // under it. The job only actually starts on the first caller and only
-    // actually stops once every caller has released it.
     private var liveLocationJob: kotlinx.coroutines.Job? = null
-    private var liveLocationObservers = 0
-    private var lastLiveWeatherRefreshAt = 0L
 
     /**
-     * Starts (or joins) a continuous [UiState.deviceLocation] subscription --
-     * see [com.bloo.bluelink.autolock.LocationHelper.liveUpdates] -- for as
-     * long as at least one caller wants it. Reported directly: the map's own
-     * "you are here" dot and weather's distance-to-car only ever reflected
-     * wherever the phone was at the last pull-to-refresh, not where it
-     * actually is while the map/weather card is genuinely on screen.
-     *
-     * Every call MUST be paired with [endLiveDeviceLocation] (a
-     * `DisposableEffect`'s `onDispose`, not a one-shot `LaunchedEffect` body)
-     * once the caller is no longer visible, or this leaks a live GPS
-     * subscription for the rest of the app's process lifetime.
+     * Starts a continuous [UiState.deviceLocation] subscription -- see
+     * [com.bloo.bluelink.autolock.LocationHelper.liveUpdates] -- for the rest
+     * of this ViewModel's (i.e. the app's) lifetime. Reported directly: the
+     * map's own "you are here" dot and weather's distance-to-car only ever
+     * reflected wherever the phone was at the last pull-to-refresh, not
+     * "every minute or two while inside the app" as asked for. Called once
+     * from [loadGarageInner] (app open); no matching stop call exists on
+     * purpose -- same as the one-shot [refreshDeviceLocation], this rides out
+     * the process's own lifetime rather than a composable's.
      */
     fun beginLiveDeviceLocation() {
-        liveLocationObservers++
         if (liveLocationJob?.isActive == true) return
         liveLocationJob = viewModelScope.launch {
             com.bloo.bluelink.autolock.LocationHelper.liveUpdates(getApplication()).collect { loc ->
@@ -2849,29 +2846,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                         ),
                     )
                 }
-                // The map dot/distance readout above updates on EVERY tick for a
-                // genuinely live feel, but re-geocoding + re-fetching weather that
-                // often (liveUpdates ticks every few seconds) would hammer both
-                // for no benefit -- weather itself doesn't change second to
-                // second. Throttled to once a minute here instead; the one-shot
-                // refreshDeviceLocation() path above (app open/pull-to-refresh/
-                // Locate) is unaffected and still fires immediately every time.
-                val now = System.currentTimeMillis()
-                if (now - lastLiveWeatherRefreshAt >= 60_000L) {
-                    lastLiveWeatherRefreshAt = now
-                    weather.refreshDeviceLocationForWeather(loc)
-                }
+                weather.refreshDeviceLocationForWeather(loc)
             }
-        }
-    }
-
-    /** Releases one [beginLiveDeviceLocation] call; stops the underlying
-     *  subscription once every caller has released it. */
-    fun endLiveDeviceLocation() {
-        liveLocationObservers = (liveLocationObservers - 1).coerceAtLeast(0)
-        if (liveLocationObservers == 0) {
-            liveLocationJob?.cancel()
-            liveLocationJob = null
         }
     }
 

@@ -435,14 +435,31 @@ internal fun ControlsPebble(v: Vehicle, state: UiState, vm: AppViewModel, dragHa
     }
 }
 
-/** The reorderable pebble stack for a car. */
+/** The reorderable pebble stack for a car.
+ *
+ * [pinHotspot] defaults to true (exclude "controls" + any secondary pin, on
+ * the assumption the caller renders them separately via [HotspotSlot] --
+ * true for the wide/dual-column [ExpandedCar]). [VehicleDetailContent]'s
+ * single-column layout has no separate hero-column slot to pin anything
+ * into, so it passes false: "controls" and any secondary pin then flow
+ * through this list like any other pebble, landing in their normal
+ * [DEFAULT_SECTIONS] position (right after "summary"/"update") instead of
+ * vanishing from the list with nothing rendering them in their place. */
 @Composable
-internal fun PebbleList(v: Vehicle, state: State<UiState>, vm: AppViewModel, exclude: Set<String> = emptySet()) {
+internal fun PebbleList(
+    v: Vehicle,
+    state: State<UiState>,
+    vm: AppViewModel,
+    exclude: Set<String> = emptySet(),
+    pinHotspot: Boolean = true,
+) {
     val sel = state.value
     val allSections = sel.sectionsFor(v)
     val hasBattery = sel.hasBattery(v)
     // Exclude any pebbles pinned to the hotspot (both primary and secondary slots)
-    val pinnedPebbles = sel.hotspotFor(v.vin)
+    // -- but only when the caller is actually rendering them separately. See
+    // [pinHotspot]'s own doc.
+    val pinnedPebbles = if (pinHotspot) sel.hotspotFor(v.vin) else emptyList()
     val allExclude = remember(exclude, pinnedPebbles) {
         exclude + pinnedPebbles
     }

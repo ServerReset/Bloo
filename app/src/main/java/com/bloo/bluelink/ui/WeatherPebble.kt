@@ -19,11 +19,20 @@ import android.net.Uri
 import androidx.browser.customtabs.CustomTabsIntent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.FastOutLinearInEasing
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.LinearOutSlowInEasing
 import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.detectTransformGestures
+import androidx.compose.foundation.gestures.waitForUpOrCancellation
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
@@ -40,6 +49,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
@@ -68,7 +78,6 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
@@ -211,17 +220,9 @@ internal fun LocationPebble(v: Vehicle, state: UiState, vm: AppViewModel, dragHa
         ) {
             val loc = location
             if (loc != null) {
-                // Live device-location tracking runs for as long as this map is
-                // genuinely on screen (the pebble expanded with a car location to
-                // show), and stops the moment it isn't -- ref-counted in the
-                // ViewModel so the full-screen map sheet/overlay below (which
-                // read the exact same state.deviceLocation) can layer their own
-                // begin/end on top of this without either one stopping the
-                // other's tracking early. See beginLiveDeviceLocation's own doc.
-                DisposableEffect(v.vin) {
-                    vm.beginLiveDeviceLocation()
-                    onDispose { vm.endLiveDeviceLocation() }
-                }
+                // Live device-location tracking (see AppViewModel.beginLiveDeviceLocation)
+                // now runs for the whole time the app is open, started once from
+                // loadGarageInner -- not tied to this pebble's own visibility any more.
                 Column(
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
@@ -294,7 +295,15 @@ internal fun LocationPebble(v: Vehicle, state: UiState, vm: AppViewModel, dragHa
                         ),
                     )
                     if (showMapSheet) {
-                        CarMapSheet(loc, v.name, state.deviceLocation, mapOriginBounds) { showMapSheet = false }
+                        CarMapSheet(
+                            loc, v.name, state.deviceLocation, mapOriginBounds,
+                            // Same "Locate" entry point the pebble's own header action
+                            // uses -- this flip-cover fallback sheet had no refresh
+                            // action at all before; wiring it up matches the primary
+                            // (LocalExpandedMap) path instead of leaving it behind.
+                            onRefreshLocation = { locateWithPermission() },
+                            refreshing = locating,
+                        ) { showMapSheet = false }
                     }
                 }
                 // Same reasoning as the cover hero above: a resolved address is
@@ -1134,41 +1143,46 @@ internal data class MapFeature(
  * [ExpressiveButtonRow] -- the same connected-group framework the lock/horn cluster
  * and every other multi-button row in the app uses, so pressing one pill takes width
  * FROM its neighbour (both keep their own independent pill shape; only the WIDTH
- * trades) instead of each growing independently into free space. That was the first
- * version here: each button wrapped in a standalone [SafeExpansiveButton], which
- * grows for real -- correct for a lone button, but reported directly as "the map
- * buttons don't push each other, they just expand" once there were two of them
- * sharing a row. `wrap = true` (not a scrolling Row): a future feature list long
- * enough to overflow one line wraps to a second instead of needing its own
- * horizontal-scroll affordance.
+ * trades) instead of each growing independently into free space. `equalWidths = true`
+ * keeps both pills the same width regardless, matching the even split this row always
+ * had. `wrap = true` (not a scrolling Row): a future feature list long enough to
+ * overflow one line wraps to a second instead of needing its own horizontal-scroll
+ * affordance.
+ *
+ * Icon AND label, with the same outlined-tonal styling [LinkButton] (InfoPebble.kt)
+ * already uses for every other "open/go to something" action in the app -- these two
+ * buttons (Expand, Open in Maps) are that exact same shape of action, and used to be
+ * icon-only with no visible label or border, reported directly as wanting names and
+ * outlines like the app's other buttons.
  */
 @Composable
 private fun MapFeatureRow(features: List<MapFeature>, modifier: Modifier = Modifier) {
-    // Icon-only buttons to avoid label overflow. Both icons are clear (fullscreen =
-    // expand, map = open externally) so text redundancy isn't a loss. If tooltips or
-    // accessibility hints are needed later, they can be added to the button's own
-    // semantics without affecting layout.
-    Row(
+    ExpressiveButtonRow(
         modifier = modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp),
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        spacing = 10.dp,
+        equalWidths = true,
     ) {
         features.forEach { feature ->
             val source = remember { MutableInteractionSource() }
             SafeExpansiveButton(
                 interactionSource = source,
                 enabled = feature.enabled,
-                modifier = Modifier.weight(1f),
             ) {
-                MorphIconButton(
+                MorphButton(
                     onClick = feature.onClick,
                     interactionSource = source,
                     enabled = feature.enabled,
+                    // Same tonal fill LinkButton uses -- and the same hairline rim
+                    // MorphSegmented's own border already standardised on (the "every
+                    // other interactive surface got a rim once real glass blur stopped
+                    // giving flat surfaces a second depth cue" one) -- so this reads as
+                    // the same family of button as everything else, not a bespoke one.
+                    containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                    contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.18f)),
+                    contentPadding = PaddingValues(horizontal = 18.dp, vertical = 8.dp),
                 ) {
-                    Icon(
-                        imageVector = feature.icon,
-                        contentDescription = feature.label,
-                        modifier = Modifier.size(ButtonIconOnlySize),
-                    )
+                    MorphButtonLabel(feature.icon, feature.label, pending = false)
                 }
             }
         }
@@ -1233,6 +1247,11 @@ internal fun CarMapSheet(
      * scale-from-a-touch-under-full-size CarMapSheet always had.
      */
     originBounds: Rect?,
+    /** Null (the default) omits the refresh icon entirely -- see [MapTopBar]'s
+     *  own doc. */
+    onRefreshLocation: (() -> Unit)? = null,
+    /** See [MapTopBar]'s own doc -- the real command-pending flag, not a guess. */
+    refreshing: Boolean = false,
     onDismiss: () -> Unit,
 ) {
     // The Dialog-based fallback for hosts that don't provide a LocalExpandedMap
@@ -1270,6 +1289,8 @@ internal fun CarMapSheet(
             mapState = rememberCarMapState(),
             originBounds = originBounds,
             hazeState = null,
+            onRefreshLocation = onRefreshLocation,
+            refreshing = refreshing,
             onDismiss = onDismiss,
         )
     }
@@ -1306,14 +1327,21 @@ internal fun CarMapSheet(
  * actual ask: a name on the left, a drag handle centered above a divider, and
  * a refresh action on the right, all inside one rounded rect.
  *
- * [onRefreshLocation]/[lastFetchedAt] are null together at [CarMapSheet]'s call
- * site (that sheet has no refresh action of its own) -- the bar simply omits
- * that side entirely rather than showing a dead button.
+ * [onRefreshLocation] null (the [CarMapSheet]/[CarMapSheetBody] default) omits
+ * the refresh side entirely rather than showing a dead button.
  *
  * [dragModifier] carries the vertical-drag-to-dismiss gesture -- built by the
  * caller, since the two call sites each close over their own [dragPx]/`scope`/
  * `close()`, and passing the finished modifier in is simpler than exporting a
  * matching set of callback params for the same thing.
+ *
+ * ONE line, not the old two-row layout (a drag-handle row stacked above a
+ * name/refresh row) -- name at [Alignment.CenterStart], the drag handle nub
+ * genuinely centred on the bar regardless of the name's length or whether a
+ * refresh icon is showing, and the refresh icon at [Alignment.CenterEnd], all
+ * three positioned independently in one [Box] rather than flowing through a
+ * [Row]. Reported directly as wanting one line with bigger text and the
+ * handle in the middle.
  */
 @Composable
 private fun MapTopBar(
@@ -1321,72 +1349,121 @@ private fun MapTopBar(
     mapHazeState: HazeState,
     dragModifier: Modifier,
     modifier: Modifier = Modifier,
-    lastFetchedAt: Long? = null,
     onRefreshLocation: (() -> Unit)? = null,
+    /** True while a refresh this bar's own [onRefreshLocation] kicked off is
+     *  still in flight -- the real command-pending flag from the caller
+     *  (state.isPending(vin, "locate")), not a locally-faked timer, so the
+     *  icon's spin genuinely tracks "still fetching" rather than a guessed
+     *  duration. */
+    refreshing: Boolean = false,
 ) {
-    val rel = if (onRefreshLocation != null) rememberRelativeTime(lastFetchedAt) else null
+    // Press-and-hold "pop" on the drag handle nub -- an immediate, small scale-up
+    // the instant it's touched, before any actual drag motion, reading as "I feel
+    // you, go ahead" rather than the nub simply being inert until it moves.
+    // requireUnconsumed = false: this OBSERVES the down/up sequence without
+    // consuming it, so the same touch still reaches dragModifier's own gesture
+    // detector on the parent Column -- popping the nub must never steal the
+    // drag it's advertising.
+    var nubPressed by remember { mutableStateOf(false) }
+    val nubScale by animateFloatAsState(
+        targetValue = if (nubPressed) 1.5f else 1f,
+        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium),
+        label = "dragHandlePop",
+    )
     GlassSurface(
         shape = RoundedCornerShape(24.dp),
         modifier = modifier.fillMaxWidth(),
         hazeState = mapHazeState,
         contentColor = Color.White,
     ) {
-        Column(Modifier.fillMaxWidth().then(dragModifier)) {
-            // The drag handle nub -- a slim, quiet affordance rather than its own
-            // separate pill, now that it lives inside the bar's own glass instead
-            // of needing a second one behind it. The whole bar is the drag target
-            // (dragModifier is on this Column, not just this nub's row), matching
-            // every other bottom-sheet convention where the entire header drags.
-            // 14dp, not 20 -- reported directly as the bar reading "too thick";
-            // this alone trims a visible slice off the top with the nub still
-            // easy to grab.
-            Box(Modifier.fillMaxWidth().height(14.dp), contentAlignment = Alignment.Center) {
+        Box(
+            Modifier
+                .fillMaxWidth()
+                .then(dragModifier)
+                // 48dp: tall enough for the bigger titleLarge name and a comfortable
+                // touch target for both the drag handle and the refresh icon, all on
+                // one line -- the old two-row layout (a 14dp handle strip stacked
+                // above a name/refresh row) took noticeably more vertical space for
+                // the same content.
+                .height(48.dp)
+                .padding(horizontal = 16.dp),
+        ) {
+            // Name and bigger, titleLarge (was titleMedium) -- reported directly as
+            // wanting bigger text. Reserves room on the end for the refresh icon
+            // (never under it) regardless of alignment, since both float independently
+            // in this Box rather than sharing a Row's own space-distribution.
+            Text(
+                vehicleName,
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier
+                    .align(Alignment.CenterStart)
+                    .padding(end = if (onRefreshLocation != null) 44.dp else 0.dp),
+            )
+            Box(
+                Modifier
+                    .align(Alignment.Center)
+                    .pointerInput(Unit) {
+                        awaitEachGesture {
+                            awaitFirstDown(requireUnconsumed = false)
+                            nubPressed = true
+                            waitForUpOrCancellation()
+                            nubPressed = false
+                        }
+                    }
+                    // Padding grows the touch target well past the nub's own small
+                    // visual size without changing how big the nub itself looks.
+                    .padding(12.dp)
+                    .graphicsLayer { scaleX = nubScale; scaleY = nubScale },
+            ) {
                 Box(
                     Modifier
                         .size(width = 32.dp, height = 4.dp)
                         .background(Color.White.copy(alpha = 0.5f), RoundedCornerShape(2.dp)),
                 )
             }
-            Row(
-                Modifier
-                    .fillMaxWidth()
-                    .padding(start = 16.dp, end = 14.dp, bottom = 8.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween,
-            ) {
-                // Name and refresh now share ONE type scale (titleMedium, weight the
-                // only difference) instead of the name at titleMedium/Bold beside a
-                // visibly smaller labelMedium refresh chip -- reported directly as
-                // the two sides reading as mismatched sizes rather than one bar.
-                Text(
-                    vehicleName,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    // fill = false: a short name should not stretch and shove the
-                    // refresh action to the far edge -- only a genuinely long one
-                    // claims more room, at the refresh side's expense.
-                    modifier = Modifier.weight(1f, fill = false),
-                )
-                if (onRefreshLocation != null) {
-                    Spacer(Modifier.width(8.dp))
-                    Row(
-                        Modifier
-                            .clip(RoundedCornerShape(50))
-                            .clickable(onClick = onRefreshLocation)
-                            .padding(horizontal = 8.dp, vertical = 4.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    ) {
-                        Text(
-                            if (rel != null) "Updated $rel" else "Refresh",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Medium,
-                            maxLines = 1,
-                        )
-                        Icon(Icons.Filled.Refresh, contentDescription = "Refresh location", modifier = Modifier.size(18.dp))
+            if (onRefreshLocation != null) {
+                // Icon-only (was a text chip: "Updated Xm ago" / "Refresh" beside a
+                // static icon) -- reported directly as wanting a refresh INDICATOR,
+                // not a label, that animates while it's actually working. Same
+                // ramp-up/steady-spin language MorphButtonGlyph (Morph.kt) already
+                // uses for every other in-progress icon in the app, driven by the
+                // real pending flag rather than a guessed duration -- see
+                // [refreshing]'s own doc.
+                val angle = remember { Animatable(0f) }
+                LaunchedEffect(refreshing) {
+                    if (refreshing) {
+                        angle.animateTo(angle.value + 360f, tween(850, easing = FastOutLinearInEasing))
+                        while (true) {
+                            angle.animateTo(angle.value + 360f, tween(600, easing = LinearEasing))
+                        }
+                    } else if (angle.value != 0f) {
+                        val target = kotlin.math.ceil(angle.value / 360f) * 360f
+                        angle.animateTo(target, tween(700, easing = LinearOutSlowInEasing))
+                        angle.snapTo(0f)
                     }
+                }
+                GlassSurface(
+                    shape = CircleShape,
+                    modifier = Modifier.align(Alignment.CenterEnd).size(36.dp),
+                    hazeState = mapHazeState,
+                    onClick = onRefreshLocation,
+                    contentDescription = "Refresh location",
+                    contentColor = Color.White,
+                    // Nested inside the bar's own already-elevated GlassSurface --
+                    // see glassEdge's own doc for why a nested panel skips the second
+                    // shadow (GlassChrome.kt).
+                    shadow = false,
+                ) {
+                    Icon(
+                        Icons.Filled.Refresh,
+                        contentDescription = null,
+                        modifier = Modifier
+                            .size(22.dp)
+                            .graphicsLayer { rotationZ = angle.value },
+                    )
                 }
             }
         }
@@ -1402,8 +1479,9 @@ internal fun ExpandableMapLayer(
     deviceLocation: GeoLocation?,
     mapState: CarMapState,
     hazeState: HazeState?,
-    lastFetchedAt: Long?,
     onRefreshLocation: () -> Unit,
+    /** See [MapTopBar]'s own doc -- the real command-pending flag, not a guess. */
+    refreshing: Boolean = false,
     onDismiss: () -> Unit,
 ) {
     val context = LocalContext.current
@@ -1567,8 +1645,8 @@ internal fun ExpandableMapLayer(
                 MapTopBar(
                     vehicleName = vehicleName,
                     mapHazeState = mapHazeState,
-                    lastFetchedAt = lastFetchedAt,
                     onRefreshLocation = onRefreshLocation,
+                    refreshing = refreshing,
                     dragModifier = Modifier.pointerInput(Unit) {
                         detectVerticalDragGestures(
                             onVerticalDrag = { change, amount ->
@@ -1647,7 +1725,15 @@ internal fun CarMapExpandedOverlay(
     hazeState: HazeState?,
     onDismiss: () -> Unit,
 ) {
-    CarMapSheetBody(location, vehicleName, deviceLocation, mapState, originBounds, hazeState, onDismiss)
+    CarMapSheetBody(
+        location = location,
+        vehicleName = vehicleName,
+        deviceLocation = deviceLocation,
+        mapState = mapState,
+        originBounds = originBounds,
+        hazeState = hazeState,
+        onDismiss = onDismiss,
+    )
 }
 
 /**
@@ -1699,6 +1785,11 @@ private fun CarMapSheetBody(
      *  path) falls back to a plain darkened scrim, since Haze cannot reach across
      *  windows. */
     hazeState: HazeState?,
+    /** Null (the default) omits the refresh icon entirely -- see [MapTopBar]'s
+     *  own doc. */
+    onRefreshLocation: (() -> Unit)? = null,
+    /** See [MapTopBar]'s own doc -- the real command-pending flag, not a guess. */
+    refreshing: Boolean = false,
     onDismiss: () -> Unit,
 ) {
     val context = LocalContext.current
@@ -1874,14 +1965,16 @@ private fun CarMapSheetBody(
             }
             // One consolidated top bar -- name + drag handle, sharing one floating
             // pill background instead of two separate pieces of glass (see
-            // MapTopBar's own doc). No refresh side here: this sheet has no refresh
-            // action of its own, so onRefreshLocation stays null and the bar simply
-            // omits that half. Also the ONLY thing on this sheet a user can pull
-            // down to dismiss (see [dragPx]'s own doc up top) -- the whole bar is
-            // now the drag target, not just a slim strip above it.
+            // MapTopBar's own doc). Refresh is whatever this sheet's own caller
+            // passed in (null omits it entirely, same as before -- CarMapExpandedOverlay's
+            // dead-code call site never wires one up). Also the ONLY thing on this sheet
+            // a user can pull down to dismiss (see [dragPx]'s own doc up top) -- the
+            // whole bar is now the drag target, not just a slim strip above it.
             MapTopBar(
                 vehicleName = vehicleName,
                 mapHazeState = mapHazeState,
+                onRefreshLocation = onRefreshLocation,
+                refreshing = refreshing,
                 dragModifier = Modifier.pointerInput(Unit) {
                     detectVerticalDragGestures(
                         onVerticalDrag = { change, amount ->
