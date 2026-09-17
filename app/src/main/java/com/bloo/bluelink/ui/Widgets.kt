@@ -219,10 +219,9 @@ internal fun StatusBarScrim(
             )
             .background(
                 Brush.verticalGradient(
-                    // The gradient's own tint (which layers over the blur above, or
-                    // stands alone on the pre-S/no-hazeState fallback path) fades from
-                    // the one shared glassTint down to fully transparent.
-                    listOf(tint, Color.Transparent),
+                    // Weaker glass effect: reduce tint alpha by half for a lighter scrim
+                    // that still provides legibility without being too heavy.
+                    listOf(tint.copy(alpha = tint.alpha * 0.5f), Color.Transparent),
                 ),
             )
             .then(
