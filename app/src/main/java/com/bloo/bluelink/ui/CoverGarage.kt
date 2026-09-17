@@ -268,16 +268,6 @@ internal fun CompactGarage(state: UiState, vm: AppViewModel, appearance: Setting
             // at once. (total - 1) / 2, capped at 1, is the largest beyond that
             // can never revisit an item within one full cycle.
             beyondViewportPageCount = ((total - 1) / 2).coerceIn(0, 1),
-            // Without this, HorizontalPager keys each page by its raw VIRTUAL page
-            // index (there are total*1000 of them -- the wrap trick's whole point)
-            // instead of the real item it maps to, so every distinct virtual page
-            // ever swiped onto becomes its own permanent entry in the pager's
-            // saved-state holder and composition cache, retained for the life of
-            // the process -- see GarageScreen's matching fix for the full reasoning
-            // (a real, reported OOM: heap exhausted shortly after unlock). Keying by
-            // the wrapped REAL index instead collapses every virtual copy of the
-            // same item onto one shared, bounded (`total`-many) identity.
-            key = { page -> realCar(page) },
         ) { page ->
             val real = realCar(page)
             if (real == slots) {
@@ -645,10 +635,6 @@ internal fun CompactCar(
             // Most cars have well more than 2 tiles, so this is a rare-but-real edge rather
             // than the everyday case the horizontal car pager's own fix is.
             beyondViewportPageCount = ((tiles.size - 1) / 2).coerceIn(0, 1),
-            // Same fix as the car-switching HorizontalPager beside this one (see its
-            // own doc): without a key, every distinct virtual tile page ever scrolled
-            // onto is retained forever instead of being reused across wraps.
-            key = { page -> vWrap.real(page) },
         ) { page ->
             val i = vWrap.real(page)
             val tileScroll = tileScrollStates.getOrPut(tiles[i]) { ScrollState(0) }

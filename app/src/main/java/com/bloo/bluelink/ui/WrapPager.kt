@@ -35,7 +35,36 @@ import androidx.compose.ui.unit.dp
 import kotlin.math.floor
 import kotlin.math.abs
 
-private const val WRAP_MULTIPLIER = 1000
+// Was 1000. Every one of these pagers (GarageScreen's collapsed and expanded
+// pagers, CompactGarage's car pager, CompactCar's tile pager) composes its
+// pages with NO explicit `key`, so HorizontalPager/VerticalPager default to
+// keying by the raw VIRTUAL page index -- not the real item it wraps to.
+// That means every DISTINCT virtual page a user ever swipes onto becomes its
+// own permanent composition (a whole SettingsScreen, a whole
+// VehicleDetailContent) that's never reused, for the life of the process.
+// Reported directly as a real OOM (heap exhausted shortly after unlock, a
+// trivial 32-byte allocation the one that finally failed).
+//
+// The obvious fix -- `key = { page -> wrap.real(page) }`, so every virtual
+// copy of the same real item shares one bounded identity -- was tried and
+// reverted: it collided ("Key \"1\" was already used") in a way that traced
+// back through HorizontalPager's own measure/subcompose internals (prefetch
+// and beyond-bounds item requests, which this codebase has no visibility or
+// control over) rather than this file's own modulo math, which is provably
+// collision-free for the deliberately-composed viewport+beyond window (see
+// wrapRealIndex's own doc). Without being able to build and test on a real
+// device, re-attempting that fix blind risks a second crash for a first one
+// -- not an acceptable trade.
+//
+// Shrinking the multiplier instead doesn't touch keying or the modulo
+// semantics at all -- it just bounds how many DISTINCT virtual pages exist
+// for a user to ever reach, which bounds the leak's ceiling directly. 30
+// full wrap-arounds is still, in practice, an unreachably long one-directional
+// swipe streak for how this app is actually used (switching between a
+// handful of cars, not spinning through dozens of laps), while capping the
+// worst case at 30x a small number of real items (single digits for most
+// accounts) instead of 1000x it.
+private const val WRAP_MULTIPLIER = 30
 /** Max per-page scale shrink at full off-screen offset (floor 0.94). */
 private const val PAGER_SHRINK = 0.06f
 
