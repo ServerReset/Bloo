@@ -187,8 +187,9 @@ data class UiState(
     val collapsedPebbles: Set<String> = emptySet(),
     /** Hidden pebbles, keyed "vin:section". */
     val hiddenPebbles: Set<String> = emptySet(),
-    /** Per-VIN pebbles pinned to the dual-column "hot spot" (under car info). */
-    val hotspotSections: Map<String, List<String>> = emptyMap(),
+    /** Per-VIN secondary pebble pinned to the dual-column "hot spot" (under car info).
+     *  Primary slot is always "controls" (lock/unlock). Secondary slot stores the selected pebble, or null if none. */
+    val hotspotSections: Map<String, String?> = emptyMap(),
     /** Quick-tile assignments: index -> (vin, command), or null if unassigned. */
     val tileConfigs: List<Pair<String, String>?> = List(12) { null },
     /** Optional per-tile custom names (index -> label or null). */
@@ -325,9 +326,14 @@ data class UiState(
 
     fun isPebbleHidden(vin: String, section: String): Boolean = "$vin:$section" in hiddenPebbles
 
-    /** Pebbles pinned to the hotspot. Default includes "controls" (the lock/unlock pebble).
-     *  Returns empty list only if the user explicitly unpinned all sections. */
-    fun hotspotFor(vin: String): List<String> = hotspotSections[vin] ?: listOf("controls")
+    /** Pebbles pinned to the hotspot as a list for rendering.
+     *  Primary slot is always "controls" (lock/unlock).
+     *  Secondary slot contains the selected pebble if one is pinned, or null if empty.
+     *  Returns a list for easy iteration: ["controls"] or ["controls", selectedPebble] */
+    fun hotspotFor(vin: String): List<String> {
+        val secondary = hotspotSections[vin]
+        return if (secondary != null) listOf("controls", secondary) else listOf("controls")
+    }
 
     fun isShortcutEnabled(vin: String, cmd: String): Boolean =
         shortcutSet?.contains("${cmd}_$vin") ?: true

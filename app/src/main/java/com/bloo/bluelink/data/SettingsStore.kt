@@ -1931,19 +1931,17 @@ class SettingsStore(private val context: Context) {
 
     // --- Dual-column "hot spot" (pebbles pinned under the car-info column) -----
 
-    suspend fun hotspots(vin: String): List<String>? = hotspots(vin, context.settingsDataStore.data.first())
+    /** Secondary pebble pinned to the hotspot (primary is always "controls"). Null if none selected. */
+    suspend fun hotspots(vin: String): String? = hotspots(vin, context.settingsDataStore.data.first())
 
-    fun hotspots(vin: String, p: Preferences): List<String>? {
-        val json = p[stringPreferencesKey("hotspots_$vin")]?.takeIf { it.isNotBlank() } ?: return null
-        return runCatching {
-            Json.decodeFromString<List<String>>(json)
-        }.getOrNull()
+    fun hotspots(vin: String, p: Preferences): String? {
+        return p[stringPreferencesKey("hotspots_$vin")]?.takeIf { it.isNotBlank() }
     }
 
-    suspend fun setHotspots(vin: String, sections: List<String>?) {
+    suspend fun setHotspots(vin: String, section: String?) {
         editTracked {
             val key = stringPreferencesKey("hotspots_$vin")
-            if (sections.isNullOrEmpty()) it.remove(key) else it[key] = Json.encodeToString(sections)
+            if (section.isNullOrBlank()) it.remove(key) else it[key] = section
         }
     }
 

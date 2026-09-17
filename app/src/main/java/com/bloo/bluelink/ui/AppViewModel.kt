@@ -2645,22 +2645,20 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     /** Pin a pebble to the dual-column hot spot (or toggle it off if already pinned). */
+    /** Set (or toggle off) the secondary hotspot pebble. Primary slot ("controls") is always locked in place. */
     fun setHotspot(v: Vehicle, section: String) {
         _state.update {
-            val current = it.hotspotSections[v.vin] ?: listOf("controls")
-            val updated = if (section in current) {
-                current - section
-            } else {
-                current + section
-            }
+            val current = it.hotspotSections[v.vin]
+            // If tapping the same pebble, unpin it (toggle off); otherwise pin the new one
+            val updated = if (current == section) null else section
             it.copy(
-                hotspotSections = if (updated.isEmpty()) it.hotspotSections - v.vin else it.hotspotSections + (v.vin to updated),
+                hotspotSections = if (updated == null) it.hotspotSections - v.vin else it.hotspotSections + (v.vin to updated),
             )
         }
         viewModelScope.launch { settingsStore.setHotspots(v.vin, _state.value.hotspotSections[v.vin]) }
     }
 
-    /** Unpin all pebbles from the hot spot. */
+    /** Clear the secondary hotspot pebble (keep primary "controls" pinned). */
     fun clearHotspots(v: Vehicle) {
         _state.update {
             it.copy(hotspotSections = it.hotspotSections - v.vin)

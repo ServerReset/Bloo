@@ -202,8 +202,9 @@ class UiStateLogicTest {
     @Test
     fun hotspotFor_andFetchedAt_matchStringByVin() {
         val s = UiState(hotspotSections = mapOf("V1" to "info"), lastFetched = mapOf("V1" to 1234L))
-        assertEquals("info", s.hotspotFor("V1"))
-        assertEquals("controls", s.hotspotFor("V2"))  // Default hotspot is "controls"
+        // hotspotFor returns a list: primary slot is always "controls", secondary is the selected pebble
+        assertEquals(listOf("controls", "info"), s.hotspotFor("V1"))
+        assertEquals(listOf("controls"), s.hotspotFor("V2"))  // Default: only primary slot
         assertEquals(1234L, s.fetchedAt(usHyundai))
         assertNull(s.fetchedAt(usKia))
     }

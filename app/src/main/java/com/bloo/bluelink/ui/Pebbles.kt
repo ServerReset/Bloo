@@ -130,9 +130,9 @@ internal fun sectionLabel(section: String): String = when (section) {
 }
 
 /**
- * The dual-column "hot spot": a fixed slot under the car-info column with zero or more
- * pinned pebbles shown as a vertical list. New pebbles can be dragged or selected from
- * a menu to add them; each pinned pebble can be dragged away to unpin.
+ * The dual-column "hot spot": two fixed slots under the car-info column.
+ * Slot 1 (Primary/Top): Always "controls" (lock/unlock buttons) - FORCED, cannot be unpinned
+ * Slot 2 (Secondary/Bottom): User-selectable slot where they can choose any available pebble, or empty
  */
 @Composable
 internal fun HotspotSlot(
@@ -152,24 +152,37 @@ internal fun HotspotSlot(
     val hotDrag = LocalHotSeatDrag.current
     val hovered = hotDrag?.overSlot == true
 
-    // Available pebbles not yet pinned
+    // Available pebbles for the secondary slot (excludes "summary", "controls", and hidden)
     val allAvailable = remember(
         state.sectionOrders[v.vin], state.hiddenPebbles, state.aiEnabled, state.hasBattery(v),
         v.isGen5W, state.platforms[v.vin], state.updateAvailable, state.updateTileDismissed,
     ) {
         state.sectionsFor(v).filter {
-            it != "summary" && state.isSectionAvailable(v, it)
+            it != "summary" && it != "controls" && state.isSectionAvailable(v, it)
         }
     }
-    val unpinned = remember(hotspots, allAvailable) {
-        allAvailable.filter { it !in hotspots }
+
+    // Secondary slot pebble (if any)
+    val secondaryPebble = state.hotspotSections[v.vin]
+
+    // Available pebbles not yet pinned to the secondary slot
+    val unpinned = remember(secondaryPebble, allAvailable) {
+        allAvailable.filter { it != secondaryPebble }
     }
 
     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-        // Pinned pebbles
-        hotspots.forEach { section ->
-            var lifted by remember(section) { mutableStateOf(false) }
-            var dragY by remember(section) { mutableFloatStateOf(0f) }
+        // PRIMARY SLOT (Top) - Always "controls", locked
+        CompositionLocalProvider(LocalForceExpanded provides true) {
+            Box(Modifier.fillMaxWidth()) {
+                SinglePebble("controls", v, stateSource, vm, Modifier)
+            }
+        }
+
+        // SECONDARY SLOT (Bottom) - User-selectable
+        if (secondaryPebble != null) {
+            // Secondary slot is occupied - show the pebble with removal option
+            var lifted by remember(secondaryPebble) { mutableStateOf(false) }
+            var dragY by remember(secondaryPebble) { mutableFloatStateOf(0f) }
             val lift by animateFloatAsState(if (lifted) 1.03f else 1f, label = "unpinLift")
 
             Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(2.dp)) {
@@ -188,61 +201,61 @@ internal fun HotspotSlot(
                     )
                     Spacer(Modifier.width(6.dp))
                     Text(
-                        if (lifted) "Release to unpin" else sectionLabel(section),
+                        if (lifted) "Release to unpin" else sectionLabel(secondaryPebble),
                         style = MaterialTheme.typography.labelSmall,
                         color = if (lifted) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.weight(1f),
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
-                    MorphTextButton("Unpin", onClick = { vm.setHotspot(v, section) })
+                    MorphTextButton("Remove", onClick = { vm.setHotspot(v, secondaryPebble) })
                 }
                 CompositionLocalProvider(LocalForceExpanded provides true) {
                     Box(
                         Modifier
                             .graphicsLayer { scaleX = lift; scaleY = lift }
-                            .pointerInput(section) {
+                            .pointerInput(secondaryPebble) {
                                 detectDragGesturesAfterLongPress(
                                     onDragStart = { dragY = 0f; lifted = true; haptics?.tick() },
                                     onDrag = { change, amt -> change.consume(); dragY += abs(amt.x) + abs(amt.y) },
                                     onDragEnd = {
                                         lifted = false
-                                        if (dragY > 56f) { haptics?.heavy(); vm.setHotspot(v, section) }
+                                        if (dragY > 56f) { haptics?.heavy(); vm.setHotspot(v, secondaryPebble) }
                                     },
                                     onDragCancel = { lifted = false },
                                 )
                             },
                     ) {
-                        SinglePebble(section, v, stateSource, vm, Modifier)
+                        SinglePebble(secondaryPebble, v, stateSource, vm, Modifier)
                     }
                 }
             }
-        }
-
-        // Pin new pebbles button (shown if there are unpinned pebbles available)
-        if (unpinned.isNotEmpty()) {
-            var menu by remember { mutableStateOf(false) }
-            Box(
-                Modifier.onGloballyPositioned {
-                    hotDrag?.let { d -> d.slotTopLeft = it.localToWindow(Offset.Zero); d.slotSize = it.size }
-                },
-            ) {
-                MorphButton(
-                    onClick = { menu = true },
-                    modifier = Modifier.fillMaxWidth(),
-                    active = hovered,
-                    activeContainerColor = MaterialTheme.colorScheme.primaryContainer,
-                    activeContentColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                    contentPadding = PaddingValues(12.dp),
+        } else {
+            // Secondary slot is empty - show "Add a pebble" button if pebbles are available
+            if (unpinned.isNotEmpty()) {
+                var menu by remember { mutableStateOf(false) }
+                Box(
+                    Modifier.onGloballyPositioned {
+                        hotDrag?.let { d -> d.slotTopLeft = it.localToWindow(Offset.Zero); d.slotSize = it.size }
+                    },
                 ) {
-                    MorphButtonLabel(Icons.Filled.PushPin, if (hovered) "Release to pin" else "Pin a pebble here", pending = false)
-                }
-                DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
-                    unpinned.forEach { sec ->
-                        DropdownMenuItem(
-                            text = { Text(sectionLabel(sec)) },
-                            onClick = { vm.setHotspot(v, sec); menu = false },
-                        )
+                    MorphButton(
+                        onClick = { menu = true },
+                        modifier = Modifier.fillMaxWidth(),
+                        active = hovered,
+                        activeContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                        activeContentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                        contentPadding = PaddingValues(12.dp),
+                    ) {
+                        MorphButtonLabel(Icons.Filled.PushPin, if (hovered) "Release to pin" else "Add a pebble", pending = false)
+                    }
+                    DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
+                        unpinned.forEach { sec ->
+                            DropdownMenuItem(
+                                text = { Text(sectionLabel(sec)) },
+                                onClick = { vm.setHotspot(v, sec); menu = false },
+                            )
+                        }
                     }
                 }
             }
@@ -426,8 +439,11 @@ internal fun PebbleList(v: Vehicle, state: State<UiState>, vm: AppViewModel, exc
     val sel = state.value
     val allSections = sel.sectionsFor(v)
     val hasBattery = sel.hasBattery(v)
-    val allExclude = remember(exclude, sel.hotspotSections[v.vin]) {
-        exclude + sel.hotspotSections[v.vin].orEmpty()
+    // Exclude "controls" (always in primary hotspot slot) and the selected secondary pebble (if any)
+    val secondaryPebble = sel.hotspotSections[v.vin]
+    val allExclude = remember(exclude, secondaryPebble) {
+        val baseExclude = exclude + "controls"
+        if (secondaryPebble != null) baseExclude + secondaryPebble else baseExclude
     }
     val sections = remember(
         allSections, allExclude, sel.hiddenPebbles, sel.aiEnabled, hasBattery, v.isGen5W, sel.platforms[v.vin],
