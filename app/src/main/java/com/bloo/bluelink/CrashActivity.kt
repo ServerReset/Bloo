@@ -68,13 +68,14 @@ import java.io.File
  * read and copied directly off the device, with no adb already attached at the
  * moment of the crash.
  *
- * [BlooApplication]'s handler deliberately does NOT kill the process after launching
- * this -- this activity is the one thing standing between "app is bricked" and "back
- * to GitHub in a browser to grab a fresh APK by hand," so the check/download/install
- * buttons below talk directly to the same GitHub-release update pipeline the normal
- * app uses ([UpdateChecker]/[UpdateApi]/[ShizukuInstaller]), completely independent
- * of whatever state just crashed. "Restart Bloo" is the only thing here that tears
- * the process down, and only once the user actually asks for it.
+ * [BlooApplication]'s handler ALWAYS kills the crashed process right after launching
+ * this (see its own doc for why that has to be unconditional, not skipped for this
+ * activity's sake) -- which is fine: startActivity() already handed the launch off to
+ * system_server before the kill, so this always comes up in a brand-new, healthy
+ * process regardless. That fresh process is exactly what lets the check/download/
+ * install buttons below talk to the same GitHub-release update pipeline the normal
+ * app uses ([UpdateChecker]/[UpdateApi]/[ShizukuInstaller]) with a fully working main
+ * thread under them, completely independent of whatever state just crashed the old one.
  */
 class CrashActivity : ComponentActivity() {
     companion object {
