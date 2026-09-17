@@ -56,13 +56,19 @@ class BlooApplication : Application(), Configuration.Provider {
                     addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
                 }
                 startActivity(intent)
+                // Deliberately do NOT kill the process here. CrashActivity keeps this
+                // process alive on purpose -- its own check-for-updates/install buttons
+                // talk straight to the GitHub release pipeline, independent of whatever
+                // state just crashed, so a bricked build can self-heal without a trip
+                // back to GitHub by hand. CrashActivity itself is now the one thing that
+                // tears the process down ("Restart Bloo"), only once the user asks.
             } catch (e: Throwable) {
-                // If even launching the crash screen fails, there's nothing left to
-                // do but fall through to the process kill below -- the exception is
-                // still in logcat either way (logged above).
+                // Even the crash screen itself couldn't come up -- there's nothing left
+                // to show the user, so fall back to a clean kill rather than limping
+                // along with whatever corrupted state caused this.
+                android.os.Process.killProcess(android.os.Process.myPid())
+                Runtime.getRuntime().exit(10)
             }
-            android.os.Process.killProcess(android.os.Process.myPid())
-            Runtime.getRuntime().exit(10)
         }
     }
 }
