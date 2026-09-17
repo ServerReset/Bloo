@@ -203,7 +203,7 @@ class UiStateLogicTest {
     fun hotspotFor_andFetchedAt_matchStringByVin() {
         val s = UiState(hotspotSections = mapOf("V1" to "info"), lastFetched = mapOf("V1" to 1234L))
         assertEquals("info", s.hotspotFor("V1"))
-        assertNull(s.hotspotFor("V2"))
+        assertEquals("controls", s.hotspotFor("V2"))  // Default hotspot is "controls"
         assertEquals(1234L, s.fetchedAt(usHyundai))
         assertNull(s.fetchedAt(usKia))
     }

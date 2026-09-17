@@ -325,7 +325,9 @@ data class UiState(
 
     fun isPebbleHidden(vin: String, section: String): Boolean = "$vin:$section" in hiddenPebbles
 
-    fun hotspotFor(vin: String): String? = hotspotSections[vin]
+    /** Default hotspot is "controls" (the lock/unlock pebble pinned to the hero column).
+     *  Returns null only if the section is explicitly unpinned by the user. */
+    fun hotspotFor(vin: String): String? = hotspotSections[vin] ?: "controls"
 
     fun isShortcutEnabled(vin: String, cmd: String): Boolean =
         shortcutSet?.contains("${cmd}_$vin") ?: true

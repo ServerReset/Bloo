@@ -81,8 +81,6 @@ import com.bloo.bluelink.data.rangeMiFor
 import com.bloo.bluelink.data.formatDistance
 import com.bloo.bluelink.data.displayChargeLimit
 import com.bloo.bluelink.data.targetForCurrentPlug
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.first
 
 internal class ChargeReadout(
     val pctText: String,

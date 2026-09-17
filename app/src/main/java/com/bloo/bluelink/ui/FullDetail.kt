@@ -220,7 +220,6 @@ internal fun ExpandedCar(
     // the multi-car grid the flag was meant for, so the real M3 Expressive
     // indicator should show here too.
     Refreshable(v, refreshing, vm) {
-        Box(Modifier.fillMaxSize()) {
         // Animate the swap when the columns are flipped. Same spring the
         // expand/collapse transition (GarageScreen) and the collapsed
         // pager's own settle both use -- this was the one transition left
@@ -280,8 +279,6 @@ internal fun ExpandedCar(
                 }
             }
         }
-        }
-    }
     }
 }
 
