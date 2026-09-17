@@ -51,8 +51,6 @@ sealed interface Screen {
      *  (Screens.kt) for why nothing else belongs here. */
     data object Loading : Screen
     data object Login : Screen
-    /** No vehicles enrolled (or still loading the first time). */
-    data object Empty : Screen
     /**
      * Shown once, right after a first-time sign-in resolves at least one
      * vehicle -- BEFORE [Onboarding] -- asking whether to pull an existing
@@ -67,9 +65,12 @@ sealed interface Screen {
     data object Onboarding : Screen
     /** Feature-setup wizard for one or more newly-detected cars (post-first-run). */
     data class CarSetup(val vins: List<String>) : Screen
-    /** Main screen: the car carousel/grid. */
+    /** Main screen: the car carousel/grid. Also where a zero-vehicle account
+     *  lands now -- GarageScreen folds a "no connection"/"not signed in"/"no
+     *  vehicles" status card in as a page of its own pager (see
+     *  GarageStatusCard in Guard.kt), exactly the way it folds in Settings, so
+     *  there is no separate screen or route for that state any more. */
     data object Garage : Screen
-    data object Settings : Screen
 }
 
 /** Reserved pseudo-VIN for Settings cards, so they can share car pebbles' collapse state and
@@ -217,17 +218,11 @@ data class UiState(
     val aiSearchReply: String? = null,
     /** Whether the garage's collapsed pager (or the compact cover screen's own
      *  pager) is currently settled on its Settings slot -- Settings is always
-     *  the page right after the last car, so this is simply "the pager is on
-     *  that page". Kept in sync by those pagers' own settle effects. AppRoot
-     *  ORs this into the same
-     *  "are we looking at Settings" signal `screen == Screen.Settings` already
-     *  drives, so SearchLayer's floating bubble/pill morph reflects reality
-     *  while the embedded page is showing too, not just the standalone route.
-     *  Without it the search element stayed a garage "bubble" the whole time
-     *  the embedded Settings page was on screen, then visibly snapped to a
-     *  "pill" only once you swiped back off it and the flag caught up on
-     *  something else entirely -- exactly the kind of un-seamless style
-     *  transition this exists to prevent. */
+     *  the last page (right after the last car, or the one page there is when
+     *  there are none), so this is simply "the pager is on that page". Kept in
+     *  sync by those pagers' own settle effects; it's the ONLY "are we looking
+     *  at Settings" signal now (there is no standalone Settings route or
+     *  screen any more), and drives SearchLayer's floating bubble/pill morph. */
     val onSettingsPageSlot: Boolean = false,
     /** Gentle hint shown on the garage right after onboarding, nudging the user
      *  toward Settings to fine-tune each car. */
@@ -306,15 +301,18 @@ data class UiState(
     /** Set when the garage fetch came back empty because a request actually
      *  failed (network/API error), not because the account genuinely has zero
      *  vehicles. Distinguishes a real failure from "not signed in" / "no
-     *  vehicles" in [Screen.Empty]. Cleared by the next successful load. */
+     *  vehicles" on the status card GarageScreen folds in as a page when there
+     *  are no vehicles (see GarageStatusCard, Guard.kt). Cleared by the next
+     *  successful load. */
     val garageLoadError: String? = null,
     /** Whether [garageLoadError] happened while the device had no real internet
      *  connectivity, as opposed to a live network reporting an actual API/auth
-     *  failure. [Screen.Empty] uses this to show a plain "no connection" page
-     *  instead of surfacing a raw exception message for something the user can't
-     *  act on beyond "check your connection" -- and, just as importantly, to NOT
-     *  show it for a real API error while genuinely online. Meaningless when
-     *  [garageLoadError] is null. */
+     *  failure (Hyundai/Kia's own servers down for maintenance, an expired
+     *  token, etc). GarageStatusCard uses this to show a plain "no connection"
+     *  card instead of surfacing a raw exception message for something the user
+     *  can't act on beyond "check your connection" -- and, just as importantly,
+     *  to NOT show it for a real API error while genuinely online. Meaningless
+     *  when [garageLoadError] is null. */
     val garageLoadOffline: Boolean = false,
 ) {
     fun statusFor(v: Vehicle): VehicleStatus? = statuses[v.vin]

@@ -338,16 +338,22 @@ internal fun RefreshIndicatorBadge(
  * the boolean `state.refreshing`), and driving [RefreshIndicatorBadge] off
  * that same distance so it can slide fully off-screen above the content when
  * idle and only ease into view as the user pulls.
+ *
+ * [onRefresh] is a plain lambda, not a fixed `vm.refreshStatus(v)` call, so
+ * this same wrapper also covers [GarageStatusCard] (Guard.kt) -- the "no
+ * vehicles"/"no connection" page has no [Vehicle] to refresh, just
+ * [AppViewModel.loadGarage] to retry, and reported directly as wanting to be
+ * "just another card like the rest of them" rather than its own one-off
+ * Reload button.
  */
 @Composable
 internal fun Refreshable(
-    v: Vehicle,
     // The single UiState field this needs, and NOT the whole UiState: passing the state object
     // subscribed every caller's composition to every emission -- a weather tick for another car,
     // an AI probe, a log line -- for all three live pager pages at once, which is exactly what
     // the callers' State<UiState> indirection exists to avoid.
     refreshing: Boolean,
-    vm: AppViewModel,
+    onRefresh: () -> Unit,
     hideIndicator: Boolean = false,
     hazeState: HazeState? = null,
     content: @Composable BoxScope.() -> Unit,
@@ -367,7 +373,7 @@ internal fun Refreshable(
             .pullToRefresh(
                 isRefreshing = refreshing,
                 state = ptrState,
-                onRefresh = { haptics?.diceRoll(); vm.refreshStatus(v) },
+                onRefresh = { haptics?.diceRoll(); onRefresh() },
             ),
     ) {
         // Content stays full-size and edge-to-edge; never shifted down.

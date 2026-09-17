@@ -103,7 +103,12 @@ internal fun GarageScreen(
     hazeState: HazeState = remember { HazeState() },
 ) {
     val vehicles = state.value.vehicles
-    if (vehicles.isEmpty()) return
+    // No more early return on an empty garage: a zero-vehicle account is now
+    // just another state of this SAME screen (see `slots`/GarageStatusCard
+    // below), not a separate standalone Screen.Empty route -- reported
+    // directly as wanting it to "just be another card like the rest of them",
+    // swipeable to Settings rather than a whole different screen with its own
+    // header/back-navigation chrome.
     val appearance = LocalAppearance.current
 
     // Collected here rather than read off UiState: the pager's position is its
@@ -111,7 +116,10 @@ internal fun GarageScreen(
     // car pages. Reading it in THIS composable is fine and intended -- this is
     // one of the few places that genuinely needs it, and it is above the pages.
     val currentIndex by vm.currentIndex.collectAsStateWithLifecycle()
-    val currentVehicle = vehicles.getOrNull(currentIndex.coerceIn(0, vehicles.lastIndex))
+    // lastIndex.coerceAtLeast(0): lastIndex is -1 on an empty list, and
+    // coerceIn(0, -1) throws (min > max) before getOrNull ever gets a chance
+    // to just return null for it.
+    val currentVehicle = vehicles.getOrNull(currentIndex.coerceIn(0, vehicles.lastIndex.coerceAtLeast(0)))
     val currentFetchedAt = currentVehicle?.let { state.value.fetchedAt(it) }
     val sessionStartMs = remember { System.currentTimeMillis() }
     LaunchedEffect(currentVehicle?.vin, currentFetchedAt) {
@@ -174,6 +182,15 @@ internal fun GarageScreen(
     // recomposed GarageScreen, for a value only ever consumed inside an
     // offset { } at its two use sites.
     val count = vehicles.size
+    // At least one non-Settings page even with zero cars: the "no connection"/
+    // "not signed in"/"no vehicles" status card (GarageStatusCard, Guard.kt)
+    // takes that one slot instead of a car, so Settings is still just one
+    // swipe away rather than a whole separate unreachable-by-swipe screen.
+    // Everywhere below that used to divide/coerce against `count` for pager
+    // math (which throws or misbehaves at zero -- see each use site's own
+    // comment) uses this instead; `count` itself stays the real vehicle
+    // count for anything that indexes into `vehicles`.
+    val slots = maxOf(count, 1)
     val cfg = LocalConfiguration.current
     val widthDp = cfg.screenWidthDp
     val large = widthDp >= COVER_SCREEN_WIDTH_DP
@@ -196,11 +213,6 @@ internal fun GarageScreen(
     // a user who opened the app unfolded and then closed the phone reached the
     // cover screen with the hint already marked shown and never saw it: the hint
     // was reliably consumed everywhere except the one screen it exists for.
-    //
-    // The `vehicles.isEmpty()` variant that used to pick a "setup experience"
-    // wording is gone with it -- GarageScreen returns on the first line when
-    // vehicles is empty, so that branch was unreachable and the string it chose
-    // could never appear.
     LaunchedEffect(compact, hasCameraCutout) {
         if (compact && hasCameraCutout && !coverHintShown) {
             coverHintShown = true
@@ -253,7 +265,10 @@ internal fun GarageScreen(
     // car's map can be expanded at a time regardless of which page it's on.
     val expandedMap = remember { ExpandedMapState() }
     // How many full-height cards fit side by side; pages advance by this many.
-    val perPage = (widthDp / MIN_CARD_DP).coerceIn(1, count)
+    // `slots`, not `count`: coerceIn(1, 0) throws (min > max) with zero cars,
+    // and there is exactly one non-Settings page to show anyway in that case
+    // (the status card), so multi-column grid mode never applies to it.
+    val perPage = (widthDp / MIN_CARD_DP).coerceIn(1, slots)
     // Expanding to the dual-column view only makes sense on a wide screen.
     val canExpand = large && count > 1
     // Expanded means exactly one thing now: the user tapped the fullscreen icon
@@ -370,16 +385,16 @@ internal fun GarageScreen(
                 }
             } else {
                 // Settings is appended as one more ITEM to the sequence this pager
-                // cycles through (index `count`, right after the last real car),
+                // cycles through (index `slots`, right after the last real page),
                 // always rendered at exactly one car-column's width (see
                 // `pageWidth` below) -- so on a wide/multi-car screen Settings is
                 // never wider than one car's column, however many share the
                 // screen with it, and SettingsScreen's own LazyVerticalStaggeredGrid
                 // naturally collapses to a single column at that width.
                 //
-                // ONE ITEM PER PAGE -- a car, or (index `count`) the folded-in
-                // Settings page -- exactly the model a phone (perPage == 1)
-                // already used. On a wide/multi-car screen (perPage > 1) this is
+                // ONE ITEM PER PAGE -- a car, the status card with none, or (index
+                // `slots`) the folded-in Settings page -- exactly the model a phone
+                // (perPage == 1) already used. On a wide/multi-car screen (perPage > 1) this is
                 // now the ONLY model: `perPage` of these single-item pages are
                 // simply narrow enough (see `pageWidth` below, applied via
                 // `PageSize.Fixed`) to sit side by side in the viewport at once,
@@ -399,10 +414,15 @@ internal fun GarageScreen(
                 // instead is what makes HorizontalPager's native per-page drag/
                 // fling physics apply per CAR again, matching the phone exactly,
                 // instead of reimplementing "shift by one" on top of wide pages.
-                val total = count + 1
-                // Always the car currentIndex was already parked on: this pager
-                // opens on a car, never on the Settings page at the end of it.
-                val initialItem = currentIndex.coerceIn(0, count - 1)
+                // slots + 1, not count + 1: coerceIn(0, -1) below throws (min > max)
+                // with zero cars, and there's still exactly one non-Settings page to
+                // open on either way -- the status card (GarageStatusCard) takes the
+                // one real-car slot that a zero-vehicle account would otherwise leave
+                // empty. See `slots`' own doc above.
+                val total = slots + 1
+                // Always the car (or status card) currentIndex was already parked on:
+                // this pager opens there, never on the Settings page at the end of it.
+                val initialItem = currentIndex.coerceIn(0, slots - 1)
                 // Infinite wrap-around: WrapPagerState.realCount is `total` --
                 // one virtual page per real item, no window multiplier of any
                 // kind -- and the real item for a page is realItem(page) itself.
@@ -416,16 +436,15 @@ internal fun GarageScreen(
                 LaunchedEffect(pager, total) {
                     snapshotFlow { pager.settledPage }.collect { page ->
                         val real = realItem(page)
-                        // Guarded: settling on the Settings page (real == count)
-                        // is not a car selection -- currentIndex keeps whatever
-                        // car it had, so swiping back lands where you left off
-                        // instead of snapping to car 0.
+                        // Guarded: settling on the Settings page (real == slots), or
+                        // the status card slot with zero cars, is not a car selection
+                        // -- currentIndex keeps whatever car it had, so swiping back
+                        // lands where you left off instead of snapping to car 0.
                         if (real < count) vm.selectIndex(real)
-                        // See UiState.onSettingsPageSlot's own doc -- lets
-                        // SearchLayer's floating bubble/pill morph track this
-                        // pager's own Settings page the same way it already
-                        // tracks the standalone route.
-                        vm.setOnSettingsPageSlot(real == count)
+                        // See UiState.onSettingsPageSlot's own doc -- it's the one
+                        // "are we on Settings" signal now, there's no standalone route
+                        // left to also track.
+                        vm.setOnSettingsPageSlot(real == slots)
                     }
                 }
                 // Resets the flag above the moment this pager itself leaves
@@ -467,7 +486,7 @@ internal fun GarageScreen(
                     // animation -- see the `total` effect below, which skips
                     // itself on the way out for the same reason.
                     if (state.value.screen != Screen.Garage) return@LaunchedEffect
-                    wrap.snapToReal(currentIndex.coerceIn(0, count - 1))
+                    wrap.snapToReal(currentIndex.coerceIn(0, slots - 1))
                 }
                 // A car being added or removed changes `total` -- and therefore
                 // `wrap`'s realCount, the modulo divisor real() uses -- out from
@@ -485,7 +504,7 @@ internal fun GarageScreen(
                 LaunchedEffect(total) {
                     if (skipFirstTotalSnap.value) { skipFirstTotalSnap.value = false; return@LaunchedEffect }
                     if (state.value.screen != Screen.Garage) return@LaunchedEffect
-                    wrap.snapToReal(currentIndex.coerceIn(0, count - 1))
+                    wrap.snapToReal(currentIndex.coerceIn(0, slots - 1))
                 }
                 Box(Modifier.fillMaxSize()) {
                     // The pixel width of ONE item's page -- viewport width divided
@@ -535,8 +554,8 @@ internal fun GarageScreen(
                         // LazyVerticalStaggeredGrid state racing the other's -- exactly the
                         // shape of corruption that crash is.
                         //
-                        // A single-car account is the sharpest case: total = count+1 = 2,
-                        // perPage is forced to 1 (coerceIn(1, count) above), so a flat
+                        // A single-car account is the sharpest case: total = slots+1 = 2,
+                        // perPage is forced to 1 (coerceIn(1, slots) above), so a flat
                         // beyond=1 composes 1+2*1 = 3 virtual pages cycling through only 2
                         // real items -- guaranteed collision, every single time that user
                         // opens the app. Solving `perPage + 2*beyond <= total` for the
@@ -553,13 +572,18 @@ internal fun GarageScreen(
                         // "flat scroll on a wide screen" case.
                         val real = realItem(page)
                         Box(Modifier.fillMaxSize()) {
-                            if (real == count) {
-                                // The folded-in Settings item -- embedded, not
-                                // navigated to -- see SettingsScreen's own `embedded`
-                                // doc. Its own LazyVerticalStaggeredGrid naturally
-                                // collapses to a single column at this page's width
-                                // (one car-column) instead of spreading wider.
-                                SettingsScreen(vm, embedded = true)
+                            if (real == slots) {
+                                // The folded-in Settings item, always the last one --
+                                // it's a page in this pager, not a route, so its own
+                                // LazyVerticalStaggeredGrid naturally collapses to a
+                                // single column at this page's width (one car-column)
+                                // instead of spreading wider.
+                                SettingsScreen(vm)
+                            } else if (count == 0) {
+                                // No cars at all: the status card takes this pager's
+                                // one other slot instead of a car -- see
+                                // GarageStatusCard's own doc (Guard.kt).
+                                GarageStatusCard(state, vm, hazeState = hazeState)
                             } else {
                                 val gv = vehicles[real]
                                 CarThemeOverride(

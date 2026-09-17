@@ -64,7 +64,6 @@ import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Pin
 import androidx.compose.material.icons.filled.LockReset
-import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.Person
@@ -221,39 +220,29 @@ import com.bloo.uicommon.ReorderColumn
 
 
 /**
- * Two modes, keyed only on [embedded]:
- *
- *  - [embedded] = true -- this is a page inside a car pager (GarageScreen's collapsed
- *    block/window pager, or CompactGarage's cover pager), always the one right after
- *    the last car. Swiping to a car IS "back", so the screen-navigation chrome that
- *    only makes sense standalone (the floating "back to the app" arrow, its status-bar
- *    scrim) is skipped, and system-back -- which has no page left of it to land on --
- *    takes the double-press-to-exit contract below rather than slamming the app shut
- *    on the first press.
- *  - [embedded] = false -- the standalone `Screen.Settings` route. Only the no-vehicles
- *    screen reaches it (there is no car pager there to fold a page into), and a single
- *    back press closes it as plain navigation.
- *
- * Nothing else about this composable changes between the two: same cards, same search
- * integration, same everything -- it's genuinely the same screen, just reached a
- * different way.
+ * Always a page inside a car pager now (GarageScreen's collapsed block/window pager,
+ * or CompactGarage's cover pager -- via CoverSettingsGate there), always the one right
+ * after the last real page (a car, or the status card with none). There is no
+ * standalone Settings route or screen any more, for any vehicle count -- swiping IS
+ * how you reach it and how you leave it. Swiping to a car IS "back", so this skips the
+ * screen-navigation chrome that only ever made sense standalone (a floating "back to
+ * the app" arrow, its own status-bar scrim), and system-back -- which has no page left
+ * of it to land on -- takes the double-press-to-exit contract below rather than
+ * slamming the app shut on the first press.
  */
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 internal fun SettingsScreen(
     vm: AppViewModel,
-    embedded: Boolean = false,
     /** True on the flip cover, where every dimension is precious: tighter
      *  gutters, a slimmer header, closer card spacing. The grid still
      *  scrolls exactly as it does on the phone -- compactness here is
      *  density, not reachability. */
     compact: Boolean = false,
-    /** Defaults to a fresh one for every existing caller's exact prior behavior
-     *  (embedded/cover callers still get their own). Screens.kt's standalone
-     *  Settings route passes its own shared instance instead, the same one
-     *  GarageScreen gets -- see GarageScreen's own doc for why: the floating
-     *  search bar/results panel hosted ABOVE both screens needs one real blur
-     *  source it can use regardless of which of the two is actually showing. */
+    /** GarageScreen passes its own shared instance (the same one its car pages
+     *  get) so the floating search bar/results panel hosted ABOVE it gets one
+     *  real blur source regardless of which page is actually showing. Cover
+     *  callers (CoverSettingsGate) get their own fresh default instead. */
     hazeState: HazeState = remember { HazeState() },
 ) {
     val appearance = LocalAppearance.current
@@ -289,41 +278,32 @@ internal fun SettingsScreen(
   val bottomInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
   // Search no longer lives on this screen -- it is one app-root element now
   // (see SearchLayer), so its query, its focus and its own back handling went
-  // with it. Back here means only what it always meant underneath: return to
-  // the garage. SearchLayer composes after this screen, so while search is
-  // open ITS handler is the one that runs first.
+  // with it. SearchLayer composes after this screen, so while search is open
+  // ITS handler is the one that runs first.
   //
-  // Skipped when embedded: there is no separate route here to close (this IS
-  // the garage, just parked on its own pager page), so the default system-back
-  // behaviour underneath (GarageScreen's own handling, or the app backgrounding)
-  // is what should run instead.
-  if (!embedded) BackHandler { vm.closeSettings() }
-  if (embedded) {
-      // The Settings pager page is the LAST page -- there is no car page
-      // left of it for system-back to land on, so a single back press would
-      // slam the whole app shut. Double-back instead: the first press arms
-      // a two-second window and says so, the second press inside it really
-      // closes.
-      var backArmed by remember { mutableStateOf(false) }
-      LaunchedEffect(backArmed) {
-          if (backArmed) {
-              delay(2000)
-              backArmed = false
-          }
+  // The Settings pager page is the LAST page -- there is no car page left of
+  // it for system-back to land on, so a single back press would slam the
+  // whole app shut. Double-back instead: the first press arms a two-second
+  // window and says so, the second press inside it really closes.
+  var backArmed by remember { mutableStateOf(false) }
+  LaunchedEffect(backArmed) {
+      if (backArmed) {
+          delay(2000)
+          backArmed = false
       }
-      BackHandler {
-          if (backArmed) {
-              haptics?.heavy()
-              (context as? android.app.Activity)?.finish()
-          } else {
-              haptics?.tick()
-              backArmed = true
-              android.widget.Toast.makeText(
-                  context,
-                  "Press back one more time to close",
-                  android.widget.Toast.LENGTH_SHORT,
-              ).show()
-          }
+  }
+  BackHandler {
+      if (backArmed) {
+          haptics?.heavy()
+          (context as? android.app.Activity)?.finish()
+      } else {
+          haptics?.tick()
+          backArmed = true
+          android.widget.Toast.makeText(
+              context,
+              "Press back one more time to close",
+              android.widget.Toast.LENGTH_SHORT,
+          ).show()
       }
   }
   // hazeState is now a parameter (see this function's own doc) -- backs the
@@ -2239,40 +2219,19 @@ internal fun SettingsScreen(
         } // Box (wide-screen centering)
         // Same blurred scrim GarageScreen uses behind the system clock/battery
         // icons -- this content scrolls behind the status bar too (see the
-        // comment above the Column's top spacer). Skipped on a folding
-        // phone's compact cover screen, matching GarageScreen/LockOverlay:
-        // that tiny layout doesn't draw content under the status bar at all.
-        // Also skipped when embedded: this page sits inside GarageScreen's own
-        // HorizontalPager, which already draws its own StatusBarScrim on top of
-        // every page in it (cars included) -- drawing a second one here stacked
-        // the same scrim twice for exactly this one page, reading as a subtly
-        // darker/hazier status-bar band than every car page beside it.
-        if (!isCompactCoverScreen() && !embedded) StatusBarScrim(
-            hazeState = hazeState,
-        )
         // No more floating "Settings" corner badge -- removed as unwanted UI (see the floating
         // car-name pill's own removal). The "Settings" title is real, static content on
         // SettingsHeaderRow now; it just scrolls off with the rest of the grid.
-        // Floating back-arrow (remains separate and floating, not part of status bar).
-        // Only shown when Settings isn't embedded -- an embedded Settings page
-        // (folded into the car grid/pager) is reached by swiping, not a back
-        // arrow, and closeSettings() would fight the pager's own navigation.
-        if (!embedded) {
-            FloatingIcon(
-                icon = Icons.Filled.ArrowBack,
-                description = "Back to the app",
-                onClick = { vm.closeSettings() },
-                hazeState = hazeState,
-                modifier = Modifier.align(Alignment.TopStart).statusBarsPadding(),
-            )
-        }
+        //
+        // No StatusBarScrim or floating back-arrow here at all any more: this page always
+        // sits inside GarageScreen's/CompactGarage's own HorizontalPager now, which already
+        // draws its own StatusBarScrim on top of every page in it (cars and the status card
+        // included) -- a second one here stacked as a subtly darker/hazier status-bar band
+        // than every other page beside it. A back arrow makes even less sense: reaching this
+        // page IS swiping, so leaving it is swiping back, not tapping anything.
+        //
         // Settings mode toggle as a tab-like element below the status bar,
         // positioned at the top-right, styled like it's hanging from the status bar.
-        // NOT gated on `!embedded` -- unlike the back arrow above, this is the
-        // only way to switch Simple/Advanced mode, and it was previously tied
-        // to the same condition, so a user reaching Settings through the
-        // embedded/swipeable page (or the folded-into-grid layout) had no way
-        // to change modes at all.
         SettingsModeTab(
             settingsMode = state.settingsMode,
             onSettingsModeChange = { vm.setSettingsMode(it) },

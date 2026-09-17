@@ -371,19 +371,21 @@ fun BlooApp(vm: AppViewModel) {
         AnimatedContent(
             targetState = target,
             transitionSpec = {
-                // Settings slides in from the right; returning slides back left. A real
-                // spring (this app's own SoftDamping/StiffnessMediumLow, the same feel
-                // the garage's own expand/collapse AnimatedContent uses a few screens
-                // down) rather than AnimatedContent's bare default -- the default spec
-                // is tuned for a small content swap settling quickly, and on a screen-
-                // sized slide that read as slightly clipped/mechanical next to every
-                // other full-screen motion in the app. fadeIn/fadeOut keep their own
-                // (fast, linear-feeling) defaults on purpose: only the SLIDE -- the part
-                // that actually travels screen-sized distance -- needed the softer landing.
-                val sign = if (targetState == Screen.Settings) 1 else -1
+                // A real spring (this app's own SoftDamping/StiffnessMediumLow, the
+                // same feel the garage's own expand/collapse AnimatedContent uses a
+                // few screens down) rather than AnimatedContent's bare default -- the
+                // default spec is tuned for a small content swap settling quickly,
+                // and on a screen-sized slide that read as slightly clipped/mechanical
+                // next to every other full-screen motion in the app. fadeIn/fadeOut
+                // keep their own (fast, linear-feeling) defaults on purpose: only the
+                // SLIDE -- the part that actually travels screen-sized distance --
+                // needed the softer landing. Settings used to be one of these targets
+                // (reached only from the no-vehicles screen) with its own slide
+                // direction; it's a page in the garage's own pager now, for every
+                // vehicle count, so there's nothing left here to give a special sign.
                 val slideSpec = spring<IntOffset>(dampingRatio = SoftDamping, stiffness = Spring.StiffnessMediumLow)
-                (slideInHorizontally(slideSpec) { w -> sign * w } + fadeIn()) togetherWith
-                    (slideOutHorizontally(slideSpec) { w -> -sign * w } + fadeOut())
+                (slideInHorizontally(slideSpec) { w -> -w } + fadeIn()) togetherWith
+                    (slideOutHorizontally(slideSpec) { w -> w } + fadeOut())
             },
             label = "screen",
         ) { screen ->
@@ -412,8 +414,6 @@ fun BlooApp(vm: AppViewModel) {
                     state.kiaOtp?.let { otp -> KiaOtpDialog(otp, loading = state.loading, vm = vm) }
                     state.canadaOtp?.let { otp -> CanadaOtpDialog(otp, loading = state.loading, vm = vm) }
                 }
-                // Lock is an overlay (see LockOverlay), not a full screen.
-                Screen.Empty -> Box(Modifier.padding(padding)) { EmptyScreen(vm) }
                 // Shown once, right after sign-in resolves at least one vehicle for
                 // a first-run device -- before Onboarding -- so a second phone (or
                 // reinstall) never has to click through the whole welcome wizard
@@ -437,47 +437,29 @@ fun BlooApp(vm: AppViewModel) {
                         GarageScreen(rememberUpdatedState(state), vm, hazeState = searchHazeState)
                     }
                 }
-                // The standalone Settings route. Settings is a page in the car
-                // pager everywhere there IS a car pager (GarageScreen's collapsed
-                // pager, CompactGarage's cover pager), so the only way in here is
-                // the no-vehicles screen -- there is nothing to fold a page into
-                // when there are no cars.
-                //
-                // The full phone Settings (search + keyboard, photo pickers, crop,
-                // drag-reorder lists, sign-out) is unusable crammed onto a ~1-inch
-                // flip cover — it used to render there verbatim. On the cover, show a
-                // compact "manage on your phone" card instead; the real settings are
-                // one unfold away.
-                Screen.Settings ->
-                    if (isCompactCoverScreen()) {
-                        // The cover can scroll settings fine (the grid scrolls as
-                        // it does on the phone), but it is a cramped view of a
-                        // screen built for a tall display -- say so once, then let
-                        // them use it anyway.
-                        CoverSettingsGate(vm)
-                    } else SettingsScreen(vm, hazeState = searchHazeState)
             }
         }
         // Search lives HERE, above the screen-switching AnimatedContent and
         // outside it, which is the whole point: one element that survives the
         // transition, so garage -> Settings genuinely morphs a corner bubble
         // into the bottom bar instead of cross-fading two different objects
-        // that happen to look alike. Only on the two screens that have
-        // anything to search; login, onboarding and the setup wizard don't.
-        val searchable = target == Screen.Garage || target == Screen.Settings
+        // that happen to look alike. Only the one screen that has anything to
+        // search; login, onboarding and the setup wizard don't. Settings is
+        // always a page inside THIS screen's own pager now (no standalone
+        // route any more, for any vehicle count), so it doesn't need a
+        // separate entry here.
+        val searchable = target == Screen.Garage
         val cover = isCompactCoverScreen()
         val notifPrefs by vm.notifications.collectAsStateWithLifecycle()
-        // On the garage (and the cover) it is the user's switch. In Settings it
-        // is always there -- that is how you find a setting. `|| state.onSettingsPageSlot`
-        // on both lines below extends that same rule to Settings-as-a-pager-page,
-        // which is how Settings is normally reached: without it, swiping to the
-        // Settings page fell back to the ordinary garage-screen showSearch preference
-        // (search could disappear entirely there for anyone with that off) and the search
-        // element itself stayed shaped like a garage "bubble" instead of morphing into the
-        // settings "pill", since the standalone route wasn't what put you there --
-        // exactly the kind of un-seamless style transition between the two ways of
-        // reaching Settings this exists to prevent.
-        val effectivelyInSettings = target == Screen.Settings || state.onSettingsPageSlot
+        // On the garage (and the cover) it is the user's switch. On the Settings
+        // PAGE of that same pager it is always there -- that is how you find a
+        // setting. state.onSettingsPageSlot (kept in sync by the pager's own
+        // settle effect) is the one signal for that now: without it, swiping to
+        // the Settings page fell back to the ordinary garage-screen showSearch
+        // preference (search could disappear entirely there for anyone with
+        // that off) and the search element itself stayed shaped like a garage
+        // "bubble" instead of morphing into the settings "pill".
+        val effectivelyInSettings = state.onSettingsPageSlot
         if (searchable && !state.locked && (appearance.showSearch || effectivelyInSettings)) {
             // fillMaxSize() alone, no `.padding(padding)` -- SearchLayer already
             // reads WindowInsets itself for every edge it cares about (its own

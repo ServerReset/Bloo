@@ -1024,8 +1024,9 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
      *  not just "some network interface is up", which is also true mid-captive-
      *  portal or on a link with no actual internet behind it. Used to tell a real
      *  API/auth failure (garageLoadError while genuinely online) apart from the
-     *  device simply having no connection at all, so [Screen.Empty] only shows
-     *  the plain "no connection" page for the latter. */
+     *  device simply having no connection at all, so the status card
+     *  GarageScreen folds in for a zero-vehicle account only shows the plain
+     *  "no connection" copy for the latter. */
     private fun isDeviceOnline(): Boolean {
         val cm = getApplication<Application>()
             .getSystemService(android.content.Context.CONNECTIVITY_SERVICE) as? android.net.ConnectivityManager
@@ -1088,7 +1089,10 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             _state.update {
                 it.copy(
                     vehicles = emptyList(),
-                    screen = Screen.Empty,
+                    // Garage, not a separate empty screen -- GarageScreen folds
+                    // the "no connection"/"not signed in"/"no vehicles" status
+                    // card in as a page of its own pager instead.
+                    screen = Screen.Garage,
                     garageLoadError = lastError,
                     garageLoadOffline = lastError != null && !isDeviceOnline(),
                 )
@@ -1180,7 +1184,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         // UiState emission. bootstrapDriveSync's own call to the same function, a few lines
         // into the coroutine below, is unrelated to this and untouched: it runs once per
         // PROCESS (guarded), specifically to cover a cold start whose very first garage
-        // load returned nothing at all (Screen.Empty, an early return above this point) --
+        // load returned nothing at all (the empty-vehicles branch, an early return above
+        // this point) --
         // this fold does not affect that path since it never reaches this line either.
         // One-time: start the Drive auto-sync bootstrap + collector.
         bootstrapDriveSync()
@@ -2196,12 +2201,10 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         landInApp()
     }
 
-    /** Leave a setup flow and show the garage (or the empty state if there are no cars),
-     *  clearing any stale load error. The trailing move shared by [finishOnboarding] and
-     *  [finishCarSetup], which had it written out identically. */
-    private fun landInApp() = _state.update {
-        it.copy(screen = if (it.vehicles.isEmpty()) Screen.Empty else Screen.Garage, garageLoadError = null)
-    }
+    /** Leave a setup flow and show the garage, clearing any stale load error. The
+     *  trailing move shared by [finishOnboarding] and [finishCarSetup], which had
+     *  it written out identically. */
+    private fun landInApp() = _state.update { it.copy(screen = Screen.Garage, garageLoadError = null) }
 
     /** Mark newly-detected cars as configured and return to the garage. */
     fun finishCarSetup(vins: List<String>) {
@@ -3261,21 +3264,6 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     // --- Settings / nav --------------------------------------------------
 
-    /** Navigate to the Settings screen (the car carousel keeps its state
-     *  behind it, restored as-is by [closeSettings]). */
-    fun openSettings() = _state.update { it.copy(screen = Screen.Settings) }
-    /** Leaves the standalone Settings route (the only way in is the
-     *  no-vehicles screen now -- everywhere else Settings is a page in the
-     *  garage's own pager, swiped away rather than closed). */
-    fun closeSettings() {
-        // Always return to the card/grid view (collapse any expanded car).
-        _state.update {
-            it.copy(
-                screen = if (it.vehicles.isEmpty()) Screen.Empty else Screen.Garage,
-                expandedIndex = null,
-            )
-        }
-    }
     /** Kept in sync by the garage pager's and the compact cover pager's own
      *  settle effects -- see
      *  [UiState.onSettingsPageSlot]'s own doc. Guarded the same way, so

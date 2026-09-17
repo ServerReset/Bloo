@@ -9,10 +9,11 @@ package com.bloo.bluelink.ui
 
 /**
  * Cover.kt's flip-cover garage cluster, peeled out of Cover.kt (which kept the
- * tile/tile-face chrome): the settings gate CoverSettingsGate (the standalone
- * Settings route's cover rendering, reachable only when there are no cars) and
- * the car pager CompactGarage -- its per-car CompactCar page composable plus
- * one embedded Settings page after the last car.
+ * tile/tile-face chrome): the settings gate CoverSettingsGate (a one-time "this
+ * was built for a taller phone" nudge shown the first time this pager's own
+ * folded-in Settings page appears) and the car pager CompactGarage -- its
+ * per-car CompactCar page composable, a status card in place of a car when
+ * there are none, and one embedded Settings page after everything else.
  */
 
 import androidx.compose.animation.core.Animatable
@@ -96,7 +97,8 @@ import kotlin.math.max
  * everything from the update card onward), introduced once by a polite
  * "this was built for a taller phone" prompt with a persistent "don't show
  * again". The prompt is a doorbell, not a bouncer: after it, settings just
- * scroll on the cover.
+ * scroll on the cover. Called from CompactGarage's own pager -- Settings has
+ * no separate route to reach it through any more, on the cover or the phone.
  */
 @Composable
 internal fun CoverSettingsGate(vm: AppViewModel) {
@@ -167,47 +169,42 @@ internal fun CoverSettingsGate(vm: AppViewModel) {
 internal fun CompactGarage(state: UiState, vm: AppViewModel, appearance: SettingsStore.Appearance, hazeState: HazeState = remember { HazeState() }) {
     val vehicles = state.vehicles
     val count = vehicles.size
-    // count - 1 goes negative with zero cars, and coerceIn(0, -1) throws
-    // (min > max) before the pager below ever gets a chance to handle an empty
-    // list gracefully. Kept as a crash guard rather than an expected state, and
-    // labelled that way on purpose: it is currently UNREACHABLE from the one
-    // caller -- GarageScreen returns on its first line when vehicles is empty,
-    // and a zero-car app routes to Screen.Empty long before Screen.Garage. This
-    // comment used to cite a `compact && vehicles.isEmpty()` branch in that caller
-    // as proof the state was real; that branch was itself dead for the same
-    // reason, and has been deleted. Two lines of guard against a throwing
-    // coerceIn is still worth keeping; the claim that something reaches it wasn't.
-    if (count == 0) {
-        EmptyScreen(vm)
-        return
-    }
+    // At least one non-Settings page even with zero cars: the "no connection"/
+    // "not signed in"/"no vehicles" status card takes that one slot instead of
+    // a car, so Settings is still just one swipe away on the cover exactly as
+    // it is with cars -- see GarageScreen's matching `slots`/GarageStatusCard
+    // for the full reasoning. Also what keeps `slots - 1` (used below) from
+    // going negative: count - 1 does with zero cars, and coerceIn(0, -1) throws
+    // (min > max).
+    val slots = maxOf(count, 1)
     // Infinite wrap-around, matching every other car-switching pager in the
     // app (the expanded pager, the default grid) and the cover screen's own
     // tile pager, which already looped.
     // Same as GarageScreen: the index is its own flow, collected here.
     val currentIndex by vm.currentIndex.collectAsStateWithLifecycle()
-    // count + 1, not count: Settings is a page in this pager, exactly as it is
-    // in the phone garage's own pager -- the page right after the last car,
-    // index `count`. There is no gear button on the cover and no modal route to
-    // it from here; swiping past your last car IS how you reach Settings, the
-    // same gesture that already switches cars.
-    val total = count + 1
-    val wrap = rememberWrapPager(total, currentIndex.coerceIn(0, count - 1))
+    // slots + 1, not count: Settings is a page in this pager, exactly as it is
+    // in the phone garage's own pager -- the page right after the last car (or
+    // the status card, with none), index `slots`. There is no gear button on
+    // the cover and no modal route to it from here; swiping past the last real
+    // page IS how you reach Settings, the same gesture that already switches cars.
+    val total = slots + 1
+    val wrap = rememberWrapPager(total, currentIndex.coerceIn(0, slots - 1))
     val pager = wrap.pager
-    /** Real item index for a virtual page: a vehicle index, or [count] for the
+    /** Real item index for a virtual page: a vehicle index, or [slots] for the
      *  folded-in Settings page. */
     fun realCar(virtualPage: Int) = wrap.real(virtualPage)
     LaunchedEffect(pager, count) {
         snapshotFlow { pager.settledPage }.collect { page ->
             val real = realCar(page)
-            // Guarded: settling on the Settings page is not a car selection, so
-            // currentIndex keeps whatever car it had and swiping back lands
-            // where you left off instead of snapping to car 0.
+            // Guarded: settling on the Settings page (or the status card slot)
+            // is not a car selection, so currentIndex keeps whatever car it had
+            // and swiping back lands where you left off instead of snapping to
+            // car 0.
             if (real < count) vm.selectIndex(real)
             // See UiState.onSettingsPageSlot's own doc -- the same signal
             // GarageScreen's pager publishes, so SearchLayer's bubble/pill morph
             // tracks the cover's embedded Settings page too.
-            vm.setOnSettingsPageSlot(real == count)
+            vm.setOnSettingsPageSlot(real == slots)
         }
     }
     // Mirrors GarageScreen's own reset: nothing else clears this once this pager
@@ -220,7 +217,7 @@ internal fun CompactGarage(state: UiState, vm: AppViewModel, appearance: Setting
     // different one) by snapping to it, instead of only ever pushing this
     // pager's own settles into currentIndex one-way.
     LaunchedEffect(currentIndex) {
-        wrap.snapToReal(currentIndex.coerceIn(0, count - 1))
+        wrap.snapToReal(currentIndex.coerceIn(0, slots - 1))
     }
     // True while the page scrubber is active; suspends car-switching swipes so a
     // scrub gesture can't be hijacked into flipping to the next car.
@@ -265,7 +262,7 @@ internal fun CompactGarage(state: UiState, vm: AppViewModel, appearance: Setting
             // This pager shows exactly one item per page (perPage is implicitly
             // 1 here, never narrower), so pre-warming 1 neighbour on EACH side
             // composes 3 virtual pages at once cycling through `total` real
-            // items -- for a single-car cover user, total = count+1 = 2, so a
+            // items -- for a single-car cover user, total = slots+1 = 2, so a
             // flat beyond=1 guarantees two of those three pages resolve to the
             // SAME real item (the folded-in Settings page) and mount it TWICE
             // at once. (total - 1) / 2, capped at 1, is the largest beyond that
@@ -273,14 +270,21 @@ internal fun CompactGarage(state: UiState, vm: AppViewModel, appearance: Setting
             beyondViewportPageCount = ((total - 1) / 2).coerceIn(0, 1),
         ) { page ->
             val real = realCar(page)
-            if (real == count) {
-                // The folded-in Settings page. compact = true: this IS the cover
-                // screen, so SettingsScreen renders its tighter cover density.
-                // embedded = true: it's a page in this pager, not a route -- see
-                // SettingsScreen's own `embedded` doc for the back contract that
-                // comes with it.
+            if (real == slots) {
+                // The folded-in Settings page, always the last one -- via
+                // CoverSettingsGate rather than SettingsScreen directly, so the
+                // one-time "built for a taller phone" nudge shows here too, the
+                // only place cover Settings is reached now.
                 Box(Modifier.fillMaxSize().pagerDepth(pager, page)) {
-                    SettingsScreen(vm, embedded = true, compact = true)
+                    CoverSettingsGate(vm)
+                }
+                return@HorizontalPager
+            }
+            if (count == 0) {
+                // No cars at all: the status card takes this pager's one other
+                // slot instead of a car -- see GarageStatusCard's own doc.
+                Box(Modifier.fillMaxSize().pagerDepth(pager, page)) {
+                    GarageStatusCard(rememberUpdatedState(state), vm, hazeState = hazeState)
                 }
                 return@HorizontalPager
             }

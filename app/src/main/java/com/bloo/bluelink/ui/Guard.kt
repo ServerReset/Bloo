@@ -25,6 +25,7 @@ import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.only
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -44,8 +45,6 @@ import androidx.compose.material.icons.filled.DirectionsCar
 import androidx.compose.material.icons.filled.Fingerprint
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.LockOpen
-import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.WifiOff
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.onClick
@@ -62,8 +61,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.State
 import dev.chrisbanes.haze.HazeState
-import dev.chrisbanes.haze.hazeSource
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -414,56 +413,72 @@ internal fun LockOverlay(vm: AppViewModel) {
 }
 
 
-// --- Empty ----------------------------------------------------------------
+// --- Garage status card -----------------------------------------------
 
-@OptIn(ExperimentalMaterial3Api::class)
+/**
+ * Folded into the garage's own pager (GarageScreen.kt's collapsed pager,
+ * CompactGarage's cover pager) as a page in place of a car when there are
+ * none -- exactly the way Settings is folded in as the page after it. Used
+ * to be a full standalone screen (`Screen.Empty`) with its own "Bloo" title
+ * bar, floating Reload/Settings icons, and buttons that jumped to a separate
+ * standalone Settings route. Reported directly: this -- and the "API is
+ * down" / "no connection" states it can show -- should "just be another
+ * card like the rest of them," reached and left the same way every other
+ * page in the pager is: swipe, not a button, a menu, or a back press.
+ *
+ * GarageScreen/CompactGarage already provide the Aurora backdrop, status-bar
+ * scrim, and blur source this card sits on top of, so this composable is
+ * only the card's own content -- the same division VehicleDetailContent and
+ * CompactCar keep for a real car page. [Refreshable] (Pebbles.kt) supplies
+ * the retry action: pulling down here calls [AppViewModel.loadGarage] the
+ * exact same way pulling down on a car page calls
+ * [AppViewModel.refreshStatus] -- one standard gesture, not a one-off Reload
+ * button this page alone had.
+ */
 @Composable
-internal fun EmptyScreen(vm: AppViewModel) {
-    val state by vm.state.collectAsStateWithLifecycle()
+internal fun GarageStatusCard(state: State<UiState>, vm: AppViewModel, hazeState: HazeState? = null) {
+    val s = state.value
     val scheme = MaterialTheme.colorScheme
-    val haptics = LocalHaptics.current
-    // Note: pull-to-refresh feature temporarily disabled due to Material 3 version compatibility
 
     // Four distinct causes used to collapse into the same "No vehicles found" /
-    // "Not signed in" copy -- including a real network/API failure, which then
-    // looked exactly like the app had silently signed the user out. Each now
-    // gets its own icon, headline, and primary action so the actual cause is
-    // always clear. A true connectivity failure (garageLoadOffline) gets its
-    // own plain "no connection" copy instead of a raw exception message --
-    // there's nothing actionable in that message beyond "check your
-    // connection", which the dedicated copy already says -- and, gated the
-    // other way, an error that happens while the device IS online (an auth
-    // failure, a 500, etc.) keeps the more specific message since that one
-    // might actually help.
-    val loadFailed = state.accounts.isNotEmpty() && state.garageLoadError != null
-    val offline = loadFailed && state.garageLoadOffline
+    // "Not signed in" copy -- including a real network/API failure (including
+    // the manufacturer's own servers being down), which then looked exactly
+    // like the app had silently signed the user out. Each now gets its own
+    // icon and headline so the actual cause is always clear. A true
+    // connectivity failure (garageLoadOffline) gets its own plain "no
+    // connection" copy instead of a raw exception message -- there's nothing
+    // actionable in that message beyond "check your connection", which the
+    // dedicated copy already says -- and, gated the other way, an error that
+    // happens while the device IS online (an auth failure, Hyundai/Kia's own
+    // API returning a 500, etc.) keeps the more specific message since that
+    // one might actually help.
+    val loadFailed = s.accounts.isNotEmpty() && s.garageLoadError != null
+    val offline = loadFailed && s.garageLoadOffline
     val (icon, headline, body) = when {
-        state.accounts.isEmpty() -> Triple(
+        s.accounts.isEmpty() -> Triple(
             Icons.Filled.CloudOff,
             "Not signed in",
-            "Sign in to your Hyundai, Kia, or Genesis account in Settings to get started.",
+            "Sign in to your Hyundai, Kia, or Genesis account -- swipe right for Settings.",
         )
         offline -> Triple(
             Icons.Filled.WifiOff,
             "No connection",
-            "Bloo can't reach the internet right now. You're still signed in -- check your connection and tap Reload.",
+            "Bloo can't reach the internet right now. You're still signed in -- check your connection and pull down to retry.",
         )
         loadFailed -> Triple(
             Icons.Filled.WifiOff,
             "Couldn't load your vehicles",
-            "${state.garageLoadError}\n\nCheck your connection and try again.",
+            "${s.garageLoadError}\n\nPull down to try again.",
         )
         else -> Triple(
             Icons.Filled.DirectionsCar,
             "No vehicles found",
-            "No enrolled vehicles were found on this account.\n\nMake sure your car is registered in the BlueLink / UVO app, then tap Reload.",
+            "No enrolled vehicles were found on this account.\n\nMake sure your car is registered in the BlueLink / UVO app, then pull down to reload.",
         )
     }
 
     // Fade + slide up on first composition, matching HeroHeader and every
-    // other first-paint card elsewhere in the app -- this screen used to pop
-    // in instantly, one more thing that made it read as a leftover plain
-    // Material screen rather than part of the same app.
+    // other first-paint card elsewhere in the app.
     val contentAlpha = remember { Animatable(0f) }
     val contentOffset = remember { Animatable(16f) }
     LaunchedEffect(Unit) {
@@ -471,78 +486,45 @@ internal fun EmptyScreen(vm: AppViewModel) {
         launch { contentOffset.animateTo(0f, spring(dampingRatio = 0.7f, stiffness = Spring.StiffnessMediumLow)) }
     }
 
-    // Backs the StatusBarScrim call below with a REAL backdrop blur of the Aurora
-    // background -- same pattern GarageScreen.kt uses for its own two pagers. See
-    // StatusBarScrim's own doc for why plain Modifier.blur never worked here.
-    val hazeState = remember { HazeState() }
-    Box(
-        Modifier
-            .fillMaxSize(),
-    ) {
-        // The rest of the app never sits on a flat black/theme-background
-        // screen with a stock opaque TopAppBar -- Garage, Settings, and
-        // Onboarding all float their header over an animated Aurora backdrop
-        // with a blurred status-bar scrim and translucent circular icon
-        // buttons. This was the one screen still doing it the plain way.
-        AuroraBackground(Modifier.matchParentSize().hazeSource(hazeState))
-        StatusBarScrim(hazeState = hazeState)
-        Column(Modifier.fillMaxSize()) {
-            Row(
-                Modifier
-                    .fillMaxWidth()
-                    .statusBarsPadding()
-                    .padding(start = 20.dp, end = 8.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text(
-                    "Bloo",
-                    style = MaterialTheme.typography.headlineSmall,
-                    fontWeight = FontWeight.Black,
-                    color = scheme.onSurface,
-                    modifier = Modifier.weight(1f),
-                )
-                FloatingIcon(Icons.Filled.Refresh, "Reload", { vm.loadGarage() }, hazeState = hazeState)
-                FloatingIcon(Icons.Filled.Settings, "Settings", { vm.openSettings() }, hazeState = hazeState)
-            }
-            Box(
+    // loadGarage() sets state.loading (not state.refreshing, which only ever
+    // covers a single car's own status fetch) -- that's the flag this card's
+    // pull gesture needs to reflect for the indicator/release behaviour to
+    // track the request it actually triggers.
+    Refreshable(refreshing = s.loading, onRefresh = { vm.loadGarage() }, hazeState = hazeState) {
+        Box(
+            Modifier
+                .fillMaxSize()
+                .statusBarsPadding()
+                .navigationBarsPadding()
+                .padding(horizontal = 20.dp),
+            contentAlignment = Alignment.Center,
+        ) {
+            // GlassSurface (GlassChrome.kt): the same card shell every other piece of
+            // content in the app sits on top of (Garage's pebbles, Settings' cards, the
+            // lock overlay's own PIN card) -- blurring the real Aurora behind it, exactly
+            // like a real car page's own content does.
+            GlassSurface(
+                shape = RoundedCornerShape(28.dp),
                 modifier = Modifier
-                    .fillMaxSize()
-                    .padding(horizontal = 20.dp, vertical = 24.dp),
-                contentAlignment = Alignment.Center,
+                    .widthIn(max = 400.dp)
+                    .fillMaxWidth()
+                    .graphicsLayer {
+                        alpha = contentAlpha.value
+                        // .dp.toPx(), not the raw Animatable value: translationY is in
+                        // PIXELS, so feeding it 16f slid this 16px -- about 5dp on a
+                        // 3x-density phone, and a different distance on every device.
+                        translationY = contentOffset.value.dp.toPx()
+                    },
+                hazeState = hazeState,
             ) {
-                // GlassSurface (GlassChrome.kt): this used to be bare Icon+Text+Button
-                // floating directly on the Aurora backdrop with no card under it at all --
-                // the one major piece of content in the app with no glass chrome around it,
-                // next to Garage's pebbles, Settings' cards and the lock overlay's own PIN
-                // card above, all of which live inside one. Reported as not fitting the rest
-                // of the app; this puts it in the same card every other piece of content sits
-                // on top of, blurring the real Aurora behind it like everything else does.
-                GlassSurface(
-                    shape = RoundedCornerShape(28.dp),
-                    modifier = Modifier
-                        .widthIn(max = 400.dp)
-                        .fillMaxWidth()
-                        .graphicsLayer {
-                            alpha = contentAlpha.value
-                            // .dp.toPx(), not the raw Animatable value:
-                            // translationY is in PIXELS, so feeding it 16f slid
-                            // this 16px -- about 5dp on a 3x-density phone, and a
-                            // different distance on every device. GraphicsLayerScope
-                            // is a Density, so the conversion is free right here
-                            // (same idiom ReorderColumn's intro slide already uses).
-                            translationY = contentOffset.value.dp.toPx()
-                        },
-                    hazeState = hazeState,
-                ) {
                 Column(
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.spacedBy(16.dp),
                     modifier = Modifier.padding(horizontal = 28.dp, vertical = 32.dp),
                 ) {
                     // Same tonal icon-badge every SettingsCard header uses (StatusHeaderRow,
-                    // SettingsHeader.kt) instead of this screen's own one-off radial-gradient
-                    // glow -- one badge treatment for "an icon summarizing this card's state,"
-                    // not two different-looking ones depending which screen you're on.
+                    // SettingsHeader.kt) -- one badge treatment for "an icon summarizing this
+                    // card's state," not a one-off radial-gradient glow of its own.
                     val badgeTint = if (loadFailed) scheme.error else scheme.onSurfaceVariant
                     Box(
                         Modifier
@@ -569,57 +551,6 @@ internal fun EmptyScreen(vm: AppViewModel) {
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         textAlign = TextAlign.Center,
                     )
-                    Spacer(Modifier.height(8.dp))
-                    if (state.accounts.isEmpty()) {
-                        // Just the one CTA here -- "Account Settings" below used to repeat
-                        // it as a second button doing the exact same vm.openSettings() call,
-                        // which is what a not-signed-in screen with no other action to offer
-                        // does not need: two buttons to the same place.
-                        val settingsSource = remember { MutableInteractionSource() }
-                        SafeExpansiveButton(
-                            interactionSource = settingsSource,
-                            enabled = true,
-                        ) {
-                            // The shared action button, like every other plain "go do this"
-                            // control -- this screen's one CTA had no reason to be the bare
-                            // default fill while the map's and the car-info pebble's are
-                            // outlined tonal.
-                            MorphActionButton(
-                                label = "Open Settings",
-                                icon = Icons.Filled.Settings,
-                                onClick = { vm.openSettings() },
-                                interactionSource = settingsSource,
-                                modifier = Modifier.fillMaxWidth(),
-                            )
-                        }
-                    } else {
-                        val reloadSource = remember { MutableInteractionSource() }
-                        SafeExpansiveButton(
-                            interactionSource = reloadSource,
-                            enabled = true,
-                        ) {
-                            MorphActionButton(
-                                label = if (loadFailed) "Try again" else "Reload",
-                                icon = Icons.Filled.Refresh,
-                                onClick = { vm.loadGarage() },
-                                interactionSource = reloadSource,
-                                modifier = Modifier.fillMaxWidth(),
-                            )
-                        }
-                        val accountSource = remember { MutableInteractionSource() }
-                        SafeExpansiveButton(
-                            interactionSource = accountSource,
-                            enabled = true,
-                        ) {
-                            MorphTextButton(
-                                "Account Settings",
-                                onClick = { vm.openSettings() },
-                                interactionSource = accountSource,
-                                modifier = Modifier.fillMaxWidth()
-                            )
-                        }
-                    }
-                }
                 }
             }
         }
