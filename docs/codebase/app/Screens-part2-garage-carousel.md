@@ -39,11 +39,11 @@ It exists because Bloo runs on candybar phones, tablets, **and** flip-phone cove
 Top-level dispatcher. Returns immediately if `state.vehicles` is empty (2545). Selects a layout:
 - `compact` → delegates to `CompactGarage(state, vm, appearance)` and `return`s (2627–2630).
 - otherwise builds the normal/large layout with an `AnimatedContent(expandedIdx != null)` (2644) crossfade/scale between the **expanded single-car pager** and the **collapsed multi-car-per-page grid pager**.
-Renders floating overlays: a Back button (`ArrowBack`, when `expandedByUser != null`), a Flip-columns button (`SwapHoriz`, when `expandedIdx != null`), and always a Settings button. Registers `BackHandler(enabled = expandedByUser != null)` → `vm.collapse()` (2640).
+Renders floating overlays: a Back button (`ArrowBack`) and a Flip-columns button (`SwapHoriz`), both when `expandedIdx != null`. There is no floating Settings/gear button any more: Settings is the page right after the last car in the collapsed pager (`total = count + 1`, rendered as `SettingsScreen(vm, embedded = true)` at item index `count`), so from an expanded car you collapse back to the grid and swipe to it. Registers `BackHandler(enabled = expandedIdx != null)` → `vm.collapse()` (2640).
 
 ### Cover-screen composables
 
-- **`@Composable CompactGarage(state, vm, appearance: SettingsStore.Appearance)`** (2963) — owns the car-switching `HorizontalPager`. Renders one `CompactCar` per page and the hoisted car-switch `PagerDots`.
+- **`@Composable CompactGarage(state, vm, appearance: SettingsStore.Appearance)`** (2963) — owns the car-switching `HorizontalPager`, whose real item count is `count + 1`: one `CompactCar` per page plus an embedded `SettingsScreen(vm, embedded = true, compact = true)` as the page after the last car (and the hoisted car-switch `PagerDots`). Its settle observer publishes `vm.setOnSettingsPageSlot(...)` the same way the phone garage's does.
 - **`@Composable CompactCar(v: Vehicle, state, vm, dotsAlpha: Float)`** (3092) — one car's page: a `VerticalPager` of pebble tiles, camera-cutout avoidance, edge-trace refresh gesture, and the right-rail `VerticalPagerDots` scrubber.
 - **`@Composable CompactMainTile(v, state, vm)`** (3531) — the always-present "main" tile: faded car photo, name row (with Refresh + Settings `FloatingIcon`s), `LastUpdatedLabel`, `ChargeFuelBar`, `PrimaryActions`.
 - **`@Composable VerticalPagerDots(current, count, tiles: List<String>, onPageJump: suspend (Int) -> Unit, modifier)`** (3373) — vertical page indicator that expands into a long-press scrubber (14 dp drag/page). Includes TalkBack `customActions`.
@@ -115,8 +115,8 @@ Renders floating overlays: a Back button (`ArrowBack`, when `expandedByUser != n
    - `count = vehicles.size`, `widthDp`, `large = widthDp >= 600`, `compact = isCompactCoverScreen()`.
    - Cover-screen hint: `LaunchedEffect(compact, hasCameraCutout)` shows a one-per-session "Open your phone…" toast when a cutout is detected.
    - `if (compact) { CompactGarage(...); return }`.
-   - `perPage = (widthDp / MIN_CARD_DP).coerceIn(1, count)`; `canExpand = large && count > 1`; `singleLarge = large && count == 1`.
-   - `expandedByUser = state.expandedIndex?.takeIf { it in indices && canExpand }`; `expandedIdx = if (singleLarge) 0 else expandedByUser`.
+   - `perPage = (widthDp / MIN_CARD_DP).coerceIn(1, count)`; `canExpand = large && count > 1`.
+   - `expandedIdx = state.expandedIndex?.takeIf { it in indices && canExpand }` — manual expansion only. There is no automatic "lone car on a wide screen fills the screen" case: a single car renders through the same collapsed block/window pager as any other count, so the Settings page folded in after the last car stays reachable by swipe.
 5. **`AnimatedContent(expandedIdx != null)`** (2644): fade+scale (0.94) crossfade between expanded and collapsed layouts.
 
 **Expanded branch** (2653–2720): a single-car `HorizontalPager` (`exPager`). Infinite wrap: `exVirtualCount = count*1000` (if `count>1`), start at `virtual/2 + expandedIdx`. `exReal(page) = ((page % count) + count) % count`. `snapshotFlow { exPager.settledPage }` → `vm.expand(exReal(it))`. Per-page transform (alpha/scaleX/scaleY) is computed **inside `graphicsLayer{}`** (draw phase only) from `(page - currentPage) + currentPageOffsetFraction` — reading it as a plain val used to recompose the whole page (CarThemeOverride + VehicleDetailContent + every pebble) each drag frame (the documented jank cause). Each page wraps `ExpandedCar` in `CarThemeOverride`. `StatusBarScrim()` + `PagerDots` on top.
@@ -220,7 +220,7 @@ No data class / sealed hierarchy with wire serialization is defined *in this ran
 - `SettingsStore.Appearance` (via `vm.appearance`): `carCustomPaletteIds`, `customPalettes`, `themeMode`, `vibrancy`, `columnsFlipped`, `unitSystem`, `pebbleOutline`.
 - Android: `LocalView.rootWindowInsets.displayCutout` (camera hole), `WindowInsets.statusBars/navigationBars`, `LocalConfiguration`, `LocalDensity`, `Build.VERSION`.
 
-**Writes / calls (out) to `vm`:** `selectIndex`, `expand`, `collapse`, `refreshStatus(v)`, `setColumnsFlipped`, `openSettings`, `setSectionOrder(v, list)`, `setHotspot(v, sec?)`, `lock/unlock(v)`, `flashLights(v)`, `hornAndLights(v)`, `summarizeCar(v)`, `installDownloadedUpdate`, `downloadUpdateInBackground`, `dismissUpdate`, `snoozeUpdate`, `reportInfo/reportError`, `dismissSettingsHint`.
+**Writes / calls (out) to `vm`:** `selectIndex`, `expand`, `collapse`, `refreshStatus(v)`, `setColumnsFlipped`, `setOnSettingsPageSlot`, `setSectionOrder(v, list)`, `setHotspot(v, sec?)`, `lock/unlock(v)`, `flashLights(v)`, `hornAndLights(v)`, `summarizeCar(v)`, `installDownloadedUpdate`, `downloadUpdateInBackground`, `dismissUpdate`, `snoozeUpdate`, `reportInfo/reportError`, `dismissSettingsHint`.
 - `UpdateAvailableTile` also starts an `Intent(ACTION_VIEW, info.run.htmlUrl)` when no direct APK URL is available.
 
 **Data-layer / self-update channel:** `UpdateAvailableTile` surfaces GitHub-Releases build metadata (`info.run.phoneApkUrl`, `runNumber`, `displayTitle`, `htmlUrl`, `releaseNotes`) — the app self-updates by downloading the phone APK asset directly (no Play Store).

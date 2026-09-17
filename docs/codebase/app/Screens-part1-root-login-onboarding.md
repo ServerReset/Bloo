@@ -44,7 +44,7 @@ What it does / renders (outside-in):
     - `Screen.Onboarding` → `OnboardingScreen(vm)`.
     - `is Screen.CarSetup` → `CarSetupWizardScreen(vm, screen.vins)`.
     - `Screen.Garage` → full-bleed `Box`; if `appearance.auroraBackground` draws `AuroraBackground(...)` behind, then `GarageScreen(state, vm)`.
-    - `Screen.Settings` → `SettingsScreen(vm)`.
+    - `Screen.Settings` → `SettingsScreen(vm)` (or `CoverSettingsGate(vm)` on a compact cover screen). Reached only from the no-vehicles screen; with cars, Settings is an embedded page in the garage/cover car pager instead.
 11. **Lock overlay** (line 562–567): drawn last, on top of everything; if `lockAlpha > 0.01f`, `Box(fillMaxSize().alpha(lockAlpha)) { LockOverlay(vm) }`.
 
 Everything else in scope is `private` (composables, data classes, enums, helper funcs) and documented in §3/§4.
@@ -130,7 +130,7 @@ Everything else in scope is `private` (composables, data classes, enums, helper 
 - **`private fun coverScaled(base: Dp, refWidthDp: Float = 280f): Dp`** — line 2484–2489. Scales a reference spacing value by `(screenWidthDp / refWidthDp)` clamped to [0.6, 1.4].
 - **`private enum class CameraEdge { TOP, BOTTOM, LEFT, RIGHT }`** — line 2495.
 - **`private fun cameraEdgeOf(rect: Rect?, viewWidthPx, viewHeightPx): CameraEdge?`** — line 2501–2510. Returns the edge a cutout is flush against (smallest margin), or null.
-- **`private fun GarageScreen(state: UiState, vm: AppViewModel)`** — line 2542+ (extends beyond this doc's scope). Top-level garage dispatcher. In scope here (line 2543–2748): returns early if no vehicles; sets up stale-data warning (`LaunchedEffect(currentVehicle?.vin, currentFetchedAt)` at line 2551 waits 25 s then `vm.reportError(...)`, cancellable when fresh data lands), the one-time post-onboarding settings hint (line 2564), a settle haptic on refresh completion (line 2574), pull-to-refresh overlay state (`pullFractionState`, `dotsAlpha`, `refreshShift`), layout selection (`large`, `compact`, `perPage`, `canExpand`, `singleLarge`, `expandedIdx`), the cover-screen hint, and the expanded/collapsed `HorizontalPager`s with infinite-wrap virtual paging. Full detail in a later part.
+- **`private fun GarageScreen(state: UiState, vm: AppViewModel)`** — line 2542+ (extends beyond this doc's scope). Top-level garage dispatcher. In scope here (line 2543–2748): returns early if no vehicles; sets up stale-data warning (`LaunchedEffect(currentVehicle?.vin, currentFetchedAt)` at line 2551 waits 25 s then `vm.reportError(...)`, cancellable when fresh data lands), the one-time post-onboarding settings hint (line 2564), a settle haptic on refresh completion (line 2574), pull-to-refresh overlay state (`pullFractionState`, `dotsAlpha`, `refreshShift`), layout selection (`large`, `compact`, `perPage`, `canExpand`, `expandedIdx`), the cover-screen hint, and the expanded/collapsed `HorizontalPager`s with infinite-wrap virtual paging. Full detail in a later part.
 
 ---
 

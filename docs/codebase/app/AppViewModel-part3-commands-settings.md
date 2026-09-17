@@ -130,9 +130,11 @@ the async persist completes.
   `repoFor(v).setChargeTargets(electric(v), acPercent, dcPercent)`.
 
 ### Settings / navigation
-- **`fun openSettings()`** (1963) — `screen = Screen.Settings`.
+- **`fun openSettings()`** (1963) — `screen = Screen.Settings`. Only the no-vehicles screen calls it: everywhere with a car pager, Settings is the page right after the last car.
 - **`fun closeSettings()`** (1964–1973) — back to `Garage` (or `Empty` if no
-  vehicles), clears `expandedIndex` and `showSettingsCoach`.
+  vehicles) and clears `expandedIndex`. Only the standalone `Screen.Settings`
+  route (reached from the no-vehicles screen) needs it; everywhere else
+  Settings is a page in a car pager and is swiped away, not closed.
 
 ### Appearance / preference setters (DataStore-only unless noted)
 - **`fun setThemeMode(mode: ThemeMode)`** (1989–1992) — persist + best-effort

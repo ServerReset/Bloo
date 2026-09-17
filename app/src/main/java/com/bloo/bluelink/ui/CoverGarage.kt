@@ -9,8 +9,10 @@ package com.bloo.bluelink.ui
 
 /**
  * Cover.kt's flip-cover garage cluster, peeled out of Cover.kt (which kept the
- * tile/tile-face chrome): the settings gate CoverSettingsGate and the two-page
- * car pager CompactGarage with its per-car CompactCar page composable.
+ * tile/tile-face chrome): the settings gate CoverSettingsGate (the standalone
+ * Settings route's cover rendering, reachable only when there are no cars) and
+ * the car pager CompactGarage -- its per-car CompactCar page composable plus
+ * one embedded Settings page after the last car.
  */
 
 import androidx.compose.animation.core.Animatable
@@ -151,14 +153,19 @@ internal fun CoverSettingsGate(vm: AppViewModel) {
 }
 
 /**
- * Cover-screen layout: swipe left/right for cars, up/down for section tiles.
+ * Cover-screen layout: swipe left/right for cars (and one page further, for
+ * Settings), up/down for section tiles.
  *
  * Owns one [HorizontalPager] (`pager`) for switching between cars, using the
  * same "virtual page count = real count * 1000, start in the middle, map
  * back with modulo" trick as the other car pagers in this file to fake
  * infinite wrap-around. Each car's page then hosts its own vertical tile
  * pager/scrubber further down (not shown in this snippet) for swiping
- * between that car's pebbles; `scrubbing` is shared mutable state that, when
+ * between that car's pebbles. The page right after the last car is not a car
+ * at all but an embedded [SettingsScreen] -- the cover has no gear button and
+ * no modal Settings route, exactly like the phone garage.
+ *
+ * `scrubbing` is shared mutable state that, when
  * true, disables `userScrollEnabled` on this horizontal pager so a
  * long-press-drag scrub of the vertical tile indicator can't accidentally
  * also trigger a car-switch swipe underneath it.
@@ -187,12 +194,34 @@ internal fun CompactGarage(state: UiState, vm: AppViewModel, appearance: Setting
     // tile pager, which already looped.
     // Same as GarageScreen: the index is its own flow, collected here.
     val currentIndex by vm.currentIndex.collectAsStateWithLifecycle()
-    val wrap = rememberWrapPager(count, currentIndex.coerceIn(0, count - 1))
+    // count + 1, not count: Settings is a page in this pager, exactly as it is
+    // in the phone garage's own pager -- the page right after the last car,
+    // index `count`. There is no gear button on the cover and no modal route to
+    // it from here; swiping past your last car IS how you reach Settings, the
+    // same gesture that already switches cars.
+    val total = count + 1
+    val wrap = rememberWrapPager(total, currentIndex.coerceIn(0, count - 1))
     val pager = wrap.pager
+    /** Real item index for a virtual page: a vehicle index, or [count] for the
+     *  folded-in Settings page. */
     fun realCar(virtualPage: Int) = wrap.real(virtualPage)
-    LaunchedEffect(pager) {
-        snapshotFlow { pager.settledPage }.collect { vm.selectIndex(realCar(it)) }
+    LaunchedEffect(pager, count) {
+        snapshotFlow { pager.settledPage }.collect { page ->
+            val real = realCar(page)
+            // Guarded: settling on the Settings page is not a car selection, so
+            // currentIndex keeps whatever car it had and swiping back lands
+            // where you left off instead of snapping to car 0.
+            if (real < count) vm.selectIndex(real)
+            // See UiState.onSettingsPageSlot's own doc -- the same signal
+            // GarageScreen's pager publishes, so SearchLayer's bubble/pill morph
+            // tracks the cover's embedded Settings page too.
+            vm.setOnSettingsPageSlot(real == count)
+        }
     }
+    // Mirrors GarageScreen's own reset: nothing else clears this once this pager
+    // leaves composition (unfolding, navigating away), so a stale `true` could
+    // otherwise outlive the page it described.
+    DisposableEffect(Unit) { onDispose { vm.setOnSettingsPageSlot(false) } }
     // Mirror of the default garage pager's own fix: react to currentIndex
     // changing out from under an already-composed pager (e.g. a widget tap
     // selecting a specific car while the cover screen was already showing a
@@ -239,7 +268,19 @@ internal fun CompactGarage(state: UiState, vm: AppViewModel, appearance: Setting
             userScrollEnabled = !scrubbing.value,
             beyondViewportPageCount = 1,
         ) { page ->
-            val v = vehicles[realCar(page)]
+            val real = realCar(page)
+            if (real == count) {
+                // The folded-in Settings page. compact = true: this IS the cover
+                // screen, so SettingsScreen renders its tighter cover density.
+                // embedded = true: it's a page in this pager, not a route -- see
+                // SettingsScreen's own `embedded` doc for the back contract that
+                // comes with it.
+                Box(Modifier.fillMaxSize().pagerDepth(pager, page)) {
+                    SettingsScreen(vm, embedded = true, compact = true)
+                }
+                return@HorizontalPager
+            }
+            val v = vehicles[real]
             // No blur -- see the other two car pagers' history for why: a plain
             // Modifier.blur(x.dp) reconstructs and re-lays-out its own modifier
             // node on every drag frame (the jitter this exact pattern caused

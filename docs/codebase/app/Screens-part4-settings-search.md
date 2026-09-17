@@ -155,9 +155,15 @@ collected from the VM; `canBio = vm.canUseBiometrics()` (remembered);
 `settingsScroll`/`settingsScope`; `pickTarget`/`cropUri` for photos; `query`,
 `searchFocused`, `submittedQuery` for search.
 
-- **`BackHandler` (8341–8348)** is layered: if `searchFocused || query.isNotEmpty()`,
-  back **collapses/clears search** (`searchFocused=false; query=""`); otherwise
-  `vm.closeSettings()` returns to the garage.
+- **`BackHandler` (8341–8348)** depends on the single `embedded` axis. When
+  `embedded = false` (the standalone `Screen.Settings` route, reached only from
+  the no-vehicles screen) a single back press calls `vm.closeSettings()`. When
+  `embedded = true` (Settings as the page after the last car in the garage's or
+  the cover's pager) there is no page left of it for back to land on, so back is
+  a double-press-to-exit: the first press arms a two-second window and toasts
+  "Press back one more time to close", the second finishes the Activity. The
+  back-arrow `FloatingIcon` and the screen's own `StatusBarScrim` are likewise
+  `!embedded`-only.
 - **`LaunchedEffect(query.isBlank())` (8356)**: whenever the box becomes blank, it
   drops any stale AI reply (`vm.clearAiReply()`) and resets `submittedQuery=""`.
 - Structure inside `BackdropHost` (8357): a width-capped (`widthIn(max=640.dp)`)
@@ -180,9 +186,7 @@ collected from the VM; `canBio = vm.canUseBiometrics()` (remembered);
   4. The top chrome `Row` (9291): back `FloatingIcon`, "Settings" title pill
      (tap → `settingsScroll.animateScrollTo(0)`), and the Simple/Advanced
      `MorphSegmented` (`vm.setSettingsMode`).
-  5. First-run coach mark (9348, `state.showSettingsCoach`, dismiss →
-     `vm.dismissSettingsCoach()`).
-  6. Crop dialog (9381): when `cropUri != null && pickTarget != null`, shows
+  5. Crop dialog (9381): when `cropUri != null && pickTarget != null`, shows
      `CropScreen`; on save → `vm.setVehicleImage(target, path)`.
 
 ### 3.2 `SettingsSearchResults` flow (9963–10196)
@@ -348,7 +352,7 @@ External types referenced (not defined here): `Vehicle`, `UiState`,
 
 **Reads from `UiState` (via `state`):** `accounts`, `aiSupported`, `aiEnabled`,
 `aiAuto`, `aiBusy`, `aiSearchReply`, `vehicles`, `settingsMode`, `syncUri`,
-`syncError`, `lastSyncMs`, `syncWifiOnly`, `showSettingsCoach`, `seatConfigs`,
+`syncError`, `lastSyncMs`, `syncWifiOnly`, `seatConfigs`,
 `imageUrls`, `climatePresets`, `defaultClimatePresets`, `licensePlates`,
 `lastServiceMiles`, `serviceIntervalMiles`, `tileConfigs`, `tileLabels`,
 `tileClimateTargets`, `tileBackground`, `tileLiveRefresh`, `locations`,
@@ -375,7 +379,7 @@ setters/`setDynamicColor`/`setColorPalette`/`setActiveCustomPaletteId`/`saveCust
 `setWeatherPlace`/`useDeviceLocationForWeather`/`clearWeatherLocation`,
 `setPowertrain`, `setSeatFlag`, `setDefaultClimatePreset`, `setLicensePlate`,
 `setLastServiceMiles`/`setServiceIntervalMiles`, `setSectionHidden`,
-`dismissSettingsCoach`, `canUseBiometrics`.
+`canUseBiometrics`.
 
 **Command/AI flow OUT:**
 - **Commands** bypass the VM for dispatch and go **directly** to

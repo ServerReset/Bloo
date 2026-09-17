@@ -215,19 +215,11 @@ data class UiState(
     /** In-flight AI work: VINs being summarized, plus "search" for the query box. */
     val aiBusy: Set<String> = emptySet(),
     val aiSearchReply: String? = null,
-    /** First-run coach mark on the Settings screen (points at the back arrow). */
-    val showSettingsCoach: Boolean = false,
-    /** One-shot: set by [AppViewModel.closeSettings] when Settings itself just
-     *  switched INTO page mode and asked to be followed there, so flipping
-     *  Appearance.settingsAsPage from inside Settings reads as one continuous
-     *  move (still looking at Settings, just presented differently) instead of
-     *  "close Settings, land on whichever car was last selected, then go find
-     *  the page yourself." Consumed once by GarageScreen's collapsed pager
-     *  (see its own LaunchedEffect) via [AppViewModel.consumeLandOnSettingsPage]. */
-    val landOnSettingsPage: Boolean = false,
-    /** Whether the garage's collapsed pager is currently settled on its
-     *  Settings slot (Appearance.settingsAsPage) -- kept in sync by
-     *  GarageScreen's own pager-settle effect. AppRoot ORs this into the same
+    /** Whether the garage's collapsed pager (or the compact cover screen's own
+     *  pager) is currently settled on its Settings slot -- Settings is always
+     *  the page right after the last car, so this is simply "the pager is on
+     *  that page". Kept in sync by those pagers' own settle effects. AppRoot
+     *  ORs this into the same
      *  "are we looking at Settings" signal `screen == Screen.Settings` already
      *  drives, so SearchLayer's floating bubble/pill morph reflects reality
      *  while the embedded page is showing too, not just the standalone route.

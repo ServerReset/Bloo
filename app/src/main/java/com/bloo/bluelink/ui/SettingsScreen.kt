@@ -18,10 +18,6 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.shrinkVertically
-import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -156,7 +152,6 @@ import com.bloo.bluelink.data.brand
 import com.bloo.bluelink.data.LiveCharge
 import com.bloo.bluelink.data.LockTiming
 import com.bloo.bluelink.data.SettingsStore
-import com.bloo.uicommon.dropShadow
 import com.bloo.bluelink.data.Weather
 import com.bloo.bluelink.data.links
 import kotlinx.coroutines.delay
@@ -226,13 +221,22 @@ import com.bloo.uicommon.ReorderColumn
 
 
 /**
- * [embedded] is true when this is rendered as GarageScreen's own extra pager page
- * (Appearance.settingsAsPage) rather than the separate `Screen.Settings` route --
- * swiping to a car IS "back" in that mode, so the screen-navigation chrome that only
- * makes sense standalone (the BackHandler that closes a route which was never opened,
- * the floating "back to the app" arrow) is skipped. Nothing else about this composable
- * changes: same cards, same search integration, same everything -- it's genuinely the
- * same screen, just reached a different way.
+ * Two modes, keyed only on [embedded]:
+ *
+ *  - [embedded] = true -- this is a page inside a car pager (GarageScreen's collapsed
+ *    block/window pager, or CompactGarage's cover pager), always the one right after
+ *    the last car. Swiping to a car IS "back", so the screen-navigation chrome that
+ *    only makes sense standalone (the floating "back to the app" arrow, its status-bar
+ *    scrim) is skipped, and system-back -- which has no page left of it to land on --
+ *    takes the double-press-to-exit contract below rather than slamming the app shut
+ *    on the first press.
+ *  - [embedded] = false -- the standalone `Screen.Settings` route. Only the no-vehicles
+ *    screen reaches it (there is no car pager there to fold a page into), and a single
+ *    back press closes it as plain navigation.
+ *
+ * Nothing else about this composable changes between the two: same cards, same search
+ * integration, same everything -- it's genuinely the same screen, just reached a
+ * different way.
  */
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
@@ -294,15 +298,12 @@ internal fun SettingsScreen(
   // behaviour underneath (GarageScreen's own handling, or the app backgrounding)
   // is what should run instead.
   if (!embedded) BackHandler { vm.closeSettings() }
-  if (embedded && appearance.settingsAsPage) {
+  if (embedded) {
       // The Settings pager page is the LAST page -- there is no car page
       // left of it for system-back to land on, so a single back press would
       // slam the whole app shut. Double-back instead: the first press arms
       // a two-second window and says so, the second press inside it really
-      // closes. Kept to the pager page only when settingsAsPage is true
-      // (Settings integrated into the car layout as a swipeable page).
-      // When embedded but settingsAsPage is false (Settings is a modal),
-      // back just closes Settings and returns to the cars (handled below).
+      // closes.
       var backArmed by remember { mutableStateOf(false) }
       LaunchedEffect(backArmed) {
           if (backArmed) {
@@ -324,11 +325,6 @@ internal fun SettingsScreen(
               ).show()
           }
       }
-  }
-  if (embedded && !appearance.settingsAsPage) {
-      // Settings is a modal/separate screen, not part of the swipeable page flow.
-      // Back just closes Settings and returns to the cars, no double-back prompt.
-      BackHandler { vm.closeSettings() }
   }
   // hazeState is now a parameter (see this function's own doc) -- backs the
   // StatusBarScrim call far below with a REAL backdrop blur of the settings grid,
@@ -1097,37 +1093,6 @@ internal fun SettingsScreen(
                         "Ask about the car (\"battery level\"), run a command (\"lock my car\"), " +
                         "or jump to a setting. Settings always has it.",
                 ) { vm.setShowSearch(it) }
-                // SIMPLE, not advanced -- same test as Search above: this changes
-                // how you get to Settings every single time, not a knob set once.
-                //
-                // Flipping this while actually standing in Settings used to leave
-                // you exactly where you were until the NEXT time you left and came
-                // back -- turn it on from the standalone route and nothing visibly
-                // happened; turn it off from the embedded page and the pager's own
-                // correction (see Screens.kt) stranded you on whichever car the
-                // block math now resolved to. Both branches below follow Settings
-                // to its new presentation immediately instead, so the switch reads
-                // as "Settings just changed shape" rather than "go find it again":
-                // turning on from the standalone route closes it landing straight
-                // on the pager's new Settings slot (closeSettings' own
-                // landOnSettingsPage, consumed once by GarageScreen); turning off
-                // from the embedded page opens the standalone route in its place,
-                // back arrow included, before the pager gets a chance to bounce
-                // you to a car instead.
-                ToggleRow(
-                    "Settings as a swipeable page",
-                    appearance.settingsAsPage,
-                    description = "Reach Settings by swiping past your last car instead of the gear " +
-                        "button -- one continuous pager, with Settings as its own page at " +
-                        "the end instead of a separate screen.",
-                ) { turningOn ->
-                    vm.setSettingsAsPage(turningOn)
-                    if (turningOn && !embedded) {
-                        vm.closeSettings(landOnSettingsPage = true)
-                    } else if (!turningOn && embedded) {
-                        vm.openSettings()
-                    }
-                }
                 // Unit system: controls temperature, distance, and speed display.
                 SettingsSegmentedRow(
                     label = "Units",
@@ -2317,42 +2282,6 @@ internal fun SettingsScreen(
             onSettingsModeChange = { vm.setSettingsMode(it) },
             hazeState = hazeState,
         )
-        // First-run coach mark pointing at the back arrow.
-        if (state.showSettingsCoach) {
-            val coachAlpha = remember { Animatable(0f) }
-            val coachOffset = remember { Animatable(-20f) }
-            LaunchedEffect(Unit) {
-                launch { coachAlpha.animateTo(1f, tween(500, easing = FastOutSlowInEasing)) }
-                launch { coachOffset.animateTo(0f, spring(dampingRatio = 0.7f, stiffness = Spring.StiffnessMediumLow)) }
-            }
-            Surface(
-                onClick = { vm.dismissSettingsCoach() },
-                shape = RoundedCornerShape(16.dp),
-                color = MaterialTheme.colorScheme.primaryContainer,
-                contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                modifier = Modifier
-                    .align(Alignment.TopStart)
-                    .statusBarsPadding()
-                    .padding(start = 12.dp, top = 60.dp, end = 12.dp)
-                    .graphicsLayer {
-                        alpha = coachAlpha.value
-                        // .dp.toPx() -- see EmptyScreen's own note; the raw -20f
-                        // was 20 PIXELS, not 20dp.
-                        translationY = coachOffset.value.dp.toPx()
-                    }
-                    .dropShadow(RoundedCornerShape(16.dp)),
-            ) {
-                Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Filled.ArrowBack, contentDescription = null, modifier = Modifier.size(18.dp))
-                    Spacer(Modifier.width(8.dp))
-                    Text(
-                        "That arrow takes you into the app when you're done here. Tap to dismiss.",
-                        style = MaterialTheme.typography.bodyMedium,
-                        modifier = Modifier.weight(1f),
-                    )
-                }
-            }
-        }
         cropUri?.let { uri ->
             val target = pickTarget
             if (target != null) {

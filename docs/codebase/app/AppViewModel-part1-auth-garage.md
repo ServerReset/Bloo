@@ -223,7 +223,6 @@ Launches independent, long-lived `viewModelScope` coroutines. Ordering doesn't m
 | `aiSummaries` | `Map<String,String>` | `{}` | produced summaries by VIN |
 | `aiBusy` | `Set<String>` | `{}` | VINs being summarized, plus `"search"` for the query box |
 | `aiSearchReply` | `String?` | `null` | free-form AI answer card |
-| `showSettingsCoach` | `Boolean` | `false` | coach mark on Settings (points at back arrow) |
 | `showSettingsHint` | `Boolean` | `false` | post-onboarding "check out Settings" nudge |
 | `accounts` | `List<Credentials>` | `[]` | all signed-in accounts (one per brand) |
 | `addingAccount` | `Boolean` | `false` | login form shown over a loaded garage |

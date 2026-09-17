@@ -2191,9 +2191,6 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
      *  (in-memory only -- it's a one-time nudge, not worth persisting). */
     fun dismissSettingsHint() = _state.update { it.copy(showSettingsHint = false) }
 
-    /** Dismiss the coach mark pointing at Settings' back arrow. */
-    fun dismissSettingsCoach() = _state.update { it.copy(showSettingsCoach = false) }
-
     fun setPowertrain(v: Vehicle, value: Powertrain) {
         _state.update { it.copy(powertrains = it.powertrains + (v.vin to value)) }
         // Republish immediately: the watch's Charge/Fuel tile derives hasBattery
@@ -3245,30 +3242,20 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     /** Navigate to the Settings screen (the car carousel keeps its state
      *  behind it, restored as-is by [closeSettings]). */
     fun openSettings() = _state.update { it.copy(screen = Screen.Settings) }
-    /** [landOnSettingsPage] threads through to [UiState.landOnSettingsPage] --
-     *  see its own doc. Only ever passed true from SettingsScreen's own
-     *  settingsAsPage toggle, right after switching it on while standing on
-     *  the standalone route; every other caller (the back arrow, the
-     *  BackHandler) leaves it at the default false, an ordinary return to
-     *  whichever car was showing before. */
-    fun closeSettings(landOnSettingsPage: Boolean = false) {
+    /** Leaves the standalone Settings route (the only way in is the
+     *  no-vehicles screen now -- everywhere else Settings is a page in the
+     *  garage's own pager, swiped away rather than closed). */
+    fun closeSettings() {
         // Always return to the card/grid view (collapse any expanded car).
         _state.update {
             it.copy(
                 screen = if (it.vehicles.isEmpty()) Screen.Empty else Screen.Garage,
                 expandedIndex = null,
-                showSettingsCoach = false,
-                landOnSettingsPage = landOnSettingsPage,
             )
         }
     }
-    /** Clears the one-shot [UiState.landOnSettingsPage] flag once GarageScreen's
-     *  collapsed pager has used it to seed its initial page -- guarded so a
-     *  redundant call (it was already false) doesn't emit a no-op UiState update. */
-    fun consumeLandOnSettingsPage() {
-        if (_state.value.landOnSettingsPage) _state.update { it.copy(landOnSettingsPage = false) }
-    }
-    /** Kept in sync by GarageScreen's own pager-settle effect -- see
+    /** Kept in sync by the garage pager's and the compact cover pager's own
+     *  settle effects -- see
      *  [UiState.onSettingsPageSlot]'s own doc. Guarded the same way, so
      *  settling on the same kind of page repeatedly (two cars in a row, or
      *  two settles on the Settings slot) doesn't emit a redundant UiState
@@ -3512,10 +3499,6 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     // that fixed color (or null to fall back to theme-derived).
     fun setPebbleOutline(value: Boolean) = viewModelScope.launch { settingsStore.setPebbleOutline(value) }
     fun setShowSearch(value: Boolean) = viewModelScope.launch { settingsStore.setShowSearch(value) }
-
-    /** Whether Settings is reached by swiping past the last car in the garage's own
-     *  pager instead of the floating gear button. See Appearance.settingsAsPage. */
-    fun setSettingsAsPage(value: Boolean) = viewModelScope.launch { settingsStore.setSettingsAsPage(value) }
 
     /** Where the cover screen's floating search bubble was last dragged to (fractions
      *  of its own drag range), or null if never dragged. See SettingsStore's own doc. */

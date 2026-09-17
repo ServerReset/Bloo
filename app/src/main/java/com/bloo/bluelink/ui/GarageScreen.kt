@@ -35,7 +35,6 @@ import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Build
-import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.ui.semantics.onClick
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -257,36 +256,18 @@ internal fun GarageScreen(
     val expandedMap = remember { ExpandedMapState() }
     // How many full-height cards fit side by side; pages advance by this many.
     val perPage = (widthDp / MIN_CARD_DP).coerceIn(1, count)
-    // Hoisted above the block-pager setup below (which also reads this) so
-    // singleLarge, just below, can gate on it too. See the "|| landOnSettingsPage"
-    // half's own doc further down, where the rest of this value's usage lives.
-    val settingsAsPage = appearance.settingsAsPage || state.value.landOnSettingsPage
     // Expanding to the dual-column view only makes sense on a wide screen.
     val canExpand = large && count > 1
-    // The lone car on a big screen skips the grid/pager entirely and goes
-    // straight to the full-screen dual-column view -- with only one car, the
-    // block-pager below would just be a single page with one car in it, so
-    // this is a shortcut to the same visual result, not a different feature.
-    // Gated on !settingsAsPage: when the user has opted into reaching Settings
-    // by swiping (Appearance.settingsAsPage), that swipe target is a second
-    // page on the BLOCK PAGER below, not on this expanded view's own pager
-    // (exWrap, a plain wrap over `count` cars with no Settings slot of its
-    // own and finger-swipe disabled entirely -- see its own doc). Without this
-    // guard, singleLarge unconditionally won the isExpanded fork below and
-    // silently made Settings unreachable by swipe for exactly this one
-    // combination (a single car on a wide screen) while working everywhere else.
-    val singleLarge = large && count == 1 && !settingsAsPage
-    // A car expanded by the user (multi-car), or the lone car on a big screen.
-    val expandedByUser = state.value.expandedIndex?.takeIf { it in vehicles.indices && canExpand }
-    val expandedIdx = if (singleLarge) 0 else expandedByUser
+    // Expanded means exactly one thing now: the user tapped the fullscreen icon
+    // on a car. There is deliberately no automatic "a lone car on a wide screen
+    // fills the screen by itself" case -- that shortcut bypassed the block pager
+    // below, and with Settings folded into that pager as its own page it would
+    // have made Settings unreachable by swipe for exactly that one combination
+    // (a single car on a wide screen). A lone car renders through the same
+    // block/window pager as any other count instead.
+    val expandedIdx = state.value.expandedIndex?.takeIf { it in vehicles.indices && canExpand }
 
-    // Deliberately excludes singleLarge: collapsing a lone car has nowhere
-    // to collapse TO (there is no grid behind it, just this same one car),
-    // so system back falls through to whatever the default is outside this
-    // screen instead of this screen intercepting it to do nothing useful.
-    // The "Back to all cars" button below is gated the same way for the
-    // same reason.
-    BackHandler(enabled = expandedByUser != null) { vm.collapse() }
+    BackHandler(enabled = expandedIdx != null) { vm.collapse() }
 
     CompositionLocalProvider(LocalPullFraction provides pullFractionState, LocalExpandedMap provides expandedMap) {
     BackdropHost {
@@ -390,12 +371,9 @@ internal fun GarageScreen(
                     // Pager dots removed: user requested no page indicators at the top of the screen
                 }
             } else {
-                // settingsAsPage is hoisted above (see its own doc up there for why
-                // it's the OR and not appearance.settingsAsPage alone).
-                //
-                // Settings, when settingsAsPage is on, is appended as one more ITEM
-                // to the sequence this pager cycles through (index `count`, right
-                // after the last real car) rather than getting its own dedicated
+                // Settings is appended as one more ITEM to the sequence this pager
+                // cycles through (index `count`, right after the last real car)
+                // rather than getting its own dedicated
                 // perPage-wide block. On a wide/multi-car screen (perPage > 1) that
                 // means Settings lands in the same block as whatever real cars are
                 // left over in the final partial block -- e.g. 3 cars at perPage 2
@@ -408,7 +386,7 @@ internal fun GarageScreen(
                 // The two `currentIndex`-derived targetBlock calcs further down
                 // divide by perPage directly and never needed a car-only block
                 // count of their own -- they only mean "which car," never Settings.
-                val total = if (settingsAsPage) count + 1 else count
+                val total = count + 1
                 // A SLIDING WINDOW, not a block grid: on a wide/multi-car screen
                 // (perPage > 1) each "page" still shows `perPage` items side by
                 // side, but consecutive pages overlap -- window N covers indices
@@ -430,76 +408,36 @@ internal fun GarageScreen(
                 // the end still lands on a window that contains it (as its last
                 // visible item) rather than overflowing past totalWindows-1.
                 fun windowFor(index: Int) = index.coerceIn(0, count - 1).coerceAtMost(totalWindows - 1)
-                // Normally the car currentIndex was already parked on. The one
-                // exception is state.value.landOnSettingsPage (see its own doc): Settings
-                // itself just switched settingsAsPage on and asked to be followed,
-                // so this fresh mount seeds straight onto the LAST window -- by
-                // construction (totalWindows-1 = total-perPage) that window's
-                // final index is always `total-1`, which is exactly the just-
-                // created Settings slot -- instead of whichever car was selected
-                // before Settings was ever opened -- otherwise the user would land
-                // on a car for one frame before having to go find the page
-                // themselves.
-                val initialBlock = if (state.value.landOnSettingsPage && settingsAsPage) {
-                    totalWindows - 1
-                } else {
-                    windowFor(currentIndex)
-                }
+                // Always the car currentIndex was already parked on: this pager
+                // opens on a car, never on the Settings page at the end of it.
+                val initialBlock = windowFor(currentIndex)
                 // Infinite wrap-around: WrapPagerState.realCount is the WINDOW
-                // count here (totalWindows, Settings item folded into `total`
-                // when present), and the real starting vehicle index for a page
+                // count here (totalWindows, with the Settings item folded into
+                // `total`), and the real starting vehicle index for a page
                 // is realBlock(page) itself (a window's own start, not
                 // window * perPage -- windows overlap by construction).
                 val wrap = rememberWrapPager(totalWindows, initialBlock)
                 val pager = wrap.pager
                 fun realBlock(virtualPage: Int) = wrap.real(virtualPage)
-                // Authoritative, not just a fire-and-hope seed: initialBlock above
-                // already gets this right on the fast path (a genuinely fresh mount,
-                // which returning from Screen.Settings normally is), but that value
-                // is only ever honoured the very FIRST time rememberWrapPager builds
-                // its underlying pager for this composable instance -- if anything
-                // about Compose's own state retention across the AnimatedContent
-                // screen transition ever meant this pager wasn't quite as fresh as
-                // assumed, a seed-only fix would silently do nothing and Settings
-                // would look like it was never actually followed. This actively
-                // MOVES the pager there instead of hoping the seed took, which costs
-                // nothing extra in the common case (wrap.snapToReal no-ops when
-                // already there) and is the actual fix in the uncommon one.
-                LaunchedEffect(state.value.landOnSettingsPage) {
-                    if (state.value.landOnSettingsPage) {
-                        // The last window always ends on index `total-1` -- the
-                        // just-created Settings slot -- same reasoning as
-                        // initialBlock's own doc above.
-                        if (settingsAsPage) wrap.snapToReal(totalWindows - 1)
-                        vm.consumeLandOnSettingsPage()
-                    }
-                }
                 // Keyed on totalWindows too, not just pager/perPage: this effect's
-                // own collect{} closes over realBlock/total/settingsAsPage as
-                // they were the moment it (re)started. Toggling Appearance.
-                // settingsAsPage from a search result while GarageScreen stays
-                // mounted the whole time (see that toggle's own comment -- it
-                // deliberately doesn't require a fresh mount) changes totalWindows
-                // without touching pager's identity or perPage, so without this
-                // key the running coroutine kept using a stale, pre-toggle
-                // settingsAsPage (permanently false, so onSettingsPageSlot could
-                // never become true and the search bubble never morphed to a
-                // pill) AND a stale total/realBlock pairing that no longer
-                // matched the pager's own (live) virtual page count -- a
-                // mismatched modulus that could resolve `block` to an unrelated
-                // number and fire selectIndex with a bogus index. Restarting here
-                // rebinds the closure to the current values the instant the slot
-                // count changes.
+                // own collect{} closes over realBlock/total as they were the
+                // moment it (re)started. Adding or removing a car changes
+                // totalWindows without touching pager's identity or perPage, so
+                // without this key the running coroutine kept a stale
+                // total/realBlock pairing that no longer matched the pager's own
+                // (live) virtual page count -- a mismatched modulus that could
+                // resolve `block` to an unrelated number and fire selectIndex
+                // with a bogus index. Restarting here rebinds the closure to the
+                // current values the instant the window count changes.
                 LaunchedEffect(pager, perPage, totalWindows) {
                     snapshotFlow { pager.settledPage }.collect { page ->
                         // A window's own start IS the real index -- windows
                         // overlap by construction, so there is no `* perPage`
                         // multiply here the way there was for blocks.
                         val start = realBlock(page)
-                        // Guarded: a window past the last real car (only possible
-                        // when settingsAsPage folded Settings in as the final
-                        // item and this window is Settings-only, i.e. count ==
-                        // totalWindows-1 exactly) isn't a car window at all, and
+                        // Guarded: a window past the last real car (a Settings-only
+                        // window, i.e. count == totalWindows-1 exactly) isn't a car
+                        // window at all, and
                         // selectIndex/currentIndex only ever mean "which car" --
                         // settling there should leave whatever car was last
                         // selected exactly as it was, so swiping back to a car
@@ -515,7 +453,7 @@ internal fun GarageScreen(
                         // "bubble" the whole time it's on screen. True whenever
                         // Settings' folded-in slot (index `count`) falls within
                         // this settled block, mixed with cars or not.
-                        vm.setOnSettingsPageSlot(settingsAsPage && minOf(start + perPage, total) == total)
+                        vm.setOnSettingsPageSlot(minOf(start + perPage, total) == total)
                     }
                 }
                 // Resets the flag above the moment this pager itself leaves
@@ -543,13 +481,11 @@ internal fun GarageScreen(
                 // set it). LaunchedEffect always runs its body once on first
                 // composition regardless of whether its key "changed" from
                 // anything, and initialBlock above has ALREADY seeded the correct
-                // starting page for every case, landOnSettingsPage included -- so
-                // an unguarded first firing here did not correct drift, it
-                // OVERWROTE that seed, unconditionally snapping back to
-                // currentIndex's own block the instant the pager mounted. That
-                // silently defeated landOnSettingsPage every time (Settings looked
-                // like it never actually got followed) and, worse, chained into
-                // the settle-observer above calling selectIndex for that block --
+                // starting page -- so an unguarded first firing here did not
+                // correct drift, it OVERWROTE that seed, unconditionally snapping
+                // back to currentIndex's own block the instant the pager mounted.
+                // That chained into the settle-observer above calling selectIndex
+                // for that block --
                 // which on a multi-car-per-page grid is not always literally
                 // currentIndex when the two don't share a block boundary, so the
                 // "correction" could self-report as a genuine, uninitiated car
@@ -562,59 +498,36 @@ internal fun GarageScreen(
                     // updating live even while AnimatedContent slides its ALREADY-
                     // STALE content off screen, so without this guard a snap here
                     // still visibly moves the pager underneath its own exit
-                    // animation -- see the totalWindows effect below for the exact
-                    // trigger (settingsAsPage flipping mid-exit) and why it read as
-                    // jank rather than a clean transition.
+                    // animation -- see the totalWindows effect below, which skips
+                    // itself on the way out for the same reason.
                     if (state.value.screen != Screen.Garage) return@LaunchedEffect
                     wrap.snapToReal(windowFor(currentIndex))
                 }
-                // Toggling Appearance.settingsAsPage changes totalWindows -- and
+                // A car being added or removed changes totalWindows -- and
                 // therefore `wrap`'s realCount, the modulo divisor real() uses --
                 // out from under the pager's raw (unmoved) virtual position. That
                 // divisor changing while the position doesn't is exactly what a
-                // "seam" is: real(pager.currentPage) resolves to a DIFFERENT block
-                // than the one on screen a moment ago, so flipping the switch
-                // could silently reshuffle which car you land on, or -- toggling
-                // off while parked on the Settings slot itself, which no longer
-                // exists under the new count -- strand the pager on an arbitrary
-                // block instead of the last real car you were actually on. Same
-                // fix as the currentIndex effect above and for the same reason:
-                // snap (not fly-through) back to the block currentIndex actually
-                // means, which is exactly "stay on the same car" when a car was
-                // showing, and "return to the last car you had" when Settings was.
+                // "seam" is: real(pager.currentPage) resolves to a DIFFERENT window
+                // than the one on screen a moment ago, so the count changing could
+                // silently reshuffle which car you land on, or strand the pager on
+                // an arbitrary window instead of the last real car you were
+                // actually on. Same fix as the currentIndex effect above and for
+                // the same reason: snap (not fly-through) back to the window
+                // currentIndex actually means, which is exactly "stay on the same
+                // car" when a car was showing, and "return to the last car you
+                // had" when Settings was.
                 // Skips its own first firing too -- see the currentIndex effect's
                 // comment just above for why. Also skips once this screen is on
-                // its way out (same reason, same fix): toggling the switch OFF
-                // from the embedded page calls vm.openSettings() immediately, which
-                // starts the OUTER Garage -> Settings slide the instant it runs --
-                // but appearance.settingsAsPage's own DataStore write can still
-                // land a beat or two INTO that slide, while this now-exiting
-                // composition is still live and still reacting to real state
-                // changes. totalWindows changing at that exact moment used to fire
-                // this effect and snap the pager to a different page while its
-                // (already stale, already animating off screen) content was
-                // visibly sliding away -- the reported "janky" transition.
+                // its way out (same reason, same fix): this composition stays live
+                // and keeps reacting to real state changes while AnimatedContent
+                // slides its already-stale content off screen, and totalWindows
+                // changing at that exact moment used to fire this effect and snap
+                // the pager to a different page mid-slide -- the reported "janky"
+                // transition.
                 val skipFirstBlocksSnap = remember { mutableStateOf(true) }
                 LaunchedEffect(totalWindows) {
                     if (skipFirstBlocksSnap.value) { skipFirstBlocksSnap.value = false; return@LaunchedEffect }
                     if (state.value.screen != Screen.Garage) return@LaunchedEffect
-                    // Toggling settingsAsPage ON from the standalone route
-                    // (SettingsScreen's own toggle) changes totalWindows AND
-                    // sets state.value.landOnSettingsPage in the very same
-                    // transition -- this effect exists to snap back to
-                    // currentIndex's own window when totalWindows changes for
-                    // its OWN reasons (see the doc above), but that's
-                    // exactly wrong here: it raced the landOnSettingsPage
-                    // effect above (both fire off the same totalWindows
-                    // change, in the same frame) and could snap to the
-                    // CURRENT CAR right after that effect had already landed
-                    // on the new Settings slot, silently undoing it --
-                    // reported as toggling the switch not actually taking
-                    // you to the embedded page. That effect's own
-                    // consumeLandOnSettingsPage() call clears this flag once
-                    // it's genuinely done, so deferring to it here is safe
-                    // even if this effect happens to run first.
-                    if (state.value.landOnSettingsPage) return@LaunchedEffect
                     wrap.snapToReal(windowFor(currentIndex))
                 }
                 Box(Modifier.fillMaxSize()) {
@@ -704,8 +617,8 @@ internal fun GarageScreen(
                         // A window's own start IS the real index (see totalWindows'
                         // own doc above) -- no `* perPage` multiply, windows overlap.
                         val start = realBlock(page)
-                        // `total`, not `count`: Settings, when settingsAsPage folded it
-                        // in above, is item index `count` -- one past the last real
+                        // `total`, not `count`: Settings, folded in above, is item
+                        // index `count` -- one past the last real
                         // car -- and needs to be included in this window's own range so
                         // it renders alongside whatever real cars share its window.
                         val end = minOf(start + perPage, total)
@@ -770,20 +683,16 @@ internal fun GarageScreen(
                                             VehicleDetailContent(
                                                 gv, state, vm,
                                                 onExpand = if (canExpand) ({ vm.expand(i) }) else null,
-                                                // Dynamic, not a flat "last car always leaves
-                                                // room": the persistent gear button this is
-                                                // dodging is itself hidden right here, in the
-                                                // collapsed grid, whenever settingsAsPage is on
-                                                // (see that button's own condition below --
-                                                // expandedIdx is always null in this branch, so
-                                                // its "|| expandedIdx != null" half never
-                                                // applies). Reserving the gap for a button
-                                                // that isn't there just left the last car's own
+                                                // Always false now: this only ever reserved
+                                                // room for the persistent floating gear button
+                                                // in the top-right corner, and that button is
+                                                // gone -- Settings is the page right after the
+                                                // last car in this very pager, reached by
+                                                // swiping. Reserving the gap for a button that
+                                                // isn't there just left the last car's own
                                                 // expand button sitting noticeably further from
-                                                // the true corner than every other car's, for
-                                                // no reason once nothing was actually competing
-                                                // with it.
-                                                reserveHeaderEnd = canExpand && i == end - 1 && !appearance.settingsAsPage,
+                                                // the true corner than every other car's.
+                                                reserveHeaderEnd = false,
                                                 // Pager dots removed: always false now
                                                 reserveTopForDots = false,
                                                 // Only hide the per-car pull indicator in the
@@ -854,10 +763,9 @@ internal fun GarageScreen(
                 }
             }
         }
-        // Back/flip ride the refresh shift with the page content during a pull-
-        // to-refresh; Settings stays put -- it's a persistent nav target, not
-        // page-local chrome, so it shouldn't wander while pulling to refresh.
-        if (expandedByUser != null) {
+        // Back/flip ride the refresh shift with the page content during a
+        // pull-to-refresh.
+        if (expandedIdx != null) {
             FloatingIcon(
                 icon = Icons.Filled.ArrowBack,
                 description = "Back to all cars",
@@ -874,29 +782,12 @@ internal fun GarageScreen(
                 icon = Icons.Filled.SwapHoriz,
                 description = "Flip columns",
                 onClick = { vm.setColumnsFlipped(!appearance.columnsFlipped) },
-                modifier = Modifier.align(Alignment.TopEnd).statusBarsPadding().padding(end = 52.dp)
-                    .floatingOverlay(FloatingIds.FlipIcon, fade = false),
-                hazeState = hazeState,
-            )
-        }
-        // Hidden when Settings is reached by swiping instead (Appearance.settingsAsPage)
-        // -- the pager's own extra page is the discovery mechanism in that mode, so a
-        // second, redundant entry point here would contradict the "either/or" the
-        // setting itself offers. BUT kept while a car is expanded (expandedIdx != null):
-        // that pager has finger-swipe disabled entirely (see its own comment above), so
-        // there is no swipe alternative there at all -- hiding this unconditionally
-        // would make Settings genuinely unreachable from the expanded view.
-        if (!appearance.settingsAsPage || expandedIdx != null) {
-            FloatingIcon(
-                icon = Icons.Filled.Settings,
-                description = "Settings",
-                onClick = { vm.openSettings() },
-                // shift = false: the cog is a persistent nav target anchored to the SCREEN, not
-                // page-local chrome, so it should not wander while the page is pulled. That was
-                // already the intent at this site; it is now stated rather than implied by the
-                // absence of a modifier.
+                // Corner-anchored: the Settings cog that used to sit here (and
+                // which this was offset by 52dp to clear) is gone -- Settings is
+                // a page in the collapsed pager now, reached by collapsing back
+                // to the grid and swiping, not from the expanded view.
                 modifier = Modifier.align(Alignment.TopEnd).statusBarsPadding()
-                    .floatingOverlay(FloatingIds.SettingsIcon, fade = false, shift = false),
+                    .floatingOverlay(FloatingIds.FlipIcon, fade = false),
                 hazeState = hazeState,
             )
         }

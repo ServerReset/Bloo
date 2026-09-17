@@ -55,7 +55,6 @@ Signatures below are the real declarations. "Optimistic" means `_state` is updat
 - **`fun finishOnboarding()`** (`AppViewModel.kt:1268`) — Mark onboarding seen + every current VIN configured (async), then set screen to `Garage` (or `Empty` if no vehicles) and clear `garageLoadError`.
 - **`fun finishCarSetup(vins: List<String>)`** (`AppViewModel.kt:1280`) — Mark the given VINs configured (async), same screen transition.
 - **`fun dismissSettingsHint()`** (`AppViewModel.kt:1289`) — Clear the post-onboarding nudge (in-memory only).
-- **`fun dismissSettingsCoach()`** (`AppViewModel.kt:1292`) — Clear the back-arrow coach mark (in-memory only).
 
 ### Self-update (GitHub Releases; not on Play Store)
 

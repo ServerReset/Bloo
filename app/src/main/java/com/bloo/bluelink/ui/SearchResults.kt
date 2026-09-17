@@ -224,44 +224,6 @@ internal fun SettingsSearchResults(
     add("Search on the car screen", "search bubble car screen cover home garage ask command") {
         ToggleRow("Search on the car screen", appearance.showSearch) { vm.setShowSearch(it) }
     }
-    // Unlike every other entry here, this ONE still needs a slice of the
-    // Display card's own cross-navigation -- search is reachable from the
-    // garage screen too, not just from inside Settings, so toggling this on
-    // from a search result was a real, easy-to-hit way to trip the exact
-    // "kicked out instead of moved to the right place" bug the Display card's
-    // own toggle was fixed for: the preference flipped with no visible
-    // navigation, and only the NEXT time Settings was reached did it turn up
-    // somewhere unexpected. Turning ON always follows it there now, safe to
-    // call from any screen: closeSettings(landOnSettingsPage = true) is a
-    // harmless no-op navigation if already on the garage, and the pager's own
-    // authoritative landing effect (Screens.kt) snaps onto the new Settings
-    // slot regardless of whether this composition is fresh or already
-    // mounted.
-    //
-    // Turning OFF used to be treated as a plain preference change, on the
-    // theory that the pager's own drift-correction (LaunchedEffect(totalBlocks)
-    // in GarageScreen) would "land back on a car gracefully once the slot
-    // disappears" -- that's exactly the bug: reached from a search result
-    // while genuinely parked on the embedded slot, nothing ever calls
-    // openSettings(), so that drift-correction effect finds state.screen
-    // still == Screen.Garage and snaps the pager to whatever car currentIndex
-    // resolves to instead of navigating anywhere -- the "turning this off
-    // takes you back to the first car, not the real Settings screen" bug.
-    // The main Settings card's own copy of this toggle (see ToggleRow above
-    // in this same file) already gets this right by checking `embedded`; this
-    // one has no such parameter, so it checks state.onSettingsPageSlot
-    // instead -- true exactly when the pager is currently settled on the
-    // embedded slot, the same signal GarageScreen itself uses.
-    add("Settings as a swipeable page", "gear button pager swipe car screen navigation") {
-        ToggleRow("Settings as a swipeable page", appearance.settingsAsPage) { turningOn ->
-            vm.setSettingsAsPage(turningOn)
-            if (turningOn) {
-                vm.closeSettings(landOnSettingsPage = true)
-            } else if (state.onSettingsPageSlot) {
-                vm.openSettings()
-            }
-        }
-    }
     add("Units", "unit system metric imperial temperature distance speed miles km") {
         SettingsSegmentedRow(
             label = "Units",

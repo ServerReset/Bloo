@@ -58,9 +58,7 @@ value class FloatingId(val name: String)
 /** The app's own floaters. Anything may define its own id; these are just the ones that
  *  currently negotiate with each other. */
 object FloatingIds {
-    /** The Settings cog in the top-right corner. */
-    val SettingsIcon = FloatingId("settingsIcon")
-    /** The flip-columns button, beside the cog while a car is expanded. */
+    /** The flip-columns button in the top-right corner while a car is expanded. */
     val FlipIcon = FloatingId("flipIcon")
     /** The back arrow in the top-left corner while a car is expanded. */
     val BackIcon = FloatingId("backIcon")

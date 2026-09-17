@@ -437,12 +437,17 @@ fun BlooApp(vm: AppViewModel) {
                         GarageScreen(rememberUpdatedState(state), vm, hazeState = searchHazeState)
                     }
                 }
+                // The standalone Settings route. Settings is a page in the car
+                // pager everywhere there IS a car pager (GarageScreen's collapsed
+                // pager, CompactGarage's cover pager), so the only way in here is
+                // the no-vehicles screen -- there is nothing to fold a page into
+                // when there are no cars.
+                //
                 // The full phone Settings (search + keyboard, photo pickers, crop,
                 // drag-reorder lists, sign-out) is unusable crammed onto a ~1-inch
                 // flip cover — it used to render there verbatim. On the cover, show a
                 // compact "manage on your phone" card instead; the real settings are
-                // one unfold away. (The cover's gear button is also removed, so this
-                // is a belt-and-suspenders fallback for the back-stack landing here.)
+                // one unfold away.
                 Screen.Settings ->
                     if (isCompactCoverScreen()) {
                         // The cover can scroll settings fine (the grid scrolls as
@@ -464,12 +469,12 @@ fun BlooApp(vm: AppViewModel) {
         val notifPrefs by vm.notifications.collectAsStateWithLifecycle()
         // On the garage (and the cover) it is the user's switch. In Settings it
         // is always there -- that is how you find a setting. `|| state.onSettingsPageSlot`
-        // on both lines below extends that same rule to Settings-as-an-embedded-page
-        // (Appearance.settingsAsPage): without it, reaching Settings by swiping instead of
-        // the gear button fell back to the ordinary garage-screen showSearch preference
+        // on both lines below extends that same rule to Settings-as-a-pager-page,
+        // which is how Settings is normally reached: without it, swiping to the
+        // Settings page fell back to the ordinary garage-screen showSearch preference
         // (search could disappear entirely there for anyone with that off) and the search
         // element itself stayed shaped like a garage "bubble" instead of morphing into the
-        // settings "pill" the moment the standalone route wasn't what put you there --
+        // settings "pill", since the standalone route wasn't what put you there --
         // exactly the kind of un-seamless style transition between the two ways of
         // reaching Settings this exists to prevent.
         val effectivelyInSettings = target == Screen.Settings || state.onSettingsPageSlot
