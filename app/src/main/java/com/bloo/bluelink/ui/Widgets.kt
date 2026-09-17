@@ -236,9 +236,27 @@ internal fun StatusBarScrim(
 }
 
 /**
- * Tab-like settings mode toggle positioned below the status bar.
- * Styled as a separate element hanging from the bottom edge of the status bar,
- * with glass treatment matching the status bar scrim.
+ * Settings mode (Simple/Advanced) toggle, flush against the status bar's own
+ * bottom edge so it reads as one continuous piece of chrome hanging from it,
+ * not a second, separately-bordered pill floating below it.
+ *
+ * Previously this nested a fully-rounded [MorphSegmented] pill (its own
+ * background AND its own hairline border, from the app-level `MorphSegmented`
+ * wrapper's hardcoded `borderColor`) inside an outer, flat-topped/round-
+ * bottomed [GlassSurface] that ALSO carried its own border (glassEdge's
+ * frostedRim) plus an [ambientRing] halo shadow drawn on all four sides --
+ * including the top edge, right where it meets the status bar. Two
+ * differently-shaped bordered surfaces stacked on each other, with a shadow
+ * ring interrupting the seam between this tab and the status bar above it,
+ * is what read as disjointed rather than as one element.
+ *
+ * Now there is exactly one bordered/shadowed/blurred surface -- this
+ * [GlassSurface], using its normal edge treatment (a plain downward
+ * dropShadow, which only ever darkens BELOW the shape, so it can't interrupt
+ * the seam above) and no [ambientRing]. [MorphSegmented] is called directly
+ * (bypassing the app wrapper's fixed border) with a transparent container and
+ * no border of its own, so it draws only its segment labels and highlight
+ * indicator on top of this surface's own fill.
  */
 @Composable
 internal fun SettingsModeTab(
@@ -247,13 +265,14 @@ internal fun SettingsModeTab(
     hazeState: HazeState? = null,
 ) {
     val topInset = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
-    val canBlur = CanBlurBackdrops()
+    val haptics = LocalHaptics.current
+    val scheme = MaterialTheme.colorScheme
 
     Box(
         Modifier
             .fillMaxWidth()
             .padding(top = topInset)
-            .padding(end = HeaderCornerGap, bottom = 8.dp),
+            .padding(end = HeaderCornerGap),
         contentAlignment = Alignment.TopEnd,
     ) {
         GlassSurface(
@@ -263,21 +282,24 @@ internal fun SettingsModeTab(
                 bottomStart = 16.dp,
                 bottomEnd = 16.dp,
             ),
-            modifier = Modifier
-                .width(172.dp)
-                .ambientRing(RoundedCornerShape(16.dp)),
+            modifier = Modifier.width(172.dp),
             hazeState = hazeState,
-            tint = Color.Transparent,
         ) {
-            MorphSegmented(
+            com.bloo.uicommon.MorphSegmented(
                 options = listOf(
                     SegmentOption("simple", "Simple", null),
                     SegmentOption("advanced", "Advanced", null),
                 ),
                 selectedKey = settingsMode,
-                onSelect = { onSettingsModeChange(it) },
-                containerColor = glassTint(blurred = canBlur),
+                onSelect = onSettingsModeChange,
+                containerColor = Color.Transparent,
+                indicatorColor = scheme.primary,
+                selectedTextColor = scheme.onPrimary,
+                unselectedTextColor = scheme.onSurfaceVariant,
+                textStyle = ButtonLabelStyle,
+                onTick = { haptics?.tick() },
                 trackHeight = HeaderButtonSize,
+                borderColor = null,
             )
         }
     }
