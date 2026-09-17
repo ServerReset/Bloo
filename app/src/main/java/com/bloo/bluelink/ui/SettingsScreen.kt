@@ -294,13 +294,15 @@ internal fun SettingsScreen(
   // behaviour underneath (GarageScreen's own handling, or the app backgrounding)
   // is what should run instead.
   if (!embedded) BackHandler { vm.closeSettings() }
-  if (embedded) {
+  if (embedded && appearance.settingsAsPage) {
       // The Settings pager page is the LAST page -- there is no car page
       // left of it for system-back to land on, so a single back press would
       // slam the whole app shut. Double-back instead: the first press arms
       // a two-second window and says so, the second press inside it really
-      // closes. Kept to the pager page only -- the standalone Settings
-      // screen's back returns to the garage (above).
+      // closes. Kept to the pager page only when settingsAsPage is true
+      // (Settings integrated into the car layout as a swipeable page).
+      // When embedded but settingsAsPage is false (Settings is a modal),
+      // back just closes Settings and returns to the cars (handled below).
       var backArmed by remember { mutableStateOf(false) }
       LaunchedEffect(backArmed) {
           if (backArmed) {
@@ -322,6 +324,11 @@ internal fun SettingsScreen(
               ).show()
           }
       }
+  }
+  if (embedded && !appearance.settingsAsPage) {
+      // Settings is a modal/separate screen, not part of the swipeable page flow.
+      // Back just closes Settings and returns to the cars, no double-back prompt.
+      BackHandler { vm.closeSettings() }
   }
   // hazeState is now a parameter (see this function's own doc) -- backs the
   // StatusBarScrim call far below with a REAL backdrop blur of the settings grid,

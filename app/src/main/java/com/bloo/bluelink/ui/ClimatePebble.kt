@@ -201,6 +201,14 @@ internal fun ClimatePebble(
     val presets = state.climatePresets[v.vin].orEmpty()
     var showAddPreset by remember { mutableStateOf(false) }
     var presetName by remember { mutableStateOf("") }
+
+    // Helper to warn if the car engine is on before changing AC/climate settings
+    val startClimateWithEngineCheck: (ClimateRequest) -> Unit = { req ->
+        if (status?.engine == true) {
+            vm.reportInfo("AC changes might be rejected because the car is already running and remote climate control takes priority")
+        }
+        vm.startClimate(v, req)
+    }
     // Which preset (if any) is currently applied: set when you start one, and
     // cleared automatically once the live settings drift away from it (e.g. you
     // nudge a slider) so the highlight only marks a true match.
@@ -274,25 +282,25 @@ internal fun ClimatePebble(
                     // Start should do exactly what they're currently set to,
                     // not second-guess with the smart/preset logic meant for
                     // the collapsed one-tap case below.
-                    startClimate()
+                    startClimateWithEngineCheck(currentReq)
                 } else if (simpleMode && weather != null) {
                     val ambientF = ambientFahrenheit(weather.tempC)
                     val smartTarget = smartClimateTargetF(ambientF)
                     tempF = smartTarget; defrost = false; activePresetId = null
-                    vm.startClimate(v, currentReq.copy(tempF = smartTarget, defrost = false))
+                    startClimateWithEngineCheck(currentReq.copy(tempF = smartTarget, defrost = false))
                 } else {
                     val defaultId = state.defaultClimatePresets[v.vin]
                     val matchingPreset = defaultId?.let { id -> presets.firstOrNull { it.id == id } }
                     if (matchingPreset != null) {
                         applyRequest(matchingPreset.request)
-                        vm.startClimate(v, matchingPreset.request)
+                        startClimateWithEngineCheck(matchingPreset.request)
                         activePresetId = matchingPreset.id
                     } else if (weather != null) {
                         val ambientF = ambientFahrenheit(weather.tempC)
                         val smartTarget = smartClimateTargetF(ambientF)
                         tempF = smartTarget; defrost = false; activePresetId = null
-                        vm.startClimate(v, currentReq.copy(tempF = smartTarget, defrost = false))
-                    } else startClimate()
+                        startClimateWithEngineCheck(currentReq.copy(tempF = smartTarget, defrost = false))
+                    } else startClimateWithEngineCheck(currentReq)
                 }
             },
             enabled = !driving,
@@ -341,7 +349,7 @@ internal fun ClimatePebble(
                     activePresetId = null
                 } else {
                     applyRequest(preset.request)
-                    vm.startClimate(v, preset.request)
+                    startClimateWithEngineCheck(preset.request)
                     activePresetId = preset.id
                 }
             },
@@ -380,7 +388,7 @@ internal fun ClimatePebble(
                                 tempF = smartTarget
                                 defrost = false
                                 activePresetId = null
-                                vm.startClimate(v, currentReq.copy(tempF = smartTarget, defrost = false))
+                                startClimateWithEngineCheck(currentReq.copy(tempF = smartTarget, defrost = false))
                             },
                             enabled = !pending && !climateOn,
                             interactionSource = smartSource,
