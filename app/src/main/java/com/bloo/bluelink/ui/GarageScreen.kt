@@ -329,6 +329,19 @@ internal fun GarageScreen(
                         // below for why).
                         beyondViewportPageCount = 0,
                         pageSize = androidx.compose.foundation.pager.PageSize.Fill,
+                        // Without this, HorizontalPager keys each page by its raw VIRTUAL
+                        // page index (there are count*1000 of them, the wrap trick's whole
+                        // point) instead of the real car it maps to -- so every distinct
+                        // virtual page ever swiped onto becomes its own permanent entry in
+                        // the pager's saved-state holder and composition cache, retained
+                        // for the life of the process. Keying by the wrapped REAL index
+                        // instead collapses every virtual copy of the same car onto one
+                        // shared, bounded (`count`-many) identity, exactly like keying a
+                        // LazyColumn by a stable item id instead of its position. This is
+                        // a real, confirmed OOM: reported directly (heap exhausted, target
+                        // footprint 512MB, <1% free after GC) with a fresh AnimatedVisibility
+                        // MutableState as the allocation that finally failed.
+                        key = { page -> exWrap.real(page) },
                     ) { page ->
                         // Read the continuous pager offset ONLY inside graphicsLayer{}
                         // below (draw-phase, never triggers recomposition) -- reading
@@ -563,6 +576,22 @@ internal fun GarageScreen(
                         // neighbour is already all PebbleList's own lazy-fill needs to hide,
                         // per this parameter's own history) gives the formula below.
                         beyondViewportPageCount = ((total - perPage) / 2).coerceIn(0, 1),
+                        // Without this, HorizontalPager keys each page by its raw VIRTUAL
+                        // page index (there are total*1000 of them -- the wrap trick's
+                        // whole point) instead of the real car/Settings item it maps to,
+                        // so every distinct virtual page ever swiped onto becomes its own
+                        // permanent entry in the pager's saved-state holder and
+                        // composition cache -- retained for the life of the process, one
+                        // more SettingsScreen or VehicleDetailContent composition every
+                        // time the user swipes past the wrap boundary again. Keying by the
+                        // wrapped REAL index instead collapses every virtual copy of the
+                        // same item onto one shared, bounded (`total`-many) identity,
+                        // exactly like keying a LazyColumn by a stable item id instead of
+                        // its position. This is a real, confirmed OOM: reported directly
+                        // (heap exhausted, target footprint 512MB, <1% free after GC)
+                        // shortly after unlock, with a fresh AnimatedVisibility MutableState
+                        // inside a Settings pebble as the allocation that finally failed.
+                        key = { page -> realItem(page) },
                     ) { page ->
                         // Same fade/scale transition the expanded single-car pager
                         // above uses (see its own comment for why: the continuous
