@@ -1252,7 +1252,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         val collapsed = if (firstRun) emptySet()
         else vehicles.flatMap { v -> settingsStore.collapsedSections(v.vin, prefs).map { "${v.vin}:$it" } }.toSet()
         val hidden = vehicles.flatMap { v -> settingsStore.hiddenSections(v.vin, prefs).map { "${v.vin}:$it" } }.toSet()
-        val hotspots = vehicles.mapNotNull { v -> settingsStore.hotspot(v.vin, prefs)?.let { v.vin to it } }.toMap()
+        val hotspots = vehicles.mapNotNull { v -> settingsStore.hotspots(v.vin, prefs)?.let { v.vin to it } }.toMap()
         val tileConfigs = (0 until com.bloo.bluelink.data.TILE_COUNT).map { settingsStore.tileConfig(it, prefs) }
         val tileLabels = (0 until com.bloo.bluelink.data.TILE_COUNT).map { settingsStore.tileLabel(it, prefs) }
         val tileClimateTargets = (0 until com.bloo.bluelink.data.TILE_COUNT).map { settingsStore.tileClimateTarget(it, prefs) }
@@ -2644,15 +2644,28 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    /** Pin (or clear, with null) a pebble to the dual-column hot spot. */
-    fun setHotspot(v: Vehicle, section: String?) {
+    /** Pin a pebble to the dual-column hot spot (or toggle it off if already pinned). */
+    fun setHotspot(v: Vehicle, section: String) {
         _state.update {
+            val current = it.hotspotSections[v.vin] ?: listOf("controls")
+            val updated = if (section in current) {
+                current - section
+            } else {
+                current + section
+            }
             it.copy(
-                hotspotSections =
-                    if (section == null) it.hotspotSections - v.vin else it.hotspotSections + (v.vin to section),
+                hotspotSections = if (updated.isEmpty()) it.hotspotSections - v.vin else it.hotspotSections + (v.vin to updated),
             )
         }
-        viewModelScope.launch { settingsStore.setHotspot(v.vin, section) }
+        viewModelScope.launch { settingsStore.setHotspots(v.vin, _state.value.hotspotSections[v.vin]) }
+    }
+
+    /** Unpin all pebbles from the hot spot. */
+    fun clearHotspots(v: Vehicle) {
+        _state.update {
+            it.copy(hotspotSections = it.hotspotSections - v.vin)
+        }
+        viewModelScope.launch { settingsStore.setHotspots(v.vin, null) }
     }
 
     /** Persist a new pebble order for a car (drag-and-drop on the card). */

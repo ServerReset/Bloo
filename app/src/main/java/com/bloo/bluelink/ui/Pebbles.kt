@@ -130,14 +130,14 @@ internal fun sectionLabel(section: String): String = when (section) {
 }
 
 /**
- * The dual-column "hot spot": a fixed slot under the car-info column. When a
- * pebble is pinned here it renders non-collapsible (always open); otherwise it's
- * a chooser to pin one. Pinning moves the pebble out of the scrolling list.
+ * The dual-column "hot spot": a fixed slot under the car-info column with zero or more
+ * pinned pebbles shown as a vertical list. New pebbles can be dragged or selected from
+ * a menu to add them; each pinned pebble can be dragged away to unpin.
  */
 @Composable
 internal fun HotspotSlot(
     v: Vehicle,
-    hotspot: String?,
+    hotspots: List<String>,
     /**
      * State SOURCE. It was already immediately re-wrapped into a rememberUpdatedState here,
      * so nothing downstream ever wanted the snapshot -- but taking the snapshot meant the
@@ -148,95 +148,102 @@ internal fun HotspotSlot(
     vm: AppViewModel,
 ) {
     val state = stateSource.value
-    if (hotspot != null) {
-        val haptics = LocalHaptics.current
-        // Drag the pinned pebble away (long-press, then drag past a threshold) to
-        // unpin - the mirror of dragging a pebble onto the slot to pin. The Unpin
-        // button does the same thing for discoverability.
-        var lifted by remember(hotspot) { mutableStateOf(false) }
-        var dragY by remember(hotspot) { mutableFloatStateOf(0f) }
-        val lift by animateFloatAsState(if (lifted) 1.03f else 1f, label = "unpinLift")
-        Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                Icon(
-                    Icons.Filled.PushPin,
-                    contentDescription = null,
-                    modifier = Modifier.size(14.dp),
-                    tint = if (lifted) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                Spacer(Modifier.width(6.dp))
-                Text(
-                    if (lifted) "Release to unpin" else "Pinned",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = if (lifted) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.weight(1f),
-                )
-                MorphTextButton("Unpin", onClick = { vm.setHotspot(v, null) })
-            }
-            CompositionLocalProvider(LocalForceExpanded provides true) {
-                Box(
+    val haptics = LocalHaptics.current
+    val hotDrag = LocalHotSeatDrag.current
+    val hovered = hotDrag?.overSlot == true
+
+    // Available pebbles not yet pinned
+    val allAvailable = remember(
+        state.sectionOrders[v.vin], state.hiddenPebbles, state.aiEnabled, state.hasBattery(v),
+        v.isGen5W, state.platforms[v.vin], state.updateAvailable, state.updateTileDismissed,
+    ) {
+        state.sectionsFor(v).filter {
+            it != "summary" && state.isSectionAvailable(v, it)
+        }
+    }
+    val unpinned = remember(hotspots, allAvailable) {
+        allAvailable.filter { it !in hotspots }
+    }
+
+    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+        // Pinned pebbles
+        hotspots.forEach { section ->
+            var lifted by remember(section) { mutableStateOf(false) }
+            var dragY by remember(section) { mutableFloatStateOf(0f) }
+            val lift by animateFloatAsState(if (lifted) 1.03f else 1f, label = "unpinLift")
+
+            Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Row(
                     Modifier
-                        .graphicsLayer { scaleX = lift; scaleY = lift }
-                        .pointerInput(hotspot) {
-                            detectDragGesturesAfterLongPress(
-                                onDragStart = { dragY = 0f; lifted = true; haptics?.tick() },
-                                onDrag = { change, amt -> change.consume(); dragY += abs(amt.x) + abs(amt.y) },
-                                onDragEnd = {
-                                    lifted = false
-                                    if (dragY > 56f) { haptics?.heavy(); vm.setHotspot(v, null) }
-                                },
-                                onDragCancel = { lifted = false },
-                            )
-                        },
+                        .fillMaxWidth()
+                        .height(32.dp)
+                        .padding(horizontal = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    SinglePebble(hotspot, v, stateSource, vm, Modifier)
+                    Icon(
+                        Icons.Filled.PushPin,
+                        contentDescription = null,
+                        modifier = Modifier.size(12.dp),
+                        tint = if (lifted) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Spacer(Modifier.width(6.dp))
+                    Text(
+                        if (lifted) "Release to unpin" else sectionLabel(section),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = if (lifted) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.weight(1f),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    MorphTextButton("Unpin", onClick = { vm.setHotspot(v, section) })
+                }
+                CompositionLocalProvider(LocalForceExpanded provides true) {
+                    Box(
+                        Modifier
+                            .graphicsLayer { scaleX = lift; scaleY = lift }
+                            .pointerInput(section) {
+                                detectDragGesturesAfterLongPress(
+                                    onDragStart = { dragY = 0f; lifted = true; haptics?.tick() },
+                                    onDrag = { change, amt -> change.consume(); dragY += abs(amt.x) + abs(amt.y) },
+                                    onDragEnd = {
+                                        lifted = false
+                                        if (dragY > 56f) { haptics?.heavy(); vm.setHotspot(v, section) }
+                                    },
+                                    onDragCancel = { lifted = false },
+                                )
+                            },
+                    ) {
+                        SinglePebble(section, v, stateSource, vm, Modifier)
+                    }
                 }
             }
         }
-    } else {
-        var menu by remember { mutableStateOf(false) }
-        // Memoized on the exact slices the predicate reads, mirroring the sibling PebbleList
-        // (which documents the same fix). HotspotSlot takes the whole UiState, so it recomposes
-        // on every emission; without this it re-allocated the filtered list AND a fresh setOf()
-        // literal on every refresh/command tick for the visible car. The two `!=` checks replace
-        // the per-pass set allocation.
-        val options = remember(
-            state.sectionOrders[v.vin], state.hiddenPebbles, state.aiEnabled, state.hasBattery(v),
-            v.isGen5W, state.platforms[v.vin], state.updateAvailable, state.updateTileDismissed,
-        ) {
-            state.sectionsFor(v).filter {
-                it != "summary" && state.isSectionAvailable(v, it)
-            }
-        }
-        val hotDrag = LocalHotSeatDrag.current
-        val hovered = hotDrag?.overSlot == true
-        // The empty slot is both a drop target (drag any pebble onto it to pin)
-        // and a tap target (tap to pick one from a menu). It highlights while a
-        // dragged pebble hovers over it.
-        Box(
-            Modifier.onGloballyPositioned {
-                hotDrag?.let { d -> d.slotTopLeft = it.localToWindow(Offset.Zero); d.slotSize = it.size }
-            },
-        ) {
-            MorphButton(
-                onClick = { menu = true },
-                modifier = Modifier.fillMaxWidth(),
-                active = hovered,
-                activeContainerColor = MaterialTheme.colorScheme.primaryContainer,
-                activeContentColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                contentPadding = PaddingValues(16.dp),
+
+        // Pin new pebbles button (shown if there are unpinned pebbles available)
+        if (unpinned.isNotEmpty()) {
+            var menu by remember { mutableStateOf(false) }
+            Box(
+                Modifier.onGloballyPositioned {
+                    hotDrag?.let { d -> d.slotTopLeft = it.localToWindow(Offset.Zero); d.slotSize = it.size }
+                },
             ) {
-                // MorphButtonLabel, not a hand-rolled Icon+Spacer+Text -- that Text used
-                // bodyMedium, not ButtonLabelStyle, so this button read visibly smaller/lighter
-                // than every other MorphButton label in the app.
-                MorphButtonLabel(Icons.Filled.PushPin, if (hovered) "Release to pin" else "Pin a pebble here", pending = false)
-            }
-            DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
-                options.forEach { sec ->
-                    DropdownMenuItem(
-                        text = { Text(sectionLabel(sec)) },
-                        onClick = { vm.setHotspot(v, sec); menu = false },
-                    )
+                MorphButton(
+                    onClick = { menu = true },
+                    modifier = Modifier.fillMaxWidth(),
+                    active = hovered,
+                    activeContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                    activeContentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                    contentPadding = PaddingValues(12.dp),
+                ) {
+                    MorphButtonLabel(Icons.Filled.PushPin, if (hovered) "Release to pin" else "Pin a pebble here", pending = false)
+                }
+                DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
+                    unpinned.forEach { sec ->
+                        DropdownMenuItem(
+                            text = { Text(sectionLabel(sec)) },
+                            onClick = { vm.setHotspot(v, sec); menu = false },
+                        )
+                    }
                 }
             }
         }
@@ -330,25 +337,18 @@ internal fun Refreshable(
 /** Hero image + gauge (expanded view). */
 @Composable
 internal fun CriticalContent(v: Vehicle, stateSource: State<UiState>, vm: AppViewModel) {
-    // Read here rather than at the call site, for the same reason as HotspotSlot above: this
-    // does need most of UiState, but its caller does not, and a read in the caller's body
-    // subscribes the caller's whole subtree.
     val state = stateSource.value
     val status = state.statusFor(v)
-    val hMetric = LocalAppearance.current.unitSystem == "metric"
-    // Same fix as SinglePebble's "summary" branch, same reasoning: HeroHeader takes no
-    // `state` itself, so what's memoized is the derived arguments built here.
+    val metric = LocalAppearance.current.unitSystem == "metric"
     val heroState = remember(
         status, state.imageUrls[v.vin], state.hasBattery(v), state.hasFuel(v),
         state.locations[v.vin], state.isPebbleExpanded(v.vin, com.bloo.bluelink.data.HERO_PHOTO_SECTION),
     ) { state }
     HeroHeader(
         v, status, heroState.imageUrls[v.vin], heroState.hasBattery(v), heroState.hasFuel(v), vm,
-        heroState.drivingLabel(v), metric = hMetric,
+        heroState.drivingLabel(v), metric = metric,
         photoExpanded = heroState.isPebbleExpanded(v.vin, com.bloo.bluelink.data.HERO_PHOTO_SECTION),
     )
-    // Lock/unlock controls are now a standard pebble (ControlsPebble) in the pebbles column,
-    // where they can be reordered and pinned to the hotspot like any other pebble.
 }
 
 /**
@@ -375,19 +375,10 @@ internal fun ControlsPebble(v: Vehicle, state: UiState, vm: AppViewModel, dragHa
     var showHistory by remember(v.vin) { mutableStateOf(false) }
     val history = state.remoteActionHistory[v.vin].orEmpty()
     Surface(
-        modifier = Modifier.fillMaxWidth().then(dragHandle)
-            // AFTER dragHandle, and on the same node rather than on a child. Order matters both
-            // ways: detectDragGesturesAfterLongPress does not consume the initial down until a
-            // long press actually fires, so a quick tap falls through to this detector, while a
-            // long press is claimed by the drag and never toggles. On a CHILD it would instead
-            // consume the press outright and silently kill drag-to-reorder for this pebble.
+        modifier = Modifier
+            .fillMaxWidth()
+            .then(dragHandle)
             .pointerInput(v.vin) { detectTapGestures { showHistory = !showHistory } }
-            // The tap above is a bare pointerInput, which contributes NO semantics -- so to a
-            // screen reader the history simply did not exist. "Hidden" here means hidden from
-            // the visual chrome, not withheld from TalkBack, and a custom action is exactly the
-            // right shape for that: it adds nothing on screen and no extra focus stop, but the
-            // gesture is announced and invokable through the actions menu. Guarded on there
-            // being history to show, so it isn't offered when it would do nothing.
             .semantics {
                 customActions = listOf(
                     CustomAccessibilityAction(
@@ -434,21 +425,16 @@ internal fun ControlsPebble(v: Vehicle, state: UiState, vm: AppViewModel, dragHa
 internal fun PebbleList(v: Vehicle, state: State<UiState>, vm: AppViewModel, exclude: Set<String> = emptySet()) {
     val sel = state.value
     val allSections = sel.sectionsFor(v)
-    // Memoized on the exact slices the predicate reads (the `eager` set below was
-    // already remembered; this sibling filter was missed). PebbleList takes the STATE
-    // SOURCE and reads by slice, so the filter re-allocates only when one of its own
-    // keys changes rather than on every emission.
     val hasBattery = sel.hasBattery(v)
-    // state.updateTileDismissed is in the key because isSectionAvailable now reads it: without
-    // it this memo would keep the stale section list and the dismissed tile's phantom slot
-    // would survive until some unrelated key changed. Every input the predicate reads has to be
-    // a key, which is the contract this line already follows for the other six.
+    val allExclude = remember(exclude, sel.hotspotSections[v.vin]) {
+        exclude + sel.hotspotSections[v.vin].orEmpty()
+    }
     val sections = remember(
-        allSections, exclude, sel.hiddenPebbles, sel.aiEnabled, hasBattery, v.isGen5W, sel.platforms[v.vin],
+        allSections, allExclude, sel.hiddenPebbles, sel.aiEnabled, hasBattery, v.isGen5W, sel.platforms[v.vin],
         sel.updateAvailable, sel.updateTileDismissed,
     ) {
         allSections.filter {
-            it !in exclude && sel.isSectionAvailable(v, it)
+            it !in allExclude && sel.isSectionAvailable(v, it)
         }
     }
     val hotDrag = LocalHotSeatDrag.current
@@ -575,30 +561,19 @@ internal fun stateSlice(state: State<UiState>, vararg keys: Any?): UiState =
 @Composable
 internal fun SinglePebble(section: String, v: Vehicle, state: State<UiState>, vm: AppViewModel, dragHandle: Modifier) {
     val status = state.value.statusFor(v)
-    val seats = state.value.seatConfigFor(v)
-    val enabled = !state.value.loading
-    val mSingle = LocalAppearance.current.unitSystem == "metric"
+    val metric = LocalAppearance.current.unitSystem == "metric"
     when (section) {
         "summary" -> {
-            // HeroHeader itself takes no `state` param -- its dependency is entirely
-            // in the derived arguments built here, so THOSE are what's memoized.
             val heroState = stateSlice(
                 state, status, state.value.imageUrls[v.vin], state.value.hasBattery(v), state.value.hasFuel(v),
                 state.value.locations[v.vin], state.value.isPebbleExpanded(v.vin, com.bloo.bluelink.data.HERO_PHOTO_SECTION),
             )
             HeroHeader(
                 v, status, heroState.imageUrls[v.vin], heroState.hasBattery(v), heroState.hasFuel(v), vm,
-                heroState.drivingLabel(v), dragHandle = dragHandle, metric = mSingle,
+                heroState.drivingLabel(v), dragHandle = dragHandle, metric = metric,
                 photoExpanded = heroState.isPebbleExpanded(v.vin, com.bloo.bluelink.data.HERO_PHOTO_SECTION),
             )
         }
-        // Its own reorderable/pinnable slot now, like every other pebble --
-        // only actually present in the list while state.value.updateAvailable != null
-        // (see PebbleList's filter and the two hotspot-eligibility checks). Global,
-        // not per-car fields, but still worth memoizing: this section is rendered
-        // on every car page, so an unrelated per-car state change (another car's
-        // status, weather, AI) would otherwise recompose it just as often as any
-        // other pebble.
         "update" -> {
             val updateState = stateSlice(
                 state, state.value.updateAvailable, state.value.updateTileDismissed, state.value.shizukuAvailable,
@@ -612,6 +587,7 @@ internal fun SinglePebble(section: String, v: Vehicle, state: State<UiState>, vm
             ControlsPebble(v, controlsState, vm, dragHandle)
         }
         "climate" -> {
+            val seats = state.value.seatConfigFor(v)
             val climateState = stateSlice(
                 state, status, seats, state.value.isPending(v.vin, "climate"), state.value.climatePresets[v.vin],
                 state.value.climateSync[v.vin], state.value.locations[v.vin], state.value.carWeather[v.vin],
@@ -620,9 +596,8 @@ internal fun SinglePebble(section: String, v: Vehicle, state: State<UiState>, vm
             )
             ClimatePebble(v, status, seats, climateState, vm, dragHandle)
         }
-        // The "charge" slot is the powertrain's energy pebble: charging for an
-        // EV/PHEV, a fuel readout for a gas/hybrid car (no charge UI at all).
         "charge" -> if (state.value.hasBattery(v)) {
+            val enabled = !state.value.loading
             val chargeState = stateSlice(
                 state, status, enabled, state.value.isPending(v.vin, "charge"), state.value.isPending(v.vin, "chargeLimit"),
                 state.value.hasBattery(v), state.value.hasFuel(v), state.value.locations[v.vin],

@@ -1929,17 +1929,21 @@ class SettingsStore(private val context: Context) {
     // the dead widget accessors, sitting apart from the rest of the block. See the
     // tombstone at the old "Home-screen widgets" section for why all of them went.
 
-    // --- Dual-column "hot spot" (pebble pinned under the car-info column) -----
+    // --- Dual-column "hot spot" (pebbles pinned under the car-info column) -----
 
-    suspend fun hotspot(vin: String): String? = hotspot(vin, context.settingsDataStore.data.first())
+    suspend fun hotspots(vin: String): List<String>? = hotspots(vin, context.settingsDataStore.data.first())
 
-    fun hotspot(vin: String, p: Preferences): String? =
-        p[stringPreferencesKey("hotspot_$vin")]?.takeIf { it.isNotBlank() }
+    fun hotspots(vin: String, p: Preferences): List<String>? {
+        val json = p[stringPreferencesKey("hotspots_$vin")]?.takeIf { it.isNotBlank() } ?: return null
+        return runCatching {
+            Json.decodeFromString<List<String>>(json)
+        }.getOrNull()
+    }
 
-    suspend fun setHotspot(vin: String, section: String?) {
+    suspend fun setHotspots(vin: String, sections: List<String>?) {
         editTracked {
-            val key = stringPreferencesKey("hotspot_$vin")
-            if (section.isNullOrBlank()) it.remove(key) else it[key] = section
+            val key = stringPreferencesKey("hotspots_$vin")
+            if (sections.isNullOrEmpty()) it.remove(key) else it[key] = Json.encodeToString(sections)
         }
     }
 

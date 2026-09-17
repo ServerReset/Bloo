@@ -194,7 +194,7 @@ internal fun animatedChargeFrac(target: Float): Float {
         animationSpec = lowPowerAwareSpring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessLow),
         label = "chargeFill",
     )
-    return frac
+    return frac  // Extracted as a reusable composable to avoid hand-copied animations
 }
 
 // ChargeStatsBlock was deleted here. It was the expanded-density readout, and it had become

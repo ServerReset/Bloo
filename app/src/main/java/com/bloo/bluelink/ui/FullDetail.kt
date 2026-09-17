@@ -172,14 +172,13 @@ internal fun ExpandedCar(
     /** See [CarHeaderRow]'s own doc -- forwarded through so its chips can blur. */
     hazeState: HazeState? = null,
 ) {
-    // All derived, so this view recomposes when the hotspot section or the refresh flag
+    // All derived, so this view recomposes when the hotspot sections or the refresh flag
     // actually changes -- not on every UiState emission for every car.
-    val hotspot by remember(v) {
+    val hotspots by remember(v) {
         derivedStateOf {
-            state.value.hotspotFor(v.vin)
-                ?.takeIf {
-                    it in state.value.sectionsFor(v) && state.value.isSectionAvailable(v, it)
-                }
+            state.value.hotspotFor(v.vin).filter {
+                it in state.value.sectionsFor(v) && state.value.isSectionAvailable(v, it)
+            }
         }
     }
     val refreshing by remember { derivedStateOf { state.value.refreshing } }
@@ -205,12 +204,11 @@ internal fun ExpandedCar(
     val controls: @Composable ColumnScope.() -> Unit = {
         CarHeaderRow(v, state, onExpand = null, reserveEnd = false, hideName = true, hazeState = hazeState)
         CriticalContent(v, state, vm)
-        HotspotSlot(v, hotspot, state, vm)
+        HotspotSlot(v, hotspots, state, vm)
     }
     val pebbles: @Composable ColumnScope.() -> Unit = {
-        // "controls" is now a standard pebble that can be reordered and pinned to the hotspot,
-        // so it's no longer excluded from the pebble list.
-        PebbleList(v, state, vm, exclude = setOfNotNull("summary", hotspot))
+        // Pinned pebbles in the hotspot are excluded from the reorderable list
+        PebbleList(v, state, vm, exclude = setOf("summary"))
     }
     CompositionLocalProvider(LocalHotSeatDrag provides hotDrag) {
     // Was hardcoded hideIndicator = true -- the same "grid-only" flag that
@@ -241,24 +239,8 @@ internal fun ExpandedCar(
             val rightCol = if (isFlipped) controls else pebbles
             val leftScroll = if (isFlipped) pebblesScroll else controlsScroll
             val rightScroll = if (isFlipped) controlsScroll else pebblesScroll
-            // Inset spacers (not padding) so content scrolls *behind* the bars;
-            // the leading spacer also clears the floating overlay buttons --
-            // HeaderCornerGap + HeaderButtonSize (their real combined
-            // footprint, 60dp), not the bare 52.dp this used to hardcode,
-            // which let content peek up 8dp under the buttons' own bottom
-            // edge. HeaderContentClearance adds real buffer on top of that
-            // bare footprint -- without it, the column's own 12dp
-            // `spacedBy` was the only thing standing between the button's
-            // ambient glow/shadow halo and the first pebble/control's own
-            // card shadow, and the two could visibly touch (e.g. the AI
-            // summary pebble sitting right under the gear/flip buttons).
-            val lead: @Composable ColumnScope.() -> Unit = { Spacer(Modifier.height(topInset + HeaderCornerGap + HeaderButtonSize + HeaderContentClearance)) }
-            // Same live searchBarClearance as VehicleDetailContent's identical trailing
-            // spacer -- this dual-column view sits under the same globally-floating search
-            // bubble (Screen.Garage).
-            val trail: @Composable ColumnScope.() -> Unit = {
-                Spacer(Modifier.height(searchBarClearance(fallback = bottomInset + 132.dp)))
-            }
+            val topSpacerHeight = topInset + HeaderCornerGap + HeaderButtonSize + HeaderContentClearance
+            val bottomSpacerHeight = searchBarClearance(fallback = bottomInset + 132.dp)
             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 Row(
                     Modifier
@@ -271,11 +253,19 @@ internal fun ExpandedCar(
                     Column(
                         Modifier.weight(1f).fillMaxHeight().verticalScroll(leftScroll),
                         verticalArrangement = Arrangement.spacedBy(12.dp),
-                    ) { lead(); leftCol(); trail() }
+                    ) {
+                        Spacer(Modifier.height(topSpacerHeight))
+                        leftCol()
+                        Spacer(Modifier.height(bottomSpacerHeight))
+                    }
                     Column(
                         Modifier.weight(1f).fillMaxHeight().verticalScroll(rightScroll),
                         verticalArrangement = Arrangement.spacedBy(12.dp),
-                    ) { lead(); rightCol(); trail() }
+                    ) {
+                        Spacer(Modifier.height(topSpacerHeight))
+                        rightCol()
+                        Spacer(Modifier.height(bottomSpacerHeight))
+                    }
                 }
             }
         }
@@ -330,7 +320,7 @@ internal fun CarHeaderRow(
     Row(
         Modifier
             .fillMaxWidth()
-            .then(if (reserveEnd) Modifier.padding(end = 52.dp) else Modifier),
+            .padding(end = if (reserveEnd) 52.dp else 0.dp),
         verticalAlignment = if (hideName) Alignment.CenterVertically else Alignment.Top,
     ) {
         Column(Modifier.weight(1f)) {
