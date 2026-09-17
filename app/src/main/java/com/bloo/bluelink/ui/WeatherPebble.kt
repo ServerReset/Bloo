@@ -68,6 +68,7 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
@@ -96,6 +97,7 @@ import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.ColorMatrix
 import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
@@ -209,6 +211,17 @@ internal fun LocationPebble(v: Vehicle, state: UiState, vm: AppViewModel, dragHa
         ) {
             val loc = location
             if (loc != null) {
+                // Live device-location tracking runs for as long as this map is
+                // genuinely on screen (the pebble expanded with a car location to
+                // show), and stops the moment it isn't -- ref-counted in the
+                // ViewModel so the full-screen map sheet/overlay below (which
+                // read the exact same state.deviceLocation) can layer their own
+                // begin/end on top of this without either one stopping the
+                // other's tracking early. See beginLiveDeviceLocation's own doc.
+                DisposableEffect(v.vin) {
+                    vm.beginLiveDeviceLocation()
+                    onDispose { vm.endLiveDeviceLocation() }
+                }
                 Column(
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
@@ -490,10 +503,6 @@ private const val CarMapMaxZoom = 19
 /** Where every [CarMapState] starts: street level, car dead-centre. */
 private const val CarMapDefaultZoom = 15
 
-/** The standard "you are here" blue, distinct from the car's own [MaterialTheme]
- *  error-toned pin so the two markers never read as the same kind of thing. */
-private val DeviceLocationBlue = Color(0xFF4285F4)
-
 /**
  * Live view state for one [CarMap] instance: zoom level and the pixel pan offset
  * from the car-centred origin, plus the pinch gesture's own running accumulator.
@@ -728,11 +737,27 @@ internal fun CarMap(
 ) {
     val context = LocalContext.current
 
-    // Contrast-aware pin color: bright on dark maps, dark on light maps
-    // OSM maps use a light color scheme with blues/greens/grays
-    // so we use a bright red pin on the map, but ensure readability
-    val pinColor = MaterialTheme.colorScheme.error
-    val isDarkMode = isSystemInDarkTheme()
+    // The car's own pin uses the app's actual dynamic/custom-palette primary --
+    // not a fixed semantic role like `error` -- so a car with its own custom
+    // palette override (CarThemeOverride) shows ITS colour on the map, the same
+    // way that colour already drives everything else on that car's screen.
+    // Reported directly as wanting map colours "pulled from the dynamic color
+    // of the app" rather than a hardcoded red.
+    val pinColor = MaterialTheme.colorScheme.primary
+    // The device's own position gets a second, DIFFERENT dynamic role
+    // (secondary) rather than a hardcoded blue -- still theme-driven, just
+    // visually distinct from the car's own primary-coloured pin.
+    val deviceLocationColor = MaterialTheme.colorScheme.secondary
+    // Same fix as pebbleCardEdge/glassTint (GlassChrome.kt): resolve dark from
+    // the app's own ThemeMode override, not a raw isSystemInDarkTheme() read --
+    // otherwise a user who forced Light/Dark against a differently-set system
+    // theme got a map whose colour filter didn't match the rest of the app.
+    val themeMode = LocalAppearance.current.themeMode
+    val isDarkMode = when (themeMode) {
+        ThemeMode.LIGHT -> false
+        ThemeMode.DARK, ThemeMode.AMOLED -> true
+        ThemeMode.SYSTEM, ThemeMode.SYSTEM_AMOLED -> isSystemInDarkTheme()
+    }
 
     // Adaptive map background: light map needs bright pins, dark needs adjustment
     // The map tiles themselves provide the visual theme, so minimal background needed
@@ -1010,40 +1035,74 @@ internal fun CarMap(
                 }
             }
         }
-        // The pin's screen offset from the box's own centre: zero (i.e. dead-centre) at
-        // rest, and it rides along with panX/panY exactly like the tiles do -- so panning
-        // away from the car slides the pin off toward wherever the car actually is
-        // relative to the new view, instead of it staying glued to the middle of the box.
-        Icon(
-            Icons.Filled.LocationOn,
-            contentDescription = "Car location",
-            tint = pinColor,
-            modifier = Modifier
-                .align(Alignment.Center)
-                .offset { IntOffset(state.panX.roundToInt(), state.panY.roundToInt()) }
-                .size(40.dp)
-                .offset(y = (-20).dp),
-        )
-        // The device's own position, if it fetched one -- offset from the box's centre
-        // the same way the tiles/pin are, but derived from ITS OWN tile coordinate
-        // rather than riding along with panX/panY: the pin's offset (panX, panY) is a
-        // shortcut that only works because the pin IS what the view is centred on.
-        // Anything else on the map has to go through the full conversion: its tile
-        // position minus the car's, in pixels, plus however far the user has panned.
-        deviceLocation?.let { dev ->
-            Box(
-                Modifier
+        // Screen-space (not real-world) distance between the car pin and the device
+        // dot, in tile pixels -- panX/panY cancel out of this difference (both pins
+        // ride along with pan identically), so this is purely "how far apart do
+        // they actually look right now," which is exactly what should decide
+        // whether to merge them: at a zoomed-out view a mile apart can overlap on
+        // screen, and at a close zoom a genuinely close pair can still read as
+        // two distinct pins. Recomputed from tile coordinates directly rather than
+        // real-world lat/lon distance for that reason -- it already accounts for
+        // the current zoom level the same way the pins' own on-screen positions do.
+        val devTileOffsetPx = deviceLocation?.let { dev ->
+            val dx = (MapTiles.tileX(dev.longitude, zoom) - xTileF) * tilePx
+            val dy = (MapTiles.tileY(dev.latitude, zoom) - yTileF) * tilePx
+            dx to dy
+        }
+        // Under this many screen px apart, the two pins would visually overlap
+        // (each pin is ~40dp/16dp wide) -- merge them into one instead of drawing
+        // two pins stacked on top of each other.
+        val mergeThresholdPx = with(density) { 36.dp.toPx() }
+        val isMerged = devTileOffsetPx?.let { (dx, dy) ->
+            kotlin.math.hypot(dx, dy) < mergeThresholdPx
+        } ?: false
+        if (isMerged && devTileOffsetPx != null) {
+            val (dx, dy) = devTileOffsetPx
+            // One pin at the midpoint between the two, tinted with an even mix of
+            // the car's own colour and the device's -- "a combined pin that has
+            // the mix of the two colors" rather than picking one or stacking both.
+            Icon(
+                Icons.Filled.LocationOn,
+                contentDescription = "Car and your location",
+                tint = lerp(pinColor, deviceLocationColor, 0.5f),
+                modifier = Modifier
                     .align(Alignment.Center)
-                    .offset {
-                        val devOffX = ((MapTiles.tileX(dev.longitude, zoom) - xTileF) * tilePx) + state.panX
-                        val devOffY = ((MapTiles.tileY(dev.latitude, zoom) - yTileF) * tilePx) + state.panY
-                        IntOffset(devOffX.roundToInt(), devOffY.roundToInt())
-                    }
-                    .size(16.dp)
-                    .background(Color.White, CircleShape)
-                    .padding(3.dp)
-                    .background(DeviceLocationBlue, CircleShape),
+                    .offset { IntOffset((state.panX + dx / 2f).roundToInt(), (state.panY + dy / 2f).roundToInt()) }
+                    .size(40.dp)
+                    .offset(y = (-20).dp),
             )
+        } else {
+            // The pin's screen offset from the box's own centre: zero (i.e. dead-centre) at
+            // rest, and it rides along with panX/panY exactly like the tiles do -- so panning
+            // away from the car slides the pin off toward wherever the car actually is
+            // relative to the new view, instead of it staying glued to the middle of the box.
+            Icon(
+                Icons.Filled.LocationOn,
+                contentDescription = "Car location",
+                tint = pinColor,
+                modifier = Modifier
+                    .align(Alignment.Center)
+                    .offset { IntOffset(state.panX.roundToInt(), state.panY.roundToInt()) }
+                    .size(40.dp)
+                    .offset(y = (-20).dp),
+            )
+            // The device's own position, if it fetched one -- offset from the box's centre
+            // the same way the tiles/pin are, but derived from ITS OWN tile coordinate
+            // rather than riding along with panX/panY: the pin's offset (panX, panY) is a
+            // shortcut that only works because the pin IS what the view is centred on.
+            // Anything else on the map has to go through the full conversion: its tile
+            // position minus the car's, in pixels, plus however far the user has panned.
+            devTileOffsetPx?.let { (dx, dy) ->
+                Box(
+                    Modifier
+                        .align(Alignment.Center)
+                        .offset { IntOffset((state.panX + dx).roundToInt(), (state.panY + dy).roundToInt()) }
+                        .size(16.dp)
+                        .background(Color.White, CircleShape)
+                        .padding(3.dp)
+                        .background(deviceLocationColor, CircleShape),
+                )
+            }
         }
         } // close the scaled tiles/pin/dot layer
         // No buttons drawn over the map any more -- reported directly from a
