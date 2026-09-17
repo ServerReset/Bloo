@@ -855,7 +855,26 @@ internal fun SyncDeviceRow(
             .fillMaxWidth()
             .clip(shape)
             .background(container)
-            .then(if (dragging) Modifier.dropShadow(shape, blurRadius = 14.dp, offsetY = 4.dp) else Modifier)
+            // The drag-lift shadow, at a weight the current theme can carry. It used
+            // to be dropShadow's bare default colour (0.38-alpha black), and this row
+            // is the worst case for that: its fill is glassTint(blurred = false),
+            // which in light mode is surfaceContainer at 0.12 alpha -- so the lifted
+            // row was a barely-there pale film with a hard black silhouette under it,
+            // i.e. a black smudge following the finger rather than a card lifting off
+            // the page. Same split as glassDropShadow (GlassChrome.kt), where the same
+            // root cause was finally tracked down for every floating GlassSurface.
+            .then(
+                if (dragging) {
+                    Modifier.dropShadow(
+                        shape,
+                        color = Color.Black.copy(alpha = if (appIsDarkTheme()) 0.38f else 0.12f),
+                        blurRadius = 14.dp,
+                        offsetY = 4.dp,
+                    )
+                } else {
+                    Modifier
+                },
+            )
             .padding(horizontal = 10.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {

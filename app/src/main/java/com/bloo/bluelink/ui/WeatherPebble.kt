@@ -1353,22 +1353,34 @@ private fun MapTopBar(
      *  duration. */
     refreshing: Boolean = false,
 ) {
-    // Press-and-hold "pop" on the drag handle nub -- an immediate, small scale-up
-    // the instant it's touched, before any actual drag motion, reading as "I feel
-    // you, go ahead" rather than the nub simply being inert until it moves.
+    // Press-and-hold "pop" on the WHOLE pill -- not just the drag handle nub --
+    // the instant any part of it is touched, before any actual drag motion,
+    // reading as "I feel you, go ahead" rather than staying inert until it
+    // moves. Reported directly as wanting the entire bar (name, handle AND
+    // refresh indicator together) to pop, not just the nub in isolation.
     // requireUnconsumed = false: this OBSERVES the down/up sequence without
     // consuming it, so the same touch still reaches dragModifier's own gesture
-    // detector on the parent Column -- popping the nub must never steal the
-    // drag it's advertising.
-    var nubPressed by remember { mutableStateOf(false) }
-    val nubScale by animateFloatAsState(
-        targetValue = if (nubPressed) 1.5f else 1f,
+    // detector -- popping must never steal the drag it's advertising, and the
+    // refresh button's own click still fires normally (a click is a down+up
+    // with no net movement, exactly what this passes through unconsumed).
+    var pillPressed by remember { mutableStateOf(false) }
+    val pillScale by animateFloatAsState(
+        targetValue = if (pillPressed) 1.04f else 1f,
         animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium),
-        label = "dragHandlePop",
+        label = "mapBarPop",
     )
     GlassSurface(
         shape = RoundedCornerShape(24.dp),
-        modifier = modifier.fillMaxWidth(),
+        modifier = modifier.fillMaxWidth()
+            .pointerInput(Unit) {
+                awaitEachGesture {
+                    awaitFirstDown(requireUnconsumed = false)
+                    pillPressed = true
+                    waitForUpOrCancellation()
+                    pillPressed = false
+                }
+            }
+            .graphicsLayer { scaleX = pillScale; scaleY = pillScale },
         hazeState = mapHazeState,
         contentColor = Color.White,
     ) {
@@ -1387,7 +1399,12 @@ private fun MapTopBar(
             // Name and bigger, titleLarge (was titleMedium) -- reported directly as
             // wanting bigger text. Reserves room on the end for the refresh icon
             // (never under it) regardless of alignment, since both float independently
-            // in this Box rather than sharing a Row's own space-distribution.
+            // in this Box rather than sharing a Row's own space-distribution. Reserves
+            // the SAME 40dp the refresh circle itself occupies (see below) -- previously
+            // this reserved 44dp against a 36dp circle, a mismatched pair that was the
+            // "refresh button is in the incorrect place, not equal" report: the circle
+            // sat 8dp closer to the edge than the space carved out for it implied, so it
+            // read as off-centre against its own reserved slot.
             Text(
                 vehicleName,
                 style = MaterialTheme.typography.titleLarge,
@@ -1396,30 +1413,20 @@ private fun MapTopBar(
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier
                     .align(Alignment.CenterStart)
-                    .padding(end = if (onRefreshLocation != null) 44.dp else 0.dp),
+                    .padding(end = if (onRefreshLocation != null) 40.dp else 0.dp),
             )
+            // The drag handle nub -- purely visual now, no pointerInput of its own:
+            // the pop above already tracks press for the whole pill, so a second,
+            // separate press-tracker here would just be redundant (and, worse, could
+            // read a DIFFERENT pressed state than the pill around it if the two ever
+            // drifted, which is exactly the "parts of the pill disagree" look this is
+            // meant to avoid).
             Box(
                 Modifier
                     .align(Alignment.Center)
-                    .pointerInput(Unit) {
-                        awaitEachGesture {
-                            awaitFirstDown(requireUnconsumed = false)
-                            nubPressed = true
-                            waitForUpOrCancellation()
-                            nubPressed = false
-                        }
-                    }
-                    // Padding grows the touch target well past the nub's own small
-                    // visual size without changing how big the nub itself looks.
-                    .padding(12.dp)
-                    .graphicsLayer { scaleX = nubScale; scaleY = nubScale },
-            ) {
-                Box(
-                    Modifier
-                        .size(width = 32.dp, height = 4.dp)
-                        .background(Color.White.copy(alpha = 0.5f), RoundedCornerShape(2.dp)),
-                )
-            }
+                    .size(width = 32.dp, height = 4.dp)
+                    .background(Color.White.copy(alpha = 0.5f), RoundedCornerShape(2.dp)),
+            )
             if (onRefreshLocation != null) {
                 // Icon-only (was a text chip: "Updated Xm ago" / "Refresh" beside a
                 // static icon) -- reported directly as wanting a refresh INDICATOR,
@@ -1441,9 +1448,13 @@ private fun MapTopBar(
                         angle.snapTo(0f)
                     }
                 }
+                // 40dp, matching the Text's own reserved end space above exactly --
+                // was 36dp against a 44dp reservation, a mismatched pair (see the
+                // Text's own comment). Centred in the 48dp-tall bar the same way the
+                // drag handle and the name both are, so all three read as one row.
                 GlassSurface(
                     shape = CircleShape,
-                    modifier = Modifier.align(Alignment.CenterEnd).size(36.dp),
+                    modifier = Modifier.align(Alignment.CenterEnd).size(40.dp),
                     hazeState = mapHazeState,
                     onClick = onRefreshLocation,
                     contentDescription = "Refresh location",
