@@ -51,7 +51,6 @@ import androidx.compose.material.icons.filled.Place
 import androidx.compose.material.icons.filled.PushPin
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Star
-import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.ui.graphics.isSpecified
 import androidx.compose.ui.layout.IntrinsicMeasurable
@@ -307,6 +306,61 @@ fun MorphTextButton(
                 overflow = TextOverflow.Ellipsis,
             )
         }
+    }
+}
+
+/**
+ * **The** standard action button: a glyph, a label, a tonal fill and a hairline rim.
+ *
+ * This is the one look for "tap this and something happens" -- Expand / Open in Maps on
+ * the map, every owner-area destination on the car-info pebble, Set place / My location,
+ * Change PIN, Add a tile, Reload. It was previously re-typed inline at each of those call
+ * sites with a slightly different container, padding or border (or none), which is exactly
+ * what made a screen full of buttons read as several unrelated button families.
+ *
+ * Why these particular values, rather than [MorphButton]'s bare defaults:
+ *  - `secondaryContainer`, not [buttonContainer]: a tonal accent reads as an *action*
+ *    against the neutral card it sits on, where the surface-derived default can wash out
+ *    on a glass pebble.
+ *  - the 0.18-alpha `outline` rim: the same hairline every other interactive surface got
+ *    (MorphSegmented's own border) once real glass blur stopped giving flat surfaces a
+ *    second depth cue. It is the "nice outline" that made the map buttons the reference.
+ *  - 18dp/8dp padding on the shared 48dp [ButtonTargetHeight], so a row mixing these with
+ *    [MorphTextButton]s still lines up.
+ *
+ * Deliberately NOT the button for: a destructive action (keep `errorContainer` -- red is
+ * information, not decoration), a screen's single primary CTA (`active = true` / an
+ * explicit `primary` fill), a toggle showing state (StateControl), a picker
+ * ([MorphSegmented]), or a low-emphasis tertiary link ([MorphTextButton]).
+ */
+@Composable
+fun MorphActionButton(
+    label: String,
+    icon: ImageVector,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true,
+    /** Swaps the glyph for the shared in-flight spinner; pass a real flag, not `true`. */
+    pending: Boolean = false,
+    interactionSource: MutableInteractionSource = remember { MutableInteractionSource() },
+    /** See [MorphButton]'s own `groupWeight`. */
+    groupWeight: Float = 0f,
+) {
+    MorphButton(
+        onClick = onClick,
+        modifier = modifier,
+        enabled = enabled,
+        interactionSource = interactionSource,
+        groupWeight = groupWeight,
+        containerColor = MaterialTheme.colorScheme.secondaryContainer,
+        contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.18f)),
+        contentPadding = PaddingValues(horizontal = 18.dp, vertical = 8.dp),
+    ) {
+        // The shared label, so the glyph gets the standard gap and -- the part a
+        // hand-assembled Icon+Spacer+Text cannot do -- the button can tell a cramped
+        // button group how small it is willing to get.
+        MorphButtonLabel(icon, label, pending = pending)
     }
 }
 

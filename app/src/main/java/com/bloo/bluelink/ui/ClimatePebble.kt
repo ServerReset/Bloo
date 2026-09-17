@@ -383,7 +383,12 @@ internal fun ClimatePebble(
                         interactionSource = smartSource,
                         enabled = !pending && !climateOn,
                     ) {
-                        MorphButton(
+                        // The shared MorphActionButton: an ordinary "tap this and the car does
+                        // a thing" action, so it takes the standard outlined-tonal look rather
+                        // than the bare default fill at its own one-off 12dp vertical padding.
+                        MorphActionButton(
+                            label = smartLabel,
+                            icon = Icons.Filled.AcUnit,
                             onClick = {
                                 tempF = smartTarget
                                 defrost = false
@@ -392,13 +397,7 @@ internal fun ClimatePebble(
                             },
                             enabled = !pending && !climateOn,
                             interactionSource = smartSource,
-                            contentPadding = PaddingValues(horizontal = 18.dp, vertical = 12.dp),
-                        ) {
-                            // MorphButtonLabel, not a hand-rolled Icon+Spacer+Text -- that Text had
-                            // no `style`, so it rendered at ambient size instead of ButtonLabelStyle.
-                            // Content-width, matching every other standalone CTA in the app.
-                            MorphButtonLabel(Icons.Filled.AcUnit, smartLabel, pending = false)
-                        }
+                        )
                     }
                     Text(
                         "It's $ambientLabel where your car is. Smart climate is targeting $targetLabel.",

@@ -31,7 +31,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -353,7 +352,11 @@ internal fun AutoLockSettingsGroup(v: Vehicle, vm: AppViewModel) {
                 }
             },
             confirmButton = {
-                TextButton(onClick = { showDevicePicker = false }) { Text("Close") }
+                // MorphTextButton, not M3's TextButton: the only bare Material button left in
+                // the app's own UI, and it rendered with stock M3 styling -- no morph, no
+                // haptic, none of the app's own button language -- next to dialogs whose
+                // dismiss action is always a MorphTextButton.
+                MorphTextButton("Close", onClick = { showDevicePicker = false })
             },
         )
     }

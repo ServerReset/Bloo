@@ -32,7 +32,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.asPaddingValues
@@ -103,6 +102,7 @@ import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material.icons.filled.WbSunny
 import androidx.compose.material.icons.filled.MyLocation
+import androidx.compose.material.icons.filled.Place
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.onClick
 import androidx.compose.ui.semantics.heading
@@ -1550,20 +1550,15 @@ internal fun SettingsScreen(
                         interactionSource = pinSource,
                         enabled = true,
                     ) {
-                        MorphButton(
+                        // The shared action button. "Remove" beside it keeps its errorContainer
+                        // tone on purpose -- red is the one difference in this row that carries
+                        // meaning, so the OTHER half is what had to move onto the standard look.
+                        MorphActionButton(
+                            label = if (pinSet) "Change PIN" else "Set up PIN",
+                            icon = if (pinSet) Icons.Filled.LockReset else Icons.Filled.Lock,
                             onClick = { pinDialog = "set" },
                             interactionSource = pinSource,
-                        ) {
-                            // MorphButtonLabel, not a hand-rolled Icon+Spacer+Text: that pair had
-                            // no `style`, so it rendered at the ambient default size instead of
-                            // ButtonLabelStyle -- visibly smaller than "Remove" right beside it in
-                            // this same row, confirmed by audit.
-                            MorphButtonLabel(
-                                if (pinSet) Icons.Filled.LockReset else Icons.Filled.Lock,
-                                if (pinSet) "Change PIN" else "Set up PIN",
-                                pending = false,
-                            )
-                        }
+                        )
                     }
                     if (pinSet) {
                         val removeSource = remember { MutableInteractionSource() }
@@ -2106,8 +2101,13 @@ internal fun SettingsScreen(
                         enabled = weatherQuery.isNotBlank(),
                         modifier = Modifier.weight(1f),
                     ) {
-                        MorphTextButton(
-                            "Set place",
+                        // Both halves of this pair are the shared MorphActionButton now. They
+                        // sit in one row doing the same kind of thing, and were a text button
+                        // beside a default-filled one -- the mismatch reads as two different
+                        // controls when it is one choice with two answers.
+                        MorphActionButton(
+                            label = "Set place",
+                            icon = Icons.Filled.Place,
                             modifier = Modifier.fillMaxWidth(),
                             interactionSource = setPlaceSource,
                             enabled = weatherQuery.isNotBlank(),
@@ -2120,17 +2120,13 @@ internal fun SettingsScreen(
                         enabled = true,
                         modifier = Modifier.weight(1f),
                     ) {
-                        MorphButton(
+                        MorphActionButton(
+                            label = "My location",
+                            icon = Icons.Filled.MyLocation,
                             onClick = { locationPermission.launch(android.Manifest.permission.ACCESS_COARSE_LOCATION) },
                             modifier = Modifier.fillMaxWidth(),
                             interactionSource = myLocationSource,
-                            contentPadding = PaddingValues(horizontal = 14.dp, vertical = 10.dp),
-                        ) {
-                            // MorphButtonLabel, not a hand-rolled Icon+Spacer+Text -- that pair had
-                            // no `style`, so it rendered at a different size than "Set place" right
-                            // beside it in this same row, confirmed by audit.
-                            MorphButtonLabel(Icons.Filled.MyLocation, "My location", pending = false)
-                        }
+                        )
                     }
                 }
             }

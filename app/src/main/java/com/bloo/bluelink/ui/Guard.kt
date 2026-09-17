@@ -568,13 +568,17 @@ internal fun EmptyScreen(vm: AppViewModel) {
                             interactionSource = settingsSource,
                             enabled = true,
                         ) {
-                            MorphButton(
+                            // The shared action button, like every other plain "go do this"
+                            // control -- this screen's one CTA had no reason to be the bare
+                            // default fill while the map's and the car-info pebble's are
+                            // outlined tonal.
+                            MorphActionButton(
+                                label = "Open Settings",
+                                icon = Icons.Filled.Settings,
                                 onClick = { vm.openSettings() },
                                 interactionSource = settingsSource,
-                                modifier = Modifier.fillMaxWidth()
-                            ) {
-                                MorphButtonLabel(Icons.Filled.Settings, "Open Settings", pending = false)
-                            }
+                                modifier = Modifier.fillMaxWidth(),
+                            )
                         }
                     } else {
                         val reloadSource = remember { MutableInteractionSource() }
@@ -582,13 +586,13 @@ internal fun EmptyScreen(vm: AppViewModel) {
                             interactionSource = reloadSource,
                             enabled = true,
                         ) {
-                            MorphButton(
+                            MorphActionButton(
+                                label = if (loadFailed) "Try again" else "Reload",
+                                icon = Icons.Filled.Refresh,
                                 onClick = { vm.loadGarage() },
                                 interactionSource = reloadSource,
-                                modifier = Modifier.fillMaxWidth()
-                            ) {
-                                MorphButtonLabel(Icons.Filled.Refresh, if (loadFailed) "Try again" else "Reload", pending = false)
-                            }
+                                modifier = Modifier.fillMaxWidth(),
+                            )
                         }
                         val accountSource = remember { MutableInteractionSource() }
                         SafeExpansiveButton(

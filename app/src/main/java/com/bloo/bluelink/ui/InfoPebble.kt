@@ -8,18 +8,17 @@
 package com.bloo.bluelink.ui
 
 /**
- * Car-info pebble and owner links: InfoPebble, OwnerLinks, LinkButton --
- * extracted from Pebbles.kt to keep the UI file focused.
+ * Car-info pebble and owner links: InfoPebble, OwnerLinks -- extracted from
+ * Pebbles.kt to keep the UI file focused. The buttons themselves are the shared
+ * MorphActionButton (Morph.kt); this file no longer declares a button of its own.
  */
 
 import android.content.Context
 import android.os.Build
 import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.text.selection.SelectionContainer
@@ -46,7 +45,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.bloo.bluelink.data.Brand
@@ -230,22 +228,22 @@ internal fun OwnerLinks(v: Vehicle, state: UiState, context: Context, inApp: Boo
 
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         group("App & account") {
-            LinkButton("${links.appName} app", Icons.Filled.OpenInNew) {
+            MorphActionButton("${links.appName} app", Icons.Filled.OpenInNew) {
                 openApp(context, listOf(links.appPackage), links.playStoreUrl, inApp)
             }
-            LinkButton("Owners site", Icons.Filled.Person) { openUrl(context, links.ownersUrl, inApp) }
+            MorphActionButton("Owners site", Icons.Filled.Person) { openUrl(context, links.ownersUrl, inApp) }
             // Features-on-Demand store (themes, lighting patterns…): ccNC-era
             // head units only - older Gen5W cars have nothing to buy. Honours
             // the user's own confirmed generation over the raw API guess.
             if (state.supportsConnectedStoreEffective(v)) {
-                LinkButton("Car store", Icons.Filled.Storefront) { openUrl(context, links.storeUrl, inApp) }
+                MorphActionButton("Car store", Icons.Filled.Storefront) { openUrl(context, links.storeUrl, inApp) }
             }
         }
         group("Service") {
-            LinkButton("Schedule service", Icons.Filled.Build) { openUrl(context, links.serviceScheduleUrl, inApp) }
-            LinkButton(links.dealerLabel, Icons.Filled.Place) { openUrl(context, links.dealerUrl, inApp) }
-            LinkButton("Manuals", Icons.Filled.MenuBook) { openUrl(context, links.manualsUrl, inApp) }
-            LinkButton("Roadside", Icons.Filled.Call) { dial(context, links.roadsidePhone) }
+            MorphActionButton("Schedule service", Icons.Filled.Build) { openUrl(context, links.serviceScheduleUrl, inApp) }
+            MorphActionButton(links.dealerLabel, Icons.Filled.Place) { openUrl(context, links.dealerUrl, inApp) }
+            MorphActionButton("Manuals", Icons.Filled.MenuBook) { openUrl(context, links.manualsUrl, inApp) }
+            MorphActionButton("Roadside", Icons.Filled.Call) { dial(context, links.roadsidePhone) }
         }
         // Digital Key: Gen5W head units use DK1 (BLE/NFC dedicated app).
         // Gen3+ and all Kia models use DK2 (UWB via wallet).
@@ -255,7 +253,7 @@ internal fun OwnerLinks(v: Vehicle, state: UiState, context: Context, inApp: Boo
         group("Digital Car Key") {
             if (isGen5W) {
                 when (v.brand) {
-                    Brand.HYUNDAI -> LinkButton("Digital Key", Icons.Filled.VpnKey) {
+                    Brand.HYUNDAI -> MorphActionButton("Digital Key", Icons.Filled.VpnKey) {
                         openApp(
                             context,
                             listOf("com.hyundaiusa.hyundai.digitalcarkey"),
@@ -263,7 +261,7 @@ internal fun OwnerLinks(v: Vehicle, state: UiState, context: Context, inApp: Boo
                             inApp,
                         )
                     }
-                    Brand.GENESIS -> LinkButton("Digital Key", Icons.Filled.VpnKey) {
+                    Brand.GENESIS -> MorphActionButton("Digital Key", Icons.Filled.VpnKey) {
                         openApp(
                             context,
                             listOf("com.genesisusa.genesis.digitalcarkey"),
@@ -275,11 +273,11 @@ internal fun OwnerLinks(v: Vehicle, state: UiState, context: Context, inApp: Boo
                 }
             } else {
                 if (isSamsung) {
-                    LinkButton("Digital Key", Icons.Filled.CreditCard) {
+                    MorphActionButton("Digital Key", Icons.Filled.CreditCard) {
                         openApp(context, listOf("com.samsung.android.spay"), "https://www.samsung.com/us/samsung-wallet/", inApp)
                     }
                 } else {
-                    LinkButton("Digital Key", Icons.Filled.AccountBalanceWallet) {
+                    MorphActionButton("Digital Key", Icons.Filled.AccountBalanceWallet) {
                         openApp(
                             context,
                             listOf("com.google.android.apps.walletnfcrel", "com.google.android.apps.wallet"),
@@ -293,27 +291,7 @@ internal fun OwnerLinks(v: Vehicle, state: UiState, context: Context, inApp: Boo
     }
 }
 
-/** A compact owner-area destination button (sized to its label, not full width). */
-@Composable
-internal fun LinkButton(label: String, icon: ImageVector, onClick: () -> Unit) {
-    // Same morphing pill framework as every other button, with a tonal fill that
-    // reads clearly on the car-info pebble.
-    val linkSource = remember { MutableInteractionSource() }
-    MorphButton(
-        onClick = onClick,
-        interactionSource = linkSource,
-        containerColor = MaterialTheme.colorScheme.secondaryContainer,
-        contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
-        // 18dp, up from 14dp, to match every other labelled button. The give no longer comes
-        // from padding at all -- a group member rests with a per-seam reserve and squeezes back
-        // to its own content when a neighbour presses (see ExpressivePressGrowth) -- so this is
-        // purely about these links looking like the buttons they sit among.
-        contentPadding = PaddingValues(horizontal = 18.dp, vertical = 8.dp),
-    ) {
-        // The shared label: standard gap, standard type, and -- the reason it matters here --
-        // the fit rule. These links are the row that reported as "they expand but just push
-        // the other buttons away", and hand-assembled content is exactly what cannot tell the
-        // group how small it is willing to get.
-        MorphButtonLabel(icon, label, pending = false)
-    }
-}
+// LinkButton used to live here: the same tonal pill, minus the rim, re-declared for this
+// one pebble. It IS the app's standard action button and nothing about it was link-specific,
+// so it moved to Morph.kt as MorphActionButton, beside the rest of the button family, and
+// these owner-area destinations are now just its first callers.

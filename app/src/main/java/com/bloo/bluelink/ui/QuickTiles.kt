@@ -19,7 +19,6 @@ import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -344,7 +343,7 @@ internal fun QuickTileCard(index: Int, vin: String, state: UiState, vm: AppViewM
     }
 }
 
-/** An outlined "add" pill that morphs like the app's other buttons with expansion animation. */
+/** An "add" pill that morphs like the app's other buttons with expansion animation. */
 @Composable
 internal fun AddTilePill(label: String, onClick: () -> Unit) {
     val interactionSource = remember { MutableInteractionSource() }
@@ -353,18 +352,18 @@ internal fun AddTilePill(label: String, onClick: () -> Unit) {
         interactionSource = interactionSource,
         enabled = true,
     ) {
-        MorphButton(
+        // The shared MorphActionButton, not its own surface/primary/outlineVariant recipe:
+        // this WAS the app's one other bordered button, and its border being a different
+        // colour on a different fill at a different padding is precisely the "several button
+        // styles at once" this pass exists to remove. Still full width -- it spans the tile
+        // list it appends to, which is a layout choice, not a second look.
+        MorphActionButton(
+            label = label,
+            icon = Icons.Filled.Add,
             onClick = onClick,
             interactionSource = interactionSource,
             modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
-            containerColor = MaterialTheme.colorScheme.surface,
-            contentColor = MaterialTheme.colorScheme.primary,
-            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-            contentPadding = PaddingValues(horizontal = 18.dp, vertical = 12.dp),
-        ) {
-            // MorphButtonLabel, not a hand-rolled Icon+Spacer+Text -- that Text had no `style`.
-            MorphButtonLabel(Icons.Filled.Add, label, pending = false)
-        }
+        )
     }
 }
 

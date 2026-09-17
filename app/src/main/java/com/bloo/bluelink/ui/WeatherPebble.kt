@@ -25,7 +25,6 @@ import androidx.compose.animation.core.LinearOutSlowInEasing
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -49,7 +48,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
@@ -1145,11 +1143,11 @@ internal data class MapFeature(
  * overflow one line wraps to a second instead of needing its own horizontal-scroll
  * affordance.
  *
- * Icon AND label, with the same outlined-tonal styling [LinkButton] (InfoPebble.kt)
- * already uses for every other "open/go to something" action in the app -- these two
- * buttons (Expand, Open in Maps) are that exact same shape of action, and used to be
- * icon-only with no visible label or border, reported directly as wanting names and
- * outlines like the app's other buttons.
+ * Icon AND label, via the shared [MorphActionButton] -- these two buttons (Expand, Open
+ * in Maps) used to be icon-only with no visible label or border, reported directly as
+ * wanting names and outlines like the app's other buttons. The outlined-tonal treatment
+ * they were given here is now THE standard action-button look, so it lives in Morph.kt
+ * rather than being re-typed inline here.
  */
 @Composable
 private fun MapFeatureRow(features: List<MapFeature>, modifier: Modifier = Modifier) {
@@ -1164,22 +1162,13 @@ private fun MapFeatureRow(features: List<MapFeature>, modifier: Modifier = Modif
                 interactionSource = source,
                 enabled = feature.enabled,
             ) {
-                MorphButton(
+                MorphActionButton(
+                    label = feature.label,
+                    icon = feature.icon,
                     onClick = feature.onClick,
                     interactionSource = source,
                     enabled = feature.enabled,
-                    // Same tonal fill LinkButton uses -- and the same hairline rim
-                    // MorphSegmented's own border already standardised on (the "every
-                    // other interactive surface got a rim once real glass blur stopped
-                    // giving flat surfaces a second depth cue" one) -- so this reads as
-                    // the same family of button as everything else, not a bespoke one.
-                    containerColor = MaterialTheme.colorScheme.secondaryContainer,
-                    contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
-                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.18f)),
-                    contentPadding = PaddingValues(horizontal = 18.dp, vertical = 8.dp),
-                ) {
-                    MorphButtonLabel(feature.icon, feature.label, pending = false)
-                }
+                )
             }
         }
     }
