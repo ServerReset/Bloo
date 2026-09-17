@@ -163,6 +163,17 @@ internal fun StatusBarScrim(
      * whole job, and not something `Modifier.blur` alone can do without it.
      */
     hazeState: HazeState? = null,
+    /**
+     * Optional settings mode to display in the status bar. When provided along with
+     * [onSettingsModeChange], integrates the Simple/Advanced toggle into the status
+     * bar itself on the right side, nestled into the corner.
+     */
+    settingsMode: String? = null,
+    /**
+     * Callback when the settings mode toggle is changed. Should be provided when
+     * [settingsMode] is non-null.
+     */
+    onSettingsModeChange: ((String) -> Unit)? = null,
 ) {
     if (inMultiWindowMode) return
     val topInset = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
@@ -231,7 +242,38 @@ internal fun StatusBarScrim(
                     Modifier
                 },
             ),
-    )
+    ) {
+        // Integrate settings mode toggle on the right side if provided
+        if (settingsMode != null && onSettingsModeChange != null) {
+            Box(
+                Modifier
+                    .align(Alignment.CenterEnd)
+                    .padding(end = HeaderCornerGap),
+            ) {
+                // Settings mode toggle nestled into the top right corner
+                // Same glass treatment as FloatingIcon but integrated into status bar
+                GlassSurface(
+                    shape = RoundedCornerShape(16.dp),
+                    modifier = Modifier
+                        .width(172.dp)
+                        .ambientRing(RoundedCornerShape(16.dp)),
+                    hazeState = hazeState,
+                    tint = Color.Transparent,
+                ) {
+                    MorphSegmented(
+                        options = listOf(
+                            SegmentOption("simple", "Simple", null),
+                            SegmentOption("advanced", "Advanced", null),
+                        ),
+                        selectedKey = settingsMode,
+                        onSelect = { onSettingsModeChange(it) },
+                        containerColor = glassTint(blurred = canBlur),
+                        trackHeight = HeaderButtonSize,
+                    )
+                }
+            }
+        }
+    }
 }
 
 /** The one shared "gap below the status bar" every free-floating header

@@ -178,8 +178,17 @@ internal fun glassTint(blurred: Boolean): Color {
         val alpha = if (blurred) GlassBlurredTintAlpha else GlassTintAlpha
         Color.White.copy(alpha = alpha)
     } else {
-        // Light mode: very minimal tint (almost transparent), let the blur do the work
-        Color.Black.copy(alpha = 0.01f)
+        // Light mode: use theme-aware surface color for better color matching.
+        // Use a semi-transparent overlay on top of the surface to maintain proper
+        // contrast while respecting the theme's palette. This ensures floating
+        // buttons don't appear as black overlays but instead blend with the theme.
+        val scheme = MaterialTheme.colorScheme
+        // Use surfaceContainer with adjusted alpha for proper glass effect
+        // When blurred: lighter alpha (blur provides softness)
+        // When not blurred: stronger alpha (need more visual weight)
+        val surfaceColor = scheme.surfaceContainer
+        val alpha = if (blurred) 0.08f else 0.12f
+        surfaceColor.copy(alpha = alpha)
     }
 }
 

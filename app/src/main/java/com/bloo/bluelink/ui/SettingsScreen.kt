@@ -2277,69 +2277,24 @@ internal fun SettingsScreen(
         // every page in it (cars included) -- drawing a second one here stacked
         // the same scrim twice for exactly this one page, reading as a subtly
         // darker/hazier status-bar band than every car page beside it.
-        if (!isCompactCoverScreen() && !embedded) StatusBarScrim(hazeState = hazeState)
+        if (!isCompactCoverScreen() && !embedded) StatusBarScrim(
+            hazeState = hazeState,
+            settingsMode = state.settingsMode,
+            onSettingsModeChange = { vm.setSettingsMode(it) },
+        )
         // No more floating "Settings" corner badge -- removed as unwanted UI (see the floating
         // car-name pill's own removal). The "Settings" title is real, static content on
         // SettingsHeaderRow now; it just scrolls off with the rest of the grid.
-        // Floating back-arrow + "Settings" label + simple/advanced button.
-        Row(
-            Modifier.fillMaxWidth().align(Alignment.TopStart).statusBarsPadding()
-                // FloatingIcon's own 12dp outer padding is what has always kept
-                // the "Settings" pill clear of the true screen edge -- but that
-                // Icon is skipped entirely when embedded, and this Row has no
-                // start padding of its own to fall back on, so the pill sat
-                // flush against the edge (and the device's own rounded corner/
-                // cutout) with nothing reserving room for it. Reproduces the
-                // same 12dp by hand only when there's no FloatingIcon here to
-                // provide it for free.
-                .then(if (embedded) Modifier.padding(start = HeaderCornerGap) else Modifier),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            // No back arrow when embedded -- there's no separate screen it would be
-            // returning FROM (swiping to a car does that), and "Back to the app"
-            // literally isn't true here: this already is the app's main screen.
-            if (!embedded) FloatingIcon(Icons.Filled.ArrowBack, "Back to the app", { vm.closeSettings() }, hazeState = hazeState)
-            Spacer(Modifier.weight(1f))
-            // A real segmented control (not a single button that only ever
-            // names the OTHER mode) so the CURRENT mode is always obvious at a
-            // glance -- the old single-label button was easy to misread as "the
-            // mode you're already in" and tap the wrong way.
-            // GlassSurface (GlassChrome.kt), not a hand-chained
-            // ambientRing/dropShadow/frostedRim/hazeEffect -- one shared call for the
-            // edge treatment and the real blur, matching the "Settings" title pill/
-            // FloatingIcon right next to it in the same row (same glass treatment,
-            // same track height) instead of the ordinary button-track color/size
-            // every other MorphSegmented uses. `tint = Color.Transparent`: MorphSegmented
-            // has no backdrop slot of its own, so it paints ITS OWN containerColor as
-            // the actual visible fill, on top of GlassSurface's blur -- GlassSurface's
-            // own tint stays invisible here rather than doubling up with it.
-            GlassSurface(
-                shape = RoundedCornerShape(16.dp),
-                modifier = Modifier
-                    .width(172.dp)
-                    // Was 20.dp -- MorphSegmented's own track corner is 16.dp,
-                    // so the outline ring drawn here never actually matched
-                    // the pill's real corners underneath it.
-                    .ambientRing(RoundedCornerShape(16.dp)),
+        // Floating back-arrow (remains separate and floating, not part of status bar).
+        // The Simple/Advanced toggle is now integrated into the status bar itself.
+        if (!embedded) {
+            FloatingIcon(
+                icon = Icons.Filled.ArrowBack,
+                description = "Back to the app",
+                onClick = { vm.closeSettings() },
                 hazeState = hazeState,
-                tint = Color.Transparent,
-            ) {
-                MorphSegmented(
-                    options = listOf(
-                        SegmentOption("simple", "Simple", null),
-                        SegmentOption("advanced", "Advanced", null),
-                    ),
-                    selectedKey = state.settingsMode,
-                    onSelect = { vm.setSettingsMode(it) },
-                    containerColor = glassTint(blurred = CanBlurBackdrops()),
-                    // HeaderButtonSize (48dp), not its own one-off 44dp -- the
-                    // comment above already says this is meant to match the
-                    // "Settings" pill/FloatingIcon's own height in the same
-                    // row; it just hadn't actually been set to the same value.
-                    trackHeight = HeaderButtonSize,
-                )
-            }
-            Spacer(Modifier.width(8.dp))
+                modifier = Modifier.align(Alignment.TopStart).statusBarsPadding(),
+            )
         }
         // First-run coach mark pointing at the back arrow.
         if (state.showSettingsCoach) {
