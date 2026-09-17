@@ -1931,7 +1931,8 @@ class SettingsStore(private val context: Context) {
 
     // --- Dual-column "hot spot" (pebbles pinned under the car-info column) -----
 
-    /** Pebbles pinned to the hotspot. Serialized as comma-separated list. Null if none selected. */
+    /** The single pebble pinned to the hotspot's secondary slot for [vin], or null if none
+     *  selected. The primary slot ("controls") is hardcoded and never persisted here. */
     suspend fun hotspots(vin: String): String? = hotspots(vin, context.settingsDataStore.data.first())
 
     fun hotspots(vin: String, p: Preferences): String? {

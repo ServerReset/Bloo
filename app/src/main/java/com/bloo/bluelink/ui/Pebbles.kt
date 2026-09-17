@@ -442,7 +442,7 @@ internal fun PebbleList(v: Vehicle, state: State<UiState>, vm: AppViewModel, exc
     val allSections = sel.sectionsFor(v)
     val hasBattery = sel.hasBattery(v)
     // Exclude any pebbles pinned to the hotspot (both primary and secondary slots)
-    val pinnedPebbles = sel.hotspotSections[v.vin] ?: emptyList()
+    val pinnedPebbles = sel.hotspotFor(v.vin)
     val allExclude = remember(exclude, pinnedPebbles) {
         exclude + pinnedPebbles
     }
