@@ -279,7 +279,7 @@ internal val VehicleToggleSettings: List<VehicleToggleSpec> = buildList {
     // the eight-line literal costs to duplicate.
     val sectionLabels = mapOf(
         "charge" to "Charge / fuel", "climate" to "Climate", "location" to "Location",
-        "weather" to "Weather", "trips" to "Trips", "info" to "Car info",
+        "trips" to "Trips", "info" to "Car info",
         "diagnostics" to "Diagnostics", "ai" to "AI summary",
     )
     com.bloo.bluelink.data.HIDEABLE_SECTIONS.forEach { sec ->

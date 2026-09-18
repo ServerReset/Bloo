@@ -440,7 +440,7 @@ internal val CompactKnownTiles = setOf(
     // Rendered through the same SinglePebble routing as every other tile, so
     // the Install/Remind-me/Not-now card works on the flip screen exactly as
     // it does unfolded.
-    "climate", "charge", "location", "weather", "trips", "info", "diagnostics", "ai", "update"
+    "climate", "charge", "location", "trips", "info", "diagnostics", "ai", "update"
 )
 
 /**

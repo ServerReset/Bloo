@@ -144,7 +144,7 @@ val LockTiming.wireKey: String
 // a "Summarize" button ahead of every actual control on both phone and watch
 // (the watch's tile order mirrors this list) for anyone who hasn't
 // customized their section order.
-val DEFAULT_SECTIONS = listOf("summary", "update", "controls", "charge", "climate", "ai", "info", "location", "weather", "trips", "diagnostics")
+val DEFAULT_SECTIONS = listOf("summary", "update", "controls", "charge", "climate", "ai", "info", "location", "trips", "diagnostics")
 
 /**
  * Collapse key for the hero card's photo, so it rides the same per-car
@@ -160,7 +160,7 @@ val DEFAULT_SECTIONS = listOf("summary", "update", "controls", "charge", "climat
 const val HERO_PHOTO_SECTION = "hero"
 
 /** Pebbles the user may hide (the others are essential). */
-val HIDEABLE_SECTIONS = listOf("charge", "climate", "location", "weather", "trips", "info", "diagnostics", "ai")
+val HIDEABLE_SECTIONS = listOf("charge", "climate", "location", "trips", "info", "diagnostics", "ai")
 
 /**
  * App appearance preferences, kept separate from the session so sign-out keeps them.

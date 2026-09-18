@@ -8,9 +8,12 @@
 package com.bloo.bluelink.ui
 
 /**
- * Location + weather pebbles: LocationPebble, WeatherStripe, WeatherPebble,
- * CarMap, weatherIcon/weatherTint and the openUrl/openApp/dial launchers --
- * extracted from Pebbles.kt.
+ * The Location pebble (map, address, distance to car, and the car's own local
+ * weather) plus its supporting pieces: WeatherStripe/WeatherDetail, CarMap,
+ * weatherIcon/weatherTint and the openUrl/openApp/dial launchers -- extracted
+ * from Pebbles.kt. The standalone "Weather" pebble (a separate global readout
+ * of the user's configured "home" location) was folded into this one; see
+ * [WeatherDetail]'s own doc.
  */
 
 import android.content.Context
@@ -63,13 +66,11 @@ import androidx.compose.material.icons.filled.MyLocation
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.filled.WbSunny
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.onClick
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
-import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -133,7 +134,9 @@ import com.bloo.bluelink.data.Vehicle
 import com.bloo.bluelink.data.Weather
 import com.bloo.bluelink.data.WeatherCode
 import com.bloo.bluelink.data.coordString
+import com.bloo.bluelink.data.distanceMilesTo
 import com.bloo.bluelink.data.links
+import com.bloo.bluelink.data.formatDistance
 import com.bloo.bluelink.data.formatSpeed
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
@@ -149,7 +152,8 @@ import kotlin.math.roundToInt
 @Composable
 internal fun LocationPebble(v: Vehicle, state: UiState, vm: AppViewModel, dragHandle: Modifier) {
     val context = LocalContext.current
-    val fahrenheit = LocalAppearance.current.useFahrenheit
+    val appearance = LocalAppearance.current
+    val fahrenheit = appearance.useFahrenheit
     val location = state.locations[v.vin]
     // ACCESS_FINE_LOCATION -- needed for the map's own "device location" blue dot
     // ([UiState.deviceLocation], via LocationHelper -- see its own doc) -- is
@@ -310,6 +314,16 @@ internal fun LocationPebble(v: Vehicle, state: UiState, vm: AppViewModel, dragHa
                 // "should be an address, not coordinates" was pointing at. Only shown
                 // as a fallback while geocoding hasn't (yet, or ever) resolved a name.
                 if (!coverGlance && place == null) StatusRow("Location", loc.coordString())
+                // How far the phone is from the car right now -- the phone's own
+                // last-known fix (kept live app-wide via AppViewModel.beginLiveDeviceLocation)
+                // against this car's. Absent (not just zero) until a device fix has ever
+                // landed, same "don't assert a number you don't actually have" rule the
+                // lock-state / odometer rows elsewhere in this app already follow.
+                if (!coverGlance) {
+                    state.deviceLocation?.let { device ->
+                        StatusRow("Distance", formatDistance(device.distanceMilesTo(loc), appearance.unitSystem == "metric"))
+                    }
+                }
                 // Weather where the car is parked. Fetched lazily once we have a fix.
                 // Only load if not already fetched/loading to prevent redundant requests
                 val carWeather = state.carWeather[v.vin]
@@ -320,9 +334,19 @@ internal fun LocationPebble(v: Vehicle, state: UiState, vm: AppViewModel, dragHa
                 // Its own PopVisible: weather can arrive AFTER this pebble is already
                 // open (it's a separate fetch triggered above), so this row pops in
                 // live rather than only ever being present from the first frame --
-                // same idiom the Climate pebble's smart-climate section uses.
+                // same idiom the Climate pebble's smart-climate section uses. Full detail
+                // (feels like, high/low, humidity, wind), not just the compact WeatherStripe
+                // -- this absorbed the old standalone Weather pebble, which showed exactly
+                // this, so folding it in here as a one-line stripe would have been a real
+                // loss of detail, not just a relocation.
                 PopVisible(visible = carWeather != null) {
-                    if (carWeather != null) WeatherStripe(carWeather, fahrenheit, place ?: "At the car")
+                    if (carWeather != null) {
+                        if (coverGlance) {
+                            WeatherStripe(carWeather, fahrenheit, place ?: "At the car")
+                        } else {
+                            WeatherDetail(carWeather, fahrenheit, appearance.unitSystem == "metric")
+                        }
+                    }
                 }
                 // "Open in maps" + "Expand" render right under the map itself, via
                 // the MapFeatureRow call inside the if/else above -- see there.
@@ -372,134 +396,42 @@ internal fun WeatherStripe(weather: Weather, fahrenheit: Boolean, caption: Strin
 }
 
 /**
- * The Weather pebble: current conditions at the user's configured "home"
- * location, with a big temperature, condition icon and a few detail rows. Shown
- * identically on every car (it's a global readout). If no location is set it
- * nudges the user to Settings.
+ * Full weather detail for [weather]: icon, big temperature, condition, and
+ * feels-like/high-low/humidity/wind rows. Used inside [LocationPebble] for the
+ * car's own local weather -- this used to be the standalone "Weather" pebble's
+ * body (a separate global readout of the user's configured "home" location,
+ * shown identically on every car), folded in here once the Location pebble
+ * became the one place a car's surroundings are shown. `state.homeWeather` and
+ * [AppViewModel.loadHomeWeather] still exist -- [ClimatePebble] falls back to
+ * home weather for its smart-climate ambient estimate when a car has no fix of
+ * its own yet -- only the dedicated garage card for it is gone.
  */
 @Composable
-internal fun WeatherPebble(v: Vehicle, state: UiState, vm: AppViewModel, dragHandle: Modifier) {
-    val appearance = LocalAppearance.current
-    val hasLocation = appearance.weatherLat != null && appearance.weatherLon != null
-    val fahrenheit = appearance.useFahrenheit
-    val w = state.homeWeather
-    var weatherSpinning by remember { mutableStateOf(false) }
-    var spinStartedAt by remember { mutableLongStateOf(0L) }
-    // Refresh on first show (the VM throttles to a 15-minute TTL).
-    LaunchedEffect(appearance.weatherLat, appearance.weatherLon) {
-        if (hasLocation) vm.loadHomeWeather()
-    }
-    // Stop the spinner once new weather data arrives, but keep it visible for a
-    // minimum duration so a cached/instant response still shows the animation.
-    LaunchedEffect(state.homeWeather?.fetchedAt) {
-        if (weatherSpinning) {
-            val elapsed = System.currentTimeMillis() - spinStartedAt
-            val minSpin = 900L
-            if (elapsed < minSpin) delay(minSpin - elapsed)
-            weatherSpinning = false
-        }
-    }
-    val summary = when {
-        !hasLocation -> "Set a location"
-        w != null -> "${w.tempLabel(fahrenheit)} · ${w.condition.label}"
-        else -> "Loading…"
-    }
-    Pebble(
-        v, "weather", "Weather", Icons.Filled.WbSunny, state, vm, dragHandle, summary = summary,
-        headerAction = PebbleHeaderAction(
-            label = "Refresh",
-            icon = Icons.Filled.Refresh,
-            onClick = {
-                weatherSpinning = true
-                spinStartedAt = System.currentTimeMillis()
-                vm.loadHomeWeather(force = true)
-            },
-            enabled = hasLocation,
-            spinning = weatherSpinning,
-        ),
-        // NOT alwaysExpandedInSimpleMode: that flag is for pebbles with a single setting
-        // that reads better inline without an expand/collapse control (see its own doc).
-        // This one renders temperature, condition, and several more StatusRows below,
-        // so forcing it always open in simple mode just removed the ability to collapse it.
+internal fun WeatherDetail(weather: Weather, fahrenheit: Boolean, metric: Boolean) {
+    val tint = weatherTint(weather.condition, weather.isDay)
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        when {
-            !hasLocation -> Text(
-                "Set your weather location in Settings → Weather to see local conditions here.",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+        Icon(
+            weatherIcon(weather.condition, weather.isDay),
+            contentDescription = weather.condition.label,
+            tint = tint,
+            modifier = Modifier.size(64.dp),
+        )
+        Column(Modifier.weight(1f)) {
+            RollingNumber(
+                text = weather.tempLabel(fahrenheit),
+                style = MaterialTheme.typography.displaySmall,
+                fontWeight = FontWeight.Bold,
             )
-            w == null -> Row(verticalAlignment = Alignment.CenterVertically) {
-                LoadingIndicator(Modifier.size(22.dp))
-                Spacer(Modifier.width(10.dp))
-                Text("Fetching current conditions…")
-            }
-            else -> {
-                val tint = weatherTint(w.condition, w.isDay)
-                // COVER SCREEN: center the icon+temp and make the temp bigger so the
-                // tile reads as a weather face; the phone keeps the left-aligned
-                // icon+column layout. Gated on LocalForceExpanded.
-                val coverGlance = LocalForceExpanded.current
-                if (coverGlance) {
-                    // The COVER's headline is already this pebble's summary -- "72° · Partly
-                    // cloudy" -- so the temperature and the condition word are both spoken for
-                    // before the body starts. What was here repeated them at display size beside
-                    // a 64dp icon, which is why this tile alone needed a font-scale guard
-                    // against ellipsizing its own temperature: it was fighting for width it did
-                    // not need to spend.
-                    //
-                    // The picture is the one thing the header cannot carry (its icon is a fixed
-                    // sun, not the live condition), so the icon stays and the words go.
-                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
-                        Icon(
-                            weatherIcon(w.condition, w.isDay),
-                            contentDescription = w.condition.label,
-                            tint = tint,
-                            modifier = Modifier.size(44.dp),
-                        )
-                    }
-                    appearance.weatherLabel?.let {
-                        Text(
-                            it,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                } else {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(16.dp),
-                    ) {
-                        Icon(
-                            weatherIcon(w.condition, w.isDay),
-                            contentDescription = w.condition.label,
-                            tint = tint,
-                            modifier = Modifier.size(64.dp),
-                        )
-                        Column(Modifier.weight(1f)) {
-                            RollingNumber(
-                                text = w.tempLabel(fahrenheit),
-                                style = MaterialTheme.typography.displaySmall,
-                                fontWeight = FontWeight.Bold,
-                            )
-                            Text(w.condition.label, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-                            appearance.weatherLabel?.let {
-                                MutedText(it)
-                            }
-                        }
-                    }
-                }
-                // No trailing Spacer — the cover shell's spacedBy owns the gap uniformly.
-                StatusRow("Feels like", w.feelsLikeLabel(fahrenheit))
-                w.highLowLabel(fahrenheit)?.let { StatusRow("High / low", it) }
-                // Humidity + wind are secondary; hide them on the cover so it reads as
-                // a clean weather face (feels-like + high/low stay).
-                if (!coverGlance) {
-                    w.humidity?.let { StatusRow("Humidity", "$it%") }
-                    StatusRow("Wind", formatSpeed(w.windKph, appearance.unitSystem == "metric"))
-                }
-            }
+            Text(weather.condition.label, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
         }
     }
+    StatusRow("Feels like", weather.feelsLikeLabel(fahrenheit))
+    weather.highLowLabel(fahrenheit)?.let { StatusRow("High / low", it) }
+    weather.humidity?.let { StatusRow("Humidity", "$it%") }
+    StatusRow("Wind", formatSpeed(weather.windKph, metric))
 }
 
 /** Zoom bounds for [CarMap]'s zoom, pinch or button-driven -- 3 is "half the

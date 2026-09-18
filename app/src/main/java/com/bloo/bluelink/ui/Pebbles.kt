@@ -123,7 +123,6 @@ internal fun sectionLabel(section: String): String = when (section) {
     "charge" -> "Charge / fuel"
     "climate" -> "Climate"
     "location" -> "Location"
-    "weather" -> "Weather"
     "trips" -> "Trips"
     "info" -> "Car info"
     "diagnostics" -> "Diagnostics"
@@ -750,13 +749,9 @@ internal fun SinglePebble(section: String, v: Vehicle, state: State<UiState>, vm
         "location" -> {
             val locationState = stateSlice(
                 state, state.value.locations[v.vin], state.value.placeNames[v.vin], state.value.isPending(v.vin, "locate"),
-                state.value.carWeather[v.vin], state.value.isPebbleExpanded(v.vin, "location"),
+                state.value.carWeather[v.vin], state.value.deviceLocation, state.value.isPebbleExpanded(v.vin, "location"),
             )
             LocationPebble(v, locationState, vm, dragHandle)
-        }
-        "weather" -> {
-            val weatherState = stateSlice(state, state.value.homeWeather, state.value.isPebbleExpanded(v.vin, "weather"))
-            WeatherPebble(v, weatherState, vm, dragHandle)
         }
         // Trip history rides on the EV trip-details endpoint, so EVs only.
         "trips" -> {

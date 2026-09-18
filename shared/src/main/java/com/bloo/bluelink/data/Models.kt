@@ -477,6 +477,26 @@ data class GeoLocation(
     val speed: Double? = null,
 )
 
+/**
+ * Great-circle distance to [other], in miles. Haversine, not
+ * `android.location.Location.distanceBetween` -- this is pure Kotlin/JVM math with
+ * no Android platform dependency, so it stays testable from a plain unit test the
+ * way the rest of this file's format/parse helpers are, and the couple of meters
+ * Haversine's spherical-Earth approximation loses against WGS84 don't matter for a
+ * "how far is the car" readout.
+ */
+fun GeoLocation.distanceMilesTo(other: GeoLocation): Double {
+    val earthRadiusMi = 3958.8
+    val lat1 = Math.toRadians(latitude)
+    val lat2 = Math.toRadians(other.latitude)
+    val dLat = Math.toRadians(other.latitude - latitude)
+    val dLon = Math.toRadians(other.longitude - longitude)
+    val a = kotlin.math.sin(dLat / 2).let { it * it } +
+        kotlin.math.cos(lat1) * kotlin.math.cos(lat2) * kotlin.math.sin(dLon / 2).let { it * it }
+    val c = 2 * kotlin.math.atan2(kotlin.math.sqrt(a), kotlin.math.sqrt(1 - a))
+    return earthRadiusMi * c
+}
+
 // --- Shared status helpers (used across UI, snapshots, cache, AI) ---------
 
 /** The headline charge/fuel percentage for this car. Takes [hasBattery]
