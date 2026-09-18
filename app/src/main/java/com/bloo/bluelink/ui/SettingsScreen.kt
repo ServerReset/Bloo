@@ -10,7 +10,6 @@ package com.bloo.bluelink.ui
 import android.content.Intent
 import android.os.Build
 import android.net.Uri
-import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
@@ -222,9 +221,10 @@ import com.bloo.uicommon.ReorderColumn
  * standalone Settings route or screen any more, for any vehicle count -- swiping IS
  * how you reach it and how you leave it. Swiping to a car IS "back", so this skips the
  * screen-navigation chrome that only ever made sense standalone (a floating "back to
- * the app" arrow, its own status-bar scrim), and system-back -- which has no page left
- * of it to land on -- takes the double-press-to-exit contract below rather than
- * slamming the app shut on the first press.
+ * the app" arrow, its own status-bar scrim). System-back has no page left of it to
+ * land on, so it exits the app on a single press like any other terminal screen --
+ * this used to arm a "press back again to close" guard instead, cut as unnecessary
+ * ceremony for a gesture every Android user already expects to just work.
  */
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
@@ -255,7 +255,6 @@ internal fun SettingsScreen(
     // there's genuinely room, so this one grid covers both instead of two
     // separate layouts to keep in sync.
     val settingsGridState = rememberLazyStaggeredGridState()
-    val haptics = LocalHaptics.current
     // === PULL-TO-REFRESH FOR SETTINGS ===
     // Settings uses Material 3's native PullToRefresh on the LazyVerticalStaggeredGrid.
     // When the user drags from the top, it triggers vm.syncNow() to sync with Google Drive.
@@ -277,31 +276,12 @@ internal fun SettingsScreen(
   // with it. SearchLayer composes after this screen, so while search is open
   // ITS handler is the one that runs first.
   //
-  // The Settings pager page is the LAST page -- there is no car page left of
-  // it for system-back to land on, so a single back press would slam the
-  // whole app shut. Double-back instead: the first press arms a two-second
-  // window and says so, the second press inside it really closes.
-  var backArmed by remember { mutableStateOf(false) }
-  LaunchedEffect(backArmed) {
-      if (backArmed) {
-          delay(2000)
-          backArmed = false
-      }
-  }
-  BackHandler {
-      if (backArmed) {
-          haptics?.heavy()
-          (context as? android.app.Activity)?.finish()
-      } else {
-          haptics?.tick()
-          backArmed = true
-          android.widget.Toast.makeText(
-              context,
-              "Press back one more time to close",
-              android.widget.Toast.LENGTH_SHORT,
-          ).show()
-      }
-  }
+  // The Settings pager page is the LAST page -- there is no car page left of it
+  // for system-back to land on, so a single back press exits the app here, same
+  // as any other terminal screen. No BackHandler of its own needed for that;
+  // this used to arm a "press back again to close" guard first, cut as
+  // unnecessary ceremony for a gesture every Android user already expects to
+  // just work.
   // hazeState is now a parameter (see this function's own doc) -- backs the
   // StatusBarScrim call far below with a REAL backdrop blur of the settings grid,
   // same pattern GarageScreen.kt uses for its own two pagers. See StatusBarScrim's
