@@ -63,7 +63,6 @@ import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SnackbarVisuals
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -262,12 +261,20 @@ fun BlooApp(vm: AppViewModel) {
                     else -> MaterialTheme.colorScheme.errorContainer to MaterialTheme.colorScheme.onErrorContainer
                 }
                 val snackShape = RoundedCornerShape(24.dp)
-                Surface(
+                // GlassSurface, not a plain solid Surface -- this was the one floating
+                // element in the app still using a flat opaque fill instead of the shared
+                // blur/tint every other piece of chrome (dialogs, the search bar, floating
+                // buttons) uses. searchHazeState is the same HazeState the screen behind
+                // this snackbar already renders into (see this file's own `hazeSource`
+                // wiring), so the blur is real, not a guess at a color. Alpha stays fairly
+                // high even with real blur behind it -- unlike ambient chrome, a toast is
+                // reporting something that just happened and needs to read clearly the
+                // instant it appears, not fade into whatever's behind it.
+                GlassSurface(
                     shape = snackShape,
-                    color = snackColors.first,
+                    hazeState = searchHazeState,
+                    tint = snackColors.first.copy(alpha = if (CanBlurBackdrops()) 0.75f else 0.94f),
                     contentColor = snackColors.second,
-                    tonalElevation = 6.dp,
-                    shadowElevation = 6.dp,
                     modifier = Modifier
                         .padding(16.dp)
                         // This is a hand-rolled Surface, not M3's own Snackbar()
