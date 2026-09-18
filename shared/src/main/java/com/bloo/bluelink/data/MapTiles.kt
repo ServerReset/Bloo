@@ -9,41 +9,19 @@ import kotlin.math.tan
  * The Web Mercator tile projection -- the "slippy map" scheme -- and the OpenStreetMap
  * request details, in one place.
  *
- * Three surfaces draw a map of the car -- the phone's interactive map, the widget's
- * thumbnail, and the watch's -- and each had its own copy of the projection, its own
- * tile URL, and, most consequentially, its own User-Agent string:
- *
- *     phone   "Bloo Bluelink companion app"
- *     widget  "Bloo-Android/1.0 (https://claude.ai/code)"
- *     watch   "Bloo-WearOS/0.1 (https://claude.ai/code)"
- *
- * That last one is not cosmetic. OSM's tile usage policy requires a User-Agent that
- * identifies the application, and their servers return a "blocked" placeholder tile
- * to clients that don't provide one -- which is exactly the 403 the watch's WearImage
- * comment records fixing. The phone's string carried no version and no contact URL,
- * i.e. it was the one still shaped like the thing that gets blocked.
- *
- * Only the maths and the request are shared. How each surface DRAWS the result is
- * legitimately its own business: the phone lays out a mosaic of Coil images sized to
- * its box, the widget bakes a mosaic into a Bitmap for RemoteViews, the watch shows a
- * single tile in a small circle. Zoom stays per-surface too -- the widget deliberately
- * uses 13 where the phone uses 15, and its own comment explains why (13 reads as
- * "which part of town", 15 as "which driveway").
+ * Kept in `:shared` from when multiple surfaces (the phone's interactive map, a since-
+ * removed home-screen widget, and a since-removed Wear OS companion app) each drew a map
+ * of the car and needed the same projection, tile URL, and User-Agent string. OSM's tile
+ * usage policy requires a User-Agent that identifies the application, and their servers
+ * return a "blocked" placeholder tile to clients that don't provide one -- so this exists
+ * to make sure whichever surface asks sends one that actually satisfies that policy.
  */
 object MapTiles {
 
     /** Edge of one OSM tile in pixels. Fixed by the tile server, not a preference. */
     const val TILE_PX = 256
 
-    /**
-     * A User-Agent that satisfies OSM's usage policy, for [platform] ("Android",
-     * "WearOS").
-     *
-     * The shape is the one the widget and the watch already proved works against the
-     * real servers, so those two keep sending byte-identical strings (bar the watch's
-     * version number, previously 0.1). Only the phone's changes, because the phone's
-     * was the broken one.
-     */
+    /** A User-Agent that satisfies OSM's usage policy, for [platform] (e.g. "Android"). */
     fun userAgent(platform: String): String = "Bloo-$platform/1.0 (https://claude.ai/code)"
 
     /**

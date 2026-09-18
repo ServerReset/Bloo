@@ -234,11 +234,6 @@ class SettingsStore(private val context: Context) {
         val LAST_VIN = stringPreferencesKey("last_vehicle_vin")
         val ORDER = stringPreferencesKey("vehicle_order")
         val SETTINGS_MODE = stringPreferencesKey("settings_mode")
-        /** Watch's own PIN lock enabled/timing, mirrored here purely as a backup
-         *  record (see WearLocalPayload's doc comment) -- the phone never reads
-         *  or acts on these, and never pushes them back down to the watch. */
-        val WATCH_PIN_ENABLED = stringPreferencesKey("watch_pin_lock_enabled")
-        val WATCH_PIN_TIMING = stringPreferencesKey("watch_pin_lock_timing")
         /** Per-VIN default climate preset ID for the one-tap Start button in advanced mode. */
         const val DEFAULT_CLIMATE_PRESET_PREFIX = "default_climate_preset_"
     }
@@ -317,10 +312,6 @@ class SettingsStore(private val context: Context) {
          *  device-local capability (Shizuku may not be present on other devices), so
          *  it never roams via Drive sync (see SyncMerge.DEVICE_LOCAL_KEYS). */
         val seamlessInstallShizuku: Boolean = false,
-        /** Watch's own PIN lock enabled/timing -- a backup record only, mirrored
-         *  from the watch. See [SettingsStore.Keys.WATCH_PIN_ENABLED]'s comment. */
-        val watchPinLockEnabled: Boolean = false,
-        val watchPinLockTiming: String = "immediate",
         /** Opt-in "liquid glass" appearance. Off by default = current look; when
          *  on, floating chrome and cards use real backdrop refraction (API 31+)
          *  or an enhanced-frosted fallback below that. */
@@ -373,8 +364,6 @@ class SettingsStore(private val context: Context) {
             // Shared rule -- see FormatUtils.useFahrenheit for why this stopped being
             // written out here and on the watch separately.
             useFahrenheit = useFahrenheit(prefs[Keys.UNIT_SYSTEM]),
-            watchPinLockEnabled = prefs[Keys.WATCH_PIN_ENABLED]?.toBooleanStrictOrNull() ?: false,
-            watchPinLockTiming = prefs[Keys.WATCH_PIN_TIMING] ?: "immediate",
             pebbleOutline = prefs[Keys.PEBBLE_OUTLINE]?.toBooleanStrictOrNull() ?: false,
             coverSettingsHintDismissed = prefs[Keys.COVER_SETTINGS_HINT]?.toBooleanStrictOrNull() ?: false,
             showSearch = prefs[Keys.SHOW_SEARCH]?.toBooleanStrictOrNull() ?: true,
@@ -427,16 +416,6 @@ class SettingsStore(private val context: Context) {
      *  an enum constant (e.g. after a rename). */
     suspend fun setLockTiming(value: LockTiming) {
         editTracked { it[Keys.LOCK_TIMING] = value.name }
-    }
-
-    /** Mirrors the watch's own PIN lock enabled/timing for backup purposes only
-     *  -- called from WearPhoneService when the watch pushes a change, never
-     *  from phone UI (the phone has no control over the watch's PIN lock). */
-    suspend fun setWatchPinLock(enabled: Boolean, timing: String) {
-        editTracked {
-            it[Keys.WATCH_PIN_ENABLED] = enabled.toString()
-            it[Keys.WATCH_PIN_TIMING] = timing
-        }
     }
 
     suspend fun setColumnsFlipped(flipped: Boolean) {
@@ -2579,11 +2558,10 @@ class SettingsStore(private val context: Context) {
     }
 
     /** Set the home weather location from this device's own last-known GPS
-     *  fix, reverse-geocoded to a place label. Shared by the phone Settings
-     *  screen's "My location" action and the watch's equivalent (relayed
-     *  through WearPhoneService, since the watch has no weather fetch of its
-     *  own). Returns false when no location is available (e.g. permission
-     *  never granted on this device) so the caller can report that clearly.
+     *  fix, reverse-geocoded to a place label -- the phone Settings screen's
+     *  "My location" action. Returns false when no location is available
+     *  (e.g. permission never granted on this device) so the caller can
+     *  report that clearly.
      *
      *  [preloaded], when given, is used AS-IS instead of this function doing
      *  its own LocationManager fetch -- specifically so AppViewModel's periodic
@@ -2593,9 +2571,9 @@ class SettingsStore(private val context: Context) {
      *  not two independently-fetched ones that can legitimately disagree by
      *  city blocks. Reported directly: the map's device dot, the home weather
      *  card and "how far is the car from me" could each show a different spot
-     *  for "here". Callers with no pre-fetched location (the Settings screen's
-     *  manual "My location" button, the watch's own relayed request) still get
-     *  the original LocationManager-based fetch below. */
+     *  for "here". A caller with no pre-fetched location (the Settings screen's
+     *  manual "My location" button) still gets the original LocationManager-based
+     *  fetch below. */
     suspend fun setWeatherFromDeviceLocation(preloaded: android.location.Location? = null): Boolean {
         val loc = preloaded ?: run {
             // GetLastKnownLocation requires an active location grant; fail fast and

@@ -2107,7 +2107,7 @@ internal fun SettingsScreen(
                                 ),
                                 CreditEntry(
                                     "kotlinx.serialization",
-                                    "Every persisted setting, cached response and the whole phone ↔ watch sync protocol.",
+                                    "Every persisted setting and cached response.",
                                     "https://github.com/Kotlin/kotlinx.serialization",
                                     Icons.Filled.DataObject,
                                 ),
@@ -2119,7 +2119,7 @@ internal fun SettingsScreen(
                                 ),
                                 CreditEntry(
                                     "OpenStreetMap",
-                                    "Map tiles for the car's and device's location, on the phone, the flip cover, the home-screen widget, and the watch. © OpenStreetMap contributors.",
+                                    "Map tiles for the car's and device's location, on the phone and the flip cover. © OpenStreetMap contributors.",
                                     "https://www.openstreetmap.org/copyright",
                                     Icons.Filled.Map,
                                 ),
@@ -2151,7 +2151,7 @@ internal fun SettingsScreen(
           // running (the update tile shows the AVAILABLE build; this shows the current
           // one). Based on the GitHub Actions run number baked in at CI build time;
           // "dev build" for a local build. buildLabel is the canonical formatter shared
-          // with the watch About footer and the update tile's delta.
+          // with the update tile's delta.
           Spacer(Modifier.height(SettingsGapRow))
           Text(
               "Bloo · " + com.bloo.bluelink.data.buildLabel(vm.currentBuildNumber, com.bloo.bluelink.BuildConfig.BUILD_BRANCH),

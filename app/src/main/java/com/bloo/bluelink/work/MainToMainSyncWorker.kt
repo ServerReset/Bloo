@@ -9,9 +9,6 @@ import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkerParameters
 import com.bloo.bluelink.data.AppLog
 import com.bloo.bluelink.data.SettingsStore
-import com.bloo.bluelink.wear.MainToSecondarySync
-import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.withTimeout
 import java.util.concurrent.TimeUnit
 
 /**
@@ -41,16 +38,10 @@ class MainToMainSyncWorker(ctx: Context, params: WorkerParameters) : CoroutineWo
      *    turned into [Result.retry] rather than being swallowed, so a real
      *    failure is actually surfaced and retried instead of masquerading as a
      *    silent success.
-     * 3. If settings were actually imported/changed by the sync, proactively
-     *    pushes the fresh appearance settings to the watch and refreshes the
-     *    home-screen widget -- both wrapped in their own [runCatching] since
-     *    this worker can run with the app's process not currently alive, so
-     *    there's no live ViewModel that would otherwise pick up the DataStore
-     *    change reactively and do this itself.
-     * 4. If the sync reported an error, logs it and returns [Result.retry] so
+     * 3. If the sync reported an error, logs it and returns [Result.retry] so
      *    WorkManager retries with the exponential backoff configured in
      *    [schedule] instead of waiting for the next full periodic interval.
-     * 5. Otherwise (no error, sync attempted and either succeeded or found
+     * 4. Otherwise (no error, sync attempted and either succeeded or found
      *    nothing new to import) returns [Result.success].
      */
     override suspend fun doWork(): Result {
@@ -64,20 +55,6 @@ class MainToMainSyncWorker(ctx: Context, params: WorkerParameters) : CoroutineWo
             // surface it and let WorkManager retry with the configured backoff.
             AppLog.log("⚠ Background Drive sync threw: $t")
             return retryWhileAttemptsRemain()
-        }
-        if (outcome.imported) {
-            // A live ViewModel would pick up the DataStore change reactively, but
-            // this worker can run with the app process dead — explicitly push the
-            // newly-imported settings out so the watch/widgets don't wait for the
-            // app to next be opened. Bounded by a short timeout so a wedged Data
-            // Layer connection can't pin the worker slot up to WorkManager's
-            // execution ceiling.
-            runCatching {
-                withTimeout(5_000L) {
-                    MainToSecondarySync.publishSettingsNow(ctx, store.appearance.first())
-                }
-            }
-            // Widget update removed - widget system deleted
         }
         if (outcome.error != null) {
             AppLog.log("⚠ Background Drive sync: ${outcome.error}")

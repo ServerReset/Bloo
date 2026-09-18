@@ -17,7 +17,6 @@ import com.bloo.bluelink.data.SessionStore
 import com.bloo.bluelink.data.SettingsStore
 import com.bloo.bluelink.data.SnapshotStore
 import com.bloo.bluelink.data.VehicleStatus
-import com.bloo.bluelink.wear.MainToSecondarySync
 import kotlinx.coroutines.sync.withLock
 import java.util.concurrent.TimeUnit
 
@@ -57,17 +56,8 @@ class AlertWorker(context: Context, params: WorkerParameters) : CoroutineWorker(
      *    obtained (possibly null, which `evaluate` itself interprets as "poll
      *    failed, don't guess") and posts every alert it returns.
      * 5. Folds every successfully-fetched status back into [SnapshotStore] in a
-     *    single write, then calls [MainToSecondarySync.refreshAllSurfaces] once, so this
-     *    30-minute poll doubles as a general data refresh for the watch, tiles
-     *    and widgets instead of them waiting on their own schedules.
-     *
-     *    Step 5 used to be only the fan-out, and this doc used to claim on that
-     *    basis that the poll let those surfaces "pick up new data". It did not:
-     *    nothing here ever persisted what it fetched, and refreshAllSurfaces
-     *    republishes from SnapshotStore, so every surface was re-handed whatever
-     *    the phone APP last wrote. The relative timestamps they showed were
-     *    measuring the last time the app was opened, not the last time anything
-     *    spoke to the car.
+     *    single write, so this 30-minute poll keeps the persisted snapshot
+     *    current instead of it only ever being written while the app is open.
      * Always returns [Result.success] -- there's no retry path here; a failed
      * fetch for one car/brand is silently absorbed per-item as described above,
      * and the whole thing just runs again on the next periodic tick regardless.
@@ -86,13 +76,7 @@ class AlertWorker(context: Context, params: WorkerParameters) : CoroutineWorker(
 
         // This worker fetches fresh status for every car every 30 minutes and used to
         // throw all of it away: it read the status, raised alerts, updated the live
-        // charging bar, and never wrote it anywhere. Then it called
-        // MainToSecondarySync.refreshAllSurfaces() at the end, which republishes from
-        // SnapshotStore -- so the watch, the QS tiles and the widgets were handed
-        // whatever the phone app last persisted, however old, seconds after the phone
-        // had learned the truth. Every "Updated 4h ago" on a glanceable surface was
-        // reporting the last time the APP was opened, not the last time this worker
-        // spoke to the car.
+        // charging bar, and never wrote it anywhere.
         //
         // Collected here and written ONCE below rather than per car: every write is a
         // full decode plus re-encode plus commit of the whole vehicle blob and emits on
@@ -160,13 +144,8 @@ class AlertWorker(context: Context, params: WorkerParameters) : CoroutineWorker(
                 }
             }
         }
-        // Persist BEFORE fanning out, so the publish below carries this tick's data
-        // rather than the previous one's. One write for every car, every brand.
+        // One write for every car, every brand.
         runCatching { SnapshotStore(applicationContext).mergeStatuses(fetched) }
-
-        // The 30-min alert poll also constitutes a data refresh — fan out to the
-        // watch + QS tiles so they don't wait for their own next scheduled update.
-        MainToSecondarySync.refreshAllSurfaces(applicationContext)
         return Result.success()
     }
 

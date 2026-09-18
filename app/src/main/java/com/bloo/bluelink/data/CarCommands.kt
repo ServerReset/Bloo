@@ -13,19 +13,12 @@ import com.bloo.bluelink.work.ClimateExtendWorker
  * running after the user stopped climate would restart the car up to ten minutes later.
  *
  * The rule lives here because [WearCommandRunner.execute] is in `:shared` and cannot
- * reference `:app`'s worker, and because the four call sites that CAN reach it --
- * WidgetActions, AlertActionReceiver (the notification's "Turn off" button),
- * WearPhoneService (relayed watch commands) and TileCommandRunner -- would otherwise each
- * need their own copy of it. Four copies of a rule is how this codebase's recurring class
- * of bug gets made; ClimateExtendWorker.cancel already had exactly two callers, both in
- * AppViewModel, under a KDoc claiming it was "called whenever climate is stopped
- * manually".
- *
- * ⚠ Known residual gap, deliberately not papered over: the watch's STANDALONE path calls
- * WearCommandRunner directly from `:wear`, which also cannot see `:app`. That only happens
- * when the phone is unreachable — and the chain runs ON the phone, so an unreachable phone
- * will still fire it. Closing that needs a stop marker in the shared snapshot payload,
- * which is a cross-process schema change and wants a real device to validate.
+ * reference `:app`'s worker, and because the call sites that CAN reach it --
+ * AlertActionReceiver (the notification's "Turn off" button) and AutoLockController --
+ * would otherwise each need their own copy of it. Two copies of a rule is how this
+ * codebase's recurring class of bug gets made; ClimateExtendWorker.cancel already had
+ * exactly two callers, both in AppViewModel, under a KDoc claiming it was "called
+ * whenever climate is stopped manually".
  */
 suspend fun runCarCommand(context: Context, command: WearCommand): WearCommandResult {
     // Resolve the direction the same way execute() will, from the same store, so a

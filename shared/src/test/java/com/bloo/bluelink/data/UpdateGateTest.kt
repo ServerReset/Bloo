@@ -6,8 +6,8 @@ import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 /**
- * Pure-JVM tests for [UpdateGate], the side-effect-free decisions shared by the phone's
- * UpdateChecker and the watch's WearViewModel.
+ * Pure-JVM tests for [UpdateGate], the side-effect-free decisions used by the phone's
+ * UpdateChecker.
  *
  * Worth pinning because both failure directions are invisible in normal use. Skip too
  * eagerly and updates silently never appear -- there is no error, just a banner that

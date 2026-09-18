@@ -19,15 +19,14 @@ import java.io.File
 import java.util.concurrent.TimeUnit
 
 /** A completed GitHub build of the app, normalised to what the update flow
- *  needs. [phoneApkUrl]/[wearApkUrl] are direct, public, unzipped asset
- *  download links (null only for a stale release published before this
- *  field existed, or if an asset failed to upload). */
+ *  needs. [phoneApkUrl] is a direct, public, unzipped asset download link
+ *  (null only for a stale release published before this field existed, or if
+ *  the asset failed to upload). */
 data class WorkflowRun(
     val runNumber: Int,
     val htmlUrl: String,
     val displayTitle: String? = null,
     val phoneApkUrl: String? = null,
-    val wearApkUrl: String? = null,
     /** The release's markdown body -- install steps + generated changelog
      *  (see android.yml's "Publish build" step), shown as this build's patch
      *  notes in the update tile. Null for a release with no body. */
@@ -36,7 +35,7 @@ data class WorkflowRun(
 
 /**
  * The one canonical user-facing build label, so every surface (phone Settings,
- * watch About, update tile, widget) shows the version the same way — based on the
+ * update tile) shows the version the same way — based on the
  * GitHub Actions run number baked in at CI build time (BuildConfig.BUILD_RUN_NUMBER).
  * A local/dev build has run number 0 (nothing to compare against) → "dev build".
  * When a non-blank [branch] is supplied and isn't the mainline, it's appended so a
@@ -56,8 +55,8 @@ fun buildLabel(runNumber: Int, branch: String = ""): String {
  * Checks GitHub for the latest build. Bloo isn't on the Play Store, so this
  * is the app's real update channel: every ordinary push publishes a rolling
  * pre-release (see android.yml's "Publish build as a GitHub Release" step)
- * tagged "build-<run number>" with the raw phone/watch APKs attached as
- * public release assets — no auth and no zip needed to download them,
+ * tagged "build-<run number>" with the raw phone APK attached as a
+ * public release asset — no auth and no zip needed to download it,
  * unlike the Actions artifacts from the same build (which this used to read
  * instead, before that was the actual reason the update flow needed a
  * browser + manual unzip). BuildConfig.BUILD_RUN_NUMBER (baked in at CI
@@ -68,9 +67,8 @@ object UpdateApi {
     private const val OWNER = "ServerReset"
     private const val REPO = "Bloo"
     private const val PHONE_ASSET_NAME = "Bloo.apk"
-    private const val WEAR_ASSET_NAME = "Bloo-Wear.apk"
 
-    /** The branch new builds land on — see UpdateChecker/WearViewModel. */
+    /** The branch new builds land on — see UpdateChecker. */
     const val DEFAULT_BRANCH = "claude/great-faraday-QuX3x"
 
     /** The GitHub Releases page — a manual "second source" the user can open in a
@@ -85,9 +83,8 @@ object UpdateApi {
         .build()
 
     /** One file attached to a GitHub Release. [name] is matched against the
-     *  known phone/watch asset filenames (see [PHONE_ASSET_NAME]/
-     *  [WEAR_ASSET_NAME]) to pick out just the two APKs from whatever else a
-     *  release might have attached. */
+     *  known phone asset filename (see [PHONE_ASSET_NAME]) to pick out just
+     *  the APK from whatever else a release might have attached. */
     @Serializable
     private data class ReleaseAsset(
         val name: String = "",
@@ -115,8 +112,8 @@ object UpdateApi {
      *  [branch] is unused: GitHub's release list has no server-side branch
      *  filter (a release is tied to a tag, not a source branch), and in
      *  practice this repo only ever pushes to one branch at a time. Kept in
-     *  the signature so callers (UpdateChecker, WearViewModel) don't need a
-     *  matching change for what would be a no-op today. */
+     *  the signature so the caller (UpdateChecker) doesn't need a matching
+     *  change for what would be a no-op today. */
     suspend fun fetchLatestSuccessfulRun(branch: String): WorkflowRun? = withContext(Dispatchers.IO) {
         runCatching {
             val url = "https://api.github.com/repos/$OWNER/$REPO/releases"
@@ -145,7 +142,6 @@ object UpdateApi {
                     htmlUrl = release.htmlUrl,
                     displayTitle = release.name,
                     phoneApkUrl = release.assets.firstOrNull { it.name == PHONE_ASSET_NAME }?.browserDownloadUrl,
-                    wearApkUrl = release.assets.firstOrNull { it.name == WEAR_ASSET_NAME }?.browserDownloadUrl,
                     releaseNotes = extractChangelog(release.body),
                 )
             }
@@ -239,10 +235,8 @@ object UpdateApi {
  * happened. Callers show their own message on false -- the download succeeded, so "we have
  * it but could not open the installer" is a different thing to say than "download failed".
  *
- * Shared because Bloo is sideloaded on BOTH surfaces -- neither app is on a store, so each
- * installs its own updates -- and the phone and watch copies of this were byte-identical
- * bar how each reached its Context. That is the same duplication UpdateGate and
- * UPDATE_SNOOZE_MS were pulled in here to end.
+ * Lives in `:shared` (originally to end a byte-identical duplicate between the phone and a
+ * since-removed Wear OS companion app; see [UpdateGate]'s own doc for the same history).
  *
  * Checks [android.content.pm.PackageManager.canRequestPackageInstalls] first: "install
  * unknown apps" is a per-app, user-granted, restricted setting on modern Android, and
@@ -270,15 +264,12 @@ fun installDownloadedApk(context: Context, apk: File): Boolean = runCatching {
 }.isSuccess
 
 /**
- * The side-effect-free decisions shared by the phone's UpdateChecker.checkPhone and the
- * watch's WearViewModel.runUpdateCheck. Only the pure predicates live here: each caller
- * keeps its own store reads/writes, its own debounce interval (phone 1 minute, watch
- * 12h), the watch-only "already found one this session" guard, its `setLastCheckedAt`
- * timing (phone stamps even on a failed fetch to debounce retries; the watch stamps only
- * on success), and its own result mapping (sealed UpdateCheckResult vs Boolean + UI
- * update). Those genuinely differ and MUST stay per-caller -- folding them in here would
- * change behaviour. What was duplicated, and drifting (the watch comment literally says
- * it "mirrors UpdateChecker.checkPhone"), is the gate arithmetic below.
+ * The side-effect-free decisions used by the phone's UpdateChecker.checkPhone. Only the
+ * pure predicates live here -- the caller keeps its own store reads/writes, its own
+ * debounce interval, `setLastCheckedAt` timing, and its own result mapping. Originally
+ * shared with a since-removed Wear OS companion app's own update check, which had begun
+ * drifting from this gate arithmetic before that app was removed; kept factored out here
+ * rather than folded back into the one remaining caller.
  */
 object UpdateGate {
     /**

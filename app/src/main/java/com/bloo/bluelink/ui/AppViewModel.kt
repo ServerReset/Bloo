@@ -289,102 +289,6 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     init {
-        // Everything below launches independent coroutines in viewModelScope
-        // (so they're all cancelled together when the ViewModel is cleared) and
-        // most of them are long-lived `collect` loops on a Flow — they never
-        // complete, they just re-run their body every time the upstream Flow
-        // emits a new value, for the lifetime of the ViewModel. Each one is
-        // one-directional (phone state -> watch), independent of the others,
-        // and safe to fire in any order since they only ever read from
-        // settingsStore/_state and write out to the watch bridge.
-        // Mirror appearance/preferences to a paired watch whenever they change,
-        // so the watch theme + settings always match the phone live.
-        viewModelScope.launch {
-            // distinctUntilChanged, like the three sibling collectors below -- this was
-            // the one that didn't have it, and it collected the raw store flow rather
-            // than the conflated `appearance` StateFlow this class already exposes.
-            //
-            // DataStore re-emits on ANY key change in the whole file, and
-            // SettingsStore.appearance is a bare .map over that with no dedupe of its
-            // own. So this fired for writes to keys that aren't part of Appearance at
-            // all -- tile_refreshed_$vin, sync_last_ms, plate_$vin, sections_$vin,
-            // climate_presets_$vin -- and every editTracked write also stamps
-            // sync_dirty_keys in the same transaction, so in practice EVERY setter in
-            // the app triggered a full watch settings republish carrying an identical
-            // Appearance. That republish is not cheap: it re-decodes the snapshot
-            // payload, does 3N+5 sequential preference reads, resolves two Material
-            // colour schemes, and makes a blocking Data Layer round trip.
-            //
-            // Appearance is a data class of vals, so structural equality is exactly the
-            // right test for "did anything the watch cares about actually change".
-            settingsStore.appearance.distinctUntilChanged().collect { a ->
-                com.bloo.bluelink.wear.MainToSecondarySync.publishSettings(getApplication(), a)
-            }
-        }
-        // Re-publish settings (which carry each car's pebble order) whenever the
-        // user reorders pebbles, so the watch's tile layout follows the phone.
-        viewModelScope.launch {
-            _state.map { it.sectionOrders }.distinctUntilChanged().collect {
-                com.bloo.bluelink.wear.MainToSecondarySync.publishSettings(
-                    getApplication(), settingsStore.appearance.first(),
-                )
-            }
-        }
-        // Mirror saved climate presets to the watch whenever they change.
-        viewModelScope.launch {
-            _state.map { it.climatePresets }.distinctUntilChanged().collect { presets ->
-                com.bloo.bluelink.wear.MainToSecondarySync.publishPresets(getApplication(), presets)
-            }
-        }
-        // Mirror the watch's live climate draft (sliders, active preset) into state.
-        viewModelScope.launch {
-            com.bloo.bluelink.data.ClimateSyncStore(getApplication()).flow
-                .collect { s -> _state.update { it.copy(climateSync = s.byVin) } }
-        }
-        // Mirror AI summaries the WATCH requested (WearPhoneService writes them to
-        // AiSummaryStore because it has no live ViewModel). Merged, not replaced: a
-        // phone-generated summary already in _state must survive, and the watch store
-        // only ever holds the watch-requested ones. Folding into _state is what lets the
-        // extras republish below carry the summary to the watch (and the phone show it).
-        viewModelScope.launch {
-            com.bloo.bluelink.data.AiSummaryStore(getApplication()).flow
-                .collect { fromWatch -> _state.update { it.copy(aiSummaries = it.aiSummaries + fromWatch) } }
-        }
-        // Mirror weather / car photos / AI summaries to the watch.
-        //
-        // `.drop(1)` is NOT cosmetic and must not be removed. `_state` is
-        // `MutableStateFlow(UiState())`, so its first emission is definitionally the
-        // constructor default -- homeWeather null, carWeather/imageUrls/aiSummaries all empty --
-        // and `distinctUntilChanged` passes a first emission through unconditionally. So every
-        // cold start of the phone app published WearExtras(null, {}, {}, {}) to the watch before
-        // the garage or weather had loaded anything.
-        //
-        // On the watch that is destructive, not merely empty. WearListenerService reads
-        // `decodeExtras(raw).images.keys` as the set of cars that still have a photo and calls
-        // `WearPhotoCache.prune(context, vins)` UNCONDITIONALLY -- correctly, because removing
-        // the last car has to reclaim its file. An empty set therefore means "no car has a
-        // photo", and prune deleted every cached photo on the watch. Weather and AI cards blanked
-        // at the same time, and AI summaries are memory-only on the phone (never persisted), so
-        // those were gone until regenerated.
-        //
-        // This is why the watch kept losing car photos: the phone told it to, on launch, every
-        // time. The watch side was right; the publisher was lying to it.
-        //
-        // Dropping only the FIRST emission keeps the genuine all-empty case working: after
-        // sign-out, state really is empty and that publish must still reach the watch to clear
-        // it -- that arrives as a later emission, not the initial one.
-        viewModelScope.launch {
-            _state.map { s ->
-                com.bloo.bluelink.data.WearExtras(
-                    homeWeather = s.homeWeather?.toWear(),
-                    carWeather = s.carWeather.mapValues { it.value.toWear() },
-                    images = s.imageUrls,
-                    ai = s.aiSummaries,
-                )
-            }.distinctUntilChanged().drop(1).collect { extras ->
-                com.bloo.bluelink.wear.MainToSecondarySync.publishExtras(getApplication(), extras)
-            }
-        }
         // Probe on-device Gemini Nano once; the AI toggle only appears if present.
         // Dispatchers.IO -- like the Shizuku probe right below, and for the same
         // reason its own comment states but this one didn't follow: ai.isSupported()
@@ -521,10 +425,6 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             credentialStore.save(Credentials(username.trim(), password, pin.trim(), brand))
             AppLog.log("Signed in as ${maskEmail(username.trim())} (${brand.label})")
             _state.update { it.copy(accounts = credentialStore.loadAll(), addingAccount = false) }
-            // Push the session to the watch IMMEDIATELY on login success (not only
-            // via the eventual post-garage-fetch publish) so a watch waiting on a
-            // "Set up on phone" handoff advances past its login screen right away.
-            runCatching { com.bloo.bluelink.wear.MainToSecondarySync.publishAuth(getApplication()) }
             loadGarageInternal()
         }
     }
@@ -533,7 +433,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
      * Europe (Hyundai Bluelink EU) sign-in. Single-step like the Hyundai/Genesis
      * US branch — no OTP — just against [EuRepository] instead of
      * [BlueLinkRepository]; same post-login bookkeeping (persist credentials,
-     * push the session to the watch, reload the garage).
+     * reload the garage).
      */
     private fun loginEurope(username: String, password: String, pin: String, brand: Brand) {
         launchBusy {
@@ -541,7 +441,6 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             credentialStore.save(Credentials(username, password, pin, brand))
             AppLog.log("Signed in as ${maskEmail(username)} (${brand.label})")
             _state.update { it.copy(accounts = credentialStore.loadAll(), addingAccount = false) }
-            runCatching { com.bloo.bluelink.wear.MainToSecondarySync.publishAuth(getApplication()) }
             loadGarageInternal()
         }
     }
@@ -616,9 +515,6 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         credentialStore.save(creds)
         AppLog.log("Signed in as ${maskEmail(creds.email)} (Kia)")
         _state.update { it.copy(accounts = credentialStore.loadAll(), addingAccount = false) }
-        // Push the Kia session to the watch immediately (Kia can't sign in on-watch,
-        // so the watch relies entirely on this push) — same reasoning as login().
-        runCatching { com.bloo.bluelink.wear.MainToSecondarySync.publishAuth(getApplication()) }
         loadGarageInternal()
     }
 
@@ -683,7 +579,6 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         credentialStore.save(creds)
         AppLog.log("Signed in as ${maskEmail(creds.email)} (${creds.brand.label})")
         _state.update { it.copy(accounts = credentialStore.loadAll(), addingAccount = false) }
-        runCatching { com.bloo.bluelink.wear.MainToSecondarySync.publishAuth(getApplication()) }
         loadGarageInternal()
     }
 
@@ -788,11 +683,6 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 _state.update { it.copy(accounts = remaining) }
                 loadGarage()
             }
-            // Push the (now reduced or empty) auth bundle to the watch on BOTH
-            // branches so a sign-out actually reaches it and wipes the revoked
-            // session -- WearStateWriter.persistAuth is authoritative to the
-            // bundle, clearing any brand not present in it.
-            com.bloo.bluelink.wear.MainToSecondarySync.publishAuth(getApplication())
         }
     }
 
@@ -1435,9 +1325,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         // Bidirectional auto-sync on refresh: download newer settings from Drive,
         // then upload our current settings (merge loop for cross-device sync).
         // The actual download/compare/import/upload sequence lives in
-        // SettingsStore.performMainToMainSync() — shared with the watch's on-demand
-        // "Sync now" request (MainToSecondarySync.mainToMainSync) so there's exactly one
-        // implementation of that logic.
+        // SettingsStore.performMainToMainSync().
         viewModelScope.launch {
             _state.map { it.refreshing }.distinctUntilChanged().collect { wasRefreshing ->
                 // Route through the single sync path so an imported remote is
@@ -1891,8 +1779,6 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     private suspend fun persistSnapshots(vehicles: List<Vehicle> = _state.value.vehicles) {
         snapshotStore.saveVehicles(vehicles.map { snapshotOf(it, _state.value.statuses[it.vin], _state.value) })
-        // Mirror the fresh snapshots to a paired watch (no-op when none is connected).
-        com.bloo.bluelink.wear.MainToSecondarySync.publish(getApplication())
         refreshLiveChargeBar(vehicles)
     }
 
@@ -2039,25 +1925,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             else -> current
         }
         _state.update { it.copy(seatConfigs = it.seatConfigs + (v.vin to updated)) }
-        viewModelScope.launch {
-            settingsStore.setSeatFlag(v.vin, field, value)
-            // Republish, for the same reason setPowertrain does. The watch's Comfort card shows
-            // only the seat/wheel controls the car actually has, driven by
-            // WearSettingsPayload.seatConfigs -- and MainToSecondarySync builds that field by reading the
-            // store per VIN directly, NOT from `appearance`.
-            //
-            // That is why the appearance collector cannot cover this: it is
-            // `settingsStore.appearance.distinctUntilChanged()`, and a seat flag does not change
-            // appearance, so it never emits. Without this call the watch kept offering a heated
-            // seat the user had just told the phone the car does not have, until something
-            // unrelated happened to touch appearance.
-            runCatching {
-                com.bloo.bluelink.wear.MainToSecondarySync.publishSettingsNow(
-                    getApplication(),
-                    settingsStore.appearance.first(),
-                )
-            }
-        }
+        viewModelScope.launch { settingsStore.setSeatFlag(v.vin, field, value) }
     }
 
     // --- AutoLock (app/.../autolock/) -------------------------------------
@@ -2140,13 +2008,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         _state.update {
             it.copy(hiddenPebbles = if (hidden) it.hiddenPebbles + key else it.hiddenPebbles - key)
         }
-        viewModelScope.launch {
-            settingsStore.setSectionHidden(v.vin, section, hidden)
-            // hiddenSections isn't part of Appearance, so it isn't covered by the
-            // appearance.collect mirror below -- republish explicitly so the
-            // watch's matching tile hides/shows immediately.
-            com.bloo.bluelink.wear.MainToSecondarySync.publishSettings(getApplication(), appearance.value)
-        }
+        viewModelScope.launch { settingsStore.setSectionHidden(v.vin, section, hidden) }
     }
 
     /** [Screen.SyncChoice] -- user picked "Set up fresh" instead of restoring.
@@ -2207,19 +2069,13 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     fun setPowertrain(v: Vehicle, value: Powertrain) {
         _state.update { it.copy(powertrains = it.powertrains + (v.vin to value)) }
-        // Republish immediately: the watch's Charge/Fuel tile derives hasBattery
-        // from the synced snapshot, so a correction here needs to reach it right
-        // away rather than waiting on the next status refresh.
         viewModelScope.launch { settingsStore.setPowertrain(v.vin, value); persistSnapshots() }
     }
 
     fun setPlatform(v: Vehicle, value: VehiclePlatform) {
         _state.update { it.copy(platforms = it.platforms + (v.vin to value)) }
-        // Same reason setPowertrain republishes: persistSnapshots writes the
-        // EFFECTIVE (override-applied) generation number into the synced
-        // VehicleSnapshot -- see snapshotOf -- which is what lets the watch's
-        // own isGen5W check (computed on its own rebuilt Vehicle) agree with
-        // this choice with no watch-side code of its own.
+        // persistSnapshots writes the EFFECTIVE (override-applied) generation
+        // number into the synced VehicleSnapshot -- see snapshotOf.
         viewModelScope.launch { settingsStore.setPlatform(v.vin, value); persistSnapshots() }
     }
 
@@ -2427,13 +2283,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     fun setAiEnabled(value: Boolean) {
         _state.update { it.copy(aiEnabled = value) }
-        viewModelScope.launch {
-            settingsStore.setAiEnabled(value)
-            // aiEnabled isn't part of Appearance, so it isn't covered by the
-            // appearance.collect mirror below -- republish explicitly so the
-            // watch's own AI toggle/tile visibility updates immediately.
-            com.bloo.bluelink.wear.MainToSecondarySync.publishSettings(getApplication(), appearance.value)
-        }
+        viewModelScope.launch { settingsStore.setAiEnabled(value) }
     }
 
     /** Toggle "run AI summaries automatically" -- when on, [autoSummarize] is
@@ -2735,9 +2585,6 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         if (_state.value.climateSync[vin] == cs) return
         val merged = _state.value.climateSync + (vin to cs)
         _state.update { it.copy(climateSync = merged) }
-        com.bloo.bluelink.wear.MainToSecondarySync.publishClimate(
-            getApplication(), com.bloo.bluelink.data.WearClimateState(merged),
-        )
     }
 
     /**
@@ -3289,11 +3136,6 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             // photo, ...) so the UI reflects the restore immediately instead of
             // waiting for some unrelated event to trigger a full garage reload.
             refreshLocalCarConfig()
-            // Push the restored appearance/preferences down to the watch too --
-            // otherwise a manual restore only takes effect on the phone until
-            // some unrelated event (a pebble reorder, the next Drive sync) later
-            // happens to trigger a watch push.
-            com.bloo.bluelink.wear.MainToSecondarySync.publishSettings(getApplication(), settingsStore.appearance.first())
         }
     }
 
@@ -3511,14 +3353,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     /** Switch between simple and advanced settings view. */
     fun setSettingsMode(mode: String) {
         _state.update { it.copy(settingsMode = mode) }
-        viewModelScope.launch {
-            settingsStore.setSettingsMode(mode)
-            // settingsMode isn't part of Appearance, so it isn't covered by the
-            // appearance.collect mirror below -- republish explicitly so the
-            // watch hides/shows the same advanced-only rows immediately,
-            // same as setAiEnabled above.
-            com.bloo.bluelink.wear.MainToSecondarySync.publishSettings(getApplication(), appearance.value)
-        }
+        viewModelScope.launch { settingsStore.setSettingsMode(mode) }
     }
 
     /** Set (or clear, with null) which saved preset the one-tap climate Start
@@ -3563,13 +3398,6 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             settingsStore.setPrimaryDevice(id)
             _state.update { it.copy(syncPrimaryId = id) }
             runDriveSyncNow()
-            // Push settings to the watch so its read-only devices summary reflects
-            // the new primary immediately — same as pebble/AI/aurora changes do.
-            // (setPrimaryDevice writes via the raw DataStore, so it doesn't trip the
-            // dirty-key auto-push, and neither performMainToMainSync nor runDriveSyncNow
-            // republishes to the watch — without this the watch shows the old primary
-            // until some unrelated publish.)
-            runCatching { com.bloo.bluelink.wear.MainToSecondarySync.publishSettings(getApplication(), appearance.value) }
         }
     }
 
@@ -3592,9 +3420,6 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             settingsStore.setSyncDeviceName(name)
             _state.update { it.copy(syncDeviceName = name.trim()) }
             runDriveSyncNow()
-            // Republish so the watch's devices summary shows the new name at once
-            // (same gap/fix as setPrimaryDevice — device name isn't dirty-tracked).
-            runCatching { com.bloo.bluelink.wear.MainToSecondarySync.publishSettings(getApplication(), appearance.value) }
         }
     }
 

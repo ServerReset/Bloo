@@ -16,14 +16,13 @@
 #     person able to report it.
 #
 # Turning renaming on later is a one-line deletion here, but do it only after a
-# release APK has actually been installed and exercised: sign-in, a Drive sync,
-# the watch pairing.
+# release APK has actually been installed and exercised: sign-in, a Drive sync.
 -dontobfuscate
 
 # --- kotlinx.serialization ------------------------------------------------------
-# The entire phone<->watch protocol, every persisted JSON blob, and the settings
-# backup format are kotlinx.serialization. A stripped $$serializer does not fail
-# the build; it fails the decode, at runtime.
+# Every persisted setting, cached response and the settings backup format are
+# kotlinx.serialization. A stripped $$serializer does not fail the build; it
+# fails the decode, at runtime.
 -keepattributes *Annotation*, InnerClasses
 -dontnote kotlinx.serialization.**
 -keepclassmembers class **$$serializer { *; }

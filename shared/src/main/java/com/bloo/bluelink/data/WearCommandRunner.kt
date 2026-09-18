@@ -217,22 +217,14 @@ object WearCommandRunner {
         vin: String,
         force: Boolean = true,
         /**
-         * Receives every VehicleStatus this call actually fetched, keyed by VIN.
-         *
-         * Exists for the WATCH. `refresh` folds each status into the snapshot and drops the
-         * rest, which is all the phone needs -- it keeps its own StatusCache. The watch has no
-         * other source: its `statuses` map's only inbound path was `statusCache.load()`, and
-         * nothing in the wear module ever called `statusCache.save()`, so the map was
-         * permanently empty and every statuses-only field was dead. The Diagnostics tile never
-         * appeared, `alertCount` was always 0 so the Alerts tile never appeared with a door
-         * open, and ~25 diagnostics fields were always null -- while THIS function was
-         * fetching all of it and throwing it away.
-         *
-         * A callback rather than a changed return type, deliberately: the four other callers
-         * (tile worker, widget receiver, widget actions, WearPhoneService) are unaffected and
-         * do not have to know. And NOT a StatusCache write in here, because the phone calls
-         * this too and its cache also holds locations/placeNames -- a read-modify-write from
-         * here would race the phone's own saves and could blank them.
+         * Receives every VehicleStatus this call actually fetched, keyed by VIN. `refresh`
+         * folds each status into the snapshot and drops the rest, which is all most callers
+         * need -- the phone keeps its own StatusCache. Currently unused (always null); kept as
+         * an extension point rather than removed outright, since no caller has needed the full
+         * fetched map since the one consumer that did was removed. NOT a StatusCache write in
+         * here, because several callers share this function and its cache also holds
+         * locations/placeNames -- a read-modify-write from here would race their own saves and
+         * could blank them.
          */
         onStatuses: (suspend (Map<String, VehicleStatus>) -> Unit)? = null,
     ): Boolean {

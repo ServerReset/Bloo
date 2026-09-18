@@ -29,16 +29,17 @@ kotlin {
 
 dependencies {
     // BlooColors (semantic ARGB Int constants) and other pure-Kotlin data --
-    // both :app and :wear already depend on :shared directly, so this adds
-    // nothing new to either APK's dependency graph, just lets uicommon
-    // composables reference the same canonical constants instead of each
-    // platform re-declaring (and silently drifting from) their own copies.
+    // :app already depends on :shared directly, so this adds nothing new to
+    // its dependency graph, just lets uicommon composables reference the same
+    // canonical constants instead of re-declaring (and silently drifting
+    // from) their own copies.
     implementation(project(":shared"))
-    // Foundation-only, pinned via the same Compose BOM the watch uses so the
-    // versions resolve <= each consumer (the phone pins a newer foundation, the
-    // watch this BOM) and Gradle upgrades, never downgrades. Deliberately NO
-    // Material dependency: shared composables take colours/specs as parameters so
-    // they're neutral to compose.material3 (phone) vs wear.compose.material3.
+    // Foundation-only, pinned via a Compose BOM no newer than :app's own so
+    // versions resolve consistently and Gradle upgrades, never downgrades.
+    // Deliberately NO Material dependency: shared composables take
+    // colours/specs as parameters instead, a boundary originally kept so
+    // this module stayed neutral to compose.material3 vs. a since-removed
+    // Wear OS companion app's own wear.compose.material3.
     val composeBom = platform("androidx.compose:compose-bom:2025.04.01")
     implementation(composeBom)
     implementation("androidx.compose.foundation:foundation")

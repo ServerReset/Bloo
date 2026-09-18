@@ -118,14 +118,18 @@ import com.bloo.uicommon.ReorderColumn
  *     was last saved for this car (`settingsLoaded` gates the debounced
  *     save below so it doesn't immediately re-save the values it just
  *     loaded).
- *  2. `remoteClimate` (from `state.climateSync`) mirrors whatever the watch
- *     app or another session set; a [LaunchedEffect] keyed on it snaps all
- *     the local state to match whenever it changes.
+ *  2. `remoteClimate` (from `state.climateSync`) mirrors whatever another
+ *     LIVE composition of this same car's climate pebble just set -- the dual-
+ *     column hotspot can pin "controls" to a secondary slot while the full
+ *     pebble list still renders it too, so the same car's climate can be on
+ *     screen twice at once; a [LaunchedEffect] keyed on it snaps all the
+ *     local state to match whenever either instance changes it.
  *  3. A single debounced [LaunchedEffect] keyed on `(currentReq,
  *     activePresetId)` persists + publishes the current settings back out
- *     (to storage and to the watch) after they stop changing -- the actual
- *     400ms debounce lives in the ViewModel's own coroutine scope rather
- *     than in this effect, specifically so a car-switch or pebble collapse
+ *     (to storage, and to `state.climateSync` for the other instance above)
+ *     after they stop changing -- the actual 400ms debounce lives in the
+ *     ViewModel's own coroutine scope rather than in this effect, specifically
+ *     so a car-switch or pebble collapse
  *     that removes this composable from the tree within that window can't
  *     silently cancel and drop the pending save.
  *
@@ -220,8 +224,9 @@ internal fun ClimatePebble(
         if (active != null && active.request != currentReq) activePresetId = null
     }
 
-    // --- Two-way climate sync with the watch ----------------------------------
-    // Reflect whatever the watch (or another session) set: sliders + active preset.
+    // --- Cross-composition climate sync ---------------------------------------
+    // Reflect whatever another live composition of this same car's climate
+    // pebble just set: sliders + active preset.
     val remoteClimate = state.climateSync[v.vin]
     LaunchedEffect(remoteClimate) {
         val r = remoteClimate ?: return@LaunchedEffect

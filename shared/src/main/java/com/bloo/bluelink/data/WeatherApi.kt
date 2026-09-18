@@ -13,12 +13,7 @@ import kotlin.math.roundToInt
 /**
  * Current conditions for a single point, normalised from the Open-Meteo response.
  * Temperatures are kept in Celsius; the UI converts to the user's chosen unit.
- *
- * Lives in `:shared` (not `:app`) so both the phone AND the watch can fetch
- * weather directly — the watch needs its own fetch to show weather / Smart
- * Climate when running standalone with no phone to relay through. It's a
- * self-contained, key-less Open-Meteo GET over okhttp (already a `:shared`
- * dependency), so nothing about the phone's usage changes by relocating it.
+ * A self-contained, key-less Open-Meteo GET over okhttp.
  */
 data class Weather(
     val tempC: Double,
@@ -33,11 +28,6 @@ data class Weather(
     /** When this reading was fetched (wall-clock millis). */
     val fetchedAt: Long = System.currentTimeMillis(),
 ) {
-    /** Same shape as [WearWeather], for mirroring a fetched reading to the watch. */
-    fun toWear() = WearWeather(
-        tempC = tempC, feelsLikeC = feelsLikeC, highC = highC, lowC = lowC,
-        windKph = windKph, humidity = humidity, isDay = isDay, code = code,
-    )
     // Straightforward Celsius-to-Fahrenheit conversions; kept as separate small
     // functions (rather than converting once at fetch time) so the canonical
     // stored value always stays Celsius and callers pick the unit at display time.

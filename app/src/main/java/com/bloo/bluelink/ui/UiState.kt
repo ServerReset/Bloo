@@ -154,7 +154,8 @@ data class UiState(
     val trips: Map<String, List<EvTrip>> = emptyMap(),
     /** User-named climate presets by VIN. */
     val climatePresets: Map<String, List<ClimatePreset>> = emptyMap(),
-    /** Live climate draft mirrored from the watch, by VIN (two-way climate sync). */
+    /** Live climate draft, by VIN, shared between simultaneous live compositions
+     *  of the same car's climate pebble (see ClimatePebble's own doc). */
     val climateSync: Map<String, com.bloo.bluelink.data.ClimateSync> = emptyMap(),
     val seatConfigs: Map<String, SeatConfig> = emptyMap(),
     val powertrains: Map<String, Powertrain> = emptyMap(),

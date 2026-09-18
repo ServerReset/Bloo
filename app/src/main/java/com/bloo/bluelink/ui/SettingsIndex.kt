@@ -96,7 +96,6 @@ internal val SearchSynonyms: Map<String, List<String>> = mapOf(
     "beep" to listOf("horn"),
     "flash" to listOf("lights"),
     "headlights" to listOf("lights"),
-    "watch" to listOf("wear", "wearable"),
     "backup" to listOf("sync", "drive", "google"),
     "cloud" to listOf("sync", "drive"),
     "notify" to listOf("notification", "alert"),

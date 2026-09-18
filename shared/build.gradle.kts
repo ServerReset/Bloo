@@ -26,8 +26,8 @@ kotlin {
 }
 
 dependencies {
-    // Exposed with api(...) so both :app and :wear pick up the model/networking
-    // types transitively — these classes appear in their public signatures.
+    // Exposed with api(...) so :app picks up the model/networking types
+    // transitively — these classes appear in its public signatures.
     api("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
     api("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")
 

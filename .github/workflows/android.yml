@@ -55,7 +55,7 @@ jobs:
 
       # One Gradle invocation, not two: every separate `./gradlew` call repeats
       # the whole project's CONFIGURATION phase (evaluating every build.gradle.kts
-      # in :app/:wear/:shared/:uicommon/:hidden-api-stub) before it schedules a
+      # in :app/:shared/:uicommon/:hidden-api-stub) before it schedules a
       # single task, regardless of which task was asked for -- so running unit
       # tests and the release build as two invocations paid that cost twice for
       # no benefit. Gradle happily schedules both task graphs from one command
@@ -95,8 +95,6 @@ jobs:
           path: |
             app/build/reports/lint-results-*.html
             app/build/reports/lint-results-*.txt
-            wear/build/reports/lint-results-*.html
-            wear/build/reports/lint-results-*.txt
           if-no-files-found: ignore
 
       # No actions/upload-artifact for the APKs themselves -- that was reported
@@ -127,7 +125,7 @@ jobs:
           prev_tag=$(git tag -l 'build-*' | sed 's/^build-//' | sort -n | tail -1)
           {
             echo "### How to install"
-            echo "1. Download \`Bloo.apk\` below (and \`Bloo-Wear.apk\` for the watch)."
+            echo "1. Download \`Bloo.apk\` below."
             echo "2. Open the downloaded file from your notification shade or Downloads app."
             echo "3. If Android shows **\"Blocked by Play Protect\"**, tap **\"More details\"**, then **\"Install anyway\"** and confirm with your biometrics or device password."
             echo
@@ -155,7 +153,6 @@ jobs:
           body_path: release_notes.md
           files: |
             app/build/outputs/apk/release/Bloo.apk
-            wear/build/outputs/apk/release/Bloo-Wear.apk
 
   # A separate, manually-tagged Release ("vN") for anyone who wants a stable
   # build instead of the rolling "build-<run number>" pre-release the build
@@ -206,5 +203,4 @@ jobs:
         with:
           files: |
             app/build/outputs/apk/release/Bloo.apk
-            wear/build/outputs/apk/release/Bloo-Wear.apk
           generate_release_notes: true
