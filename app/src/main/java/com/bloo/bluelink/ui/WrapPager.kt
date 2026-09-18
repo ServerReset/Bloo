@@ -71,16 +71,28 @@ import kotlin.math.abs
 // as few as 3-4 swipes in one direction, which is exactly the "swipe the
 // same way repeatedly to see if it loops" motion anyone testing this feature
 // would make -- reported directly as "very obvious when it doesn't infinite
-// scroll and goes around." Recentering is a safety NET now, not the only
-// thing standing between "fine" and "unbounded" the way the huge multiplier
-// used to be -- so it can afford to be large again: worst case, an account
-// with two real items now retains at most 1000x2 = 2000 compositions before
-// ever needing to reclaim any of them, a bounded and self-correcting number
-// (not the old unbounded growth), while requiring roughly 500+ one-directional
-// swipes before a recenter is ever even reachable -- past any realistic
-// swiping session, so the visible jump this was reported over should no
-// longer be reachable in practice either.
-private const val WRAP_MULTIPLIER = 1000
+// scroll and goes around."
+//
+// Raising it all the way to 1000 traded that bug for a real OutOfMemoryError
+// (a heap-exhaustion crash on a live device, not a hypothetical): with
+// realCount=2 that let the pager retain up to 1000x2 = 2000 distinct virtual
+// pages before recentering ever became reachable, and each one is a whole
+// VehicleDetailContent/SettingsScreen subtree, not a lightweight row --
+// nowhere near the "bounded and self-correcting" ceiling that number was
+// asserted to be when 1000 was chosen; it was never actually measured
+// against a device heap. 80 is the compromise: still a wide safe zone
+// (realCount x (40 - RECENTER_MARGIN_CYCLES) one-directional swipes before a
+// recenter is reachable -- 60 for two cars, comfortably past any "does this
+// loop" test), while capping the worst case at 80x[realCount] retained
+// pages instead of 1000x -- an order of magnitude smaller ceiling for
+// whatever in a page's subtree scales with distinct-pages-ever-visited.
+// This is a bound on the ceiling, not a fix for a confirmed root cause: this
+// sandbox can't run the app or take a heap dump, so the exact mechanism
+// retaining those pages (composition-slot retention, an image cache, a
+// per-page coroutine that's never cancelled) hasn't been isolated. If the
+// OOM recurs, that measurement -- not another guess at this constant -- is
+// the next step.
+private const val WRAP_MULTIPLIER = 80
 /** Recenter once the pager drifts within this many real-item-widths of
  *  either edge of the virtual range -- see [WRAP_MULTIPLIER]'s own doc. This
  *  only needs to be big enough that a single fling can't overshoot past it in
