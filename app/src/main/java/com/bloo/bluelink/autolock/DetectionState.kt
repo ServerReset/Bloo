@@ -8,7 +8,7 @@ package com.bloo.bluelink.autolock
  */
 enum class DetectionState {
     IDLE,
-    CONFIRMING,   // Trigger fired; waiting for corroborating signals (activity/geofence).
+    CONFIRMING,   // Trigger fired; waiting for walking confirmation.
     GRACE,        // Counting down before acting.
     VERIFYING,    // Querying the vehicle status via the API.
     LOCKING,      // Sending the lock command.
@@ -29,6 +29,5 @@ sealed interface DetectionEvent {
     data object CarBluetoothDisconnected : DetectionEvent
     data object CarBluetoothReconnected : DetectionEvent
     data object WalkingConfirmed : DetectionEvent
-    data object MovedBeyondGeofence : DetectionEvent
     data object UserCancelled : DetectionEvent
 }

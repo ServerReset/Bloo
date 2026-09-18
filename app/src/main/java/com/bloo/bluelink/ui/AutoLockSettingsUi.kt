@@ -39,16 +39,14 @@ import kotlin.math.roundToInt
 /**
  * AutoLock's per-car Settings section, inside [CarSettingsCard]. Ported feature from the
  * i5-AutoLock reference implementation by Vel-San (github.com/Vel-San/i5-AutoLock): locks
- * this car automatically when the phone disconnects from its paired Bluetooth device, after
- * an optional walking/geofence confirmation and a cancellable grace period -- see
- * app/.../autolock/ for the detection + policy machinery this configures.
+ * this car automatically when the phone disconnects from its paired Bluetooth device, once
+ * Activity Recognition confirms you're actually walking away -- see app/.../autolock/ for
+ * the detection + policy machinery this configures.
  *
- * Laid out as sibling [SettingsGroup]s (AutoLock, Trigger, Confirm before locking, Safety,
- * Test), the same standard box every other feature in this card uses -- not a bespoke
- * per-section treatment of its own. Each toggle that turns on a signal this app has no
- * permission for yet actively prompts for it right there, instead of silently flipping a
- * setting whose underlying detector will just no-op until the user happens to find their
- * way to Android's own permission settings.
+ * Collapsed to one [SettingsGroup] plus a "Test" group: Bluetooth is the only trigger (no
+ * geofence option -- that whole confirmation path, and the location permissions it needed,
+ * were cut entirely), motion confirmation is mandatory and not a toggle, and the remaining
+ * controls are Enable, the paired device picker, grace period, dry-run, and a way to test it.
  */
 @Composable
 internal fun AutoLockSettingsGroup(v: Vehicle, vm: AppViewModel) {
@@ -71,25 +69,11 @@ internal fun AutoLockSettingsGroup(v: Vehicle, vm: AppViewModel) {
 
     var showDevicePicker by remember { mutableStateOf(false) }
 
-    val backgroundLocationLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.RequestPermission(),
-    ) { /* no-op either way: GeofenceManager checks for itself before registering. */ }
-    val fineLocationLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.RequestPermission(),
-    ) { fineGranted ->
-        if (fineGranted && Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q &&
-            !granted(Manifest.permission.ACCESS_BACKGROUND_LOCATION)
-        ) {
-            backgroundLocationLauncher.launch(Manifest.permission.ACCESS_BACKGROUND_LOCATION)
-        }
-    }
     val bluetoothConnectLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission(),
     ) { granted -> if (granted) showDevicePicker = true }
-    // Walking confirmation is mandatory now (not a toggle -- see the "Confirm before
-    // locking" SettingsGroup below), so ACTIVITY_RECOGNITION is requested right alongside
-    // the other permissions AutoLock needs the moment it's turned on, rather than behind
-    // its own toggle.
+    // Motion confirmation is mandatory (not a toggle), so ACTIVITY_RECOGNITION is requested
+    // right alongside the other permissions AutoLock needs the moment it's turned on.
     val corePermissions = remember {
         buildList {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) add(Manifest.permission.BLUETOOTH_CONNECT)
@@ -109,31 +93,12 @@ internal fun AutoLockSettingsGroup(v: Vehicle, vm: AppViewModel) {
         }
     }
 
-    fun onGeofenceChanged(value: Boolean) {
-        update(current.copy(useGeofence = value))
-        if (value) {
-            if (!granted(Manifest.permission.ACCESS_FINE_LOCATION)) {
-                fineLocationLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
-            } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && !granted(Manifest.permission.ACCESS_BACKGROUND_LOCATION)) {
-                backgroundLocationLauncher.launch(Manifest.permission.ACCESS_BACKGROUND_LOCATION)
-            }
-        }
-    }
-
-    // Plain SettingsGroups, the same standard box every other feature in this card
-    // (Powertrain, Head-unit generation, Climate features) uses -- not a bespoke
-    // per-section Surface+icon treatment of its own. SettingsGroup's own
-    // Arrangement.spacedBy already gives every direct child an 8dp gap, so the
-    // only Spacers left below are the ones the rest of this file already reaches
-    // for beyond that default (a tighter hairline gap right before a slider/picker
-    // that follows a caption -- see Head-unit generation's own SettingsGroup for
-    // the same idiom).
     SettingsGroup("AutoLock") {
         Text(
-            "Automatically locks ${v.name} after you leave, detected from your phone " +
-                "disconnecting from its paired Bluetooth. Starts disabled and in dry-run " +
-                "mode -- it decides what it would do but never sends a real lock command " +
-                "until you turn that off.",
+            "Automatically locks ${v.name} once your phone disconnects from its paired " +
+                "Bluetooth and Activity Recognition confirms you're walking away. Starts " +
+                "disabled and in dry-run mode -- it decides what it would do but never sends " +
+                "a real lock command until you turn that off.",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -149,7 +114,7 @@ internal fun AutoLockSettingsGroup(v: Vehicle, vm: AppViewModel) {
             )
         }
 
-        // Locking always waits for a walking confirmation now, so denying this permission
+        // Locking always waits for a walking confirmation, so denying this permission
         // means every evaluation times out and skips -- surfaced here since it would
         // otherwise look like AutoLock is simply broken, with no toggle left to point at.
         if (current.enabled && Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q &&
@@ -163,12 +128,8 @@ internal fun AutoLockSettingsGroup(v: Vehicle, vm: AppViewModel) {
                 icon = Icons.Filled.Warning,
             )
         }
-    }
 
-    // Only show detailed settings when enabled -- sibling SettingsGroups, same as
-    // the rest of this card, not sub-cards nested one level inside a wrapping group.
-    if (current.enabled) {
-        SettingsGroup("Trigger") {
+        if (current.enabled) {
             StatusRow("Car Bluetooth device", current.deviceName ?: "Not set")
             val deviceSource = remember { MutableInteractionSource() }
             SafeExpansiveButton(interactionSource = deviceSource, enabled = true) {
@@ -198,51 +159,16 @@ internal fun AutoLockSettingsGroup(v: Vehicle, vm: AppViewModel) {
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-        }
 
-        SettingsGroup("Confirm before locking") {
-            Text(
-                "Always waits for Activity Recognition to notice you're walking before starting the countdown — cuts false triggers from a brief signal drop.",
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            ToggleRow(
-                "Confirm with geofence",
-                current.useGeofence,
-                description = "Waits for you to walk beyond a radius around where the car's parked.",
-                onChange = ::onGeofenceChanged,
-            )
-
-            if (current.useGeofence) {
-                StepRow("Geofence radius", "${current.geofenceRadiusMeters} m")
-                AnimatedSlider(
-                    value = current.geofenceRadiusMeters.toFloat(),
-                    onValueChange = { updateLocal(current.copy(geofenceRadiusMeters = it.roundToInt())) },
-                    onValueSettled = { update(current.copy(geofenceRadiusMeters = it.roundToInt())) },
-                    valueRange = 50f..500f,
-                    steps = 8,
-                )
-                Text(
-                    "Lock only after you've walked this far from the parked location.",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-        }
-
-        SettingsGroup("Safety") {
-            Text(
-                "Never locks if any door or window is reported open.",
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
             ToggleRow(
                 "Dry run (testing mode)",
                 current.dryRun,
                 description = "Runs the full flow and logs what it would do, but never sends the real lock command. Defaults on; turn off once you trust it.",
             ) { update(current.copy(dryRun = it)) }
         }
+    }
 
+    if (current.enabled) {
         SettingsGroup("Test") {
             val simSource = remember { MutableInteractionSource() }
             SafeExpansiveButton(interactionSource = simSource, enabled = current.isUsable) {

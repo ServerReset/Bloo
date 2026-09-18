@@ -353,9 +353,6 @@ internal fun SettingsSearchResults(
         add("AutoLock · ${v.name}", "autolock automatic lock leave walk away bluetooth disconnect ${v.name}") {
             AutoLockSearchToggle(v, vm, "Enabled", { it.enabled }, { c, x -> c.copy(enabled = x) })
         }
-        add("AutoLock geofence confirmation · ${v.name}", "autolock confirm geofence location area ${v.name}") {
-            AutoLockSearchToggle(v, vm, "Confirm with geofence", { it.useGeofence }, { c, x -> c.copy(useGeofence = x) })
-        }
         add("AutoLock dry run · ${v.name}", "autolock dry run test simulate safety ${v.name}") {
             AutoLockSearchToggle(v, vm, "Dry run", { it.dryRun }, { c, x -> c.copy(dryRun = x) })
         }

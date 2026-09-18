@@ -19,10 +19,9 @@ import kotlinx.coroutines.launch
 
 /**
  * Short-lived foreground service that runs while one or more AutoLock evaluations are in
- * flight. Starts when a car's Bluetooth disconnects (or its geofence fires, if Bluetooth
- * isn't the configured trigger), drives [AutoLockController], reflects progress in a
- * per-car notification, and stops itself once every evaluation it's tracking has reached a
- * terminal state. Ported/simplified from i5-AutoLock's `AutoLockService` -- no persistent
+ * flight. Starts when a car's Bluetooth disconnects, drives [AutoLockController], reflects
+ * progress in a per-car notification, and stops itself once every evaluation it's tracking
+ * has reached a terminal state. Ported/simplified from i5-AutoLock's `AutoLockService` -- no persistent
  * "watching" mode, since Bloo's manifest-registered [AutoLockBluetoothReceiver] already
  * catches the disconnect without needing a service alive in between.
  *
@@ -62,7 +61,7 @@ class AutoLockService : Service() {
             }
         }
 
-        // Default: a trigger fired (Bluetooth disconnect / geofence exit). The FIRST
+        // Default: a trigger fired (Bluetooth disconnect). The FIRST
         // startForegroundCompat call here is deliberately synchronous and unconditional --
         // Android requires startForeground() promptly and unconditionally after
         // startForegroundService(), and a coroutine dispatch (even on Main.immediate) is one
@@ -144,8 +143,8 @@ class AutoLockService : Service() {
         const val ACTION_LOCK_NOW = "com.bloo.bluelink.AUTOLOCK_LOCK_NOW"
         const val EXTRA_VIN = "vin"
 
-        /** Fires a one-off evaluation for [vin] (Bluetooth disconnect / geofence exit / a
-         *  manual "Simulate leaving" test from Settings). */
+        /** Fires a one-off evaluation for [vin] (Bluetooth disconnect / a manual
+         *  "Simulate leaving" test from Settings). */
         fun start(context: Context, vin: String) {
             val intent = Intent(context, AutoLockService::class.java).putExtra(EXTRA_VIN, vin)
             try {

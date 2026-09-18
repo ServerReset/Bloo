@@ -12,11 +12,11 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 
 /**
- * Primary "left the car" trigger: fires when the phone disconnects from a car's paired
- * Bluetooth device (its head unit / hands-free profile). Also cancels a pending lock and
- * re-arms the geofence on reconnect (the user got back in). Ported from i5-AutoLock's
- * `BluetoothStateReceiver`, generalized to Bloo's multiple garages: every car with AutoLock
- * enabled is checked, since more than one could plausibly share a phone.
+ * The "left the car" trigger: fires when the phone disconnects from a car's paired
+ * Bluetooth device (its head unit / hands-free profile). Also cancels a pending lock on
+ * reconnect (the user got back in). Ported from i5-AutoLock's `BluetoothStateReceiver`,
+ * generalized to Bloo's multiple garages: every car with AutoLock enabled is checked,
+ * since more than one could plausibly share a phone.
  *
  * Registered in the manifest (not `registerReceiver` at runtime) -- ACL connect/disconnect
  * is one of the implicit broadcasts still delivered to manifest-declared receivers even
@@ -48,7 +48,7 @@ class AutoLockBluetoothReceiver : BroadcastReceiver() {
                 // device, not just a car's), so it wants to be cheap when there's nothing to
                 // do, which is almost always.
                 for ((vin, settings) in SettingsStore(ctx).allAutoLockConfigs()) {
-                    if (!settings.enabled || !settings.useBluetoothTrigger) continue
+                    if (!settings.enabled) continue
                     if (!deviceMac.equals(settings.deviceAddress, ignoreCase = true)) continue
 
                     when (action) {
@@ -56,15 +56,7 @@ class AutoLockBluetoothReceiver : BroadcastReceiver() {
                             AppLog.log("AutoLock: car Bluetooth disconnected for $vin — starting evaluation.")
                             AutoLockService.start(ctx, vin)
                         }
-                        BluetoothDevice.ACTION_ACL_CONNECTED -> {
-                            AutoLockController.cancel(vin)
-                            if (settings.useGeofence) {
-                                LocationHelper.currentLocation(ctx)?.let { loc ->
-                                    GeofenceManager.register(ctx, vin, loc.latitude, loc.longitude, settings.geofenceRadiusMeters)
-                                    AppLog.log("AutoLock: arrived at $vin — geofence armed.")
-                                }
-                            }
-                        }
+                        BluetoothDevice.ACTION_ACL_CONNECTED -> AutoLockController.cancel(vin)
                     }
                 }
             } finally {

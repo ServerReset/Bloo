@@ -814,10 +814,10 @@ class SettingsStore(private val context: Context) {
     //
     // Ported from the i5-AutoLock reference app (github.com/Vel-San/i5-AutoLock): locks a
     // car automatically when the phone disconnects from its paired Bluetooth device (the
-    // head unit), optionally confirmed by Activity Recognition (driving -> walking) and/or a
-    // geofence, after a cancellable grace period, and only when the car's own status says
-    // it's safe to (unlocked, engine off, doors/windows closed if that's required). See
-    // app/.../autolock/ for the state machine, policy and detection plumbing.
+    // head unit), confirmed by Activity Recognition (driving -> walking), after a
+    // cancellable grace period, and only when the car's own status says it's safe to
+    // (unlocked, engine off, doors/windows closed). See app/.../autolock/ for the state
+    // machine, policy and detection plumbing.
 
     suspend fun autoLockConfig(vin: String): AutoLockConfig =
         autoLockConfig(vin, context.settingsDataStore.data.first())
@@ -838,10 +838,7 @@ class SettingsStore(private val context: Context) {
             enabled = b("autolock_enabled_$vin", false),
             deviceAddress = s("autolock_device_addr_$vin"),
             deviceName = s("autolock_device_name_$vin"),
-            useBluetoothTrigger = b("autolock_use_bt_$vin", true),
             graceSeconds = i("autolock_grace_$vin", 30),
-            useGeofence = b("autolock_use_geofence_$vin", false),
-            geofenceRadiusMeters = i("autolock_geofence_radius_$vin", 100),
             dryRun = b("autolock_dry_run_$vin", true),
         )
     }
@@ -851,11 +848,12 @@ class SettingsStore(private val context: Context) {
      *  them on sign-out) can't drift out of sync with each other the way two hand-written key
      *  lists eventually would.
      *
-     *  Includes two keys ("autolock_use_activity_$vin", "autolock_dont_lock_if_open_$vin")
-     *  that [autoLockConfig] no longer reads and [setAutoLockConfig] no longer writes -- both
-     *  behaviors are now hardcoded always-on rather than user choices. Left in this list purely
-     *  so a sign-out still clears any value an older build wrote for them, rather than leaving
-     *  orphaned keys behind. */
+     *  Includes several keys ("autolock_use_activity_$vin", "autolock_dont_lock_if_open_$vin",
+     *  "autolock_use_bt_$vin", "autolock_use_geofence_$vin", "autolock_geofence_radius_$vin")
+     *  that [autoLockConfig] no longer reads and [setAutoLockConfig] no longer writes -- those
+     *  behaviors are now either hardcoded always-on or removed entirely (geofence). Left in
+     *  this list purely so a sign-out still clears any value an older build wrote for them,
+     *  rather than leaving orphaned keys behind. */
     private fun autoLockKeys(vin: String) = listOf(
         booleanPreferencesKey("autolock_enabled_$vin"),
         stringPreferencesKey("autolock_device_addr_$vin"),
@@ -876,14 +874,11 @@ class SettingsStore(private val context: Context) {
             if (config.deviceAddress == null) it.remove(addrKey) else it[addrKey] = config.deviceAddress
             val nameKey = stringPreferencesKey("autolock_device_name_$vin")
             if (config.deviceName == null) it.remove(nameKey) else it[nameKey] = config.deviceName
-            it[booleanPreferencesKey("autolock_use_bt_$vin")] = config.useBluetoothTrigger
             it[stringPreferencesKey("autolock_grace_$vin")] = config.graceSeconds.toString()
-            it[booleanPreferencesKey("autolock_use_geofence_$vin")] = config.useGeofence
-            it[stringPreferencesKey("autolock_geofence_radius_$vin")] = config.geofenceRadiusMeters.toString()
             it[booleanPreferencesKey("autolock_dry_run_$vin")] = config.dryRun
         }
-        // Maintain the registry of "cars with AutoLock configured" so the Bluetooth/geofence
-        // receivers -- which start from a raw device MAC or a VIN, not a UI selection -- can
+        // Maintain the registry of "cars with AutoLock configured" so the Bluetooth
+        // receiver -- which starts from a raw device MAC or a VIN, not a UI selection -- can
         // enumerate every car to check instead of needing one BroadcastReceiver registration
         // per car.
         editTracked {
@@ -926,9 +921,9 @@ class SettingsStore(private val context: Context) {
     }
 
     /** One DataStore read for every registered car's full [AutoLockConfig] -- what the
-     *  Bluetooth/geofence receivers actually want (a device MAC or a VIN comes in, every
-     *  configured car needs checking against it), instead of the registry list plus one
-     *  [autoLockConfig] round trip per car. */
+     *  Bluetooth receiver actually wants (a device MAC or a VIN comes in, every configured
+     *  car needs checking against it), instead of the registry list plus one [autoLockConfig]
+     *  round trip per car. */
     suspend fun allAutoLockConfigs(): Map<String, AutoLockConfig> {
         val p = context.settingsDataStore.data.first()
         return autoLockConfiguredVins(p).associateWith { autoLockConfig(it, p) }

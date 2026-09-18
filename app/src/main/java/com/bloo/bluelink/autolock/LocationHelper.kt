@@ -15,12 +15,14 @@ import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlin.coroutines.resume
 
-/** A single best-effort current-location read, used to register (arrival) and confirm
- *  (walked-beyond-radius) AutoLock's geofence. Ported down from i5-AutoLock's
- *  `LocationHelper` -- Bloo's own weather "My location" feature only needs a one-shot coarse
- *  fix via the platform `LocationManager`, so this is new: AutoLock's geofence needs the
- *  fine, fused location fix that comes with play-services-location (already a dependency
- *  for the geofencing/activity-recognition APIs it also uses). */
+/** A single best-effort current-location read (the phone's own last-known position), and
+ *  a continuous stream of the same for surfaces that want it live. Originally added for
+ *  AutoLock's geofence trigger (ported down from i5-AutoLock's `LocationHelper`); that
+ *  trigger is gone, but this fine, fused location fix (via play-services-location, already
+ *  a dependency for Activity Recognition) is still what backs the car map's "you are here"
+ *  dot, weather's distance-to-car, and [com.bloo.bluelink.ui.AppViewModel.refreshDeviceLocation] --
+ *  Bloo's own weather "My location" feature is unrelated and uses a one-shot coarse fix via
+ *  the platform `LocationManager` instead. */
 object LocationHelper {
     private fun hasPermission(context: Context): Boolean =
         ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) ==

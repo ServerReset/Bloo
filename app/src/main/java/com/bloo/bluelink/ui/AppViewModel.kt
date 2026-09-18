@@ -625,7 +625,6 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 runCatching {
                     val autoLockVins = settingsStore.autoLockConfiguredVins()
                     com.bloo.bluelink.autolock.AutoLockController.forgetAll(autoLockVins)
-                    autoLockVins.forEach { com.bloo.bluelink.autolock.GeofenceManager.remove(getApplication(), it) }
                     settingsStore.clearAllAutoLockConfigs()
                 }
                 // `sessionFetched` is add-only and lives for the ViewModel's life, and
@@ -2574,8 +2573,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     /**
      * Refreshes [UiState.deviceLocation] -- the PHONE's own last-known position, not any
-     * car's. Best-effort via the same fused-location helper AutoLock's geofence uses
-     * ([com.bloo.bluelink.autolock.LocationHelper]); fails soft (leaves whatever value
+     * car's. Best-effort via the same fused-location helper
+     * ([com.bloo.bluelink.autolock.LocationHelper]) used elsewhere; fails soft (leaves whatever value
      * was already there) with no permission or no fix, the same way [locate] already
      * treats a failed car GPS fix. Fire-and-forget: callers do not await this, since a
      * missing/slow device fix should never hold up whatever ELSE they were doing (loading

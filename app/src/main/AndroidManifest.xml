@@ -22,32 +22,24 @@
          distribution either way: Bloo isn't on the Play Store, so that policy
          doesn't gate this build at all. -->
     <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
-    <!-- Optional: only used to set the weather location to the device's position.
-         The app works fine without it (a place can be typed in Settings instead). -->
+    <!-- Optional: only used to set the weather location to the device's position
+         (the map's own "device location" blue dot also uses the FINE grant below).
+         The app works fine without either (a place can be typed in Settings instead). -->
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
 
     <!-- AutoLock (app/.../autolock/): locks a car when the phone disconnects from its
-         paired Bluetooth device, optionally confirmed by Activity Recognition and/or a
-         geofence. All optional — AutoLock is off by default per car and every permission
-         below is requested only from AutoLock's own Settings section, only for the signal
-         the user actually turns on. -->
+         paired Bluetooth device, confirmed by Activity Recognition. Off by default per
+         car and every permission below is requested only from AutoLock's own Settings
+         section, only once the feature is actually turned on. -->
     <!-- Bluetooth disconnect trigger + the paired-device picker in Settings. -->
     <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
-    <!-- Geofence confirmation/trigger and the one-shot fix used to register it on arrival. -->
-    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
-    <!-- Needed for the geofence EXIT callback to fire while the app is backgrounded —
-         which is the only time it ever needs to, since the phone is in your pocket, not
-         the app in the foreground, when you walk away from the car. -->
-    <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" />
     <!-- Activity Recognition confirmation (driving -> walking). -->
     <uses-permission android:name="android.permission.ACTIVITY_RECOGNITION" />
     <!-- The short-lived foreground service that runs while an evaluation (grace countdown,
          status check, lock) is in flight. -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE" />
-    <!-- Re-arms a car's geofence after a reboot (which clears every app's registered
-         geofences outright) or an app update — see AutoLockBootReceiver's own doc. -->
-    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <!-- Bloo isn't on the Play Store, so the in-app update prompt downloads
          the new APK itself and launches the system package installer;
          needs this to be allowed to request an install at all on API 26+. -->
@@ -200,17 +192,14 @@
                 <action android:name="android.bluetooth.device.action.ACL_DISCONNECTED" />
             </intent-filter>
         </receiver>
-        <!-- Geofence EXIT callbacks (LocationServices.GeofencingClient) and Activity
-             Recognition transitions are both delivered via an explicit PendingIntent built
-             from these two receivers, see GeofenceManager/ActivityRecognitionManager,
-             so neither needs an intent-filter here. -->
-        <receiver android:name=".autolock.AutoLockGeofenceReceiver" android:exported="false" />
+        <!-- Activity Recognition transitions are delivered via an explicit PendingIntent
+             built from this receiver, see ActivityRecognitionManager, so it needs no
+             intent-filter here. -->
         <receiver android:name=".autolock.AutoLockActivityReceiver" android:exported="false" />
-        <!-- Re-arms a connected car's geofence after a reboot (which clears every app's
-             registered geofences outright) or an app update — see its own doc comment. -->
+        <!-- Relaunches MainActivity once an in-place app update finishes installing --
+             see its own doc comment. -->
         <receiver android:name=".autolock.AutoLockBootReceiver" android:exported="false">
             <intent-filter>
-                <action android:name="android.intent.action.BOOT_COMPLETED" />
                 <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
             </intent-filter>
         </receiver>

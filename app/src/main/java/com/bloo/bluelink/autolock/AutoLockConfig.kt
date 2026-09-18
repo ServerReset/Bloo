@@ -13,16 +13,11 @@ data class AutoLockConfig(
      *  user picks one in Settings -- AutoLock can't trigger without it. */
     val deviceAddress: String? = null,
     val deviceName: String? = null,
-    /** The primary trigger. Off only makes sense alongside [useGeofence], for a car whose
-     *  head unit doesn't report a clean Bluetooth disconnect. */
-    val useBluetoothTrigger: Boolean = true,
     val graceSeconds: Int = 30,
-    val useGeofence: Boolean = false,
-    val geofenceRadiusMeters: Int = 100,
     /** Runs the full detect -> verify flow but never sends the real lock command -- logs
      *  "would have locked" instead. Defaults on; the user turns it off once they trust it. */
     val dryRun: Boolean = true,
 ) {
     /** Whether this car has enough configured to ever actually trigger. */
-    val isUsable: Boolean get() = deviceAddress != null && (useBluetoothTrigger || useGeofence)
+    val isUsable: Boolean get() = deviceAddress != null
 }

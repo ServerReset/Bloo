@@ -55,8 +55,8 @@ data class AutoLockEvalState(
 object AutoLockController {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     // ConcurrentHashMap, not a plain HashMap guarded by nothing: the Bluetooth receiver's
-    // coroutine, the service's, and a geofence/activity receiver's can all touch these for
-    // different VINs (or race the same one) from different threads.
+    // coroutine, the service's, and the activity-recognition receiver's can all touch these
+    // for different VINs (or race the same one) from different threads.
     private val locks = java.util.concurrent.ConcurrentHashMap<String, Mutex>()
     private val jobs = java.util.concurrent.ConcurrentHashMap<String, Job>()
     private val machines = java.util.concurrent.ConcurrentHashMap<String, LockStateMachine>()
@@ -92,11 +92,6 @@ object AutoLockController {
      *  per-VIN), so a "walking" transition confirms every evaluation currently waiting on it. */
     fun onWalkingConfirmedAny() {
         _state.value.filterValues { it.detection == DetectionState.CONFIRMING }.keys.forEach { onWalkingConfirmed(it) }
-    }
-
-    fun onMovedBeyondGeofence(vin: String) {
-        walkAwayConfirmed.add(vin)
-        machines[vin]?.let { advance(vin, it.next(stateFor(vin).detection, DetectionEvent.MovedBeyondGeofence)) }
     }
 
     /** Reconnect or user cancel: abort a pending evaluation for [vin], if there is one.
@@ -145,19 +140,18 @@ object AutoLockController {
             val settings = SettingsStore(context).autoLockConfig(vin)
             if (!settings.enabled) return@withLock
 
-            val sm = LockStateMachine(settings.useGeofence).also { machines[vin] = it }
+            val sm = LockStateMachine().also { machines[vin] = it }
             advance(vin, sm.next(DetectionState.IDLE, DetectionEvent.CarBluetoothDisconnected))
             AppLog.log("AutoLock: left the car ($vin) — evaluating.")
 
             ActivityRecognitionManager.start(context)
             startedActivityRecognition = true
 
-            // Wait for corroborating signals (activity + geofence) to promote CONFIRMING -> GRACE,
-            // or time out and either proceed on the Bluetooth signal alone or skip, per settings.
-            // Suspends on the state flow itself rather than polling on a timer: a confirmation
-            // (onWalkingConfirmed/onMovedBeyondGeofence) resumes this immediately instead of up
-            // to 250ms late, and the coroutine does no work at all in between -- no wakeups, no
-            // CPU, for however long the confirmation window is open.
+            // Wait for the walking confirmation to promote CONFIRMING -> GRACE, or time out and
+            // skip. Suspends on the state flow itself rather than polling on a timer: a
+            // confirmation (onWalkingConfirmed) resumes this immediately instead of up to 250ms
+            // late, and the coroutine does no work at all in between -- no wakeups, no CPU, for
+            // however long the confirmation window is open.
             //
             // No explicit ABORTED check follows this (or the grace countdown below): cancel(vin)
             // cancels THIS coroutine directly, so a reconnect/manual cancel during either wait
@@ -169,8 +163,8 @@ object AutoLockController {
             }
             if (leftConfirming == null) {
                 // Timed out still CONFIRMING: walking confirmation is always required, so this
-                // means it (and geofence, if enabled) never arrived in time -- skip rather than
-                // lock on the Bluetooth disconnect alone.
+                // means it never arrived in time -- skip rather than lock on the Bluetooth
+                // disconnect alone.
                 if (!walkAwayConfirmed.contains(vin)) {
                     _state.update { it + (vin to AutoLockEvalState(detection = DetectionState.SKIPPED)) }
                     AppLog.log("AutoLock: no walk-away confirmation for $vin — not locking.")
