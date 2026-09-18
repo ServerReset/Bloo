@@ -106,18 +106,8 @@ private fun DebugInfoItem(
     }
 }
 
-/**
- * Collects all debug information for the device and app.
- * Used to populate DebugSettingsPanel with relevant data.
- *
- * **Include:**
- * - App version and build number
- * - Device model, OS, API level
- * - Runtime info (memory, network)
- * - Feature flags and configuration
- *
- * @return List of DebugInfo items ready for display
- */
+/** Just enough for a support request to identify the build and device -- see the trim
+ *  note on the Device Info entries below for what's deliberately left out. */
 @Composable
 fun getDebugInfo(): List<DebugInfo> {
     return listOf(
@@ -132,41 +122,17 @@ fun getDebugInfo(): List<DebugInfo> {
             value = BuildConfig.VERSION_CODE.toString(),
             copyable = true,
         ),
-        DebugInfo(
-            label = "Build Type",
-            value = BuildConfig.BUILD_TYPE,
-        ),
-
-        // Device Info
+        // Device Info -- just enough for a support request to identify the device and OS;
+        // manufacturer/API level/runtime versions are developer-only detail nobody filing a
+        // bug report needs to read off a screen, let alone the person reading the report.
         DebugInfo(
             label = "Device Model",
             value = Build.MODEL,
             copyable = true,
         ),
         DebugInfo(
-            label = "Manufacturer",
-            value = Build.MANUFACTURER,
-        ),
-        DebugInfo(
             label = "OS Version",
             value = "Android ${Build.VERSION.RELEASE}",
-        ),
-        DebugInfo(
-            label = "API Level",
-            value = Build.VERSION.SDK_INT.toString(),
-        ),
-
-        // Runtime Info
-        DebugInfo(
-            label = "Java Runtime",
-            value = listOfNotNull(
-                System.getProperty("java.vm.name"),
-                System.getProperty("java.vm.version")
-            ).joinToString(" ").ifBlank { "Unknown" },
-        ),
-        DebugInfo(
-            label = "Kotlin Runtime",
-            value = KotlinVersion.CURRENT.toString(),
         ),
     )
 }
@@ -215,9 +181,8 @@ fun DebugSettingsPanel(
         // LazyVerticalStaggeredGrid item{}, which measures its content with an UNBOUNDED max
         // height, and a vertically scrollable component measured with an infinite max height
         // throws outright -- so entering Advanced mode, which is the only way this card is
-        // composed, crashed the screen every time. The Logs card and AnnouncementHistory both
-        // already cap themselves at 300.dp against this exact failure; this panel was the one
-        // that did not.
+        // composed, crashed the screen every time. The Logs card already caps itself at
+        // 300.dp against this exact failure; this panel was the one that did not.
         LazyColumn(modifier = Modifier.fillMaxWidth().heightIn(max = 300.dp)) {
             items(debugInfo) { info ->
                 DebugInfoItem(

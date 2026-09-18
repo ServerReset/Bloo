@@ -92,7 +92,6 @@ import androidx.compose.material.icons.filled.LockOpen
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.BugReport
-import androidx.compose.material.icons.filled.Campaign
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
@@ -339,7 +338,6 @@ internal fun SettingsScreen(
         val advTransition0 = rememberGridItemVisibility(advVisible[0])
         val advTransition1 = rememberGridItemVisibility(advVisible[1])
         val advTransition2 = rememberGridItemVisibility(advVisible[2])
-        val advTransition3 = rememberGridItemVisibility(advVisible[3])
         LazyVerticalStaggeredGrid(
             columns = StaggeredGridCells.Adaptive(minSize = 380.dp),
             state = settingsGridState,
@@ -626,58 +624,11 @@ internal fun SettingsScreen(
             }
             if (advTransition0.targetState || !advTransition0.isIdle) item {
 
-            // Announcements -- currently sourced from the one real signal this
-            // app has for it (an available build, same state.updateAvailable
-            // the Updates card renders) rather than a synthetic feed.
-            // AnnouncementHistory's LazyColumn needs an explicit height cap:
-            // it's placed inside this screen's own LazyVerticalStaggeredGrid
-            // item{}, an unbounded-height vertical container, and a nested
-            // LazyColumn with no height constraint crashes there (same class
-            // of bug the Logs card's heightIn(max = 300.dp) guards
-            // against, just via Modifier.verticalScroll there instead of a
-            // second lazy layout).
-            AnimatedVisibility(visibleState = advTransition0, enter = collapseEnter(), exit = collapseExit()) {
-            SettingsCard("Announcements", Icons.Filled.Campaign, vm) {
-                val update = state.updateAvailable
-                val announcements = remember(update) {
-                    if (update == null) {
-                        emptyList()
-                    } else {
-                        listOf(
-                            Announcement(
-                                id = "update-${update.run.runNumber}",
-                                title = "Build #${update.run.runNumber} available",
-                                message = update.run.releaseNotes?.trim().takeUnless { it.isNullOrBlank() }
-                                    ?: "A new build is ready to view.",
-                                severity = if (state.updateApkReady) AnnouncementSeverity.WARNING else AnnouncementSeverity.INFO,
-                                timestamp = java.time.Instant.now().toString(),
-                                actionLabel = "View",
-                                onAction = {
-                                    runCatching {
-                                        context.startActivity(
-                                            Intent(Intent.ACTION_VIEW, Uri.parse(update.run.htmlUrl))
-                                                .apply { addFlags(Intent.FLAG_ACTIVITY_NEW_TASK) },
-                                        )
-                                    }
-                                },
-                            ),
-                        )
-                    }
-                }
-                AnnouncementHistory(
-                    announcements = announcements,
-                    modifier = Modifier.heightIn(max = 300.dp),
-                )
-            }
-            }
-            }
-            if (advTransition1.targetState || !advTransition1.isIdle) item {
-
             // (The "Updates" card now lives after Notifications — its natural home —
             // ungated so its controls show with or without Shizuku. See below.)
 
             // App-icon shortcuts (long-press the launcher icon)
-            AnimatedVisibility(visibleState = advTransition1, enter = collapseEnter(), exit = collapseExit()) {
+            AnimatedVisibility(visibleState = advTransition0, enter = collapseEnter(), exit = collapseExit()) {
                 SettingsCard("App shortcuts", Icons.Filled.Bolt, vm) {
                     // No inner MorphExpandButton any more -- this used to have its
                     // own second chevron gating the per-vehicle toggles below,
@@ -998,12 +949,12 @@ internal fun SettingsScreen(
                 }
             }
             }
-            if (advTransition2.targetState || !advTransition2.isIdle) item {
+            if (advTransition1.targetState || !advTransition1.isIdle) item {
 
             // Debug -- app/device diagnostics for support troubleshooting. A power-user
             // diagnostic card like Logs, and it takes its OWN slot in this screen's stagger
             // sequence rather than sharing Logs': the two animate independently.
-            AnimatedVisibility(visibleState = advTransition2, enter = collapseEnter(), exit = collapseExit()) {
+            AnimatedVisibility(visibleState = advTransition1, enter = collapseEnter(), exit = collapseExit()) {
             SettingsCard("Debug", Icons.Filled.BugReport, vm) {
                 DebugSettingsPanel(
                     onCopyToClipboard = { text -> clipboard.setText(AnnotatedString(text)) },
@@ -1093,10 +1044,10 @@ internal fun SettingsScreen(
                 }
             }
             }
-            if (advTransition3.targetState || !advTransition3.isIdle) item {
+            if (advTransition2.targetState || !advTransition2.isIdle) item {
 
             // Logs
-            AnimatedVisibility(visibleState = advTransition3, enter = collapseEnter(), exit = collapseExit()) {
+            AnimatedVisibility(visibleState = advTransition2, enter = collapseEnter(), exit = collapseExit()) {
             SettingsCard("Logs", Icons.Filled.Info, vm) {
                 // No local expand state any more. The card's OWN chevron (PebbleShell's, via
                 // SettingsCard) already governs this body -- nothing inside a collapsed card is

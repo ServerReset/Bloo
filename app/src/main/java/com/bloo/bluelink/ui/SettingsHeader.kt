@@ -90,10 +90,10 @@ internal const val STAGGER_STEP_MS = 45L
 /** How many advanced-only cards Settings staggers in as whole grid items. Kept beside the
  *  stagger itself so the count and the sequence cannot drift apart when a card is added.
  *
- *  Four, not eight: three further advanced blocks are nested INSIDE other cards and drive
+ *  Three, not eight: three further advanced blocks are nested INSIDE other cards and drive
  *  themselves through [staggeredAdvancedVisible], which takes its own index and never touches
  *  this list. The count only ever covers the cards this screen gates as items. */
-internal const val ADVANCED_CARD_COUNT = 4
+internal const val ADVANCED_CARD_COUNT = 3
 
 /**
  * The same staggered reveal as [staggeredAdvancedVisible], but for ALL advanced cards at once,
