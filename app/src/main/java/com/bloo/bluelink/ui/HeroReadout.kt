@@ -178,12 +178,12 @@ internal fun chargeReadoutOf(
                 //    doc in UiTokens.kt). This line opted out of that provider, so on a
                 //    light-themed app the expanded hero drew "Parked" in near-black over a
                 //    dark photo scrim -- invisible -- while the percentage directly above
-                //    it was near-white. With a per-car CarThemeOverride palette it was
+                //    it was near-white. With a custom palette active it was
                 //    worse: onSurfaceVariant carries a slice of that car's seed colour, so
                 //    it came out as a tinted grey belonging to no backdrop at all.
                 //
                 // Reading LocalContentColor means this now tracks the ACTIVE
-                // MaterialTheme.colorScheme -- including a CarThemeOverride palette, since
+                // MaterialTheme.colorScheme -- including a custom palette, since
                 // the hero's provider derives from colorScheme.onSurface inside that scope
                 // -- in every theme mode, with no dark-mode test of its own to get wrong.
                 // Nothing here needs to know whether it is dark: the provider upstream
@@ -593,7 +593,7 @@ internal fun HeroMorphReadout(
             // in near-black over a dark photo, invisible, while the percentage and range
             // beside it -- both painted from the hero's LocalContentColor provider, which
             // travels onSurface -> HeroOnPhoto as the card opens -- were near-white. Under
-            // a per-car CarThemeOverride it also picked up a slice of that car's seed
+            // a custom palette active it also picked up a slice of the seed
             // colour, so it came out a tinted grey belonging to no backdrop at all.
             // MutedContentAlpha keeps it subordinate to the numbers the way the muted
             // variant role used to, and statusAlpha still carries the morph fade-in.

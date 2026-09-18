@@ -297,26 +297,19 @@ internal fun CompactGarage(state: UiState, vm: AppViewModel, appearance: Setting
             // updated when that got fixed there. Just the cheap graphicsLayer
             // fade/scale transforms now, consistent with the other pagers.
             Box(Modifier.fillMaxSize().pagerDepth(pager, page)) {
-                CarThemeOverride(
-                    paletteId = appearance.carCustomPaletteIds[v.vin],
-                    customPalettes = appearance.customPalettes,
-                    themeMode = appearance.themeMode,
-                    vibrancy = appearance.vibrancy,
+                CompositionLocalProvider(
+                    LocalCoverScrubbing provides scrubbing,
+                    // So each section tile can put the car's name on its own title row --
+                    // see CoverTile.trailingLabel. Provided here, where the page's vehicle
+                    // is known, rather than threaded through every tile composable.
+                    // Null when the camera band is already showing the name. The band is
+                    // free real estate beside the island; the tile's trailing label costs a
+                    // share of its header row. So where a band exists it owns the name and
+                    // the tiles get their full width back -- and the name is never drawn
+                    // twice, which it was.
+                    LocalCoverCarName provides v.name.takeIf { band == null },
                 ) {
-                    CompositionLocalProvider(
-                        LocalCoverScrubbing provides scrubbing,
-                        // So each section tile can put the car's name on its own title row --
-                        // see CoverTile.trailingLabel. Provided here, where the page's vehicle
-                        // is known, rather than threaded through every tile composable.
-                        // Null when the camera band is already showing the name. The band is
-                        // free real estate beside the island; the tile's trailing label costs a
-                        // share of its header row. So where a band exists it owns the name and
-                        // the tiles get their full width back -- and the name is never drawn
-                        // twice, which it was.
-                        LocalCoverCarName provides v.name.takeIf { band == null },
-                    ) {
-                        CompactCar(v, state, vm)
-                    }
+                    CompactCar(v, state, vm)
                 }
             }
         }

@@ -2,7 +2,6 @@
     ExperimentalMaterial3Api::class,
     ExperimentalMaterial3ExpressiveApi::class,
     ExperimentalFoundationApi::class,
-    ExperimentalLayoutApi::class,
 )
 
 package com.bloo.bluelink.ui
@@ -17,8 +16,6 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -290,32 +287,6 @@ internal fun CarSettingsCard(
                 selectedKey = currentDefault,
                 onSelect = { key -> vm.setDefaultClimatePreset(v.vin, key.takeIf { it != "smart" }) },
             )
-        }
-
-        // Per-car palette override: existed in SettingsStore/AppViewModel
-        // (setCarPaletteId) with no UI entry point anywhere -- only shown
-        // once there's at least one custom palette to actually choose.
-        val appearance = LocalAppearance.current
-        if (state.settingsMode == "advanced" && appearance.customPalettes.isNotEmpty()) {
-            SettingsGroup("Palette override") {
-                Text(
-                    "Give this car its own colour palette instead of the app-wide theme.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                Spacer(Modifier.height(SettingsGapHairline))
-                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    appearance.customPalettes.forEach { palette ->
-                        val selected = appearance.carCustomPaletteIds[v.vin] == palette.id
-                        CustomPaletteSwatch(
-                            palette = palette,
-                            selected = selected,
-                            onClick = { vm.setCarPaletteId(v.vin, if (selected) null else palette.id) },
-                            onEdit = {},
-                        )
-                    }
-                }
-            }
         }
 
         SettingsGroup("Photo") {

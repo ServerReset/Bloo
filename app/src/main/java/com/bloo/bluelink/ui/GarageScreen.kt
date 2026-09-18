@@ -336,8 +336,8 @@ internal fun GarageScreen(
                         // Read the continuous pager offset ONLY inside graphicsLayer{}
                         // below (draw-phase, never triggers recomposition) -- reading
                         // it as a plain val in this composable scope used to subscribe
-                        // the WHOLE page composable (CarThemeOverride, VehicleDetailContent,
-                        // every pebble in it) to recompose on literally every drag frame,
+                        // the WHOLE page composable (VehicleDetailContent, every pebble in
+                        // it) to recompose on literally every drag frame,
                         // the real remaining cause of swipe jank after the blur/tilt
                         // removal below. A secondary "snap bounce" spring driven off a
                         // discretized settled/unsettled boolean used to multiply into
@@ -358,24 +358,17 @@ internal fun GarageScreen(
                         // these pages are the same shadow-heavy pebble columns.
                         Box(Modifier.fillMaxSize()) {
                             val pv = vehicles[exWrap.real(page)]
-                            CarThemeOverride(
-                                paletteId = appearance.carCustomPaletteIds[pv.vin],
-                                customPalettes = appearance.customPalettes,
-                                themeMode = appearance.themeMode,
-                                vibrancy = appearance.vibrancy,
-                            ) {
-                                ExpandedCar(
-                                    pv,
-                                    state,
-                                    vm,
-                                    flipped = appearance.columnsFlipped,
-                                    // Wired unconditionally per page. Pager dots (which previously
-                                    // needed per-page notification) were removed, but the structure
-                                    // remains for consistency. Only one page is ever actually
-                                    // composed here (beyondViewportPageCount = 0) anyway.
-                                    hazeState = hazeState,
-                                )
-                            }
+                            ExpandedCar(
+                                pv,
+                                state,
+                                vm,
+                                flipped = appearance.columnsFlipped,
+                                // Wired unconditionally per page. Pager dots (which previously
+                                // needed per-page notification) were removed, but the structure
+                                // remains for consistency. Only one page is ever actually
+                                // composed here (beyondViewportPageCount = 0) anyway.
+                                hazeState = hazeState,
+                            )
                         }
                     }
                     // Always active, even mid-drag -- disabling it during a scroll (the
@@ -590,31 +583,24 @@ internal fun GarageScreen(
                                 GarageStatusCard(state, vm, hazeState = hazeState)
                             } else {
                                 val gv = vehicles[real]
-                                CarThemeOverride(
-                                    paletteId = appearance.carCustomPaletteIds[gv.vin],
-                                    customPalettes = appearance.customPalettes,
-                                    themeMode = appearance.themeMode,
-                                    vibrancy = appearance.vibrancy,
-                                ) {
-                                    VehicleDetailContent(
-                                        gv, state, vm,
-                                        onExpand = if (canExpand) ({ vm.expand(real) }) else null,
-                                        // Always false now: this only ever reserved
-                                        // room for the persistent floating gear button
-                                        // in the top-right corner, and that button is
-                                        // gone -- Settings is the page right after the
-                                        // last car in this very pager, reached by
-                                        // swiping.
-                                        reserveHeaderEnd = false,
-                                        // Only hide the per-car pull indicator in the
-                                        // multi-car grid (perPage > 1) -- state.refreshing
-                                        // is one app-wide flag, not per-car, so leaving
-                                        // it unhidden would light up every visible car's
-                                        // spinner for a refresh that only touched one.
-                                        hideIndicator = perPage > 1,
-                                        hazeState = hazeState,
-                                    )
-                                }
+                                VehicleDetailContent(
+                                    gv, state, vm,
+                                    onExpand = if (canExpand) ({ vm.expand(real) }) else null,
+                                    // Always false now: this only ever reserved
+                                    // room for the persistent floating gear button
+                                    // in the top-right corner, and that button is
+                                    // gone -- Settings is the page right after the
+                                    // last car in this very pager, reached by
+                                    // swiping.
+                                    reserveHeaderEnd = false,
+                                    // Only hide the per-car pull indicator in the
+                                    // multi-car grid (perPage > 1) -- state.refreshing
+                                    // is one app-wide flag, not per-car, so leaving
+                                    // it unhidden would light up every visible car's
+                                    // spinner for a refresh that only touched one.
+                                    hideIndicator = perPage > 1,
+                                    hazeState = hazeState,
+                                )
                             }
                         }
                     }

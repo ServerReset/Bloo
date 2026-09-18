@@ -629,7 +629,7 @@ internal fun carTonalBrush(scheme: ColorScheme): Brush {
     // (WeatherPebble.kt). isSystemInDarkTheme() only ever sees the PHONE's setting.
     // This brush is the hero's whole backdrop for any car without a photo, and it picked
     // its branch off the wrong source while the [scheme] it draws from is the app's real
-    // (possibly force-dark, possibly per-car CarThemeOverride) one: an app forced to Light
+    // (possibly force-dark, possibly a custom palette) one: an app forced to Light
     // on a dark phone got the "vivid primary/tertiary" branch under light-theme content,
     // and an app forced to Dark on a light phone got the near-white surfaceContainerLowest
     // branch -- the two cases where the hero's fallback fill and everything drawn on it

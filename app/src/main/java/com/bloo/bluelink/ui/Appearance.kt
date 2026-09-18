@@ -562,31 +562,30 @@ internal fun PaletteEditorDialog(
     )
 }
 
-// Five fixed stops instead of a free continuous 0-2 range with 20 snap
-// points -- most of those were indistinguishable by eye, and "what number is
-// this" isn't a useful question for a saturation slider. Each label names
-// what you'd actually see, ending on "Best Buy TV" (a factor of 2.5 -- since
-// saturate() coerces the HSV saturation channel to a hard 1.0 ceiling, this
-// already pushes virtually every color to maximum saturation, the visual
-// definition of "showroom TV wall" oversaturation).
-internal val VibrancySteps = floatArrayOf(0f, 0.5f, 1f, 1.6f, 2.5f)
-internal val VibrancyLabels = listOf("Monochrome", "A bit of color", "Normal", "Extra", "Best Buy TV")
+// Three fixed stops instead of a free continuous 0-2 range with 20 snap points -- most
+// of those were indistinguishable by eye, and "what number is this" isn't a useful
+// question for a saturation slider. Bounded to match SettingsStore's own read-clamp
+// (0.5..1.6): this used to run 0f ("Monochrome") to 2.5f ("Best Buy TV"), but both
+// extremes silently got clamped back to 0.5/1.6 on the very next read, so picking
+// either one showed a value the persisted state could never actually hold.
+internal val VibrancySteps = floatArrayOf(0.5f, 1f, 1.6f)
+internal val VibrancyLabels = listOf("Muted", "Normal", "Vivid")
 internal fun vibrancyIndexFor(v: Float): Int =
-    VibrancySteps.indices.minByOrNull { kotlin.math.abs(VibrancySteps[it] - v) } ?: 2
+    VibrancySteps.indices.minByOrNull { kotlin.math.abs(VibrancySteps[it] - v) } ?: 1
 
 /** Shared by the main Appearance card and the settings-search quick-jump
- *  preview so the 5-stop mapping lives in exactly one place. */
+ *  preview so the 3-stop mapping lives in exactly one place. */
 @Composable
 internal fun VibrancySlider(appearance: SettingsStore.Appearance, vm: AppViewModel) {
     var indexDraft by remember(appearance.vibrancy) { mutableFloatStateOf(vibrancyIndexFor(appearance.vibrancy).toFloat()) }
-    StepRow("Vibrancy", VibrancyLabels[indexDraft.roundToInt().coerceIn(0, 4)])
+    StepRow("Vibrancy", VibrancyLabels[indexDraft.roundToInt().coerceIn(0, 2)])
     AnimatedSlider(
         value = indexDraft,
         onValueChange = { indexDraft = it },
-        valueRange = 0f..4f,
-        steps = 3,
+        valueRange = 0f..2f,
+        steps = 1,
         onValueSettled = {
-            val idx = it.roundToInt().coerceIn(0, 4)
+            val idx = it.roundToInt().coerceIn(0, 2)
             indexDraft = idx.toFloat()
             vm.setVibrancySoon(VibrancySteps[idx])
         },

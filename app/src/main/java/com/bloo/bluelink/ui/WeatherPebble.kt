@@ -746,7 +746,7 @@ internal fun CarMap(
 
     // The car's own pin uses the app's actual dynamic/custom-palette primary --
     // not a fixed semantic role like `error` -- so a car with its own custom
-    // palette override (CarThemeOverride) shows ITS colour on the map, the same
+    // palette shows ITS colour on the map, the same
     // way that colour already drives everything else on that car's screen.
     // Reported directly as wanting map colours "pulled from the dynamic color
     // of the app" rather than a hardcoded red.
@@ -1383,7 +1383,7 @@ private fun MapTopBar(
         // the car's name, the drag nub and the refresh glyph were near-white on
         // near-white -- the bar read as empty. onSurface tracks the same theme the
         // map filter does, so it is dark-on-light map and light-on-dark map by
-        // construction, and it honours a per-car CarThemeOverride palette the way
+        // construction, and it honours an active custom palette the way
         // the pin beside it already does. It is also what the map's own
         // MapFeatureRow buttons below already use.
     ) {

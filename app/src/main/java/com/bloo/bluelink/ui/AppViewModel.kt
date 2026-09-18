@@ -3051,20 +3051,11 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         settingsStore.setThemeMode(mode)
     }
     fun setFontChoice(choice: FontChoice) = viewModelScope.launch { settingsStore.setFontChoice(choice) }
-    // Deviates from the group pattern above: turning dynamic (Material You)
-    // color on means every car's custom fixed palette id would otherwise sit
-    // around unused but still selected -- clear them all so switching back to
-    // a fixed palette later doesn't silently resurrect a stale per-car choice
-    // that no longer matches what's shown while dynamic color was active.
-    fun setDynamicColor(enabled: Boolean) = viewModelScope.launch {
-        settingsStore.setDynamicColor(enabled)
-        if (enabled) settingsStore.clearAllCarPaletteIds()
-    }
+    fun setDynamicColor(enabled: Boolean) = viewModelScope.launch { settingsStore.setDynamicColor(enabled) }
     fun setColorPalette(palette: ColorPalette) = viewModelScope.launch { settingsStore.setColorPalette(palette) }
     fun saveCustomPalette(palette: CustomPaletteData) = viewModelScope.launch { settingsStore.saveCustomPalette(palette) }
     fun deleteCustomPalette(id: String) = viewModelScope.launch { settingsStore.deleteCustomPalette(id) }
     fun setActiveCustomPaletteId(id: String?) = viewModelScope.launch { settingsStore.setActiveCustomPaletteId(id) }
-    fun setCarPaletteId(vin: String, paletteId: String?) = viewModelScope.launch { settingsStore.setCarPaletteId(vin, paletteId) }
 
     /**
      * Share a full settings backup (includes colours and palettes) via the share

@@ -30,7 +30,6 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.DeserializationStrategy
 import kotlinx.serialization.builtins.ListSerializer
-import kotlinx.serialization.builtins.MapSerializer
 import kotlinx.serialization.builtins.serializer
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
@@ -198,7 +197,6 @@ class SettingsStore(private val context: Context) {
         val PALETTE = stringPreferencesKey("color_palette")
         val CUSTOM_PALETTES = stringPreferencesKey("custom_palettes")
         val ACTIVE_CUSTOM_PALETTE_ID = stringPreferencesKey("active_custom_palette_id")
-        val CAR_PALETTE_IDS = stringPreferencesKey("car_palette_ids")
         val WEATHER_LAT = stringPreferencesKey("weather_lat")
         val WEATHER_LON = stringPreferencesKey("weather_lon")
         val WEATHER_LABEL = stringPreferencesKey("weather_label")
@@ -236,10 +234,9 @@ class SettingsStore(private val context: Context) {
     }
 
     /** @Immutable for the same reason as UiState: this is threaded through
-     *  every screen and into CarThemeOverride on every car page, and while
-     *  Compose infers it unstable (it holds Maps and Lists) nothing taking it
-     *  can ever skip. All fields are vals and every collection in one is built
-     *  fresh by the store, never edited in place. */
+     *  every screen, and while Compose infers it unstable (it holds Maps and
+     *  Lists) nothing taking it can ever skip. All fields are vals and every
+     *  collection in one is built fresh by the store, never edited in place. */
     @Immutable
     data class Appearance(
         val themeMode: ThemeMode = ThemeMode.SYSTEM,
@@ -251,8 +248,6 @@ class SettingsStore(private val context: Context) {
         val customPalettes: List<CustomPaletteData> = emptyList(),
         /** ID of the active custom palette, or null to use a built-in palette. */
         val activeCustomPaletteId: String? = null,
-        /** Per-vehicle custom palette overrides: VIN → customPaletteId (absent = use global). */
-        val carCustomPaletteIds: Map<String, String> = emptyMap(),
         /** User-set weather location (latitude/longitude/place label), or null if unset. */
         val weatherLat: Double? = null,
         val weatherLon: Double? = null,
@@ -333,9 +328,6 @@ class SettingsStore(private val context: Context) {
                 decodeJsonOr(paletteJson, paletteListSerializer, json, emptyList())
             } ?: emptyList(),
             activeCustomPaletteId = prefs[Keys.ACTIVE_CUSTOM_PALETTE_ID],
-            carCustomPaletteIds = prefs[Keys.CAR_PALETTE_IDS]?.let { json ->
-                decodeJsonOr(paletteJson, MapSerializer(String.serializer(), String.serializer()), json, emptyMap())
-            } ?: emptyMap(),
             weatherLat = prefs[Keys.WEATHER_LAT]?.toDoubleOrNull(),
             weatherLon = prefs[Keys.WEATHER_LON]?.toDoubleOrNull(),
             weatherLabel = prefs[Keys.WEATHER_LABEL],
@@ -1970,25 +1962,6 @@ class SettingsStore(private val context: Context) {
             if (id == null) it.remove(Keys.ACTIVE_CUSTOM_PALETTE_ID)
             else it[Keys.ACTIVE_CUSTOM_PALETTE_ID] = id
         }
-    }
-
-    private val carPaletteSerializer = MapSerializer(String.serializer(), String.serializer())
-
-    /** Set or clear a per-car custom palette override (null clears it → use global). */
-    suspend fun setCarPaletteId(vin: String, paletteId: String?) {
-        val current = context.settingsDataStore.data.first()[Keys.CAR_PALETTE_IDS]?.let { json ->
-            decodeJsonOr(paletteJson, carPaletteSerializer, json, emptyMap())
-        } ?: emptyMap()
-        val updated = if (paletteId == null) current - vin else current + (vin to paletteId)
-        editTracked {
-            if (updated.isEmpty()) it.remove(Keys.CAR_PALETTE_IDS)
-            else it[Keys.CAR_PALETTE_IDS] = paletteJson.encodeToString(carPaletteSerializer, updated)
-        }
-    }
-
-    /** Clear all per-car palette overrides at once (e.g. when reverting to dynamic color). */
-    suspend fun clearAllCarPaletteIds() {
-        editTracked { it.remove(Keys.CAR_PALETTE_IDS) }
     }
 
     // exportPalettesJson() / importPalettesJson() were deleted here: no callers. Custom palettes

@@ -552,7 +552,7 @@ internal fun PebbleShell(
                         // a scrimmed car photo and the title travels to HeroOnPhoto for it
                         // (see titleColor's own doc), while this Icon kept inheriting the
                         // CARD's content colour -- near-black in a light theme, and tinted by
-                        // whatever slice of the seed colour a per-car CarThemeOverride palette
+                        // whatever slice of the seed colour an active custom palette
                         // feeds onSurfaceVariant. So the name was legible over the photo and
                         // the glyph 10dp to its left was not, in the app's light theme AND in
                         // any custom palette.
