@@ -43,13 +43,18 @@ import kotlin.math.abs
 // OOM (heap exhausted shortly after unlock, a trivial 32-byte allocation the
 // one that finally failed). A first fix (`key = { page -> wrap.real(page) }`,
 // letting every virtual copy of the same real item share one identity) was
-// tried and reverted -- it collided ("Key \"1\" was already used") inside
-// HorizontalPager's own subcompose internals (prefetch/beyond-bounds item
-// requests this codebase has no visibility into), not this file's own modulo
-// math, which is provably collision-free for the pages it deliberately
-// composes. A follow-up mitigation just shrunk this constant to 30, capping
-// the leak's ceiling instead of removing it -- still real growth, just bounded,
-// and a real (if very unlikely) dead end once a user actually swiped that far.
+// tried and reverted -- it collided ("Key \"1\" was already used") because
+// TWO simultaneously-composed virtual pages can map to the SAME real index
+// whenever `realCount` is small relative to how many pages a pager holds
+// alive at once (beyondViewportPageCount, and perPage on the multi-column
+// pager) -- not a HorizontalPager internals mystery, just this fix skipping
+// that collision check the first time around. A follow-up mitigation just
+// shrunk this constant to 30, capping the leak's ceiling instead of removing
+// it -- still real growth, just bounded, and a real (if very unlikely) dead
+// end once a user actually swiped that far. The key IS back now (see
+// [WrapPagerState.keyFor]), this time gated on the exact inequality that
+// makes it collision-free, with every call site falling back to the old
+// unkeyed behaviour below that threshold.
 //
 // This is the actual fix: recenter ([WrapPagerState.recenterIfNearEdge],
 // called after every settle) silently jumps back toward the middle once the
@@ -58,10 +63,15 @@ import kotlin.math.abs
 // shown doesn't change, and the pager keeps having room to go. This is what
 // actually bounds the leak (the old huge-range trick just hoped nobody
 // swiped far enough to need bounding at all) -- but recentering jumps to a
-// DIFFERENT virtual page than the one just left, which is a distinct
+// DIFFERENT virtual page than the one just left, which USED TO BE a distinct
 // Compose slot (fresh scroll position, fresh enter animations, whatever
-// per-composition state that page holds), so a recenter is not perfectly
-// invisible the way sliding to a genuinely neighbouring page is.
+// per-composition state that page holds), so a recenter was not perfectly
+// invisible the way sliding to a genuinely neighbouring page is. See
+// [WrapPagerState.keyFor]: every call site now keys its pages by REAL index
+// (where it's provably safe to), so a recenter jump reuses the very same
+// composition instead of creating a fresh one -- the jump is now actually
+// invisible, not just rare, which is most of why this constant no longer
+// needs to be huge to hide it.
 //
 // First shipped with this constant at 10, "so recentering can only ever
 // retain a small number of compositions" -- but that shrank the SAFE ZONE
@@ -151,6 +161,33 @@ internal fun wrapPageToward(currentPage: Int, pageCount: Int, realCount: Int, ta
 internal class WrapPagerState(val pager: PagerState, val realCount: Int) {
     fun real(page: Int): Int = wrapRealIndex(page, realCount)
     val currentReal: Int get() = real(pager.currentPage)
+
+    /**
+     * The [HorizontalPager]/[VerticalPager] `key` for [page], given that pager's own
+     * [beyondViewportPageCount] and [perPage] (how many real items one page-width actually
+     * shows at once -- 1 for every wrap-pager except the multi-column collapsed garage pager).
+     * Keying by [real] index (not raw virtual page) lets Compose treat every virtual copy of
+     * the same real item as ONE composition slot, so a [recenterIfNearEdge] jump reuses it
+     * (its scroll position, its `remember` state, no fresh enter animation) instead of
+     * composing a brand-new one -- the recenter becomes genuinely invisible instead of merely
+     * bounded, and this pager stops accumulating a new distinct composition per virtual page
+     * ever visited (the actual leak an earlier fix here mistook a bigger multiplier for
+     * solving; see [WRAP_MULTIPLIER]'s own doc).
+     *
+     * Only safe once [realCount] is large enough that no two pages this pager can EVER hold
+     * simultaneously composed map to the same real index. A contiguous run of `perPage +
+     * 2 * beyondViewportPageCount` virtual pages is composed at once (the multi-column
+     * pager's own `beyondViewportPageCount` was already sized by solving exactly this
+     * inequality for a real, reported crash -- see its call site's own doc), and a contiguous
+     * run of consecutive integers only visits every residue mod [realCount] at most once
+     * while its length is <= [realCount] (pigeonhole). Below that threshold (this session
+     * already hit the resulting "Key already used" crash once, from skipping this check on a
+     * single-item pager), falls back to the raw page index -- the pre-existing, uncrashable
+     * behaviour -- since a small [realCount] already keeps [WRAP_MULTIPLIER]'s own worst-case
+     * retained-page count small regardless.
+     */
+    fun keyFor(page: Int, beyondViewportPageCount: Int, perPage: Int = 1): Any =
+        if (realCount >= perPage + 2 * beyondViewportPageCount) real(page) else page
     // settledReal was removed: zero readers. Both places that care about a SETTLE go through
     // `snapshotFlow { pager.settledPage }.collect { real(it) }` instead (GarageScreen's and
     // CompactGarage's pager-settle effects), because they need the settle as an EVENT, not as

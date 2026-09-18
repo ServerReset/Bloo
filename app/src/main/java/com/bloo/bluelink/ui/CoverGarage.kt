@@ -269,6 +269,7 @@ internal fun CompactGarage(state: UiState, vm: AppViewModel, appearance: Setting
             // at once. (total - 1) / 2, capped at 1, is the largest beyond that
             // can never revisit an item within one full cycle.
             beyondViewportPageCount = ((total - 1) / 2).coerceIn(0, 1),
+            key = { page -> wrap.keyFor(page, ((total - 1) / 2).coerceIn(0, 1)) },
         ) { page ->
             val real = realCar(page)
             if (real == slots) {
@@ -635,6 +636,7 @@ internal fun CompactCar(
             // Most cars have well more than 2 tiles, so this is a rare-but-real edge rather
             // than the everyday case the horizontal car pager's own fix is.
             beyondViewportPageCount = ((tiles.size - 1) / 2).coerceIn(0, 1),
+            key = { page -> vWrap.keyFor(page, ((tiles.size - 1) / 2).coerceIn(0, 1)) },
         ) { page ->
             val i = vWrap.real(page)
             val tileScroll = tileScrollStates.getOrPut(tiles[i]) { ScrollState(0) }

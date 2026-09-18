@@ -332,6 +332,7 @@ internal fun GarageScreen(
                         // below for why).
                         beyondViewportPageCount = 0,
                         pageSize = androidx.compose.foundation.pager.PageSize.Fill,
+                        key = { page -> exWrap.keyFor(page, 0) },
                     ) { page ->
                         // Read the continuous pager offset ONLY inside graphicsLayer{}
                         // below (draw-phase, never triggers recomposition) -- reading
@@ -560,6 +561,7 @@ internal fun GarageScreen(
                         // neighbour is already all PebbleList's own lazy-fill needs to hide,
                         // per this parameter's own history) gives the formula below.
                         beyondViewportPageCount = ((total - perPage) / 2).coerceIn(0, 1),
+                        key = { page -> wrap.keyFor(page, ((total - perPage) / 2).coerceIn(0, 1), perPage) },
                     ) { page ->
                         // Same fade/scale transition the expanded single-car pager
                         // above uses (see its own comment for why: the continuous
