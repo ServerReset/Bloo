@@ -790,7 +790,11 @@ internal fun SettingsScreen(
                         onSelect = { vm.setSyncWifiOnly(it == "wifi") },
                     )
                     Spacer(Modifier.height(SettingsGapRow))
-                    ExpressiveButtonRow(modifier = Modifier.fillMaxWidth(), spacing = 8.dp) {
+                    // equalWidths: this row sits directly under the Wi-Fi only/Any network
+                    // segmented control, which splits its full width evenly -- left otherwise,
+                    // the two buttons packed to their own content width and read as a mismatched
+                    // pair next to the evenly-split control right above them.
+                    ExpressiveButtonRow(modifier = Modifier.fillMaxWidth(), spacing = 8.dp, equalWidths = true) {
                         val changeFileSource = remember { MutableInteractionSource() }
                         SafeExpansiveButton(
                             interactionSource = changeFileSource,
