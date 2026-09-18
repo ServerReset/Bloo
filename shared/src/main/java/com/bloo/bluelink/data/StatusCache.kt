@@ -84,11 +84,18 @@ class StatusCache(private val context: Context) {
         placeNames: Map<String, String>,
         fetched: Map<String, Long>,
     ) {
-        context.statusCacheStore.edit {
-            it[key] = json.encodeToString(
-                CachePayload.serializer(),
-                CachePayload(statuses, locations, placeNames, fetched),
-            )
+        // withContext, same reason as load()'s own comment: the caller is a
+        // viewModelScope.launch on Main.immediate, and this JSON-encodes every
+        // cached vehicle's status/location/place name into one blob on every call
+        // -- called once per car as each car's status arrives, landing squarely on
+        // the cold-start card-loading path this store's read side already accounted for.
+        withContext(Dispatchers.IO) {
+            context.statusCacheStore.edit {
+                it[key] = json.encodeToString(
+                    CachePayload.serializer(),
+                    CachePayload(statuses, locations, placeNames, fetched),
+                )
+            }
         }
     }
 
@@ -100,6 +107,8 @@ class StatusCache(private val context: Context) {
      * makes the next [load] fall back to an all-empty [CachePayload].
      */
     suspend fun clear() {
-        context.statusCacheStore.edit { it.remove(key) }
+        withContext(Dispatchers.IO) {
+            context.statusCacheStore.edit { it.remove(key) }
+        }
     }
 }

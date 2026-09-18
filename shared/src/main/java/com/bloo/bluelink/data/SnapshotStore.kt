@@ -314,16 +314,23 @@ class SnapshotStore(private val context: Context) {
      */
     suspend fun saveVehiclesKeepingStatus(vehicles: List<VehicleSnapshot>) {
         if (vehicles.isEmpty()) return
-        context.snapshotDataStore.edit { prefs ->
-            val existing = decode(prefs[Keys.PAYLOAD])
-            val known = existing.vehicles.associateBy { it.vin }
-            val merged = vehicles.map { fresh -> known[fresh.vin]?.let { fresh.keepingStatusOf(it) } ?: fresh }
-            val selected = existing.selectedVin?.takeIf { sel -> merged.any { it.vin == sel } }
-                ?: merged.firstOrNull()?.vin
-            prefs[Keys.PAYLOAD] = json.encodeToString(
-                SnapshotPayload.serializer(),
-                SnapshotPayload(merged, selected),
-            )
+        // withContext(Dispatchers.IO) for the same reason as `current()` above: every caller
+        // here is a viewModelScope.launch (or worse, called directly on it -- see loadStatus)
+        // on Main.immediate, and this decodes/re-encodes the WHOLE vehicle payload on every
+        // call. Missed when `current()` got this fix; this is called once per car as each
+        // car's status arrives, landing squarely on the cold-start card-loading path.
+        withContext(Dispatchers.IO) {
+            context.snapshotDataStore.edit { prefs ->
+                val existing = decode(prefs[Keys.PAYLOAD])
+                val known = existing.vehicles.associateBy { it.vin }
+                val merged = vehicles.map { fresh -> known[fresh.vin]?.let { fresh.keepingStatusOf(it) } ?: fresh }
+                val selected = existing.selectedVin?.takeIf { sel -> merged.any { it.vin == sel } }
+                    ?: merged.firstOrNull()?.vin
+                prefs[Keys.PAYLOAD] = json.encodeToString(
+                    SnapshotPayload.serializer(),
+                    SnapshotPayload(merged, selected),
+                )
+            }
         }
     }
 
@@ -332,14 +339,17 @@ class SnapshotStore(private val context: Context) {
      *  present in the new list; otherwise falls back to the first vehicle so
      *  there's always a selection as long as the list isn't empty. */
     suspend fun saveVehicles(vehicles: List<VehicleSnapshot>) {
-        context.snapshotDataStore.edit { prefs ->
-            val existing = decode(prefs[Keys.PAYLOAD])
-            val selected = existing.selectedVin?.takeIf { sel -> vehicles.any { it.vin == sel } }
-                ?: vehicles.firstOrNull()?.vin
-            prefs[Keys.PAYLOAD] = json.encodeToString(
-                SnapshotPayload.serializer(),
-                SnapshotPayload(vehicles, selected),
-            )
+        // See saveVehiclesKeepingStatus's own comment on why this is on Dispatchers.IO.
+        withContext(Dispatchers.IO) {
+            context.snapshotDataStore.edit { prefs ->
+                val existing = decode(prefs[Keys.PAYLOAD])
+                val selected = existing.selectedVin?.takeIf { sel -> vehicles.any { it.vin == sel } }
+                    ?: vehicles.firstOrNull()?.vin
+                prefs[Keys.PAYLOAD] = json.encodeToString(
+                    SnapshotPayload.serializer(),
+                    SnapshotPayload(vehicles, selected),
+                )
+            }
         }
     }
 
@@ -362,12 +372,15 @@ class SnapshotStore(private val context: Context) {
      */
     suspend fun updateVehicles(snapshots: List<VehicleSnapshot>) {
         if (snapshots.isEmpty()) return
-        context.snapshotDataStore.edit { prefs ->
-            val existing = decode(prefs[Keys.PAYLOAD])
-            prefs[Keys.PAYLOAD] = json.encodeToString(
-                SnapshotPayload.serializer(),
-                SnapshotPayload(mergeVehicleUpdates(existing.vehicles, snapshots), existing.selectedVin),
-            )
+        // See saveVehiclesKeepingStatus's own comment on why this is on Dispatchers.IO.
+        withContext(Dispatchers.IO) {
+            context.snapshotDataStore.edit { prefs ->
+                val existing = decode(prefs[Keys.PAYLOAD])
+                prefs[Keys.PAYLOAD] = json.encodeToString(
+                    SnapshotPayload.serializer(),
+                    SnapshotPayload(mergeVehicleUpdates(existing.vehicles, snapshots), existing.selectedVin),
+                )
+            }
         }
     }
 
@@ -389,35 +402,42 @@ class SnapshotStore(private val context: Context) {
      */
     suspend fun mergeStatuses(statuses: Map<String, VehicleStatus>) {
         if (statuses.isEmpty()) return
-        context.snapshotDataStore.edit { prefs ->
-            val existing = decode(prefs[Keys.PAYLOAD])
-            if (existing.vehicles.isEmpty()) return@edit
-            prefs[Keys.PAYLOAD] = json.encodeToString(
-                SnapshotPayload.serializer(),
-                SnapshotPayload(
-                    existing.vehicles.map { snap ->
-                        statuses[snap.vin]?.let { snap.merged(it) } ?: snap
-                    },
-                    existing.selectedVin,
-                ),
-            )
+        // See saveVehiclesKeepingStatus's own comment on why this is on Dispatchers.IO.
+        withContext(Dispatchers.IO) {
+            context.snapshotDataStore.edit { prefs ->
+                val existing = decode(prefs[Keys.PAYLOAD])
+                if (existing.vehicles.isEmpty()) return@edit
+                prefs[Keys.PAYLOAD] = json.encodeToString(
+                    SnapshotPayload.serializer(),
+                    SnapshotPayload(
+                        existing.vehicles.map { snap ->
+                            statuses[snap.vin]?.let { snap.merged(it) } ?: snap
+                        },
+                        existing.selectedVin,
+                    ),
+                )
+            }
         }
     }
 
     /** Change which car is the "active" one for widgets/tiles, without
      *  touching the vehicle data itself. */
     suspend fun setSelected(vin: String) {
-        context.snapshotDataStore.edit { prefs ->
-            val existing = decode(prefs[Keys.PAYLOAD])
-            prefs[Keys.PAYLOAD] = json.encodeToString(
-                SnapshotPayload.serializer(),
-                SnapshotPayload(existing.vehicles, vin),
-            )
+        // See saveVehiclesKeepingStatus's own comment on why this is on Dispatchers.IO.
+        withContext(Dispatchers.IO) {
+            context.snapshotDataStore.edit { prefs ->
+                val existing = decode(prefs[Keys.PAYLOAD])
+                prefs[Keys.PAYLOAD] = json.encodeToString(
+                    SnapshotPayload.serializer(),
+                    SnapshotPayload(existing.vehicles, vin),
+                )
+            }
         }
     }
 
     /** Advance the widget/tile selection to the next car, looping. */
-    suspend fun selectNext(): VehicleSnapshot? {
+    suspend fun selectNext(): VehicleSnapshot? = withContext(Dispatchers.IO) {
+        // See saveVehiclesKeepingStatus's own comment on why this is on Dispatchers.IO.
         var result: VehicleSnapshot? = null
         context.snapshotDataStore.edit { prefs ->
             val existing = decode(prefs[Keys.PAYLOAD])
@@ -430,7 +450,7 @@ class SnapshotStore(private val context: Context) {
                 SnapshotPayload(existing.vehicles, next.vin),
             )
         }
-        return result
+        result
     }
 
     /** Parse the raw stored JSON string into [SnapshotData]. A null [raw]
