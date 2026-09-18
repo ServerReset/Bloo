@@ -2111,7 +2111,7 @@ private fun CreditRow(entry: CreditEntry) {
             Row(
                 Modifier
                     .clip(RoundedCornerShape(6.dp))
-                    .clickable { openUrl(context, entry.url, inApp = true) }
+                    .clickable { openUrl(context, entry.url) }
                     .wrapContentWidth(),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(4.dp),
