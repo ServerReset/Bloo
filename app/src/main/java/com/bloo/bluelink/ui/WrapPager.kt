@@ -185,9 +185,20 @@ internal class WrapPagerState(val pager: PagerState, val realCount: Int) {
      * single-item pager), falls back to the raw page index -- the pre-existing, uncrashable
      * behaviour -- since a small [realCount] already keeps [WRAP_MULTIPLIER]'s own worst-case
      * retained-page count small regardless.
+     *
+     * [realCount] <= 1 is excluded even though the inequality above can hold for it (e.g.
+     * realCount=1, beyondViewportPageCount=0, perPage=1): [real] collapses to the CONSTANT 0
+     * for every page whenever realCount <= 1, so keying by it would give literally every
+     * virtual page the same key. The pigeonhole reasoning above only bounds the STEADY-STATE
+     * composed window; it doesn't cover Compose's Pager transiently composing both the source
+     * and destination page during an animated `scrollToPage` (from [snapToReal] or
+     * [recenterIfNearEdge]) even with beyondViewportPageCount=0 -- which is exactly the crash
+     * this hit on a single-car account expanding full-screen. [recenterIfNearEdge] itself
+     * already no-ops for realCount <= 1, so there is no reuse to gain from real-keying here in
+     * the first place -- the raw page index is both safe and sufficient.
      */
     fun keyFor(page: Int, beyondViewportPageCount: Int, perPage: Int = 1): Any =
-        if (realCount >= perPage + 2 * beyondViewportPageCount) real(page) else page
+        if (realCount > 1 && realCount >= perPage + 2 * beyondViewportPageCount) real(page) else page
     // settledReal was removed: zero readers. Both places that care about a SETTLE go through
     // `snapshotFlow { pager.settledPage }.collect { real(it) }` instead (GarageScreen's and
     // CompactGarage's pager-settle effects), because they need the settle as an EVENT, not as

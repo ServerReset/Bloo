@@ -254,14 +254,14 @@ class CrashActivity : ComponentActivity() {
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-            SelectionContainer {
-                Text(trace, fontFamily = FontFamily.Monospace, style = MaterialTheme.typography.bodySmall)
-            }
             MorphTextButton(
                 "Copy",
                 icon = Icons.Filled.ContentCopy,
                 onClick = { clipboard.setText(AnnotatedString(trace)) },
             )
+            SelectionContainer {
+                Text(trace, fontFamily = FontFamily.Monospace, style = MaterialTheme.typography.bodySmall)
+            }
         }
     }
 }
