@@ -201,8 +201,6 @@ data class UiState(
     /** On-device Gemini Nano availability + opt-in, and produced summaries. */
     val aiSupported: Boolean = false,
     val aiEnabled: Boolean = false,
-    /** Run AI summaries automatically on open/refresh/command (manual still works). */
-    val aiAuto: Boolean = false,
     val aiSummaries: Map<String, String> = emptyMap(),
     /** In-flight AI work: VINs being summarized, plus "search" for the query box. */
     val aiBusy: Set<String> = emptySet(),

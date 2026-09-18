@@ -340,7 +340,6 @@ internal fun SettingsScreen(
         val advTransition1 = rememberGridItemVisibility(advVisible[1])
         val advTransition2 = rememberGridItemVisibility(advVisible[2])
         val advTransition3 = rememberGridItemVisibility(advVisible[3])
-        val advTransition4 = rememberGridItemVisibility(advVisible[4])
         LazyVerticalStaggeredGrid(
             columns = StaggeredGridCells.Adaptive(minSize = 380.dp),
             state = settingsGridState,
@@ -607,11 +606,7 @@ internal fun SettingsScreen(
                         icon = Icons.Filled.AutoAwesome,
                         tint = aiTint,
                         title = "On-device AI",
-                        status = when {
-                            !state.aiEnabled -> "Off"
-                            state.aiAuto -> "On · auto-summarize"
-                            else -> "On"
-                        },
+                        status = if (state.aiEnabled) "On" else "Off",
                     )
                     Spacer(Modifier.height(SettingsGapGroup))
                     // Names the ENGINE. The card is titled "AI" and the header right above
@@ -620,30 +615,12 @@ internal fun SettingsScreen(
                     ToggleRow("Gemini Nano", state.aiEnabled) { vm.setAiEnabled(it) }
                     Text(
                         "Adds an AI summary pebble to each car and lets you ask the search " +
-                            "box plain questions like \"what's the odometer\". Everything runs " +
-                            "privately on your device.",
+                            "box plain questions like \"what's the odometer\". Summaries refresh " +
+                            "on their own when you open a car, refresh its status, or send a " +
+                            "command -- everything runs privately on your device.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
-                    // Advanced-only: a power-user nuance on top of the basic
-                    // AI toggle above, not something a novice needs to see. PopVisible,
-                    // not a bare `if` -- was snapping in/out with the toggle above with
-                    // no animation at all.
-                    PopVisible(visible = state.aiEnabled && advanced) {
-                      Column {
-                        ToggleRow("Summarize automatically", state.aiAuto) { vm.setAiAuto(it) }
-                        Text(
-                            if (state.aiAuto) {
-                                "Summaries refresh on their own when you open a car, refresh its " +
-                                    "status, or send a command. You can still tap Summarize anytime."
-                            } else {
-                                "Summaries only run when you tap Summarize on a car."
-                            },
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                      }
-                    }
                 }
             }
             }
@@ -1118,33 +1095,8 @@ internal fun SettingsScreen(
             }
             if (advTransition3.targetState || !advTransition3.isIdle) item {
 
-            // Links
-            AnimatedVisibility(visibleState = advTransition3, enter = collapseEnter(), exit = collapseExit()) {
-            // One control, so it renders on the title row with no chevron -- the same treatment
-            // Sounds & vibration gets. The row's own "Open links" label went with it: inside a
-            // card already titled "Links" it restated the card, and the choice reads fine as
-            // "Links: In app / Browser".
-            SettingsCard(
-                "Links",
-                Icons.Filled.OpenInNew,
-                vm,
-                inlineSetting = {
-                    MorphSegmented(
-                        options = listOf(
-                            SegmentOption("app", "In app", null),
-                            SegmentOption("browser", "Browser", null),
-                        ),
-                        selectedKey = if (appearance.linksInApp) "app" else "browser",
-                        onSelect = { vm.setLinksInApp(it == "app") },
-                    )
-                },
-            ) {}
-            }
-            }
-            if (advTransition4.targetState || !advTransition4.isIdle) item {
-
             // Logs
-            AnimatedVisibility(visibleState = advTransition4, enter = collapseEnter(), exit = collapseExit()) {
+            AnimatedVisibility(visibleState = advTransition3, enter = collapseEnter(), exit = collapseExit()) {
             SettingsCard("Logs", Icons.Filled.Info, vm) {
                 // No local expand state any more. The card's OWN chevron (PebbleShell's, via
                 // SettingsCard) already governs this body -- nothing inside a collapsed card is
@@ -1397,10 +1349,9 @@ internal fun SettingsScreen(
                                 //
                                 // Reaching this screen does NOT prove the person
                                 // holding the phone ever authenticated. LockTiming.OFF
-                                // never re-locks after launch at all, and the longest
-                                // grace setting is ten minutes, so an app that is open
-                                // or was recently backgrounded is simply past the lock.
-                                // From there a single unauthenticated tap removed it
+                                // never re-locks after launch at all, so an app that is
+                                // open or was recently backgrounded is simply past the
+                                // lock. From there a single unauthenticated tap removed it
                                 // permanently, including on future cold launches --
                                 // turning momentary physical access to an unlocked
                                 // phone into standing access to unlocking someone's

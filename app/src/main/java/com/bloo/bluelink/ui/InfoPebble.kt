@@ -71,7 +71,6 @@ import com.bloo.bluelink.data.isPluggedOrCharging
 internal fun InfoPebble(v: Vehicle, status: VehicleStatus?, state: UiState, vm: AppViewModel, dragHandle: Modifier) {
     val context = LocalContext.current
     val appearance = LocalAppearance.current
-    val inApp = appearance.linksInApp
     val metric = appearance.unitSystem == "metric"
     val location = state.locations[v.vin]
     val odoInt = parseOdometerMiles(v.odometer)
@@ -188,7 +187,7 @@ internal fun InfoPebble(v: Vehicle, status: VehicleStatus?, state: UiState, vm: 
             }
 
             SectionLabel("${v.brand.label} owners")
-            OwnerLinks(v, state, context, inApp)
+            OwnerLinks(v, state, context)
         }
     }
 }
@@ -206,7 +205,7 @@ internal fun InfoPebble(v: Vehicle, status: VehicleStatus?, state: UiState, vm: 
  */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-internal fun OwnerLinks(v: Vehicle, state: UiState, context: Context, inApp: Boolean) {
+internal fun OwnerLinks(v: Vehicle, state: UiState, context: Context) {
     val links = v.brand.links
 
     // ExpressiveButtonRow, not FlowRow: it wraps the same way, but a FlowRow has no notion of a
@@ -231,12 +230,12 @@ internal fun OwnerLinks(v: Vehicle, state: UiState, context: Context, inApp: Boo
             MorphActionButton(
                 label = "${links.appName} app",
                 icon = Icons.Filled.OpenInNew,
-                onClick = { openApp(context, listOf(links.appPackage), links.playStoreUrl, inApp) },
+                onClick = { openApp(context, listOf(links.appPackage), links.playStoreUrl) },
             )
             MorphActionButton(
                 label = "Owners site",
                 icon = Icons.Filled.Person,
-                onClick = { openUrl(context, links.ownersUrl, inApp) },
+                onClick = { openUrl(context, links.ownersUrl) },
             )
             // Features-on-Demand store (themes, lighting patterns…): ccNC-era
             // head units only - older Gen5W cars have nothing to buy. Honours
@@ -245,7 +244,7 @@ internal fun OwnerLinks(v: Vehicle, state: UiState, context: Context, inApp: Boo
                 MorphActionButton(
                     label = "Car store",
                     icon = Icons.Filled.Storefront,
-                    onClick = { openUrl(context, links.storeUrl, inApp) },
+                    onClick = { openUrl(context, links.storeUrl) },
                 )
             }
         }
@@ -253,17 +252,17 @@ internal fun OwnerLinks(v: Vehicle, state: UiState, context: Context, inApp: Boo
             MorphActionButton(
                 label = "Schedule service",
                 icon = Icons.Filled.Build,
-                onClick = { openUrl(context, links.serviceScheduleUrl, inApp) },
+                onClick = { openUrl(context, links.serviceScheduleUrl) },
             )
             MorphActionButton(
                 label = links.dealerLabel,
                 icon = Icons.Filled.Place,
-                onClick = { openUrl(context, links.dealerUrl, inApp) },
+                onClick = { openUrl(context, links.dealerUrl) },
             )
             MorphActionButton(
                 label = "Manuals",
                 icon = Icons.Filled.MenuBook,
-                onClick = { openUrl(context, links.manualsUrl, inApp) },
+                onClick = { openUrl(context, links.manualsUrl) },
             )
             MorphActionButton(
                 label = "Roadside",
@@ -287,7 +286,6 @@ internal fun OwnerLinks(v: Vehicle, state: UiState, context: Context, inApp: Boo
                                 context,
                                 listOf("com.hyundaiusa.hyundai.digitalcarkey"),
                                 "https://play.google.com/store/apps/details?id=com.hyundaiusa.hyundai.digitalcarkey",
-                                inApp,
                             )
                         },
                     )
@@ -299,7 +297,6 @@ internal fun OwnerLinks(v: Vehicle, state: UiState, context: Context, inApp: Boo
                                 context,
                                 listOf("com.genesisusa.genesis.digitalcarkey"),
                                 "https://play.google.com/store/apps/details?id=com.genesisusa.genesis.digitalcarkey",
-                                inApp,
                             )
                         },
                     )
@@ -311,7 +308,7 @@ internal fun OwnerLinks(v: Vehicle, state: UiState, context: Context, inApp: Boo
                         label = "Digital Key",
                         icon = Icons.Filled.CreditCard,
                         onClick = {
-                            openApp(context, listOf("com.samsung.android.spay"), "https://www.samsung.com/us/samsung-wallet/", inApp)
+                            openApp(context, listOf("com.samsung.android.spay"), "https://www.samsung.com/us/samsung-wallet/")
                         },
                     )
                 } else {
@@ -323,7 +320,6 @@ internal fun OwnerLinks(v: Vehicle, state: UiState, context: Context, inApp: Boo
                                 context,
                                 listOf("com.google.android.apps.walletnfcrel", "com.google.android.apps.wallet"),
                                 "https://pay.google.com/",
-                                inApp,
                             )
                         },
                     )

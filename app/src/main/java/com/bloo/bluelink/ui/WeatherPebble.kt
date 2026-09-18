@@ -2075,24 +2075,21 @@ internal fun openInExternalMaps(context: Context, location: GeoLocation, label: 
     }
 }
 
-internal fun openUrl(context: Context, url: String, inApp: Boolean) {
+internal fun openUrl(context: Context, url: String) {
     val uri = Uri.parse(url)
-    val external = { context.startActivity(Intent(Intent.ACTION_VIEW, uri).apply { addFlags(Intent.FLAG_ACTIVITY_NEW_TASK) }) }
-    if (inApp) {
-        runCatching { CustomTabsIntent.Builder().build().launchUrl(context, uri) }
-            .onFailure { runCatching { external() } }
-    } else {
-        runCatching { external() }
-    }
+    runCatching { CustomTabsIntent.Builder().build().launchUrl(context, uri) }
+        .onFailure {
+            runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, uri).apply { addFlags(Intent.FLAG_ACTIVITY_NEW_TASK) }) }
+        }
 }
 
-internal fun openApp(context: Context, packages: List<String>, fallbackUrl: String, inApp: Boolean) {
+internal fun openApp(context: Context, packages: List<String>, fallbackUrl: String) {
     for (p in packages) {
         context.packageManager.getLaunchIntentForPackage(p)?.let {
             runCatching { context.startActivity(it) }.onSuccess { return }
         }
     }
-    openUrl(context, fallbackUrl, inApp)
+    openUrl(context, fallbackUrl)
 }
 
 internal fun dial(context: Context, number: String) {

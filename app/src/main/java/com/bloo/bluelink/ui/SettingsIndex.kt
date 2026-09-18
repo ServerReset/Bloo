@@ -171,10 +171,6 @@ internal val ToggleSettings = listOf(
         checked = { a, _, _ -> a.hapticsEnabled }, onToggle = { vm, v -> vm.setHapticsEnabled(v) },
     ),
     ToggleSpec(
-        title = "Open links in app", keywords = "browser tab links",
-        checked = { a, _, _ -> a.linksInApp }, onToggle = { vm, v -> vm.setLinksInApp(v) },
-    ),
-    ToggleSpec(
         title = "Live charging updates", keywords = "notification charging live progress ongoing bar ev limit",
         checked = { _, n, _ -> n.charging }, onToggle = { vm, v -> vm.setNotifyCharging(v) },
     ),
@@ -212,10 +208,6 @@ internal val ToggleSettings = listOf(
     ToggleSpec(
         title = "On-device AI", label = "On-device AI (Gemini Nano)", keywords = "gemini nano ai summary assistant privacy on-device",
         visible = { it.aiSupported }, checked = { _, _, s -> s.aiEnabled }, onToggle = { vm, v -> vm.setAiEnabled(v) },
-    ),
-    ToggleSpec(
-        title = "Summarize automatically", keywords = "ai auto summary refresh",
-        visible = { it.aiSupported }, checked = { _, _, s -> s.aiAuto }, onToggle = { vm, v -> vm.setAiAuto(v) },
     ),
     // Same gate as the row itself (Backup & sync): only meaningful with
     // Shizuku actually installed and running.

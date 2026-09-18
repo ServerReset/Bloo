@@ -570,7 +570,7 @@ internal fun SettingsSearchResults(
                     // (same action as OwnerLinks' own "<appName> app" button)
                     // rather than going through TileCommandRunner.
                     val links = targetVehicle.brand.links
-                    openApp(ctx, listOf(links.appPackage), links.playStoreUrl, appearance.linksInApp)
+                    openApp(ctx, listOf(links.appPackage), links.playStoreUrl)
                     actionResult = "Opening ${links.appName}"
                     commandExecuted = true
                 } else {

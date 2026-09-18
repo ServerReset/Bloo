@@ -115,29 +115,27 @@ fun resolvePowertrain(v: Vehicle, override: Powertrain?): Powertrain =
  */
 enum class VehiclePlatform { GEN5W, CCNC }
 
-/** When the biometric app-lock re-engages after the app leaves the foreground. */
+/** When the biometric app-lock re-engages after the app leaves the foreground.
+ *
+ *  Used to also offer 1/5/10-minute grace periods; cut down to the one meaningful choice
+ *  -- lock immediately, or not at all -- since nobody consciously calibrates a numeric grace
+ *  period and [shouldRelockAfter] still honours a legacy "1min"/"5min"/"10min" wire key for
+ *  anyone who had one of those stored already. */
 enum class LockTiming(val label: String) {
     OFF("Off"),
     IMMEDIATE("Immediate"),
-    AFTER_1_MIN("1 min"),
-    AFTER_5_MIN("5 min"),
-    AFTER_10_MIN("10 min"),
 }
 
 /**
- * The wire-key form of a [LockTiming], matching the string vocabulary the watch stores and
- * [shouldRelockAfter] switches on. NOT the enum's persistence format -- LockTiming persists via
- * `.name` -- purely the bridge into the shared re-lock predicate so the phone and watch share
- * one copy of the timing thresholds. Exhaustive with no `else` on purpose: adding a LockTiming
- * value must fail to compile here until its key is chosen.
+ * The wire-key form of a [LockTiming], matching the string vocabulary [shouldRelockAfter]
+ * switches on. NOT the enum's persistence format -- LockTiming persists via `.name` -- purely
+ * the bridge into the shared re-lock predicate. Exhaustive with no `else` on purpose: adding a
+ * LockTiming value must fail to compile here until its key is chosen.
  */
 val LockTiming.wireKey: String
     get() = when (this) {
         LockTiming.OFF -> "off"
         LockTiming.IMMEDIATE -> "immediate"
-        LockTiming.AFTER_1_MIN -> "1min"
-        LockTiming.AFTER_5_MIN -> "5min"
-        LockTiming.AFTER_10_MIN -> "10min"
     }
 
 /** Reorderable detail sections (pebbles), in their default order. */
@@ -208,7 +206,6 @@ class SettingsStore(private val context: Context) {
         val BIOMETRIC = stringPreferencesKey("biometric_lock")
         val LOCK_TIMING = stringPreferencesKey("lock_timing")
         val FLIPPED = stringPreferencesKey("columns_flipped")
-        val LINKS_IN_APP = stringPreferencesKey("links_in_app")
         val UI_SCALE = stringPreferencesKey("ui_scale")
         val VIBRANCY = stringPreferencesKey("vibrancy")
         val HAPTICS = stringPreferencesKey("haptics_enabled")
@@ -275,8 +272,6 @@ class SettingsStore(private val context: Context) {
         val lockTiming: LockTiming = LockTiming.IMMEDIATE,
         /** In the wide expanded view, put pebbles on the left, controls right. */
         val columnsFlipped: Boolean = false,
-        /** Open Hyundai/Genesis links in an in-app browser tab vs the system browser. */
-        val linksInApp: Boolean = true,
         /** Text/UI scale multiplier (0.85–1.3). */
         val uiScale: Float = 1f,
         /** Colour vibrancy multiplier (0.5–1.6, 1 = default). */
@@ -349,7 +344,6 @@ class SettingsStore(private val context: Context) {
             lockTiming = prefs[Keys.LOCK_TIMING]?.let { runCatching { LockTiming.valueOf(it) }.getOrNull() }
                 ?: LockTiming.IMMEDIATE,
             columnsFlipped = prefs[Keys.FLIPPED]?.toBooleanStrictOrNull() ?: false,
-            linksInApp = prefs[Keys.LINKS_IN_APP]?.toBooleanStrictOrNull() ?: true,
             // Clamp on read: a corrupt/hand-edited/foreign backup with e.g.
             // ui_scale="10" would otherwise scale the whole UI 10x and lock the
             // user out of Settings, so a bad stored value can never take effect.
@@ -631,10 +625,6 @@ class SettingsStore(private val context: Context) {
 
     suspend fun setVibrancy(value: Float) {
         editTracked { it[Keys.VIBRANCY] = value.toString() }
-    }
-
-    suspend fun setLinksInApp(value: Boolean) {
-        editTracked { it[Keys.LINKS_IN_APP] = value.toString() }
     }
 
     suspend fun setAuroraBackground(value: Boolean) {
@@ -1072,14 +1062,6 @@ class SettingsStore(private val context: Context) {
 
     suspend fun setAiEnabled(value: Boolean) {
         editTracked { it[booleanPreferencesKey("ai_enabled")] = value }
-    }
-
-    /** When on, AI summaries run automatically on open/refresh/command (vs only on tap). */
-    suspend fun aiAuto(): Boolean =
-        context.settingsDataStore.data.first()[booleanPreferencesKey("ai_auto")] ?: false
-
-    suspend fun setAiAuto(value: Boolean) {
-        editTracked { it[booleanPreferencesKey("ai_auto")] = value }
     }
 
     // --- App-icon shortcut selection -------------------------------------

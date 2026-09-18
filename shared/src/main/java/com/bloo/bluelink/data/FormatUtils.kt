@@ -653,14 +653,12 @@ fun parseOdometerMiles(odometer: String?): Int? =
 
 /**
  * Whether an app-lock should re-engage after [elapsedMs] in the background, given the user's
- * lock-timing setting as its wire key ("off" / "immediate" / "1min" / "5min" / "10min").
+ * lock-timing setting as its wire key ("off" / "immediate", via [LockTiming.wireKey]).
  *
- * The phone (biometric) and watch (PIN) each ran this exact rule with the same 60_000 /
- * 300_000 / 600_000 thresholds -- the phone off its LockTiming enum, the watch off the string
- * key it stores. One home keeps those magic numbers from drifting between the two lock flows.
- * The phone maps its enum via LockTiming.wireKey; the watch already holds the key. `else` maps
- * to "lock" as a fail-safe (an unrecognised key means re-lock rather than silently stay open),
- * matching the watch's prior branch -- though both callers only ever pass one of the five keys.
+ * The "1min"/"5min"/"10min" branches are legacy: LockTiming no longer offers those grace
+ * periods as a choice, but a value stored by an older build still resolves correctly here
+ * instead of falling through to the `else` fail-safe. `else` maps to "lock" (an unrecognised
+ * key means re-lock rather than silently stay open).
  */
 fun shouldRelockAfter(elapsedMs: Long, timingKey: String): Boolean = when (timingKey) {
     "off" -> false

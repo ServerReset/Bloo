@@ -304,7 +304,6 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                     it.copy(
                         aiSupported = true,
                         aiEnabled = settingsStore.aiEnabled(),
-                        aiAuto = settingsStore.aiAuto(),
                     )
                 }
             }
@@ -667,7 +666,6 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                     screen = Screen.Login,
                     aiSupported = keep.aiSupported,
                     aiEnabled = keep.aiEnabled,
-                    aiAuto = keep.aiAuto,
                     shizukuAvailable = keep.shizukuAvailable,
                     settingsMode = keep.settingsMode,
                     syncUri = keep.syncUri,
@@ -744,13 +742,9 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
      *
      * Deleted rather than wired up, deliberately. Using it would mean re-locking on
      * screen-off regardless of elapsed time, which contradicts the setting the user
-     * actually chose: LockTiming's options are labelled "1 min", "5 min", "10 min",
-     * so someone who picked ten minutes and pocketed their phone for one has said
-     * what they want. Nothing is weakened by removing it, since it was providing no
+     * actually chose. Nothing is weakened by removing it, since it was providing no
      * protection at all -- if screen-off-locks-immediately is wanted, it is a new
-     * LockTiming option, not a hidden override of the existing ones. This also brings
-     * the signature in line with the watch's own maybeRelock, which takes only the
-     * timestamp.
+     * LockTiming option, not a hidden override of the existing ones.
      */
     fun maybeRelock(backgroundedAtMs: Long) {
         if (_state.value.locked) return
@@ -760,9 +754,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             // device has usable biometrics, or the app PIN when one is set.
             if (!((a.biometricLock && canUseBiometrics()) || pinInstalled())) return@launch
             val elapsed = System.currentTimeMillis() - backgroundedAtMs
-            // Shared with the watch's PIN maybeRelock via shouldRelockAfter -- the LockTiming
-            // enum maps to the same wire key the watch stores, so the timing thresholds have
-            // one home. See LockTiming.wireKey (exhaustive, so a new enum value must be mapped).
+            // See LockTiming.wireKey (exhaustive, so a new enum value must be mapped) and
+            // shouldRelockAfter's own doc for the legacy wire keys it still honours.
             if (shouldRelockAfter(elapsed, a.lockTiming.wireKey)) _state.update { it.copy(locked = true) }
         }
         // Prompt to refresh if data is stale after returning from background.
@@ -2286,23 +2279,15 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch { settingsStore.setAiEnabled(value) }
     }
 
-    /** Toggle "run AI summaries automatically" -- when on, [autoSummarize] is
-     *  invoked after every status load/command instead of requiring a manual
-     *  tap on Summarize. Updates [_state] immediately (so the switch reflects
-     *  the change without waiting on the DataStore write) and persists async. */
-    fun setAiAuto(value: Boolean) {
-        _state.update { it.copy(aiAuto = value) }
-        viewModelScope.launch { settingsStore.setAiAuto(value) }
-    }
-
     /**
-     * Auto-summarize a car when auto-AI is on (called after open/refresh/command).
+     * Auto-summarize a car (called after open/refresh/command) whenever on-device AI is
+     * enabled -- summaries always refresh on their own now, no separate opt-in.
      * Silent: no "refresh first" nudge and no error toast, since the user didn't
      * explicitly ask — they can always tap Summarize for the surfaced version.
      */
     private fun autoSummarize(v: Vehicle) {
         val s = _state.value
-        if (!s.aiSupported || !s.aiEnabled || !s.aiAuto) return
+        if (!s.aiSupported || !s.aiEnabled) return
         if (v.vin in s.aiBusy) return
         val status = s.statusFor(v) ?: return
         _state.update { it.copy(aiBusy = it.aiBusy + v.vin) }
@@ -3260,9 +3245,6 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     /** Swap which dual-column side the "hot spot" pebble lives on. */
     fun setColumnsFlipped(flipped: Boolean) = viewModelScope.launch { settingsStore.setColumnsFlipped(flipped) }
-    /** Open in-app links (maps, OEM app store page, etc.) inside a custom
-     *  tab instead of handing off to an external browser. */
-    fun setLinksInApp(value: Boolean) = viewModelScope.launch { settingsStore.setLinksInApp(value) }
 
     // Deferred variants for the settings sliders: these two values recompose
     // ~the whole app (colorScheme / LocalDensity), so the commit waits a beat
