@@ -58,7 +58,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.Build
-import androidx.compose.material.icons.filled.Devices
 import androidx.compose.material.icons.filled.DragHandle
 import androidx.compose.material.icons.filled.CloudSync
 import androidx.compose.material.icons.filled.Cloud
@@ -1033,7 +1032,7 @@ internal fun OnboardingCrashCoursePage() {
  * Settings. Distinct from [OnboardingCrashCoursePage] just before it: that page is about
  * *how to use the screen you're about to land on* (gestures); this one is about
  * *things the app can do that aren't obvious from looking at it* (AutoLock, live charging,
- * natural-language search, widgets/watch). On-device AI is the one entry gated on
+ * natural-language search). On-device AI is the one entry gated on
  * [UiState.aiSupported] -- the others work on every device, but advertising a feature this
  * phone's own hardware can't run would be a promise the app can't keep.
  */
@@ -1043,7 +1042,6 @@ internal fun OnboardingFeaturesPage(state: UiState) {
         add(Triple(Icons.Filled.Lock, "AutoLock", "Locks your car on its own soon after you walk away, confirmed by a Bluetooth disconnect -- turn it on anytime in each car's Settings"))
         add(Triple(Icons.Filled.Bolt, "Live charging updates", "Watch an EV's charge progress right from your lock screen while it's plugged in"))
         add(Triple(Icons.Filled.Search, "Just ask", "Search for things like \"lock my car\" or \"start climate at 70\" and it runs right from the search bar"))
-        add(Triple(Icons.Filled.Devices, "Widgets and your watch", "Add a home screen widget or check in from a paired Wear OS watch for one-tap lock, unlock, and climate"))
         if (state.aiSupported) {
             add(Triple(Icons.Filled.AutoAwesome, "On-device AI summaries", "Get a plain-language summary of your car's status, generated right on your phone -- nothing leaves the device"))
         }

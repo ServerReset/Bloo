@@ -16,8 +16,8 @@
 #     person able to report it.
 #
 # Turning renaming on later is a one-line deletion here, but do it only after a
-# release APK has actually been installed and exercised: sign-in, a Drive sync, a
-# widget at two sizes, the watch pairing.
+# release APK has actually been installed and exercised: sign-in, a Drive sync,
+# the watch pairing.
 -dontobfuscate
 
 # --- kotlinx.serialization ------------------------------------------------------
@@ -33,13 +33,10 @@
 
 # Scoped to com.bloo.bluelink.** and NOT com.bloo.bluelink.data.** as it was.
 # The old scope shipped with a comment asserting that data/ "is where every
-# @Serializable type in this app actually lives -- verified". That is wrong for
-# :app, and R8 would have quietly stripped the two exceptions:
-#   - com.bloo.bluelink.ui.CustomPaletteData             (Theme.kt)
-#   - com.bloo.bluelink.widget.WidgetConfigStore$Stored  (private, nested)
-# Both persist to DataStore, so the symptom would have been an empty custom
-# palette list and every placed widget losing its configuration -- with no build
-# warning anywhere.
+# @Serializable type in this app actually lives -- verified". That was wrong: at
+# least one persisted @Serializable type (com.bloo.bluelink.ui.CustomPaletteData,
+# Theme.kt) lives outside data/, and R8 would have quietly stripped it, with no
+# build warning -- the symptom would just be an empty custom palette list.
 -keep,includedescriptorclasses class com.bloo.bluelink.**$$serializer { *; }
 -keepclassmembers class com.bloo.bluelink.** {
     *** Companion;
@@ -70,15 +67,6 @@
 # and this was never actually exercised before now (see the file-level comment on
 # -dontobfuscate above -- assembleRelease succeeding was never proof of this).
 -keep class androidx.work.impl.** { *; }
-
-# --- Glance (home-screen widget) -------------------------------------------------
-# Glance runs its own composition session through WorkManager internally, via a
-# worker/session class this app never references by type -- the same
-# reflectively-resolved pattern that already bit WorkManager's own internal
-# database above, and R8's shrinker has no static reference telling it those
-# Glance classes are live. Keeping the whole package is the same cheap tradeoff
-# already made for androidx.work.impl above.
--keep class androidx.glance.** { *; }
 
 # --- Optional / reflective third parties ----------------------------------------
 # Shizuku is OPTIONAL, gated at runtime behind Shizuku.pingBinder(), and its

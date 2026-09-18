@@ -1,4 +1,3 @@
 <resources>
     <string name="app_name">Bloo</string>
-    <string name="widget_description">Car name, charge/fuel level, and a simple gauge.</string>
 </resources>

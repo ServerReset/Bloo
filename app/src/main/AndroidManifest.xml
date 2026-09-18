@@ -321,20 +321,6 @@
             </intent-filter>
         </service>
 
-        <!-- Basic home-screen car widget (Jetpack Glance): name, charge/fuel percent,
-             and a simple 3-segment level gauge. No configure screen. -->
-        <receiver
-            android:name=".widget.CarWidgetReceiver"
-            android:exported="true"
-            android:label="@string/app_name">
-            <intent-filter>
-                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
-            </intent-filter>
-            <meta-data
-                android:name="android.appwidget.provider"
-                android:resource="@xml/car_widget_info" />
-        </receiver>
-
         <!-- Runs an alert notification's action button (e.g. Lock / Turn off),
              including taps bridged from the watch. -->
         <receiver

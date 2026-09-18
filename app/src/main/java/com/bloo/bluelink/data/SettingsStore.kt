@@ -1203,39 +1203,6 @@ class SettingsStore(private val context: Context) {
         editTracked { it[stringPreferencesKey("tile_refreshed_$vin")] = value.toString() }
     }
 
-    // --- Home-screen widgets (removed) ---------------------------------------
-    //
-    // The whole "widget_<id>_*" section is gone: WIDGET_KEY_SUFFIXES plus nineteen
-    // suspend accessors (widgetConfig/setWidgetConfig/clearWidgetConfig,
-    // widgetPendingAction, widgetRequireAuth, widgetPhotoBackground,
-    // widgetBackgroundAlpha, widgetShowLocation, widgetPillShape, widgetLayoutMode,
-    // widgetLocationAddress, and their setters). Every one had zero call sites in
-    // any module and any file type -- checked individually, not in aggregate.
-    //
-    // This was supersession, not rot. Widget config moved to
-    // widget/WidgetConfigStore.kt, which keeps one JSON blob per widget under
-    // widget_cfg_$widgetId in a SEPARATE DataStore file (bloo_widget_config),
-    // deliberately so a widget's layout doesn't roam to other devices via Drive
-    // backup. Its Stored class carries the successors, renamed on the way:
-    // photoBackground, pillShape, backgroundOpacity (was alpha), showMap (was
-    // showLocation), priority (was layoutMode), plus infoFields/actions/vin.
-    // CarWidget, WidgetConfigActivity and CarWidgetReceiver all use that store
-    // exclusively.
-    //
-    // Three had no successor at all -- widgetRequireAuth (per-widget biometric
-    // gating), widgetPendingAction, and widgetLocationAddress. Those are features
-    // that were dropped rather than migrated, so this deletes the last trace of
-    // their persistence layer. Recorded here because that is the one part of this
-    // removal a reader might otherwise mistake for an accident.
-    //
-    // Not addressed here: an upgrading user's DataStore still holds their old
-    // widget_<id>_* keys, and export/import/sync enumerate it generically via
-    // prefs.asMap(), so those keys keep being round-tripped as inert data.
-    // clearWidgetConfig was the only thing that could ever have purged them and it
-    // was itself dead, so nothing is newly stranded by this commit -- it just makes
-    // the situation legible. A one-time key sweep is a data-migration question,
-    // separate from deleting unreachable code.
-
     /** Drive URI for auto-backup; null when not configured. */
     suspend fun syncUri(): String? = syncUri(context.settingsDataStore.data.first())
     fun syncUri(p: Preferences): String? =
