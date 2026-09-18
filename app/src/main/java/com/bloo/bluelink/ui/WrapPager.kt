@@ -51,28 +51,43 @@ import kotlin.math.abs
 // the leak's ceiling instead of removing it -- still real growth, just bounded,
 // and a real (if very unlikely) dead end once a user actually swiped that far.
 //
-// This is the actual fix: don't fake an infinite range at all. Keep the
-// virtual range small and FIXED, and after every settle
-// ([WrapPagerState.recenterIfNearEdge]) silently jump back toward the middle
-// once the pager drifts within [RECENTER_MARGIN_CYCLES] real-item-widths of
-// either edge -- the destination page has the IDENTICAL real index, so
-// nothing visibly changes, but the pager now has room to keep going. This is
-// the standard "infinite carousel" technique (recentering, not a huge fake
-// range) and it fixes BOTH problems that the huge range only ever traded off
-// against each other: the number of distinct virtual pages this app can ever
-// compose stays capped at roughly this constant's own small size no matter
-// how long or how far someone swipes (there is no more "give it a long
-// enough session and it grows without bound"), and there is never a real
-// edge to swipe off of either, because recentering always happens first.
-private const val WRAP_MULTIPLIER = 10
+// This is the actual fix: recenter ([WrapPagerState.recenterIfNearEdge],
+// called after every settle) silently jumps back toward the middle once the
+// pager drifts within [RECENTER_MARGIN_CYCLES] real-item-widths of either
+// edge -- the destination page has the IDENTICAL real index, so the content
+// shown doesn't change, and the pager keeps having room to go. This is what
+// actually bounds the leak (the old huge-range trick just hoped nobody
+// swiped far enough to need bounding at all) -- but recentering jumps to a
+// DIFFERENT virtual page than the one just left, which is a distinct
+// Compose slot (fresh scroll position, fresh enter animations, whatever
+// per-composition state that page holds), so a recenter is not perfectly
+// invisible the way sliding to a genuinely neighbouring page is.
+//
+// First shipped with this constant at 10, "so recentering can only ever
+// retain a small number of compositions" -- but that shrank the SAFE ZONE
+// (the number of one-directional swipes before recentering triggers) down
+// with it, especially for the common case of a small `realCount` (one or two
+// cars): with realCount=2 and this at 10, recentering could trigger after
+// as few as 3-4 swipes in one direction, which is exactly the "swipe the
+// same way repeatedly to see if it loops" motion anyone testing this feature
+// would make -- reported directly as "very obvious when it doesn't infinite
+// scroll and goes around." Recentering is a safety NET now, not the only
+// thing standing between "fine" and "unbounded" the way the huge multiplier
+// used to be -- so it can afford to be large again: worst case, an account
+// with two real items now retains at most 1000x2 = 2000 compositions before
+// ever needing to reclaim any of them, a bounded and self-correcting number
+// (not the old unbounded growth), while requiring roughly 500+ one-directional
+// swipes before a recenter is ever even reachable -- past any realistic
+// swiping session, so the visible jump this was reported over should no
+// longer be reachable in practice either.
+private const val WRAP_MULTIPLIER = 1000
 /** Recenter once the pager drifts within this many real-item-widths of
- *  either edge of the (small, fixed) virtual range -- see [WRAP_MULTIPLIER]'s
- *  own doc. Leaves 2 real-item-widths of slack on either side of the recenter
- *  target at all times (WRAP_MULTIPLIER=10 → margin=3 on each side around a
- *  center at the halfway point, 5), comfortably more than a single fling
- *  ever moves the pager, so the literal edge (page 0 or the last page) is
- *  never actually reachable in practice. */
-private const val RECENTER_MARGIN_CYCLES = 3
+ *  either edge of the virtual range -- see [WRAP_MULTIPLIER]'s own doc. This
+ *  only needs to be big enough that a single fling can't overshoot past it in
+ *  one frame (it does not need to scale with [WRAP_MULTIPLIER] -- that
+ *  constant is what controls how RARELY this triggers, this one just needs
+ *  enough runway once it does). */
+private const val RECENTER_MARGIN_CYCLES = 10
 /** Max per-page scale shrink at full off-screen offset (floor 0.94). */
 private const val PAGER_SHRINK = 0.06f
 
