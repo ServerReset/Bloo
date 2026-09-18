@@ -141,7 +141,14 @@ class CrashActivity : ComponentActivity() {
         var downloading by remember { mutableStateOf(false) }
         var downloadProgress by remember { mutableStateOf(0f) }
         var installing by remember { mutableStateOf(false) }
-        var apkReady by remember { mutableStateOf(apkFile.exists() && apkFile.length() > 0) }
+        // Starts false regardless of whether apkFile already exists on disk: a leftover
+        // Bloo.apk from a PRIOR session (crashed mid-download, or just never installed) isn't
+        // something this session downloaded, and trusting it blindly showed "Install now"
+        // immediately on screen load with no download having happened yet -- possibly for a
+        // stale or genuinely partial/corrupt file. Only a download that completes below
+        // (ok == true) ever sets this true, so Install only ever appears after THIS screen
+        // actually finished fetching an APK.
+        var apkReady by remember { mutableStateOf(false) }
         var statusMessage by remember { mutableStateOf<String?>(null) }
 
         SettingsGroup("Update") {
