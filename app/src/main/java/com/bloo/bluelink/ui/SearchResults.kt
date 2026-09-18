@@ -50,7 +50,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
-import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -82,7 +81,6 @@ import com.bloo.bluelink.data.displayChargeLimit
 import com.bloo.bluelink.data.parseOdometerMiles
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import kotlin.math.roundToInt
 
 internal const val SEARCH_RESULT_STAGGER_MS = 35L
 
@@ -214,15 +212,8 @@ internal fun SettingsSearchResults(
         }
     }
     add("Text & layout scale", "display size zoom bigger") {
-        var uiScaleDraft by remember(appearance.uiScale) { mutableFloatStateOf(appearance.uiScale) }
-        StepRow("Scale", "${(uiScaleDraft * 100).roundToInt()}%")
-        AnimatedSlider(
-            value = uiScaleDraft,
-            onValueChange = { uiScaleDraft = it },
-            valueRange = 0.8f..1.3f,
-            steps = 4,
-            onValueSettled = { uiScaleDraft = (it * 10).roundToInt() / 10f; vm.setUiScaleSoon(uiScaleDraft) },
-        )
+        // Deferred-commit, same as the main Appearance card's slider — see there.
+        UiScaleSlider(appearance, vm, label = "Scale")
     }
     add("Colour vibrancy", "color saturation vivid material you monochrome best buy tv") {
         // Deferred-commit, same as the main Appearance card's slider — see there.

@@ -121,7 +121,6 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
-import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import dev.chrisbanes.haze.HazeState
@@ -154,7 +153,6 @@ import com.bloo.bluelink.data.links
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlin.math.max
-import kotlin.math.roundToInt
 import com.bloo.uicommon.ReorderColumn
 /**
  * The whole Settings screen.
@@ -976,15 +974,7 @@ internal fun SettingsScreen(
                 // not a bare `if` -- was snapping in/out with the mode switch.
                 PopVisible(visible = advanced) {
                   Column {
-                    var uiScaleDraft by remember(appearance.uiScale) { mutableFloatStateOf(appearance.uiScale) }
-                    StepRow("Text & layout scale", "${(uiScaleDraft * 100).roundToInt()}%")
-                    AnimatedSlider(
-                        value = uiScaleDraft,
-                        onValueChange = { uiScaleDraft = it },
-                        valueRange = 0.8f..1.3f,
-                        steps = 4,
-                        onValueSettled = { uiScaleDraft = (it * 10).roundToInt() / 10f; vm.setUiScaleSoon(uiScaleDraft) },
-                    )
+                    UiScaleSlider(appearance, vm)
                     Spacer(Modifier.height(SettingsGapGroup))
                   }
                 }

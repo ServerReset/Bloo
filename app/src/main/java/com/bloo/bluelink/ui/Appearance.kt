@@ -591,3 +591,19 @@ internal fun VibrancySlider(appearance: SettingsStore.Appearance, vm: AppViewMod
         },
     )
 }
+
+/** Shared by the main Appearance card and the settings-search quick-jump
+ *  preview so this slider's range/step/rounding lives in exactly one place
+ *  -- the two used to be hand-copied and could drift out of sync. */
+@Composable
+internal fun UiScaleSlider(appearance: SettingsStore.Appearance, vm: AppViewModel, label: String = "Text & layout scale") {
+    var uiScaleDraft by remember(appearance.uiScale) { mutableFloatStateOf(appearance.uiScale) }
+    StepRow(label, "${(uiScaleDraft * 100).roundToInt()}%")
+    AnimatedSlider(
+        value = uiScaleDraft,
+        onValueChange = { uiScaleDraft = it },
+        valueRange = 0.8f..1.3f,
+        steps = 4,
+        onValueSettled = { uiScaleDraft = (it * 10).roundToInt() / 10f; vm.setUiScaleSoon(uiScaleDraft) },
+    )
+}
