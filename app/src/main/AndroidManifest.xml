@@ -196,7 +196,7 @@
              built from this receiver, see ActivityRecognitionManager, so it needs no
              intent-filter here. -->
         <receiver android:name=".autolock.AutoLockActivityReceiver" android:exported="false" />
-        <!-- Relaunches MainActivity once an in-place app update finishes installing --
+        <!-- Relaunches MainActivity once an in-place app update finishes installing;
              see its own doc comment. -->
         <receiver android:name=".autolock.AutoLockBootReceiver" android:exported="false">
             <intent-filter>
