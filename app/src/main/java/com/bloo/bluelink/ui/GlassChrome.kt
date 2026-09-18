@@ -254,11 +254,9 @@ internal const val GlassTintAlpha = 0.10f
 internal const val GlassBlurredTintAlpha = 0.02f
 
 /**
- * Resolves [GlassSurface]'s own fill color -- also called directly by the one place
- * in the app that can't host [GlassSurface] itself because it doesn't own its own
- * layout, just a `Color` parameter on a platform composable: the single-column pull-
- * to-refresh indicator (`PullToRefreshDefaults.LoadingIndicator`'s `containerColor`
- * in Pebbles.kt).
+ * Resolves [GlassSurface]'s own fill color -- also called directly by places that
+ * can't host [GlassSurface] itself because they don't own their own layout, just a
+ * `Color` parameter on a platform composable or a `Modifier.background()`.
  *
  * Plain black/white by theme, deliberately NOT a `MaterialTheme.colorScheme` tonal
  * role -- see [MetaChip]'s own doc for the reason: this app's dynamic/custom palette

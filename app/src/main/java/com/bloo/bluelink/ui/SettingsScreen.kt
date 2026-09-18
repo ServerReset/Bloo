@@ -96,7 +96,6 @@ import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Warning
-import androidx.compose.material.icons.filled.WbSunny
 import androidx.compose.material.icons.filled.MyLocation
 import androidx.compose.material.icons.filled.Place
 import androidx.compose.ui.semantics.contentDescription
@@ -255,11 +254,6 @@ internal fun SettingsScreen(
     // there's genuinely room, so this one grid covers both instead of two
     // separate layouts to keep in sync.
     val settingsGridState = rememberLazyStaggeredGridState()
-    // === PULL-TO-REFRESH FOR SETTINGS ===
-    // Settings uses Material 3's native PullToRefresh on the LazyVerticalStaggeredGrid.
-    // When the user drags from the top, it triggers vm.syncNow() to sync with Google Drive.
-    // The loading indicator floats at the top with spring animation, appearing only once
-    // System back returns to the garage, not out of the app.
     var pickTarget by remember { mutableStateOf<String?>(null) }
     var cropUri by remember { mutableStateOf<Uri?>(null) }
     // System photo picker (crash-free), then our own Compose crop step.
@@ -1798,8 +1792,22 @@ internal fun SettingsScreen(
             }
             item {
 
-            // Weather
-            SettingsCard("Weather", Icons.Filled.WbSunny, vm) {
+            // Location -- was titled "Weather" and talked only about weather, even though
+            // choosing "My location" here does more than that: it sets
+            // Appearance.weatherFollowsDevice, and AppViewModel.refreshDeviceLocation()
+            // (the same place that keeps the map's own "you are here" dot and the Location
+            // pebble's distance-to-car current) re-syncs this location to that live fix on
+            // every refresh -- see WeatherController.refreshDeviceLocationForWeather's own
+            // doc. So "My location" was already one location feeding both weather and the
+            // map; this card just never said so.
+            SettingsCard("Location", Icons.Filled.LocationOn, vm) {
+                Text(
+                    "Where \"my location\" points for weather -- and, once set that way, the " +
+                        "same live position the map's own device dot and \"distance to car\" use.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(Modifier.height(SettingsGapRow))
                 var weatherQuery by remember { mutableStateOf("") }
                 val locationPermission = rememberLauncherForActivityResult(
                     ActivityResultContracts.RequestPermission(),
