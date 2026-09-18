@@ -18,6 +18,7 @@ package com.bloo.bluelink.ui
 
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Canvas
@@ -310,7 +311,7 @@ internal fun CompactGarage(state: UiState, vm: AppViewModel, appearance: Setting
                     // twice, which it was.
                     LocalCoverCarName provides v.name.takeIf { band == null },
                 ) {
-                    CompactCar(v, state, vm)
+                    CompactCar(v, state, vm, hazeState = hazeState)
                 }
             }
         }
@@ -451,6 +452,11 @@ internal fun CompactCar(
     v: Vehicle,
     state: UiState,
     vm: AppViewModel,
+    /** Same shared instance the pager marks as its own hazeSource -- see
+     *  [RefreshIndicatorBadge]'s own doc for why this needs to be a REAL blur of
+     *  the tile behind it, not the flat-tint fallback a null/mismatched
+     *  hazeState would fall back to. */
+    hazeState: HazeState,
 ) {
     // Live source passed to SinglePebble (which takes State<UiState> now).
     val stateSource = rememberUpdatedState(state)
@@ -764,5 +770,23 @@ internal fun CompactCar(
             }
         }
         // Vertical page dots removed: user requested no page indicators
+        // Same shared RefreshIndicatorBadge (Pebbles.kt) every other refresh surface in the
+        // app uses -- a real GlassSurface blur of the tile behind it via `hazeState`, not a
+        // flat tint. The cover screen had NO visual feedback at all once refreshStatus() above
+        // actually fired (only the edge-trace RING, which tracks the GESTURE, not the network
+        // call it triggers) -- reported directly as wanting every refresh indicator in the app
+        // to look the same. No live pull distance to follow here (VerticalPager owns the drag,
+        // there is no pull-to-refresh gesture on this screen), so progress is just animated
+        // between 0 and 1 off the plain `state.refreshing` boolean, the same way GarageScreen's
+        // own grid-mode badge (no per-car pull gesture either) already does it.
+        val coverRefreshProgress by animateFloatAsState(
+            targetValue = if (state.refreshing) 1f else 0f,
+            animationSpec = tween(if (state.refreshing) 150 else 200),
+            label = "coverRefreshProgress",
+        )
+        RefreshIndicatorBadge(
+            hazeState = hazeState,
+            modifier = Modifier.align(Alignment.TopCenter),
+        ) { coverRefreshProgress }
     }
 }
