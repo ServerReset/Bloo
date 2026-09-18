@@ -335,22 +335,6 @@ internal fun CarSettingsCard(
                         .clip(RoundedCornerShape(14.dp)),
                 )
             }
-            if (storedImage != null && storedImage.startsWith("/")) {
-                Text(
-                    "Custom photo set",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            } else {
-                OutlinedTextField(
-                    value = storedImage ?: "",
-                    onValueChange = { vm.setVehicleImage(v.vin, it) },
-                    label = { Text("Image URL (blank = gradient)") },
-                    singleLine = true,
-                    shape = FieldShape,
-                    modifier = Modifier.fillMaxWidth(),
-                )
-            }
             // A group, not a plain Row: pressing "Choose photo" should take its extra width
             // from "Clear" beside it rather than shove it sideways. See ExpressiveButtons.kt.
             ExpressiveButtonRow(spacing = 8.dp) {
