@@ -852,13 +852,13 @@ internal fun SettingsScreen(
                                 verticalArrangement = Arrangement.spacedBy(8.dp),
                             ) {
                                 val lastSyncLabel = com.bloo.bluelink.data.relativeLabel(state.lastSyncMs)
-                                SyncInfoRow("Last synced", if (lastSyncLabel.isNotBlank()) lastSyncLabel else "—")
+                                StatusRow("Last synced", if (lastSyncLabel.isNotBlank()) lastSyncLabel else "—")
                                 // File-identity fingerprint: two phones truly on the SAME Drive
                                 // file show the SAME code. If they differ, they picked different
                                 // files (Drive allows duplicate names) — the #1 reason sync
                                 // doesn't converge, now checkable at a glance across phones.
                                 state.syncFileFingerprint?.let { fp ->
-                                    SyncInfoRow("File ID", fp, valueMono = true)
+                                    StatusRow("File ID", fp, valueMono = true)
                                 }
                             }
                             Spacer(Modifier.height(SettingsGapRow))

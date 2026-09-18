@@ -175,7 +175,7 @@ internal fun LiveUpdateTroubleshootDialog(onDismiss: () -> Unit) {
 
 @Composable
 internal fun TroubleshootStep(number: Int, text: String) {
-    Row(modifier = Modifier.padding(bottom = 10.dp)) {
+    Row(modifier = Modifier.padding(bottom = SettingsGapGroup)) {
         Text(
             "$number.",
             style = MaterialTheme.typography.bodyMedium,
@@ -384,7 +384,7 @@ internal fun MinutesField(initial: Int, label: String, onSet: (Int) -> Unit) {
         singleLine = true,
         shape = FieldShape,
         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-        modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+        modifier = Modifier.fillMaxWidth().padding(top = SettingsGapRow),
     )
 }
 

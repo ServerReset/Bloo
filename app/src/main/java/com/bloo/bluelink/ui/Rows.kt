@@ -279,7 +279,7 @@ internal fun CropScreen(vin: String, uriString: String, onCancel: () -> Unit, on
 // --- Small reusable pieces ------------------------------------------------
 
 @Composable
-internal fun StatusRow(label: String, value: String) {
+internal fun StatusRow(label: String, value: String, valueMono: Boolean = false) {
     Row(
         Modifier.fillMaxWidth(),
         // Top-align so that if the value wraps to a 2nd line (a long value at a
@@ -342,11 +342,12 @@ internal fun StatusRow(label: String, value: String) {
             val baseStyle = LocalTextStyle.current
             val onSurfaceColor = MaterialTheme.colorScheme.onSurface
             // Memoized to avoid recreating the TextStyle.copy() on every recomposition.
-            val valueStyle = remember(baseStyle, onSurfaceColor) {
+            val valueStyle = remember(baseStyle, onSurfaceColor, valueMono) {
                 baseStyle.copy(
                     fontWeight = FontWeight.Medium,
                     color = onSurfaceColor,
                     textAlign = TextAlign.End,
+                    fontFamily = if (valueMono) FontFamily.Monospace else baseStyle.fontFamily,
                 )
             }
             com.bloo.uicommon.AnimatedValue(
@@ -617,36 +618,6 @@ internal fun SeatConfigRow(
 // function with zero call sites and a comment describing a layout the app no longer has.
 // Nothing needs a 64dp button now; if something does, MorphButton + MorphButtonLabel is the
 // two-line body this was.
-
-/** A label/value row inside the sync status block: muted label on the left,
- *  emphasised value on the right (monospaced for the File ID so it reads as a
- *  code to compare across devices). */
-@Composable
-internal fun SyncInfoRow(
-    label: String,
-    value: String,
-    valueMono: Boolean = false,
-    valueColor: Color = MaterialTheme.colorScheme.onSurface,
-) {
-    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-        Text(
-            label,
-            style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.weight(1f),
-        )
-        Text(
-            value,
-            style = MaterialTheme.typography.labelLarge,
-            fontWeight = FontWeight.SemiBold,
-            color = valueColor,
-            fontFamily = if (valueMono) androidx.compose.ui.text.font.FontFamily.Monospace else null,
-            textAlign = TextAlign.End,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
-    }
-}
 
 /**
  * The synced-devices registry shown in the "Backup & sync" card: a
