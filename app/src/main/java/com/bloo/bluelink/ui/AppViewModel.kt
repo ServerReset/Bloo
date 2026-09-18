@@ -3250,10 +3250,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     // More of the same appearance-setter pattern described above the
     // setThemeMode group: DataStore write only, UI updates via the
-    // `appearance` StateFlow mirror. setAuroraMotion/setAuroraColorMode
-    // configure the animated background's speed and how it picks colors
-    // (theme-derived vs. a fixed custom one); setAuroraCustomColor supplies
-    // that fixed color (or null to fall back to theme-derived).
+    // `appearance` StateFlow mirror. setAuroraMotion configures the animated
+    // background's speed; its colors always derive from the current theme.
     fun setPebbleOutline(value: Boolean) = viewModelScope.launch { settingsStore.setPebbleOutline(value) }
     fun setShowSearch(value: Boolean) = viewModelScope.launch { settingsStore.setShowSearch(value) }
 
@@ -3294,10 +3292,6 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     fun setAuroraBackground(value: Boolean) = viewModelScope.launch { settingsStore.setAuroraBackground(value) }
 
     fun setAuroraMotion(value: String) = viewModelScope.launch { settingsStore.setAuroraMotion(value) }
-
-    fun setAuroraColorMode(value: String) = viewModelScope.launch { settingsStore.setAuroraColorMode(value) }
-
-    fun setAuroraCustomColor(value: String?) = viewModelScope.launch { settingsStore.setAuroraCustomColor(value) }
 
     /** Imperial vs. metric display throughout the app. */
     fun setUnitSystem(value: String) = viewModelScope.launch { settingsStore.setUnitSystem(value) }

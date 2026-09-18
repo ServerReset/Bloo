@@ -223,8 +223,6 @@ class SettingsStore(private val context: Context) {
         val SEARCH_BUBBLE_Y = stringPreferencesKey("search_bubble_y")
         val AURORA = stringPreferencesKey("aurora_background")
         val AURORA_MOTION = stringPreferencesKey("aurora_motion")
-        val AURORA_COLOR_MODE = stringPreferencesKey("aurora_color_mode")
-        val AURORA_CUSTOM_COLOR = stringPreferencesKey("aurora_custom_color")
         val UNIT_SYSTEM = stringPreferencesKey("unit_system")
         val LAST_VIN = stringPreferencesKey("last_vehicle_vin")
         val ORDER = stringPreferencesKey("vehicle_order")
@@ -275,10 +273,6 @@ class SettingsStore(private val context: Context) {
         val auroraBackground: Boolean = false,
         /** Aurora motion mode: "off", "static", "motion". */
         val auroraMotion: String = "static",
-        /** Aurora color mode: "complementary", "material", "custom". */
-        val auroraColorMode: String = "complementary",
-        /** Custom color hex for aurora (only used when auroraColorMode is "custom"). */
-        val auroraCustomColor: String? = null,
         /** Unit system: "imperial" (miles, mph, F) or "metric" (km, km/h, C). */
         val unitSystem: String = "imperial",
         /** Haptic feedback across the UI. */
@@ -344,8 +338,6 @@ class SettingsStore(private val context: Context) {
             hapticsEnabled = prefs[Keys.HAPTICS]?.toBooleanStrictOrNull() ?: true,
             auroraBackground = prefs[Keys.AURORA]?.toBooleanStrictOrNull() ?: false,
             auroraMotion = prefs[Keys.AURORA_MOTION] ?: "static",
-            auroraColorMode = prefs[Keys.AURORA_COLOR_MODE] ?: "complementary",
-            auroraCustomColor = prefs[Keys.AURORA_CUSTOM_COLOR],
             unitSystem = prefs[Keys.UNIT_SYSTEM] ?: "imperial",
             // Shared rule -- see FormatUtils.useFahrenheit for why this stopped being
             // written out here and on the watch separately.
@@ -623,24 +615,13 @@ class SettingsStore(private val context: Context) {
         editTracked { it[Keys.AURORA] = value.toString() }
     }
 
-    // Both setters below validate the incoming string against the fixed set of
+    // The setters below validate the incoming string against the fixed set of
     // legal values and silently fall back to the default if it's anything else
     // (e.g. a stale string from a future app version we don't recognize),
     // rather than storing garbage that the appearance Flow above would then
     // have to re-validate on every read.
     suspend fun setAuroraMotion(value: String) {
         editTracked { it[Keys.AURORA_MOTION] = value.takeIf { it in setOf("off", "static", "motion") } ?: "static" }
-    }
-
-    suspend fun setAuroraColorMode(value: String) {
-        editTracked { it[Keys.AURORA_COLOR_MODE] = value.takeIf { it in setOf("complementary", "material", "custom") } ?: "complementary" }
-    }
-
-    suspend fun setAuroraCustomColor(value: String?) {
-        editTracked {
-            val key = Keys.AURORA_CUSTOM_COLOR
-            if (value.isNullOrBlank()) it.remove(key) else it[key] = value
-        }
     }
 
     suspend fun setUnitSystem(value: String) {

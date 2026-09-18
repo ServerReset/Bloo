@@ -785,11 +785,12 @@ internal fun triangleWave(elapsedMs: Long, periodMs: Long): Float {
  * onboarding, and (optionally) the garage. Colors, motion style, and the
  * pull-to-refresh "explosion" pulse are all independent concerns composed
  * together here:
- *  - [colorMode] picks how the blob hues are derived: "material" uses the
- *    theme's primary/secondary/tertiary directly, "custom" derives
- *    complementary/analogous hues from [appearance]'s stored hex color via
- *    HSV rotation, and the default ("complementary") derives a hue from the
- *    surface color rotated 180°.
+ *  - Blob hues always derive from the surface color rotated 180° (a
+ *    complementary hue) plus tertiary/secondary passthrough -- this used to
+ *    be a user-facing choice ("Material You" or a hand-typed custom hex),
+ *    but that duplicated the app-wide dynamic-color toggle for the same
+ *    underlying "where do the theme's colors come from" decision, so it
+ *    always follows the current theme now.
  *  - [motionMode] picks whether the blobs drift on their own (`static`,
  *    driven by [triangleWave]-based ease loops further below) or track the
  *    phone's tilt via the accelerometer (`motion`). In Motion mode, a fast
@@ -830,8 +831,6 @@ internal fun AuroraBackground(
         return
     }
     val motionMode = appearance?.auroraMotion ?: "static"
-    val colorMode = appearance?.auroraColorMode ?: "complementary"
-    val customHex = appearance?.auroraCustomColor
 
     // "Motion" follows the phone's tilt (like a lock-screen wallpaper
     // parallax); "Static" ignores tilt entirely and instead gets its own
@@ -900,48 +899,19 @@ internal fun AuroraBackground(
         LaunchedEffect(motionActive) { tiltX = 0f; tiltY = 0f }
     }
 
-    // Remembered on the inputs the derivation actually reads, so the HSV round-trips and
-    // parseColor calls don't re-run on every frame of the pull-to-refresh explosion animation
-    // (this composable recomposes each of those frames because it reads explosion.value below;
-    // the blob colours don't depend on the animation, so they shouldn't ride along with it).
-    // Keys cover all three branches: material reads scheme.primary/tertiary/secondary, custom
-    // reads customHex, complementary reads scheme.surface (+ tertiary/secondary passthrough).
-    val (basePrimary, baseTertiary, baseSecondary) = remember(
-        colorMode, customHex, scheme.primary, scheme.tertiary, scheme.secondary, scheme.surface,
-    ) {
-        val primary = when (colorMode) {
-            "material" -> scheme.primary
-            "custom" -> customHex?.let { hx -> runCatching { Color(android.graphics.Color.parseColor(hx)) }.getOrNull() } ?: scheme.primary
-            else -> {
-                val hsv = FloatArray(3)
-                android.graphics.Color.colorToHSV(scheme.surface.toArgb(), hsv)
-                hsv[0] = (hsv[0] + 180f) % 360f
-                Color(android.graphics.Color.HSVToColor(hsv))
-            }
+    // Remembered on the inputs the derivation actually reads, so the HSV round-trips
+    // don't re-run on every frame of the pull-to-refresh explosion animation (this
+    // composable recomposes each of those frames because it reads explosion.value
+    // below; the blob colours don't depend on the animation, so they shouldn't ride
+    // along with it).
+    val (basePrimary, baseTertiary, baseSecondary) = remember(scheme.tertiary, scheme.secondary, scheme.surface) {
+        val primary = run {
+            val hsv = FloatArray(3)
+            android.graphics.Color.colorToHSV(scheme.surface.toArgb(), hsv)
+            hsv[0] = (hsv[0] + 180f) % 360f
+            Color(android.graphics.Color.HSVToColor(hsv))
         }
-        val tertiary = when (colorMode) {
-            "material" -> scheme.tertiary
-            "custom" -> customHex?.let { hx -> runCatching {
-                val c = android.graphics.Color.parseColor(hx)
-                val hsv = FloatArray(3)
-                android.graphics.Color.colorToHSV(c, hsv)
-                hsv[0] = (hsv[0] + 180f) % 360f
-                Color(android.graphics.Color.HSVToColor(hsv))
-            }.getOrNull() } ?: scheme.tertiary
-            else -> scheme.tertiary
-        }
-        val secondary = when (colorMode) {
-            "material" -> scheme.secondary
-            "custom" -> customHex?.let { hx -> runCatching {
-                val c = android.graphics.Color.parseColor(hx)
-                val hsv = FloatArray(3)
-                android.graphics.Color.colorToHSV(c, hsv)
-                hsv[0] = (hsv[0] + 90f) % 360f
-                Color(android.graphics.Color.HSVToColor(hsv))
-            }.getOrNull() } ?: scheme.secondary
-            else -> scheme.secondary
-        }
-        Triple(primary, tertiary, secondary)
+        Triple(primary, scheme.tertiary, scheme.secondary)
     }
 
     // A guaranteed grow-then-shrink pulse rather than a value that just

@@ -1472,9 +1472,9 @@ internal fun SettingsScreen(
                     onSelect = { vm.setThemeMode(ThemeMode.valueOf(it)) },
                 )
                 // Advanced-only, same tier as the dynamic-color block below --
-                // Aurora's motion/colour-mode/custom-hex sub-options are
-                // power-user territory, not something a simple-mode user needs
-                // (the built-in solid-surface background covers everyone else).
+                // Aurora's motion sub-option is power-user territory, not
+                // something a simple-mode user needs (the built-in solid-surface
+                // background covers everyone else).
                 AnimatedVisibility(visible = staggeredAdvancedVisible(advanced, 5), enter = collapseEnter(), exit = collapseExit()) {
                   Column {
                     Spacer(Modifier.height(SettingsGapRow))
@@ -1486,8 +1486,8 @@ internal fun SettingsScreen(
                     )
                     // Same AnimatedVisibility-wraps-a-Column idiom as the dynamic-
                     // color section below, instead of a bare `if` -- this whole
-                    // Motion/Colour block otherwise just materialized the instant
-                    // the toggle above flipped on.
+                    // Motion block otherwise just materialized the instant the
+                    // toggle above flipped on.
                     AnimatedVisibility(
                         visible = appearance.auroraBackground,
                         enter = collapseEnter(),
@@ -1505,35 +1505,6 @@ internal fun SettingsScreen(
                                 selectedKey = appearance.auroraMotion,
                                 onSelect = { vm.setAuroraMotion(it) },
                             )
-                            Spacer(Modifier.height(SettingsGapRow))
-                            Text("Colour", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.primary)
-                            Spacer(Modifier.height(SettingsGapHairline))
-                            MorphSegmented(
-                                options = listOf(
-                                    SegmentOption("complementary", "Complementary", null),
-                                    SegmentOption("material", "Material You", null),
-                                    SegmentOption("custom", "Custom", null),
-                                ),
-                                selectedKey = appearance.auroraColorMode,
-                                onSelect = { vm.setAuroraColorMode(it) },
-                            )
-                            AnimatedVisibility(
-                                visible = appearance.auroraColorMode == "custom",
-                                enter = collapseEnter(),
-                                exit = collapseExit(),
-                            ) {
-                                Column {
-                                    Spacer(Modifier.height(SettingsGapRow))
-                                    OutlinedTextField(
-                                        value = appearance.auroraCustomColor ?: "",
-                                        onValueChange = { vm.setAuroraCustomColor(it.take(7).takeIf { it.matches(RxHexColorDraft) } ?: appearance.auroraCustomColor) },
-                                        label = { Text("Hex colour") },
-                                        singleLine = true,
-                                        shape = FieldShape,
-                                        modifier = Modifier.fillMaxWidth(),
-                                    )
-                                }
-                            }
                         }
                     }
                   }
