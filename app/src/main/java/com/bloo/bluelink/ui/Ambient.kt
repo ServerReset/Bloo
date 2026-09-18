@@ -724,14 +724,24 @@ internal fun GlassAlertDialog(
                 }
             }
         }
-        // GlassSurface (GlassChrome.kt) -- the same fill/rim/shadow every other
-        // floating surface in the app now shares, no per-site override. This used
-        // to run its own near-opaque 0.97-alpha fill, reasoned as a deliberate
-        // exception for a modal dialog; there are no exceptions now, only one
-        // shared implementation.
+        // GlassSurface (GlassChrome.kt) -- the same edge/shadow every other floating
+        // surface in the app shares, but NOT its default ambient tint. That tint
+        // (GlassTintAlpha, ~0.10) is deliberately low so floating chrome over the
+        // app's own content -- the status bar, search results -- shows background
+        // through it; it was tuned down repeatedly on exactly that reasoning (see
+        // its own doc). A modal dialog is the opposite case: nothing here wires a
+        // hazeState in (a dialog opens its own platform Window, not a layer inside
+        // whatever screen is behind it, so there's no blur to do the legibility
+        // work), and it needs to read clearly regardless of what's behind it --
+        // reported directly as dialog text bleeding into a Settings screen's own
+        // log viewer showing right through the card. Back to a near-opaque,
+        // theme-aware fill for this one call site, restoring the "deliberate
+        // exception for a modal dialog" an earlier pass folded into the ambient
+        // default and lost.
         GlassSurface(
             shape = shape,
             modifier = Modifier.fillMaxWidth(),
+            tint = scheme.surfaceContainerHigh.copy(alpha = 0.97f),
         ) {
             Column(Modifier.padding(24.dp)) {
                 if (icon != null) {
