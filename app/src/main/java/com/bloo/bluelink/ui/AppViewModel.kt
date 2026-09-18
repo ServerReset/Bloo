@@ -39,6 +39,7 @@ import com.bloo.bluelink.data.STALE_STATUS_MS
 import com.bloo.bluelink.data.StatusCache
 import com.bloo.bluelink.data.toGeoLocation
 import com.bloo.bluelink.data.GeoLocation
+import com.bloo.bluelink.data.MapTiles
 import com.bloo.bluelink.data.Powertrain
 import com.bloo.bluelink.data.VehiclePlatform
 import com.bloo.bluelink.data.isGen5W
@@ -52,6 +53,8 @@ import com.bloo.bluelink.data.Vehicle
 import com.bloo.bluelink.data.VehicleSnapshot
 import com.bloo.bluelink.data.VehicleStatus
 import com.bloo.bluelink.data.Weather
+import coil.imageLoader
+import coil.request.ImageRequest
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -1647,6 +1650,18 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                             } else st.locations,
                         )
                     }
+                    // Warm Coil's cache for this car's map BEFORE the user ever swipes to
+                    // it -- see prefetchMapTiles's own doc for why this is what actually
+                    // fixes "switching cars is slow the first time, instant once cached":
+                    // CarMap itself only ever composes for the ONE car page currently on
+                    // screen (beyondViewportPageCount = 0 elsewhere disposes the rest), so
+                    // a car's tiles never had a chance to start loading until the moment
+                    // its page actually appeared. Status for every OTHER car keeps arriving
+                    // here in the background the whole time the current one is being looked
+                    // at (see loadGarageInner's own per-car ensureStatus loop), so by the
+                    // time a swipe actually lands on one of them, this has usually already
+                    // had seconds to finish.
+                    statusLoc?.let { loc -> prefetchMapTiles(loc) }
                     persistSnapshots()
                     persistCache()
                     checkAlerts(v, status)
@@ -1699,6 +1714,57 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                     surfaceInFlight.isEmpty()
                 }
                 if (noMoreSurface) _state.update { it.copy(refreshing = false) }
+            }
+        }
+    }
+
+    /**
+     * Fire-and-forget warm-up of Coil's cache for the small grid of OSM tiles
+     * [CarMap] (WeatherPebble.kt) will need to draw [location] at its own starting
+     * zoom ([CarMapDefaultZoom]) -- called the moment a car's location is learned
+     * from a status fetch, not when its Location pebble actually appears.
+     *
+     * Every car's map otherwise only ever starts loading the instant its page
+     * becomes the one visible page in the garage pager (beyondViewportPageCount = 0
+     * there keeps every OTHER page fully disposed, on purpose -- see that pager's
+     * own doc), which is exactly what made switching to a car you have not looked
+     * at yet this session pay real network + decode latency for every tile on
+     * screen, while a car you had already visited felt instant (its tiles were
+     * already sitting in Coil's memory/disk cache from that earlier visit). This
+     * fetches the CENTRE of that same tile grid ahead of time, from wherever a
+     * status fetch happens to land -- often seconds before the user actually
+     * swipes there, since every other car's status keeps loading in the background
+     * the whole time the current one is on screen (see loadGarageInner's own
+     * per-car ensureStatus loop).
+     *
+     * A fixed 5x5 grid, not the exact box size CarMap itself measures at runtime:
+     * this runs with no composition (and therefore no on-screen box to measure) in
+     * scope at all. 5x5 covers the car's own pin and its immediate surroundings --
+     * the part every screen size needs regardless -- at the cost of a handful of
+     * small (bytes to tens of KB) tile requests; a wide/tablet screen's outermost
+     * edge tiles may still need a fresh fetch, which is strictly no worse than
+     * today's zero-prefetched tiles.
+     */
+    private fun prefetchMapTiles(location: GeoLocation) {
+        viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+            val context = getApplication<Application>()
+            val loader = context.imageLoader
+            val zoom = CarMapDefaultZoom
+            val centerX = MapTiles.tileX(location.longitude, zoom).toInt()
+            val centerY = MapTiles.tileY(location.latitude, zoom).toInt()
+            val span = MapTiles.span(zoom)
+            for (dx in -2..2) {
+                for (dy in -2..2) {
+                    val ty = centerY + dy
+                    if (ty < 0 || ty >= span) continue
+                    val tx = MapTiles.wrapX(centerX + dx, zoom)
+                    loader.enqueue(
+                        ImageRequest.Builder(context)
+                            .data(MapTiles.tileUrl(zoom, tx, ty))
+                            .setHeader("User-Agent", MapTiles.userAgent("Android"))
+                            .build(),
+                    )
+                }
             }
         }
     }
