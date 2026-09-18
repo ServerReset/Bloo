@@ -127,6 +127,15 @@ internal fun HeroHeader(
      *  inside it would recompose the whole hero on every unrelated state change, and
      *  both call sites already hold the UiState they would read it from. */
     photoExpanded: Boolean = true,
+    /**
+     * The multi-column grid's own "expand to full screen"/expanded-view's "back to all
+     * cars" toggle, rendered as this pebble's [PebbleShell] header action (next to the
+     * existing collapse/expand chevron) instead of a separate floating icon elsewhere
+     * on screen -- [SinglePebble]'s "summary" case supplies the fullscreen version,
+     * [CriticalContent] the back version; null (the phone's single-column view, which
+     * has neither concept) renders no action at all.
+     */
+    expandAction: PebbleHeaderAction? = null,
 ) {
     // Play the fade/slide-up entrance only ONCE per car per session, gated on the
     // same coldStartIntroPlayed set the pebble stagger uses. Previously this was an
@@ -279,6 +288,7 @@ internal fun HeroHeader(
             title = v.name,
             dragHandle = dragHandle,
             titleColor = heroTitleColorNow,
+            headerAction = expandAction,
             // The ONLY pebble that grows its title. Here the title is the car's NAME and the
             // card becomes a photo of that car, so the name scaling up reads as the card taking
             // over. On "Location" or "Diagnostics" it is a heading resizing for no reason.

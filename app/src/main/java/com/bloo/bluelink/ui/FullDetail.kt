@@ -23,6 +23,8 @@ import androidx.compose.animation.togetherWith
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -45,9 +47,6 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Fullscreen
-import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.MaterialTheme
@@ -96,13 +95,13 @@ internal fun VehicleDetailContent(
     state: State<UiState>,
     vm: AppViewModel,
     onExpand: (() -> Unit)? = null,
-    reserveHeaderEnd: Boolean = false,
     hideIndicator: Boolean = false,
-    // reserveTopForDots was removed. It reserved room at the top for the pager dots; the dots
-    // are gone app-wide, so the body stopped reading it and its own comment had been reduced to
-    // "no longer used but kept for API compatibility. Always false." There is no API to be
+    // reserveTopForDots and reserveHeaderEnd were removed the same way: each reserved room for
+    // a floating button that no longer exists (the pager dots, then CarHeaderRow's own
+    // Fullscreen icon -- see its doc), each reduced to "no longer used but kept for API
+    // compatibility. Always false/[value]" once its button went, and there is no API to be
     // compatible with -- this is an `internal` composable with exactly one caller in the same
-    // module, which passed the literal `false`.
+    // module, which passed the literal constant either time.
     /** See [CarHeaderRow]'s own doc -- forwarded through so its chips can blur. */
     hazeState: HazeState? = null,
 ) {
@@ -124,7 +123,7 @@ internal fun VehicleDetailContent(
             // topInset alone, no extra breathing room, so the name sits right at
             // the status bar's own edge instead of noticeably below it.
             Spacer(Modifier.height(topInset))
-            CarHeaderRow(v, state, onExpand, reserveHeaderEnd, hideName = true, hazeState = hazeState)
+            CarHeaderRow(v, state, hideName = true, hazeState = hazeState)
             // Single column has no separate "hero info column" to pin anything into --
             // that's a wide/dual-column-only concept (ExpandedCar's own HotspotSlot,
             // with its drag-to-pin secondary slot and "Add a pebble" call to action).
@@ -137,7 +136,7 @@ internal fun VehicleDetailContent(
             // ExpandedCar -- which did put "controls" back on screen, but ALSO
             // surfaced the wide-layout-only "Add a pebble" drag target above the hero
             // card, on every phone, reported directly as the layout looking wrong.
-            PebbleList(v, state, vm, pinHotspot = false)
+            PebbleList(v, state, vm, pinHotspot = false, onExpand = onExpand)
             // Reserves exactly as much room as the floating search bubble (SearchLayer, mounted
             // globally for Screen.Garage -- see Screens.kt's `searchable` gate) actually needs,
             // read live off its own reported bounds -- not a flat guessed height. A guess here
@@ -179,6 +178,10 @@ internal fun ExpandedCar(
     state: State<UiState>,
     vm: AppViewModel,
     flipped: Boolean,
+    /** Collapse back to the multi-column grid -- surfaced as the hero card's own header
+     *  action (see [HeroHeader]'s `expandAction`) instead of a separate floating back
+     *  button, now that this view has one already for the opposite direction. */
+    onCollapse: () -> Unit,
     /** See [CarHeaderRow]'s own doc -- forwarded through so its chips can blur. */
     hazeState: HazeState? = null,
 ) {
@@ -212,8 +215,8 @@ internal fun ExpandedCar(
     // everywhere else in the app. hideName = true here, matching
     // VehicleDetailContent's own CarHeaderRow call exactly.
     val controls: @Composable ColumnScope.() -> Unit = {
-        CarHeaderRow(v, state, onExpand = null, reserveEnd = false, hideName = true, hazeState = hazeState)
-        CriticalContent(v, state, vm)
+        CarHeaderRow(v, state, hideName = true, hazeState = hazeState)
+        CriticalContent(v, state, vm, onCollapse = onCollapse)
         HotspotSlot(v, hotspots, state, vm)
     }
     val pebbles: @Composable ColumnScope.() -> Unit = {
@@ -251,7 +254,31 @@ internal fun ExpandedCar(
             val rightScroll = if (isFlipped) controlsScroll else pebblesScroll
             val topSpacerHeight = topInset + HeaderCornerGap + HeaderButtonSize + HeaderContentClearance
             val bottomSpacerHeight = searchBarClearance(fallback = bottomInset + 132.dp)
-            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    // Swipe left/right to flip which column ("controls" vs "pebbles") renders on
+                    // which side -- replaces the screen-level "Flip columns" floating icon that
+                    // used to be the only way to do this. Keyed on `flipped` so a drag that
+                    // crosses the threshold and flips doesn't immediately re-trigger off the
+                    // rest of the SAME continuous gesture (isFlipped's own AnimatedContent swap
+                    // restarts pointerInput's coroutine, zeroing the accumulator).
+                    .pointerInput(isFlipped) {
+                        var dragTotal = 0f
+                        detectHorizontalDragGestures(
+                            onDragEnd = { dragTotal = 0f },
+                            onDragCancel = { dragTotal = 0f },
+                        ) { change, dragAmount ->
+                            change.consume()
+                            dragTotal += dragAmount
+                            if (kotlin.math.abs(dragTotal) > size.width / 4f) {
+                                vm.setColumnsFlipped(!isFlipped)
+                                dragTotal = 0f
+                            }
+                        }
+                    },
+                contentAlignment = Alignment.Center,
+            ) {
                 Row(
                     Modifier
                         .fillMaxHeight()
@@ -285,21 +312,18 @@ internal fun ExpandedCar(
 
 
 /**
- * A row of small fact chips (model/powertrain, "updated x ago"), with an
- * optional expand button -- [hideName] is true from every real caller now
- * ([VehicleDetailContent] and [ExpandedCar] both pass it, the car's name is
- * only ever drawn ONCE, live, on the hero photo card, so a second copy here
- * would be the same name twice on screen at once), which makes this row's
- * ENTIRE content the chips, not a name plus a caption underneath it.
+ * A row of small fact chips (model/powertrain, "updated x ago"). [hideName] is
+ * true from every real caller now ([VehicleDetailContent] and [ExpandedCar]
+ * both pass it, the car's name is only ever drawn ONCE, live, on the hero
+ * photo card, so a second copy here would be the same name twice on screen at
+ * once), which makes this row's ENTIRE content the chips, not a name plus a
+ * caption underneath it.
  *
- * CenterVertically, not Top: with no name line above them any more, the
- * chips are the row's only content, sitting noticeably shorter than
- * [FloatingIcon]'s fixed 48dp -- top-aligning them against it left the icon
- * looming taller beside a strip of chips hugging the top edge, reading as
- * mismatched pieces rather than one row. Centering both against each other
- * is what makes it read as one consistent band, the same alignment this
- * exact icon-beside-content pairing uses everywhere else it isn't paired
- * with a taller title line of its own.
+ * The "expand to full screen" button that used to float here (and "back to
+ * all cars"/"flip columns" as separate screen-level floating icons) all moved
+ * onto the hero card's own header instead -- see [HeroHeader]'s `expandAction`
+ * -- so this row is chips only now, CenterVertically since there is no longer
+ * a taller icon beside them to align against.
  *
  * [hideName] itself (and the name [Text] it would draw) stays as an escape
  * hatch rather than being deleted outright -- nothing currently calls it
@@ -318,8 +342,6 @@ internal fun CarHeaderRow(
      * it actually shows change, and not when some other car's weather ticks.
      */
     state: State<UiState>,
-    onExpand: (() -> Unit)?,
-    reserveEnd: Boolean,
     hideName: Boolean = false,
     /** The screen's own [HazeState] (see GarageScreen's own `hazeSource` doc) -- threaded
      *  through so these chips get a real backdrop blur instead of the flat-tint fallback
@@ -329,9 +351,7 @@ internal fun CarHeaderRow(
     val meta by remember(v) { derivedStateOf { "${v.model} · ${state.value.powertrainLabel(v)}" } }
     val fetchedAt by remember(v) { derivedStateOf { state.value.fetchedAt(v) } }
     Row(
-        Modifier
-            .fillMaxWidth()
-            .padding(end = if (reserveEnd) 52.dp else 0.dp),
+        Modifier.fillMaxWidth(),
         verticalAlignment = if (hideName) Alignment.CenterVertically else Alignment.Top,
     ) {
         Column(Modifier.weight(1f)) {
@@ -351,10 +371,6 @@ internal fun CarHeaderRow(
                 MetaChip(meta, hazeState = hazeState)
                 LastUpdatedLabel(fetchedAt, hazeState = hazeState)
             }
-        }
-        if (onExpand != null) {
-            // A proper floating chip (was a hard-to-see bare icon).
-            FloatingIcon(Icons.Filled.Fullscreen, "Expand to full screen", onExpand)
         }
     }
 }

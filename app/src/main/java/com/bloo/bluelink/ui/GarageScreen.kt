@@ -24,15 +24,10 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.pager.HorizontalPager
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
-import androidx.compose.material.icons.filled.Build
-import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.ui.semantics.onClick
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
@@ -368,6 +363,7 @@ internal fun GarageScreen(
                                 // needed per-page notification) were removed, but the structure
                                 // remains for consistency. Only one page is ever actually
                                 // composed here (beyondViewportPageCount = 0) anyway.
+                                onCollapse = { vm.collapse() },
                                 hazeState = hazeState,
                             )
                         }
@@ -588,13 +584,6 @@ internal fun GarageScreen(
                                 VehicleDetailContent(
                                     gv, state, vm,
                                     onExpand = if (canExpand) ({ vm.expand(real) }) else null,
-                                    // Always false now: this only ever reserved
-                                    // room for the persistent floating gear button
-                                    // in the top-right corner, and that button is
-                                    // gone -- Settings is the page right after the
-                                    // last car in this very pager, reached by
-                                    // swiping.
-                                    reserveHeaderEnd = false,
                                     // Only hide the per-car pull indicator in the
                                     // multi-car grid (perPage > 1) -- state.refreshing
                                     // is one app-wide flag, not per-car, so leaving
@@ -643,34 +632,10 @@ internal fun GarageScreen(
                 }
             }
         }
-        // Back/flip ride the refresh shift with the page content during a
-        // pull-to-refresh.
-        if (expandedIdx != null) {
-            FloatingIcon(
-                icon = Icons.Filled.ArrowBack,
-                description = "Back to all cars",
-                onClick = { vm.collapse() },
-                modifier = Modifier.align(Alignment.TopStart).statusBarsPadding()
-                    // No fade: a nav affordance that vanishes mid-refresh is a trap, and unlike
-                    // the dots it is not re-drawn by anything else while it is gone.
-                    .floatingOverlay(FloatingIds.BackIcon, fade = false),
-                hazeState = hazeState,
-            )
-        }
-        if (expandedIdx != null) {
-            FloatingIcon(
-                icon = Icons.Filled.SwapHoriz,
-                description = "Flip columns",
-                onClick = { vm.setColumnsFlipped(!appearance.columnsFlipped) },
-                // Corner-anchored: the Settings cog that used to sit here (and
-                // which this was offset by 52dp to clear) is gone -- Settings is
-                // a page in the collapsed pager now, reached by collapsing back
-                // to the grid and swiping, not from the expanded view.
-                modifier = Modifier.align(Alignment.TopEnd).statusBarsPadding()
-                    .floatingOverlay(FloatingIds.FlipIcon, fade = false),
-                hazeState = hazeState,
-            )
-        }
+        // The floating "Back to all cars" and "Flip columns" icons that used to live here
+        // are gone: back is now the hero card's own header action (see HeroHeader's
+        // expandAction, wired via ExpandedCar's onCollapse above), and flipping columns is
+        // now a swipe gesture on ExpandedCar itself rather than a button anyone had to find.
         // THE SINGLE CarMap instance, positioned at the screen level.
         // It animates from the pebble location (collapsed) to full-screen (expanded).
         // Same instance, literally growing -- not two separate maps or morphing.

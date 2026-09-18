@@ -49,8 +49,10 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Campaign
+import androidx.compose.material.icons.filled.Fullscreen
 import androidx.compose.material.icons.filled.FlashOn
 import androidx.compose.material.icons.filled.PushPin
 import androidx.compose.material.icons.filled.Lock
@@ -394,7 +396,7 @@ internal fun Refreshable(
 }
 /** Hero image + gauge (expanded view). */
 @Composable
-internal fun CriticalContent(v: Vehicle, stateSource: State<UiState>, vm: AppViewModel) {
+internal fun CriticalContent(v: Vehicle, stateSource: State<UiState>, vm: AppViewModel, onCollapse: (() -> Unit)? = null) {
     val state = stateSource.value
     val status = state.statusFor(v)
     val metric = LocalAppearance.current.unitSystem == "metric"
@@ -406,6 +408,9 @@ internal fun CriticalContent(v: Vehicle, stateSource: State<UiState>, vm: AppVie
         v, status, heroState.imageUrls[v.vin], heroState.hasBattery(v), heroState.hasFuel(v), vm,
         heroState.drivingLabel(v), metric = metric,
         photoExpanded = heroState.isPebbleExpanded(v.vin, com.bloo.bluelink.data.HERO_PHOTO_SECTION),
+        expandAction = onCollapse?.let {
+            PebbleHeaderAction(label = "Back to all cars", icon = Icons.Filled.ArrowBack, onClick = it)
+        },
     )
 }
 
@@ -556,6 +561,8 @@ internal fun PebbleList(
     vm: AppViewModel,
     exclude: Set<String> = emptySet(),
     pinHotspot: Boolean = true,
+    /** Forwarded to the "summary" hero pebble only -- see [HeroHeader]'s `expandAction`. */
+    onExpand: (() -> Unit)? = null,
 ) {
     val sel = state.value
     val allSections = sel.sectionsFor(v)
@@ -644,7 +651,7 @@ internal fun PebbleList(
         // pebble composition this whole mechanism exists to defer.
         val nonEagerIndex = sections.indexOf(section) - EAGER_PEBBLES
         if (section in eager || nonEagerIndex < filledCount) {
-            SinglePebble(section, v, state, vm, dragHandle)
+            SinglePebble(section, v, state, vm, dragHandle, onExpand = onExpand)
         } else {
             // Off-screen placeholder, up to a few frames now rather than always exactly
             // one: reserves ~collapsed pebble height so the list doesn't visibly jump
@@ -697,7 +704,7 @@ internal fun stateSlice(state: State<UiState>, vararg keys: Any?): UiState =
     remember(*keys) { state.value }
 
 @Composable
-internal fun SinglePebble(section: String, v: Vehicle, state: State<UiState>, vm: AppViewModel, dragHandle: Modifier) {
+internal fun SinglePebble(section: String, v: Vehicle, state: State<UiState>, vm: AppViewModel, dragHandle: Modifier, onExpand: (() -> Unit)? = null) {
     val status = state.value.statusFor(v)
     val metric = LocalAppearance.current.unitSystem == "metric"
     when (section) {
@@ -710,6 +717,9 @@ internal fun SinglePebble(section: String, v: Vehicle, state: State<UiState>, vm
                 v, status, heroState.imageUrls[v.vin], heroState.hasBattery(v), heroState.hasFuel(v), vm,
                 heroState.drivingLabel(v), dragHandle = dragHandle, metric = metric,
                 photoExpanded = heroState.isPebbleExpanded(v.vin, com.bloo.bluelink.data.HERO_PHOTO_SECTION),
+                expandAction = onExpand?.let {
+                    PebbleHeaderAction(label = "Expand to full screen", icon = Icons.Filled.Fullscreen, onClick = it)
+                },
             )
         }
         "update" -> {

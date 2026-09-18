@@ -58,10 +58,6 @@ value class FloatingId(val name: String)
 /** The app's own floaters. Anything may define its own id; these are just the ones that
  *  currently negotiate with each other. */
 object FloatingIds {
-    /** The flip-columns button in the top-right corner while a car is expanded. */
-    val FlipIcon = FloatingId("flipIcon")
-    /** The back arrow in the top-left corner while a car is expanded. */
-    val BackIcon = FloatingId("backIcon")
     /**
      * The search bubble/bar. The one floater a PERSON positions: on a cover screen it can be
      * dragged and parked anywhere along an edge, and where the device reports a camera island it
