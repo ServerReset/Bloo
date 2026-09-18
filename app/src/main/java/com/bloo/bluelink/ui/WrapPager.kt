@@ -180,25 +180,30 @@ internal class WrapPagerState(val pager: PagerState, val realCount: Int) {
      * pager's own `beyondViewportPageCount` was already sized by solving exactly this
      * inequality for a real, reported crash -- see its call site's own doc), and a contiguous
      * run of consecutive integers only visits every residue mod [realCount] at most once
-     * while its length is <= [realCount] (pigeonhole). Below that threshold (this session
-     * already hit the resulting "Key already used" crash once, from skipping this check on a
-     * single-item pager), falls back to the raw page index -- the pre-existing, uncrashable
-     * behaviour -- since a small [realCount] already keeps [WRAP_MULTIPLIER]'s own worst-case
-     * retained-page count small regardless.
+     * while its length is <= [realCount] (pigeonhole). Below that threshold, falls back to
+     * the raw page index -- the pre-existing, uncrashable behaviour -- since a small
+     * [realCount] already keeps [WRAP_MULTIPLIER]'s own worst-case retained-page count small
+     * regardless.
      *
-     * [realCount] <= 1 is excluded even though the inequality above can hold for it (e.g.
-     * realCount=1, beyondViewportPageCount=0, perPage=1): [real] collapses to the CONSTANT 0
-     * for every page whenever realCount <= 1, so keying by it would give literally every
-     * virtual page the same key. The pigeonhole reasoning above only bounds the STEADY-STATE
-     * composed window; it doesn't cover Compose's Pager transiently composing both the source
-     * and destination page during an animated `scrollToPage` (from [snapToReal] or
-     * [recenterIfNearEdge]) even with beyondViewportPageCount=0 -- which is exactly the crash
-     * this hit on a single-car account expanding full-screen. [recenterIfNearEdge] itself
-     * already no-ops for realCount <= 1, so there is no reuse to gain from real-keying here in
-     * the first place -- the raw page index is both safe and sufficient.
+     * Requires STRICT `>`, not `>=`: this session hit the resulting "Key already used" crash
+     * twice from trusting the boundary (composed count == realCount) as safe. The pigeonhole
+     * argument above only holds if the composed window is truly never more than `perPage +
+     * 2 * beyondViewportPageCount` pages wide -- and the multi-column garage pager's own
+     * `pageWidth = boxWidthPx / perPage` (integer division) broke that assumption: `perPage`
+     * pages of a FLOORED width sum to less than boxWidthPx, leaving a leftover sliver of the
+     * viewport that forces an extra (perPage+1)-th page to be composed to cover it. That's
+     * fixed at its own call site (ceiling division instead), but this margin stays as the
+     * backstop regardless -- a one-item spare residue means even one uncounted extra page
+     * still lands on a residue nothing else in the window is using, instead of relying on
+     * every call site getting its own page-count math exactly, provably right. It also
+     * subsumes the realCount <= 1 case for free: [real] collapses to the CONSTANT 0 for every
+     * page whenever realCount <= 1 (which would otherwise key every virtual page identically),
+     * and since `perPage >= 1` always, `realCount > perPage + 2 * beyond` can never hold for
+     * realCount <= 1 -- so that case always falls back to the raw index without needing its
+     * own special-cased branch.
      */
     fun keyFor(page: Int, beyondViewportPageCount: Int, perPage: Int = 1): Any =
-        if (realCount > 1 && realCount >= perPage + 2 * beyondViewportPageCount) real(page) else page
+        if (realCount > perPage + 2 * beyondViewportPageCount) real(page) else page
     // settledReal was removed: zero readers. Both places that care about a SETTLE go through
     // `snapshotFlow { pager.settledPage }.collect { real(it) }` instead (GarageScreen's and
     // CompactGarage's pager-settle effects), because they need the settle as an EVENT, not as

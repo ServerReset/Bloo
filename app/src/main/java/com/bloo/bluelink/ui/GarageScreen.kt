@@ -515,7 +515,16 @@ internal fun GarageScreen(
                     // wrong layout decision.
                     var boxWidthPx by remember { mutableIntStateOf(0) }
                     val density = LocalDensity.current
-                    val pageWidth = with(density) { (boxWidthPx / perPage).toDp() }
+                    // Ceiling division, not floor: `perPage` pages of a FLOORED width sum to
+                    // LESS than boxWidthPx (a leftover gap up to perPage-1 px at the right
+                    // edge), which forces the viewport to need a (perPage+1)-th page composed
+                    // to cover that gap during a scroll -- silently breaking every
+                    // beyondViewportPageCount/keyFor formula below, all of which assume
+                    // exactly perPage pages are ever on-screen at once. Rounding up instead
+                    // means perPage pages together are always >= boxWidthPx (they may overhang
+                    // the edge by a sub-pixel amount instead), which is what actually keeps
+                    // that assumption true.
+                    val pageWidth = with(density) { ((boxWidthPx + perPage - 1) / perPage).toDp() }
                     HorizontalPager(
                         state = pager,
                         modifier = Modifier.fillMaxSize().hazeSource(hazeState)
