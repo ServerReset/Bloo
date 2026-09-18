@@ -96,16 +96,17 @@ internal fun AutoLockSettingsGroup(v: Vehicle, vm: AppViewModel) {
             backgroundLocationLauncher.launch(Manifest.permission.ACCESS_BACKGROUND_LOCATION)
         }
     }
-    val activityRecognitionLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.RequestPermission(),
-    ) { /* no-op: ActivityRecognitionManager checks for itself before registering. */ }
     val bluetoothConnectLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission(),
     ) { granted -> if (granted) showDevicePicker = true }
+    // Walking confirmation is mandatory now (not a toggle -- see AutoLockSection("Confirm
+    // before locking") below), so ACTIVITY_RECOGNITION is requested right alongside the other
+    // permissions AutoLock needs the moment it's turned on, rather than behind its own toggle.
     val corePermissions = remember {
         buildList {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) add(Manifest.permission.BLUETOOTH_CONNECT)
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) add(Manifest.permission.POST_NOTIFICATIONS)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) add(Manifest.permission.ACTIVITY_RECOGNITION)
         }
     }
     val corePermissionLauncher = rememberLauncherForActivityResult(
@@ -117,13 +118,6 @@ internal fun AutoLockSettingsGroup(v: Vehicle, vm: AppViewModel) {
         if (value) {
             val missing = corePermissions.filter { !granted(it) }
             if (missing.isNotEmpty()) corePermissionLauncher.launch(missing.toTypedArray())
-        }
-    }
-
-    fun onActivityRecognitionChanged(value: Boolean) {
-        update(current.copy(useActivityRecognition = value))
-        if (value && Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && !granted(Manifest.permission.ACTIVITY_RECOGNITION)) {
-            activityRecognitionLauncher.launch(Manifest.permission.ACTIVITY_RECOGNITION)
         }
     }
 
@@ -167,6 +161,22 @@ internal fun AutoLockSettingsGroup(v: Vehicle, vm: AppViewModel) {
             MorphTextButton(
                 text = "Allow background activity",
                 onClick = { LiveCharge.requestBackgroundUnrestricted(context) },
+                contentColor = MaterialTheme.colorScheme.primary,
+                icon = Icons.Filled.Warning,
+            )
+        }
+
+        // Locking always waits for a walking confirmation now, so denying this permission
+        // means every evaluation times out and skips -- surfaced here since it would
+        // otherwise look like AutoLock is simply broken, with no toggle left to point at.
+        if (current.enabled && Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q &&
+            !granted(Manifest.permission.ACTIVITY_RECOGNITION)
+        ) {
+            Spacer(Modifier.height(SettingsGapHairline))
+            SettingsCaption("Won't lock without motion access", bottomGap = SettingsGapHairline)
+            MorphTextButton(
+                text = "Grant Physical activity permission",
+                onClick = { corePermissionLauncher.launch(arrayOf(Manifest.permission.ACTIVITY_RECOGNITION)) },
                 contentColor = MaterialTheme.colorScheme.primary,
                 icon = Icons.Filled.Warning,
             )
@@ -220,12 +230,12 @@ internal fun AutoLockSettingsGroup(v: Vehicle, vm: AppViewModel) {
             Spacer(Modifier.height(SettingsGapRow))
 
             AutoLockSection("Confirm before locking", Icons.Filled.DirectionsWalk) {
-                ToggleRow(
-                    "Confirm with walking",
-                    current.useActivityRecognition,
-                    description = "Waits for Activity Recognition to notice you're walking before starting the countdown — cuts false triggers from a brief signal drop.",
-                    onChange = ::onActivityRecognitionChanged,
+                Text(
+                    "Always waits for Activity Recognition to notice you're walking before starting the countdown — cuts false triggers from a brief signal drop.",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
+                Spacer(Modifier.height(SettingsGapRow))
                 ToggleRow(
                     "Confirm with geofence",
                     current.useGeofence,
@@ -257,11 +267,12 @@ internal fun AutoLockSettingsGroup(v: Vehicle, vm: AppViewModel) {
             Spacer(Modifier.height(SettingsGapRow))
 
             AutoLockSection("Safety", Icons.Filled.Security) {
-                ToggleRow(
-                    "Skip if a door or window is open",
-                    current.dontLockIfOpen,
-                    description = "Doesn't lock if any door or window is reported open.",
-                ) { update(current.copy(dontLockIfOpen = it)) }
+                Text(
+                    "Never locks if any door or window is reported open.",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(Modifier.height(SettingsGapRow))
                 ToggleRow(
                     "Dry run (testing mode)",
                     current.dryRun,

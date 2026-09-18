@@ -135,11 +135,9 @@ object AutoLockController {
     private suspend fun runEvaluation(context: Context, vin: String) = mutexFor(vin).withLock {
         // Declared OUTSIDE the try block (and so, unlike a val inside it, visible to the
         // finally below) and only ever flipped true at the exact point start() is actually
-        // called -- the finally's stop() call is paired against what THIS evaluation really
-        // started, not a fresh settings re-read that could disagree if the user changed the
-        // "confirm with walking" toggle for this car mid-evaluation. A start()/stop() pair
-        // that can silently go unbalanced defeats the whole point of the reference count in
-        // ActivityRecognitionManager.
+        // called -- the finally's stop() call is only skipped if an exception struck before
+        // start() ever ran. A start()/stop() pair that can silently go unbalanced defeats the
+        // whole point of the reference count in ActivityRecognitionManager.
         var startedActivityRecognition = false
         try {
             skipGrace.remove(vin)
@@ -147,14 +145,12 @@ object AutoLockController {
             val settings = SettingsStore(context).autoLockConfig(vin)
             if (!settings.enabled) return@withLock
 
-            val sm = LockStateMachine(settings.useActivityRecognition, settings.useGeofence).also { machines[vin] = it }
+            val sm = LockStateMachine(settings.useGeofence).also { machines[vin] = it }
             advance(vin, sm.next(DetectionState.IDLE, DetectionEvent.CarBluetoothDisconnected))
             AppLog.log("AutoLock: left the car ($vin) — evaluating.")
 
-            if (settings.useActivityRecognition) {
-                ActivityRecognitionManager.start(context)
-                startedActivityRecognition = true
-            }
+            ActivityRecognitionManager.start(context)
+            startedActivityRecognition = true
 
             // Wait for corroborating signals (activity + geofence) to promote CONFIRMING -> GRACE,
             // or time out and either proceed on the Bluetooth signal alone or skip, per settings.
@@ -172,9 +168,10 @@ object AutoLockController {
                 _state.first { (it[vin]?.detection ?: DetectionState.IDLE) != DetectionState.CONFIRMING }
             }
             if (leftConfirming == null) {
-                // Timed out still CONFIRMING: proceed on the Bluetooth signal alone unless a
-                // still-enabled confirmation signal was required and never arrived.
-                if ((settings.useActivityRecognition || settings.useGeofence) && !walkAwayConfirmed.contains(vin)) {
+                // Timed out still CONFIRMING: walking confirmation is always required, so this
+                // means it (and geofence, if enabled) never arrived in time -- skip rather than
+                // lock on the Bluetooth disconnect alone.
+                if (!walkAwayConfirmed.contains(vin)) {
                     _state.update { it + (vin to AutoLockEvalState(detection = DetectionState.SKIPPED)) }
                     AppLog.log("AutoLock: no walk-away confirmation for $vin — not locking.")
                     return@withLock
@@ -209,7 +206,7 @@ object AutoLockController {
                 return@withLock
             }
 
-            when (val decision = LockPolicy.decide(status, dontLockIfOpen = settings.dontLockIfOpen)) {
+            when (val decision = LockPolicy.decide(status)) {
                 is LockDecision.Skip -> {
                     _state.update { it + (vin to AutoLockEvalState(detection = DetectionState.SKIPPED)) }
                     AppLog.log("AutoLock: skipped for $vin — ${decision.reason}.")

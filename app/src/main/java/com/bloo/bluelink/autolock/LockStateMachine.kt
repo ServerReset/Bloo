@@ -5,15 +5,14 @@ package com.bloo.bluelink.autolock
  * `LockStateMachine`. [AutoLockController] owns timers and I/O; this class only computes
  * the next state, which is what makes it exhaustively unit-testable.
  *
- * Confirmation policy: after the Bluetooth disconnect trigger, every *enabled* corroborating
- * signal (activity recognition + geofence) must confirm before the grace countdown starts.
- * Disabled signals count as already-confirmed, so a car with neither enabled goes straight
- * from the disconnect to GRACE -- matching this app's existing behaviour for a car with no
- * extra confirmation configured.
+ * Confirmation policy: after the Bluetooth disconnect trigger, walking confirmation (via
+ * Activity Recognition) is always required before the grace countdown starts, plus geofence
+ * confirmation when that's *enabled* -- a disabled geofence counts as already-confirmed, so a
+ * car without it goes straight from walking confirmation to GRACE.
  */
-class LockStateMachine(useActivityRecognition: Boolean, useGeofence: Boolean) {
+class LockStateMachine(useGeofence: Boolean) {
 
-    private var walkingConfirmed = !useActivityRecognition
+    private var walkingConfirmed = false
     private var geofenceConfirmed = !useGeofence
 
     fun next(current: DetectionState, event: DetectionEvent): DetectionState = when (event) {

@@ -877,10 +877,8 @@ class SettingsStore(private val context: Context) {
             deviceName = s("autolock_device_name_$vin"),
             useBluetoothTrigger = b("autolock_use_bt_$vin", true),
             graceSeconds = i("autolock_grace_$vin", 30),
-            useActivityRecognition = b("autolock_use_activity_$vin", false),
             useGeofence = b("autolock_use_geofence_$vin", false),
             geofenceRadiusMeters = i("autolock_geofence_radius_$vin", 100),
-            dontLockIfOpen = b("autolock_dont_lock_if_open_$vin", false),
             dryRun = b("autolock_dry_run_$vin", true),
         )
     }
@@ -888,7 +886,13 @@ class SettingsStore(private val context: Context) {
     /** Every DataStore key one car's [AutoLockConfig] occupies -- named once so
      *  [setAutoLockConfig] (which writes them) and [clearAllAutoLockConfigs] (which removes
      *  them on sign-out) can't drift out of sync with each other the way two hand-written key
-     *  lists eventually would. */
+     *  lists eventually would.
+     *
+     *  Includes two keys ("autolock_use_activity_$vin", "autolock_dont_lock_if_open_$vin")
+     *  that [autoLockConfig] no longer reads and [setAutoLockConfig] no longer writes -- both
+     *  behaviors are now hardcoded always-on rather than user choices. Left in this list purely
+     *  so a sign-out still clears any value an older build wrote for them, rather than leaving
+     *  orphaned keys behind. */
     private fun autoLockKeys(vin: String) = listOf(
         booleanPreferencesKey("autolock_enabled_$vin"),
         stringPreferencesKey("autolock_device_addr_$vin"),
@@ -911,10 +915,8 @@ class SettingsStore(private val context: Context) {
             if (config.deviceName == null) it.remove(nameKey) else it[nameKey] = config.deviceName
             it[booleanPreferencesKey("autolock_use_bt_$vin")] = config.useBluetoothTrigger
             it[stringPreferencesKey("autolock_grace_$vin")] = config.graceSeconds.toString()
-            it[booleanPreferencesKey("autolock_use_activity_$vin")] = config.useActivityRecognition
             it[booleanPreferencesKey("autolock_use_geofence_$vin")] = config.useGeofence
             it[stringPreferencesKey("autolock_geofence_radius_$vin")] = config.geofenceRadiusMeters.toString()
-            it[booleanPreferencesKey("autolock_dont_lock_if_open_$vin")] = config.dontLockIfOpen
             it[booleanPreferencesKey("autolock_dry_run_$vin")] = config.dryRun
         }
         // Maintain the registry of "cars with AutoLock configured" so the Bluetooth/geofence

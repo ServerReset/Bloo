@@ -17,11 +17,8 @@ data class AutoLockConfig(
      *  head unit doesn't report a clean Bluetooth disconnect. */
     val useBluetoothTrigger: Boolean = true,
     val graceSeconds: Int = 30,
-    val useActivityRecognition: Boolean = false,
     val useGeofence: Boolean = false,
     val geofenceRadiusMeters: Int = 100,
-    /** Skip the lock if a door or window is reported open, rather than locking around it. */
-    val dontLockIfOpen: Boolean = false,
     /** Runs the full detect -> verify flow but never sends the real lock command -- logs
      *  "would have locked" instead. Defaults on; the user turns it off once they trust it. */
     val dryRun: Boolean = true,
