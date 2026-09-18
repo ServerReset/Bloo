@@ -36,7 +36,12 @@ import com.bloo.bluelink.R
 import kotlinx.serialization.Serializable
 
 /** User-selectable appearance. */
-enum class ThemeMode { SYSTEM, LIGHT, DARK, AMOLED, SYSTEM_AMOLED }
+/** Dark mode is always true-black (OLED-friendly) now -- see [blooColorScheme]'s own
+ *  doc. This used to also offer separate "AMOLED"/"+AMOLED" variants alongside plain
+ *  DARK/SYSTEM; there was never a real reason to make dark mode dimmer than it needs
+ *  to be by default, so that's just what DARK/SYSTEM-while-dark do now, with no extra
+ *  choice to make. */
+enum class ThemeMode { SYSTEM, LIGHT, DARK }
 
 /**
  * User-selectable typeface. GOOGLE_SANS uses Google Sans Flex — Google's
@@ -290,13 +295,11 @@ private fun Color.saturate(factor: Float): Color {
 
 /**
  * Resolve the final Material 3 [ColorScheme] for the given appearance, outside
- * composition. [BlooTheme] uses it, and so does the Wear sync (to mirror the
- * exact resolved colours to the watch).
+ * composition. [BlooTheme] uses it.
  */
 fun blooColorScheme(
     context: Context,
     dark: Boolean,
-    themeMode: ThemeMode,
     dynamicColor: Boolean,
     colorPalette: ColorPalette,
     customPalette: CustomPaletteData?,
@@ -317,13 +320,13 @@ fun blooColorScheme(
         else -> LightExpressive.applyPalette(colorPalette)
     }
 
-    // AMOLED mode overrides just the background/surface tiers to true (or near-true) black
-    // to actually turn off OLED pixels for the big flat areas, while leaving every other
+    // Dark mode overrides just the background/surface tiers to true (or near-true) black --
+    // actually turning off OLED pixels for the big flat areas -- while leaving every other
     // role (text, accents, containers) exactly as the resolved base scheme already has them.
-    // SYSTEM_AMOLED only applies this override in its dark half -- it's meant to look like
-    // ordinary SYSTEM in light mode, and only swap in true-black surfaces once the system
-    // (or the day/night boundary) actually flips to dark, per [dark].
-    val amoled = if (themeMode == ThemeMode.AMOLED || (themeMode == ThemeMode.SYSTEM_AMOLED && dark)) {
+    // This used to be a separate opt-in "AMOLED"/"+AMOLED" mode alongside plain DARK/SYSTEM;
+    // there is no reason to make dark mode dimmer-than-necessary on an OLED screen by default,
+    // so true black is just what dark mode IS now, with no extra choice to make.
+    val amoled = if (dark) {
         val black = Color(0xFF000000)
         base.copy(
             background = black,
@@ -372,8 +375,7 @@ fun blooColorScheme(
 /**
  * The app's root theme wrapper, applied once around the whole Compose tree (see
  * [com.bloo.bluelink.MainActivity]). Resolves [themeMode]/[dynamicColor]/[colorPalette]/
- * [customPalette]/[vibrancy] into a concrete [ColorScheme] via [blooColorScheme] (the same
- * function used to mirror colours to the watch, so both surfaces always agree), applies
+ * [customPalette]/[vibrancy] into a concrete [ColorScheme] via [blooColorScheme], applies
  * [uiScale] by scaling the font-scale component of [LocalDensity] (so a user's "make
  * everything bigger" preference scales text-driven layout without needing every composable
  * to read a separate scale value), and reads the system's global animator-duration-scale
@@ -402,8 +404,8 @@ fun BlooTheme(
 ) {
     val dark = when (themeMode) {
         ThemeMode.LIGHT -> false
-        ThemeMode.DARK, ThemeMode.AMOLED -> true
-        ThemeMode.SYSTEM, ThemeMode.SYSTEM_AMOLED -> isSystemInDarkTheme()
+        ThemeMode.DARK -> true
+        ThemeMode.SYSTEM -> isSystemInDarkTheme()
     }
 
     val context = LocalContext.current
@@ -411,12 +413,11 @@ fun BlooTheme(
     // can be expensive (wallpaper extraction), and vibrancy saturation involves HSV
     // conversions. Only recompute when inputs actually change.
     val scheme = remember(
-        dark, themeMode, dynamicColor, colorPalette, customPalette, vibrancy
+        dark, dynamicColor, colorPalette, customPalette, vibrancy
     ) {
         blooColorScheme(
             context = context,
             dark = dark,
-            themeMode = themeMode,
             dynamicColor = dynamicColor,
             colorPalette = colorPalette,
             customPalette = customPalette,
@@ -480,7 +481,7 @@ val LocalReduceMotion = staticCompositionLocalOf { false }
  * This exists because the same four-line `when (themeMode)` block was re-typed at every
  * site that needed it, and the bug it exists to stop has now been reported and fixed
  * FIVE separate times: a composable reading `isSystemInDarkTheme()` directly, which is
- * the PHONE's setting and has nothing to say about the app's own Light/Dark/AMOLED
+ * the PHONE's setting and has nothing to say about the app's own Light/Dark
  * override. Every one of those five rendered a dark-mode treatment inside a light-themed
  * app (or the reverse) whenever the two disagreed -- [pebbleCardEdge]'s pebble shadow,
  * [glassTint]'s near-solid-black floating glass, `CarMap`'s tile/pin palette
@@ -490,9 +491,9 @@ val LocalReduceMotion = staticCompositionLocalOf { false }
  * [BlooTheme].
  *
  * So: ONE implementation, and the call is short enough that copying the `when` back out
- * is strictly more work than calling this. LIGHT/DARK/AMOLED force their answer
- * regardless of the system; only SYSTEM/SYSTEM_AMOLED fall through to the phone -- byte
- * for byte what [BlooTheme] itself does when it picks the colour scheme, which is the
+ * is strictly more work than calling this. LIGHT/DARK force their answer regardless of
+ * the system; only SYSTEM falls through to the phone -- byte for byte what [BlooTheme]
+ * itself does when it picks the colour scheme, which is the
  * property that matters: anything branching on this agrees with the scheme it is drawing
  * against, by construction rather than by two places happening to stay in step.
  *
@@ -503,7 +504,7 @@ val LocalReduceMotion = staticCompositionLocalOf { false }
 @Composable
 internal fun appIsDarkTheme(): Boolean = when (LocalAppearance.current.themeMode) {
     ThemeMode.LIGHT -> false
-    ThemeMode.DARK, ThemeMode.AMOLED -> true
-    ThemeMode.SYSTEM, ThemeMode.SYSTEM_AMOLED -> isSystemInDarkTheme()
+    ThemeMode.DARK -> true
+    ThemeMode.SYSTEM -> isSystemInDarkTheme()
 }
 

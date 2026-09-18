@@ -311,8 +311,17 @@ class SettingsStore(private val context: Context) {
     // eagerly near app launch, so a decode failure here must never crash startup.
     val appearance: Flow<Appearance> = context.settingsDataStore.data.map { prefs ->
         Appearance(
-            themeMode = prefs[Keys.THEME]?.let { runCatching { ThemeMode.valueOf(it) }.getOrNull() }
-                ?: ThemeMode.SYSTEM,
+            // AMOLED/SYSTEM_AMOLED were removed as separate modes once Dark itself became
+            // always-true-black (see ThemeMode's own doc) -- remapped explicitly rather than
+            // falling through to the generic ThemeMode.valueOf()-failure default (SYSTEM), so
+            // a device that had AMOLED selected keeps a dark theme instead of silently
+            // reverting to System.
+            themeMode = when (val raw = prefs[Keys.THEME]) {
+                "AMOLED" -> ThemeMode.DARK
+                "SYSTEM_AMOLED" -> ThemeMode.SYSTEM
+                null -> ThemeMode.SYSTEM
+                else -> runCatching { ThemeMode.valueOf(raw) }.getOrDefault(ThemeMode.SYSTEM)
+            },
             fontChoice = prefs[Keys.FONT]?.let { runCatching { FontChoice.valueOf(it) }.getOrNull() }
                 ?: FontChoice.SYSTEM,
             dynamicColor = prefs[Keys.DYNAMIC]?.toBooleanStrictOrNull() ?: true,

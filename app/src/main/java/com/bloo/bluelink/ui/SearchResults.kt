@@ -245,15 +245,13 @@ internal fun SettingsSearchResults(
             }
         }
     }
-    add("Display mode", "theme light dark amoled system appearance") {
+    add("Display mode", "theme light dark amoled oled system appearance") {
         SettingsSegmentedRow(
             label = "Appearance",
             options = listOf(
                 SegmentOption(ThemeMode.SYSTEM.name, "System", null),
-                SegmentOption(ThemeMode.SYSTEM_AMOLED.name, "+AMOLED", null),
                 SegmentOption(ThemeMode.LIGHT.name, "Light", null),
                 SegmentOption(ThemeMode.DARK.name, "Dark", null),
-                SegmentOption(ThemeMode.AMOLED.name, "AMOLED", null),
             ),
             selectedKey = appearance.themeMode.name,
             onSelect = { vm.setThemeMode(ThemeMode.valueOf(it)) },
