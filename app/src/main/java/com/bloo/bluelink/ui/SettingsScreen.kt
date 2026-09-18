@@ -69,7 +69,6 @@ import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Straighten
 import androidx.compose.material.icons.filled.TextFields
-import androidx.compose.material.icons.filled.Dashboard
 import androidx.compose.material.icons.filled.Vibration
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.Add
@@ -336,13 +335,12 @@ internal fun SettingsScreen(
         // Same reason advVisible itself lives out here and not in the grid content below:
         // rememberGridItemVisibility calls remember(), so it needs a real composable scope,
         // which LazyStaggeredGridScope's content lambda is not. One transition per gated
-        // card, hoisted together so none of the six item{} sites below has to break that rule.
+        // card, hoisted together so none of the five item{} sites below has to break that rule.
         val advTransition0 = rememberGridItemVisibility(advVisible[0])
         val advTransition1 = rememberGridItemVisibility(advVisible[1])
         val advTransition2 = rememberGridItemVisibility(advVisible[2])
         val advTransition3 = rememberGridItemVisibility(advVisible[3])
         val advTransition4 = rememberGridItemVisibility(advVisible[4])
-        val advTransition5 = rememberGridItemVisibility(advVisible[5])
         LazyVerticalStaggeredGrid(
             columns = StaggeredGridCells.Adaptive(minSize = 380.dp),
             state = settingsGridState,
@@ -747,9 +745,9 @@ internal fun SettingsScreen(
                 ) { uri -> uri?.let { vm.importSettingsAndSync(context, it) } }
 
                 // Icon + status caption up front, matching the icon-led header
-                // every other multi-row card in Settings uses (Quick tiles, AI)
-                // -- this card was the one still opening on two stacked lines
-                // of plain text with no at-a-glance state.
+                // every other multi-row card in Settings uses (AI) -- this card
+                // was the one still opening on two stacked lines of plain text
+                // with no at-a-glance state.
                 val driveConfigured = state.syncUri != null
                 val driveIcon = when {
                     driveConfigured && state.syncError != null -> Icons.Filled.CloudOff
@@ -1348,53 +1346,6 @@ internal fun SettingsScreen(
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-            }
-            }
-            if (advTransition5.targetState || !advTransition5.isIdle) item {
-
-            // Quick Settings tiles -- per-tile config is power-user territory,
-            // same tier as App shortcuts/Cars above.
-            AnimatedVisibility(visibleState = advTransition5, enter = collapseEnter(), exit = collapseExit()) {
-            SettingsCard("Quick tiles", Icons.Filled.Dashboard, vm) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    ThemedIcon(Icons.Filled.Bolt, tint = MaterialTheme.colorScheme.primary, size = 20.dp)
-                    Spacer(Modifier.width(8.dp))
-                    Text(
-                        "Each car can have up to 12 tiles in your Quick Settings shade. " +
-                            "Configure below, then tap \"Add to Quick Settings\" to place each one.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.weight(1f),
-                    )
-                }
-                Spacer(Modifier.height(SettingsGapGroup))
-
-                InlineSegmentedRow(
-                    label = "On tap:",
-                    caption = if (state.tileBackground) "Tiles fire the command directly and show a confirmation."
-                        else "Tiles briefly open Bloo to send the command, then close.",
-                    options = listOf(
-                        SegmentOption("background", "Run in background", Icons.Filled.Bolt),
-                        SegmentOption("open", "Open the app", Icons.Filled.OpenInNew),
-                    ),
-                    selectedKey = if (state.tileBackground) "background" else "open",
-                    onSelect = { vm.setTileBackground(it == "background") },
-                )
-
-                Spacer(Modifier.height(SettingsGapGroup))
-                InlineSegmentedRow(
-                    label = "Refresh:",
-                    caption = "Pulls the car's latest state when the tile appears (throttled to once a minute per car).",
-                    options = listOf(
-                        SegmentOption("off", "Off", null),
-                        SegmentOption("on", "On", Icons.Filled.Refresh),
-                    ),
-                    selectedKey = if (state.tileLiveRefresh) "on" else "off",
-                    onSelect = { vm.setTileLiveRefresh(it == "on") },
-                )
-                Spacer(Modifier.height(SettingsGapGroup))
-                QuickTilesManager(state, vm)
-            }
             }
             }
             item {

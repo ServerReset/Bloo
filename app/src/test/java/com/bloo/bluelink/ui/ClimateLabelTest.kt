@@ -8,47 +8,13 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 
 /**
- * Pins for the small pure string layer that renders quick-tile and climate
- * summaries. These strings are user-facing copy in two places at once
- * (the configured tile list under Settings, and the running pebble header /
- * AI confirm card), so a typo or a changed unit rule appears on both -- and
- * the climate conversions (["presetDetail"]) had a documented history of
- * re-inlining the °F->°C rule and drifting from [degValue]; the shared-rule
- * pin is what makes a future drift fail loudly instead of displaying 68°
- * in Celsius.
+ * Pins for the small pure string layer that renders climate summaries --
+ * the running pebble header / AI confirm card. The conversions
+ * (["presetDetail"]) had a documented history of re-inlining the °F->°C
+ * rule and drifting from [degValue]; the shared-rule pin is what makes a
+ * future drift fail loudly instead of displaying 68° in Celsius.
  */
-class TileAndClimateLabelTest {
-
-    // --- tileActionLabel / tileSummary --------------------------------------
-
-    @Test
-    fun tileActionLabel_knownCommandsMapToCopy() {
-        assertEquals("Lock / unlock", tileActionLabel("doors"))
-        assertEquals("Climate", tileActionLabel("climate"))
-        assertEquals("Charge", tileActionLabel("charge"))
-    }
-
-    @Test
-    fun tileActionLabel_unknownFallsBackToRawCommand() {
-        assertEquals("frobnicate", tileActionLabel("frobnicate"))
-    }
-
-    @Test
-    fun tileSummary_staticCommands() {
-        assertEquals("Lock / unlock", tileSummary("doors", "default", null))
-        assertEquals("Start / stop charge", tileSummary("charge", "default", null))
-        assertEquals("Opens the app", tileSummary("open", "default", null))
-    }
-
-    @Test
-    fun tileSummary_climateVariants() {
-        assertEquals("Climate · Smart", tileSummary("climate", "smart", null))
-        assertEquals("Climate · Basic", tileSummary("climate", "default", null))
-        // A named preset shows its name; an unnamed temp target falls back
-        // to "Preset" rather than leaking the raw temp:temp:70 target.
-        assertEquals("Climate · Arctic blast", tileSummary("climate", "temp:70", "Arctic blast"))
-        assertEquals("Climate · Preset", tileSummary("climate", "temp:70", null))
-    }
+class ClimateLabelTest {
 
     // --- climateChunksLabel ---------------------------------------------------
 
@@ -107,9 +73,8 @@ class TileAndClimateLabelTest {
 
     @Test
     fun presetDetail_rawTempTargetNeverLeaksIntoTheSummary() {
-        // The label path used to fall back to the raw target when unnamed
-        // (see tileSummary's own "Preset" fallback); at the settings picker the
-        // summary always carries a clean name or the generic word.
+        // An unnamed temp target must never leak its raw value into the summary --
+        // it should always carry a clean name or the generic word instead.
         val d = presetDetail(req(70), fahrenheit = true)
         assertEquals("70°", d)
     }

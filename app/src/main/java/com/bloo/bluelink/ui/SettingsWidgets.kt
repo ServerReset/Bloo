@@ -189,41 +189,6 @@ fun SettingsSegmentedRow(
     }
 }
 
-/**
- * A [MorphSegmented] with a fixed-width caption to its left and an explanatory line
- * beneath -- the layout the Quick-tiles card uses for its "On tap" and "Refresh"
- * choices. Distinct from [SettingsSegmentedRow], which stacks its label above the
- * control and carries no sub-caption; this one keeps the label inline (a 60dp column,
- * so the two rows' controls line up) and always has a hint below.
- */
-@Composable
-internal fun InlineSegmentedRow(
-    label: String,
-    caption: String,
-    options: List<SegmentOption>,
-    selectedKey: String,
-    onSelect: (String) -> Unit,
-) {
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        LabelText(label, modifier = Modifier.width(60.dp))
-        Spacer(Modifier.width(8.dp))
-        MorphSegmented(
-            modifier = Modifier.weight(1f),
-            options = options,
-            selectedKey = selectedKey,
-            onSelect = onSelect,
-        )
-    }
-    Spacer(Modifier.height(SettingsGapHairline))
-    Text(
-        caption,
-        style = MaterialTheme.typography.bodySmall,
-        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
-    )
-}
-
-
-
 
 
 

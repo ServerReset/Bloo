@@ -94,8 +94,8 @@ class MainToMainSyncWorker(ctx: Context, params: WorkerParameters) : CoroutineWo
             // gives up on Result.retry(), so a revoked Drive grant retried forever,
             // each attempt paying performMainToMainSync's ~15 DataStore reads, a Drive round
             // trip and (when photos sync) a full per-car JPEG re-encode. Backoff caps
-            // the RATE, not the count. LiveChargePollWorker and TileCommandWorker both
-            // already bound theirs; this is the same shape.
+            // the RATE, not the count. LiveChargePollWorker already bounds its own
+            // retries; this is the same shape.
             return retryWhileAttemptsRemain()
         }
         return Result.success()

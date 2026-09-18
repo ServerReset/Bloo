@@ -192,16 +192,6 @@ data class UiState(
      *  Primary slot is always "controls" (lights/horn) - hardcoded, not stored.
      *  Secondary slot is user-selectable, stored here as a single String or null. */
     val hotspotSections: Map<String, String?> = emptyMap(),
-    /** Quick-tile assignments: index -> (vin, command), or null if unassigned. */
-    val tileConfigs: List<Pair<String, String>?> = List(12) { null },
-    /** Optional per-tile custom names (index -> label or null). */
-    val tileLabels: List<String?> = List(12) { null },
-    /** Per-tile climate target: "default", "smart", or a preset id. */
-    val tileClimateTargets: List<String> = List(12) { "default" },
-    /** Quick tiles run the command in the background (vs opening the app). */
-    val tileBackground: Boolean = false,
-    /** Quick tiles kick a throttled status refresh when shown. */
-    val tileLiveRefresh: Boolean = false,
     /** Enabled app-icon shortcut ids ("cmd_vin"); null = show all. */
     val shortcutSet: Set<String>? = null,
     /** Whether Shizuku is installed + running, so the "seamless install" toggle is

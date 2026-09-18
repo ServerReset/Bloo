@@ -48,6 +48,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.SystemUpdate
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.onClick
 import androidx.compose.ui.text.style.TextOverflow
@@ -658,6 +659,43 @@ internal fun StatusChip(
         ) {
             label()
         }
+    }
+}
+
+/**
+ * The Updates card's tonal status chip, split out of the card body so the
+ * spring-animated tint (`updateTint`) only recomposes this small Row/Icon/Text
+ * scope on every animation frame, instead of the whole card content lambda
+ * (which also hosts the RollingNumber hero stat and outer Surface/Row layout).
+ */
+@Composable
+internal fun UpdateStatusChip(state: UiState) {
+    val updateTint by androidx.compose.animation.animateColorAsState(
+        targetValue = when {
+            state.updateAvailable != null -> MaterialTheme.colorScheme.tertiary
+            else -> MaterialTheme.colorScheme.onSurfaceVariant
+        },
+        // Sprung rather than snapped -- "up to date" turning tertiary the instant
+        // a check lands is the one moment this card actually has news, and a cut
+        // read as flat next to how much of the rest of the app now springs.
+        animationSpec = lowPowerAwareSpring(
+            dampingRatio = SoftDamping,
+            stiffness = androidx.compose.animation.core.Spring.StiffnessLow,
+        ),
+        label = "settingsUpdateTint",
+    )
+    StatusChip(
+        tint = updateTint,
+        icon = Icons.Filled.SystemUpdate,
+    ) {
+        androidx.compose.animation.AnimatedContent(
+            targetState = when {
+                state.updateChecking -> "Checking…"
+                state.updateAvailable != null -> "Build ${state.updateAvailable.run.runNumber} ready"
+                else -> "Up to date"
+            },
+            label = "settingsUpdateChipText",
+        ) { text -> Text(text) }
     }
 }
 

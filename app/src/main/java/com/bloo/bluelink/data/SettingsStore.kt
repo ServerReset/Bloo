@@ -165,9 +165,6 @@ const val HERO_PHOTO_SECTION = "hero"
 /** Pebbles the user may hide (the others are essential). */
 val HIDEABLE_SECTIONS = listOf("charge", "climate", "location", "weather", "trips", "info", "diagnostics", "ai")
 
-/** Number of configurable Quick Settings tiles (room for ~two per car). */
-const val TILE_COUNT = 12
-
 /**
  * App appearance preferences, kept separate from the session so sign-out keeps them.
  *
@@ -182,7 +179,7 @@ const val TILE_COUNT = 12
  * (changed locally but not yet uploaded).
  *
  * Because DataStore only stores primitives, anything structured (climate presets,
- * custom palettes, per-widget action lists, the full settings backup itself) is
+ * custom palettes, the full settings backup itself) is
  * JSON-encoded with kotlinx.serialization into a single string value under one
  * key, then decoded back out on read. Anything keyed per-car interpolates the
  * vehicle's VIN directly into the preference key name (e.g. "plate_$vin",
@@ -192,10 +189,10 @@ const val TILE_COUNT = 12
 class SettingsStore(private val context: Context) {
 
     /** All strongly-typed, non-interpolated preference keys used directly by
-     *  name below. Per-car/per-tile/per-widget keys are instead built ad hoc
-     *  with string interpolation (see e.g. [seatConfig], [tileConfig]) since
-     *  Preferences DataStore has no notion of a keyed sub-namespace — this
-     *  object only holds the ones that are the same for the whole app. */
+     *  name below. Per-car keys are instead built ad hoc with string
+     *  interpolation (see e.g. [seatConfig]) since Preferences DataStore has
+     *  no notion of a keyed sub-namespace — this object only holds the ones
+     *  that are the same for the whole app. */
     private object Keys {
         val THEME = stringPreferencesKey("theme_mode")
         val FONT = stringPreferencesKey("font_choice")
@@ -1116,91 +1113,6 @@ class SettingsStore(private val context: Context) {
 
     suspend fun setEnabledShortcuts(ids: Set<String>) {
         editTracked { it[stringPreferencesKey("enabled_shortcuts")] = ids.joinToString(",") }
-    }
-
-    // --- Quick Settings tiles --------------------------------------------
-
-    /** Per-tile assignment: (vin, command) or null if unassigned.
-     *  Each of the [TILE_COUNT] tiles gets two independent string keys, keyed by
-     *  its numeric [index] ("tile_0_vin", "tile_0_cmd", "tile_1_vin", …). Both
-     *  must be present and non-blank for the tile to count as configured — if
-     *  either is missing (e.g. the car was removed and its keys cleared but the
-     *  command key survived some other way) the tile is treated as fully
-     *  unassigned rather than half-configured. */
-    suspend fun tileConfig(index: Int): Pair<String, String>? =
-        tileConfig(index, context.settingsDataStore.data.first())
-
-    fun tileConfig(index: Int, p: Preferences): Pair<String, String>? {
-        val vin = p[stringPreferencesKey("tile_${index}_vin")]?.takeIf { it.isNotBlank() } ?: return null
-        val cmd = p[stringPreferencesKey("tile_${index}_cmd")]?.takeIf { it.isNotBlank() } ?: return null
-        return vin to cmd
-    }
-
-    /** Passing null/blank for either [vin] or [cmd] clears both keys, unassigning
-     *  the tile entirely (a tile can't be half-configured — see [tileConfig]). */
-    suspend fun setTileConfig(index: Int, vin: String?, cmd: String?) {
-        editTracked {
-            val vk = stringPreferencesKey("tile_${index}_vin")
-            val ck = stringPreferencesKey("tile_${index}_cmd")
-            if (vin.isNullOrBlank() || cmd.isNullOrBlank()) { it.remove(vk); it.remove(ck) }
-            else { it[vk] = vin; it[ck] = cmd }
-        }
-    }
-
-    /** Optional user-chosen label shown on the tile (null → derive from state). */
-    suspend fun tileLabel(index: Int): String? = tileLabel(index, context.settingsDataStore.data.first())
-
-    fun tileLabel(index: Int, p: Preferences): String? =
-        p[stringPreferencesKey("tile_${index}_label")]?.takeIf { it.isNotBlank() }
-
-    suspend fun setTileLabel(index: Int, label: String?) {
-        editTracked {
-            val k = stringPreferencesKey("tile_${index}_label")
-            if (label.isNullOrBlank()) it.remove(k) else it[k] = label.trim()
-        }
-    }
-
-    /** What the climate tile runs: "default", "smart", or a preset id. */
-    suspend fun tileClimateTarget(index: Int): String = tileClimateTarget(index, context.settingsDataStore.data.first())
-
-    fun tileClimateTarget(index: Int, p: Preferences): String =
-        p[stringPreferencesKey("tile_${index}_climate")]
-            ?.takeIf { it.isNotBlank() } ?: "default"
-
-    suspend fun setTileClimateTarget(index: Int, target: String?) {
-        editTracked {
-            val k = stringPreferencesKey("tile_${index}_climate")
-            if (target.isNullOrBlank()) it.remove(k) else it[k] = target
-        }
-    }
-
-    /** When true, tiles run the command in the background; else they open the app. */
-    suspend fun tileBackground(): Boolean = tileBackground(context.settingsDataStore.data.first())
-
-    fun tileBackground(p: Preferences): Boolean =
-        p[booleanPreferencesKey("tile_background")] ?: false
-
-    suspend fun setTileBackground(value: Boolean) {
-        editTracked { it[booleanPreferencesKey("tile_background")] = value }
-    }
-
-    /** When true, a tile kicks a throttled status refresh when it becomes visible,
-     *  so its lock/climate state stays live (at some battery/rate-limit cost). */
-    suspend fun tileLiveRefresh(): Boolean = tileLiveRefresh(context.settingsDataStore.data.first())
-
-    fun tileLiveRefresh(p: Preferences): Boolean =
-        p[booleanPreferencesKey("tile_live_refresh")] ?: false
-
-    suspend fun setTileLiveRefresh(value: Boolean) {
-        editTracked { it[booleanPreferencesKey("tile_live_refresh")] = value }
-    }
-
-    /** Last time a tile-driven refresh ran for [vin] (epoch ms), for throttling. */
-    suspend fun tileRefreshedAt(vin: String): Long =
-        context.settingsDataStore.data.first()[stringPreferencesKey("tile_refreshed_$vin")]?.toLongOrNull() ?: 0L
-
-    suspend fun setTileRefreshedAt(vin: String, value: Long) {
-        editTracked { it[stringPreferencesKey("tile_refreshed_$vin")] = value.toString() }
     }
 
     /** Drive URI for auto-backup; null when not configured. */

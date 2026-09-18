@@ -1290,11 +1290,6 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         else vehicles.flatMap { v -> settingsStore.collapsedSections(v.vin, prefs).map { "${v.vin}:$it" } }.toSet()
         val hidden = vehicles.flatMap { v -> settingsStore.hiddenSections(v.vin, prefs).map { "${v.vin}:$it" } }.toSet()
         val hotspots = vehicles.mapNotNull { v -> settingsStore.hotspots(v.vin, prefs)?.let { v.vin to it } }.toMap()
-        val tileConfigs = (0 until com.bloo.bluelink.data.TILE_COUNT).map { settingsStore.tileConfig(it, prefs) }
-        val tileLabels = (0 until com.bloo.bluelink.data.TILE_COUNT).map { settingsStore.tileLabel(it, prefs) }
-        val tileClimateTargets = (0 until com.bloo.bluelink.data.TILE_COUNT).map { settingsStore.tileClimateTarget(it, prefs) }
-        val tileBackground = settingsStore.tileBackground(prefs)
-        val tileLiveRefresh = settingsStore.tileLiveRefresh(prefs)
         val shortcutSet = settingsStore.enabledShortcuts(prefs)
         PerCarConfig(
             apply = {
@@ -1311,11 +1306,6 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                     collapsedPebbles = collapsed,
                     hiddenPebbles = hidden,
                     hotspotSections = hotspots,
-                    tileConfigs = tileConfigs,
-                    tileLabels = tileLabels,
-                    tileClimateTargets = tileClimateTargets,
-                    tileBackground = tileBackground,
-                    tileLiveRefresh = tileLiveRefresh,
                     shortcutSet = shortcutSet,
                 )
             },
@@ -1903,7 +1893,6 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         snapshotStore.saveVehicles(vehicles.map { snapshotOf(it, _state.value.statuses[it.vin], _state.value) })
         // Mirror the fresh snapshots to a paired watch (no-op when none is connected).
         com.bloo.bluelink.wear.MainToSecondarySync.publish(getApplication())
-        // Refresh Quick Settings tiles too.
         refreshLiveChargeBar(vehicles)
     }
 
@@ -2629,61 +2618,6 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    /** Assign (or clear) a Quick Settings tile to a car + command. */
-    fun setTileAssignment(index: Int, vin: String?, cmd: String?) {
-        _state.update {
-            val entry = if (vin != null && cmd != null) vin to cmd else null
-            it.copy(tileConfigs = it.tileConfigs.mapIndexed { i, old -> if (i == index) entry else old })
-        }
-        viewModelScope.launch {
-            settingsStore.setTileConfig(index, vin, cmd)
-        }
-    }
-
-    /** Set (or clear with null/blank) a tile's custom display name. */
-    fun setTileLabel(index: Int, label: String?) {
-        _state.update {
-            val clean = label?.trim()?.takeIf { s -> s.isNotEmpty() }
-            it.copy(tileLabels = it.tileLabels.mapIndexed { i, old -> if (i == index) clean else old })
-        }
-        viewModelScope.launch {
-            settingsStore.setTileLabel(index, label)
-        }
-    }
-
-    /** Set what the climate tile runs: "default", "smart", or a preset id. */
-    fun setTileClimateTarget(index: Int, target: String) {
-        _state.update {
-            it.copy(tileClimateTargets = it.tileClimateTargets.mapIndexed { i, old -> if (i == index) target else old })
-        }
-        viewModelScope.launch {
-            settingsStore.setTileClimateTarget(index, target)
-        }
-    }
-
-    // These two are global (not per-tile) toggles for how Quick Settings tiles
-    // behave, following the same shape as setTileAssignment/setTileLabel/
-    // setTileClimateTarget above: update _state for immediate UI feedback,
-    // persist to SettingsStore, then poke BlooTileService so the system tiles
-    // (which read their state independently, not via this StateFlow) refresh
-    // right away instead of waiting for their next natural update tick.
-
-    /** Whether tiles run their command in the background vs. opening the app. */
-    fun setTileBackground(value: Boolean) {
-        _state.update { it.copy(tileBackground = value) }
-        viewModelScope.launch {
-            settingsStore.setTileBackground(value)
-        }
-    }
-
-    /** Whether tapping a tile also kicks a throttled status refresh. */
-    fun setTileLiveRefresh(value: Boolean) {
-        _state.update { it.copy(tileLiveRefresh = value) }
-        viewModelScope.launch {
-            settingsStore.setTileLiveRefresh(value)
-        }
-    }
-
     /** Pin or unpin a pebble in the dual-column hot spot. */
     fun setHotspot(v: Vehicle, section: String) {
         _state.update {
@@ -3075,8 +3009,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
      * (the flip cover's action bar).
      *
      * Starting climate needs a whole [ClimateRequest]; every other one-tap
-     * surface -- widget, Quick Settings tile, watch -- resolves that the same
-     * way, from the car's last-saved settings (see
+     * surface resolves that the same way, from the car's last-saved settings (see
      * [com.bloo.bluelink.data.WearAction.TOGGLE_CLIMATE]). This does the same
      * rather than inventing a second answer, falling back to a plain 72F /
      * 10-minute run only when the car has never had climate configured at all.
@@ -3191,7 +3124,6 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                     st.copy(statuses = statuses)
                 }
                 persistSnapshots()
-                // Keep the Quick Settings tiles' state/icon in sync with the car.
                 // Auto-AI: a command changed the car's state, refresh the summary.
                 _state.value.vehicles.firstOrNull { it.vin == vin }?.let { autoSummarize(it) }
             } catch (e: Exception) {
