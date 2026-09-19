@@ -52,6 +52,30 @@ class BlueLinkRepository(
 ) : VehicleRepository {
 
     /**
+     * In-memory copy of the last [SessionStore.Session] loaded for this brand, alongside
+     * [withSession]'s own timing showing store.load() itself taking 1-3 SECONDS -- not the
+     * usual "instant, already-warm DataStore read" this class's own comments assumed -- and
+     * a single cold-start burst calling it three separate times back to back (once each for
+     * the current car's status, another car's status, and trips), paying that cost fully
+     * every time for data that cannot have changed between them. Caching here doesn't
+     * explain why any ONE read is that slow -- still an open question -- but it cuts
+     * three paid reads down to one regardless of the underlying cause, which is worth
+     * doing on its own merits.
+     *
+     * Invalidated (never served stale) on anything that can actually change the session:
+     * [login] writes a fresh one directly below, a 401 retry in [withSession] re-loads after
+     * [SessionStore.updateAccessToken], and [logout] clears it. Not invalidated by an
+     * EXTERNAL writer (a background worker refreshing the token in its own process) --
+     * that was already a possible race before this cache existed (two readers, one writer,
+     * no coordination beyond the account-wide statusMutex serializing the NETWORK calls, not
+     * the session read itself), and this doesn't make that scenario any more likely to
+     * matter: a stale token here still fails with 401 and retries via the exact same
+     * refresh path as before, just after one wasted round trip instead of zero.
+     */
+    @Volatile
+    private var cachedSession: SessionStore.Session? = null
+
+    /**
      * Authenticates against the brand's API and persists the resulting tokens plus
      * the caller-supplied [pin]/[username] as a new [SessionStore.Session] for this
      * brand. Note the PIN itself is never sent to or validated by the login call —
@@ -59,18 +83,21 @@ class BlueLinkRepository(
      */
     suspend fun login(username: String, password: String, pin: String) {
         val token = api.login(username, password)
-        store.save(
-            SessionStore.Session(
-                accessToken = token.accessToken,
-                refreshToken = token.refreshToken,
-                username = username,
-                pin = pin,
-                brand = brand,
-            )
+        val session = SessionStore.Session(
+            accessToken = token.accessToken,
+            refreshToken = token.refreshToken,
+            username = username,
+            pin = pin,
+            brand = brand,
         )
+        store.save(session)
+        cachedSession = session
     }
 
-    override suspend fun logout() = store.clear(brand)
+    override suspend fun logout() {
+        store.clear(brand)
+        cachedSession = null
+    }
 
     // Stamps each vehicle returned by the API with this repository's brand code,
     // since the raw API response doesn't distinguish brand and the UI/other layers
@@ -144,16 +171,20 @@ class BlueLinkRepository(
      * failure surfaces immediately rather than looping.
      */
     private suspend fun <T> withSession(block: suspend (SessionStore.Session) -> T): T {
-        // Logged only past a threshold: store.load() is a plain (unencrypted) Preferences
-        // DataStore read that should already be warm by the time any repo call runs, but a
-        // real report showed a multi-second gap between statusMutex being acquired and the
-        // actual HTTP request firing with no other candidate in between, so this needs its
-        // own number rather than being assumed free.
-        val loadStartedAt = System.currentTimeMillis()
-        val session = store.load(brand) ?: throw BlueLinkException("Not logged in")
-        val loadMs = System.currentTimeMillis() - loadStartedAt
-        if (loadMs > 500) {
-            AppLog.log("BlueLinkRepository: store.load(${brand.label}) took ${loadMs}ms")
+        // cachedSession first -- see that property's own doc for why (three of these paid
+        // the full store.load() cost back to back in one cold-start burst, for data that
+        // hadn't changed between them). Logged only past a threshold on an actual disk read:
+        // store.load() is a plain (unencrypted) Preferences DataStore read that should
+        // already be warm by the time any repo call runs, but real reports showed it taking
+        // 1-3 SECONDS on its own, so that number still needs to be visible when it happens.
+        val session = cachedSession ?: run {
+            val loadStartedAt = System.currentTimeMillis()
+            val loaded = store.load(brand) ?: throw BlueLinkException("Not logged in")
+            val loadMs = System.currentTimeMillis() - loadStartedAt
+            if (loadMs > 500) {
+                AppLog.log("BlueLinkRepository: store.load(${brand.label}) took ${loadMs}ms")
+            }
+            loaded.also { cachedSession = it }
         }
         return try {
             block(session)
@@ -164,6 +195,7 @@ class BlueLinkRepository(
                 val refreshed = api.refresh(refreshToken)
                 store.updateAccessToken(brand, refreshed.accessToken, refreshed.refreshToken)
                 val updated = store.load(brand) ?: throw e
+                cachedSession = updated
                 block(updated)
             } else {
                 throw e
