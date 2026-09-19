@@ -515,13 +515,28 @@ class BlueLinkApi(private val brand: Brand = Brand.HYUNDAI) {
      *  while any other exception (IOException, SerializationException, etc.)
      *  is wrapped so every public method on this class has one exception
      *  type callers need to handle. */
-    private suspend fun <T> execute(block: suspend () -> T): T = withContext(Dispatchers.IO) {
-        try {
-            block()
-        } catch (e: BlueLinkException) {
-            throw e
-        } catch (e: Exception) {
-            throw BlueLinkException(e.message ?: "Network error", e)
+    private suspend fun <T> execute(block: suspend () -> T): T {
+        // Logged only past a threshold, unconditionally (not just for the cold-start path --
+        // see BlueLinkRepository/AppViewModel's own logStartupTiming for that): the mutex was
+        // proven instant and the actual HTTP request/response were both proven fast in a real
+        // report, yet several real seconds still elapsed somewhere between the two -- this
+        // withContext(Dispatchers.IO) hop is the next-most-likely place for that time to be
+        // hiding (a busy/starved IO dispatcher, or a slow one-time class-load the very first
+        // time this call shape runs), so it needs its own number rather than being assumed
+        // instant the way coroutine dispatch onto Main already was ruled out to be.
+        val dispatchStartedAt = System.currentTimeMillis()
+        return withContext(Dispatchers.IO) {
+            val dispatchMs = System.currentTimeMillis() - dispatchStartedAt
+            if (dispatchMs > 500) {
+                AppLog.log("BlueLinkApi: dispatch onto Dispatchers.IO took ${dispatchMs}ms")
+            }
+            try {
+                block()
+            } catch (e: BlueLinkException) {
+                throw e
+            } catch (e: Exception) {
+                throw BlueLinkException(e.message ?: "Network error", e)
+            }
         }
     }
 }

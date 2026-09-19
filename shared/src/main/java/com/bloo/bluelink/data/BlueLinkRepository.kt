@@ -144,7 +144,17 @@ class BlueLinkRepository(
      * failure surfaces immediately rather than looping.
      */
     private suspend fun <T> withSession(block: suspend (SessionStore.Session) -> T): T {
+        // Logged only past a threshold: store.load() is a plain (unencrypted) Preferences
+        // DataStore read that should already be warm by the time any repo call runs, but a
+        // real report showed a multi-second gap between statusMutex being acquired and the
+        // actual HTTP request firing with no other candidate in between, so this needs its
+        // own number rather than being assumed free.
+        val loadStartedAt = System.currentTimeMillis()
         val session = store.load(brand) ?: throw BlueLinkException("Not logged in")
+        val loadMs = System.currentTimeMillis() - loadStartedAt
+        if (loadMs > 500) {
+            AppLog.log("BlueLinkRepository: store.load(${brand.label}) took ${loadMs}ms")
+        }
         return try {
             block(session)
         } catch (e: BlueLinkException) {
