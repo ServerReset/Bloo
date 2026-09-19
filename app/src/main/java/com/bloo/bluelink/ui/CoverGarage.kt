@@ -247,7 +247,18 @@ internal fun CompactGarage(state: UiState, vm: AppViewModel, appearance: Setting
     // The band chip (below) floats over whatever car page is currently showing --
     // this is what gives it a REAL blur of that content instead of just a flat tint,
     // the same hazeSource/hazeEffect pairing GarageScreen's own pagers already use.
-    val hazeState = remember { HazeState() }
+    //
+    // Uses the FUNCTION PARAMETER (see its own doc), not a fresh local instance: this
+    // used to shadow it with `val hazeState = remember { HazeState() }` right here,
+    // silently discarding whatever the caller passed in. GarageScreen's own call site
+    // passes its own hazeState through -- ultimately Screens.kt's shared searchHazeState,
+    // the SAME instance the floating search bar/results panel and the app-wide snackbar
+    // blur whatever's currently on screen through (see GarageScreen's own hazeState doc).
+    // With the shadowed local in place, every blur INSIDE this screen (the band chip, the
+    // per-car pager, RefreshIndicatorBadge) still worked fine against each other, but
+    // nothing outside it -- a snackbar or the search overlay shown while the cover screen
+    // was up -- ever saw this screen's content as a hazeSource at all, so THEIR glass
+    // silently fell back to a flat tint instead of a real blur specifically on this screen.
     Box(Modifier.fillMaxSize()) {
         // Measured once and shared by every reader below: the tiles' car-name label, the band
         // itself, and the search dock. Hoisted ABOVE the pager because the tiles need to know
