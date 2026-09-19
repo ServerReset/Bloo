@@ -457,8 +457,26 @@ class BlueLinkApi(private val brand: Brand = Brand.HYUNDAI) {
      *  never has to check isSuccessful itself. `.use` ensures the response
      *  body is closed even when an exception is thrown reading it. */
     private fun call(request: Request): String {
+        // The HttpLoggingInterceptor's own logged "Nms" (BASIC level) times only
+        // chain.proceed() -- which OkHttp returns as soon as the response STATUS LINE and
+        // HEADERS are parsed, with the body left as a lazy, unread stream tied to the live
+        // socket. `.string()` below is what actually pulls the body bytes off the wire and
+        // buffers them, and on a slow/cellular connection carrying a real payload (a full
+        // vehicleStatus is not tiny) that read can legitimately take seconds longer than the
+        // interceptor's own number -- reported directly as "the app looks slow for ~5s after
+        // unlock, then instantly smooth", i.e. exactly this network wait, not a UI-thread
+        // stall (this whole function already runs on Dispatchers.IO -- see this class's own
+        // doc). Logged only past a threshold so a normal fast body read on Wi-Fi says nothing.
+        val respondedAt = System.currentTimeMillis()
         client.newCall(request).execute().use { resp ->
             val text = resp.body?.string().orEmpty()
+            val bodyReadMs = System.currentTimeMillis() - respondedAt
+            if (bodyReadMs > 500) {
+                AppLog.log(
+                    "${request.method} ${request.url.encodedPath}: response body " +
+                        "(${text.length} chars) took ${bodyReadMs}ms to download/read",
+                )
+            }
             if (!resp.isSuccessful) {
                 val message = friendlyError(resp.code, text)
                 AppLog.log("ERROR ${resp.code} ${request.method} ${request.url.encodedPath}: $message")

@@ -573,7 +573,19 @@ class KiaUsaApi {
      * repository layer can re-authenticate with the rmtoken and retry.
      */
     private fun call(request: Request): JsonElement = raw(request).use { resp ->
+        // See BlueLinkApi.call's own doc for why this is measured separately from the
+        // HttpLoggingInterceptor's own (headers-only) timing: `.string()` is what actually
+        // downloads the body, and that can run seconds behind a fast-looking interceptor log
+        // on a slow/cellular connection with a real payload.
+        val bodyReadStartedAt = System.currentTimeMillis()
         val text = resp.body?.string().orEmpty()
+        val bodyReadMs = System.currentTimeMillis() - bodyReadStartedAt
+        if (bodyReadMs > 500) {
+            AppLog.log(
+                "${request.method} ${request.url.encodedPath}: response body " +
+                    "(${text.length} chars) took ${bodyReadMs}ms to download/read",
+            )
+        }
         if (!resp.isSuccessful) {
             val msg = friendly(resp.code, text)
             AppLog.log("ERROR ${resp.code} ${request.method} ${request.url.encodedPath}: $msg")

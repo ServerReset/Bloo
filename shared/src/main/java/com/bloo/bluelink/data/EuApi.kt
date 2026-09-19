@@ -627,7 +627,19 @@ class EuApi(private val brand: Brand) {
      *  `retCode == "F"` error. The failing method+path is included in the message. */
     private fun call(request: Request, httpClient: OkHttpClient = this.client): JsonElement =
         httpClient.newCall(request).execute().use { resp ->
+            // See BlueLinkApi.call's own doc for why this is measured separately from the
+            // HttpLoggingInterceptor's own (headers-only) timing: `.string()` is what actually
+            // downloads the body, and that can run seconds behind a fast-looking interceptor
+            // log on a slow/cellular connection with a real payload.
+            val bodyReadStartedAt = System.currentTimeMillis()
             val text = resp.body?.string().orEmpty()
+            val bodyReadMs = System.currentTimeMillis() - bodyReadStartedAt
+            if (bodyReadMs > 500) {
+                AppLog.log(
+                    "${request.method} ${request.url.encodedPath}: response body " +
+                        "(${text.length} chars) took ${bodyReadMs}ms to download/read",
+                )
+            }
             val root = if (text.isBlank()) JsonObject(emptyMap())
             else runCatching { json.parseToJsonElement(text) }.getOrNull() ?: JsonObject(emptyMap())
             val where = "${request.method} ${request.url.encodedPath}"
