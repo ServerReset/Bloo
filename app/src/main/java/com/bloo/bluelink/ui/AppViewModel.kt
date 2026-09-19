@@ -124,6 +124,25 @@ private val AI_COMMANDS = setOf(
 @Stable
 class AppViewModel(app: Application) : AndroidViewModel(app) {
 
+    // Set before any other property below, so every timing log this class writes measures
+    // from the actual first instant this constructor started running -- the moment
+    // MainActivity.onCreate's `by viewModels()` dereference (see its own comment) forces
+    // this ViewModel into existence, ahead of setContent. Reported directly as still
+    // stuttering hard on first load even with BlooApplication's "App starting" and this
+    // class's own "Garage loaded" breadcrumbs in place -- those two points bracket the
+    // WHOLE cold start with nothing in between, so a slow stretch anywhere inside it had no
+    // way to show up in a report. Every `logStartup` call below narrows that down to one
+    // specific stage instead.
+    private val coldStartAt = System.currentTimeMillis()
+
+    /** Logs [message] to [AppLog] with elapsed time since this ViewModel was constructed
+     *  ([coldStartAt]) -- see that property's own doc. Startup-only: nothing outside the
+     *  cold-start path below calls this, since "+1234ms since app start" stops being a
+     *  meaningful number once the app has been open and used for a while. */
+    private fun logStartup(message: String) {
+        AppLog.log("$message (+${System.currentTimeMillis() - coldStartAt}ms)")
+    }
+
     private val store = SessionStore(app)
     private val settingsStore = SettingsStore(app)
     private val credentialStore = CredentialStore(app)
@@ -289,6 +308,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     init {
+        logStartup("AppViewModel constructed")
         // Probe on-device Gemini Nano once; the AI toggle only appears if present.
         // Dispatchers.IO -- like the Shizuku probe right below, and for the same
         // reason its own comment states but this one didn't follow: ai.isSupported()
@@ -298,7 +318,9 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         // cost was landing on the main thread at exactly the moment of the reported
         // cold-start lag, alongside every other init-block probe.
         viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+            val startedAt = System.currentTimeMillis()
             val supported = ai.isSupported()
+            logStartup("AI probe done in ${System.currentTimeMillis() - startedAt}ms, supported=$supported")
             if (supported) {
                 _state.update {
                     it.copy(
@@ -320,7 +342,12 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         // Restore the last-known status/location from disk so the UI shows
         // stale-but-useful data immediately, before any network call returns.
         viewModelScope.launch {
+            val startedAt = System.currentTimeMillis()
             val cached = statusCache.load()
+            logStartup(
+                "Status cache restored in ${System.currentTimeMillis() - startedAt}ms: " +
+                    "${cached.statuses.size} status(es), ${cached.locations.size} location(s)",
+            )
             if (cached.statuses.isNotEmpty() || cached.locations.isNotEmpty()) {
                 _state.update {
                     it.copy(
@@ -339,12 +366,14 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             val brands = store.loggedInBrands()
             if (brands.isEmpty()) {
+                logStartup("Cold start: no saved logins -> Screen.Login")
                 // Genuinely logged out -- the real destination IS Login, so
                 // move off Screen.Loading (screen's own default) to it now
                 // rather than waiting on anything else to do it.
                 _state.update { it.copy(screen = Screen.Login) }
                 return@launch
             }
+            logStartup("Cold start: ${brands.size} saved login(s) (${brands.joinToString { it.label }})")
             // repoFor(it) lazily creates+caches one VehicleRepository per brand
             // in the `repos` map (see repoFor above) so later calls just reuse it.
             //
@@ -365,7 +394,9 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 // the heaviest class-load chains in the app and it was running on Main.immediate
                 // during cold start, once per signed-in brand, three lines above a call that was
                 // already moved off for being cheaper than this one.
+                val reposStartedAt = System.currentTimeMillis()
                 withContext(Dispatchers.IO) { brands.forEach { repoFor(it) } }
+                logStartup("Repos constructed in ${System.currentTimeMillis() - reposStartedAt}ms")
                 // Off the main thread: loadAll() touches CredentialStore's lazy
                 // `prefs`, which on first access does real work (MasterKey
                 // generation/lookup + EncryptedSharedPreferences setup) --
@@ -376,12 +407,18 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 // one call in the cold-start auto-login path -- the app's
                 // everyday launch, for any returning user -- that actually did
                 // blocking work on it.
+                val credsStartedAt = System.currentTimeMillis()
                 val accounts = withContext(Dispatchers.IO) { credentialStore.loadAll() }
+                logStartup("Credentials loaded in ${System.currentTimeMillis() - credsStartedAt}ms: ${accounts.size} account(s)")
                 _state.update { it.copy(accounts = accounts) }
                 val appearance = settingsStore.appearance.first()
                 val lockMechanisms = (appearance.biometricLock && canUseBiometrics()) || pinInstalled()
                 refreshPinState()
-                if (lockMechanisms) _state.update { it.copy(locked = true) }
+                if (lockMechanisms) {
+                    logStartup("Cold start: lock screen required, deferring garage load until unlock")
+                    _state.update { it.copy(locked = true) }
+                }
+                logStartup("Cold start: calling loadGarage()")
                 loadGarage()
             } catch (e: Exception) {
                 AppLog.log("⚠ cold-start auto-login failed: ${e.message}")
@@ -919,6 +956,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     private suspend fun loadGarageInner() {
+        logStartup("loadGarageInner: started")
         // Fire-and-forget, in parallel with the vehicle fetch below (its own
         // viewModelScope.launch, not awaited here) -- refreshes the DEVICE's own
         // last-known location on every cold start/app open. See refreshDeviceLocation's
@@ -954,6 +992,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         // should not have its half-fetched vehicles land in the merged list, and a
         // brand signed in mid-load gets its own reload from logout()/login()'s own
         // path anyway.
+        val vehiclesFetchStartedAt = System.currentTimeMillis()
         val fetched = repos.values.toList().flatMap { r ->
             runCatching { statusMutex.withLock { r.vehicles() } }.getOrElse { e ->
                 val msg = e.message ?: "Couldn't load vehicles"
@@ -962,6 +1001,10 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 emptyList()
             }
         }
+        logStartup(
+            "loadGarageInner: vehicle list fetched in " +
+                "${System.currentTimeMillis() - vehiclesFetchStartedAt}ms: ${fetched.size} vehicle(s)",
+        )
         if (fetched.isEmpty()) {
             // Still bootstrap Drive sync on an empty/failed cold start so the
             // restore + persisted-grant check + auto-sync collector run once this
@@ -992,7 +1035,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         // be stale by the time it was used if the user changed a setting meanwhile.
         val prefs = settingsStore.snapshot()
         val vehicles = applyOrder(fetched, settingsStore.vehicleOrder(prefs))
-        // The 17 per-car/per-tile config fields, shared with refreshLocalCarConfig via
+        // The 16 per-car/per-tile config fields, shared with refreshLocalCarConfig via
         // perCarConfig so the two can't drift. firstRun's empty-collapsed rule lives inside it.
         val cfg = perCarConfig(vehicles, prefs)
         // All three read the SAME prefs snapshot taken just above (the Preferences-taking
@@ -1088,12 +1131,14 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         val currentLocked = _state.value.locked
         if (!currentLocked) {
             // Unlocked session: fetch status now (no lock animation to worry about).
-            ensureStatus(vehicles[index])
+            logStartup("loadGarageInner: fetching status for ${vehicles[index].name} (current car)")
+            ensureStatus(vehicles[index], logStartupTiming = true)
             viewModelScope.launch {
                 vehicles.forEachIndexed { i, v -> if (i != index) ensureStatus(v) }
             }
         } else {
             // Locked session: defer status fetching until after unlock animation completes.
+            logStartup("loadGarageInner: locked, deferring status fetch until unlock")
             deferredStatusLoad = true
         }
     }
@@ -1176,7 +1221,6 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         // On first open all pebbles start expanded regardless of any stored state.
         val collapsed = if (firstRun) emptySet()
         else vehicles.flatMap { v -> settingsStore.collapsedSections(v.vin, prefs).map { "${v.vin}:$it" } }.toSet()
-        val hidden = vehicles.flatMap { v -> settingsStore.hiddenSections(v.vin, prefs).map { "${v.vin}:$it" } }.toSet()
         val hotspots = vehicles.mapNotNull { v -> settingsStore.hotspots(v.vin, prefs)?.let { v.vin to it } }.toMap()
         val shortcutSet = settingsStore.enabledShortcuts(prefs)
         PerCarConfig(
@@ -1192,7 +1236,6 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                     serviceIntervalMiles = svcInterval,
                     climatePresets = climatePresets,
                     collapsedPebbles = collapsed,
-                    hiddenPebbles = hidden,
                     hotspotSections = hotspots,
                     shortcutSet = shortcutSet,
                 )
@@ -1201,7 +1244,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         )
     }
 
-    /** Result of [perCarConfig]: a UiState transform folding in the 18 config fields, plus the
+    /** Result of [perCarConfig]: a UiState transform folding in the 17 config fields, plus the
      *  shortcut set the caller needs separately for [com.bloo.bluelink.Shortcuts.refresh]. */
     private class PerCarConfig(val apply: (UiState) -> UiState, val shortcutSet: Set<String>?)
 
@@ -1482,17 +1525,36 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
      * (so no UI flash), but we still pull a live update — otherwise a warm cache
      * would leave the garage permanently stale until a manual refresh.
      */
-    private fun ensureStatus(v: Vehicle) {
+    private fun ensureStatus(
+        v: Vehicle,
+        /** Startup-only instrumentation: when true, logs how long THIS fetch actually took
+         *  once it succeeds, so [loadGarageInner]'s own cold-start timeline can report when
+         *  the CURRENT car's status (the one gating its first-visible pebbles) was actually
+         *  ready, not just when the fetch was dispatched. Every other caller leaves this
+         *  false -- see [logStartup]'s own doc for why this isn't meaningful outside the
+         *  cold-start path. */
+        logStartupTiming: Boolean = false,
+    ) {
         if (v.vin in sessionFetched) return
+        val startedAt = System.currentTimeMillis()
         // Background load: log failures but don't interrupt with a toast (one
         // flaky car shouldn't spam errors over the others).
-        loadStatus(v, refresh = false, errorMessage = "Couldn't load status", surfaceErrors = false)
+        loadStatus(
+            v, refresh = false, errorMessage = "Couldn't load status", surfaceErrors = false,
+            logSuccess = if (logStartupTiming) {
+                {
+                    "loadGarageInner: current car's status ready in " +
+                        "${System.currentTimeMillis() - startedAt}ms " +
+                        "(+${System.currentTimeMillis() - coldStartAt}ms since app start)"
+                }
+            } else null,
+        )
     }
 
     fun refreshStatus(v: Vehicle) {
         loadStatus(
             v, refresh = true, errorMessage = "Refresh failed",
-            logSuccess = "Status refreshed for ${v.name}", surfaceErrors = true,
+            logSuccess = { "Status refreshed for ${v.name}" }, surfaceErrors = true,
         )
         // A manual pull-to-refresh is exactly the moment someone's actively
         // looking at the app and wants everything current -- piggyback the
@@ -1614,7 +1676,11 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         v: Vehicle,
         refresh: Boolean,
         errorMessage: String,
-        logSuccess: String? = null,
+        // A lazy supplier, not a plain String: a caller timing this fetch (see ensureStatus's
+        // own logSuccess param) needs to measure elapsed time at COMPLETION, and a plain
+        // String argument is evaluated eagerly at the call site -- before the fetch this is
+        // supposedly timing has even started -- which would always read "0ms".
+        logSuccess: (() -> String)? = null,
         surfaceErrors: Boolean = true,
     ) {
         // Key the in-flight set on (vin, refresh) so a user pull-to-refresh
@@ -1685,7 +1751,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                     // a car that returned null (e.g. asleep) is retried when viewed.
                     sessionFetched.add(v.vin)
                 }
-                logSuccess?.let { AppLog.log(it) }
+                logSuccess?.let { AppLog.log(it()) }
             } catch (e: Exception) {
                 val msg = e.message ?: errorMessage
                 AppLog.log("⚠ ${v.name}: $msg")
@@ -1998,15 +2064,6 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             )
         }
         viewModelScope.launch { settingsStore.setSectionCollapsed(v.vin, section, collapsedNow) }
-    }
-
-    /** Show/hide a non-essential pebble for a car (persisted). */
-    fun setSectionHidden(v: Vehicle, section: String, hidden: Boolean) {
-        val key = "${v.vin}:$section"
-        _state.update {
-            it.copy(hiddenPebbles = if (hidden) it.hiddenPebbles + key else it.hiddenPebbles - key)
-        }
-        viewModelScope.launch { settingsStore.setSectionHidden(v.vin, section, hidden) }
     }
 
     /** [Screen.SyncChoice] -- user picked "Set up fresh" instead of restoring.
