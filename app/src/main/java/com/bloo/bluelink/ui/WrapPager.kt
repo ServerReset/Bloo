@@ -163,80 +163,35 @@ internal class WrapPagerState(val pager: PagerState, val realCount: Int) {
     val currentReal: Int get() = real(pager.currentPage)
 
     /**
-     * The [HorizontalPager]/[VerticalPager] `key` for [page], given that pager's own
-     * [beyondViewportPageCount] and [perPage] (how many real items one page-width actually
-     * shows at once -- 1 for every wrap-pager except the multi-column collapsed garage pager).
-     * Keying by [real] index (not raw virtual page) lets Compose treat every virtual copy of
-     * the same real item as ONE composition slot, so a [recenterIfNearEdge] jump reuses it
-     * (its scroll position, its `remember` state, no fresh enter animation) instead of
-     * composing a brand-new one -- the recenter becomes genuinely invisible instead of merely
-     * bounded, and this pager stops accumulating a new distinct composition per virtual page
-     * ever visited (the actual leak an earlier fix here mistook a bigger multiplier for
-     * solving; see [WRAP_MULTIPLIER]'s own doc).
+     * The [HorizontalPager]/[VerticalPager] `key` for [page]: always the raw virtual page
+     * index, deliberately NEVER [real] any more.
      *
-     * Only safe once [realCount] is large enough that no two pages this pager can EVER hold
-     * simultaneously composed map to the same real index. A contiguous run of `perPage +
-     * 2 * beyondViewportPageCount` virtual pages is composed at once (the multi-column
-     * pager's own `beyondViewportPageCount` was already sized by solving exactly this
-     * inequality for a real, reported crash -- see its call site's own doc), and a contiguous
-     * run of consecutive integers only visits every residue mod [realCount] at most once
-     * while its length is <= [realCount] (pigeonhole). Below that threshold, falls back to
-     * the raw page index -- the pre-existing, uncrashable behaviour -- since a small
-     * [realCount] already keeps [WRAP_MULTIPLIER]'s own worst-case retained-page count small
-     * regardless.
+     * This file spent three separate attempts trying to key by [real] instead -- letting
+     * Compose treat every virtual copy of the same real item as ONE composition slot, so a
+     * [recenterIfNearEdge] jump could reuse it (scroll position, `remember` state, no fresh
+     * enter animation) instead of composing a brand-new one. Each attempt computed a
+     * theoretically-safe threshold for when that's collision-free (a pigeonhole argument over
+     * how many virtual pages this pager can EVER hold composed at once), and each one shipped
+     * a real, reported "Key already used" crash anyway, on a different [realCount] each time --
+     * most recently even after deriving [beyondViewportPageCount] itself from the same margin
+     * (see the removed `safeBeyond`, once here). That is three independent, wrong answers for
+     * exactly how much wider than `perPage + 2*beyondViewportPageCount` Compose's Pager can
+     * transiently make its own composed window during a settle/recenter -- without a device or
+     * emulator to actually observe that window (this sandbox has neither), there is no fourth
+     * guess worth shipping. A crash is categorically worse than the jank this was trying to
+     * remove, so the trade is no longer close.
      *
-     * STRICT `>`, confirmed necessary the hard way: loosening this to `>=` (briefly, in this
-     * session) shipped a real, reported "Key already used" crash at the exact boundary
-     * (composed count == realCount) a second time, on a DIFFERENT realCount than the first
-     * one this file ever hit that crash on -- so the composed window really can exceed the
-     * nominal `perPage + 2*beyondViewportPageCount` by one page in practice (almost certainly
-     * Compose's Pager needing both the settling-from and settling-to page's own neighbourhoods
-     * alive during a settle/recenter transition, not just whichever one is "current" at any
-     * single instant) -- not a one-off arithmetic bug at a single call site fixable by tuning
-     * that call site's own beyond formula. `>=` is not safe; do not loosen this again without
-     * first eliminating whatever transiently composes that extra page, which nothing in this
-     * codebase has actually done.
-     *
-     * The EARLIER loosening was chasing a real cost, though: requiring strict `>` while every
-     * call site kept independently picking its own `beyondViewportPageCount` (typically capped
-     * at 1 "for smoothness") meant [realCount] frequently landed EXACTLY on `perPage +
-     * 2*beyond` for the everyday case of 2-3 cars -- permanently disabling real-index keying
-     * there, so every [recenterIfNearEdge] jump (routine, recurring during ordinary swiping)
-     * composed a brand-new page instead of reusing the existing one, visibly restarting every
-     * pebble's own load/animate-in. The actual fix is [safeBeyond]: call sites now DERIVE their
-     * beyondViewportPageCount from the margin this key needs, instead of picking one
-     * independently and hoping it happens to fit -- so the two can never drift apart, and
-     * real-index keying stays available for exactly the small-realCount cases that used to
-     * lose it, at the cost of pre-warming one fewer neighbour only where [realCount] is too
-     * small to afford it.
-     *
-     * [realCount] <= 1 is excluded explicitly: [real] collapses to the CONSTANT 0 for every
-     * page whenever realCount <= 1, so keying by it would give literally every virtual page the
-     * same key. [recenterIfNearEdge] itself already no-ops for realCount <= 1, so there is no
-     * reuse to gain from real-keying there anyway -- the raw page index is both safe and
-     * sufficient.
+     * The raw page index is always unique per virtual page by construction -- Compose's own
+     * pager measure loop invokes this at most once per virtual page per pass, full stop, with
+     * no dependency on any arithmetic this file gets to guess at. [recenterIfNearEdge] still
+     * does its job (keeping the virtual page counter from drifting toward either end of the
+     * -- large but finite -- [WRAP_MULTIPLIER]-sized range), it just composes a fresh page
+     * when it jumps, the same "pre-existing, uncrashable" behaviour this file's own history
+     * (see [WRAP_MULTIPLIER]'s doc) already describes from before real-index keying was ever
+     * tried the first time. [RECENTER_MARGIN_CYCLES] keeps that jump rare in practice (tens of
+     * same-direction swipes per occurrence, not a per-swipe cost).
      */
-    fun keyFor(page: Int, beyondViewportPageCount: Int, perPage: Int = 1): Any =
-        if (realCount > 1 && realCount > perPage + 2 * beyondViewportPageCount) real(page) else page
-
-    /**
-     * The largest `beyondViewportPageCount` up to [desired] that still leaves [keyFor]'s own
-     * strict margin satisfied for THIS pager's [realCount] and [perPage] -- i.e. the largest
-     * `beyond` with `perPage + 2*beyond < realCount`. Callers should derive their actual
-     * [HorizontalPager]/[VerticalPager] `beyondViewportPageCount` from this (passing the same
-     * value to `keyFor`) instead of picking one independently: that guarantees the two can
-     * never drift apart, which is what let real-index keying get permanently, silently
-     * disabled for small-but-common [realCount] values before this existed (see [keyFor]'s own
-     * doc). [desired] is still honoured whenever [realCount] is large enough to afford it (a
-     * bigger garage keeps its full neighbour pre-warm); only a small [realCount] trades away
-     * some of that pre-warming for real-index keying's own bigger win (invisible recentering,
-     * no per-recenter recomposition) instead of losing the latter entirely.
-     */
-    fun safeBeyond(desired: Int, perPage: Int = 1): Int {
-        if (realCount <= 1) return 0
-        val maxSafe = (realCount - perPage - 1) / 2
-        return desired.coerceIn(0, maxSafe.coerceAtLeast(0))
-    }
+    fun keyFor(page: Int, beyondViewportPageCount: Int, perPage: Int = 1): Any = page
     // settledReal was removed: zero readers. Both places that care about a SETTLE go through
     // `snapshotFlow { pager.settledPage }.collect { real(it) }` instead (GarageScreen's and
     // CompactGarage's pager-settle effects), because they need the settle as an EVENT, not as

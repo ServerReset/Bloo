@@ -581,17 +581,20 @@ internal fun GarageScreen(
                         // A single-car account is the sharpest case: total = slots+1 = 2,
                         // perPage is forced to 1 (coerceIn(1, slots) above), so a flat
                         // beyond=1 composes 1+2*1 = 3 virtual pages cycling through only 2
-                        // real items -- guaranteed collision, every single time that user
-                        // opens the app. wrap.safeBeyond derives the largest beyond (capped at
-                        // 1, since 1 pre-warmed neighbour is already all PebbleList's own
-                        // lazy-fill needs to hide, per this parameter's own history) that keeps
-                        // keyFor's own STRICT margin satisfied for this pager's actual total --
-                        // see safeBeyond's own doc for why deriving it here (instead of each
-                        // solving the inequality independently and hoping it happens to match
-                        // what keyFor also computes) is what keeps real-index keying available
-                        // for small car counts instead of silently disabled by a mismatch.
-                        beyondViewportPageCount = wrap.safeBeyond(1, perPage),
-                        key = { page -> wrap.keyFor(page, wrap.safeBeyond(1, perPage), perPage) },
+                        // real items -- guaranteed collision (the SAME real item, e.g. the
+                        // folded-in SettingsScreen, mounted twice at once, each with its own
+                        // racing remember/BackHandler/LazyVerticalStaggeredGrid state), every
+                        // single time that user opens the app. Solving `perPage + 2*beyond <=
+                        // total` for the largest safe integer beyond (capped at 1, since 1
+                        // pre-warmed neighbour is already all PebbleList's own lazy-fill needs
+                        // to hide, per this parameter's own history) gives the formula below.
+                        // NOT tied to keyFor's own key choice any more -- see keyFor's doc for
+                        // why it always uses the raw page index now regardless of this value;
+                        // this beyond still exists purely to stop two DIFFERENT virtual pages
+                        // from ever resolving to the same real item while simultaneously
+                        // composed, independent of what key either of them is given.
+                        beyondViewportPageCount = ((total - perPage) / 2).coerceIn(0, 1),
+                        key = { page -> wrap.keyFor(page, ((total - perPage) / 2).coerceIn(0, 1), perPage) },
                     ) { page ->
                         // Same fade/scale transition the expanded single-car pager
                         // above uses (see its own comment for why: the continuous
