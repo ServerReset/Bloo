@@ -185,25 +185,32 @@ internal class WrapPagerState(val pager: PagerState, val realCount: Int) {
      * [realCount] already keeps [WRAP_MULTIPLIER]'s own worst-case retained-page count small
      * regardless.
      *
-     * Requires STRICT `>`, not `>=`: this session hit the resulting "Key already used" crash
-     * twice from trusting the boundary (composed count == realCount) as safe. The pigeonhole
-     * argument above only holds if the composed window is truly never more than `perPage +
-     * 2 * beyondViewportPageCount` pages wide -- and the multi-column garage pager's own
-     * `pageWidth = boxWidthPx / perPage` (integer division) broke that assumption: `perPage`
-     * pages of a FLOORED width sum to less than boxWidthPx, leaving a leftover sliver of the
-     * viewport that forces an extra (perPage+1)-th page to be composed to cover it. That's
-     * fixed at its own call site (ceiling division instead), but this margin stays as the
-     * backstop regardless -- a one-item spare residue means even one uncounted extra page
-     * still lands on a residue nothing else in the window is using, instead of relying on
-     * every call site getting its own page-count math exactly, provably right. It also
-     * subsumes the realCount <= 1 case for free: [real] collapses to the CONSTANT 0 for every
-     * page whenever realCount <= 1 (which would otherwise key every virtual page identically),
-     * and since `perPage >= 1` always, `realCount > perPage + 2 * beyond` can never hold for
-     * realCount <= 1 -- so that case always falls back to the raw index without needing its
-     * own special-cased branch.
+     * Back to `>=`, not the stricter `>` this briefly required: the extra one-item margin
+     * was added as a speculative backstop against a SUSPECTED (never actually re-confirmed)
+     * extra-composed-page risk, on top of the two fixes that address the REAL, evidence-
+     * backed causes directly -- the [realCount] <= 1 exclusion just below, and the multi-
+     * column garage pager's own `pageWidth` now using ceiling division (its call site's own
+     * doc) so `perPage` pages provably always cover the full viewport instead of leaving a
+     * sliver that silently demanded an uncounted extra page. With both of those actually
+     * fixed, `>` was pure cost with no remaining benefit: for the everyday case of 2-3 cars
+     * on a phone (`realCount` frequently equal to, not greater than, `perPage +
+     * 2*beyondViewportPageCount`), it permanently disabled real-index keying -- meaning
+     * EVERY [recenterIfNearEdge] jump (a routine, recurring event during ordinary swiping,
+     * not a rare edge case) composed a brand-new page from scratch instead of reusing the
+     * existing one, visibly restarting every pebble's own load/animate-in every time.
+     * Reported directly as pebbles "popping in individually" and feeling slow specifically
+     * after the pager work that introduced this. `>=` is exactly as safe as `>` once the
+     * window really is never wider than the formula assumes, and doesn't pay that cost.
+     *
+     * [realCount] <= 1 is excluded explicitly (not left to fall out of the inequality, which
+     * only happens under the stricter `>`): [real] collapses to the CONSTANT 0 for every page
+     * whenever realCount <= 1, so keying by it would give literally every virtual page the
+     * same key. [recenterIfNearEdge] itself already no-ops for realCount <= 1, so there is no
+     * reuse to gain from real-keying there anyway -- the raw page index is both safe and
+     * sufficient.
      */
     fun keyFor(page: Int, beyondViewportPageCount: Int, perPage: Int = 1): Any =
-        if (realCount > perPage + 2 * beyondViewportPageCount) real(page) else page
+        if (realCount > 1 && realCount >= perPage + 2 * beyondViewportPageCount) real(page) else page
     // settledReal was removed: zero readers. Both places that care about a SETTLE go through
     // `snapshotFlow { pager.settledPage }.collect { real(it) }` instead (GarageScreen's and
     // CompactGarage's pager-settle effects), because they need the settle as an EVENT, not as
