@@ -121,6 +121,15 @@ private val AI_COMMANDS = setOf(
 // where it is either present and correct or absent, so that is where the limit
 // stays.
 
+/** How long [AppViewModel.bootstrapDriveSync]'s own launch-time sync pass waits before
+ *  starting, so it doesn't compete with the cold-start critical path (the currently-
+ *  viewed car's own status fetch) for I/O -- see that call site's own doc for the real,
+ *  timed report this came from. Long enough to cover that fetch's own network round trip
+ *  under normal conditions; short enough that a user who opens Settings within the first
+ *  few seconds still sees a sync that's already well underway rather than one that looks
+ *  like it never started. */
+private const val DRIVE_SYNC_COLD_START_DELAY_MS = 3_000L
+
 @Stable
 class AppViewModel(app: Application) : AndroidViewModel(app) {
 
@@ -1372,11 +1381,36 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         // The actual download/compare/import/upload sequence lives in
         // SettingsStore.performMainToMainSync().
         viewModelScope.launch {
+            // True only for the very first emission below (the launch-time bootstrap pass,
+            // per this block's own doc a few lines down) -- NOT for a real refresh finishing
+            // later, which should still sync immediately as before.
+            var firstPass = true
             _state.map { it.refreshing }.distinctUntilChanged().collect { wasRefreshing ->
                 // Route through the single sync path so an imported remote is
                 // actually folded into UiState (refreshLocalCarConfig), not just
                 // lastSyncMs/syncError -- same handling as setSyncUri / syncNow.
-                if (!wasRefreshing) runDriveSyncNow()
+                if (!wasRefreshing) {
+                    if (firstPass) {
+                        firstPass = false
+                        // Give the cold-start critical path (fetching the currently-viewed
+                        // car's own status -- the fetch that gates its first-visible pebbles)
+                        // a head start before this joins the queue. performMainToMainSync
+                        // does real cross-process I/O (a Storage Access Framework round trip
+                        // to the Drive app, possibly network-bound on Drive's end) that isn't
+                        // anything the user is waiting ON at this exact moment the way the
+                        // car's own status is -- reported directly, and confirmed by a real
+                        // timed report: a plain, already-warm SessionStore.load() read (no
+                        // I/O of its own beyond an in-memory DataStore snapshot) measured at
+                        // 850ms-2.7s specifically while "Drive sync: uploaded settings" was
+                        // running concurrently, with nothing else in that window. Delaying
+                        // just this ONE bootstrap pass (not the dirty-key auto-push above, and
+                        // not a REAL refresh finishing later) keeps settings syncing on every
+                        // cold start same as before, just not competing for the first few
+                        // seconds a user is actually staring at a loading screen for.
+                        delay(DRIVE_SYNC_COLD_START_DELAY_MS)
+                    }
+                    runDriveSyncNow()
+                }
             }
         }
         // Auto-push on ANY tracked change: every editTracked() that touches a
