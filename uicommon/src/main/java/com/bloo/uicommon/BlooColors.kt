@@ -5,10 +5,10 @@ import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.lerp
 
 /**
- * Colour helper shared between the phone and watch Compose UIs.
+ * Colour helper used by the phone's Compose UI.
  *
  * NOT to be confused with `com.bloo.bluelink.data.BlooColors` in :shared, which is a set of
- * packed-ARGB Int CONSTANTS usable from non-Compose surfaces (Glance widget, Protolayout tile).
+ * packed-ARGB Int CONSTANTS usable from non-Compose surfaces (e.g. the notification builders).
  * This one holds Compose `Color` FUNCTIONS and depends on androidx.compose.ui.graphics, so it
  * cannot live in :shared and the two cannot merge. The name collision is deliberate-ish history;
  * import the right one for the surface.
@@ -18,7 +18,7 @@ import androidx.compose.ui.graphics.lerp
  */
 object BlooColors {
     /**
-     * The default button fill colour. Used by [MorphButton] (or its wear twin)
+     * The default button fill colour. Used by [MorphButton]
      * so idle buttons read clearly against any surface they sit on, without
      * needing a border. Pushes the highest available surface tone slightly
      * toward `onSurface` — more in dark themes, less in light — so the
@@ -33,7 +33,7 @@ object BlooColors {
     // onAccent() and accentMuted() (plus a private Color.toArgbInt() only accentMuted used) were
     // deleted here: nothing on either surface ever called them. The object's old doc claimed all
     // three were "shared utilities between phone and watch", but only buttonContainer ever was.
-    // The widget derives its own on-accent tone inline (CarWidget WidgetTheme.build) with a
+    // The widget used to derive its own on-accent tone inline (CarWidget WidgetTheme.build) with a
     // different dark value, so routing it through a shared onAccent would have changed its colour,
     // not just its call site -- another reason this was dead rather than merely uncalled.
 }

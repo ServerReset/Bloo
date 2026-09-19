@@ -8,9 +8,9 @@ package com.bloo.uicommon
 /**
  * Reorderable column + shared reorder state, pure Foundation.
  *
- * Consumers (phone, watch, widget surfaces) supply colours/sizes/content
+ * Consumers (the phone UI) supply colours/sizes/content
  * via parameters; this module carries no Material dependency, so the same
- * component works under compose.material3 and wear.compose.material3.
+ * component works regardless of the surrounding theme.
  */
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing

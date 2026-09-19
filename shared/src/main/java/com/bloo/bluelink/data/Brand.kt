@@ -66,7 +66,7 @@ enum class Brand(
         // overwrite whatever the wire sent with brand.code, never read it back
         // out of the raw API response), so it's safe to make region-distinct
         // here -- and it must be, since Brand.fromIndicator is how every command
-        // path (repoFor(v), TileCommandRunner, WearCommandRunner) re-derives
+        // path (repoFor(v), TileCommandRunner, CarCommandRunner) re-derives
         // which backend/host a saved Vehicle belongs to.
         code = "HCA",
         baseUrl = "https://mybluelink.ca/tods/api",
@@ -131,8 +131,8 @@ enum class Brand(
      * False for Canada: [CanadaApi] has no verified read endpoint for the targets,
      * so `EvStatus.reservChargeInfos` is always null on those cars (see the KNOWN-GAP
      * comment in CanadaApi.parseStatus). Every *reading* surface already self-hides on
-     * that null -- the hero marker, the "Charge limit" status row, the widget dot -- but
-     * the *editable* controls (the phone's ChargePebble pills, the watch's LimitsCard)
+     * that null -- the hero marker, the "Charge limit" status row -- but
+     * the *editable* controls (the phone's ChargePebble pills)
      * render regardless and seed themselves from the 80/90 display defaults, so their
      * "Set/Apply" could push a value the user never chose and the car never had. Hiding
      * them for Canada is the honest state: we can neither show the real limit nor safely
@@ -157,7 +157,7 @@ enum class Brand(
      * next refresh. With nothing to correct it -- and SnapshotStore's merge
      * deliberately keeping the old value when a status field is null, so a
      * missing field never wipes a known one -- the optimistic `true` would
-     * survive forever: a widget climate button lit permanently, and a toggle
+     * survive forever: a climate button lit permanently, and a toggle
      * that sends STOP because it believes climate is still on long after the
      * car's own timer ended it.
      *
@@ -195,8 +195,8 @@ enum class Brand(
         /**
          * The brands offered for a sign-in region, in display order.
          *
-         * Shared because the phone and the watch both ask this question, and a
-         * second hand-written copy is how the watch ended up offering only the
+         * Shared so a second hand-written copy doesn't creep in: the watch used to
+         * ask this question too, and its own copy offered only the
          * three US brands long after Canada shipped: a Canadian owner signing in
          * on the watch could only pick a US brand, and their credentials failed
          * against the wrong backend with nothing explaining why. Europe would
@@ -234,7 +234,7 @@ enum class Brand(
          *  of the `code` each brand stamps onto its own vehicles (see
          *  BlueLinkRepository.vehicles / KiaRepository.toVehicle / this file's CA
          *  entries), so this is also how every command path (repoFor(v),
-         *  TileCommandRunner, WearCommandRunner) re-derives which backend/host a
+         *  TileCommandRunner, CarCommandRunner) re-derives which backend/host a
          *  saved [Vehicle] belongs to. Checks the 3-letter Canada codes first
          *  since they'd otherwise be swallowed by the single-letter US checks
          *  below (e.g. "KCA" contains no exact match to "K"). */
@@ -417,7 +417,7 @@ val Vehicle.platformOverridable: Boolean
  * charge) or the Europe one ([EuApi], same four).
  *
  * On [Brand] rather than [Vehicle], because not every caller has a Vehicle. The
- * widget only has a VehicleSnapshot and its brand indicator, so it re-derived
+ * widget used to hold only a VehicleSnapshot and its brand indicator and re-derived
  * this rule by hand -- and a hand copy of a rule is a rule that gets updated in
  * one place. That is not hypothetical here: the WATCH had the same copy, it
  * missed the `isCanada` half, and every Canadian user had Flash and Horn

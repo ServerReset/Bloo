@@ -10,27 +10,6 @@ import androidx.compose.ui.unit.dp
 import com.bloo.uicommon.dropShadow
 
 /**
- * The shared "floating chrome" visual kit: the semi-transparent base-fill
- * alpha, the top-lit hairline rim, and the symmetric ambient halo -- the
- * pieces every floating pill, dialog, arrow and pebble edge in the family
- * shares, usable by the PHONE app, the WATCH app, the widget surfaces and
- * anything else that wants its floating chrome to read as one family without
- * importing the phone module.
- *
- * Foundation-only by design (no Material dependency, matching :uicommon's
- * own rule): the rim takes its tint as a parameter. The phone passes
- * `MaterialTheme.colorScheme.onSurface`; the watch passes
- * wear-material3's own onSurface; a widget passes whatever its surface
- * resolves. Nothing here invents a theme.
- *
- * Alpha history (one number every frosted surface must agree on): 0.62 read
- * as barely-there over a bright patch of car photo, so it was raised to
- * 0.74; lowered again to 0.68 on request, staying clear of the 0.62 that
- * was already found insufficient.
- */
-fun glassContainerAlpha(frosted: Float = 0.68f): Float = frosted
-
-/**
  * The hairline rim every piece of frosted chrome (floating pills, dialogs,
  * pebbles) should share -- brighter along the top, fading down the sides,
  * like a real card's edge catching ambient light. Without real glass blur

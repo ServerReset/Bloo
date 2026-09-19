@@ -5,7 +5,7 @@ import kotlin.math.roundToInt
 
 /**
  * A resolved reverse-geocode result, in two lengths:
- *  - [full] -- "123 Main St, San Jose", the existing human-readable form every phone/watch
+ *  - [full] -- "123 Main St, San Jose", the existing human-readable form every phone
  *    surface already shows.
  *  - [compact] -- "123 Main St, 95112" (street + ZIP instead of city), for the cover screen's
  *    own space-constrained surfaces, where [full] (especially with a car-name suffix appended
@@ -49,7 +49,7 @@ fun formatPlaceName(a: android.location.Address): GeocodedPlace? {
     return GeocodedPlace(full, compact)
 }
 
-/** "1h 20m" / "45 min" duration formatter, shared across phone and watch.
+/** "1h 20m" / "45 min" duration formatter, shared across the phone UI.
  *  Mechanism: integer-divides by 60 to get whole hours and takes the
  *  remainder as leftover minutes; below 60 it skips the hours part entirely
  *  and just prints "X min". */
@@ -185,8 +185,7 @@ val UPDATE_SNOOZE_MS = 3L * 24 * 60 * 60 * 1000L
  * stamps ahead of the current time. Every throttle written the obvious way then
  * suppresses its own work for exactly as long as the skew lasts, silently, with
  * nothing on screen to explain it. Real instances found in this codebase: update
- * checks (so no update ever appeared), weather refresh, and the tile live-refresh
- * throttle.
+ * checks (so no update ever appeared) and weather refresh.
  *
  * Requiring the difference to be non-negative reads a future stamp as what it
  * actually is -- not a recent event but a broken one -- and the safe reading of a
@@ -203,7 +202,7 @@ fun withinWindow(now: Long, stamp: Long, windowMs: Long): Boolean =
 /** The climate request used when nothing else is configured -- no saved
  *  preset, no smart-climate weather data, just "turn it on." Was
  *  independently typed in at 6 call sites (TileCommandRunner, AppViewModel's
- *  shortcut handling, the phone UI's slider initial state, WearCommand's and
+ *  shortcut handling, the phone UI's slider initial state, CarCommand's and
  *  WearViewModel's ClimateDraft's wire/default values) -- still consistent
  *  everywhere today, but exactly the same "hand-copied constant" shape as
  *  the climate-range bug. */
@@ -213,7 +212,7 @@ const val DEFAULT_CLIMATE_DURATION_MIN = 10
 /** The charge-limit targets used until a car's real targets load in: 80% for AC
  *  (a daily home/level-2 ceiling), 90% for DC (fast-charging past that is
  *  inefficient). One conceptual pair, previously typed as bare 80/90 literals at
- *  four sites -- WearCommand's wire defaults, applyChargeLimits' and LimitsCard's
+ *  four sites -- CarCommand's wire defaults, applyChargeLimits' and LimitsCard's
  *  `?: 80/90` fallbacks on the watch, and ChargePebble's seed on the phone -- the
  *  same hand-copied-constant shape that already caused a real drift bug (the phone
  *  once defaulted BOTH to 80%, so a "Set" before the DC target loaded pushed it
@@ -231,7 +230,7 @@ fun chargerLabel(plugin: Int?): String? = when (plugin) {
 }
 
 // The three formatters tripDate needs, built once per thread instead of three
-// times per call. tripDate renders the title of every row in the watch's trips
+// times per call. tripDate renders the title of every row in the phone's trips
 // list, so on a scroll it was constructing a SimpleDateFormat -- which parses its
 // pattern and loads a full set of locale DateFormatSymbols -- several times for
 // every item that came into view, on the device least able to afford it.
@@ -380,7 +379,7 @@ private fun trimTrailingZero(v: Double): String =
  *
  * The rounding is the point of having this. Every conversion written inline
  * around the app already rounds -- the climate slider both ways, the preset
- * summary, the widget config preview, the watch's swing label -- and the two
+ * summary -- and the two
  * SHARED helpers every surface routes through, [degLabel] and [weatherTemp], were
  * the only two that truncated. So the functions one place could fix were the ones
  * getting it wrong, while the scattered copies were right.
@@ -403,7 +402,7 @@ fun degValue(valueF: Double, fahrenheit: Boolean): Int =
  * setting.
  *
  * One rule, because there were two. The phone derived it as
- * `unitSystem != "metric"`. The watch derived it as
+ * `unitSystem != "metric"`. The watch (since removed) derived it as
  * `localUnitSystem != "metric" || phonePayload?.useFahrenheit != false` -- an OR, so
  * Celsius required the watch to be metric AND the phone to have pushed
  * `useFahrenheit == false`. Two consequences, both visible on one screen:
@@ -414,9 +413,9 @@ fun degValue(valueF: Double, fahrenheit: Boolean): Int =
  *  - A watch that had never been paired had no payload at all, so
  *    `null != false` was true and it showed °F however the user had set it.
  *
- * The watch now derives temperature from the same watch-local unit system its seven
- * distance and speed readouts already use, which is also what its own Units setting
- * writes. That makes units a per-device choice consistently, rather than per-device
+ * The watch derived temperature from the same watch-local unit system its seven
+ * distance and speed readouts already used, which was also what its own Units setting
+ * wrote -- a per-device choice consistently, rather than per-device
  * for distance and jointly-negotiated for temperature.
  */
 fun useFahrenheit(unitSystem: String?): Boolean = (unitSystem ?: "imperial") != "metric"
@@ -449,9 +448,8 @@ const val CHARGE_LOW_PCT = 30
  * expect it to.
  *
  * Only the bands are shared. Each surface maps them to its own colour system --
- * Compose theme roles on the watch, ProtoLayout roles on its tile, packed ARGB ints
- * in the widget -- which is the part that legitimately differs, including what
- * UNKNOWN should look like.
+ * packed ARGB ints on the phone -- which is the part that legitimately differs,
+ * including what UNKNOWN should look like.
  */
 fun chargeTier(percent: Int?, charging: Boolean): ChargeTier = when {
     charging -> ChargeTier.CHARGING
@@ -557,8 +555,8 @@ fun formatSpeed(kph: Double, metric: Boolean): String =
  * Both exist because the two speed sources genuinely differ in unit, and having
  * only the km/h one meant the mph source was silently run through the wrong
  * conversion: EvTrip's avgspeed/maxspeed are mph (its own KDoc says so, and its
- * sibling `distance` in the same payload is treated as miles by both the phone and
- * the watch), so `formatSpeed(62.0, metric = false)` rendered 62 mph as "38 mph"
+ * sibling `distance` in the same payload is treated as miles by the phone,
+ * so `formatSpeed(62.0, metric = false)` rendered 62 mph as "38 mph"
  * and metric rendered it as "62 km/h" instead of ~100. Wrong in both modes.
  *
  * Named for its input unit rather than overloading, so a call site cannot pick the
@@ -575,25 +573,14 @@ fun formatSpeedMph(mph: Double, metric: Boolean): String =
 fun formatTripDistance(mi: Double, metric: Boolean): String =
     if (metric) "%.1f km".format(mi * KM_PER_MI) else "%.1f mi".format(mi)
 
-/** Format efficiency (miles per kWh or km per kWh). Converts the distance
- *  component to km first when metric (same 1.609 factor as the other
- *  distance formatters here) before dividing by the energy used, so the
- *  ratio itself — not just the label — is correct for the selected unit
- *  system, not just a relabelled imperial figure. */
-fun formatEfficiency(mi: Double, kwh: Double, metric: Boolean): String {
-    val eff = if (metric) (mi * KM_PER_MI) / kwh else mi / kwh
-    return "${"%.1f".format(eff)} ${if (metric) "km" else "mi"}/kWh"
-}
-
 /**
  * The canonical "what's this car doing right now" label, in priority order
  * (driving beats charging beats climate beats lock state). Every surface that
  * shows a one-line vehicle state — the phone widget, phone Quick Settings
  * tiles, the wear tile, and wear complications — used to reimplement this same
  * priority chain independently, and they'd drifted slightly out of sync with
- * each other. Colors stay local to each surface since phone/wear use
- * different color systems (a Compose theme vs. Wear ProtoLayout roles), but
- * the label — and the priority order that decides which state "wins" when
+ * each other. Colors stay local to each surface, but the label — and the
+ * priority order that decides which state "wins" when
  * several are true at once — is exactly the kind of logic that should only
  * exist in one place.
  */
@@ -669,19 +656,3 @@ fun shouldRelockAfter(elapsedMs: Long, timingKey: String): Boolean = when (timin
     else -> true
 }
 
-/**
- * Which of [shown] page-indicator dots to light for item [index] out of [count] total.
- *
- * When there are no more items than dots the mapping is 1:1 (just clamped). When there are MORE
- * items than dots, [index]'s position in `[0, count-1]` is rescaled onto `[0, shown-1]` and
- * rounded to the nearest dot -- so the first item always lights the first dot and the last the
- * last, with the middle items sharing the dots between. Extracted from the watch's CurvedDots
- * so this off-by-one-prone integer mapping (the `count-1` divisor, the endpoint behaviour) can
- * be unit-tested; the composable owns only the drawing. Returns 0 for a degenerate
- * count/shown <= 1 (the caller draws nothing then anyway).
- */
-fun activeDotIndex(count: Int, shown: Int, index: Int): Int {
-    if (shown <= 1 || count <= 1) return 0
-    if (count <= shown) return index.coerceIn(0, shown - 1)
-    return ((index.toFloat() / (count - 1)) * (shown - 1)).roundToInt().coerceIn(0, shown - 1)
-}

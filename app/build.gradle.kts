@@ -167,12 +167,12 @@ dependencies {
     // collecting -- and preparing a recomposition for -- state nobody can see.
     implementation("androidx.lifecycle:lifecycle-runtime-compose:2.8.7")
     implementation("androidx.activity:activity-compose:1.9.3")
-    implementation("androidx.fragment:fragment-ktx:1.8.5")
+    // Only FragmentActivity is used (MainActivity / BiometricAuth); no fragment-ktx
+    // extensions are called, so the plain `fragment` artifact is the honest dependency.
+    implementation("androidx.fragment:fragment:1.8.5")
 
     implementation("androidx.compose.ui:ui:$composeUi")
     implementation("androidx.compose.ui:ui-graphics:$composeUi")
-    implementation("androidx.compose.ui:ui-tooling-preview:$composeUi")
-    debugImplementation("androidx.compose.ui:ui-tooling:$composeUi")
     implementation("androidx.compose.foundation:foundation:$composeUi")
 
     // Material 3 Expressive — the Expressive components (ButtonGroup,

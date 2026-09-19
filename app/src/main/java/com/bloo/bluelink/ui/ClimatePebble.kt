@@ -169,8 +169,8 @@ internal fun ClimatePebble(
     // restore effect just below and the preset-apply buttons further down share ONE copy of the
     // assignment -- it was written out twice, byte-for-byte, and "restore last-used" and "apply
     // preset" are the same operation (set the sliders from a request). Captures only the nine
-    // `var` setters above it. NOT reused by the watch-sync effect below, which maps through
-    // SeatLevel.fromApi and so is genuinely different.
+    // `var` setters above it. NOT reused by the cross-composition sync effect below, which maps
+    // through SeatLevel.fromApi and so is genuinely different.
     val applyRequest: (ClimateRequest) -> Unit = { r ->
         tempF = r.tempF
         duration = r.durationMinutes
@@ -198,9 +198,9 @@ internal fun ClimatePebble(
         seatRearLeft = rearLeft,
         seatRearRight = rearRight,
     )
-    // Persist + watch-mirror is handled by ONE debounced call further down
-    // (after activePresetId exists) - see the LaunchedEffect near the climate
-    // sync block.
+    // Persist + cross-composition mirror is handled by ONE debounced call further
+    // down (after activePresetId exists) - see the LaunchedEffect near the
+    // climate sync block.
 
     val presets = state.climatePresets[v.vin].orEmpty()
     var showAddPreset by remember { mutableStateOf(false) }
@@ -240,8 +240,8 @@ internal fun ClimatePebble(
         rearRight = SeatLevel.fromApi(r.seatRearRight)
         activePresetId = r.activePresetId
     }
-    // Persist + publish-to-watch once settings stop changing, not on every drag
-    // tick: publishClimateState updates the shared ViewModel StateFlow the whole
+    // Persist + cross-composition publish once settings stop changing, not on every
+    // drag tick: publishClimateState updates the shared ViewModel StateFlow the whole
     // screen collects, so per-tick commits recomposed far more than the slider
     // being dragged (read as "the sliders don't react until long after you
     // change them"). The 400ms debounce lives in the ViewModel (viewModelScope),
@@ -366,8 +366,8 @@ internal fun ClimatePebble(
         )
 
         // Smart climate: read the weather where the car is (falling back to home)
-        // and pick a target -- see smartClimateTargetF, shared with the widget/QS
-        // tile and the watch: ~10°F off ambient normally, or the car's most
+        // and pick a target -- see smartClimateTargetF, the same rule the tile
+        // command runner uses: ~10°F off ambient normally, or the car's most
         // aggressive setting on a genuinely extreme day, always within what the
         // car's own climate range actually accepts.
         // Its own PopVisible: weather can arrive AFTER the pebble is already open (it's
@@ -441,8 +441,8 @@ internal fun ClimatePebble(
         }
 
         // Was a hand-rolled version of the same blue->green->warm mapping
-        // uicommon.tempColor() now centralizes (shared with the watch, which
-        // had drifted to a different, unanimated palette).
+        // uicommon.tempColor() now centralizes (an earlier copy had drifted to
+        // a different, unanimated palette).
         val tempRange = CLIMATE_TEMP_RANGE_F.first.toFloat()..CLIMATE_TEMP_RANGE_F.last.toFloat()
         val tempColor = com.bloo.uicommon.tempColor(tempF, tempRange.start, tempRange.endInclusive)
         // The label + value readout is the same in either unit -- only degLabel's
@@ -813,7 +813,7 @@ internal fun PresetPill(
     // frequently-tapped Apply half -- a slightly mis-aimed tap silently and
     // irreversibly dropped a saved preset. Now requires a second tap, same
     // "tap again to confirm" pattern (with the same 4s auto-reset) used for
-    // Sign out and the watch's own preset-delete confirm.
+    // Sign out.
     val confirm = rememberConfirmArm()
     // No measured row height any more. These shapes used to be derived from one -- the row was
     // measured with onSizeChanged, the height written to state, and the whole row recomposed to

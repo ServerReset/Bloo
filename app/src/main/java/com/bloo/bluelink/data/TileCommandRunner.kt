@@ -4,12 +4,11 @@ import android.content.Context
 import kotlinx.coroutines.sync.withLock
 
 /**
- * Runs a Quick-Settings-tile command with the stored session and folds the
- * expected result into the [SnapshotStore] so the tile (and widgets) reflect the
+ * Runs a vehicle command with the stored session and folds the
+ * expected result into the [SnapshotStore] so snapshot-fed surfaces reflect the
  * new state immediately. Toggle commands flip against the last-known snapshot;
- * the climate command honours the tile's chosen target (a saved preset, smart
- * climate, or basic). Shared by the tile (background mode) and the transparent
- * tile-action activity (open-and-close mode).
+ * the climate command honours the caller's chosen target (a saved preset, smart
+ * climate, or basic). Shared by the settings search's command execution.
  */
 object TileCommandRunner {
 
@@ -21,16 +20,14 @@ object TileCommandRunner {
     const val DEFROST_SUFFIX = ":defrost"
 
 
-    /** Outcome of a single tile command: whether it succeeded, plus a short
+    /** Outcome of a single command: whether it succeeded, plus a short
      *  human-readable status/error message suitable for a toast or log line. */
     data class Result(val ok: Boolean, val message: String)
 
     /**
-     * Executes one Quick-Settings-tile command end to end and returns a
-     * user-facing [Result]. Called from both the tile's background handler and
-     * the transparent tile-action activity, so this is the single place that
-     * mechanism (locking, optimistic snapshot update, error formatting) lives --
-     * neither caller reimplements any of it.
+     * Executes one command end to end and returns a user-facing [Result]. This is
+     * the single place that mechanism (locking, optimistic snapshot update, error
+     * formatting) lives -- callers don't reimplement any of it.
      *
      * Order of operations. Everything that touches the CAR's backend is inside
      * the [BlueLinkGate.statusMutex] critical section, so the
@@ -44,21 +41,21 @@ object TileCommandRunner {
      *    and none of the 502-on-overlap behaviour the mutex exists to prevent, so
      *    serializing it against the car's requests buys nothing and costs
      *    everything. Inside the lock it was up to 35s -- [WeatherApi]'s own
-     *    connect+read timeouts, generous on purpose -- during which one tile tap
-     *    on a car with no signal blocked the phone UI, the watch, and every other
+     *    connect+read timeouts, generous on purpose -- during which one command
+     *    on a car with no signal blocked the phone UI and every other
      *    surface in the process. Returns null when this command needs no weather,
      *    and also when
      *    the lookup simply fails -- step 4 raises the user-facing error in both
      *    cases, so nothing here has to distinguish them.
      * 1. Acquire [BlueLinkGate.statusMutex] via [withLock] *before* reading any
      *    state or dispatching the command. This is the same app-wide mutex that
-     *    [WearCommandRunner.execute] and the phone UI's own command path already
+     *    [CarCommandRunner.execute] and the phone UI's own command path already
      *    take before talking to the car's backend. BlueLink's API returns 502s
      *    when it receives overlapping requests for the same account, so every
      *    command-issuing call site in the app serializes through this one lock
      *    to guarantee at most one in-flight request at a time. Before this
-     *    change, tile taps were the one path that skipped the lock entirely --
-     *    a tile tap racing a background status poll (or another command already
+     *    change, this was the one path that skipped the lock entirely --
+     *    a command racing a background status poll (or another command already
      *    in flight) had no protection and could trigger exactly that 502. Note
      *    this reuses the *status* mutex (not a separate command mutex): status
      *    refreshes and commands are treated as needing the same exclusion,
@@ -76,7 +73,7 @@ object TileCommandRunner {
      * 4. Dispatch on [cmd]:
      *    - "doors" toggles lock state based on the *last-known* snapshot's
      *      `locked` flag (optimistic -- there's no fresh status fetch here), not
-     *      a live re-check, since the point of a tile tap is a fast, cheap
+     *      a live re-check, since the point is a fast, cheap
      *      command dispatch, not a fresh network round-trip first.
      *    - "lock"/"unlock" are explicit, non-toggling variants of the same.
      *    - "charge" similarly toggles off the last-known `charging` flag;
@@ -88,14 +85,14 @@ object TileCommandRunner {
      *      (see below); "climate_on"/"climate_off" force start/stop directly
      *      ("climate_on" still honours the target + isDriving gate via
      *      [runClimateStart]), again for explicit start/stop phrasing.
-     *    - Anything else silently no-ops to "Done" (defensive default; the tile
+     *    - Anything else silently no-ops to "Done" (defensive default; the command
      *      vocabulary is a small closed set in practice).
      *    The whole `when` is wrapped in [runCatching] so a thrown exception
      *    (network failure, "can't start climate while driving", etc.) becomes a
      *    typed failure below rather than propagating out from inside the lock.
      * 5. On success: logs the resulting message, then -- best-effort via
      *    [runCatching] -- writes an optimistic snapshot update (see [optimistic])
-     *    so the tile/widgets flip to the new state immediately rather than
+     *    so snapshot-fed surfaces flip to the new state immediately rather than
      *    waiting for the next real status refresh to confirm it. This write is
      *    inside the lock too, so it's atomic with the read in step 2.
      * 6. On failure: formats a message (falling back to a generic "Command
@@ -114,13 +111,13 @@ object TileCommandRunner {
         // mutex that exists to stop overlapping requests to the CAR. See
         // prepareSmartClimate.
         val smart = prepareSmartClimate(ctx, vin, cmd, climateTarget)
-        // Same lock WearCommandRunner.execute()/the phone UI's own command path
+        // Same lock CarCommandRunner.execute()/the phone UI's own command path
         // already take -- BlueLink 502s on overlapping requests for the same
-        // account, and this was the one command-executing path (Quick Settings
-        // tile taps) that skipped it, so a tile tap racing a background status
-        // refresh or another in-flight command had no protection at all. The
-        // snapshot read and optimistic write live inside the lock too, so the
-        // toggle direction and the flip are atomic with the network dispatch.
+        // account, and this was the one command-executing path that skipped it, so
+        // a command racing a background status refresh or another in-flight
+        // command had no protection at all. The snapshot read and optimistic write
+        // live inside the lock too, so the toggle direction and the flip are
+        // atomic with the network dispatch.
         return BlueLinkGate.statusMutex.withLock {
             val snap = SnapshotStore(ctx).current().vehicles.firstOrNull { it.vin == vin }
                 ?: return@withLock Result(false, "Car not found")
@@ -189,7 +186,7 @@ object TileCommandRunner {
     }
 
     /**
-     * Start/stop climate; when starting, resolve the tile's chosen target.
+     * Start/stop climate; when starting, resolve the caller's chosen target.
      * Called from inside [run]'s [BlueLinkGate.statusMutex] critical section, so
      * this itself does not (and must not) take the lock again.
      *
@@ -200,12 +197,12 @@ object TileCommandRunner {
      *    car's backend rejects remote climate-start commands while the vehicle
      *    is in motion, mirroring the same driving-gate check the main phone UI's
      *    `AppViewModel.isDriving()` already applies before its own in-app Start
-     *    button. Before this check was added here, a Quick Settings tile tap
-     *    while driving would dispatch the command anyway, have it silently
+     *    button. Before this check was added here, a command
+     *    while driving would dispatch anyway, have it silently
      *    rejected by the car, and surface no explanation to the user -- this
      *    throws a descriptive error instead, which `run()`'s `runCatching`/
      *    `fold` turns into a proper failure [Result] message.
-     * 3. Resolves what climate request to actually send, based on the tile's
+     * 3. Resolves what climate request to actually send, based on the caller's
      *    configured `target`:
      *    - "smart": a target temperature computed from live weather at the car's
      *      last-known lat/lon via [smartClimateTargetF]/[ambientFahrenheit], with
@@ -218,7 +215,7 @@ object TileCommandRunner {
      *    - any other id that isn't "default": looks up that saved preset by id
      *      in [SettingsStore.climatePresets] for this VIN and uses its stored
      *      [ClimateRequest] verbatim; fails if the preset no longer exists
-     *      (e.g. deleted since the tile was configured).
+     *      (e.g. deleted since the target was configured).
      *    - "default" (or anything falling through): a fixed default request
      *      (default temp, no defrost, default duration).
      * 4. Dispatches the resolved request via [repo.startClimate] and reports
@@ -319,7 +316,7 @@ object TileCommandRunner {
      * cancellation check at which to finish early -- so the mutex would still be
      * held for the full 35s and the only thing gained would be a comment claiming
      * otherwise. Bounding it for real means putting a `callTimeout` on a client
-     * the phone UI and the watch share as well, which is a bigger change than a
+     * the phone UI shares as well, which is a bigger change than a
      * lock-scope fix should make; and it is a good deal less urgent now that the
      * fetch on every normal tap happens before the lock is taken.
      */
@@ -335,7 +332,7 @@ object TileCommandRunner {
      *  pre-lock path in [prepareSmartClimate] and the in-lock fallback in
      *  [runClimateStart] can't drift into choosing different temperatures for the
      *  same conditions -- see [smartClimateTargetF], which is itself shared with
-     *  the phone UI and the watch so all four agree. */
+     *  the phone UI so they agree. */
     private fun smartClimateRequest(w: Weather): ClimateRequest = ClimateRequest(
         tempF = smartClimateTargetF(ambientFahrenheit(w.tempC)),
         defrost = false,
@@ -361,7 +358,7 @@ object TileCommandRunner {
         // The car rejects remote climate commands while it's moving (same
         // gate the main phone UI's AppViewModel.isDriving() already applies
         // to its own Start button) -- this was the one climate-starting path
-        // with no such check at all, so a Quick Settings tile tap while
+        // with no such check at all, so a command while
         // driving used to just silently fail against the car with no
         // explanation surfaced to the user.
         if (snap.isDriving) error("Can't start climate while driving")
@@ -372,8 +369,8 @@ object TileCommandRunner {
             // "temp:64" -- an explicit temperature in Fahrenheit, which is
             // what search produces for "start climate at the coldest
             // temperature on X". Additive to the existing string protocol
-            // rather than a new parameter: every other caller (the tiles, the
-            // watch) keeps passing what it always did, and a preset id can
+            // rather than a new parameter: every other caller keeps passing what it
+            // always did, and a preset id can
             // never collide with this because ids are UUIDs.
             target.startsWith(TEMP_PREFIX) -> {
                 // "temp:64" or "temp:82:defrost". Suffix rather than a second
@@ -423,24 +420,24 @@ object TileCommandRunner {
     }
 
     /** The snapshot a tile command is expected to produce, for instant feedback.
-     *  Delegates to [WearCommandRunner.optimistic] (mapping the tile's own
+     *  Delegates to [CarCommandRunner.optimistic] (mapping the tile's own
      *  "doors"/"lock"/"unlock"/"charge"/"charge_on"/"charge_off"/"climate"/
-     *  "climate_on"/"climate_off" vocabulary onto [WearAction]) instead of
+     *  "climate_on"/"climate_off" vocabulary onto [CarAction]) instead of
      *  re-deriving the same lock/charge/climate flips independently -- this used
      *  to be a byte-for-byte duplicate of that function. */
     fun optimistic(snap: VehicleSnapshot, cmd: String): VehicleSnapshot {
         val action = when (cmd) {
-            "doors" -> WearAction.TOGGLE_LOCK
-            "lock" -> WearAction.LOCK
-            "unlock" -> WearAction.UNLOCK
-            "charge" -> WearAction.TOGGLE_CHARGE
-            "charge_on" -> WearAction.CHARGE_ON
-            "charge_off" -> WearAction.CHARGE_OFF
-            "climate" -> WearAction.TOGGLE_CLIMATE
-            "climate_on" -> WearAction.CLIMATE_ON
-            "climate_off" -> WearAction.CLIMATE_OFF
+            "doors" -> CarAction.TOGGLE_LOCK
+            "lock" -> CarAction.LOCK
+            "unlock" -> CarAction.UNLOCK
+            "charge" -> CarAction.TOGGLE_CHARGE
+            "charge_on" -> CarAction.CHARGE_ON
+            "charge_off" -> CarAction.CHARGE_OFF
+            "climate" -> CarAction.TOGGLE_CLIMATE
+            "climate_on" -> CarAction.CLIMATE_ON
+            "climate_off" -> CarAction.CLIMATE_OFF
             else -> return snap
         }
-        return WearCommandRunner.optimistic(snap, action)
+        return CarCommandRunner.optimistic(snap, action)
     }
 }

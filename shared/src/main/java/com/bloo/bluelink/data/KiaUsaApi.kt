@@ -83,9 +83,10 @@ class KiaUsaApi {
         fun newDeviceId(): String = UUID.randomUUID().toString().uppercase(Locale.US)
 
         // Process-wide — same reasoning as BlueLinkApi's shared pair: this class
-        // is constructed per call on every tile tap / widget button / watch
-        // command, and a per-call OkHttpClient means a fresh TCP + TLS handshake
-        // every time. Both types are thread-safe and meant to be shared.
+        // is constructed per call on the hot command paths (notification actions,
+        // AutoLock, climate auto-extend), and a per-call OkHttpClient means a
+        // fresh TCP + TLS handshake every time. Both types are thread-safe and
+        // meant to be shared.
         private val sharedJson = Json { ignoreUnknownKeys = true; isLenient = true; coerceInputValues = true }
 
         private val sharedClient: OkHttpClient = OkHttpClient.Builder()

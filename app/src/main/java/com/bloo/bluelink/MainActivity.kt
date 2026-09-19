@@ -24,12 +24,13 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import org.lsposed.hiddenapibypass.HiddenApiBypass
 import rikka.shizuku.Shizuku
+import androidx.core.content.pm.ShortcutManagerCompat
+import com.bloo.bluelink.data.brand
 
 /**
  * The app's single Activity: hosts the Compose UI tree ([BlooApp]) and owns the
  * process-wide setup that only needs to happen once per launch -- scheduling the
- * background workers that keep widgets/watch/tiles fresh, wiring up the screen-off
- * receiver used for app-lock timing, and routing shortcut intents into the ViewModel.
+ * background workers and routing shortcut intents into the ViewModel.
  * All actual screen/business logic lives in [AppViewModel] and the Compose tree; this
  * class is deliberately thin plumbing around the Android Activity lifecycle.
  */
@@ -211,6 +212,31 @@ class MainActivity : FragmentActivity() {
         if (intent?.action != Shortcuts.ACTION) return
         val vin = intent.getStringExtra(Shortcuts.EXTRA_VIN) ?: return
         val cmd = intent.getStringExtra(Shortcuts.EXTRA_CMD) ?: return
+        reportShortcutUsage(vin, cmd)
         viewModel.handleShortcut(vin, cmd)
+    }
+
+    /**
+     * Tell the launcher this shortcut was actually used, so its own ranking can
+     * promote the ones this user really taps over the ones that merely exist.
+     * The id must be the EXACT one [Shortcuts.refresh] registered: "cmd_vin" for a
+     * car shortcut, "bluelink_<brand>" for an "Open the <brand> app" shortcut.
+     *
+     * The brand for that second form is recovered from the CURRENT vehicle list --
+     * if the car list hasn't loaded yet (a cold launch straight from the shortcut),
+     * the id simply isn't reported for that one tap rather than guessing a brand
+     * that could name a different shortcut. Best-effort by design: this is an
+     * analytics nicety, never a reason for a shortcut tap to fail.
+     */
+    private fun reportShortcutUsage(vin: String, cmd: String) {
+        val id = if (cmd == "bluelink") {
+            val brand = runCatching {
+                viewModel.state.value.vehicles.firstOrNull { it.vin == vin }?.brand?.name
+            }.getOrNull() ?: return
+            "bluelink_$brand"
+        } else {
+            "${cmd}_$vin"
+        }
+        runCatching { ShortcutManagerCompat.reportShortcutUsed(this, id) }
     }
 }

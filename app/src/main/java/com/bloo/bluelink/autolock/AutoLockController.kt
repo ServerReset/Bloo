@@ -11,8 +11,8 @@ import com.bloo.bluelink.data.SettingsStore
 import com.bloo.bluelink.data.SnapshotStore
 import com.bloo.bluelink.data.Vehicle
 import com.bloo.bluelink.data.VehicleStatus
-import com.bloo.bluelink.data.WearAction
-import com.bloo.bluelink.data.WearCommand
+import com.bloo.bluelink.data.CarAction
+import com.bloo.bluelink.data.CarCommand
 import com.bloo.bluelink.data.repositoryFor
 import com.bloo.bluelink.data.runCarCommand
 import kotlinx.coroutines.CancellationException
@@ -43,7 +43,7 @@ data class AutoLockEvalState(
  * Single source of truth for AutoLock evaluations, one per VIN. Ported from i5-AutoLock's
  * `AutoLockController` (github.com/Vel-San/i5-AutoLock) onto Bloo's own multi-brand vehicle
  * plumbing: [repositoryFor]/[BlueLinkGate] to read status, [runCarCommand] (the same path
- * the app UI, widgets, QS tiles and the watch already use) to send the lock.
+ * the app UI already uses) to send the lock.
  *
  * A plain object, not a Hilt-injected singleton -- matching how every other cross-cutting
  * background feature in this app (`LiveCharge`, `CarAlerts`, `Notifications`) is a bare
@@ -240,7 +240,7 @@ object AutoLockController {
             }
             return
         }
-        val result = runCatching { runCarCommand(context, WearCommand(vin, WearAction.LOCK)) }.getOrNull()
+        val result = runCatching { runCarCommand(context, CarCommand(vin, CarAction.LOCK)) }.getOrNull()
         if (result?.ok == true) {
             AppLog.log("AutoLock: car locked automatically ($vin).")
             _state.update {

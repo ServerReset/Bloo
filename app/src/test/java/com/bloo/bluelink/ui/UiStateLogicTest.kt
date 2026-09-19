@@ -23,7 +23,7 @@ import kotlin.test.assertTrue
  * These are the "where does this data show up" answers for the whole app --
  * they decide which pebbles render, in what order, and what generation/state
  * machinery each car is assumed to have. A wrong answer here is not a crash;
- * it is a user's car silently missing its charge tile, or a Canadian user
+ * it is a user's car silently missing its charge readout, or a Canadian user
  * being offered the Gen5W connected store, or a Kia being shown a battery
  * it does not have. All are pure Kotlin over plain data -- the 150+ fields
  * construct with defaults -- so they pin exactly like PinLock arithmetic.

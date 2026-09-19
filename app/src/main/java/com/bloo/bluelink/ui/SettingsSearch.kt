@@ -653,7 +653,7 @@ internal fun SearchPill(
         // rather than relying on Surface's own (which applies AFTER this whole
         // caller-supplied modifier, too late to bound a blur added inside it).
         val pillShape = RoundedCornerShape(50)
-        val canBlur = hazeState != null && CanBlurBackdrops()
+        val canBlur = hazeState != null && canBlurBackdrops()
         Surface(
             onClick = { if (!expanded) onFocusChange(true) },
             shape = pillShape,

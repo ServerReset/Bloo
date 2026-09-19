@@ -7,10 +7,10 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 
 /**
- * The shared button-geometry helpers, pulled out of the app(s) so the pill
+ * The shared button-geometry helpers, pulled out of the app so the pill
  * math — the corner percentages, the split-pill seams, the connected-group
- * silhouettes — lives in ONE place and both the phone and the watch build
- * their controls from byte-identical shapes.
+ * silhouettes — lives in ONE place and every phone control builds
+ * from byte-identical shapes.
  */
 
 /** The standard text-field corner, shared by every input in both apps. */

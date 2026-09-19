@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Backup/transfer policy for Android 12+ (the platform replaced the single
+  android:allowBackup flag with these rules; the manifest keeps allowBackup="false"
+  as well, for the API levels that only understand it).
+
+  Bloo opts EVERYTHING out of both cloud backup and device-to-device transfer, which
+  is the explicit, granular spelling of allowBackup="false". That is deliberate for
+  this app, not boilerplate: its SharedPreferences hold the encrypted credential
+  vault and the account/session records, its files hold cached car photos and the
+  snapshot store, and none of that belongs on a backup server or another device.
+  The app already has its own opt-in settings sync (Drive sync) for the subset a
+  user actually means to move, and the encryption key itself lives in the Android
+  Keystore, so a backed-up vault would restore as unreadable bytes anyway: opting
+  out is both the safer and the honest configuration.
+-->
+<data-extraction-rules>
+    <cloud-backup>
+        <exclude domain="root" />
+        <exclude domain="file" />
+        <exclude domain="database" />
+        <exclude domain="sharedpref" />
+        <exclude domain="external" />
+    </cloud-backup>
+    <device-transfer>
+        <exclude domain="root" />
+        <exclude domain="file" />
+        <exclude domain="database" />
+        <exclude domain="sharedpref" />
+        <exclude domain="external" />
+    </device-transfer>
+</data-extraction-rules>

@@ -114,6 +114,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlin.math.max
 import androidx.compose.ui.graphics.toArgb
+import androidx.core.net.toUri
 
 @Composable
 internal fun borderlessFieldColors(): androidx.compose.material3.TextFieldColors {
@@ -324,9 +325,8 @@ internal fun LoginScreen(
                         style = MaterialTheme.typography.labelLarge,
                         color = scheme.onSurface,
                     )
-                    // Brand.brandsForRegion, shared with the watch's own picker --
-                    // which was a hand-written copy of this list, and had silently
-                    // stopped at the three US brands.
+                    // Brand.brandsForRegion is the single source for this list --
+                    // a hand-written copy had silently stopped at the three US brands.
                     val brandOptions = Brand.brandsForRegion(region)
                     MorphSegmented(
                         options = brandOptions.map { b ->
@@ -476,7 +476,7 @@ internal fun LoginScreen(
                                     Brand.KIA_CA -> "https://www.kia.ca/en/owners"
                                     Brand.HYUNDAI_EU -> "https://www.hyundai.com/eu/en/owners.html"
                                 }
-                                context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(forgotUrl)))
+                                context.startActivity(Intent(Intent.ACTION_VIEW, forgotUrl.toUri()))
                             },
                             contentColor = scheme.onSurfaceVariant,
                         )
@@ -829,14 +829,14 @@ internal fun AuroraBackground(
 ) {
     val scheme = MaterialTheme.colorScheme
     // Under battery saver (or pre-S, where the RenderEffect blur below can't run
-    // anyway -- see CanBlurBackdrops' own doc), skip the entire animated blob
+    // anyway -- see canBlurBackdrops' own doc), skip the entire animated blob
     // system: no accelerometer listener, no 12fps drift LaunchedEffect, no
     // full-screen blur. Just this backdrop's own base surface tone as one flat,
     // static fill -- the cheapest possible frame, and the same "flat color
     // instead of a blur" fallback every other piece of glass chrome in the app
     // already uses under battery saver, applied here too since this backdrop was
     // never actually gated on it before.
-    if (!CanBlurBackdrops()) {
+    if (!canBlurBackdrops()) {
         Box(modifier.fillMaxSize().background(scheme.surface))
         return
     }

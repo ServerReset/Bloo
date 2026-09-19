@@ -20,12 +20,12 @@ import android.os.Build
  * with `if (SDK >= O) { ... }`; identical in effect, but the kind of drift that hides a real
  * difference later).
  *
- * Lives in :shared because it is plain framework code (no Compose/Glance/Material), and
+ * Lives in :shared because it is plain framework code (no Compose/Material), and
  * :shared is an `android.library` that already reaches `android.content.Context` and
- * `android.app.*` from its stores — so both consumers can call it.
+ * `android.app.*` from its stores.
  *
- * @param showBadge whether the channel shows a launcher badge; the two alert channels rely
- *   on the platform default (true), the live-charge channel passes false.
+ * @param showBadge whether the channel shows a launcher badge; the alerts channel relies
+ *   on the platform default (true), the live-charge and AutoLock channels pass false.
  */
 fun ensureNotificationChannel(
     context: Context,

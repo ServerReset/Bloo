@@ -65,7 +65,7 @@ internal fun ChargePebble(v: Vehicle, status: VehicleStatus?, enabled: Boolean, 
     // Separate AC (home / level-2) and DC (fast) charge-limit targets, each
     // seeded to a healthy default until the car's real targets load in. The
     // seeds are the shared DEFAULT_*_CHARGE_LIMIT_PCT constants, so the phone
-    // seed can't drift from the watch/wire defaults (this once defaulted BOTH
+    // seed can't drift from the wire defaults (this once defaulted BOTH
     // to 80%, so tapping "Set" before the real DC target loaded pushed it low).
     // Both pills' "Set" sends BOTH values together (setChargeLimits(v,
     // acLimit, dcLimit)), so leaving one un-seeded at a wrong default meant

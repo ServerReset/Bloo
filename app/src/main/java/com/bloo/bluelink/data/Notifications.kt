@@ -7,12 +7,12 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
-import android.net.Uri
 import android.os.Build
 import android.provider.Settings
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
+import androidx.core.net.toUri
 import com.bloo.bluelink.R
 
 /** Posts Bloo's local alerts (service due, door left open, car left running). */
@@ -22,7 +22,7 @@ object Notifications {
     private const val ACCENT = BlooColors.brandAccent
 
     /** A tappable action on an alert that issues a remote command for [vin]. */
-    data class Action(val label: String, val vin: String, val wearAction: String)
+    data class Action(val label: String, val vin: String, val carAction: String)
 
     /**
      * Makes sure the "bloo_alerts" notification channel exists before we ever try
@@ -147,9 +147,9 @@ object Notifications {
             val actionIntent = Intent(context, AlertActionReceiver::class.java).apply {
                 action = AlertActionReceiver.ACTION_RUN
                 // Unique data per (notification, action) so PendingIntents don't collapse.
-                data = Uri.parse("bloo://alert/$id/${a.wearAction}")
+                data = "bloo://alert/$id/${a.carAction}".toUri()
                 putExtra(AlertActionReceiver.EXTRA_VIN, a.vin)
-                putExtra(AlertActionReceiver.EXTRA_ACTION, a.wearAction)
+                putExtra(AlertActionReceiver.EXTRA_ACTION, a.carAction)
                 putExtra(AlertActionReceiver.EXTRA_NOTIF_ID, id)
                 putExtra(AlertActionReceiver.EXTRA_LABEL, a.label)
             }
@@ -266,11 +266,11 @@ object LiveCharge {
     // Deleted below, once, the first time [ensureChannel] runs after this fix ships.
     private val LEGACY_CHANNELS = listOf("bloo_charging", "bloo_charging_v2")
     private const val ACCENT = BlooColors.brandAccent
-    // The one shared charge green (BlooColors.chargeGreen), same as the widget ring, the QS
-    // and watch tiles, and the watch app. This used to be its own 0xFF34C759 -- a brighter,
+    // The one shared charge green (BlooColors.chargeGreen), used by every charge readout on the
+    // phone. This used to be its own 0xFF34C759 -- a brighter,
     // Apple-style green that had drifted from the canonical token, so the live-charge bar (the
     // one charge surface that actively interrupts the user) showed a different green from every
-    // glanceable surface. Consolidated so a future palette change moves all of them together.
+    // other charge surface. Consolidated so a future palette change moves all of them together.
     private const val CHARGE_GREEN = BlooColors.chargeGreen
     // The bar's "topped up" fill, once the pack is at (or past) its own configured
     // limit -- the same shared token every other surface that draws this bar now uses.
@@ -281,7 +281,7 @@ object LiveCharge {
     // not just half -- half turned out too close to TRACK to read as a second, dimmer
     // zone once actually rendered on a real device (see the phone's ChargeSegmentBar
     // for the same finding there); NotificationCompat.ProgressStyle has no explicit
-    // inter-segment gap to fall back on the way the phone/widget bars do, so the
+    // inter-segment gap to fall back on the way the phone bars do, so the
     // colour step here has to carry the whole distinction on its own.
     private const val TRACK_DIM = 0x14FFFFFF
 
@@ -422,9 +422,16 @@ object LiveCharge {
      * spells out the manual Samsung path too rather than claiming this one request
      * covers everything.
      */
+    // @SuppressLint("BatteryLife"): lint flags ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS as
+    // a Play Content Policy risk. That policy governs Play-distributed apps; Bloo is
+    // sideloaded from a GitHub Release, and AutoLock (the only caller) genuinely cannot work
+    // from a Doze-suspended process -- its whole job is reacting to leaving the car. The
+    // documented flow still falls back to the general battery-optimization settings screen
+    // when the direct request is refused (see below), so a user who declines is never stuck.
+    @android.annotation.SuppressLint("BatteryLife")
     fun requestBackgroundUnrestricted(context: Context) {
         val intent = Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS)
-            .setData(Uri.parse("package:${context.packageName}"))
+            .setData("package:${context.packageName}".toUri())
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         if (runCatching { context.startActivity(intent); true }.getOrDefault(false)) return
         val fallback = Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS)
@@ -637,9 +644,9 @@ object LiveCharge {
         }
         val stopIntent = Intent(context, AlertActionReceiver::class.java).apply {
             action = AlertActionReceiver.ACTION_RUN
-            data = Uri.parse("bloo://live_charge/$vin")
+            data = "bloo://live_charge/$vin".toUri()
             putExtra(AlertActionReceiver.EXTRA_VIN, vin)
-            putExtra(AlertActionReceiver.EXTRA_ACTION, WearAction.CHARGE_OFF)
+            putExtra(AlertActionReceiver.EXTRA_ACTION, CarAction.CHARGE_OFF)
             putExtra(AlertActionReceiver.EXTRA_NOTIF_ID, id)
             // The confirmation must NOT land on `id`. That is this bar's own id, and
             // LiveCharge.sync posts, updates and cancels it on every 5-minute poll -- so a
@@ -661,7 +668,7 @@ object LiveCharge {
         // otherwise have one overwrite the other's extras).
         val dismissIntent = Intent(context, AlertActionReceiver::class.java).apply {
             action = AlertActionReceiver.ACTION_LIVE_CHARGE_DISMISSED
-            data = Uri.parse("bloo://live_charge_dismissed/$vin")
+            data = "bloo://live_charge_dismissed/$vin".toUri()
             putExtra(AlertActionReceiver.EXTRA_VIN, vin)
         }
         val dismissPi = PendingIntent.getBroadcast(
@@ -813,7 +820,7 @@ object CarAlerts {
             // due-ness at all (rather than treating it as "not due"). nextServiceMiles
             // is the shared formula -- this was a third inline `last + interval`, the
             // exact re-inlining that helper's KDoc warns against, and the one the phone
-            // pebble and wear card both already route through.
+            // pebble already routes through.
             val due = if (last != null && interval != null) nextServiceMiles(last, interval) else null
             // serviceDue returns raw signed miles remaining ((last+interval) - odo),
             // or null if any input is unknown. `remaining <= 0` is exactly the
@@ -823,8 +830,8 @@ object CarAlerts {
             if (remaining != null && remaining <= 0) {
                 if (canDeliver && !settings.alertFired(key)) {
                     // formatDistance, not a bare "mi". This notification stated miles to a
-                    // metric user while the phone service pebble and the wear service card
-                    // (both formatDistance) showed the same figures in km -- so the one
+                    // metric user while the phone service pebble (also formatDistance)
+                    // showed the same figures in km -- so the one
                     // surface that interrupts you was the one in the wrong unit.
                     val metric = settings.unitSystem() == "metric"
                     // odo and due are both non-null in this branch (remaining != null requires
@@ -883,7 +890,7 @@ object CarAlerts {
                         doorId(v),
                         "${v.name} door is open",
                         "A door/trunk/hood has been open for over ${prefs.doorOpenMinutes} min.",
-                        actions = listOf(Notifications.Action("Lock", v.vin, WearAction.LOCK)),
+                        actions = listOf(Notifications.Action("Lock", v.vin, CarAction.LOCK)),
                     )
                     settings.setAlertFired(key, true)
                 }
@@ -930,7 +937,7 @@ object CarAlerts {
                         unlockedId(v),
                         "${v.name} is unlocked",
                         "It's been left unlocked for over ${prefs.unlockedMinutes} min.",
-                        actions = listOf(Notifications.Action("Lock", v.vin, WearAction.LOCK)),
+                        actions = listOf(Notifications.Action("Lock", v.vin, CarAction.LOCK)),
                     )
                     settings.setAlertFired(key, true)
                 }
@@ -982,7 +989,7 @@ object CarAlerts {
                         } else {
                             "The engine/climate has been running for over ${prefs.runningMinutes} min."
                         },
-                        actions = listOf(Notifications.Action("Turn off", v.vin, WearAction.CLIMATE_OFF)),
+                        actions = listOf(Notifications.Action("Turn off", v.vin, CarAction.CLIMATE_OFF)),
                     )
                     settings.setAlertFired(key, true)
                 }

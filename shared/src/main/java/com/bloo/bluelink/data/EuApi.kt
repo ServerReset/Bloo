@@ -431,9 +431,9 @@ class EuApi(private val brand: Brand) {
             // documents that its `charging = false` means exactly that and never "we don't know",
             // and it acts on it: it cancels the live charging notification, clears the dismissal
             // flag, and LiveChargePollWorker ends its 5-minute chain. Meanwhile the snapshot
-            // keeps charging = true through `evStatus?.batteryCharge ?: charging`, so the widget
-            // still shows a green ring and TOGGLE_CHARGE resolves to CHARGE_OFF -- three surfaces
-            // disagreeing, all from one parse.
+            // keeps charging = true through `evStatus?.batteryCharge ?: charging`, so the
+            // snapshot-driven UI still shows a green ring and TOGGLE_CHARGE resolves to
+            // CHARGE_OFF -- surfaces disagreeing, all from one parse.
             //
             // A remaining-time estimate is evidence of charging when present and positive, and
             // evidence of nothing at all otherwise: cars stop reporting it near the top of a

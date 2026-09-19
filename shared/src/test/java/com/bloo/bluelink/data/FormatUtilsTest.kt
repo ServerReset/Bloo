@@ -96,7 +96,7 @@ class FormatUtilsTest {
     @Test
     fun tripDate_reusesCachedFormattersWithoutCarryingStateBetweenCalls() {
         // tripDate now holds its SimpleDateFormats in ThreadLocals instead of building
-        // three of them per call, which is a real speedup on the watch's trips list but
+        // three of them per call, which is a real speedup on the phone's trips list but
         // introduces a risk the old code could not have: SimpleDateFormat is stateful,
         // so a reused instance that carried anything between calls would corrupt later
         // rows. These pin that it does not.

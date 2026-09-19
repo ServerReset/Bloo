@@ -5,8 +5,8 @@ import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 /**
- * Pure-JVM tests for [shouldRelockAfter], the app-lock re-lock timing rule shared by the
- * phone's biometric lock and the watch's PIN lock.
+ * Pure-JVM tests for [shouldRelockAfter], the app-lock re-lock timing rule used by the
+ * phone's biometric lock.
  *
  * This is security-adjacent: the whole point of a timed lock is that it re-engages after the
  * configured delay, so the threshold boundaries are the contract worth pinning. A regression

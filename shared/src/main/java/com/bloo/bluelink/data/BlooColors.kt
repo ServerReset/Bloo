@@ -1,11 +1,10 @@
 package com.bloo.bluelink.data
 
 /**
- * Semantic color constants shared across all surfaces: phone app, watch app,
- * widget (Glance), QS tiles, and watch complications.
+ * Semantic color constants shared across the phone app's surfaces.
  *
- * Stored as ARGB Int so callers in non-Compose contexts (Glance, Protolayout)
- * can use them directly. Compose callers wrap with Color(BlooColors.chargeGreen).
+ * Stored as ARGB Int so callers in non-Compose contexts (e.g. the notification
+ * builders) can use them directly. Compose callers wrap with Color(BlooColors.chargeGreen).
  */
 object BlooColors {
     // Each constant is a packed 32-bit ARGB value (alpha in the top byte, then
@@ -23,5 +22,5 @@ object BlooColors {
     const val tempHot         = 0xFFFF5722.toInt() // high temperature alert color
     const val climateTeal     = 0xFF5DA3A3.toInt() // neutral climate-control accent color
     const val warn            = 0xFFF5A623.toInt() // generic warning/caution color
-    const val brandAccent     = 0xFF7B83EB.toInt() // Bloo brand accent: notification tint, tile fallback primary
+    const val brandAccent     = 0xFF7B83EB.toInt() // Bloo brand accent: notification tint
 }

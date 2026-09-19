@@ -4,7 +4,7 @@ import androidx.compose.ui.geometry.Rect
 
 /**
  * The pure rules behind the app's floating chrome -- the elements drawn OVER a page rather than
- * in its scroll flow (the car name once it docks into its pill, the page dots, corner buttons).
+ * in its scroll flow (corner buttons, the search bubble, the refresh indicator).
  *
  * Two questions, both of which used to be arithmetic inlined into whichever component happened to
  * ask first: "has this thing scrolled far enough to become floating?" ([shouldDock], lifted out of
@@ -36,7 +36,7 @@ fun shouldDock(topPx: Float, dockLinePx: Float, currentlyDocked: Boolean, hyster
     if (currentlyDocked) topPx < dockLinePx + hysteresisPx else topPx < dockLinePx
 
 /** Whether two pieces of floating chrome overlap, with [marginPx] of slop around [b] -- so a
- *  name ellipsizing right up against the page dots' edge still counts as being in the way,
+ *  name ellipsizing right up against a neighbouring chip's edge still counts as being in the way,
  *  without literal pixel overlap. Pure and non-composable, so a caller can run it every frame
  *  (from a draw block, or a derivedStateOf) without touching composition. A null rect means
  *  "not on screen / nothing measured yet", which never collides.
@@ -46,9 +46,8 @@ fun shouldDock(topPx: Float, dockLinePx: Float, currentlyDocked: Boolean, hyster
  *  where the JVM tests that pin its boundary behaviour can reach it. */
 fun floatersOverlap(a: Rect?, b: Rect?, marginPx: Float): Boolean {
     if (a == null || b == null) return false
-    // Vertical gate first -- floating elements usually sit on different rows (an inline name
-    // sits well below the dots' fixed top row; only a DOCKED pill, or one mid-flight toward
-    // it, climbs high enough to matter), so most calls bail out here.
+    // Vertical gate first -- floating elements usually sit on different rows, so most calls
+    // bail out here.
     if (b.bottom < a.top || b.top > a.bottom) return false
     return b.right + marginPx >= a.left && b.left - marginPx <= a.right
 }

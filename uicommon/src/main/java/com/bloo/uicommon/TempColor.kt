@@ -16,7 +16,7 @@ import com.bloo.bluelink.data.BlooColors
  * that had drifted from [BlooColors]' own cool/tempMid/tempHot constants
  * (which turn out to be exactly the intended canonical values -- phone's
  * cool and watch's mid/warm had each drifted a stop away from them). The
- * watch's version also wasn't animated at all; both now spring the same way.
+ * watch's version also wasn't animated at all; the phone's now springs.
  */
 @Composable
 fun tempColor(tempF: Int, rangeStart: Float = 62f, rangeEnd: Float = 82f): Color {

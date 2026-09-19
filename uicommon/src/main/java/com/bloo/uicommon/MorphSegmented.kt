@@ -60,18 +60,18 @@ import kotlinx.coroutines.delay
 import kotlin.math.abs
 import kotlin.math.roundToInt
 
-/** One option in a [MorphSegmented] control. [icon] is optional (watch omits it). */
+/** One option in a [MorphSegmented] control. [icon] is optional. */
 data class SegmentOption(val key: String, val label: String, val icon: ImageVector? = null)
 
 /**
- * Bloo's full-width segmented selector, shared between phone (:app) and watch
- * (:wear) so the drag/tap gesture and sliding-highlight rendering live in exactly
+ * Bloo's full-width segmented selector, used by the phone UI so the drag/tap
+ * gesture and sliding-highlight rendering live in exactly
  * one place. A tonal track whose active segment fills with [indicatorColor] and
  * morphs to a rounded square, the rest staying pill-calm; drag it and the
  * highlight bounces to wherever you let go, or tap a segment to jump there.
  *
  * Callers supply all colour/typography/haptic context as parameters so this
- * module stays neutral to compose.material3 vs wear.compose.material3.
+ * module stays neutral to the surrounding theme.
  *
  * @param onTick Called each time the selection actually changes (for a haptic).
  * @param options The segments to render, in display order; each becomes one
@@ -423,9 +423,8 @@ fun MorphSegmented(
                         contentAlignment = Alignment.Center,
                     ) {
                         Row(horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
-                            // Only rendered when the option supplies an icon (the watch
-                            // build typically omits icons entirely, see SegmentOption's
-                            // doc). Icon grows slightly and gets more breathing room from
+                            // Only rendered when the option supplies an icon, see
+                            // SegmentOption's doc. Icon grows slightly and gets more breathing room from
                             // the label when selected, echoing the same "active choice
                             // reads bigger/bolder" treatment as the label's font weight
                             // below.

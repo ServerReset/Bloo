@@ -1,6 +1,7 @@
 package com.bloo.bluelink.ui
 
 import android.content.Context
+import androidx.core.content.edit
 
 /**
  * Tracks recently used commands for quick access in the search interface.
@@ -42,14 +43,14 @@ internal class RecentCommandsTracker(private val context: Context) {
 
         // Keep only the limit
         val updated = recent.take(RECENT_COMMANDS_LIMIT)
-        prefs.edit().putString(RECENT_COMMANDS_KEY, updated.joinToString("|")).apply()
+        prefs.edit { putString(RECENT_COMMANDS_KEY, updated.joinToString("|")) }
     }
 
     /**
      * Clear all recent command history.
      */
     fun clear() {
-        prefs.edit().clear().apply()
+        prefs.edit { clear() }
     }
 }
 

@@ -36,6 +36,8 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonObject
+import androidx.core.net.toUri
+import androidx.core.graphics.scale
 
 // A corruption handler so a settings file damaged by an interrupted write / power
 // loss resets to empty prefs instead of rethrowing IOException out of every read
@@ -45,9 +47,9 @@ private val Context.settingsDataStore by preferencesDataStore(
     corruptionHandler = ReplaceFileCorruptionHandler { emptyPreferences() },
 )
 
-// Process-wide serialization for performMainToMainSync(): the periodic worker, the
-// auto-sync-on-refresh collector, and a watch-requested sync can all fire at
-// nearly the same moment, and SettingsStore is instantiated fresh at each call
+// Process-wide serialization for performMainToMainSync(): the periodic worker and the
+// auto-sync-on-refresh collector can both fire at nearly the same moment, and
+// SettingsStore is instantiated fresh at each call
 // site (not a singleton) — a per-instance lock wouldn't serialize anything, so
 // this lives at module scope instead, same pattern as BlueLinkGate.statusMutex.
 private val mainToMainSyncMutex = Mutex()
@@ -141,8 +143,7 @@ val LockTiming.wireKey: String
 // "climate" ahead of "ai": pre-heating/cooling the car before walking out to
 // it is the single most common "glance and go" action this app exists for,
 // while AI summary is a passive, network-dependent read -- the old order put
-// a "Summarize" button ahead of every actual control on both phone and watch
-// (the watch's tile order mirrors this list) for anyone who hasn't
+// a "Summarize" button ahead of every actual control for anyone who hasn't
 // customized their section order.
 val DEFAULT_SECTIONS = listOf("summary", "update", "controls", "charge", "climate", "ai", "info", "location", "trips", "diagnostics")
 
@@ -346,7 +347,7 @@ class SettingsStore(private val context: Context) {
             auroraMotion = prefs[Keys.AURORA_MOTION] ?: "static",
             unitSystem = prefs[Keys.UNIT_SYSTEM] ?: "imperial",
             // Shared rule -- see FormatUtils.useFahrenheit for why this stopped being
-            // written out here and on the watch separately.
+            // written out separately per surface.
             useFahrenheit = useFahrenheit(prefs[Keys.UNIT_SYSTEM]),
             pebbleOutline = prefs[Keys.PEBBLE_OUTLINE]?.toBooleanStrictOrNull() ?: false,
             coverSettingsHintDismissed = prefs[Keys.COVER_SETTINGS_HINT]?.toBooleanStrictOrNull() ?: false,
@@ -1357,9 +1358,9 @@ class SettingsStore(private val context: Context) {
      * a fresh timestamp.
      *
      * This is the ONE place this logic lives — it used to be duplicated between
-     * the phone's auto-sync-on-refresh collector and the watch's on-demand
-     * "Sync now" request, which is exactly how a bug (this device's own Drive URI
-     * leaking into the portable export) existed in two copies at once.
+     * the auto-sync-on-refresh collector and the on-demand "Sync now" request,
+     * which is exactly how a bug (this device's own Drive URI leaking into the
+     * portable export) existed in two copies at once.
      */
     /**
      * The last-modified time a Storage Access Framework document reports, in epoch millis, or
@@ -1381,9 +1382,9 @@ class SettingsStore(private val context: Context) {
     }.getOrNull()
 
     suspend fun performMainToMainSync(): MainToMainSyncOutcome = mainToMainSyncMutex.withLock {
-        // The periodic worker, the auto-sync-on-refresh collector, and a
-        // watch-requested sync can all fire within moments of each other with
-        // no coordination otherwise -- this mutex makes them run one at a time
+        // The periodic worker and the auto-sync-on-refresh collector can both fire
+        // within moments of each other with no coordination otherwise -- this mutex
+        // makes them run one at a time
         // instead of racing to read/merge/upload the same Drive file.
         val uri = syncUri() ?: return@withLock MainToMainSyncOutcome(ran = false, imported = false, uploaded = false, syncedAtMs = lastSyncMs())
         if (syncWifiOnly()) {
@@ -1395,7 +1396,7 @@ class SettingsStore(private val context: Context) {
                 return@withLock MainToMainSyncOutcome(ran = false, imported = false, uploaded = false, syncedAtMs = lastSyncMs())
             }
         }
-        val parsed = android.net.Uri.parse(uri)
+        val parsed = uri.toUri()
         // Installed-base migration seed: `sync_synced_ever` is a brand-new key, so
         // it's false on every device that ALREADY synced this file under the old
         // (mtime-only) scheme. Without this, that device's first post-update pass
@@ -1412,7 +1413,7 @@ class SettingsStore(private val context: Context) {
         // call (Drive app backgrounded, flaky network) previously had no
         // bound at all and could hang this coroutine indefinitely while still
         // holding mainToMainSyncMutex, blocking every other sync path (the worker,
-        // the refresh collector, a watch-requested sync) until it resolved.
+        // the refresh collector) until it resolved.
         // withDriveRetry: one immediate retry so a single transient blip
         // (momentary network hiccup, Drive app briefly waking up) doesn't
         // force waiting for the periodic worker's own backoff or the next
@@ -1691,7 +1692,7 @@ class SettingsStore(private val context: Context) {
      */
     suspend fun testSyncRoundTrip(): SyncTestResult {
         val uri = syncUri() ?: return SyncTestResult(false, "Drive sync isn't set up yet.")
-        val parsed = android.net.Uri.parse(uri)
+        val parsed = uri.toUri()
         // 1. Confirm we still hold a persisted read+write grant for this file.
         val granted = runCatching {
             context.contentResolver.persistedUriPermissions.any {
@@ -2218,7 +2219,7 @@ class SettingsStore(private val context: Context) {
         try {
             val scale = SYNCED_PHOTO_MAX_DIM.toFloat() / maxOf(decoded.width, decoded.height)
             val resized = if (scale < 1f) {
-                Bitmap.createScaledBitmap(decoded, (decoded.width * scale).toInt().coerceAtLeast(1), (decoded.height * scale).toInt().coerceAtLeast(1), true)
+                decoded.scale((decoded.width * scale).toInt().coerceAtLeast(1), (decoded.height * scale).toInt().coerceAtLeast(1))
             } else decoded
             val out = java.io.ByteArrayOutputStream()
             resized.compress(Bitmap.CompressFormat.JPEG, 78, out)
@@ -2262,8 +2263,8 @@ class SettingsStore(private val context: Context) {
         // exactly the shape Coil's default File-model cache key can't tell apart: a second
         // import that overwrites car_$vin_synced.jpg with genuinely different bytes still hits
         // whatever Coil already decoded and cached for that identical path, in-process, without
-        // ever reading the new file. This is the same "same path, new content" gap the watch's
-        // WearPhotoEvents fix closed for its own hand-rolled decode -- this app's actual image
+        // ever reading the new file. A hand-rolled BitmapFactory decode would hit the same
+        // "same path, new content" gap -- this app's actual image
         // loads go through Coil (rememberPhotoModel in Hero.kt) instead of a manual
         // BitmapFactory decode, so the fix here is Coil's own cache, not a produceState key.
         // A blanket clear() rather than targeting just these VINs' keys: constructing Coil's
@@ -2292,7 +2293,7 @@ class SettingsStore(private val context: Context) {
      *
      * Safe by construction, and deliberately NOT the per-VIN pref garbage collection the
      * same leak invites. `img_$vin` is the ONLY preference that holds a local photo path
-     * (`photo_$vin` looks like a second one but is a Wear DataMap asset key, not a pref),
+     * (a `photo_$vin` Wear DataMap asset key, since removed with the watch, was not a pref),
      * so a file absent from that set cannot be displayed by anything -- there is no code
      * path that could reach it. Crucially this makes the decision independent of the
      * VEHICLE LIST: purging prefs for "cars that disappeared" would risk destroying a

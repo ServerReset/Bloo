@@ -42,8 +42,8 @@ class BlueLinkApi(private val brand: Brand = Brand.HYUNDAI) {
         // PROCESS-WIDE, not per-instance. Nothing about either object is
         // brand-specific (base URL, host and credentials all travel per-request),
         // and this class is constructed per call on the hot out-of-app paths —
-        // every Quick Settings tile tap, every widget button, every watch command,
-        // every alert-worker tick. A per-call OkHttpClient carries its own
+        // every notification action, every AutoLock command, every climate
+        // auto-extend, every alert-worker tick. A per-call OkHttpClient carries its own
         // Dispatcher/ExecutorService, ConnectionPool and route database, so those
         // paths got ZERO TLS or connection reuse: a full TCP + TLS handshake for
         // every single command. OkHttpClient is explicitly designed to be shared

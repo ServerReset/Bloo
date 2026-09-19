@@ -128,8 +128,8 @@ internal fun TripRow(trip: EvTrip, metric: Boolean = false) {
             }
         }
         val pace = remember(trip, metric) { buildList {
-            // Same fmtMinutes the watch's Trips screen uses for these two exact
-            // fields -- without it, one trip read "95 min" here and "1h 35m" there.
+            // fmtMinutes for these two exact fields -- without it, one trip read
+            // "95 min" instead of the friendlier "1h 35m".
             trip.driveMinutes?.let { add(fmtMinutes(it)) }
             trip.idleMinutes?.takeIf { it > 0 }?.let { add("${fmtMinutes(it)} idle") }
             // formatSpeedMph, not formatSpeed: these are mph (EvTrip's KDoc, corroborated

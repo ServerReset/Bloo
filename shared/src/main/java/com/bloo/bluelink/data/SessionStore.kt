@@ -10,9 +10,9 @@ import kotlinx.coroutines.flow.first
 
 // A corruption handler so a file damaged by an interrupted write/power loss
 // resets to empty prefs (signed out) instead of rethrowing an uncaught
-// exception out of every read — every surface (app, widget, tiles, watch
-// bridge) reads this at some point, and a crash loop is worse than a forced
-// re-login.
+// exception out of every read — every surface (the app UI, the background
+// workers, the command runners) reads this at some point, and a crash loop is
+// worse than a forced re-login.
 private val Context.dataStore by preferencesDataStore(
     name = "bloo_session",
     corruptionHandler = ReplaceFileCorruptionHandler { emptyPreferences() },

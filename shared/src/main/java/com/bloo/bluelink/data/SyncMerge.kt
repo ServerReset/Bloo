@@ -88,7 +88,8 @@ object SyncMerge {
      *                      timestamp an open/running/unlocked episode began — comparing
      *                      it against another device's clock domain makes the
      *                      elapsed-time threshold fire early/late.
-     *   - `tile_refreshed_*` : the per-car tile live-refresh throttle stamp — a peer's
+     *   - `tile_refreshed_*` : the per-car live-refresh throttle stamp left by the
+     *                      since-removed tiles — a peer's
      *                      stamp would wrongly suppress this device's own refresh.
      *  Excluding them also keeps the portable content hash stable across alert/refresh
      *  ticks (otherwise every 30-min alert poll churned the hash and forced a re-upload). */

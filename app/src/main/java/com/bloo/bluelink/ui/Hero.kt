@@ -295,8 +295,7 @@ internal fun HeroHeader(
             growTitleOnExpand = true,
             // No `summary` string. The bar below IS the summary now, and it is the real
             // one -- restating "82% - 241 mi" as header text beside a bar showing the same
-            // thing is how the same numbers get rendered twice and then drift, which is a
-            // bug I already had to fix on the widget's MEDIUM tiers.
+            // thing is how the same numbers get rendered twice and then drift.
             // The photo is the card's BACKGROUND now, not a body child, so it runs up
             // behind the header row and the title and chevron overlay its top. Collapsing
             // it is the same shared transition as before -- the only change is which layer
@@ -655,34 +654,6 @@ internal fun carTonalBrush(scheme: ColorScheme): Brush {
     return Brush.linearGradient(colors)
 }
 
-/** The clipped square thumbnail used for a car: the set photo if there is one,
- *  else the [carTonalBrush] fallback with a centered car icon. [cornerRadius]
- *  and [iconSize] vary per caller (the settings card vs. the tiles header). */
-@Composable
-internal fun CarThumb(img: String?, size: Dp, cornerRadius: Dp, iconSize: Dp) {
-    val scheme = MaterialTheme.colorScheme
-    Box(
-        modifier = Modifier.size(size).clip(RoundedCornerShape(cornerRadius)),
-        contentAlignment = Alignment.Center,
-    ) {
-        if (!img.isNullOrBlank()) {
-            AsyncImage(
-                model = rememberPhotoModel(img),
-                contentDescription = null,
-                contentScale = ContentScale.Crop,
-                modifier = Modifier.fillMaxSize(),
-            )
-        } else {
-            Box(
-                Modifier.fillMaxSize().background(carTonalBrush(scheme)),
-                contentAlignment = Alignment.Center,
-            ) {
-                Icon(Icons.Filled.DirectionsCar, contentDescription = null, tint = scheme.onPrimary, modifier = Modifier.size(iconSize))
-            }
-        }
-    }
-}
-
 /** The Coil model for a stored car photo: a [java.io.File] for a locally-cropped
  *  absolute path, or the raw URL string for a pasted one. */
 @Composable
@@ -698,8 +669,7 @@ internal fun rememberPhotoModel(url: String): Any =
  *
  * Contrast, not decoration. Every element overlaid on the hero -- title, chevron, the whole
  * charge readout -- sits on an arbitrary car photo, and against a light car they all
- * disappear. The widget hit the same problem and solved it with a luminance check on the
- * resolved accent; a scrim is the cheap version and is what the hero does.
+ * disappear. A scrim under the text is the cheap, reliable answer and is what the hero does.
  *
  * The gradient covers the FULL height and never reaches transparent. An earlier version
  * scrimmed only the top strip and faded to clear by 45%, on the assumption that only the

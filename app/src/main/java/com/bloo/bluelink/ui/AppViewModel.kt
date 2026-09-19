@@ -68,6 +68,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import androidx.core.net.toUri
 
 
 /**
@@ -658,10 +659,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 // Wipe account-derived telemetry from disk on full sign-out: the
                 // last-known car GPS/lock/charge state and reverse-geocoded place
                 // names persist as plaintext JSON and would otherwise re-load into
-                // the UI (and keep the widget/tiles rendering the last location) on
-                // the next cold start. Session tokens + credentials are already
-                // cleared above; this closes the derived-location leak. Mirrors the
-                // watch's own signOutAll (snapshotStore.saveVehicles(emptyList())).
+                // the UI on the next cold start. Session tokens + credentials are
+                // already cleared above; this closes the derived-location leak.
                 runCatching { statusCache.clear() }
                 runCatching { snapshotStore.saveVehicles(emptyList()) }
                 // AutoLock config is account-derived too (it's keyed by VIN): a car left
@@ -682,7 +681,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 // and no error, until the user found pull-to-refresh.
                 //
                 // Belongs exactly here, beside the other two things being cleared because the
-                // account is gone. The watch's own signOutAll already resets its equivalent.
+                // account is gone.
                 sessionFetched.clear()
                 // Preserve everything that is NOT account state across the full reset.
                 //
@@ -1107,7 +1106,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         // car's identity and nothing about its state, and saveVehicles replaces the payload
         // wholesale -- it used to blank percent, range, lock, charge, climate, engine,
         // location and fetchedAt for every car on disk on every cold start, login and
-        // pull-to-refresh, and fetchedAt = 0 tripped the widget's stale gate on the way.
+        // pull-to-refresh, and fetchedAt = 0 tripped the stale gate on the way.
         // persistSnapshots() gets the same result by passing the in-memory status cache;
         // deliberately NOT copied here, because that cache is restored on its own
         // viewModelScope.launch and whether it has landed by now is a race. The store carries
@@ -1121,8 +1120,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         // keepingStatusOf carries the STATUS fields forward but not this one, so the false
         // stuck.
         //
-        // The widget, all twelve QS tiles, the Wear tile and the complications read that same
-        // file, so an EV got its gauge labelled "Fuel" and its battery-only actions dropped.
+        // Every surface fed from that same file read the wrong powertrain, so an EV got its
+        // gauge labelled "Fuel" and its battery-only actions dropped.
         // persistSnapshots() later repairs it -- but only when a status fetch actually returns
         // something, because it sits inside `s?.let`. With cars asleep (null status) or the
         // network down, the wrong value stood for the whole session.
@@ -1513,8 +1512,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     fun collapse() = _state.update { it.copy(expandedIndex = null) }
 
     /**
-     * Handle an app-icon shortcut (or, later, a "open app + run" quick tile). If
-     * the garage isn't loaded yet the request is queued and run once it is.
+     * Handle an app-icon shortcut. If the garage isn't loaded yet the request is
+     * queued and run once it is.
      */
     fun handleShortcut(vin: String, cmd: String) {
         pendingShortcut = vin to cmd
@@ -1528,9 +1527,9 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         val idx = _state.value.vehicles.indexOf(v)
         if (idx >= 0) selectIndex(idx)
         // selectIndex only updates which car is current, not which screen is
-        // showing -- tapping a car-specific widget while the app was sitting
+        // showing -- tapping a car-specific shortcut while the app was sitting
         // on Settings (or any other screen) previously selected the right car
-        // underneath without ever bringing it into view. A widget/shortcut
+        // underneath without ever bringing it into view. A shortcut
         // tap always means "look at this car," so force back to the garage.
         _state.update { it.copy(screen = Screen.Garage, expandedIndex = null) }
         val status = _state.value.statusFor(v)
@@ -1561,7 +1560,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         val launch = ctx.packageManager.getLaunchIntentForPackage(links.appPackage)
             ?: android.content.Intent(
                 android.content.Intent.ACTION_VIEW,
-                android.net.Uri.parse(links.playStoreUrl),
+                links.playStoreUrl.toUri(),
             )
         runCatching {
             ctx.startActivity(launch.apply { addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK) })
@@ -1902,17 +1901,15 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     private val pendingPublishes = mutableMapOf<String, Job>()
 
     /**
-     * Publish to the watch, tiles and widgets after [textFieldPublishDebounceMs] of quiet
-     * on [key], superseding any publish still pending for that same key.
+     * Publish after [textFieldPublishDebounceMs] of quiet on [key], superseding any
+     * publish still pending for that same key.
      *
      * This exists because three settings are edited through raw `onValueChange` text
      * fields -- licence plate, last-service miles, service interval -- and each one used
      * to run the full [persistSnapshots] fan-out on every single typed character. That
-     * is a full snapshot re-encode and disk commit, a blocking Data Layer round trip to
-     * the watch for state plus another for auth, and a poke to all twelve Quick Settings
-     * tile services, each of which then re-reads preferences and re-decodes the whole
-     * snapshot payload to repaint. Typing a seven-character plate did all of that seven
-     * times.
+     * is a full snapshot re-encode and disk commit, then a re-read and re-decode of the
+     * whole snapshot payload by every interested surface. Typing a seven-character plate
+     * did all of that seven times.
      *
      * What is NOT debounced, deliberately: the `_state` update (so the field the user is
      * typing in stays responsive) and the SettingsStore write itself (so the value is
@@ -2033,7 +2030,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         }
         // Store write immediate (durability), cross-surface publish debounced -- see
         // publishDebounced. Still republishes rather than waiting for the next status
-        // refresh to happen to rebuild the watch's Info tile; just not once per keypress.
+        // refresh to rebuild the snapshot; just not once per keypress.
         viewModelScope.launch { settingsStore.setLicensePlate(vin, plate) }
         publishDebounced("plate:$vin")
     }
@@ -2644,7 +2641,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             // Blue Link rejects overlapping requests ("a previous request is pending"),
             // and an unlocked trips() call could also race a concurrent 401 refresh
             // using the same stale refresh token. Every other repo.* path takes this
-            // lock (loadStatus/runCommand/loadGarage + the watch's own loadTrips); this
+            // lock (loadStatus/runCommand/loadGarage/loadTrips); this
             // was the lone gap. Only the network call is inside the lock — the filter
             // and result handling stay outside, matching loadStatus's minimal scope.
             val fetched = runCatching { statusMutex.withLock { repoFor(v).trips(v) } }
@@ -2666,7 +2663,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     private val climateSaveJobs = mutableMapOf<String, kotlinx.coroutines.Job>()
 
     /**
-     * Debounced persist + watch-mirror of the live climate draft. Lives in
+     * Debounced persist + cross-composition mirror of the live climate draft. Lives in
      * viewModelScope on purpose: a LaunchedEffect-side debounce is cancelled when
      * the ClimatePebble leaves composition (cover-screen tile swipe, car switch,
      * collapse), silently dropping any change made in the final 400ms - the
@@ -2686,8 +2683,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     // UiState.climatePresets immediately so the UI updates without waiting on
     // disk I/O, then persist the same change to SettingsStore asynchronously.
     // The [_state.map { it.climatePresets }...] collector in init mirrors the
-    // result to the watch, so none of these need to publish to the watch
-    // themselves.
+    // result, so none of these need to publish it themselves.
 
     /** Save the current climate draft as a new named preset (a fresh
      *  timestamp-based id, so presets never collide even if named the same). */
@@ -2719,9 +2715,9 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     /**
-     * Mirror this car's live climate draft + active preset to the watch. Skips the
-     * write when nothing changed, so state received *from* the watch doesn't echo
-     * straight back and loop.
+     * Mirror this car's live climate draft + active preset to the cross-composition
+     * state. Skips the write when nothing changed, so state received from another
+     * live composition doesn't echo straight back and loop.
      */
     fun publishClimateState(vin: String, presetId: String?, req: ClimateRequest) {
         val cs = req.toClimateSync(presetId)
@@ -2843,7 +2839,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 persistCache()
                 // persistCache() writes the PHONE's own status cache (statusCache) so the
                 // next cold start shows this fix. It does not touch SnapshotStore, which is
-                // what the widget, the watch and the QS tiles read -- so Locate updated the
+                // what the snapshot surfaces read -- so Locate updated the
                 // map on screen and nothing else, until the next status refresh happened to
                 // run persistSnapshots() for another reason. Publish it here too.
                 persistSnapshots()
@@ -3000,7 +2996,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
      *
      * Starting climate needs a whole [ClimateRequest]; every other one-tap
      * surface resolves that the same way, from the car's last-saved settings (see
-     * [com.bloo.bluelink.data.WearAction.TOGGLE_CLIMATE]). This does the same
+     * [com.bloo.bluelink.data.CarAction.TOGGLE_CLIMATE]). This does the same
      * rather than inventing a second answer, falling back to a plain 72F /
      * 10-minute run only when the car has never had climate configured at all.
      */
@@ -3040,8 +3036,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             v.vin, "chargeLimit", "Charge limits set (AC $acPercent% / DC $dcPercent%)",
             // Optimistic, like every other command here. The limit isn't just a
             // number in a settings row any more -- it's the seam in the hero's
-            // charge bar, the notch in the widget's ring and the watch's, and
-            // the Point on the live notification. Waiting for a round-trip and
+            // charge bar, and the Point on the live notification. Waiting for a round-trip and
             // a poll before any of those move makes tapping Set look like it
             // did nothing. Reverted locally by runCommand if the car refuses.
             { st ->
@@ -3086,10 +3081,10 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             // Snapshot the pre-command status so a failed command can be reverted
             // LOCALLY (no network) — see the catch block. Without this, a command
             // that fails offline left the optimistic value ("Locked") persisted to
-            // the widget/QS-tile/watch with no way back except a successful poll.
+            // the snapshot with no way back except a successful poll.
             val prior = _state.value.statuses[vin]
-            // Apply the optimistic state and persist it immediately so the widget
-            // reflects the expected outcome before the network round-trip completes.
+            // Apply the optimistic state and persist it immediately so the
+            // snapshot reflects the expected outcome before the network round-trip completes.
             if (optimistic != null) {
                 _state.update { st ->
                     if (st.statuses[vin] != null) {
@@ -3122,7 +3117,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 AppLog.log("⚠ $msg")
                 _state.update { it.copy(message = msg, messageType = "error") }
                 // Revert the optimistic flip LOCALLY first, then re-persist, so every
-                // surface (app + widget + QS tile + watch) returns to last-known-good
+                // surface (app + snapshot) returns to last-known-good
                 // immediately — without depending on a network refresh that will
                 // usually fail for the same reason the command did. Guarded on
                 // `prior != null` (a null prior means nothing was flipped, since the
@@ -3202,8 +3197,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     // returns. None of them touch _state directly because `appearance` above
     // is already a StateFlow mirroring settingsStore.appearance -- the UI
     // picks up the change automatically once the DataStore write completes
-    // and that Flow re-emits, and the init-block collector separately mirrors
-    // the same Flow out to a paired watch. setDynamicColor is the exception
+    // and that Flow re-emits. setDynamicColor is the exception
     // that does extra work (see its own comment).
     fun setThemeMode(mode: ThemeMode) = viewModelScope.launch {
         settingsStore.setThemeMode(mode)

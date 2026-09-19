@@ -2,9 +2,8 @@ package com.bloo.bluelink.ui
 
 /**
  * The pure reshapings between the in-memory [UiState] and the persisted
- * / external [VehicleSnapshot] form (watch, widget, tile runners) --
- * extracted from AppViewModel.kt so the mapping rules are pinnable on
- * the JVM and stable for every consumer. See snapshotOf's own doc for
+ * / external [VehicleSnapshot] form -- extracted from AppViewModel.kt so
+ * the mapping rules are pinnable on the JVM and stable for every consumer. See snapshotOf's own doc for
  * the effective-powertrain/generation logic: a consumer that only ever
  * sees a snapshot must agree with the user's override.
  */
@@ -24,10 +23,10 @@ import kotlinx.coroutines.flow.map
         // Use the effective powertrain (a PHEV reads battery %, not fuel %).
         val hasBattery = state.hasBattery(v)
         // Same idea for generation: write the EFFECTIVE (override-applied) number,
-        // not the raw API one, so the watch/widget/tile runners -- which only ever
-        // see this snapshot, never the live in-memory Vehicle -- agree with the
-        // user's own correction via the exact same isGen5W numeric check they
-        // already run on whatever Vehicle they rebuild from it. A no-op for a
+        // not the raw API one, so every consumer that only ever sees this snapshot,
+        // never the live in-memory Vehicle, agrees with the user's own correction
+        // via the exact same isGen5W numeric check they already run on whatever
+        // Vehicle they rebuild from it. A no-op for a
         // vehicle where platformOverridable is false (Kia US, Canada, Europe):
         // isGen5W ignores the generation number outright for those, so which
         // string ends up here can't change anything either way.
@@ -45,8 +44,8 @@ import kotlinx.coroutines.flow.map
         // by a status refresh, but falls back to `repoFor(v).location(v)` (findMyCar) and
         // stores that in `_state.locations` only -- and Canada's repo has no GPS on its
         // status at all, so that fallback is its ONLY source. Reading `status` alone meant
-        // every surface fed from a snapshot -- widget map, watch map, the location info
-        // field -- showed no position for a car whose location the phone was displaying on
+        // every surface fed from a snapshot -- the map, the location info field --
+        // showed no position for a car whose location the phone was displaying on
         // screen at that moment. Status wins when it has a coord (it is same-fetch fresh);
         // this is the fallback, not an override.
         //
@@ -81,7 +80,7 @@ import kotlinx.coroutines.flow.map
             lastServiceMiles = state.lastServiceMiles[v.vin],
             serviceIntervalMiles = state.serviceIntervalMiles[v.vin],
             // displayChargeLimit, not targetForCurrentPlug directly -- see that
-            // function's own doc: the widget/watch both read this field, and it used to
+            // function's own doc: snapshot consumers read this field, and it used to
             // go null the instant the car was unplugged, silently dropping their charge
             // bars back to a plain unsplit track for every parked car.
             chargeLimitPct = status?.evStatus?.displayChargeLimit(),

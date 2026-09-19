@@ -180,8 +180,8 @@ class CoordStringTest {
         }
     }
 
-    /** The GeoLocation extension and the raw-pair form must agree -- they exist so the
-     *  watch, which holds bare Doubles, doesn't need its own format string. */
+    /** The GeoLocation extension and the raw-pair form must agree -- they exist so
+     *  callers holding bare Doubles don't need their own format string. */
     @Test
     fun theExtensionAgreesWithTheRawPairForm() {
         val loc = GeoLocation(48.8566, 2.3522, null)

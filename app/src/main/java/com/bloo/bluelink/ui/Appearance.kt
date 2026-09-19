@@ -85,6 +85,7 @@ import kotlin.math.max
 import kotlin.math.roundToInt
 import java.util.UUID
 import androidx.compose.ui.graphics.toArgb
+import androidx.core.graphics.toColorInt
 
 /**
  * A round colour swatch for the palette picker. Shows the palette's seed colour
@@ -305,7 +306,7 @@ internal fun ColorPickerCanvas(
     LaunchedEffect(picked) { if (hexInput != hexOf(picked)) { hexInput = hexOf(picked); hexError = false } }
     fun commitHex() {
         val parsed = runCatching {
-            android.graphics.Color.parseColor(if (hexInput.startsWith("#")) hexInput else "#$hexInput")
+            (if (hexInput.startsWith("#")) hexInput else "#$hexInput").toColorInt()
         }.getOrNull()
         if (parsed == null) {
             hexError = true

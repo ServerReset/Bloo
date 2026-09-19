@@ -4,31 +4,31 @@ import android.content.Context
 import kotlinx.coroutines.sync.withLock
 
 /**
- * Executes a [WearCommand] against the car backend using the stored session,
+ * Executes a [CarCommand] against the car backend using the stored session,
  * and folds the result into the on-disk [SnapshotStore]. Lives in :shared so the
- * phone (relaying the watch's command) and the watch (running standalone on its
- * own connection) share one implementation — the same stored-session pattern the
- * Quick-Settings tiles use.
+ * phone's command paths (the notification action buttons, AutoLock, the climate
+ * auto-extend worker) share one implementation — the same stored-session pattern
+ * the other bare-Context runners use.
  */
-object WearCommandRunner {
+object CarCommandRunner {
 
     /**
-     * Executes one [WearCommand] end-to-end: looks up the target vehicle's current
+     * Executes one [CarCommand] end-to-end: looks up the target vehicle's current
      * [VehicleSnapshot], builds a fresh brand-specific [VehicleRepository] and
      * [ClimateRequest] from the command's fields, dispatches the right repository
      * call for [command].action inside the process-wide [BlueLinkGate] lock, and
      * (on success) writes the resulting optimistic-but-now-confirmed snapshot back to
      * [SnapshotStore] plus an [AppLog] line. Any thrown exception during dispatch is
      * caught by the outer `runCatching`/`getOrElse` and turned into a failed
-     * [WearCommandResult] with the exception's message, rather than propagating.
+     * [CarCommandResult] with the exception's message, rather than propagating.
      */
-    suspend fun execute(context: Context, command: WearCommand): WearCommandResult {
+    suspend fun execute(context: Context, command: CarCommand): CarCommandResult {
         val store = SnapshotStore(context)
         // Same lock refresh() and the phone UI's own command path already use --
         // BlueLink 502s on overlapping requests for the same account, and this
-        // was the one command-executing path that skipped it, so a resent watch
-        // command (e.g. after a slow BLE ack) could fire the same command twice
-        // concurrently, or race a phone-UI-driven command, with no protection.
+        // was the one command-executing path that skipped it, so a resent
+        // command could fire the same command twice concurrently, or race a
+        // phone-UI-driven command, with no protection.
         return BlueLinkGate.statusMutex.withLock {
             // Read the target vehicle's snapshot INSIDE the lock so the toggle
             // direction is decided from state serialized against every other
@@ -38,7 +38,7 @@ object WearCommandRunner {
             // it (e.g. car locked -> A unlocks, B still sees locked -> sends
             // UNLOCK again). See resolveToggle's docstring.
             val snap = store.current().vehicles.firstOrNull { it.vin == command.vin }
-                ?: return@withLock WearCommandResult(command.vin, command.action, ok = false, message = "Car not found")
+                ?: return@withLock CarCommandResult(command.vin, command.action, ok = false, message = "Car not found")
             val v = snap.toVehicle()
             val repo = repositoryFor(
                 Brand.fromIndicator(v.brandIndicator),
@@ -65,46 +65,46 @@ object WearCommandRunner {
                 fun climateFlag(on: Boolean): Boolean? =
                     if (v.brand.reportsClimateState) on else null
                 val updated = when (command.action) {
-                    WearAction.TOGGLE_LOCK ->
+                    CarAction.TOGGLE_LOCK ->
                         if (snap.locked == true) { repo.unlock(v); snap.copy(locked = false) }
                         else { repo.lock(v); snap.copy(locked = true) }
-                    WearAction.LOCK -> { repo.lock(v); snap.copy(locked = true) }
-                    WearAction.UNLOCK -> { repo.unlock(v); snap.copy(locked = false) }
-                    WearAction.TOGGLE_CLIMATE ->
+                    CarAction.LOCK -> { repo.lock(v); snap.copy(locked = true) }
+                    CarAction.UNLOCK -> { repo.unlock(v); snap.copy(locked = false) }
+                    CarAction.TOGGLE_CLIMATE ->
                         if (snap.climateOn == true) { repo.stopClimate(v); snap.copy(climateOn = climateFlag(false)) }
                         else {
                             // The car rejects remote climate commands while it's
                             // moving (same gate the phone UI's own Start button
-                            // applies) -- this is the standalone watch path and
-                            // the widget/relay path (both funnel through here),
-                            // neither of which checked this before.
+                            // applies) -- this runner is the bare-Context command
+                            // path those callers all funnel through, and none of
+                            // them checked this before.
                             if (snap.isDriving) error("Can't start climate while driving")
                             repo.startClimate(v, climate); snap.copy(climateOn = climateFlag(true))
                         }
-                    WearAction.CLIMATE_ON -> {
+                    CarAction.CLIMATE_ON -> {
                         if (snap.isDriving) error("Can't start climate while driving")
                         repo.startClimate(v, climate); snap.copy(climateOn = climateFlag(true))
                     }
-                    WearAction.CLIMATE_OFF -> { repo.stopClimate(v); snap.copy(climateOn = climateFlag(false)) }
-                    WearAction.TOGGLE_CHARGE ->
+                    CarAction.CLIMATE_OFF -> { repo.stopClimate(v); snap.copy(climateOn = climateFlag(false)) }
+                    CarAction.TOGGLE_CHARGE ->
                         if (snap.charging == true) { repo.stopCharge(v); snap.copy(charging = false) }
                         else { repo.startCharge(v); snap.copy(charging = true) }
-                    WearAction.CHARGE_ON -> { repo.startCharge(v); snap.copy(charging = true) }
-                    WearAction.CHARGE_OFF -> { repo.stopCharge(v); snap.copy(charging = false) }
-                    WearAction.SET_CHARGE_LIMITS -> { repo.setChargeTargets(v, command.acLimit, command.dcLimit); snap }
+                    CarAction.CHARGE_ON -> { repo.startCharge(v); snap.copy(charging = true) }
+                    CarAction.CHARGE_OFF -> { repo.stopCharge(v); snap.copy(charging = false) }
+                    CarAction.SET_CHARGE_LIMITS -> { repo.setChargeTargets(v, command.acLimit, command.dcLimit); snap }
                     // Momentary, not stateful -- no snap field to flip, so
                     // these fall through optimistic()/resolveToggle()/
                     // stateFor() below untouched (their `else` branches).
-                    WearAction.FLASH_LIGHTS -> { repo.flashLights(v); snap }
-                    WearAction.HORN_AND_LIGHTS -> { repo.hornAndLights(v); snap }
-                    else -> return@withLock WearCommandResult(command.vin, command.action, ok = false, message = "Unknown action")
+                    CarAction.FLASH_LIGHTS -> { repo.flashLights(v); snap }
+                    CarAction.HORN_AND_LIGHTS -> { repo.hornAndLights(v); snap }
+                    else -> return@withLock CarCommandResult(command.vin, command.action, ok = false, message = "Unknown action")
                 }
                 store.updateVehicle(updated)
                 AppLog.log("${command.action} → ${v.name}")
-                WearCommandResult(command.vin, command.action, ok = true)
+                CarCommandResult(command.vin, command.action, ok = true)
             }.getOrElse { e ->
                 AppLog.log("Command failed (${command.action}): ${e.message}")
-                WearCommandResult(command.vin, command.action, ok = false, message = e.message ?: "Command failed")
+                CarCommandResult(command.vin, command.action, ok = false, message = e.message ?: "Command failed")
             }
         }
     }
@@ -118,12 +118,12 @@ object WearCommandRunner {
      * unlocked -> sends LOCK).
      */
     fun resolveToggle(snap: VehicleSnapshot, action: String): String = when (action) {
-        WearAction.TOGGLE_LOCK ->
-            if (snap.locked == true) WearAction.UNLOCK else WearAction.LOCK
-        WearAction.TOGGLE_CLIMATE ->
-            if (snap.climateOn == true) WearAction.CLIMATE_OFF else WearAction.CLIMATE_ON
-        WearAction.TOGGLE_CHARGE ->
-            if (snap.charging == true) WearAction.CHARGE_OFF else WearAction.CHARGE_ON
+        CarAction.TOGGLE_LOCK ->
+            if (snap.locked == true) CarAction.UNLOCK else CarAction.LOCK
+        CarAction.TOGGLE_CLIMATE ->
+            if (snap.climateOn == true) CarAction.CLIMATE_OFF else CarAction.CLIMATE_ON
+        CarAction.TOGGLE_CHARGE ->
+            if (snap.charging == true) CarAction.CHARGE_OFF else CarAction.CHARGE_ON
         else -> action
     }
 
@@ -152,9 +152,9 @@ object WearCommandRunner {
      * the resolved verbs so it can be called on either side of [resolveToggle].
      */
     fun stateFor(snap: VehicleSnapshot, action: String): Boolean? = when (action) {
-        WearAction.TOGGLE_LOCK, WearAction.LOCK, WearAction.UNLOCK -> snap.locked
-        WearAction.TOGGLE_CLIMATE, WearAction.CLIMATE_ON, WearAction.CLIMATE_OFF -> snap.climateOn
-        WearAction.TOGGLE_CHARGE, WearAction.CHARGE_ON, WearAction.CHARGE_OFF -> snap.charging
+        CarAction.TOGGLE_LOCK, CarAction.LOCK, CarAction.UNLOCK -> snap.locked
+        CarAction.TOGGLE_CLIMATE, CarAction.CLIMATE_ON, CarAction.CLIMATE_OFF -> snap.climateOn
+        CarAction.TOGGLE_CHARGE, CarAction.CHARGE_ON, CarAction.CHARGE_OFF -> snap.charging
         else -> null
     }
 
@@ -163,9 +163,9 @@ object WearCommandRunner {
      *  to "unknown", which every surface already knows how to render as nothing
      *  rather than as a state the car never reported. */
     fun withState(snap: VehicleSnapshot, action: String, value: Boolean?): VehicleSnapshot = when (action) {
-        WearAction.TOGGLE_LOCK, WearAction.LOCK, WearAction.UNLOCK -> snap.copy(locked = value)
-        WearAction.TOGGLE_CLIMATE, WearAction.CLIMATE_ON, WearAction.CLIMATE_OFF -> snap.copy(climateOn = value)
-        WearAction.TOGGLE_CHARGE, WearAction.CHARGE_ON, WearAction.CHARGE_OFF -> snap.copy(charging = value)
+        CarAction.TOGGLE_LOCK, CarAction.LOCK, CarAction.UNLOCK -> snap.copy(locked = value)
+        CarAction.TOGGLE_CLIMATE, CarAction.CLIMATE_ON, CarAction.CLIMATE_OFF -> snap.copy(climateOn = value)
+        CarAction.TOGGLE_CHARGE, CarAction.CHARGE_ON, CarAction.CHARGE_OFF -> snap.copy(charging = value)
         else -> snap
     }
 
@@ -177,26 +177,26 @@ object WearCommandRunner {
      * true/false for every brand -- correct for the brands whose status refresh can
      * confirm or correct it, but not for Europe, whose `airCtrlOn` is always null.
      * [execute] already routed its OWN optimistic write through the brand-aware
-     * check; this is the other caller of the same idea (widget taps, tile taps),
-     * reachable straight from [com.bloo.bluelink.widget.WidgetCommandAction] and
-     * `TileCommandRunner` -- both call this directly rather than going through
-     * `execute()`, so a Hyundai EU widget/tile button was still free to paint a
-     * climate state on ("Climate on", teal highlight) that the car can never
-     * actually confirm, for however long the real command takes to land.
+     * check; this is the other caller of the same idea (a command tap),
+     * reachable straight from `TileCommandRunner` -- which calls this directly
+     * rather than going through `execute()`, so a Hyundai EU button was still
+     * free to paint a climate state on ("Climate on", teal highlight) that the
+     * car can never actually confirm, for however long the real command takes to
+     * land.
      */
     fun optimistic(snap: VehicleSnapshot, action: String): VehicleSnapshot {
         val climateKnown = Brand.fromIndicator(snap.brandIndicator).reportsClimateState
         return when (action) {
-            WearAction.TOGGLE_LOCK -> snap.copy(locked = !(snap.locked ?: false))
-            WearAction.LOCK -> snap.copy(locked = true)
-            WearAction.UNLOCK -> snap.copy(locked = false)
-            WearAction.TOGGLE_CLIMATE ->
+            CarAction.TOGGLE_LOCK -> snap.copy(locked = !(snap.locked ?: false))
+            CarAction.LOCK -> snap.copy(locked = true)
+            CarAction.UNLOCK -> snap.copy(locked = false)
+            CarAction.TOGGLE_CLIMATE ->
                 snap.copy(climateOn = if (climateKnown) !(snap.climateOn ?: false) else null)
-            WearAction.CLIMATE_ON -> snap.copy(climateOn = if (climateKnown) true else null)
-            WearAction.CLIMATE_OFF -> snap.copy(climateOn = if (climateKnown) false else null)
-            WearAction.TOGGLE_CHARGE -> snap.copy(charging = !(snap.charging ?: false))
-            WearAction.CHARGE_ON -> snap.copy(charging = true)
-            WearAction.CHARGE_OFF -> snap.copy(charging = false)
+            CarAction.CLIMATE_ON -> snap.copy(climateOn = if (climateKnown) true else null)
+            CarAction.CLIMATE_OFF -> snap.copy(climateOn = if (climateKnown) false else null)
+            CarAction.TOGGLE_CHARGE -> snap.copy(charging = !(snap.charging ?: false))
+            CarAction.CHARGE_ON -> snap.copy(charging = true)
+            CarAction.CHARGE_OFF -> snap.copy(charging = false)
             else -> snap
         }
     }
@@ -205,7 +205,7 @@ object WearCommandRunner {
      * Refresh one car (blank [vin] → all), folding fresh status into snapshots.
      * [force] true wakes the car for a live pull (on-demand button); false reads
      * the server's last-known status — light enough for frequent background polls
-     * that keep widgets/tiles fresh without draining the car's 12V battery.
+     * that keep the stored snapshots fresh without draining the car's 12V battery.
      */
     /** Returns whether any car's status was actually obtained. Callers that show a
      *  failure message need this: it used to return Unit, so the only signal a caller
@@ -249,7 +249,7 @@ object WearCommandRunner {
             // a single JSON blob, so each write decodes and re-encodes every vehicle and
             // commits to disk -- "refresh all" on N cars was paying N of those to change
             // N cars, and emitting N times on SnapshotStore.payload, which made every
-            // widget, tile and complication observing it repaint N times per refresh.
+            // observer repaint N times per refresh.
             targets.forEach { snap ->
                 runCatching {
                     val v = snap.toVehicle()

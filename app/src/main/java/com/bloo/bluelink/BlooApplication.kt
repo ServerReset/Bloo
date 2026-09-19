@@ -51,6 +51,15 @@ class BlooApplication : Application(), Configuration.Provider {
     override val workManagerConfiguration: Configuration
         get() = Configuration.Builder().build()
 
+    // @SuppressLint("DefaultUncaughtExceptionDelegation") is deliberate, not an oversight:
+    // this handler does NOT chain to the previously-installed default handler. It owns the
+    // whole crash path itself -- it writes the report, starts CrashActivity in a fresh
+    // process, and then kills this one unconditionally (see the kill's own comment below).
+    // Delegating would hand the crash to the platform's own handler, which raises the
+    // system "app has stopped" dialog on top of CrashActivity -- two crash UIs at once,
+    // which is exactly what this screen exists to replace. Lint's check assumes the
+    // conventional delegate-and-return shape; this handler cannot use it.
+    @android.annotation.SuppressLint("DefaultUncaughtExceptionDelegation")
     override fun onCreate() {
         super.onCreate()
         BatterySaverState.ensureInitialized(this)

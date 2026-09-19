@@ -117,7 +117,7 @@ fun WiggleText(
  * readout, and the watch's own ring gauge label. All three animated regardless of
  * whether the user had turned animations off in system accessibility settings,
  * while the fourth, the watch's own [AnimatedValue] wrapper, honoured it correctly.
- * Both surfaces already publish the setting as a composition local, so there was
+ * Callers already publish the setting as a composition local, so there was
  * nothing to plumb -- only a default quietly answering a question on behalf of
  * callers who had never been asked it.
  *

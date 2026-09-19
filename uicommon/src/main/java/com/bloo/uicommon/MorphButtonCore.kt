@@ -35,7 +35,7 @@ import kotlin.math.roundToInt
 
 /**
  * THE button machinery behind every filled pill↔rounded-square button in the
- * app, shared byte-for-byte by the phone and the watch.
+ * app, used by the phone UI.
  *
  * What it owns, and the answer to "why is this one component instead of N":
  *
@@ -58,11 +58,11 @@ import kotlin.math.roundToInt
  *    wash is invisible against these light cards) and only the content dims.
  *    Content colour is deliberately NOT handled here -- this component is
  *    foundation-only and cannot reach material3's LocalContentColor, so each
- *    wrapper provides that itself around its call (see MorphButton on both the
- *    phone and the watch, which is where the disabled/pending dimming lives).
+ *    wrapper provides that itself around its call (see MorphButton on the
+ *    phone, which is where the disabled/pending dimming lives).
  *
- * Fundamentally foundation-only (no Material dependency): the phone and the
- * watch supply their own platform colours (via the wrappers in each module)
+ * Fundamentally foundation-only (no Material dependency): the phone supplies
+ * its own platform colours (via the wrappers in the module)
  * and their own interaction/haptic conventions, but the drawing, the motion
  * and the shape logic here are one copy.
  *
@@ -111,14 +111,13 @@ fun MorphButtonCore(
      *  raw morph progress and the animated corner percent to build from; null
      *  gets the plain single-corner-percent pill. */
     shapeForCorner: ((morph: Float, cornerPercent: Int) -> Shape)? = null,
-    /** The phone uses StiffnessLow for its gentle morph; the watch uses
-     *  StiffnessMedium because the slower corner change alone didn't register
-     *  on a small round face. Deliberately parameterised so the two can differ
+    /** The phone uses StiffnessLow for its gentle morph; the default is the
+     *  same. Deliberately parameterised so a caller can supply a stiffer one
      *  without the comment history this file's predecessors needed. */
     morphSpring: SpringSpec<Float> = spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessLow),
     colorSpring: FiniteAnimationSpec<Color> = spring(stiffness = Spring.StiffnessMediumLow),
     /** Non-null scales the whole button down to this factor while pressed --
-     *  the watch's press-punch, which the phone doesn't use. */
+     *  the press-punch the watch used to supply; kept for a caller that wants it. */
     pressScale: Float? = null,
     content: @Composable RowScope.() -> Unit,
 ) {

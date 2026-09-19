@@ -148,14 +148,6 @@ internal fun ColorScheme.applyPalette(palette: ColorPalette): ColorScheme {
     )
 }
 
-/**
- * Resolve the app's active accent [Color] outside of a Compose context (e.g. widgets,
- * tiles, notifications). Mirrors the exact logic used by [BlooTheme] so the color is
- * always consistent with what the app shows.
- *
- * Reads system dark-mode state from the [context] configuration; also handles dynamic
- * color, per-car palette overrides, and the global custom palette.
- */
 // Widget theme functions removed - widget system deleted
 
 // --- Expressive color palettes -------------------------------------------
@@ -277,8 +269,7 @@ private fun expressiveTypography(choice: FontChoice): Typography {
  * treatment now, promoted from the map's own buttons); this remains for the handful
  * of call sites that want a flat, borderless tone on purpose -- an explicit STATE
  * colour (a toggle's off position, a segmented track) rather than the shared idle
- * button look. Delegates to the shared :uicommon helper so the watch renders
- * identically.
+ * button look. Delegates to the shared :uicommon helper.
  */
 @Composable
 fun buttonContainer(): Color = com.bloo.uicommon.BlooColors.buttonContainer(
@@ -455,8 +446,7 @@ fun BlooTheme(
         typography = typography,
         shapes = ExpressiveShapes,
     ) {
-        // Defensive, matching the fix required on the watch (see BlooWearTheme):
-        // this app's root Scaffold passes containerColor = Color.Transparent so the
+        // Defensive: this app's root Scaffold passes containerColor = Color.Transparent so the
         // edge-to-edge gradient/aurora Box behind it shows through, and
         // contentColorFor(Color.Transparent) resolves to Color.Unspecified since
         // Transparent isn't one of the theme's known roles -- which means ANY bare

@@ -175,7 +175,7 @@ internal val SettingsCardGap = 10.dp
  * same place it installs its own uncaught-exception handler.
  *
  * [isBatterySaverOn] used to register its OWN receiver inline, every time it was
- * called -- fine when [CanBlurBackdrops] had a couple of call sites, but between
+ * called -- fine when [canBlurBackdrops] had a couple of call sites, but between
  * every [GlassSurface] in the app and every [lowPowerAwareSpring], that function
  * is now read from dozens of places on a single screen. Each one registering its
  * own receiver for the exact same system broadcast, each keeping its own separate
@@ -223,7 +223,7 @@ internal object BatterySaverState {
 /** Live, reactive battery-saver state, read from the one shared [BatterySaverState]
  *  -- so toggling it while the app is already open (Quick Settings, the battery-
  *  saver notification) takes effect immediately everywhere at once, rather than
- *  only on the next cold start. [CanBlurBackdrops] is this value's biggest
+ *  only on the next cold start. [canBlurBackdrops] is this value's biggest
  *  consumer today, but it's a plain top-level composable precisely so anything
  *  else wanting to drop expensive visual effects under battery saver -- not just
  *  blur -- can read it the same way. */
@@ -244,7 +244,7 @@ internal fun isBatterySaverOn(): Boolean {
  *  their own already-existing solid-colour fallback, with nothing further to
  *  change at each individual site. */
 @Composable
-internal fun CanBlurBackdrops(): Boolean =
+internal fun canBlurBackdrops(): Boolean =
     android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S && !isBatterySaverOn()
 
 /**
@@ -257,7 +257,7 @@ internal fun CanBlurBackdrops(): Boolean =
  * describes 14 call sites that used to each hand-roll a slightly different spring/tween before
  * being migrated onto these two functions -- so gating THIS one spot under battery saver is
  * what turns every one of those sites calm without touching any of them individually, the
- * same leverage [CanBlurBackdrops] already gets from every blur site sharing it.
+ * same leverage [canBlurBackdrops] already gets from every blur site sharing it.
  *
  * A spring isn't just slower under low power, it is MORE work per frame than a tween for the
  * same visual distance: an underdamped spring overshoots and keeps re-evaluating position/
@@ -288,11 +288,11 @@ internal val StandardBlurProgressive
 
 // ---- Motion -------------------------------------------------------------------
 
-// Aliases onto :uicommon so the phone and the watch read as the same controls.
+// Aliases onto :uicommon so the phone reads the shared motion tokens.
 internal val SoftDamping get() = com.bloo.uicommon.SoftDamping
 
-// The morph button's two corner states, shared with the watch so both surfaces read as the
-// same control. Aliased the same way SoftDamping above is.
+// The morph button's two corner states from the shared motion vocabulary. Aliased the same
+// way SoftDamping above is.
 internal val PillCornerPercent get() = com.bloo.uicommon.PillCornerPercent
 internal val MorphedCornerPercent get() = com.bloo.uicommon.MorphedCornerPercent
 

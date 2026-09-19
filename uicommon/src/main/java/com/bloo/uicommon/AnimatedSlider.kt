@@ -37,12 +37,11 @@ import kotlin.math.abs
 import kotlin.math.roundToInt
 
 /**
- * Bloo's fully custom hand-drawn slider. Shared between phone (via :app) and
- * watch (via :wear) so the track/thumb/tick rendering and gesture logic live in
- * exactly one place.
+ * Bloo's fully custom hand-drawn slider. Used by the phone UI so the
+ * track/thumb/tick rendering and gesture logic live in exactly one place.
  *
  * Callers supply all colour/haptic/motion context as parameters so this module
- * stays neutral to compose.material3 vs wear.compose.material3.
+ * stays neutral to the surrounding theme.
  *
  * @param reduceMotion When true the settle spring is replaced by a snap so the
  *   thumb jumps to its step immediately instead of bouncing into place.

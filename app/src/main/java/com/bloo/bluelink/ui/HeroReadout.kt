@@ -656,9 +656,9 @@ internal fun HeroMorphReadout(
  * between two frames if the limit itself changes while charging.
  *
  * Two more animations, phone-only ("more motion on the phone card... keep others
- * static but visually matching" -- the widget and the notification are real
- * RemoteViews/Glance surfaces with no animation APIs to reach for, so this is the
- * one place any of this can live):
+ * static but visually matching" -- the notification is a real RemoteViews
+ * surface with no animation APIs to reach for, so this is the one place any of
+ * this can live):
  *  - the fill's own colour springs between green and blue rather than snapping the
  *    instant [stuckAtLimit] flips, so reaching the limit reads as the bar arriving
  *    somewhere rather than a hard colour cut mid-frame;

@@ -114,9 +114,8 @@ data class VehicleStatus(
     /** True when the embedded location's last-known speed says the car is
      *  moving. The main phone UI's AppViewModel.isDriving() layers a live GPS
      *  reading on top of this same check; this bare version is what the
-     *  watch's own standalone command path (no separate GPS tracking of its
-     *  own) uses to apply the same "car rejects climate commands while
-     *  driving" gate before starting climate. */
+     *  snapshot-based command runners use to apply the same "car rejects
+     *  climate commands while driving" gate before starting climate. */
     val isDriving: Boolean get() = (vehicleLocation?.speed?.value ?: 0.0) > 0.0
 }
 
@@ -376,22 +375,12 @@ enum class SeatLevel(val apiValue: Int, val label: String) {
     }
 }
 
-/** Which seats this car exposes a heater/vent for, inferred from the live status. */
-data class SeatCapability(
-    val frontLeft: Boolean = false,
-    val frontRight: Boolean = false,
-    val rearLeft: Boolean = false,
-    val rearRight: Boolean = false,
-) {
-    val any: Boolean get() = frontLeft || frontRight || rearLeft || rearRight
-}
-
 /**
  * Steering wheel heat level. Unlike [SeatLevel], most brands' APIs here only ever
  * modelled this as a plain on/off -- Kia's US request body is the one exception found
  * with a real second field (`steeringWheelStep`) beyond the on/off one, mirroring the
  * shape of its seat-heat step. [apiValue] is this app's own flat wire encoding (used
- * between phone and watch, [ClimateSync]/[WearCommand]) and is NOT the literal value
+ * by the command layer, [ClimateSync]/[CarCommand]) and is NOT the literal value
  * any vendor API expects -- each brand's request-builder maps a level to whatever its
  * own protocol wants (see [KiaUsaApi.startClimate]'s `steeringWheelStep`, and every
  * other brand's plain [isOn] fallback).

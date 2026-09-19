@@ -299,9 +299,8 @@ internal fun PebbleShell(
      * the title and the chevron overlay the top of the image.
      *
      * Whatever goes here is responsible for its own legibility. Header text lands on top
-     * of it, and over an arbitrary car photo that text disappears -- the widget hit the
-     * same thing and resolved it with a luminance check. A scrim under the text is the
-     * cheap version and is what the hero does.
+     * of it, and over an arbitrary car photo that text disappears -- a scrim under the
+     * text is the cheap, reliable answer and is what the hero does.
      *
      * Null for every other pebble, so nothing else gains a layer.
      */

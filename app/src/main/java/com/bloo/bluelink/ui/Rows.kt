@@ -10,7 +10,6 @@ package com.bloo.bluelink.ui
 import android.graphics.Bitmap
 import android.os.Build
 import android.graphics.BitmapFactory
-import android.net.Uri
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -107,6 +106,8 @@ import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
+import androidx.core.graphics.createBitmap
+import androidx.core.net.toUri
 import com.bloo.uicommon.dropShadow
 import com.bloo.bluelink.data.Weather
 import kotlinx.coroutines.Dispatchers
@@ -135,7 +136,7 @@ internal fun CropScreen(vin: String, uriString: String, onCancel: () -> Unit, on
     LaunchedEffect(uriString) {
         bmp = withContext(Dispatchers.IO) {
             runCatching {
-                val uri = Uri.parse(uriString)
+                val uri = uriString.toUri()
                 val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
                 context.contentResolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, bounds) }
                 var sample = 1
@@ -237,7 +238,7 @@ internal fun CropScreen(vin: String, uriString: String, onCancel: () -> Unit, on
                                     val cx = offset.x.coerceIn(-maxX, maxX)
                                     val cy = offset.y.coerceIn(-maxY, maxY)
                                     val outScale = 1080f / wpx
-                                    val out = Bitmap.createBitmap(1080, (hpx * outScale).toInt(), Bitmap.Config.ARGB_8888)
+                                    val out = createBitmap(1080, (hpx * outScale).toInt(), Bitmap.Config.ARGB_8888)
                                     val canvas = android.graphics.Canvas(out)
                                     val m = android.graphics.Matrix().apply {
                                         postTranslate(-image.width / 2f, -image.height / 2f)
@@ -333,8 +334,8 @@ internal fun StatusRow(label: String, value: String, valueMono: Boolean = false)
         // content-width box. The filling Box gives End something to align against.)
         Box(Modifier.weight(1f), contentAlignment = Alignment.CenterEnd) {
             // Was a hand-rolled AnimatedContent + WiggleText -- uicommon's shared
-            // AnimatedValue already implements this (used elsewhere in this file
-            // and now watch's ChargeRing). Colour pinned to full-strength onSurface
+            // AnimatedValue already implements this (used elsewhere in this file).
+            // Colour pinned to full-strength onSurface
             // rather than inherited -- Pebble's Card sets its content color from
             // containerColor (usually surfaceVariant), so an uncoloured value here
             // rendered at onSurfaceVariant strength, barely distinguishable from the

@@ -15,7 +15,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 
 /**
  * Maps a WMO weather interpretation code + day/night flag to the appropriate
- * Material icon. Shared between phone and watch so icon choices are consistent.
+ * Material icon, so icon choices are consistent across the phone UI.
  */
 fun weatherIcon(code: Int, isDay: Boolean): ImageVector = when (code) {
     0 -> if (isDay) Icons.Filled.WbSunny else Icons.Filled.Nightlight

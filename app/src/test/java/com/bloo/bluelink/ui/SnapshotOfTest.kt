@@ -13,7 +13,7 @@ import kotlin.test.assertTrue
 /**
  * Pins for the snapshot reshaping layer ([Snapshots.kt]) -- the mapping from
  * the in-memory [UiState] onto the persisted [VehicleSnapshot] form that the
- * watch, widget and tile runners read.
+ * command runners and background workers read.
  *
  * This is the layer a "fix the phone" bug used to ship through: the snapshot
  * carried the RAW API generation number while the phone displayed the

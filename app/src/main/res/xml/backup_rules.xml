@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Pre-Android-12 half of the backup opt-out (see res/xml/data_extraction_rules.xml
+  for the Android 12+ spelling and the full rationale). The manifest already sets
+  allowBackup="false", which disables backup outright on every API level this app
+  supports; this file states the exclusion domain by domain as well, so the intent
+  is explicit rather than implied by a single boolean, and so the platform's own
+  backup tooling reading the rules cannot resurrect a domain the flag forgot.
+-->
+<full-backup-content>
+    <exclude domain="root" path="." />
+    <exclude domain="file" path="." />
+    <exclude domain="database" path="." />
+    <exclude domain="sharedpref" path="." />
+    <exclude domain="external" path="." />
+</full-backup-content>

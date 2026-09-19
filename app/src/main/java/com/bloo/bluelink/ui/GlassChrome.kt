@@ -81,7 +81,7 @@ import com.bloo.uicommon.ambientRing as sharedAmbientRing
  * to check, one place to fix.
  *
  * The phone app's floating-chrome helpers are shared in :uicommon
- * (com.bloo.uicommon.GlassChrome) for watch and widget reuse. This file
+ * (com.bloo.uicommon.GlassChrome). This file
  * re-supplies Material theme tint the shared module can't depend on.
  */
 
@@ -128,7 +128,7 @@ internal fun Modifier.glassEdge(shape: Shape, shadow: Boolean = true): Modifier 
  * 0.10 alpha unblurred and 0.02 blurred (lowered five times, each time on a request for
  * more of the background to show through), and in light mode it is a pale
  * `surfaceContainer` at 0.08-0.12. On a device with no real backdrop blur -- pre-API-31,
- * or battery saver on, i.e. [CanBlurBackdrops] false, which is also every screen that
+ * or battery saver on, i.e. [canBlurBackdrops] false, which is also every screen that
  * still passes no `hazeState` -- there is then nothing solid on the shape at all, and the
  * single most opaque thing anywhere near a floating chip is this 0.38 black behind it.
  * The chip reads as its own shadow. Dark mode hid it because the shadow lands on an
@@ -175,8 +175,8 @@ internal fun Modifier.glassRim(shape: Shape): Modifier =
  * result from the layout side -- "a button's true on-screen silhouette is bigger than its
  * logical box... those two halos can visibly eat into" the content below it.
  *
- * The shared :uicommon implementation stays exactly as it is, and is still what the watch
- * and [com.bloo.uicommon.PagerDots] call: neither can see [LocalAppearance] (uicommon is
+ * The shared :uicommon implementation stays exactly as it is, and is still what
+ * [com.bloo.uicommon.PagerDots] calls: it can't see [LocalAppearance] (uicommon is
  * Material- and app-state-free by design, see its own file doc), and both draw over their
  * own always-dark backdrops anyway. This wrapper is the phone's theme-aware entry point,
  * which is what the wrapper existed for in the first place -- it just wasn't adding
@@ -331,7 +331,7 @@ internal fun Modifier.glassEffect(
     hazeState: HazeState?,
     progressive: Boolean = false,
 ): Modifier {
-    val canBlur = hazeState != null && CanBlurBackdrops()
+    val canBlur = hazeState != null && canBlurBackdrops()
     val tint = glassTint(canBlur)
     return this
         .then(if (canBlur) Modifier.appHazeEffect(hazeState!!, progressive) else Modifier)
@@ -347,7 +347,7 @@ internal fun Modifier.appHazeEffect(state: HazeState, progressive: Boolean = fal
 
 /**
  * The app's one floating-glass surface: a real Haze backdrop blur of [hazeState]
- * when one is given and [CanBlurBackdrops] allows it (API 31+, battery saver off),
+ * when one is given and [canBlurBackdrops] allows it (API 31+, battery saver off),
  * layered under a neutral [tint], inside the shared [dropShadow]/[appGlassRim] edge
  * treatment -- all wrapped in one function instead of separately hand-rolled at
  * every call site.
@@ -381,7 +381,7 @@ internal fun GlassSurface(
     shape: Shape,
     modifier: Modifier = Modifier,
     hazeState: HazeState? = null,
-    tint: Color = glassTint(hazeState != null && CanBlurBackdrops()),
+    tint: Color = glassTint(hazeState != null && canBlurBackdrops()),
     contentColor: Color = MaterialTheme.colorScheme.onSurface,
     onClick: (() -> Unit)? = null,
     contentDescription: String? = null,
@@ -393,7 +393,7 @@ internal fun GlassSurface(
     shadow: Boolean = true,
     content: @Composable () -> Unit = {},
 ) {
-    val canBlur = hazeState != null && CanBlurBackdrops()
+    val canBlur = hazeState != null && canBlurBackdrops()
     val interaction = interactionSource ?: remember { MutableInteractionSource() }
     Box(
         modifier = modifier
@@ -460,9 +460,9 @@ internal fun ScrimBlur(hazeState: HazeState?, progress: () -> Float, modifier: M
     // Both call sites always pass a real, non-null HazeState (each screen builds
     // one unconditionally via `remember { HazeState() }`), so `hazeState != null`
     // alone was never actually gating anything -- the blur ran unconditionally,
-    // battery saver or not. CanBlurBackdrops() is the real gate, same as every
+    // battery saver or not. canBlurBackdrops() is the real gate, same as every
     // other blur site in the app.
-    val canBlur = hazeState != null && CanBlurBackdrops()
+    val canBlur = hazeState != null && canBlurBackdrops()
     // Full-screen scrim needs strong dimming in both light and dark modes.
     // Use black with appropriate alpha for proper contrast and readability.
     val tint = if (canBlur) Color.Black.copy(alpha = 0.05f) else Color.Black.copy(alpha = 0.22f)

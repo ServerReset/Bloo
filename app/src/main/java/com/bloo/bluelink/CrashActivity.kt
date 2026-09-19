@@ -55,6 +55,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
 import android.content.ClipData
+import androidx.core.net.toUri
 
 /**
  * Shown instead of silently restarting into [MainActivity] after an uncaught
@@ -254,7 +255,7 @@ class CrashActivity : ComponentActivity() {
                 "Open GitHub instead",
                 modifier = Modifier.fillMaxWidth(),
                 onClick = {
-                    val browserIntent = Intent(Intent.ACTION_VIEW, android.net.Uri.parse(UpdateApi.RELEASES_URL))
+                    val browserIntent = Intent(Intent.ACTION_VIEW, UpdateApi.RELEASES_URL.toUri())
                     runCatching { context.startActivity(browserIntent) }
                 },
             )

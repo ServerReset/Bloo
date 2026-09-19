@@ -29,7 +29,8 @@ import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.layout
-import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.composed
 import androidx.compose.ui.unit.dp
 import kotlin.math.floor
@@ -310,6 +311,9 @@ const val COVER_SCREEN_WIDTH_DP = 600
  *  foldable-unfolded, or tablet screen. See [COVER_SCREEN_HEIGHT_DP]. */
 @Composable
 internal fun isCompactCoverScreen(): Boolean {
-    val cfg = LocalConfiguration.current
-    return cfg.screenWidthDp < COVER_SCREEN_WIDTH_DP && cfg.screenHeightDp < COVER_SCREEN_HEIGHT_DP
+    val windowInfo = LocalWindowInfo.current
+    return with(LocalDensity.current) {
+        windowInfo.containerSize.width.toDp() < COVER_SCREEN_WIDTH_DP.dp &&
+            windowInfo.containerSize.height.toDp() < COVER_SCREEN_HEIGHT_DP.dp
+    }
 }

@@ -34,8 +34,8 @@ import kotlin.math.roundToInt
 /**
  * One place that knows where every floating thing on screen currently is.
  *
- * "Floating" here means anything drawn over the page rather than in its scroll flow: the car
- * name once it docks into its corner pill, the page dots, the corner icon buttons. They overlap
+ * "Floating" here means anything drawn over the page rather than in its scroll flow: the
+ * corner icon buttons, the search bubble, the refresh indicator. They overlap
  * each other, so they have to negotiate -- and until this existed, the ONE negotiation the app
  * actually did (dots hiding behind the flying name) was hand-wired as an `onNameBoundsChanged`
  * callback threaded down through TitleFlightOverlay -> FloatingNamePill -> FullDetail (twice)
@@ -66,7 +66,7 @@ object FloatingIds {
      * about how it is placed belongs in this system. See SearchLayer.
      */
     val Search = FloatingId("search")
-    /** The pull-to-refresh spinner, which takes the page dots' place while a refresh runs. */
+    /** The pull-to-refresh spinner. */
     val RefreshIndicator = FloatingId("refreshIndicator")
     // TileRail was removed. It named the cover screen's right-edge tile scrubber, and that
     // control is gone along with every page indicator in the app ("Vertical page dots removed:
@@ -176,9 +176,9 @@ class FloatingRegistry {
          * Naming them matters because "collides with anything registered" quietly grants every
          * new floater the power to hide an existing one. The search bubble is the sharp case:
          * on a cover screen a person can drag it and park it anywhere along an edge, so parking
-         * it at the top permanently faded the page dots, with nothing on screen to connect the
-         * cause to the effect. Dodging is for chrome that arrives over you on its own -- the
-         * flying car name -- not for something the user deliberately put there.
+         * it at the top permanently faded another floater, with nothing on screen to connect the
+         * cause to the effect. Dodging is for chrome that arrives over you on its own --
+         * not for something the user deliberately put there.
          */
         avoid: Set<FloatingId>? = null,
     ): Boolean {
@@ -192,8 +192,8 @@ class FloatingRegistry {
     }
 
     internal companion object {
-        /** Delegates to uicommon's [com.bloo.uicommon.floatersOverlap] -- the same pure check
-         *  the page dots have always used, kept over there because that is where the JVM tests
+        /** Delegates to uicommon's [com.bloo.uicommon.floatersOverlap] -- one pure check,
+         *  kept over there because that is where the JVM tests
          *  pinning its boundary behaviour live. */
         fun overlaps(a: Rect, b: Rect, marginPx: Float): Boolean =
             com.bloo.uicommon.floatersOverlap(a, b, marginPx)
@@ -273,7 +273,7 @@ fun Modifier.floatingElement(id: FloatingId, active: Boolean = true): Modifier =
 
 /**
  * Fades this element out while any OTHER registered floater overlaps it, and back in when the
- * way is clear -- the generic form of "the page dots get out of the car name's way".
+ * way is clear -- the generic form of one floating element getting out of another's way.
  *
  * Draw-phase only: the alpha is read inside a `graphicsLayer {}` lambda and the collision test
  * is a `derivedStateOf`, so a neighbour moving through this element does not recompose it. The

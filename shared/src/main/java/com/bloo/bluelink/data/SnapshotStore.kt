@@ -16,9 +16,9 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 
 /**
- * A small, on-disk projection of each vehicle's latest state. Home-screen
- * widgets and Quick Settings tiles run in separate processes and can't reach
- * the in-memory ViewModel, so the app mirrors what they need here.
+ * A small, on-disk projection of each vehicle's latest state. Background
+ * workers and command runners run outside the in-memory ViewModel and can't
+ * reach it, so the app mirrors what they need here.
  */
 @Serializable
 data class VehicleSnapshot(
@@ -28,8 +28,8 @@ data class VehicleSnapshot(
     val isEv: Boolean,
     /** Whether this car has a chargeable battery, per the user's manual
      *  powertrain override on the phone (a PHEV the API misreports as gas
-     *  still needs the Charge tile). Defaults to [isEv] so snapshots built
-     *  without an override (e.g. the watch's own standalone vehicle fetch)
+     *  still needs its charge readouts). Defaults to [isEv] so snapshots
+     *  built without an override (e.g. from the account's vehicle list)
      *  behave exactly as before. */
     val hasBattery: Boolean = isEv,
     val regId: String = "",
@@ -44,12 +44,11 @@ data class VehicleSnapshot(
     val lat: Double? = null,
     val lon: Double? = null,
     /** mph, from the last fetched status's vehicleLocation.speed, if the car
-     *  reported one. Lets out-of-process command runners (Quick Settings
-     *  tiles, the widget, the watch's own standalone/relay path) apply the
-     *  same "car rejects climate commands while driving" gate the main phone
-     *  UI's own AppViewModel.isDriving() already does -- those runners only
-     *  ever see a [VehicleSnapshot], never the live location state the main
-     *  UI tracks separately. */
+     *  reported one. Lets the bare-Context command runners (CarCommandRunner,
+     *  TileCommandRunner) apply the same "car rejects climate commands while
+     *  driving" gate the main phone UI's own AppViewModel.isDriving() already
+     *  does -- those runners only ever see a [VehicleSnapshot], never the live
+     *  location state the main UI tracks separately. */
     /** CAUTION -- the name is not a promise. This is the car's raw reported
      *  speed VALUE, copied straight from the API's `{value, unit}` pair with
      *  the unit code thrown away at capture (see AppViewModel, and Speed.unit
@@ -59,8 +58,8 @@ data class VehicleSnapshot(
      *
      *  That has never mattered, because [isDriving] -- its only reader --
      *  merely asks whether it is above zero, which is true in any unit. It
-     *  would matter immediately for anything that DISPLAYS it: a widget row
-     *  or tile reading "62 mph" off a km/h value is worse than showing no
+     *  would matter immediately for anything that DISPLAYS it: a UI row
+     *  reading "62 mph" off a km/h value is worse than showing no
      *  speed at all. Resolve the unit against a real car before rendering
      *  this, and if you convert it, rename the field at the same time. */
     val speedMph: Double? = null,
@@ -71,8 +70,8 @@ data class VehicleSnapshot(
     val fetchedAt: Long = 0L,
     val odometer: String? = null,
     /** User-entered license plate and service-due tracking (phone Settings),
-     *  mirrored so surfaces other than the phone's own Info pebble -- the
-     *  watch's Info tile in particular -- can show the same maintenance info. */
+     *  mirrored so other snapshot readers besides the phone's own Info pebble
+     *  can show the same maintenance info. */
     val licensePlate: String? = null,
     val lastServiceMiles: Int? = null,
     val serviceIntervalMiles: Int? = null,
@@ -83,7 +82,7 @@ data class VehicleSnapshot(
      *  hero and the live charging notification both show. */
     val chargeLimitPct: Int? = null,
 ) {
-    /** Rebuild the command-capable Vehicle (used by widgets/tiles). */
+    /** Rebuild the command-capable Vehicle (used by the command runners). */
     fun toVehicle(): Vehicle = Vehicle(
         vin = vin,
         regId = regId,
@@ -107,7 +106,7 @@ val VehicleSnapshot.isDriving: Boolean get() = (speedMph ?: 0.0) > 0.0
  * [location] is a separately-fetched position for the brands whose STATUS carries none.
  * Canada and Europe both expose GPS only through a dedicated find-my-car endpoint, so their
  * parsed VehicleStatus has no vehicleLocation at all -- which meant every background path
- * through this function (the alert worker, the live-charge poller, the watch's refresh) left
+ * through this function (the alert worker, the live-charge poller, the command runners) left
  * lat/lon/speed exactly as they were, however far the car had driven. The phone worked around
  * it in its own layer years ago (see Snapshots.kt's note on locate()); the shared fold that
  * every out-of-process surface uses never got the equivalent, so the fix only existed while
@@ -119,8 +118,7 @@ fun VehicleSnapshot.merged(status: VehicleStatus, location: GeoLocation? = null)
     // Use hasBattery (the user's manual powertrain override), not the raw
     // isEv flag -- this reimplemented percentFor/rangeMiFor's own logic with
     // the wrong flag, so a PHEV the API misreports as gas would have every
-    // refresh through this path (WearCommandRunner.refresh, used by the
-    // watch's standalone/command-triggered refreshes) clobber percent/rangeMi
+    // refresh through this path (CarCommandRunner.refresh) clobber percent/rangeMi
     // with fuel data instead of battery data.
     val pct = status.percentFor(hasBattery)
     val range = status.rangeMiFor(hasBattery)
@@ -145,11 +143,11 @@ fun VehicleSnapshot.merged(status: VehicleStatus, location: GeoLocation? = null)
         updated = status.dateTime ?: updated,
         // The charge limit, which this function never carried -- so the only
         // path that set it was the phone app's own snapshotOf(). Every OTHER
-        // refresh goes through here (the watch standalone, the QS tiles, the
-        // widget's own), and each of those left the limit at whatever the
+        // refresh goes through here (the command runners, the background
+        // pollers), and each of those left the limit at whatever the
         // phone last wrote, or at null forever for a car the phone app had
-        // never refreshed while plugged in. The dot that marks it is on five
-        // surfaces now; four of them were reading a field nothing kept current.
+        // never refreshed while plugged in. That limit readout is on several
+        // surfaces now; the rest were reading a field nothing kept current.
         //
         // NOT the `new ?: old` shape the fields above use, deliberately. A status
         // with no evStatus at all (a gas car, a partial fetch) is still the only
@@ -213,7 +211,7 @@ private data class SnapshotPayload(
 
 // A corruption handler so a file damaged by an interrupted write/power loss
 // resets to empty prefs instead of rethrowing an uncaught exception out of
-// every read — this store is read from the widget, tiles, and complications,
+// every read — this store is read from background workers and command runners,
 // every one of which would otherwise crash on a corrupt file.
 private val Context.snapshotDataStore by preferencesDataStore(
     name = "bloo_snapshots",
@@ -226,8 +224,8 @@ private val Context.snapshotDataStore by preferencesDataStore(
  * DataStore's [edit]: decode whatever's currently on disk, apply the change,
  * re-encode the whole payload back. DataStore's edit block itself is
  * transactional (backed by a single file + mutex), so concurrent callers
- * from different processes (the widget refreshing while the watch relay also
- * writes, for instance) don't stomp on each other's writes.
+ * (a background poll writing while a command's optimistic flip also writes,
+ * for instance) don't stomp on each other's writes.
  */
 /**
  * Apply [updates] onto [existing] by VIN. Extracted from [SnapshotStore.updateVehicles]
@@ -266,11 +264,9 @@ class SnapshotStore(private val context: Context) {
         decode(prefs[Keys.PAYLOAD])
     }
         // decode() is a full Json parse of every vehicle, and DataStore only guarantees the FILE
-        // read is off the main thread -- a map{} transform runs in the collector's context.
-        // The widget collects this, and Glance's provideGlance is suspend but NOT guaranteed an
-        // IO dispatcher (Google's own guidance, and the reason WidgetPhoto/WidgetMap already
-        // wrap their loads). So this parsed the whole blob on the main thread on every widget
-        // repaint -- and a command tap deliberately emits twice, optimistic then settled.
+        // read is off the main thread -- a map{} transform runs in the collector's context, so
+        // without this the whole blob would be parsed on whatever thread collects (and a command
+        // tap deliberately emits twice, optimistic then settled).
         .flowOn(Dispatchers.IO)
 
     /** One-shot read of the current snapshot data (first() takes just the
@@ -278,7 +274,7 @@ class SnapshotStore(private val context: Context) {
      *  need to keep observing. */
     suspend fun current(): SnapshotData = withContext(Dispatchers.IO) {
         // withContext for the same reason as `payload` above: .first() resumes on the CALLER's
-        // dispatcher, and the widget's caller is the main thread. StatusCache.load already does
+        // dispatcher, and the caller is often the main thread. StatusCache.load already does
         // exactly this; this store -- the one every module reads -- had been missed.
         decode(context.snapshotDataStore.data.first()[Keys.PAYLOAD])
     }
@@ -290,12 +286,11 @@ class SnapshotStore(private val context: Context) {
      * car's identity (name, model, odometer, plate) and nothing about its state.
      * [saveVehicles] replaces the payload wholesale, so calling it with
      * status-less snapshots wipes percent, range, lock, charge, climate, engine,
-     * location and fetchedAt for every car on disk -- and the widget, the twelve
-     * Quick Settings tiles, the Wear tile and every complication read exactly that
-     * file. The result was that every cold start, every login and every
-     * pull-to-refresh blanked all of them until N sequential network round trips
-     * had completed, one car at a time through statusMutex. fetchedAt = 0 also
-     * trips the widget's own stale gate.
+     * location and fetchedAt for every car on disk -- and the background pollers
+     * and command runners read exactly that file. The result was that every cold
+     * start, every login and every pull-to-refresh blanked all of them until N
+     * sequential network round trips had completed, one car at a time through
+     * statusMutex. fetchedAt = 0 also trips the stale-data gate.
      *
      * Not fixed by passing the in-memory status cache instead: that cache is
      * restored on a SEPARATE viewModelScope.launch from the login path, so
@@ -309,7 +304,7 @@ class SnapshotStore(private val context: Context) {
      * fields always take the incoming value, since those were just read fresh.
      *
      * [saveVehicles] is deliberately left alone: sign-out calls it with an empty
-     * list to clear everything, and the watch's state writer uses it to apply the
+     * list to clear everything, and a full account refresh uses it to apply the
      * phone's authoritative payload. Both want replacement.
      */
     suspend fun saveVehiclesKeepingStatus(vehicles: List<VehicleSnapshot>) {
@@ -353,7 +348,7 @@ class SnapshotStore(private val context: Context) {
         }
     }
 
-    /** Replace a single vehicle's snapshot (e.g. after a widget refresh). */
+    /** Replace a single vehicle's snapshot (e.g. after a status refresh). */
     suspend fun updateVehicle(snapshot: VehicleSnapshot) = updateVehicles(listOf(snapshot))
 
     /**
@@ -364,8 +359,7 @@ class SnapshotStore(private val context: Context) {
      * vehicle, because the payload is one JSON blob. So a "refresh all" that called
      * [updateVehicle] once per car paid N decodes, N encodes and N fsyncs to change N
      * cars, where one of each would do. It also produced N emissions on [payload], so
-     * every widget, tile and complication observing it repainted N times for one
-     * refresh.
+     * every observer of it repainted N times for one refresh.
      *
      * A VIN in [snapshots] that isn't in the store is ignored rather than added, which
      * is [updateVehicle]'s existing behaviour -- adding cars is [saveVehicles]' job.
@@ -420,7 +414,7 @@ class SnapshotStore(private val context: Context) {
         }
     }
 
-    /** Change which car is the "active" one for widgets/tiles, without
+    /** Change which car is the "active" one for snapshot readers, without
      *  touching the vehicle data itself. */
     suspend fun setSelected(vin: String) {
         // See saveVehiclesKeepingStatus's own comment on why this is on Dispatchers.IO.
@@ -435,7 +429,7 @@ class SnapshotStore(private val context: Context) {
         }
     }
 
-    /** Advance the widget/tile selection to the next car, looping. */
+    /** Advance the snapshot selection to the next car, looping. */
     suspend fun selectNext(): VehicleSnapshot? = withContext(Dispatchers.IO) {
         // See saveVehiclesKeepingStatus's own comment on why this is on Dispatchers.IO.
         var result: VehicleSnapshot? = null
@@ -480,18 +474,3 @@ class SnapshotStore(private val context: Context) {
             get() = vehicles.firstOrNull { it.vin == selectedVin } ?: vehicles.firstOrNull()
     }
 }
-
-/**
- * The car a WATCH glanceable surface (Tile, complication) should show: the one pinned to that
- * surface if [pinnedVin] is set AND still in the snapshot, otherwise the globally-[selected]
- * car so an unconfigured or stale slot is never blank.
- *
- * IMPORTANT -- this "stale pin falls back to selected" rule is a WATCH-only choice. The phone
- * widget and QS tile deliberately do the opposite: a pinned widget shows ITS car or nothing,
- * never silently swapping to another (see CarWidget.provideGlance). Do NOT route those through
- * this helper. The two watch surfaces (ComplicationCarStore.resolveComplicationCar and
- * BlooTileService.pick) had this exact expression copied byte-for-byte; one home keeps the rule
- * -- and any future change to how a stale pin is treated -- from drifting between them.
- */
-fun SnapshotStore.SnapshotData.pinnedOrSelected(pinnedVin: String?): VehicleSnapshot? =
-    pinnedVin?.let { v -> vehicles.firstOrNull { it.vin == v } } ?: selected

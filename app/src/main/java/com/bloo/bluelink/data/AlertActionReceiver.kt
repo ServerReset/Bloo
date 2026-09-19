@@ -10,7 +10,7 @@ import kotlinx.coroutines.launch
 
 /**
  * Handles an action button tapped on a Bloo alert notification. Runs the
- * remote command with the stored session via [WearCommandRunner], dismisses
+ * remote command with the stored session via [CarCommandRunner], dismisses
  * the alert, and posts a short follow-up so the user sees whether it worked —
  * important for "Lock" when a door is still physically open and the car
  * refuses to lock.
@@ -35,7 +35,7 @@ class AlertActionReceiver : BroadcastReceiver() {
      *    a. Cancels the original alert notification right away, before the
      *       network call even starts, purely so tapping the button feels
      *       instantaneous rather than waiting on network round-trip latency.
-     *    b. Runs the actual remote command via [WearCommandRunner.execute],
+     *    b. Runs the actual remote command via [CarCommandRunner.execute],
      *       wrapped in [runCatching] so a thrown exception becomes a null
      *       result rather than crashing this coroutine.
      *    c. Posts a short follow-up notification reusing the *same* notification
@@ -86,7 +86,7 @@ class AlertActionReceiver : BroadcastReceiver() {
                 if (notifId != -1) runCatching { NotificationManagerCompat.from(ctx).cancel(notifId) }
                 // runCarCommand: the "Turn off" button on the car-is-running alert is one of
                 // the climate-stop paths that never cancelled the auto-extend chain.
-                val result = runCatching { runCarCommand(ctx, WearCommand(vin, action)) }
+                val result = runCatching { runCarCommand(ctx, CarCommand(vin, action)) }
                     .getOrNull()
                 val ok = result?.ok == true
                 val title = if (ok) "$label sent" else "$label failed"

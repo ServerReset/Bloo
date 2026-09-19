@@ -133,7 +133,7 @@ internal var inMultiWindowMode by mutableStateOf(false)
  * it is a single process-wide flag every caller should honour identically.
  *
  * The blur is always active when [hazeState] and hardware capability
- * ([CanBlurBackdrops]) allow it -- there used to be an `active: Boolean`
+ * ([canBlurBackdrops]) allow it -- there used to be an `active: Boolean`
  * escape hatch here (meant for pausing the blur during a pager fling to save
  * a per-frame RenderEffect recomposite), but every real call site already
  * passed `true` unconditionally, so the flag was dead flexibility that only
@@ -175,7 +175,7 @@ internal fun StatusBarScrim(
     // stronger gradient (blur's whole job, legibility under the status bar icons,
     // otherwise falls entirely on a fairly light 0.55 alpha fade) instead of
     // silently doing less than intended.
-    val canBlur = CanBlurBackdrops()
+    val canBlur = canBlurBackdrops()
     // glassTint, not this scrim's own separately-tuned alpha pair or scheme.surface --
     // the exact same fill (colour AND alpha) every other glass surface in the app
     // resolves to for this canBlur state. There is now exactly one function in the
@@ -188,7 +188,7 @@ internal fun StatusBarScrim(
             // The status bar's own real height, not that plus an extra margin --
             // 20dp (and 28dp before that) was still reported as "too thick", reaching
             // past the icons it exists to back into content below (a segmented
-            // toggle, page dots). Basing this directly on the actual inset means it
+            // toggle). Basing this directly on the actual inset means it
             // covers exactly the status bar and nothing past it, on every device.
             .height(topInset)
             .then(
@@ -390,7 +390,7 @@ internal fun FloatingIcon(
             }
             .ambientRing(CircleShape),
         hazeState = hazeState,
-        tint = containerColor ?: glassTint(hazeState != null && CanBlurBackdrops()),
+        tint = containerColor ?: glassTint(hazeState != null && canBlurBackdrops()),
         contentColor = contentColor,
         contentDescription = description,
         interactionSource = interaction,
@@ -459,7 +459,7 @@ internal val LocalCoverScrubbing = staticCompositionLocalOf<MutableState<Boolean
 
 /**
  * The live pull-to-refresh distance (0..1+), published by [Refreshable] so the
- * floating overlays in [GarageScreen] (page dots, settings/back/flip buttons)
+ * floating overlays in [GarageScreen] (settings/back/flip buttons)
  * can track the pull in real time instead of only animating once refresh starts.
  */
 internal val LocalPullFraction =

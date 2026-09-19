@@ -64,8 +64,8 @@ class LiveChargePollWorker(context: Context, params: WorkerParameters) : Corouti
         var learnedSomething = false
         // Same defect AlertWorker had, and more visible here: this chain relearns the
         // battery percentage every 5 minutes during a charge and used to keep all of it
-        // to itself, feeding only the notification. So the widget's charge ring, the
-        // watch and the tiles sat on whatever the phone app last persisted -- a ring
+        // to itself, feeding only the notification. So the phone UI's charge
+        // readouts sat on whatever the app last persisted -- a ring
         // frozen at 43% for the whole session, beside a notification counting up.
         // Collected and written in one merge below.
         val fetched = mutableMapOf<String, VehicleStatus>()
@@ -75,7 +75,7 @@ class LiveChargePollWorker(context: Context, params: WorkerParameters) : Corouti
         // run every 5 minutes for the entire length of a charge just to
         // re-fetch the same fleet list this worker already has cached, doubling
         // the outbound calls this chain makes. Same snap.toVehicle() rebuild
-        // TileCommandRunner/WearCommandRunner already use for the identical
+        // TileCommandRunner/CarCommandRunner already use for the identical
         // reason. A car added/removed mid-charge is picked up on the next
         // foreground refresh (AppViewModel's own saveVehiclesKeepingStatus),
         // same as it always was for anything this worker missed.

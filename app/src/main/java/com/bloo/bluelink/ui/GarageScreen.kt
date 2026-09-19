@@ -49,9 +49,9 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.onSizeChanged
-import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.unit.dp
 import com.bloo.bluelink.data.STALE_STATUS_MS
 import kotlinx.coroutines.delay
@@ -147,7 +147,7 @@ internal fun GarageScreen(
     // Live pull distance reported by Refreshable, so the overlays react the moment
     // the user starts pulling - not only once a refresh is in flight.
     val pullFractionState = remember { mutableStateOf(0f) }
-    // Hide the page indicator as soon as the pull begins (and through the refresh),
+    // Hide the floating chrome as soon as the pull begins (and through the refresh),
     // so the squiggly indicator has the stage to itself; fade it back in when done.
     // NOT read via `by` here: this is GarageScreen scope, the car pager's parent.
     // A composition-scope read meant all ~12 frames of this 200ms fade recomposed
@@ -186,9 +186,9 @@ internal fun GarageScreen(
     // comment) uses this instead; `count` itself stays the real vehicle
     // count for anything that indexes into `vehicles`.
     val slots = maxOf(count, 1)
-    val cfg = LocalConfiguration.current
-    val widthDp = cfg.screenWidthDp
-    val large = widthDp >= COVER_SCREEN_WIDTH_DP
+    val windowInfo = LocalWindowInfo.current
+    val widthDp = with(LocalDensity.current) { windowInfo.containerSize.width.toDp() }
+    val large = widthDp >= COVER_SCREEN_WIDTH_DP.dp
     val compact = isCompactCoverScreen()
     // Only show cover-screen hints once per session.
     var coverHintShown by rememberSaveable { mutableStateOf(false) }
@@ -264,7 +264,7 @@ internal fun GarageScreen(
     // and there is exactly one non-Settings page to show anyway in that case
     // (the status card), so multi-column grid mode never applies to it.
     //
-    // Derived from `widthDp` (LocalConfiguration.screenWidthDp), NOT the collapsed pager's
+    // Derived from `widthDp` (LocalWindowInfo.containerSize), NOT the collapsed pager's
     // own measured `boxWidthPx` (see that Box's own `pageWidth`, below): widthDp is available
     // synchronously from the very first frame, while boxWidthPx starts at 0 and only catches
     // up once that Box's first onSizeChanged fires a layout pass later. This briefly WAS
@@ -276,7 +276,7 @@ internal fun GarageScreen(
     // foldable, unfolded) rendered ONE frame as a single column before reflowing into its
     // real column count the instant boxWidthPx caught up -- a visible hitch on every single
     // launch, reported directly. widthDp being correct from frame one is what avoids it.
-    val perPage = (widthDp / MIN_CARD_DP).coerceIn(1, slots)
+    val perPage = (widthDp / MIN_CARD_DP.dp).toInt().coerceIn(1, slots)
     // Expanding to the dual-column view only makes sense on a wide screen.
     val canExpand = large && count > 1
     // Expanded means exactly one thing now: the user tapped the fullscreen icon
@@ -463,11 +463,10 @@ internal fun GarageScreen(
                 DisposableEffect(Unit) { onDispose { vm.setOnSettingsPageSlot(false) } }
                 // The above only pushes the pager's own settles into
                 // currentIndex, never the other direction -- so an
-                // external change (a widget/shortcut tap selecting a specific
-                // car while this pager was already composed on a different
-                // one) updated currentIndex, and the floating name pill below
-                // read it correctly, but the pager itself just sat there on
-                // whatever car it last settled on. A widget tap always means
+                // external change (a shortcut tap selecting a specific car while
+                // this pager was already composed on a different one) updated
+                // currentIndex, but the pager itself just sat there on whatever
+                // car it last settled on. A shortcut tap always means
                 // "look at this car now," so jump (no animated fly-through
                 // across a potentially large virtual-page delta) the instant
                 // currentIndex moves out from under the page actually shown.
@@ -638,11 +637,10 @@ internal fun GarageScreen(
                     // would light up every visible card's spinner for a refresh
                     // that only touched one of them. But that left a real gap:
                     // count <= perPage (every car already fits on one page, common
-                    // on tablets) meant PagerDots above never renders either, so
-                    // pulling to refresh in the grid had *zero* visual feedback of
-                    // any kind. RefreshIndicatorBadge (Pebbles.kt) -- the one shared
-                    // refresh badge every pull-to-refresh surface in the app now uses
-                    // -- covers every grid case, page dots or not. There's no drag
+                    // on tablets) meant pulling to refresh in the grid had *zero*
+                    // visual feedback of any kind. RefreshIndicatorBadge (Pebbles.kt)
+                    // -- the one shared refresh badge every pull-to-refresh surface in
+                    // the app now uses -- covers every grid case. There's no drag
                     // gesture to follow here, so its progress just animates 0->1 off
                     // the plain `refreshing` boolean instead of a live pull distance.
                     if (perPage > 1) {

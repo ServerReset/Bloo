@@ -486,7 +486,7 @@ internal fun SettingsSearchResults(
 
     // A recognised command ("lock my Ioniq", "start smart climate", "stop
     // charging") actually runs -- reuses TileCommandRunner, the same
-    // execution path the Quick Settings tiles use, so this isn't a separate,
+    // execution path used elsewhere in the app, so this isn't a separate,
     // untested way of sending vehicle commands. If the query doesn't name a
     // specific car, this falls back to a single car (unambiguous) or asks
     // the user to be more specific (multiple cars, none named).

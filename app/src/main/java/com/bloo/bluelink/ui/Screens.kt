@@ -191,8 +191,8 @@ fun BlooApp(vm: AppViewModel) {
         }
     }
 
-    // One floating registry for the whole app: every floating element (the flying car name, the
-    // page dots, corner chrome) publishes its bounds here and asks here who else is in the way,
+    // One floating registry for the whole app: every floating element (corner chrome, search,
+    // the refresh indicator) publishes its bounds here and asks here who else is in the way,
     // instead of screens hand-threading each other's positions around. See FloatingSystem.kt.
     val floatingRegistry = remember { FloatingRegistry() }
     CompositionLocalProvider(
@@ -280,7 +280,7 @@ fun BlooApp(vm: AppViewModel) {
                 GlassSurface(
                     shape = snackShape,
                     hazeState = searchHazeState,
-                    tint = snackColors.first.copy(alpha = if (CanBlurBackdrops()) 0.75f else 0.94f),
+                    tint = snackColors.first.copy(alpha = if (canBlurBackdrops()) 0.75f else 0.94f),
                     contentColor = snackColors.second,
                     modifier = Modifier
                         .padding(16.dp)

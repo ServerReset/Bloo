@@ -9,9 +9,9 @@ import androidx.work.workDataOf
 import com.bloo.bluelink.data.AppLog
 import com.bloo.bluelink.data.CLIMATE_DURATION_RANGE
 import com.bloo.bluelink.data.DEFAULT_CLIMATE_TEMP_F
-import com.bloo.bluelink.data.WearAction
-import com.bloo.bluelink.data.WearCommand
-import com.bloo.bluelink.data.WearCommandRunner
+import com.bloo.bluelink.data.CarAction
+import com.bloo.bluelink.data.CarCommand
+import com.bloo.bluelink.data.CarCommandRunner
 import java.util.concurrent.TimeUnit
 
 /**
@@ -26,10 +26,10 @@ import java.util.concurrent.TimeUnit
  * scheduled up front, so a manual stop only ever has to cancel ONE pending
  * work item regardless of how many chunks are left.
  *
- * Uses [WearCommandRunner] directly (not the phone's own repo/session
- * plumbing) -- the exact same standalone command path the widget and Quick
- * Settings tile workers already run from a bare [Context] with no live
- * ViewModel, which is exactly this worker's situation too.
+ * Uses [CarCommandRunner] directly (not the phone's own repo/session
+ * plumbing) -- the exact same bare-[Context] command path the notification
+ * actions and AutoLock already run with no live ViewModel, which is exactly
+ * this worker's situation too.
  */
 class ClimateExtendWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ctx, params) {
 
@@ -40,9 +40,9 @@ class ClimateExtendWorker(ctx: Context, params: WorkerParameters) : CoroutineWor
         // programming error elsewhere, not a reason to fail the work item.
         if (remainingMinutes <= 0) return Result.success()
 
-        val command = WearCommand(
+        val command = CarCommand(
             vin = vin,
-            action = WearAction.CLIMATE_ON,
+            action = CarAction.CLIMATE_ON,
             tempF = inputData.getInt(KEY_TEMP_F, DEFAULT_CLIMATE_TEMP_F),
             durationMinutes = remainingMinutes.coerceAtMost(CLIMATE_DURATION_RANGE.last),
             defrost = inputData.getBoolean(KEY_DEFROST, false),
@@ -52,7 +52,7 @@ class ClimateExtendWorker(ctx: Context, params: WorkerParameters) : CoroutineWor
             seatRearLeft = inputData.getInt(KEY_SEAT_RL, 0),
             seatRearRight = inputData.getInt(KEY_SEAT_RR, 0),
         )
-        val result = runCatching { WearCommandRunner.execute(applicationContext, command) }.getOrNull()
+        val result = runCatching { CarCommandRunner.execute(applicationContext, command) }.getOrNull()
         if (result?.ok != true) {
             AppLog.log("⚠ Climate auto-extend for $vin failed: ${result?.message ?: "unknown error"}")
             // Not retried: a stale extend command landing minutes late (or after
@@ -142,22 +142,17 @@ class ClimateExtendWorker(ctx: Context, params: WorkerParameters) : CoroutineWor
          * ON with different settings goes through [schedule]'s own REPLACE instead.)
          *
          * This used to say it was "called whenever climate is stopped manually", and it
-         * was not: it had two callers, both in AppViewModel, so stopping climate from the
-         * QS tile, the widget, the watch, or the "Turn off" button on the car-is-running
-         * notification left the chain armed -- and up to ten minutes later it re-issued
+         * was not: it had two callers, both in AppViewModel, so stopping climate from
+         * any other surface (the "Turn off" button on the car-is-running notification,
+         * for one) left the chain armed -- and up to ten minutes later it re-issued
          * CLIMATE_ON and restarted the car.
          *
-         * Now reached from all of those: the three that go through
-         * WearCommandRunner.execute do it via [com.bloo.bluelink.data.runCarCommand], and
+         * Now reached from every remaining stop path: the ones that go through
+         * CarCommandRunner.execute do it via [com.bloo.bluelink.data.runCarCommand], and
          * TileCommandRunner, which calls the repo directly, via its own
-         * stopClimateAndChain. Adding four separate cancel calls was the alternative, and
-         * four copies of one rule is how this drifted in the first place.
-         *
-         * ⚠ Still not covered: the watch's STANDALONE path, which calls WearCommandRunner
-         * from `:wear` and so cannot reference this worker. That path only runs when the
-         * phone is unreachable, and the chain executes on the phone, so an unreachable
-         * phone fires it regardless. Closing it needs a stop marker in the shared snapshot
-         * payload -- a cross-process schema change that wants a device to validate.
+         * stopClimateAndChain. Adding separate cancel calls at each call site was the
+         * alternative, and several copies of one rule is how this drifted in the first
+         * place.
          */
         fun cancel(context: Context, vin: String) {
             WorkManagerInit.of(context).cancelUniqueWork(uniqueName(vin))

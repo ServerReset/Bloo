@@ -8,11 +8,9 @@ package com.bloo.uicommon
 /**
  * Page-dot indicator rail, pure Compose Foundation.
  *
- * Material-free by construction: the consuming app (phone garage, cover,
- * and anything else showing a pager) resolves theme colors into a
+ * Material-free by construction: the consuming app resolves theme colors into a
  * [PagerDotColors] instance and supplies the frosted chrome, so the exact
- * same component renders under compose.material3 or wear.compose.material3
- * without either platform importing the other.
+ * same component stays free of any Material dependency.
  */
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
@@ -66,8 +64,7 @@ import androidx.compose.ui.graphics.StrokeCap
  *  gesture (and its fill-ring) entirely. The consuming app resolves
  *  [PagerDotColors] from its own theme and supplies the frosted pill chrome
  *  ([ambientRing]/[dropShadow]/[frostedRim] from this same module), so this
- *  component stays Material-free and renders identically under
- *  compose.material3 and wear.compose.material3. */
+ *  component stays Material-free. */
 
 /** Material-free color spec for [PagerDots]: the one theme coupling a
  *  cross-surface call site must supply. Defaults are neutral grayscale so a
@@ -210,9 +207,9 @@ fun PagerDots(
                 // Was relying only on Material's own tonal shadowElevation (2dp) --
                 // barely-there against a car photo, same gap as every other
                 // piece of floating chrome the frostedRim/dropShadow pass
-                // already covers (FloatingIcon, the name pill, the Settings
+                // already covers (FloatingIcon, the Settings
                 // pill). This is one of the most visible floating pills in the
-                // app (car-switcher dots at the top of the garage), so it
+                // app, so it
                 // shouldn't have been the one left out.
                 .ambientRing(CircleShape)
                 .dropShadow(CircleShape)

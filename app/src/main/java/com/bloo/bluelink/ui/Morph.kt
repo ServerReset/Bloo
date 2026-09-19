@@ -117,9 +117,9 @@ internal data class GroupIconAction(
  * Its width springs (with a little overshoot) whenever the content width changes,
  * e.g. the label flips Start -> Stop.
  *
- * This IS the shared [MorphButtonCore] from :uicommon -- the same machinery the
- * watch's MorphButton uses -- dressed in this module's Material theme colours,
- * haptics and M3 content padding, plus two phone-wide conventions:
+ * This IS the shared [MorphButtonCore] from :uicommon -- dressed in this
+ * module's Material theme colours, haptics and M3 content padding, plus two
+ * phone-wide conventions:
  *
  *  - [minHeight] of 48dp (the M3 touch target the old `Button` enforced
  *    implicitly) unless a caller opts out to keep a shorter pill

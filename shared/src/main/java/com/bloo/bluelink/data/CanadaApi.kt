@@ -393,11 +393,11 @@ class CanadaApi(private val brand: Brand) {
                 // airTemp.value straight into degLabel(), which treats its input
                 // as °F, so an undecoded "0AH" rendered as garbage "0AH°". Sibling
                 // of the 868 km→mi fix on dte just above.
-                // Normalised to °F HERE, so every surface downstream -- phone,
-                // watch, widget -- gets one unit rather than each having to know
-                // this backend's conventions. The watch in particular reads
-                // airTemp.value through a payload that carries no unit code, so a
-                // Celsius value reaching it could not be interpreted correctly
+                // Normalised to °F HERE, so every surface downstream -- the phone
+                // UI readers -- gets one unit rather than each having to know
+                // this backend's conventions. A reader that sees only
+                // airTemp.value through a payload with no unit code could not
+                // interpret a Celsius value correctly
                 // however careful the formatting was at that end.
                 //
                 // Two shapes arrive on unit 0. The hex "0AH" index decodes via

@@ -18,8 +18,8 @@ package com.bloo.bluelink.ui
 
 import android.content.Context
 import android.content.Intent
-import android.net.Uri
 import androidx.browser.customtabs.CustomTabsIntent
+import androidx.core.net.toUri
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutLinearInEasing
@@ -2004,17 +2004,17 @@ private fun CarMapSheetBody(
  * format.
  */
 internal fun openInExternalMaps(context: Context, location: GeoLocation, label: String) {
-    val uri = Uri.parse(
+    val uri = (
         "geo:${location.latitude},${location.longitude}" +
             "?q=${location.latitude},${location.longitude}($label)"
-    )
+    ).toUri()
     runCatching {
         context.startActivity(Intent(Intent.ACTION_VIEW, uri).apply { addFlags(Intent.FLAG_ACTIVITY_NEW_TASK) })
     }
 }
 
 internal fun openUrl(context: Context, url: String) {
-    val uri = Uri.parse(url)
+    val uri = url.toUri()
     runCatching { CustomTabsIntent.Builder().build().launchUrl(context, uri) }
         .onFailure {
             runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, uri).apply { addFlags(Intent.FLAG_ACTIVITY_NEW_TASK) }) }
@@ -2032,6 +2032,6 @@ internal fun openApp(context: Context, packages: List<String>, fallbackUrl: Stri
 
 internal fun dial(context: Context, number: String) {
     runCatching {
-        context.startActivity(Intent(Intent.ACTION_DIAL, Uri.parse("tel:$number")).apply { addFlags(Intent.FLAG_ACTIVITY_NEW_TASK) })
+        context.startActivity(Intent(Intent.ACTION_DIAL, "tel:$number".toUri()).apply { addFlags(Intent.FLAG_ACTIVITY_NEW_TASK) })
     }
 }

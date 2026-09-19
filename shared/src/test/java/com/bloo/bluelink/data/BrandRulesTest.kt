@@ -11,8 +11,8 @@ import kotlin.test.assertTrue
  * These rules have a documented bug history: a Horn/Lights capability rule
  * hand-copied into the WATCH missed the Canada half, and every Canadian user
  * got Flash and Horn buttons that silently did nothing on every tap (see
- * [Brand.supportsHornLights]'s own doc). Every consumer (phone screens, watch
- * buttons, widget actions) now routes through the shared accessors; these
+ * [Brand.supportsHornLights]'s own doc). Every consumer (the phone screens) now
+ * routes through the shared accessors; these
  * tests are the tripwire that keeps any future copy from diverging again,
  * by pinning the rules in the ONE place a copy would have to be written from.
  */

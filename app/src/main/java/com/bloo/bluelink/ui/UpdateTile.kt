@@ -15,7 +15,6 @@ package com.bloo.bluelink.ui
 
 import android.content.Intent
 import android.os.Build
-import android.net.Uri
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
@@ -81,6 +80,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.core.net.toUri
 import com.bloo.bluelink.update.UpdateInfo
 import com.bloo.bluelink.data.Weather
 import kotlin.math.roundToInt
@@ -95,8 +95,8 @@ import kotlin.math.roundToInt
  * button doubles as the primary control and shows live download state
  * (Update / downloading % / Install); expanded, it adds install steps, this
  * build's release notes, and Remind-me/Not-now. Every push publishes a
- * rolling GitHub Release (see android.yml) with the raw phone/watch APKs
- * attached as plain public assets, so the primary action can download the
+ * rolling GitHub Release (see android.yml) with the raw phone APK
+ * attached as a plain public asset, so the primary action can download the
  * APK directly instead of opening a browser page.
  */
 @Composable
@@ -187,7 +187,7 @@ internal fun UpdateAvailableTile(
                             // ActivityNotFoundException and dismissing anyway meant a
                             // tap did visibly nothing AND cost the user the tile.
                             val opened = runCatching {
-                                context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(info.run.htmlUrl)))
+                                context.startActivity(Intent(Intent.ACTION_VIEW, info.run.htmlUrl.toUri()))
                             }.isSuccess
                             if (opened) vm.dismissUpdate() else vm.reportError("Couldn't open the release page.")
                         }
@@ -427,7 +427,7 @@ internal fun UpdateReleaseNotes(
                         onClick = {
                             runCatching {
                                 context.startActivity(
-                                    Intent(Intent.ACTION_VIEW, Uri.parse(info.run.htmlUrl))
+                                    Intent(Intent.ACTION_VIEW, info.run.htmlUrl.toUri())
                                         .apply { addFlags(Intent.FLAG_ACTIVITY_NEW_TASK) },
                                 )
                             }
@@ -486,7 +486,7 @@ internal fun runUpdateAction(
         else -> {
             val opened = runCatching {
                 context.startActivity(
-                    Intent(Intent.ACTION_VIEW, Uri.parse(info.run.htmlUrl))
+                    Intent(Intent.ACTION_VIEW, info.run.htmlUrl.toUri())
                         .apply { addFlags(Intent.FLAG_ACTIVITY_NEW_TASK) },
                 )
             }.isSuccess

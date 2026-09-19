@@ -18,10 +18,10 @@ import androidx.compose.ui.unit.dp
 /**
  * A real drop shadow -- an offset, blurred, dark silhouette of [shape] drawn
  * behind the composable -- rather than Material3 Surface's own tonal
- * `shadowElevation` (or Wear Compose's equivalent), which reads as barely-
- * there against most backgrounds. Shared between phone and watch (pure
+ * `shadowElevation`, which reads as barely-
+ * there against most backgrounds. Used by the phone UI (pure
  * Compose graphics APIs, no Material dependency) so every piece of floating
- * chrome on both platforms uses the same technique.
+ * chrome uses the same technique.
  *
  * drawWithCache, not drawBehind: the Paint/BlurMaskFilter/Path used to get
  * rebuilt from scratch on every single draw call, static pebble or not. For

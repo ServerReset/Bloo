@@ -214,7 +214,7 @@ internal fun CompactGarage(state: UiState, vm: AppViewModel, appearance: Setting
     // otherwise outlive the page it described.
     DisposableEffect(Unit) { onDispose { vm.setOnSettingsPageSlot(false) } }
     // Mirror of the default garage pager's own fix: react to currentIndex
-    // changing out from under an already-composed pager (e.g. a widget tap
+    // changing out from under an already-composed pager (e.g. a shortcut tap
     // selecting a specific car while the cover screen was already showing a
     // different one) by snapping to it, instead of only ever pushing this
     // pager's own settles into currentIndex one-way.
@@ -224,10 +224,8 @@ internal fun CompactGarage(state: UiState, vm: AppViewModel, appearance: Setting
     // True while the page scrubber is active; suspends car-switching swipes so a
     // scrub gesture can't be hijacked into flipping to the next car.
     val scrubbing = remember { mutableStateOf(false) }
-    // Hide the page indicators while a refresh is in flight (pull-to-refresh /
-    // manual refresh) so the loading indicator owns the screen. Shared by both
-    // dot rows below (car-switch AND per-car tile) instead of each keeping its
-    // own separate Animatable of the exact same value.
+    // Fades the floating chrome while a refresh is in flight (pull-to-refresh /
+    // manual refresh) so the loading indicator owns the screen.
     // Held as State, not read via `by` — see the same treatment in GarageScreen.
     // Read in composition scope this fade recomposed the whole cover pager (and,
     // as a plain Float parameter, every CompactCar page) once per animation frame.
@@ -645,7 +643,7 @@ internal fun CompactCar(
             // mid-swipe, which is exactly when there is no frame budget to spare. The car pager
             // beside it has had this since the beginning.
             //
-            // The cost is fine here in a way it would not be on the watch: a flip phone's cover
+            // The cost is fine here: a flip phone's cover
             // is a small DISPLAY, not a small device. It runs the same flagship SoC as the main
             // screen. And a tile is cheaper than it was -- no per-tile SubcomposeLayout and no
             // hero block any more.
