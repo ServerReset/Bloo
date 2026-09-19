@@ -989,11 +989,17 @@ internal fun CarMap(
         // (each pin is ~40dp/16dp wide) -- merge them into one instead of drawing
         // two pins stacked on top of each other.
         val mergeThresholdPx = with(density) { 36.dp.toPx() }
-        val isMerged = devTileOffsetPx?.let { (dx, dy) ->
+        // Non-null only when the two pins would visually collide. Carrying the
+        // offset itself (rather than a boolean plus a second null check on the
+        // same value) is what lets the merged branch destructure it directly --
+        // and it is what the compiler was already proving: "isMerged" could only
+        // be true when the offset existed, so the old `&& devTileOffsetPx != null`
+        // was dead weight.
+        val mergedOffsetPx = devTileOffsetPx?.takeIf { (dx, dy) ->
             kotlin.math.hypot(dx, dy) < mergeThresholdPx
-        } ?: false
-        if (isMerged && devTileOffsetPx != null) {
-            val (dx, dy) = devTileOffsetPx
+        }
+        if (mergedOffsetPx != null) {
+            val (dx, dy) = mergedOffsetPx
             // One pin at the midpoint between the two, tinted with an even mix of
             // the car's own colour and the device's -- "a combined pin that has
             // the mix of the two colors" rather than picking one or stacking both.

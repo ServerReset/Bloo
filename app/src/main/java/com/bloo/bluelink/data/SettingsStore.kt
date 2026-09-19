@@ -1463,7 +1463,10 @@ class SettingsStore(private val context: Context) {
         val fullAdopt = pullPrimary || !syncedEver
         val shouldImport = remoteHasContent && (pullPrimary || !syncedEver || gatePassed)
         var imported = false
-        if (shouldImport && remoteJson != null) {
+        // No `&& remoteJson != null` here: remoteHasContent (folded into
+        // shouldImport above) already requires it, and K2 proves it -- the extra
+        // check was dead code.
+        if (shouldImport) {
             imported = if (fullAdopt) {
                 adoptSettingsJson(remoteJson)
             } else {
@@ -2236,6 +2239,11 @@ class SettingsStore(private val context: Context) {
      *  local path map for the caller to fold into whichever edit block
      *  (tracked or not) it's already running, so this lands in the SAME
      *  transaction as the rest of that import/merge instead of a separate one. */
+    // @OptIn: Coil's diskCache accessor is still @ExperimentalCoilApi. The call is a
+    // deliberate blanket clear() (see the comment at its call site), not an API we can
+    // avoid -- the annotation records that we knowingly depend on the experimental
+    // surface rather than suppressing it file-wide.
+    @OptIn(coil.annotation.ExperimentalCoilApi::class)
     private fun applySyncPhotos(photos: JsonObject?, protect: Set<String> = emptySet()): Map<String, String> {
         if (photos == null) return emptyMap()
         val dir = java.io.File(context.filesDir, "cars").apply { mkdirs() }
@@ -2519,6 +2527,11 @@ class SettingsStore(private val context: Context) {
                 ).firstNotNullOfOrNull { p -> runCatching { lm.getLastKnownLocation(p) }.getOrNull() }
             }.getOrNull() ?: return false
         }
+        // @Suppress("DEPRECATION"): the sync Geocoder is Java-deprecated in favour of
+        // the API-33+ listener overload, but the sync form is the only one that
+        // exists on every supported API level (minSdk 26) without a second,
+        // listener-shaped implementation. The whole read is runCatching-wrapped.
+        @Suppress("DEPRECATION")
         val label = runCatching {
             android.location.Geocoder(context, java.util.Locale.getDefault())
                 .getFromLocation(loc.latitude, loc.longitude, 1)?.firstOrNull()?.let { a ->

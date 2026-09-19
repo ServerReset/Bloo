@@ -89,7 +89,8 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.platform.LocalClipboard
+import androidx.compose.ui.platform.ClipEntry
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.AnnotatedString
@@ -102,6 +103,7 @@ import kotlinx.coroutines.launch
 import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.roundToInt
+import android.content.ClipData
 
 
 /**
@@ -135,7 +137,10 @@ fun BlooApp(vm: AppViewModel) {
     val searchHazeState = remember { HazeState() }
     val snackbar = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
-    val clipboard = LocalClipboardManager.current
+    // LocalClipboard (the non-deprecated spelling): its set API is SUSPEND, so
+    // the copy call below hops through this screen's existing `scope` rather
+    // than the old manager's synchronous setText.
+    val clipboard = LocalClipboard.current
     val context = LocalContext.current
 
     // One haptics engine for the whole app; its enabled flag tracks the setting.
@@ -153,7 +158,9 @@ fun BlooApp(vm: AppViewModel) {
     // (and its LaunchedEffects) alive, so without the gate a slow command kept
     // vibrating the phone in the user's pocket after they switched apps.
     val busy = state.loading || state.pending.isNotEmpty()
-    val lifecycleOwner = androidx.compose.ui.platform.LocalLifecycleOwner.current
+    // androidx.lifecycle.compose.LocalLifecycleOwner -- the compose-ui platform
+    // spelling is deprecated and slated for removal.
+    val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
     LaunchedEffect(busy) {
         if (!busy) return@LaunchedEffect
         lifecycleOwner.repeatOnLifecycle(androidx.lifecycle.Lifecycle.State.STARTED) {
@@ -350,7 +357,11 @@ fun BlooApp(vm: AppViewModel) {
                         // ones, where it can grow and they can give -- which is why
                         // MorphIconButton does it automatically.) These two keep the plain Row
                         // and the press scale MorphButtonCore already draws.
-                        MorphIconButton(onClick = { clipboard.setText(AnnotatedString(data.visuals.message)) }) {
+                        MorphIconButton(onClick = {
+                            scope.launch {
+                                clipboard.setClipEntry(ClipEntry(ClipData.newPlainText("bloo", data.visuals.message)))
+                            }
+                        }) {
                             Icon(Icons.Filled.ContentCopy, contentDescription = "Copy")
                         }
                         // Swipe-to-dismiss is a raw drag gesture with no

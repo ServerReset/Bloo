@@ -26,12 +26,12 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccountBalanceWallet
 import androidx.compose.material.icons.filled.CreditCard
 import androidx.compose.material.icons.filled.Build
-import androidx.compose.material.icons.filled.MenuBook
+import androidx.compose.material.icons.automirrored.filled.MenuBook
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Place
 import androidx.compose.material.icons.filled.Storefront
 import androidx.compose.material.icons.filled.Call
-import androidx.compose.material.icons.filled.OpenInNew
+import androidx.compose.material.icons.automirrored.filled.OpenInNew
 import androidx.compose.material.icons.filled.VpnKey
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Settings
@@ -229,7 +229,7 @@ internal fun OwnerLinks(v: Vehicle, state: UiState, context: Context) {
         group("App & account") {
             MorphActionButton(
                 label = "${links.appName} app",
-                icon = Icons.Filled.OpenInNew,
+                icon = Icons.AutoMirrored.Filled.OpenInNew,
                 onClick = { openApp(context, listOf(links.appPackage), links.playStoreUrl) },
             )
             MorphActionButton(
@@ -261,7 +261,7 @@ internal fun OwnerLinks(v: Vehicle, state: UiState, context: Context) {
             )
             MorphActionButton(
                 label = "Manuals",
-                icon = Icons.Filled.MenuBook,
+                icon = Icons.AutoMirrored.Filled.MenuBook,
                 onClick = { openUrl(context, links.manualsUrl) },
             )
             MorphActionButton(

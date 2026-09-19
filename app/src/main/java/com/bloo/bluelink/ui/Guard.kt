@@ -39,7 +39,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.CloudOff
 import androidx.compose.material.icons.filled.DirectionsCar
 import androidx.compose.material.icons.filled.Fingerprint
@@ -208,7 +208,7 @@ internal fun LockOverlay(vm: AppViewModel) {
         // override colours (this is what its old hand-rolled Surface now
         // passes in -- one circle button, one component).
         FloatingIcon(
-            icon = Icons.Filled.ArrowBack,
+            icon = Icons.AutoMirrored.Filled.ArrowBack,
             description = "Back to login",
             onClick = { haptics?.click(); vm.lockToLogin() },
             containerColor = Color.White.copy(alpha = 0.16f),

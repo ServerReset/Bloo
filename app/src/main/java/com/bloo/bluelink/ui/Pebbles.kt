@@ -49,7 +49,7 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Campaign
 import androidx.compose.material.icons.filled.Fullscreen
@@ -406,7 +406,7 @@ internal fun CriticalContent(v: Vehicle, stateSource: State<UiState>, vm: AppVie
         heroState.drivingLabel(v), metric = metric,
         photoExpanded = heroState.isPebbleExpanded(v.vin, com.bloo.bluelink.data.HERO_PHOTO_SECTION),
         expandAction = onCollapse?.let {
-            PebbleHeaderAction(label = "Back to all cars", icon = Icons.Filled.ArrowBack, onClick = it)
+            PebbleHeaderAction(label = "Back to all cars", icon = Icons.AutoMirrored.Filled.ArrowBack, onClick = it)
         },
     )
 }

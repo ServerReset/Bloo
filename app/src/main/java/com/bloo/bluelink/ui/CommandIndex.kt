@@ -4,7 +4,7 @@ package com.bloo.bluelink.ui
 
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Lock
-import androidx.compose.material.icons.filled.VolumeUp
+import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material.icons.filled.AcUnit
 import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -153,7 +153,7 @@ internal val CommandCatalog = listOf(
         title = "Flash lights",
         description = "Flash the headlights",
         category = CommandCategory.LIGHTS,
-        icon = Icons.Filled.VolumeUp,
+        icon = Icons.AutoMirrored.Filled.VolumeUp,
         keywords = "flash lights blink headlights",
         aliases = listOf("flash headlights", "blink lights", "lights on"),
     ),
@@ -164,7 +164,7 @@ internal val CommandCatalog = listOf(
         title = "Sound horn",
         description = "Sound the car horn and flash lights",
         category = CommandCategory.HORN,
-        icon = Icons.Filled.VolumeUp,
+        icon = Icons.AutoMirrored.Filled.VolumeUp,
         keywords = "horn honk beep sound",
         aliases = listOf("honk", "beep", "find my car"),
     ),

@@ -76,7 +76,7 @@ import androidx.compose.material.icons.filled.CloudDone
 import androidx.compose.material.icons.filled.CloudSync
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.SystemUpdate
-import androidx.compose.material.icons.filled.OpenInNew
+import androidx.compose.material.icons.automirrored.filled.OpenInNew
 import androidx.compose.material.icons.filled.Map
 import androidx.compose.material.icons.filled.BlurOn
 import androidx.compose.material.icons.filled.Image
@@ -132,7 +132,8 @@ import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.platform.LocalClipboard
+import androidx.compose.ui.platform.ClipEntry
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontFamily
@@ -152,6 +153,8 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlin.math.max
 import com.bloo.uicommon.ReorderColumn
+import android.content.ClipData
+import androidx.compose.runtime.rememberCoroutineScope
 /**
  * The whole Settings screen.
  *
@@ -245,7 +248,10 @@ internal fun SettingsScreen(
     val state by vm.state.collectAsStateWithLifecycle()
     val logs by vm.logs.collectAsStateWithLifecycle()
     val context = LocalContext.current
-    val clipboard = LocalClipboardManager.current
+    val clipboard = LocalClipboard.current
+    // LocalClipboard's set API is suspend; one scope for the two copy buttons
+    // below (Logs card's Copy, Debug panel's report copy).
+    val clipboardScope = rememberCoroutineScope()
     val canBio = remember { vm.canUseBiometrics() }
     // LazyVerticalStaggeredGrid, not a plain scrolling Column -- see the grid's
     // own comment below for why. StaggeredGridCells.Adaptive naturally resolves
@@ -933,7 +939,11 @@ internal fun SettingsScreen(
             AnimatedVisibility(visibleState = advTransition1, enter = collapseEnter(), exit = collapseExit()) {
             SettingsCard("Debug", Icons.Filled.BugReport, vm) {
                 DebugSettingsPanel(
-                    onCopyToClipboard = { text -> clipboard.setText(AnnotatedString(text)) },
+                    onCopyToClipboard = { text ->
+                        clipboardScope.launch {
+                            clipboard.setClipEntry(ClipEntry(ClipData.newPlainText("bloo debug", text)))
+                        }
+                    },
                 )
             }
             }
@@ -1043,7 +1053,11 @@ internal fun SettingsScreen(
                                 MorphTextButton(
                                     "Copy",
                                     onClick = {
-                                        clipboard.setText(AnnotatedString(logs.joinToString("\n")))
+                                        clipboardScope.launch {
+                                            clipboard.setClipEntry(
+                                                ClipEntry(ClipData.newPlainText("bloo logs", logs.joinToString("\n"))),
+                                            )
+                                        }
                                     },
                                     interactionSource = copySource,
                                 )
@@ -2108,7 +2122,7 @@ private fun CreditRow(entry: CreditEntry) {
                     textDecoration = TextDecoration.Underline,
                 )
                 Icon(
-                    Icons.Filled.OpenInNew,
+                    Icons.AutoMirrored.Filled.OpenInNew,
                     contentDescription = "Open link",
                     tint = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.size(12.dp),

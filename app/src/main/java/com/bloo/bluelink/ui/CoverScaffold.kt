@@ -101,6 +101,11 @@ internal fun cutoutClearanceDp(): EdgeDp {
     }
 }
 
+// @RequiresApi(P): DisplayCutout (and its boundingRects) only exist from API 28.
+// Both callers (cutoutClearanceDp, coverCutoutBand) already return early below P,
+// but the contract belongs ON the function that uses the API -- lint can't follow
+// the check across the call boundary, and neither could a future caller.
+@androidx.annotation.RequiresApi(android.os.Build.VERSION_CODES.P)
 private fun cutoutClearance(
     cutout: android.view.DisplayCutout?,
     vw: Int,
@@ -211,6 +216,8 @@ internal fun coverCutoutBand(): CoverBand? {
     }
 }
 
+/** Same P-only contract as [cutoutClearance]: see its annotation note. */
+@androidx.annotation.RequiresApi(android.os.Build.VERSION_CODES.P)
 private fun coverBand(
     cutout: android.view.DisplayCutout?,
     vw: Int,

@@ -37,7 +37,8 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.platform.LocalClipboard
+import androidx.compose.ui.platform.ClipEntry
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontFamily
@@ -53,6 +54,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
+import android.content.ClipData
 
 /**
  * Shown instead of silently restarting into [MainActivity] after an uncaught
@@ -261,7 +263,8 @@ class CrashActivity : ComponentActivity() {
 
     @Composable
     private fun CrashLog(report: String) {
-        val clipboard = LocalClipboardManager.current
+        val clipboard = LocalClipboard.current
+        val clipboardScope = rememberCoroutineScope()
         SettingsGroup("Crash report") {
             Text(
                 "Copy this and send it back -- device, build, the exact reason the app " +
@@ -272,7 +275,11 @@ class CrashActivity : ComponentActivity() {
             MorphTextButton(
                 "Copy",
                 icon = Icons.Filled.ContentCopy,
-                onClick = { clipboard.setText(AnnotatedString(report)) },
+                onClick = {
+                    clipboardScope.launch {
+                        clipboard.setClipEntry(ClipEntry(ClipData.newPlainText("bloo crash log", report)))
+                    }
+                },
             )
             SelectionContainer {
                 Text(report, fontFamily = FontFamily.Monospace, style = MaterialTheme.typography.bodySmall)
