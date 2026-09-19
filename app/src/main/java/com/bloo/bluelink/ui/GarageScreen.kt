@@ -259,32 +259,24 @@ internal fun GarageScreen(
     // rather than a copy fading in. One instance for the whole screen: only one
     // car's map can be expanded at a time regardless of which page it's on.
     val expandedMap = remember { ExpandedMapState() }
-    // The collapsed grid pager's own measured width in px -- set via onSizeChanged on that
-    // Box, further down. Hoisted up here (rather than declared next to that Box) so `perPage`
-    // below can be derived from the SAME value as `pageWidth` at that Box -- see `perPage`'s
-    // own doc for why the two must never be allowed to come from independent sources. Zero
-    // before that Box's first layout, same as before this hoist.
-    var boxWidthPx by remember { mutableIntStateOf(0) }
-    val density = LocalDensity.current
     // How many full-height cards fit side by side; pages advance by this many.
     // `slots`, not `count`: coerceIn(1, 0) throws (min > max) with zero cars,
     // and there is exactly one non-Settings page to show anyway in that case
     // (the status card), so multi-column grid mode never applies to it.
     //
-    // Derived from `boxWidthPx` (the collapsed pager's own measured width), NOT `widthDp`
-    // (LocalConfiguration.screenWidthDp): those are two INDEPENDENT signals that update on
-    // different frames -- screenWidthDp changes the instant a config change recomposes this
-    // screen, but boxWidthPx only catches up once onSizeChanged fires from that Box's NEXT
-    // layout pass. Deriving perPage from widthDp while pageWidth (at that Box, below) was
-    // built from the OLD boxWidthPx meant that for one frame after every rotation/fold/
-    // resize, Fixed(pageWidth) genuinely didn't divide the box into `perPage` columns any
-    // more -- the real fit count (viewport / pageWidth) could be MORE than perPage for that
-    // one frame, silently exceeding every beyondViewportPageCount/keyFor formula below, which
-    // is what actually produced a real, reported "Key already used" pager crash. Sourcing
-    // both perPage and pageWidth from the exact same boxWidthPx read keeps them mutually
-    // consistent by construction -- one frame stale after a resize, same as pageWidth already
-    // was, instead of two independently-stale values that can disagree with each other.
-    val perPage = with(density) { (boxWidthPx.toDp().value / MIN_CARD_DP).toInt() }.coerceIn(1, slots)
+    // Derived from `widthDp` (LocalConfiguration.screenWidthDp), NOT the collapsed pager's
+    // own measured `boxWidthPx` (see that Box's own `pageWidth`, below): widthDp is available
+    // synchronously from the very first frame, while boxWidthPx starts at 0 and only catches
+    // up once that Box's first onSizeChanged fires a layout pass later. This briefly WAS
+    // sourced from boxWidthPx instead, to fix a real "Key already used" pager crash caused by
+    // perPage/pageWidth disagreeing for one frame after a rotation -- but keyFor (below) no
+    // longer keys pages by real index at all (see its own doc for why), so that mismatch can
+    // no longer cause a crash regardless of which value perPage comes from. Sourcing it from
+    // boxWidthPx anyway meant every cold start on a wide/multi-column screen (a large
+    // foldable, unfolded) rendered ONE frame as a single column before reflowing into its
+    // real column count the instant boxWidthPx caught up -- a visible hitch on every single
+    // launch, reported directly. widthDp being correct from frame one is what avoids it.
+    val perPage = (widthDp / MIN_CARD_DP).coerceIn(1, slots)
     // Expanding to the dual-column view only makes sense on a wide screen.
     val canExpand = large && count > 1
     // Expanded means exactly one thing now: the user tapped the fullscreen icon
@@ -533,9 +525,11 @@ internal fun GarageScreen(
                     // box, PebbleShell's own row height). Zero-width for the one
                     // frame before the real size lands is safe: pageSize.Fixed(0.dp)
                     // just renders nothing that first frame rather than picking a
-                    // wrong layout decision. `boxWidthPx`/`density` are hoisted above
-                    // `perPage`'s own declaration now -- see its doc -- this Box just writes
-                    // the one and reads the other, same as before the hoist.
+                    // wrong layout decision. Local to this Box (not hoisted up to
+                    // `perPage`'s own declaration any more -- see its doc for why):
+                    // this value only feeds `pageWidth` below now.
+                    var boxWidthPx by remember { mutableIntStateOf(0) }
+                    val density = LocalDensity.current
                     // Ceiling division, not floor: `perPage` pages of a FLOORED width sum to
                     // LESS than boxWidthPx (a leftover gap up to perPage-1 px at the right
                     // edge), which forces the viewport to need a (perPage+1)-th page composed
