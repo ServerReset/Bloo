@@ -1565,6 +1565,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                         "(+${System.currentTimeMillis() - coldStartAt}ms since app start)"
                 }
             } else null,
+            logStartupTiming = logStartupTiming,
         )
     }
 
@@ -1711,7 +1712,15 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         // reported number included a full reverse-geocode lookup that happens to matter for
         // approximately nothing the user was looking at yet.
         onStatusApplied: (() -> Unit)? = null,
+        // Startup-only: when true, logs two extra checkpoints inside the viewModelScope.launch
+        // below -- when that coroutine actually starts running, and when it actually acquires
+        // statusMutex -- so a slow "status applied" number (measured from ensureStatus's own
+        // call, further back) can be split into "time waiting for a coroutine dispatch onto a
+        // busy Main thread" vs "time waiting for the mutex" vs "actual network+processing
+        // time", instead of one lump sum that could be any of the three.
+        logStartupTiming: Boolean = false,
     ) {
+        val calledAt = System.currentTimeMillis()
         // Key the in-flight set on (vin, refresh) so a user pull-to-refresh
         // (refresh=true) is never deduped behind an already-queued background
         // fetch (refresh=false) for the same car -- otherwise the manual call
@@ -1726,6 +1735,13 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         // UI stays still and no settle haptic fires when they complete.
         if (surfaceErrors) _state.update { it.copy(refreshing = true) }
         viewModelScope.launch {
+            if (logStartupTiming) {
+                logStartup(
+                    "loadStatus: coroutine dispatched in ${System.currentTimeMillis() - calledAt}ms " +
+                        "(time for Main to schedule it -- a big number here means Main was busy " +
+                        "with something else, not the network)",
+                )
+            }
             try {
                 // Only the network status() call needs the account-wide mutex
                 // (Blue Link 502s on overlapping requests). Capture the result
@@ -1733,7 +1749,13 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 // follow-up work (checkAlerts' DataStore read, the blocking
                 // Geocoder) so it doesn't stall every other car's fetch and the
                 // background poller behind it.
-                val s = statusMutex.withLock { repoFor(v).status(v, refresh = refresh) }
+                val beforeLockAt = System.currentTimeMillis()
+                val s = statusMutex.withLock {
+                    if (logStartupTiming) {
+                        logStartup("loadStatus: statusMutex acquired in ${System.currentTimeMillis() - beforeLockAt}ms")
+                    }
+                    repoFor(v).status(v, refresh = refresh)
+                }
                 s?.let { status ->
                     // The status payload carries last-known GPS for free — use
                     // it so the map/location works without the rate-limited
