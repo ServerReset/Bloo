@@ -278,10 +278,13 @@ internal fun CompactGarage(state: UiState, vm: AppViewModel, appearance: Setting
             // items -- for a single-car cover user, total = slots+1 = 2, so a
             // flat beyond=1 guarantees two of those three pages resolve to the
             // SAME real item (the folded-in Settings page) and mount it TWICE
-            // at once. (total - 1) / 2, capped at 1, is the largest beyond that
-            // can never revisit an item within one full cycle.
-            beyondViewportPageCount = ((total - 1) / 2).coerceIn(0, 1),
-            key = { page -> wrap.keyFor(page, ((total - 1) / 2).coerceIn(0, 1)) },
+            // at once. wrap.safeBeyond derives the largest beyond that keeps
+            // keyFor's own STRICT margin satisfied for this pager's actual total --
+            // see safeBeyond's own doc for why deriving it here, rather than solving
+            // the inequality independently, is what keeps real-index keying (invisible
+            // recentering) available for small car counts too.
+            beyondViewportPageCount = wrap.safeBeyond(1),
+            key = { page -> wrap.keyFor(page, wrap.safeBeyond(1)) },
         ) { page ->
             val real = realCar(page)
             if (real == slots) {
@@ -646,14 +649,15 @@ internal fun CompactCar(
             // screen. And a tile is cheaper than it was -- no per-tile SubcomposeLayout and no
             // hero block any more.
             //
-            // Capped the same way the car pager beside this one is (see its own doc): a flat
-            // beyond=1 pre-warms a neighbour on EACH side, so a car with very few visible
-            // sections (tiles.size <= 2, e.g. most sections hidden) would compose the same
-            // tile twice at once through the exact wrap-collision this whole fix targets.
+            // Capped the same way the car pager beside this one is (see its own doc):
+            // vWrap.safeBeyond derives the largest beyond that keeps keyFor's own STRICT
+            // margin satisfied for this pager's actual tile count, so a car with very few
+            // visible sections (tiles.size <= 2, e.g. most sections hidden) can't compose the
+            // same tile twice at once through the exact wrap-collision this whole fix targets.
             // Most cars have well more than 2 tiles, so this is a rare-but-real edge rather
             // than the everyday case the horizontal car pager's own fix is.
-            beyondViewportPageCount = ((tiles.size - 1) / 2).coerceIn(0, 1),
-            key = { page -> vWrap.keyFor(page, ((tiles.size - 1) / 2).coerceIn(0, 1)) },
+            beyondViewportPageCount = vWrap.safeBeyond(1),
+            key = { page -> vWrap.keyFor(page, vWrap.safeBeyond(1)) },
         ) { page ->
             val i = vWrap.real(page)
             val tileScroll = tileScrollStates.getOrPut(tiles[i]) { ScrollState(0) }
