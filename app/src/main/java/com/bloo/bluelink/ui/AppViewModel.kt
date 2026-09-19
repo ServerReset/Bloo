@@ -1541,10 +1541,23 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         // flaky car shouldn't spam errors over the others).
         loadStatus(
             v, refresh = false, errorMessage = "Couldn't load status", surfaceErrors = false,
+            // onStatusApplied, NOT logSuccess: logSuccess only fires once loadStatus's whole
+            // function body finishes, which includes reverseGeocode -- documented as taking up
+            // to GEOCODE_TIMEOUT_MS (6 SECONDS) -- plus checkAlerts/persistCache/autoSummarize,
+            // none of which the pebbles need. onStatusApplied fires the instant the fetched
+            // status actually lands in _state, which is what "ready" needs to mean here.
+            onStatusApplied = if (logStartupTiming) {
+                {
+                    logStartup(
+                        "loadGarageInner: current car's status applied to state in " +
+                            "${System.currentTimeMillis() - startedAt}ms",
+                    )
+                }
+            } else null,
             logSuccess = if (logStartupTiming) {
                 {
-                    "loadGarageInner: current car's status ready in " +
-                        "${System.currentTimeMillis() - startedAt}ms " +
+                    "loadGarageInner: current car's status fetch FULLY done (incl. geocode/" +
+                        "alerts/persist) in ${System.currentTimeMillis() - startedAt}ms " +
                         "(+${System.currentTimeMillis() - coldStartAt}ms since app start)"
                 }
             } else null,
@@ -1682,6 +1695,18 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         // supposedly timing has even started -- which would always read "0ms".
         logSuccess: (() -> String)? = null,
         surfaceErrors: Boolean = true,
+        // Fires the instant the fetched status actually lands in `_state` -- i.e. the moment
+        // a car's pebbles have real data to show -- NOT when this whole function finishes.
+        // Those are very different moments: everything after the _state.update below
+        // (persistCache, checkAlerts, autoSummarize, and especially reverseGeocode, whose own
+        // doc says it can legitimately run for GEOCODE_TIMEOUT_MS = 6 SECONDS) is bookkeeping
+        // and a "place name" label, none of which the pebbles need to render. `logSuccess`
+        // firing at the very end of this function was silently timing all of that too --
+        // ensureStatus's own cold-start instrumentation reported "current car's status ready
+        // in 5368ms" for a fetch whose actual network round trip was under 200ms, because the
+        // reported number included a full reverse-geocode lookup that happens to matter for
+        // approximately nothing the user was looking at yet.
+        onStatusApplied: (() -> Unit)? = null,
     ) {
         // Key the in-flight set on (vin, refresh) so a user pull-to-refresh
         // (refresh=true) is never deduped behind an already-queued background
@@ -1719,6 +1744,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                             } else st.locations,
                         )
                     }
+                    onStatusApplied?.invoke()
                     persistSnapshots()
                     persistCache()
                     checkAlerts(v, status)
