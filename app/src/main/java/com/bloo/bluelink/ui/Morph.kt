@@ -131,6 +131,17 @@ internal data class GroupIconAction(
  * pills, the standalone chevron, the preset pills, the cover action bar --
  * is this same component; the ones that look different simply pass different
  * shapes (shapeForCorner) and colours. There are no separate button types.
+ *
+ * The default fill is the tonal-with-outline treatment (`secondaryContainer` +
+ * a hairline `outline` rim) that used to live only on [MorphActionButton], the
+ * map's own Expand/Open in Maps pair -- reported directly as the look wanted
+ * everywhere ("more contrast, an outline"), and every idle button not already
+ * carrying an explicit colour override (the header action+chevron pills, the
+ * standalone chevron, dialog buttons that don't set their own tone) is exactly
+ * such a case, so promoting it here is what actually makes it the standard
+ * instead of one component quietly staying the odd one out. `active` still
+ * fills solid `primary` regardless -- that's a state colour, not this idle
+ * one, and stays exactly as loud as it always was.
  */
 @Composable
 fun MorphButton(
@@ -138,11 +149,11 @@ fun MorphButton(
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
     active: Boolean = false,
-    containerColor: Color = buttonContainer(),
-    contentColor: Color = MaterialTheme.colorScheme.onSurface,
+    containerColor: Color = MaterialTheme.colorScheme.secondaryContainer,
+    contentColor: Color = MaterialTheme.colorScheme.onSecondaryContainer,
     activeContainerColor: Color = MaterialTheme.colorScheme.primary,
     activeContentColor: Color = MaterialTheme.colorScheme.onPrimary,
-    border: BorderStroke? = null,
+    border: BorderStroke? = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.18f)),
     contentPadding: PaddingValues = ButtonDefaults.ContentPadding,
     /** Overrides the disabled content tone (default: resolved content at 38%
      *  alpha -- "only the label fades"). The cover action button passes its
@@ -324,15 +335,11 @@ fun MorphTextButton(
  * sites with a slightly different container, padding or border (or none), which is exactly
  * what made a screen full of buttons read as several unrelated button families.
  *
- * Why these particular values, rather than [MorphButton]'s bare defaults:
- *  - `secondaryContainer`, not [buttonContainer]: a tonal accent reads as an *action*
- *    against the neutral card it sits on, where the surface-derived default can wash out
- *    on a glass pebble.
- *  - the 0.18-alpha `outline` rim: the same hairline every other interactive surface got
- *    (MorphSegmented's own border) once real glass blur stopped giving flat surfaces a
- *    second depth cue. It is the "nice outline" that made the map buttons the reference.
- *  - 18dp/8dp padding on the shared 48dp [ButtonTargetHeight], so a row mixing these with
- *    [MorphTextButton]s still lines up.
+ * No longer overrides [MorphButton]'s container/content/border at all -- the tonal fill
+ * and hairline rim this button made the reference for ("more contrast, an outline") are
+ * now [MorphButton]'s own bare defaults, so every idle button in the app gets them, not
+ * just this one. What's left here is purely the padding: 18dp/8dp on the shared 48dp
+ * [ButtonTargetHeight], so a row mixing these with [MorphTextButton]s still lines up.
  *
  * Deliberately NOT the button for: a destructive action (keep `errorContainer` -- red is
  * information, not decoration), a screen's single primary CTA (`active = true` / an
@@ -358,9 +365,6 @@ fun MorphActionButton(
         enabled = enabled,
         interactionSource = interactionSource,
         groupWeight = groupWeight,
-        containerColor = MaterialTheme.colorScheme.secondaryContainer,
-        contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.18f)),
         contentPadding = PaddingValues(horizontal = 18.dp, vertical = 8.dp),
     ) {
         // The shared label, so the glyph gets the standard gap and -- the part a

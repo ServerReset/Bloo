@@ -1210,12 +1210,18 @@ internal fun SplitExpandButton(
         )
     }
 
-    val defaultContainer = buttonContainer()
+    // secondaryContainer/onSecondaryContainer, not buttonContainer()/onSurface: this header
+    // action (Locate, Summarize, Start, Stop...) is the app's other big case of an idle
+    // button not already carrying its own colour override, exactly the case MorphButton's
+    // own bare defaults now cover -- matching it here explicitly (rather than just omitting
+    // containerColor/contentColor below and letting them fall through) because this `when`
+    // also needs its warning/active branches, which a bare default can't express.
+    val defaultContainer = MaterialTheme.colorScheme.secondaryContainer
     val leftContainer = if (action.isWarning) MaterialTheme.colorScheme.errorContainer else defaultContainer
     val leftFg = when {
         action.isWarning -> MaterialTheme.colorScheme.onErrorContainer
         action.active -> (action.activeContent ?: MaterialTheme.colorScheme.onPrimary)
-        else -> MaterialTheme.colorScheme.onSurface
+        else -> MaterialTheme.colorScheme.onSecondaryContainer
     }
 
     // Bounce animation for the location button's icon.

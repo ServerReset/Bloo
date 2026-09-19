@@ -363,8 +363,11 @@ internal fun ChoiceRow(label: String, selected: Boolean, onSelect: () -> Unit) {
             onClick = { onSelect() },
             active = selected,
             interactionSource = choiceSource,
-            containerColor = buttonContainer(),
-            contentColor = MaterialTheme.colorScheme.onSurface,
+            // Idle container/content left at MorphButton's own defaults (the tonal fill
+            // + hairline rim every idle button in the app now shares) instead of the old
+            // bespoke buttonContainer()/onSurface -- only the SELECTED state stays a
+            // distinct explicit colour here, since that's this row's own state, not the
+            // shared idle look.
             activeContainerColor = MaterialTheme.colorScheme.primaryContainer,
             activeContentColor = MaterialTheme.colorScheme.onPrimaryContainer,
             contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),

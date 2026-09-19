@@ -271,12 +271,14 @@ private fun expressiveTypography(choice: FontChoice): Typography {
 }
 
 /**
- * The default button fill. Buttons carry no outline, so the fill alone has to
- * read clearly against every surface they sit on (pebbles use surfaceVariant,
- * cards use surfaceContainer). We push the highest available surface tone away
- * from the background — lighter in dark themes, a touch darker in light themes —
- * so an idle button is always visible without a border. Delegates to the
- * shared :uicommon helper so the watch renders identically.
+ * A flat, no-outline button fill, pushed away from the background -- lighter in dark
+ * themes, a touch darker in light themes -- so it still reads clearly with no border
+ * of its own. No longer [MorphButton]'s idle default (that's the tonal-with-outline
+ * treatment now, promoted from the map's own buttons); this remains for the handful
+ * of call sites that want a flat, borderless tone on purpose -- an explicit STATE
+ * colour (a toggle's off position, a segmented track) rather than the shared idle
+ * button look. Delegates to the shared :uicommon helper so the watch renders
+ * identically.
  */
 @Composable
 fun buttonContainer(): Color = com.bloo.uicommon.BlooColors.buttonContainer(

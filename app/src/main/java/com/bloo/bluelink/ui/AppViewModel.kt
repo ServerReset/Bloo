@@ -1046,7 +1046,17 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         // Taken HERE and not at the top of the function, deliberately: everything above
         // this is network work that can take seconds, and a snapshot read before it would
         // be stale by the time it was used if the user changed a setting meanwhile.
+        // Timed like SessionStore.load() elsewhere in this file's own history: that one
+        // turned out to take 850ms-2.9s on this same account for no visible reason, and
+        // this is the same shape of call (a suspend Preferences DataStore read) sitting
+        // directly between "vehicle list fetched" and "fetching status for" with nothing
+        // to explain a multi-second gap between them if this is where it goes too.
+        val snapshotStartedAt = System.currentTimeMillis()
         val prefs = settingsStore.snapshot()
+        val snapshotMs = System.currentTimeMillis() - snapshotStartedAt
+        if (snapshotMs > 500) {
+            logStartup("loadGarageInner: settingsStore.snapshot() took ${snapshotMs}ms")
+        }
         val vehicles = applyOrder(fetched, settingsStore.vehicleOrder(prefs))
         // The 16 per-car/per-tile config fields, shared with refreshLocalCarConfig via
         // perCarConfig so the two can't drift. firstRun's empty-collapsed rule lives inside it.
