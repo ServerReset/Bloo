@@ -439,11 +439,8 @@ internal fun WeatherDetail(weather: Weather, fahrenheit: Boolean, metric: Boolea
 private const val CarMapMinZoom = 3
 private const val CarMapMaxZoom = 19
 
-/** Where every [CarMapState] starts: street level, car dead-centre. Internal (not
- *  private): AppViewModel's background tile prefetch (see its own doc) needs the
- *  exact same zoom CarMap itself starts at, so a car's first-ever visit already has
- *  its centre tiles sitting in Coil's cache instead of starting from zero. */
-internal const val CarMapDefaultZoom = 15
+/** Where every [CarMapState] starts: street level, car dead-centre. */
+private const val CarMapDefaultZoom = 15
 
 /**
  * Live view state for one [CarMap] instance: zoom level and the pixel pan offset
