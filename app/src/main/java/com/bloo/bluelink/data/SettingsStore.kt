@@ -159,9 +159,6 @@ val DEFAULT_SECTIONS = listOf("summary", "update", "controls", "charge", "climat
  */
 const val HERO_PHOTO_SECTION = "hero"
 
-/** Pebbles the user may hide (the others are essential). */
-val HIDEABLE_SECTIONS = listOf("charge", "climate", "location", "trips", "info", "diagnostics", "ai")
-
 /**
  * App appearance preferences, kept separate from the session so sign-out keeps them.
  *
@@ -1013,22 +1010,6 @@ class SettingsStore(private val context: Context) {
             val set = csv(it, "collapsed_$vin").toMutableSet()
             if (collapsed) set.add(section) else set.remove(section)
             it[stringPreferencesKey("collapsed_$vin")] = set.joinToString(",")
-        }
-    }
-
-    suspend fun hiddenSections(vin: String): Set<String> = hiddenSections(vin, context.settingsDataStore.data.first())
-
-    fun hiddenSections(vin: String, p: Preferences): Set<String> =
-        csv(p, "hidden_$vin")
-
-    /** Same read-modify-write pattern as [setSectionCollapsed], for the
-     *  independent "hidden" set (a hidden section is fully removed from view;
-     *  a collapsed one is still shown, just closed by default). */
-    suspend fun setSectionHidden(vin: String, section: String, hidden: Boolean) {
-        editTracked {
-            val set = csv(it, "hidden_$vin").toMutableSet()
-            if (hidden) set.add(section) else set.remove(section)
-            it[stringPreferencesKey("hidden_$vin")] = set.joinToString(",")
         }
     }
 

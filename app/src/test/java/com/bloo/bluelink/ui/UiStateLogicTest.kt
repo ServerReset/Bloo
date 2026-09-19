@@ -87,16 +87,6 @@ class UiStateLogicTest {
     }
 
     @Test
-    fun hideAndExpandAreIndependentKeyspaces() {
-        val s = UiState(collapsedPebbles = setOf("V1:charge"), hiddenPebbles = setOf("V1:ai"))
-        assertFalse(s.isPebbleExpanded("V1", "charge")) // collapsed
-        assertTrue(s.isPebbleHidden("V1", "ai"))       // the hidden key is honored
-        assertTrue(s.isPebbleExpanded("V1", "ai")) // hidden, not collapsed
-        // No cross-vehicle leak either way.
-        assertFalse(UiState(hiddenPebbles = setOf("V1:ai")).isPebbleHidden("V2", "ai"))
-    }
-
-    @Test
     fun pending_keyedByVinAndAction() {
         assertFalse(UiState().isPending("V1", "lock"))
         assertTrue(UiState(pending = setOf("V1:lock")).isPending("V1", "lock"))
@@ -231,12 +221,6 @@ class UiStateLogicTest {
         assertFalse(s.isShortcutEnabled("V1", "lights"))
     }
     // --- isSectionAvailable: the per-section gate everything renders through ----
-
-    @Test
-    fun sectionHidden_alwaysWinsOverGates() {
-        val s = UiState(hiddenPebbles = setOf("V1:ai"))
-        assertFalse(s.isSectionAvailable(usHyundai, "ai"))
-    }
 
     @Test
     fun section_aiRequiresTheFeatureFlag() {

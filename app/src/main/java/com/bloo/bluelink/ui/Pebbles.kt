@@ -131,10 +131,7 @@ internal fun sectionLabel(section: String): String = when (section) {
     "controls" -> "Lock / climate"
     // Was falling through to the generic capitalise, which renders "Ai" -- visible in the
     // hot-spot slot's pin dropdown and its pinned-section caption, right next to a pebble
-    // whose own title is "AI summary". The name of a section belongs in this one `when`, so
-    // this is also where the SettingsCards copy of the exact same mapping (an 8-entry map
-    // allocated fresh on every recomposition of the per-car "Sections shown" group, with these
-    // same seven strings verbatim) now resolves through instead of re-declaring them.
+    // whose own title is "AI summary". The name of a section belongs in this one `when`.
     "ai" -> "AI summary"
     else -> section.replaceFirstChar { it.uppercase() }
 }
@@ -162,9 +159,9 @@ internal fun HotspotSlot(
     val hotDrag = LocalHotSeatDrag.current
     val hovered = hotDrag?.overSlot == true
 
-    // Available pebbles for pinning (excludes "summary" and hidden pebbles)
+    // Available pebbles for pinning (excludes "summary")
     val allAvailable = remember(
-        state.sectionOrders[v.vin], state.hiddenPebbles, state.aiEnabled, state.hasBattery(v),
+        state.sectionOrders[v.vin], state.aiEnabled, state.hasBattery(v),
         v.isGen5W, state.platforms[v.vin], state.updateAvailable, state.updateTileDismissed,
     ) {
         state.sectionsFor(v).filter {
@@ -575,7 +572,7 @@ internal fun PebbleList(
         exclude + pinnedPebbles
     }
     val sections = remember(
-        allSections, allExclude, sel.hiddenPebbles, sel.aiEnabled, hasBattery, v.isGen5W, sel.platforms[v.vin],
+        allSections, allExclude, sel.aiEnabled, hasBattery, v.isGen5W, sel.platforms[v.vin],
         sel.updateAvailable, sel.updateTileDismissed,
     ) {
         allSections.filter {

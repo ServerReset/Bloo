@@ -236,13 +236,11 @@ internal class VehicleToggleSpec(
     val onToggle: (AppViewModel, Vehicle, Boolean) -> Unit,
 )
 
-/** Every plain per-car toggle: the four seat positions' heat and cool flags,
- *  the heated steering wheel flag, and which of [com.bloo.bluelink.data.HIDEABLE_SECTIONS]
- *  shows on that car's dashboard -- generated once per position/section here
- *  instead of needing its own [SearchEntry] written out by hand. Reuses
- *  [SeatPositions] (Screens.kt), the same list [CarSettingsCard] itself
- *  builds its seat rows from, so the two can't drift out of sync with
- *  each other on label or key. */
+/** Every plain per-car toggle: the four seat positions' heat and cool flags, and the
+ *  heated steering wheel flag -- generated once per position here instead of needing
+ *  its own [SearchEntry] written out by hand. Reuses [SeatPositions] (Screens.kt), the
+ *  same list [CarSettingsCard] itself builds its seat rows from, so the two can't drift
+ *  out of sync with each other on label or key. */
 internal val VehicleToggleSettings: List<VehicleToggleSpec> = buildList {
     SeatPositions.forEach { pos ->
         add(
@@ -273,30 +271,6 @@ internal val VehicleToggleSettings: List<VehicleToggleSpec> = buildList {
             onToggle = { vm, v, value -> vm.setSeatFlag(v, "sw", value) },
         ),
     )
-    // Same labels CarSettingsCard's own "Sections shown" group uses -- kept
-    // as a second copy rather than hoisted shared, since hoisting a map two
-    // functions apart from either of its uses would cost more to find than
-    // the eight-line literal costs to duplicate.
-    val sectionLabels = mapOf(
-        "charge" to "Charge / fuel", "climate" to "Climate", "location" to "Location",
-        "trips" to "Trips", "info" to "Car info",
-        "diagnostics" to "Diagnostics", "ai" to "AI summary",
-    )
-    com.bloo.bluelink.data.HIDEABLE_SECTIONS.forEach { sec ->
-        val sectionLabel = sectionLabels[sec] ?: sec
-        add(
-            VehicleToggleSpec(
-                title = { v -> "Show $sectionLabel · ${v.name}" },
-                keywords = { v -> "section hide show dashboard card $sectionLabel ${v.name}" },
-                label = "Show $sectionLabel",
-                // The AI toggle only matters when AI is enabled for this device --
-                // same gate CarSettingsCard's own "Sections shown" group uses.
-                visible = { _, s -> sec != "ai" || s.aiEnabled },
-                checked = { v, s -> !s.isPebbleHidden(v.vin, sec) },
-                onToggle = { vm, v, value -> vm.setSectionHidden(v, sec, !value) },
-            ),
-        )
-    }
 }
 
 /** True if any WORD in [hay] starts with [prefix] -- "lim" hits "charge limit"

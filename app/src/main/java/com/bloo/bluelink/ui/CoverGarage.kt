@@ -492,7 +492,7 @@ internal fun CompactCar(
     // The phone's equivalent memo in PebbleList already lists both for exactly this reason -- the
     // cover's copy had drifted from it.
     val tiles = remember(
-        state.sectionOrders[v.vin], hasBattery, state.aiEnabled, isGen5W, state.hiddenPebbles,
+        state.sectionOrders[v.vin], hasBattery, state.aiEnabled, isGen5W,
         state.updateAvailable, state.updateTileDismissed,
     ) {
         state.sectionsFor(v).mapNotNull { section ->

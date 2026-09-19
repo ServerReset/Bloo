@@ -187,8 +187,6 @@ data class UiState(
     val remoteActionHistory: Map<String, List<RemoteAction>> = emptyMap(),
     /** Collapsed pebbles, keyed "vin:section". Absent = expanded. */
     val collapsedPebbles: Set<String> = emptySet(),
-    /** Hidden pebbles, keyed "vin:section". */
-    val hiddenPebbles: Set<String> = emptySet(),
     /** Per-VIN pebbles pinned to the dual-column "hot spot" (under car info).
      *  Primary slot is always "controls" (lights/horn) - hardcoded, not stored.
      *  Secondary slot is user-selectable, stored here as a single String or null. */
@@ -312,8 +310,6 @@ data class UiState(
 
     fun isPebbleExpanded(vin: String, section: String): Boolean = "$vin:$section" !in collapsedPebbles
 
-    fun isPebbleHidden(vin: String, section: String): Boolean = "$vin:$section" in hiddenPebbles
-
     /** Pebbles pinned to the hotspot as a list for rendering.
      *  Primary slot is always "controls" (lights/horn) - permanently pinned.
      *  Secondary slot is user-selectable from hotspotSections.
@@ -389,7 +385,6 @@ data class UiState(
      * Callers keep applying those on top of this.
      */
     fun isSectionAvailable(v: Vehicle, section: String): Boolean {
-        if (isPebbleHidden(v.vin, section)) return false
         return when (section) {
             "ai" -> aiEnabled
             // The trip-details feed is EV-only, Gen5W head units don't serve it at all,

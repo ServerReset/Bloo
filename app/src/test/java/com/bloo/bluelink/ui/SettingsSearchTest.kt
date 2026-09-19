@@ -193,9 +193,9 @@ class SettingsSearchTest {
     // --- VehicleToggleSettings: the per-car dynamic toggle index ---
 
     @Test
-    fun vehicleToggleSettings_coversEverySeatPositionHeatAndColdPlusSteeringPlusSections() {
-        // 4 seat positions x (heat, cool) + steering wheel + every hideable section.
-        val expected = SeatPositions.size * 2 + 1 + com.bloo.bluelink.data.HIDEABLE_SECTIONS.size
+    fun vehicleToggleSettings_coversEverySeatPositionHeatAndColdPlusSteering() {
+        // 4 seat positions x (heat, cool) + steering wheel.
+        val expected = SeatPositions.size * 2 + 1
         assertEquals(expected, VehicleToggleSettings.size)
     }
 
@@ -219,19 +219,4 @@ class SettingsSearchTest {
         assertTrue(driverHeat.checked(ioniq, UiState()))
     }
 
-    @Test
-    fun vehicleToggleSettings_aiSectionRespectsAiEnabledGate() {
-        val aiSection = VehicleToggleSettings.first { it.label == "Show AI summary" }
-        assertFalse(aiSection.visible(civic, UiState(aiEnabled = false)))
-        assertTrue(aiSection.visible(civic, UiState(aiEnabled = true)))
-    }
-
-    @Test
-    fun vehicleToggleSettings_sectionShownIsInvertedFromHidden() {
-        val chargeSection = VehicleToggleSettings.first { it.label == "Show Charge / fuel" }
-        val hidden = UiState(hiddenPebbles = setOf("${civic.vin}:charge"))
-        val shown = UiState(hiddenPebbles = emptySet())
-        assertFalse(chargeSection.checked(civic, hidden))
-        assertTrue(chargeSection.checked(civic, shown))
-    }
 }
