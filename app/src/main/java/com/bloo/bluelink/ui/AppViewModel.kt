@@ -1023,6 +1023,12 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 defaultClimatePresets = defaultPresets,
             )
         }
+        // Startup breadcrumb: if a crash follows shortly after, CrashActivity's own report
+        // includes the tail of AppLog, so this (and "App starting" in BlooApplication.onCreate)
+        // is what tells "did this even get as far as showing the garage" apart from "crashed
+        // during the very first frame" -- something the earlier per-brand/per-car error logs
+        // in this function don't cover on their own since they only fire on FAILURE.
+        AppLog.log("✓ Garage loaded: ${vehicles.size} vehicle(s), screen=$screen")
         val shortcutSet = cfg.shortcutSet
         // Restores the last-selected car. This used to ride along inside the
         // copy() above; it lives in its own flow now (see currentIndex), so it

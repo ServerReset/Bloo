@@ -2,9 +2,14 @@ package com.bloo.bluelink
 
 import android.app.Application
 import android.content.Intent
+import android.os.Build
 import android.util.Log
 import androidx.work.Configuration
+import com.bloo.bluelink.data.AppLog
 import com.bloo.bluelink.ui.BatterySaverState
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 /**
  * Installs a process-wide uncaught exception handler as the very first thing this
@@ -14,8 +19,10 @@ import com.bloo.bluelink.ui.BatterySaverState
  * attached at the exact moment it happened, which isn't something a user hitting a
  * silent "app has stopped" can do after the fact. This makes the crash itself hand
  * off to [CrashActivity] -- a plain, dependency-free, selectable-text screen with the
- * full stack trace -- so it can be read (and copied straight off the device) without
- * ever needing adb or reproducing it a second time with logging already running.
+ * full stack trace, plus device/build info and the [AppLog] history leading up to it
+ * (see [deviceSummary] and this handler's own `report` below) -- so it can be read
+ * (and copied straight off the device, all of it in one paste) without ever needing
+ * adb or reproducing it a second time with logging already running.
  *
  * Also implements [Configuration.Provider] for WorkManager's *on-demand initialization*.
  * The manifest removes WorkManager's default `androidx.startup` initializer (see its own
@@ -47,12 +54,38 @@ class BlooApplication : Application(), Configuration.Provider {
     override fun onCreate() {
         super.onCreate()
         BatterySaverState.ensureInitialized(this)
+        AppLog.log("▶ App starting -- ${deviceSummary()}")
         Thread.setDefaultUncaughtExceptionHandler { thread, throwable ->
             val trace = Log.getStackTraceString(throwable)
             Log.e("BlooCrash", "Uncaught exception on ${thread.name}:\n$trace")
             try {
+                // Everything a bug report needs in ONE selectable/copyable blob, gathered
+                // here because this is the only moment any of it is still available: the
+                // process gets killed unconditionally right after this handler returns (see
+                // that kill's own comment below), so CrashActivity itself starts fresh in a
+                // NEW process with none of this in memory -- AppLog.lines most of all, since
+                // it's an in-memory ring buffer with no disk backing (Settings' own copy of
+                // it is the only other reader, and that's gone too the moment this process
+                // dies). Reported directly: a crash report with just the stack trace couldn't
+                // answer "what was the app actually doing right before this" or "does this
+                // only happen on one device/Android version" without asking the user to
+                // reproduce it a second time with more logging attached -- exactly what
+                // CrashActivity's own doc says this screen exists to avoid needing.
+                val report = buildString {
+                    appendLine("Bloo crashed on ${thread.name}")
+                    appendLine("Device: ${deviceSummary()}")
+                    appendLine()
+                    appendLine("--- Stack trace ---")
+                    appendLine(trace)
+                    appendLine("--- App log (most recent ${AppLog.lines.value.size} lines) ---")
+                    if (AppLog.lines.value.isEmpty()) {
+                        append("(empty -- crashed before anything logged, or log() was never reached)")
+                    } else {
+                        append(AppLog.lines.value.joinToString("\n"))
+                    }
+                }
                 val intent = Intent(this, CrashActivity::class.java).apply {
-                    putExtra(CrashActivity.EXTRA_STACK_TRACE, trace)
+                    putExtra(CrashActivity.EXTRA_STACK_TRACE, report)
                     addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
                 }
                 startActivity(intent)
@@ -81,5 +114,22 @@ class BlooApplication : Application(), Configuration.Provider {
             android.os.Process.killProcess(android.os.Process.myPid())
             Runtime.getRuntime().exit(10)
         }
+    }
+
+    /**
+     * One line covering everything needed to tell "does this only happen on one device/
+     * Android version/build" apart from "this happens everywhere" -- the other half of what
+     * a bug report needs alongside the stack trace and [AppLog] itself. [BuildConfig]'s
+     * BUILD_RUN_NUMBER/BUILD_BRANCH (not versionCode/versionName, which stay fixed at 1/"0.1"
+     * -- see that field's own doc in build.gradle.kts) are what actually identify which CI
+     * build produced this specific APK, the same pair [UpdateChecker] itself compares against
+     * GitHub's build list.
+     */
+    private fun deviceSummary(): String {
+        val time = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US).format(Date())
+        val branch = BuildConfig.BUILD_BRANCH.ifBlank { "(local build)" }
+        return "${Build.MANUFACTURER} ${Build.MODEL} · Android ${Build.VERSION.RELEASE} " +
+            "(API ${Build.VERSION.SDK_INT}) · Bloo build ${BuildConfig.BUILD_RUN_NUMBER} " +
+            "on $branch · $time"
     }
 }

@@ -79,6 +79,13 @@ import java.io.File
  */
 class CrashActivity : ComponentActivity() {
     companion object {
+        /** Carries the FULL report now, not just a bare stack trace -- see
+         *  [BlooApplication.onCreate]'s own `report` local for what's actually in it
+         *  (device/build info, the stack trace, and the [com.bloo.bluelink.data.AppLog]
+         *  history leading up to the crash). Kept this name rather than renaming it: it's
+         *  a public Intent-extra key, and BlooApplication (the only writer) and this
+         *  Activity (the only reader) are the only two things that ever need to agree on
+         *  it, so a rename here would only be busywork, not a real compatibility concern. */
         const val EXTRA_STACK_TRACE = "stack_trace"
     }
 
@@ -87,7 +94,7 @@ class CrashActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
-        val trace = intent.getStringExtra(EXTRA_STACK_TRACE) ?: "(no stack trace captured)"
+        val report = intent.getStringExtra(EXTRA_STACK_TRACE) ?: "(no crash report captured)"
         setContent {
             MaterialTheme {
                 Surface(Modifier.fillMaxSize()) {
@@ -101,7 +108,7 @@ class CrashActivity : ComponentActivity() {
                     ) {
                         Header()
                         UpdateRecoveryPanel(apkFile = apkCacheFile())
-                        CrashLog(trace)
+                        CrashLog(report)
                     }
                 }
             }
@@ -253,21 +260,22 @@ class CrashActivity : ComponentActivity() {
     }
 
     @Composable
-    private fun CrashLog(trace: String) {
+    private fun CrashLog(report: String) {
         val clipboard = LocalClipboardManager.current
-        SettingsGroup("Crash log") {
+        SettingsGroup("Crash report") {
             Text(
-                "Copy this and send it back -- it's the exact reason the app stopped.",
+                "Copy this and send it back -- device, build, the exact reason the app " +
+                    "stopped, and what it was doing right before that.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             MorphTextButton(
                 "Copy",
                 icon = Icons.Filled.ContentCopy,
-                onClick = { clipboard.setText(AnnotatedString(trace)) },
+                onClick = { clipboard.setText(AnnotatedString(report)) },
             )
             SelectionContainer {
-                Text(trace, fontFamily = FontFamily.Monospace, style = MaterialTheme.typography.bodySmall)
+                Text(report, fontFamily = FontFamily.Monospace, style = MaterialTheme.typography.bodySmall)
             }
         }
     }
