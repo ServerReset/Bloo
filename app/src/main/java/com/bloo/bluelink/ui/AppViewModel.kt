@@ -745,9 +745,13 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             deferredStatusLoad = false
             val vehicles = _state.value.vehicles
             val index = _currentIndex.value
+            logStartup("unlocked(): deferred status fetch starting")
             viewModelScope.launch {
                 delay(500)  // Wait for unlock blur animation (450ms) to complete
-                vehicles.getOrNull(index)?.let { ensureStatus(it) }
+                vehicles.getOrNull(index)?.let {
+                    logStartup("unlocked(): fetching status for ${it.name} (current car)")
+                    ensureStatus(it, logStartupTiming = true)
+                }
                 launch {
                     vehicles.forEachIndexed { i, v -> if (i != index) ensureStatus(v) }
                 }

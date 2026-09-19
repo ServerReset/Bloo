@@ -7,6 +7,7 @@ import androidx.work.ExistingPeriodicWorkPolicy
 import androidx.work.NetworkType
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkerParameters
+import com.bloo.bluelink.data.AppLog
 import com.bloo.bluelink.data.BlueLinkGate
 import com.bloo.bluelink.data.CarAlerts
 import com.bloo.bluelink.data.CredentialStore
@@ -73,6 +74,14 @@ class AlertWorker(context: Context, params: WorkerParameters) : CoroutineWorker(
         if (!prefs.service && !prefs.doorOpen && !prefs.running && !prefs.unlocked && !prefs.charging) {
             return Result.success()
         }
+        // Logged specifically so a slow foreground cold-start/unlock status fetch (see
+        // AppViewModel's own logStartup breadcrumbs) can be told apart from this worker
+        // running at the exact same moment and holding BlueLinkGate.statusMutex in between --
+        // both share that one mutex by design (this function's own doc), so a report showing
+        // this worker's own timestamps overlapping the app's is the concrete evidence that a
+        // "why did the second car's status take 4 extra seconds" gap was this, not the app.
+        val workerStartedAt = System.currentTimeMillis()
+        AppLog.log("AlertWorker: starting")
 
         // This worker fetches fresh status for every car every 30 minutes and used to
         // throw all of it away: it read the status, raised alerts, updated the live
@@ -87,9 +96,11 @@ class AlertWorker(context: Context, params: WorkerParameters) : CoroutineWorker(
             val repo = runCatching { repositoryFor(brand, store, CredentialStore(applicationContext)) }.getOrNull() ?: continue
             // Share the app-wide status gate so a foregrounded app and this worker
             // never issue overlapping requests (Blue Link 502s otherwise).
+            AppLog.log("AlertWorker: requesting statusMutex for ${brand.label} vehicles()")
             val vehicles = runCatching { BlueLinkGate.statusMutex.withLock { repo.vehicles() } }
                 .getOrElse { emptyList() }
             for (v in vehicles) {
+                AppLog.log("AlertWorker: requesting statusMutex for ${v.name}")
                 val status = runCatching {
                     BlueLinkGate.statusMutex.withLock { repo.status(v, refresh = false) }
                 }.getOrNull()
@@ -146,6 +157,7 @@ class AlertWorker(context: Context, params: WorkerParameters) : CoroutineWorker(
         }
         // One write for every car, every brand.
         runCatching { SnapshotStore(applicationContext).mergeStatuses(fetched) }
+        AppLog.log("AlertWorker: done in ${System.currentTimeMillis() - workerStartedAt}ms, ${fetched.size} status(es)")
         return Result.success()
     }
 

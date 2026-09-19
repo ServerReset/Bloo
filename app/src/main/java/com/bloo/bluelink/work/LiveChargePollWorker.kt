@@ -8,6 +8,7 @@ import androidx.work.ExistingWorkPolicy
 import androidx.work.NetworkType
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkerParameters
+import com.bloo.bluelink.data.AppLog
 import com.bloo.bluelink.data.Brand
 import com.bloo.bluelink.data.BlueLinkGate
 import com.bloo.bluelink.data.CredentialStore
@@ -49,6 +50,13 @@ class LiveChargePollWorker(context: Context, params: WorkerParameters) : Corouti
         val store = SessionStore(applicationContext)
         val settings = SettingsStore(applicationContext)
         if (!settings.notificationPrefs().charging) return Result.success()
+        // Same reasoning as AlertWorker's own "starting"/"done" pair: this shares
+        // BlueLinkGate.statusMutex with the foreground app too, and its own chain
+        // reschedules itself every 5 minutes while a car keeps charging -- exactly the
+        // kind of background activity that could line up with an unrelated app cold
+        // start/unlock by coincidence and make the app's OWN fetch wait its turn.
+        val workerStartedAt = System.currentTimeMillis()
+        AppLog.log("LiveChargePollWorker: starting")
 
         var anyStillCharging = false
         // The distinction this worker was missing. "No car is charging" and "I couldn't
@@ -107,6 +115,7 @@ class LiveChargePollWorker(context: Context, params: WorkerParameters) : Corouti
         // tick did learn is worth keeping even if the pass as a whole is being retried.
         // No-ops on an empty map, which is exactly the !learnedSomething case.
         runCatching { SnapshotStore(applicationContext).mergeStatuses(fetched) }
+        AppLog.log("LiveChargePollWorker: done in ${System.currentTimeMillis() - workerStartedAt}ms, ${fetched.size} status(es)")
 
         // Nothing came back at all. That's transient, so hand it to WorkManager's own
         // backoff instead of reading silence as "charging finished" -- which is what
