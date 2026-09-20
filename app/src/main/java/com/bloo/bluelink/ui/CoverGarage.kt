@@ -167,8 +167,14 @@ internal fun CoverSettingsGate(vm: AppViewModel) {
  */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-internal fun CompactGarage(state: UiState, vm: AppViewModel, appearance: SettingsStore.Appearance, hazeState: HazeState = remember { HazeState() }) {
-    val vehicles = state.vehicles
+internal fun CompactGarage(state: State<UiState>, vm: AppViewModel, appearance: SettingsStore.Appearance, hazeState: HazeState = remember { HazeState() }) {
+    // Derived reads, same reasoning as GarageScreen's own: a value parameter would force the
+    // CALLER to read state.value in its body (subscribing it to every emission), and a body
+    // read here would do the same for this composable -- and this is the whole cover on
+    // phones. Only these three fields are ever drawn, so only these three can invalidate.
+    val vehicles by remember { derivedStateOf { state.value.vehicles } }
+    val refreshing by remember { derivedStateOf { state.value.refreshing } }
+    val locked by remember { derivedStateOf { state.value.locked } }
     val count = vehicles.size
     // At least one non-Settings page even with zero cars: the "no connection"/
     // "not signed in"/"no vehicles" status card takes that one slot instead of
@@ -235,7 +241,7 @@ internal fun CompactGarage(state: UiState, vm: AppViewModel, appearance: Setting
     // CompactCar as a parameter just so one dot row could read it. Modifier.floatingOverlay owns
     // the spring now; this screen publishes the target and nothing recomposes per frame.
     val coverFloatingRegistry = LocalFloatingRegistry.current
-    val coverChromeHidden = state.refreshing
+    val coverChromeHidden = refreshing
     SideEffect { coverFloatingRegistry.chromeHidden = coverChromeHidden }
     // Same reason as the garage's: nothing else resets this, so a refresh in flight when the
     // cover goes away would leave every floating element faded out for whatever comes next.
@@ -300,7 +306,7 @@ internal fun CompactGarage(state: UiState, vm: AppViewModel, appearance: Setting
                 // No cars at all: the status card takes this pager's one other
                 // slot instead of a car -- see GarageStatusCard's own doc.
                 Box(Modifier.fillMaxSize().pagerDepth(pager, page)) {
-                    GarageStatusCard(rememberUpdatedState(state), vm, hazeState = hazeState)
+                    GarageStatusCard(state, vm, hazeState = hazeState)
                 }
                 return@HorizontalPager
             }
@@ -359,7 +365,7 @@ internal fun CompactGarage(state: UiState, vm: AppViewModel, appearance: Setting
             // nearest the camera; SearchLayer reads the same band and docks
             // its own bubble into exactly that reservation (see there) --
             // one tap target, not a second one duplicated here.
-            val searchInBand = appearance.showSearch && !state.locked
+            val searchInBand = appearance.showSearch && !locked
             // Same glass chip every other floating chrome in the app wears
             // (the identity pill, FloatingIcon) -- bare text here used to sit
             // directly on whatever the tile underneath happened to be
@@ -463,7 +469,7 @@ internal fun CompactGarage(state: UiState, vm: AppViewModel, appearance: Setting
 @Composable
 internal fun CompactCar(
     v: Vehicle,
-    state: UiState,
+    state: State<UiState>,
     vm: AppViewModel,
     /** Same shared instance the pager marks as its own hazeSource -- see
      *  [RefreshIndicatorBadge]'s own doc for why this needs to be a REAL blur of
@@ -471,42 +477,39 @@ internal fun CompactCar(
      *  hazeState would fall back to. */
     hazeState: HazeState,
 ) {
-    // Live source passed to SinglePebble (which takes State<UiState> now).
-    val stateSource = rememberUpdatedState(state)
-    val isGen5W = remember(v.brand, v.generation, state.platforms[v.vin]) { state.isGen5WEffective(v) }
+    // The State itself now, not rememberUpdatedState(value): the caller no longer reads
+    // state.value to call this, so this composable is out of every emission's invalidation
+    // set except where one of the derived reads below actually changes.
+    val stateSource = state
+    val isGen5W by remember(v.vin) { derivedStateOf { state.value.isGen5WEffective(v) } }
     // Cover-screen tiles follow the same order the user arranged the pebbles in
     // (state.sectionsFor). "summary" maps to the always-present "main" tile;
     // "controls" has no cover tile so it falls away. If summary was somehow
     // dropped, "main" is prepended so the cover screen always has a home tile.
-    // Memoized on exactly the state slices the predicate reads, so this mapNotNull +
-    // list concat doesn't re-run on every unrelated state emission (CompactCar takes
-    // the whole UiState, so it recomposes on any change worth reflecting on one
-    // car page (status ticks, pending flags, messages) -- the per-tile memo
-    // below keeps that cost proportional to what changed.
-    val hasBattery = state.hasBattery(v)
-    // updateAvailable and updateTileDismissed are in the key because isSectionAvailable reads
-    // them for the "update" tile. Without them this memo kept a stale tile list: the update tile
-    // could arrive late, or survive being dismissed, until some unrelated key happened to change.
-    // The phone's equivalent memo in PebbleList already lists both for exactly this reason -- the
-    // cover's copy had drifted from it.
-    val tiles = remember(
-        state.sectionOrders[v.vin], hasBattery, state.aiEnabled, isGen5W,
-        state.updateAvailable, state.updateTileDismissed,
-    ) {
-        state.sectionsFor(v).mapNotNull { section ->
-            when (section) {
-                "summary" -> "main"
-                else -> section.takeIf {
-                    it in CompactKnownTiles &&
-                        // Cover-screen-only gate, and the reason isSectionAvailable
-                        // does not carry it: everywhere else SinglePebble falls back to
-                        // a FuelPebble for a car with no battery, so "charge" still has
-                        // something to render. The cover has no such fallback tile.
-                        (it != "charge" || hasBattery) &&
-                        state.isSectionAvailable(v, it)
+    val hasBattery by remember(v.vin) { derivedStateOf { state.value.hasBattery(v) } }
+    val refreshing by remember { derivedStateOf { state.value.refreshing } }
+    // A derived computation, not remember(keys): the keys used to be exactly the state slices
+    // this predicate reads, but reading them in the composition body to form the key still
+    // subscribed CompactCar to every emission. As a derived state it only invalidates when the
+    // resulting tile LIST differs, which is what the key list was really asking for.
+    val tiles by remember(v.vin) {
+        derivedStateOf {
+            val sel = state.value
+            sel.sectionsFor(v).mapNotNull { section ->
+                when (section) {
+                    "summary" -> "main"
+                    else -> section.takeIf {
+                        it in CompactKnownTiles &&
+                            // Cover-screen-only gate, and the reason isSectionAvailable
+                            // does not carry it: everywhere else SinglePebble falls back to
+                            // a FuelPebble for a car with no battery, so "charge" still has
+                            // something to render. The cover has no such fallback tile.
+                            (it != "charge" || hasBattery) &&
+                            sel.isSectionAvailable(v, it)
+                    }
                 }
-            }
-        }.let { ordered -> if ("main" in ordered) ordered else listOf("main") + ordered }
+            }.let { ordered -> if ("main" in ordered) ordered else listOf("main") + ordered }
+        }
     }
     // Infinite wrap-around: start in the middle of a huge virtual range and map
     // each virtual page back onto a real tile with modulo. FLAT tiles -- unlike the three
@@ -684,21 +687,12 @@ internal fun CompactCar(
                     // the phone's photo-first HeroHeader -- see CoverMainTile.
                     if (tiles[i] == "main") {
                         // Narrowed the same way every SinglePebble branch already is:
-                        // CoverMainTile and CoverActionBar (called from inside its
-                        // `actions` lambda) together only ever read this fixed set of
-                        // UiState fields, but both took the whole UiState directly, so
-                        // any unrelated emission (a location update on another car, a
-                        // log line) recomposed this tile the whole time the cover
-                        // screen was showing. remember(keys) { state } is the same
-                        // "same reference back, skip if the keys didn't move" trick
-                        // used at every other pebble call site.
-                        val mainState = remember(
-                            state.statusFor(v), state.imageUrls[v.vin], state.hasBattery(v),
-                            state.hasFuel(v), state.drivingLabel(v), state.loading,
-                            state.isPending(v.vin, "doors"), state.isPending(v.vin, "climate"),
-                            state.isPending(v.vin, "charge"), state.isPending(v.vin, "hornLights"),
-                        ) { state }
-                        CoverMainTile(v, mainState, vm)
+                        // CoverMainTile and CoverActionBar now take the State and do their
+                        // own derived reads, so this call site no longer reads state.value
+                        // (and no longer needs the remember(keys) { state } slice that used
+                        // to keep an unrelated emission -- a location update on another car,
+                        // a log line -- from recomposing this tile).
+                        CoverMainTile(v, state, vm)
                     } else {
                         SinglePebble(tiles[i], v, stateSource, vm, Modifier)
                     }
@@ -795,8 +789,8 @@ internal fun CompactCar(
         // between 0 and 1 off the plain `state.refreshing` boolean, the same way GarageScreen's
         // own grid-mode badge (no per-car pull gesture either) already does it.
         val coverRefreshProgress by animateFloatAsState(
-            targetValue = if (state.refreshing) 1f else 0f,
-            animationSpec = tween(if (state.refreshing) 150 else 200),
+            targetValue = if (refreshing) 1f else 0f,
+            animationSpec = tween(if (refreshing) 150 else 200),
             label = "coverRefreshProgress",
         )
         RefreshIndicatorBadge(

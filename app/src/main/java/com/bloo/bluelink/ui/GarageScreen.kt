@@ -236,7 +236,7 @@ internal fun GarageScreen(
         // They agreed only by accident -- the compact path returns before LocalPullFraction is
         // provided, so `pulling` was always false here and both reduced to `refreshing`. One
         // change to either expression and it becomes last-writer-wins flicker.
-        CompactGarage(state.value, vm, appearance, hazeState = hazeState)
+        CompactGarage(state, vm, appearance, hazeState = hazeState)
         return
     }
     val chromeHidden = refreshing || pulling
@@ -660,8 +660,8 @@ internal fun GarageScreen(
                     // the plain `refreshing` boolean instead of a live pull distance.
                     if (perPage > 1) {
                         val gridRefreshProgress by animateFloatAsState(
-                            targetValue = if (state.value.refreshing) 1f else 0f,
-                            animationSpec = tween(if (state.value.refreshing) 150 else 200),
+                            targetValue = if (refreshing) 1f else 0f,
+                            animationSpec = tween(if (refreshing) 150 else 200),
                             label = "gridRefreshProgress",
                         )
                         RefreshIndicatorBadge(

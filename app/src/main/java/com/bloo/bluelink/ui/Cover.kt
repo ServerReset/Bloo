@@ -59,6 +59,8 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.State
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableIntStateOf
@@ -443,10 +445,17 @@ internal fun CoverTile(
  * screen made the single most identifying thing on it the smallest text on it.
  */
 @Composable
-internal fun CoverMainTile(v: Vehicle, state: UiState, vm: AppViewModel) {
-    val status = state.statusFor(v)
+internal fun CoverMainTile(v: Vehicle, state: State<UiState>, vm: AppViewModel) {
+    // Derived, not body reads: this tile used to take the whole UiState and the caller had to
+    // read state.value to hand it over -- which put both the caller AND this tile (and the
+    // action bar inside it) in every emission's invalidation set for as long as the cover was
+    // showing. One derived read per value actually drawn.
+    val status by remember(v.vin) { derivedStateOf { state.value.statusFor(v) } }
     val metric = LocalAppearance.current.unitSystem == "metric"
-    val imageUrl = state.imageUrls[v.vin]
+    val imageUrl by remember(v.vin) { derivedStateOf { state.value.imageUrls[v.vin] } }
+    val hasBattery by remember(v.vin) { derivedStateOf { state.value.hasBattery(v) } }
+    val hasFuel by remember(v.vin) { derivedStateOf { state.value.hasFuel(v) } }
+    val drivingLabel by remember(v.vin) { derivedStateOf { state.value.drivingLabel(v) } }
     val hasPhoto = !imageUrl.isNullOrBlank()
     // The car's own name is this tile's title -- the template's title band is
     // where every other page says what it is, so the home page says which car.
@@ -500,9 +509,9 @@ internal fun CoverMainTile(v: Vehicle, state: UiState, vm: AppViewModel) {
         CompositionLocalProvider(LocalContentColor provides titleColor) {
         ChargeFuelBar(
             status,
-            state.hasBattery(v),
-            state.hasFuel(v),
-            state.drivingLabel(v),
+            hasBattery,
+            hasFuel,
+            drivingLabel,
             metric = metric,
         )
         }
@@ -525,14 +534,20 @@ internal fun CoverMainTile(v: Vehicle, state: UiState, vm: AppViewModel) {
  * narrow ones with a hole where the fourth was.
  */
 @Composable
-internal fun CoverActionBar(v: Vehicle, state: UiState, vm: AppViewModel) {
-    val status = state.statusFor(v)
+internal fun CoverActionBar(v: Vehicle, state: State<UiState>, vm: AppViewModel) {
+    val status by remember(v.vin) { derivedStateOf { state.value.statusFor(v) } }
     val ev = status?.evStatus
     val locked = status?.doorLock
     val charging = ev?.batteryCharge == true
     val plugged = ev.isPluggedOrCharging
     val climateOn = status?.airCtrlOn == true
-    val enabled = !state.loading
+    val loading by remember { derivedStateOf { state.value.loading } }
+    val enabled = !loading
+    val doorsPending by remember(v.vin) { derivedStateOf { state.value.isPending(v.vin, "doors") } }
+    val climatePending by remember(v.vin) { derivedStateOf { state.value.isPending(v.vin, "climate") } }
+    val chargePending by remember(v.vin) { derivedStateOf { state.value.isPending(v.vin, "charge") } }
+    val hornPending by remember(v.vin) { derivedStateOf { state.value.isPending(v.vin, "hornLights") } }
+    val hasBattery by remember(v.vin) { derivedStateOf { state.value.hasBattery(v) } }
     // iconOnly on all four: this row sits beside the identity pill (which just lost its
     // own icon for the same reason -- see CoverTile's showIdentityIcon doc), and the
     // labels wrapping it onto a second line on a ~1-inch cover is exactly what was
@@ -546,7 +561,7 @@ internal fun CoverActionBar(v: Vehicle, state: UiState, vm: AppViewModel) {
         // Attention, not confirmation: an unlocked car is the state worth
         // colouring, matching StateControl's own highlightWhenOff.
         attention = locked == false,
-        pending = state.isPending(v.vin, "doors"),
+        pending = doorsPending,
         enabled = enabled,
         onClick = { if (locked == true) vm.unlock(v) else vm.lock(v) },
     )
@@ -555,17 +570,17 @@ internal fun CoverActionBar(v: Vehicle, state: UiState, vm: AppViewModel) {
         label = if (climateOn) "Stop" else "Climate",
         iconOnly = true,
         active = climateOn,
-        pending = state.isPending(v.vin, "climate"),
+        pending = climatePending,
         enabled = enabled,
         onClick = { vm.toggleClimate(v) },
     )
-    if (state.hasBattery(v)) {
+    if (hasBattery) {
         CoverActionButton(
             icon = Icons.Filled.Bolt,
             label = if (charging) "Stop" else "Charge",
             iconOnly = true,
             active = charging,
-            pending = state.isPending(v.vin, "charge"),
+            pending = chargePending,
             // The car can't start a charge it isn't plugged into, and the
             // Charge pebble's own header button is gated the same way.
             enabled = enabled && plugged,
@@ -588,7 +603,7 @@ internal fun CoverActionBar(v: Vehicle, state: UiState, vm: AppViewModel) {
             iconOnly = true,
             // Both flashLights and hornAndLights run under the same "hornLights"
             // pending key (AppViewModel), so one check covers either.
-            pending = state.isPending(v.vin, "hornLights"),
+            pending = hornPending,
             enabled = enabled,
             onClick = { vm.hornAndLights(v) },
             onLongClick = { vm.flashLights(v) },
