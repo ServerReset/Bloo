@@ -97,7 +97,19 @@ internal fun GarageScreen(
      *  page is actually showing, instead of a flat tint with nothing to blur. */
     hazeState: HazeState = remember { HazeState() },
 ) {
-    val vehicles = state.value.vehicles
+    // DERIVED reads, not body reads of `state.value`.
+    //
+    // A bare `state.value.<field>` in this body subscribes the whole garage -- the pager, its
+    // item lambda, every live car page -- to EVERY UiState emission: a status poll for one car,
+    // a weather refresh, a device-location tick, any command anywhere. The values here change
+    // far less often than the state object does, and a derived state only invalidates its
+    // reader when the value it exposes actually changes, so unrelated emissions stop reaching
+    // the pager entirely.
+    val vehicles by remember { derivedStateOf { state.value.vehicles } }
+    val refreshing by remember { derivedStateOf { state.value.refreshing } }
+    val expandedIndex by remember { derivedStateOf { state.value.expandedIndex } }
+    val deviceLocation by remember { derivedStateOf { state.value.deviceLocation } }
+    val showSettingsHint by remember { derivedStateOf { state.value.showSettingsHint } }
     // No more early return on an empty garage: a zero-vehicle account is now
     // just another state of this SAME screen (see `slots`/GarageStatusCard
     // below), not a separate standalone Screen.Empty route -- reported
@@ -115,12 +127,15 @@ internal fun GarageScreen(
     // coerceIn(0, -1) throws (min > max) before getOrNull ever gets a chance
     // to just return null for it.
     val currentVehicle = vehicles.getOrNull(currentIndex.coerceIn(0, vehicles.lastIndex.coerceAtLeast(0)))
-    val currentFetchedAt = currentVehicle?.let { state.value.fetchedAt(it) }
+    val currentFetchedAt by remember(currentVehicle?.vin) {
+        derivedStateOf { currentVehicle?.let { state.value.fetchedAt(it) } }
+    }
     val sessionStartMs = remember { System.currentTimeMillis() }
     LaunchedEffect(currentVehicle?.vin, currentFetchedAt) {
-        if (currentFetchedAt != null &&
-            currentFetchedAt < sessionStartMs &&
-            System.currentTimeMillis() - currentFetchedAt > STALE_STATUS_MS) {
+        val fetchedAt = currentFetchedAt
+        if (fetchedAt != null &&
+            fetchedAt < sessionStartMs &&
+            System.currentTimeMillis() - fetchedAt > STALE_STATUS_MS) {
             // Give the automatic background fetch time to land. If it returns fresh
             // data, currentFetchedAt changes → this effect restarts → delay is
             // cancelled → user never sees a spurious "stale" toast.
@@ -130,8 +145,8 @@ internal fun GarageScreen(
     }
 
     // Gentle one-time nudge after onboarding, encouraging a Settings visit.
-    LaunchedEffect(state.value.showSettingsHint) {
-        if (state.value.showSettingsHint) {
+    LaunchedEffect(showSettingsHint) {
+        if (showSettingsHint) {
             vm.reportInfo("Tip: fine-tune each car's seats, photo and pebble order in Settings")
             vm.dismissSettingsHint()
         }
@@ -140,9 +155,9 @@ internal fun GarageScreen(
     // Settle haptic when a refresh lands.
     val haptics = LocalHaptics.current
     var wasRefreshing by remember { mutableStateOf(false) }
-    LaunchedEffect(state.value.refreshing) {
-        if (wasRefreshing && !state.value.refreshing) haptics?.slotSettle()
-        wasRefreshing = state.value.refreshing
+    LaunchedEffect(refreshing) {
+        if (wasRefreshing && !refreshing) haptics?.slotSettle()
+        wasRefreshing = refreshing
     }
     // Live pull distance reported by Refreshable, so the overlays react the moment
     // the user starts pulling - not only once a refresh is in flight.
@@ -224,7 +239,7 @@ internal fun GarageScreen(
         CompactGarage(state.value, vm, appearance, hazeState = hazeState)
         return
     }
-    val chromeHidden = state.value.refreshing || pulling
+    val chromeHidden = refreshing || pulling
     // SideEffect, not a bare assignment: these are snapshot writes, and writing state during
     // composition invalidates the composition that is running.
     //
@@ -236,7 +251,7 @@ internal fun GarageScreen(
         floatingRegistry.chromePull = { pullFractionState.value }
         // Two separate flags on purpose -- see chromeHolding's own doc. The HOLD is only while
         // a refresh is in flight; the FADE covers the pull as well.
-        floatingRegistry.chromeHolding = state.value.refreshing
+        floatingRegistry.chromeHolding = refreshing
         floatingRegistry.chromeHidden = chromeHidden
     }
     // Cleared when this screen goes away. Nothing else resets these, so leaving mid-pull or
@@ -286,7 +301,7 @@ internal fun GarageScreen(
     // have made Settings unreachable by swipe for exactly that one combination
     // (a single car on a wide screen). A lone car renders through the same
     // block/window pager as any other count instead.
-    val expandedIdx = state.value.expandedIndex?.takeIf { it in vehicles.indices && canExpand }
+    val expandedIdx = expandedIndex?.takeIf { it in vehicles.indices && canExpand }
 
     BackHandler(enabled = expandedIdx != null) { vm.collapse() }
 
@@ -679,7 +694,7 @@ internal fun GarageScreen(
                 originBounds = originBounds,
                 location = expandedLocation,
                 vehicleName = expandedVehicle.name,
-                deviceLocation = state.value.deviceLocation,
+                deviceLocation = deviceLocation,
                 mapState = expandedMap.mapStateFor(expandedVehicle.vin),
                 hazeState = hazeState,
                 // Same entry point the pebble's own "Locate" button uses --

@@ -156,20 +156,20 @@ internal fun HotspotSlot(
     stateSource: State<UiState>,
     vm: AppViewModel,
 ) {
-    val state = stateSource.value
+    // Derived, not `val state = stateSource.value`: same reason as PebbleList's own — a body
+    // read subscribes this whole dual-column view to every UiState emission. The list compare
+    // below then makes an unrelated emission free.
+    val allAvailable by remember(v.vin) {
+        derivedStateOf {
+            val state = stateSource.value
+            state.sectionsFor(v).filter {
+                it != "summary" && state.isSectionAvailable(v, it)
+            }
+        }
+    }
     val haptics = LocalHaptics.current
     val hotDrag = LocalHotSeatDrag.current
     val hovered = hotDrag?.overSlot == true
-
-    // Available pebbles for pinning (excludes "summary")
-    val allAvailable = remember(
-        state.sectionOrders[v.vin], state.aiEnabled, state.hasBattery(v),
-        v.isGen5W, state.platforms[v.vin], state.updateAvailable, state.updateTileDismissed,
-    ) {
-        state.sectionsFor(v).filter {
-            it != "summary" && state.isSectionAvailable(v, it)
-        }
-    }
 
     // Primary slot pebble (defaults to "controls" with lights/horn)
     val primaryPebble = hotspots.firstOrNull() ?: "controls"
@@ -396,17 +396,30 @@ internal fun Refreshable(
 /** Hero image + gauge (expanded view). */
 @Composable
 internal fun CriticalContent(v: Vehicle, stateSource: State<UiState>, vm: AppViewModel, onCollapse: (() -> Unit)? = null) {
-    val state = stateSource.value
-    val status = state.statusFor(v)
+    // Narrow, DERIVED reads -- one per thing the hero actually draws.
+    //
+    // This used to start with `val state = stateSource.value`, which put this composable --
+    // and therefore HeroHeader, the most expensive thing in the app -- into the invalidation
+    // set of EVERY UiState emission: a status poll for a different car, a device-location
+    // tick, a weather refresh, any command anywhere. The slice it then built
+    // (`remember(...) { state }`) narrowed what HEROHEADER received, but nothing narrowed
+    // what CriticalContent itself subscribed to, so the hero still recomposed each time.
+    // A derived state absorbs those emissions and only invalidates its reader when the value
+    // it exposes really changes.
+    val status by remember(v.vin) { derivedStateOf { stateSource.value.statuses[v.vin] } }
+    val imageUrl by remember(v.vin) { derivedStateOf { stateSource.value.imageUrls[v.vin] } }
+    val hasBattery by remember(v.vin) { derivedStateOf { stateSource.value.hasBattery(v) } }
+    val hasFuel by remember(v.vin) { derivedStateOf { stateSource.value.hasFuel(v) } }
+    val photoExpanded by remember(v.vin) {
+        derivedStateOf {
+            stateSource.value.isPebbleExpanded(v.vin, com.bloo.bluelink.data.HERO_PHOTO_SECTION)
+        }
+    }
+    val drivingLabel by remember(v.vin) { derivedStateOf { stateSource.value.drivingLabel(v) } }
     val metric = LocalAppearance.current.unitSystem == "metric"
-    val heroState = remember(
-        status, state.imageUrls[v.vin], state.hasBattery(v), state.hasFuel(v),
-        state.locations[v.vin], state.isPebbleExpanded(v.vin, com.bloo.bluelink.data.HERO_PHOTO_SECTION),
-    ) { state }
     HeroHeader(
-        v, status, heroState.imageUrls[v.vin], heroState.hasBattery(v), heroState.hasFuel(v), vm,
-        heroState.drivingLabel(v), metric = metric,
-        photoExpanded = heroState.isPebbleExpanded(v.vin, com.bloo.bluelink.data.HERO_PHOTO_SECTION),
+        v, status, imageUrl, hasBattery, hasFuel, vm,
+        drivingLabel, metric = metric, photoExpanded = photoExpanded,
         expandAction = onCollapse?.let {
             PebbleHeaderAction(label = "Back to all cars", icon = Icons.AutoMirrored.Filled.ArrowBack, onClick = it)
         },
@@ -563,22 +576,29 @@ internal fun PebbleList(
     /** Forwarded to the "summary" hero pebble only -- see [HeroHeader]'s `expandAction`. */
     onExpand: (() -> Unit)? = null,
 ) {
-    val sel = state.value
-    val allSections = sel.sectionsFor(v)
-    val hasBattery = sel.hasBattery(v)
-    // Exclude any pebbles pinned to the hotspot (both primary and secondary slots)
-    // -- but only when the caller is actually rendering them separately. See
-    // [pinHotspot]'s own doc.
-    val pinnedPebbles = if (pinHotspot) sel.hotspotFor(v.vin) else emptyList()
-    val allExclude = remember(exclude, pinnedPebbles) {
-        exclude + pinnedPebbles
-    }
-    val sections = remember(
-        allSections, allExclude, sel.aiEnabled, hasBattery, v.isGen5W, sel.platforms[v.vin],
-        sel.updateAvailable, sel.updateTileDismissed,
-    ) {
-        allSections.filter {
-            it !in allExclude && sel.isSectionAvailable(v, it)
+    // ONE derived computation, not `val sel = state.value` plus a remember over its fields.
+    //
+    // Reading `state.value` in this body subscribed the whole pebble stack's host to every
+    // UiState emission, so each poll/refresh/location tick recomposed this composable, its
+    // content lambda and every item wrapper. As a derived state, the (pure) section
+    // computation reruns on emissions but only invalidates this reader when the resulting
+    // LIST actually differs -- and lists compare by content, so an unrelated emission is now
+    // completely free here.
+    // The car's own section order, derived separately: the reorder handler below needs it,
+    // and as a derived read it too stays out of every emission's invalidation set.
+    val allSections by remember(v.vin) { derivedStateOf { state.value.sectionsFor(v) } }
+    val sections by remember(v.vin, exclude, pinHotspot) {
+        derivedStateOf {
+            val sel = state.value
+            val hasBattery = sel.hasBattery(v)
+            // Exclude any pebbles pinned to the hotspot (both primary and secondary slots)
+            // -- but only when the caller is actually rendering them separately. See
+            // [pinHotspot]'s own doc.
+            val pinnedPebbles = if (pinHotspot) sel.hotspotFor(v.vin) else emptyList()
+            val allExclude = exclude + pinnedPebbles
+            allSections.filter {
+                it !in allExclude && sel.isSectionAvailable(v, it)
+            }
         }
     }
     val hotDrag = LocalHotSeatDrag.current
