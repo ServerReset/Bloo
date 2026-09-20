@@ -19,10 +19,23 @@ object AppLog {
     // below to avoid concurrent formatting from multiple threads corrupting state.
     private val timestamp = SimpleDateFormat("HH:mm:ss", Locale.US)
 
-    // Backing mutable flow is private; the public `lines` exposes a read-only view so
-    // observers (Settings screen) can collect it but can't push new values directly.
-    private val _lines = MutableStateFlow<List<String>>(emptyList())
-    val lines: StateFlow<List<String>> = _lines.asStateFlow()
+    /**
+     * The log itself: an ArrayDeque, so appending is O(1) and dropping the oldest is O(1).
+     *
+     * It used to be a `MutableStateFlow<List<String>>` that every [log] call replaced with
+     * `(_lines.value + line).takeLast(MAX_LINES)` -- a full 500-element copy per line, on
+     * every line, forever (startup alone logs a hundred or so). The log is a ring buffer;
+     * copying the ring to append to it was pure allocation churn, and it landed on the
+     * cold-start path this app is trying to keep cheap.
+     *
+     * Observers instead watch [version] (a counter that ticks on every change) and call
+     * [snapshot] when it ticks, which is the only time a copy is actually needed.
+     */
+    private val buffer = ArrayDeque<String>()
+
+    // Bumped on every mutation; private backing flow, public read-only view.
+    private val _version = MutableStateFlow(0)
+    val version: StateFlow<Int> = _version.asStateFlow()
 
     /**
      * Appends a timestamped line to the in-memory log.
@@ -36,14 +49,23 @@ object AppLog {
      */
     fun log(message: String) {
         synchronized(this) {
-            val line = "${timestamp.format(Date())}  $message"
-            val next = (_lines.value + line).takeLast(MAX_LINES)
-            _lines.value = next
+            buffer.addLast("${timestamp.format(Date())}  $message")
+            while (buffer.size > MAX_LINES) buffer.removeFirst()
+            _version.value += 1
         }
     }
 
     /** Resets the log to empty, e.g. when the user taps "clear" in Settings. */
     fun clear() {
-        _lines.value = emptyList()
+        synchronized(this) {
+            buffer.clear()
+            _version.value += 1
+        }
     }
+
+    /** A point-in-time copy, for readers (Settings' logs card, the crash report). */
+    fun snapshot(): List<String> = synchronized(this) { buffer.toList() }
+
+    /** Line count without copying the log. */
+    fun size(): Int = synchronized(this) { buffer.size }
 }

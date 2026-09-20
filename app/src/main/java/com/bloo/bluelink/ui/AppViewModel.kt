@@ -258,7 +258,15 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     private val driveSyncBootstrapped = java.util.concurrent.atomic.AtomicBoolean(false)
 
     /** Copy-pasteable activity log shown in Settings. */
-    val logs: StateFlow<List<String>> = AppLog.lines
+    /**
+     * Ticks whenever the activity log changes. The Settings logs card collects THIS and
+     * snapshots the log when it ticks, instead of every log line allocating a fresh
+     * 500-element list for a StateFlow nobody may be watching (see [AppLog]).
+     */
+    val logsVersion: StateFlow<Int> = AppLog.version
+
+    /** Point-in-time copy of the activity log, for the Settings logs card. */
+    fun logSnapshot(): List<String> = AppLog.snapshot()
 
     val appearance: StateFlow<SettingsStore.Appearance> =
         settingsStore.appearance.stateIn(

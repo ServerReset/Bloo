@@ -237,7 +237,29 @@ fun BlooApp(vm: AppViewModel) {
     // small composables below so only those tiny scopes recompose per frame;
     // everything else just gets redrawn under the blurred/faded layer.
     Box(Modifier.fillMaxSize()) {
-    LockBlurLayer(locked = state.locked) {
+    // "Content settled": true once the screen has actually become the garage AND its first
+    // composition has had a moment to finish. Two full-screen blurs are gated on it, because
+    // both re-rasterize the whole view tree and both were measured as the dominant cost of
+    // the cold-start frames on the API 34 emulator:
+    //   - the lock screen's 22dp blur over the entire app (2.3s frame with it, 1.33s
+    //     without), and
+    //   - Aurora's own 44dp backdrop blur, which the drift redraws every 80ms.
+    // Neither is visible as a change: the lock screen paints its own scrim, and a frozen
+    // backdrop is indistinguishable for the ~1s this window lasts on hardware (~0 on a fast
+    // device, where the garage's first frame is a few ms).
+    var contentSettled by remember { mutableStateOf(state.screen == Screen.Garage) }
+    LaunchedEffect(state.screen) {
+        if (state.screen == Screen.Garage) {
+            // Two frames, not a wall-clock delay: on hardware the garage's first frame is a
+            // few milliseconds, so the blur is back essentially immediately, while a device
+            // that needs 2.5s for that frame (the software-rendered emulator) keeps the
+            // cheaper opaque backdrop for exactly as long as it is struggling.
+            withFrameNanos { }
+            withFrameNanos { }
+            contentSettled = true
+        }
+    }
+    LockBlurLayer(locked = state.locked && contentSettled) {
     Box(
         Modifier
             .fillMaxSize()
@@ -524,7 +546,7 @@ fun BlooApp(vm: AppViewModel) {
     }
     }
         // Biometric lock overlay, drawn over the blurred app; fades out on unlock.
-        LockAlphaOverlay(locked = state.locked, vm = vm)
+        LockAlphaOverlay(locked = state.locked, vm = vm, opaqueBackdrop = !contentSettled)
     }
     }
 

@@ -76,13 +76,18 @@ class AutoLockDebugReceiver : BroadcastReceiver() {
                             ),
                         )
                         AutoLockAlarm.schedule(ctx, vin, 5_000L)
-                        runCatching {
-                            NotificationManagerCompat.from(ctx).notify(
-                                AutoLockNotification.notificationId(vin),
-                                AutoLockNotification.build(
-                                    ctx, vin, carName ?: "your car", DetectionState.GRACE, 5,
-                                ),
-                            )
+                        if (androidx.core.app.ActivityCompat.checkSelfPermission(
+                                ctx, android.Manifest.permission.POST_NOTIFICATIONS,
+                            ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+                        ) {
+                            runCatching {
+                                NotificationManagerCompat.from(ctx).notify(
+                                    AutoLockNotification.notificationId(vin),
+                                    AutoLockNotification.build(
+                                        ctx, vin, carName ?: "your car", DetectionState.GRACE, 5,
+                                    ),
+                                )
+                            }
                         }
                     }
                     "walk" -> {

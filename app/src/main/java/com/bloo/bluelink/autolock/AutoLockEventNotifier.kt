@@ -101,6 +101,16 @@ object AutoLockEventNotifier {
             .setPriority(NotificationCompat.PRIORITY_DEFAULT)
         contentIntent?.let { builder.setContentIntent(it) }
 
+        // Explicit grant read at the call site: lint cannot see through
+        // [Notifications.hasPermission]'s own check, and the permission contract belongs
+        // next to the notify() it protects anyway (the check above is still the TOCTOU
+        // guard the runCatching covers).
+        if (androidx.core.app.ActivityCompat.checkSelfPermission(
+                context, android.Manifest.permission.POST_NOTIFICATIONS,
+            ) != android.content.pm.PackageManager.PERMISSION_GRANTED
+        ) {
+            return
+        }
         runCatching {
             NotificationManagerCompat.from(context).notify(notificationId(vin), builder.build())
         }

@@ -247,7 +247,10 @@ internal fun SettingsScreen(
     val appearance = LocalAppearance.current
     val notif by vm.notifications.collectAsStateWithLifecycle()
     val state by vm.state.collectAsStateWithLifecycle()
-    val logs by vm.logs.collectAsStateWithLifecycle()
+    // Keyed on the log's version counter: the snapshot (a list copy) is only taken when the
+    // log actually changed, and only while this screen is collecting.
+    val logsVersion by vm.logsVersion.collectAsStateWithLifecycle()
+    val logs = remember(logsVersion) { vm.logSnapshot() }
     val context = LocalContext.current
     val clipboard = LocalClipboard.current
     // LocalClipboard's set API is suspend; one scope for the two copy buttons

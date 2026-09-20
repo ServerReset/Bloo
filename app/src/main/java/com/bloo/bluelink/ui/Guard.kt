@@ -88,11 +88,16 @@ import kotlin.math.max
 
 @Composable
 internal fun LockBlurLayer(locked: Boolean, content: @Composable () -> Unit) {
-    val lockBlur by animateDpAsState(
-        targetValue = if (locked) 22.dp else 0.dp,
-        animationSpec = tween(durationMillis = 450),
-        label = "lockBlur",
-    )
+    // Asymmetric on purpose. Blurring IN is instant: the lock screen's own UI covers the
+    // content at that moment, so nobody can see the blur arrive, while animating the radius
+    // would force the whole app tree to be re-rasterized at 22dp on EVERY frame of the
+    // animation -- measured on the API 34 emulator as a 2.3s frame, of which ~1s was this
+    // blur (disabling it dropped the same frame to 1.33s). Unlocking still animates: there
+    // the blur is being revealed, and a snap would be visible.
+    val lockBlur = remember { Animatable(0f) }
+    LaunchedEffect(locked) {
+        if (locked) lockBlur.snapTo(LOCK_BLUR_DP) else lockBlur.animateTo(0f, tween(450))
+    }
     // The blur modifier is applied only while there IS one. Modifier.blur(0.dp) installs no
     // RenderEffect, but it still forces the whole app tree into its own graphicsLayer on every
     // frame -- for the entire life of the process, to serve a lock screen that is almost never
@@ -100,14 +105,17 @@ internal fun LockBlurLayer(locked: Boolean, content: @Composable () -> Unit) {
     Box(
         Modifier
             .fillMaxSize()
-            .then(if (lockBlur > 0.dp) Modifier.blur(lockBlur) else Modifier),
+            .then(if (lockBlur.value > 0f) Modifier.blur(lockBlur.value.dp) else Modifier),
     ) {
         content()
     }
 }
 
+/** The locked blur radius (was an inline 22.dp at its one call site). */
+private const val LOCK_BLUR_DP = 22f
+
 @Composable
-internal fun LockAlphaOverlay(locked: Boolean, vm: AppViewModel) {
+internal fun LockAlphaOverlay(locked: Boolean, vm: AppViewModel, opaqueBackdrop: Boolean = false) {
     val lockAlpha by animateFloatAsState(
         targetValue = if (locked) 1f else 0f,
         animationSpec = tween(durationMillis = 450),
@@ -115,7 +123,7 @@ internal fun LockAlphaOverlay(locked: Boolean, vm: AppViewModel) {
     )
     if (lockAlpha > 0.01f) {
         Box(Modifier.fillMaxSize().alpha(lockAlpha)) {
-            LockOverlay(vm)
+            LockOverlay(vm, opaqueBackdrop)
         }
     }
 }
@@ -139,7 +147,7 @@ internal fun LockAlphaOverlay(locked: Boolean, vm: AppViewModel) {
  * of the same app, not a leftover scaffold screen.
  */
 @Composable
-internal fun LockOverlay(vm: AppViewModel) {
+internal fun LockOverlay(vm: AppViewModel, opaqueBackdrop: Boolean = false) {
     val context = LocalContext.current
     val compact = isCompactCoverScreen()
     val appState by vm.state.collectAsStateWithLifecycle()
@@ -199,8 +207,13 @@ internal fun LockOverlay(vm: AppViewModel) {
     Box(
         Modifier
             .fillMaxSize()
-            // Darken the blur for legibility, and swallow taps to the app behind.
-            .background(Color.Black.copy(alpha = 0.45f))
+            // Darken the blur for legibility, and swallow taps to the app behind. While the
+            // backdrop is NOT blurred (the first frames of a cold start, before the app
+            // underneath has finished composing -- see LockBlurLayer's own note) this is
+            // fully opaque instead: a 45% scrim over a sharp garage would show car names,
+            // plates and status through the lock screen, which is the one thing it exists to
+            // prevent. The blur snaps in as this returns to its translucent value.
+            .background(Color.Black.copy(alpha = if (opaqueBackdrop) 1f else 0.45f))
             .clickable(interactionSource = noRipple, indication = null) {},
     ) {
         // Floating back arrow -> login: the same FloatingIcon every other floating

@@ -115,6 +115,7 @@ import kotlinx.coroutines.flow.first
 import kotlin.math.max
 import androidx.compose.ui.graphics.toArgb
 import androidx.core.net.toUri
+import androidx.compose.runtime.withFrameNanos
 
 @Composable
 internal fun borderlessFieldColors(): androidx.compose.material3.TextFieldColors {

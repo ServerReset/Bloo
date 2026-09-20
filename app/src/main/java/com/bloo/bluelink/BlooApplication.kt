@@ -136,11 +136,12 @@ class BlooApplication : Application(), Configuration.Provider {
                     appendLine()
                     appendLine("--- Stack trace ---")
                     appendLine(trace)
-                    appendLine("--- App log (most recent ${AppLog.lines.value.size} lines) ---")
-                    if (AppLog.lines.value.isEmpty()) {
+                    val logLines = AppLog.snapshot()
+                    appendLine("--- App log (most recent ${logLines.size} lines) ---")
+                    if (logLines.isEmpty()) {
                         append("(empty -- crashed before anything logged, or log() was never reached)")
                     } else {
-                        append(AppLog.lines.value.joinToString("\n"))
+                        append(logLines.joinToString("\n"))
                     }
                 }
                 val intent = Intent(this, CrashActivity::class.java).apply {
