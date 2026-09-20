@@ -17,7 +17,21 @@ import com.bloo.bluelink.R
 
 /** Posts Bloo's local alerts (service due, door left open, car left running). */
 object Notifications {
-    private const val CHANNEL = "bloo_alerts"
+    /**
+     * One channel per KIND of notification, so the user can tune (or silence) each
+     * independently in system settings -- a car that keeps nagging about a door is a very
+     * different thing from "your car was started", and Android gives no way to split them
+     * once they share a channel. Every notification this app posts names one of these.
+     */
+    /** State alerts: service due, door left open, unlocked/running too long. */
+    const val CHANNEL_ALERTS = "bloo_alerts"
+    /** Events: the car was started, a charge session completed. */
+    const val CHANNEL_EVENTS = "bloo_events"
+    /** Bloo's own app updates: a newer build is available / was downloaded. */
+    const val CHANNEL_UPDATES = "bloo_updates"
+
+    /** Kept as the alerts channel for the many existing call sites that mean "an alert". */
+    private const val CHANNEL = CHANNEL_ALERTS
     /** Bloo's accent, used to tint the small icon in the shade. */
     private const val ACCENT = BlooColors.brandAccent
 
@@ -37,11 +51,36 @@ object Notifications {
      */
     private fun ensureChannel(context: Context) = ensureNotificationChannel(
         context,
-        id = CHANNEL,
+        id = CHANNEL_ALERTS,
         name = "Car alerts",
         importance = NotificationManager.IMPORTANCE_DEFAULT,
         description = "Service-due, door-open and car-running alerts",
     )
+
+    /**
+     * Idempotently creates the channels this object can post to. Called from [post] with
+     * the channel actually being used, so a caller that only ever posts updates never
+     * creates the alerts channel and vice versa.
+     */
+    private fun ensureChannel(context: Context, channelId: String) {
+        when (channelId) {
+            CHANNEL_EVENTS -> ensureNotificationChannel(
+                context,
+                id = CHANNEL_EVENTS,
+                name = "Car events",
+                importance = NotificationManager.IMPORTANCE_DEFAULT,
+                description = "Your car was started, or a charge session finished",
+            )
+            CHANNEL_UPDATES -> ensureNotificationChannel(
+                context,
+                id = CHANNEL_UPDATES,
+                name = "App updates",
+                importance = NotificationManager.IMPORTANCE_DEFAULT,
+                description = "A newer Bloo build is available or was downloaded",
+            )
+            else -> ensureChannel(context)
+        }
+    }
 
     /**
      * Whether Bloo can actually get a notification in front of the user.
@@ -122,9 +161,17 @@ object Notifications {
      *    permission between the check and this call, and notify() would then
      *    throw a SecurityException that we don't want to crash the caller for.
      */
-    fun post(context: Context, id: Int, title: String, text: String, actions: List<Action> = emptyList()): Boolean {
+    fun post(
+        context: Context,
+        id: Int,
+        title: String,
+        text: String,
+        actions: List<Action> = emptyList(),
+        /** Which of the app's channels this belongs on -- see the CHANNEL_* consts. */
+        channelId: String = CHANNEL_ALERTS,
+    ): Boolean {
         if (!hasPermission(context)) return false
-        ensureChannel(context)
+        ensureChannel(context, channelId)
         val launch = context.packageManager.getLaunchIntentForPackage(context.packageName)
         val pi = launch?.let {
             PendingIntent.getActivity(
@@ -132,7 +179,7 @@ object Notifications {
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
             )
         }
-        val builder = NotificationCompat.Builder(context, CHANNEL)
+        val builder = NotificationCompat.Builder(context, channelId)
             .setSmallIcon(R.drawable.ic_stat_bloo)
             .setColor(ACCENT)
             .setContentTitle(title)
@@ -746,6 +793,10 @@ object CarAlerts {
         val title: String,
         val text: String,
         val actions: List<Notifications.Action> = emptyList(),
+        /** Which channel this alert belongs on. Defaults to state alerts; the
+         *  "car started" and "charge complete" transitions pass
+         *  [Notifications.CHANNEL_EVENTS]. */
+        val channelId: String = Notifications.CHANNEL_ALERTS,
     )
 
     /**
@@ -1029,6 +1080,9 @@ object CarAlerts {
                         // Same reasoning as the running-too-long alert above: an EV
                         // has no engine, so don't tell an EV owner theirs is "running".
                         if (powertrain == Powertrain.EV) "Your car is now on." else "Your car's engine is now running.",
+                        // An event, not a nagging state alert: its own channel so it can be
+                        // silenced (or made louder) independently of "door left open".
+                        channelId = Notifications.CHANNEL_EVENTS,
                     )
                     settings.setEngineStartNotificationSent(v.vin, true)
                 }
@@ -1049,6 +1103,7 @@ object CarAlerts {
                         chargeCompleteId(v),
                         "${v.name} charging is complete",
                         "Your car has finished charging.",
+                        channelId = Notifications.CHANNEL_EVENTS,
                     )
                 }
                 // Reset the flag so we're ready for the next charge cycle

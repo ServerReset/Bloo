@@ -39,6 +39,12 @@
     <!-- The short-lived foreground service that runs while an evaluation (grace countdown,
          status check, lock) is in flight. -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <!-- AutoLock's fallback path schedules the lock deadline as an exact alarm: the OS
+         refuses a background foreground-service start for a Bluetooth broadcast (see
+         AutoLockAlarm's own doc), so an alarm = which has no such restriction = is what
+         actually delivers "lock when the grace period ends". Without this access the code
+         falls back to an inexact alarm, which can be minutes late. -->
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE" />
     <!-- Bloo isn't on the Play Store, so the in-app update prompt downloads
          the new APK itself and launches the system package installer;
@@ -197,6 +203,10 @@
              built from this receiver, see ActivityRecognitionManager, so it needs no
              intent-filter here. -->
         <receiver android:name=".autolock.AutoLockActivityReceiver" android:exported="false" />
+        <!-- The alarm fallback's deadline (and the forwarded walk-away confirmation). Not
+             exported: it is only ever reached by our own PendingIntent or our own explicit
+             broadcast. -->
+        <receiver android:name=".autolock.AutoLockAlarmReceiver" android:exported="false" />
         <!-- Relaunches MainActivity once an in-place app update finishes installing;
              see its own doc comment. -->
         <receiver android:name=".autolock.AutoLockBootReceiver" android:exported="false">

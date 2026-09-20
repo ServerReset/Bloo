@@ -54,6 +54,7 @@ class UpdateReminderWorker(context: Context, params: WorkerParameters) : Corouti
                 title = "Reminder: Bloo update available",
                 text = (run.displayTitle?.takeIf { it.isNotBlank() } ?: "Build #${run.runNumber}") +
                     " — open Bloo to download and install.",
+                channelId = Notifications.CHANNEL_UPDATES,
             )
         }
         return Result.success()

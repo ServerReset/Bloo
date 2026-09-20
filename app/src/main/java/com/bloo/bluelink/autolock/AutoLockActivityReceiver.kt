@@ -17,6 +17,21 @@ class AutoLockActivityReceiver : BroadcastReceiver() {
             it.transitionType == ActivityTransition.ACTIVITY_TRANSITION_ENTER &&
                 (it.activityType == DetectedActivity.WALKING || it.activityType == DetectedActivity.ON_FOOT)
         }
-        if (walkedAway) AutoLockController.onWalkingConfirmedAny()
+        if (!walkedAway) return
+        // In-process evaluations (the service path) get the state-machine nudge...
+        AutoLockController.onWalkingConfirmedAny()
+        // ...and any evaluation owned by the alarm fallback (no service running, so the
+        // controller has no job for it) is driven directly: mark the persisted record and
+        // hand the confirmation to the deadline receiver, which locks now instead of at the
+        // deadline. Without this the fallback would always wait out the full grace period.
+        val ctx = context.applicationContext
+        AutoLockPending.all(ctx).forEach { record ->
+            AutoLockPending.markWalkConfirmed(ctx, record.vin)
+            ctx.sendBroadcast(
+                Intent(ctx, AutoLockAlarmReceiver::class.java)
+                    .putExtra(AutoLockAlarmReceiver.EXTRA_VIN, record.vin)
+                    .putExtra(AutoLockAlarmReceiver.EXTRA_WALK_CONFIRMED, true),
+            )
+        }
     }
 }

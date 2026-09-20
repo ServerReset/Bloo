@@ -4,8 +4,10 @@ import android.bluetooth.BluetoothDevice
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import androidx.core.app.NotificationManagerCompat
 import com.bloo.bluelink.data.AppLog
 import com.bloo.bluelink.data.SettingsStore
+import com.bloo.bluelink.data.SnapshotStore
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -54,9 +56,52 @@ class AutoLockBluetoothReceiver : BroadcastReceiver() {
                     when (action) {
                         BluetoothDevice.ACTION_ACL_DISCONNECTED -> {
                             AppLog.log("AutoLock: car Bluetooth disconnected for $vin — starting evaluation.")
-                            AutoLockService.start(ctx, vin)
+                            val graceSeconds = settings.graceSeconds
+                            val started = AutoLockService.start(ctx, vin)
+                            // Always arm the deadline alarm, whichever path runs: with the
+                            // service it is a safety net (the controller cancels it on any
+                            // outcome, so it only ever fires if the process died mid-way);
+                            // without it, the alarm IS the mechanism.
+                            AutoLockAlarm.schedule(
+                                ctx,
+                                vin,
+                                if (started) AutoLockAlarm.servicePathDeadlineMs(graceSeconds) else 0L,
+                            )
+                            if (!started) {
+                                // No service, so this receiver owns the whole countdown. The
+                                // record has to be persisted because the walk-away
+                                // confirmation and the deadline can land in a later process.
+                                val carName = SnapshotStore(ctx).current().vehicles
+                                    .firstOrNull { it.vin == vin }?.name
+                                AutoLockPending.begin(
+                                    ctx,
+                                    AutoLockPending.Record(
+                                        vin = vin,
+                                        carName = carName,
+                                        deadlineMs = System.currentTimeMillis() + graceSeconds * 1000L,
+                                        dryRun = settings.dryRun,
+                                    ),
+                                )
+                                // Same mandatory walk-away confirmation the service path
+                                // waits for; the transition is delivered to
+                                // AutoLockActivityReceiver, which forwards it to the alarm
+                                // receiver for an immediate lock.
+                                ActivityRecognitionManager.start(ctx)
+                                // The countdown the user can actually see and cancel. Its
+                                // Cancel / Lock now actions are user interaction, which DOES
+                                // permit the service start, so they keep working here.
+                                runCatching {
+                                    NotificationManagerCompat.from(ctx).notify(
+                                        AutoLockNotification.notificationId(vin),
+                                        AutoLockNotification.build(
+                                            ctx, vin, carName ?: "your car",
+                                            DetectionState.GRACE, graceSeconds,
+                                        ),
+                                    )
+                                }
+                            }
                         }
-                        BluetoothDevice.ACTION_ACL_CONNECTED -> AutoLockController.cancel(vin)
+                        BluetoothDevice.ACTION_ACL_CONNECTED -> AutoLockController.cancel(ctx, vin)
                     }
                 }
             } finally {

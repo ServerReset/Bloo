@@ -8,6 +8,7 @@ import android.os.Build
 import android.os.IBinder
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.app.ServiceCompat
+import com.bloo.bluelink.data.AppLog
 import com.bloo.bluelink.data.SnapshotStore
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -49,13 +50,25 @@ class AutoLockService : Service() {
 
         when (intent.action) {
             ACTION_CANCEL -> {
-                AutoLockController.cancel(vin)
+                AutoLockController.cancel(this, vin)
                 startForegroundCompat(vin, DetectionState.ABORTED, 0)
                 scope.launch { delay(3000); finishTracking(vin) }
                 return START_NOT_STICKY
             }
             ACTION_LOCK_NOW -> {
                 AutoLockController.lockNow(this, vin)
+                // The fallback path (AutoLockAlarm) has no controller job to nudge -- it is
+                // owned by a persisted record -- so the tap is forwarded straight to the
+                // deadline receiver with the walk-away confirmation attached, which is
+                // exactly "the user said go". Without this, "Lock now" on a notification
+                // posted by the fallback would wait out the walk window and then skip.
+                if (AutoLockPending.get(this, vin) != null) {
+                    sendBroadcast(
+                        Intent(this, AutoLockAlarmReceiver::class.java)
+                            .putExtra(AutoLockAlarmReceiver.EXTRA_VIN, vin)
+                            .putExtra(AutoLockAlarmReceiver.EXTRA_WALK_CONFIRMED, true),
+                    )
+                }
                 observe(vin)
                 return START_NOT_STICKY
             }
@@ -145,15 +158,21 @@ class AutoLockService : Service() {
 
         /** Fires a one-off evaluation for [vin] (Bluetooth disconnect / a manual
          *  "Simulate leaving" test from Settings). */
-        fun start(context: Context, vin: String) {
+        fun start(context: Context, vin: String): Boolean {
             val intent = Intent(context, AutoLockService::class.java).putExtra(EXTRA_VIN, vin)
-            try {
+            return try {
                 context.startForegroundService(intent)
+                true
             } catch (t: Throwable) {
-                // e.g. ForegroundServiceStartNotAllowedException when the OS blocks a background
-                // start (rare for a Bluetooth-disconnect-triggered start, which the system treats
-                // as a qualifying event, but harmless to guard regardless).
-                android.util.Log.w("AutoLockService", "startForegroundService blocked: ${t.message}")
+                // THE COMMON CASE ON ANDROID 12+, not an edge case: a Bluetooth ACL broadcast
+                // is not one of the exemptions from the background foreground-service start
+                // restriction, so this throws ForegroundServiceStartNotAllowedException
+                // whenever the app isn't in the foreground. Returning false is what lets the
+                // caller fall back to the alarm path instead of AutoLock silently doing
+                // nothing (which is exactly what it used to do -- the exception was swallowed
+                // here and AutoLock never ran in a pocket).
+                AppLog.log("AutoLock: background service start blocked (${t.javaClass.simpleName}) — using the alarm fallback.")
+                false
             }
         }
     }

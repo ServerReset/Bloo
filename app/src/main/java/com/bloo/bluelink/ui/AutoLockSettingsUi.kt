@@ -129,6 +129,31 @@ internal fun AutoLockSettingsGroup(v: Vehicle, vm: AppViewModel) {
             )
         }
 
+        // Exact alarms are what make the lock deadline honest: without this access the OS may
+        // delay the fallback's alarm by minutes, and a car that locks "eventually" is worse
+        // than one that says so up front. Android 12+ gates it behind a special access screen,
+        // so the only way to get it is to send the user there.
+        val exactAlarmsOk = Build.VERSION.SDK_INT < Build.VERSION_CODES.S ||
+            (context.getSystemService(android.app.AlarmManager::class.java))?.canScheduleExactAlarms() == true
+        if (current.enabled && !exactAlarmsOk) {
+            SettingsCaption("Locking may be delayed", bottomGap = SettingsGapHairline)
+            MorphTextButton(
+                text = "Allow Alarms & reminders",
+                onClick = {
+                    runCatching {
+                        context.startActivity(
+                            android.content.Intent(
+                                android.provider.Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM,
+                                android.net.Uri.parse("package:${context.packageName}"),
+                            ),
+                        )
+                    }
+                },
+                contentColor = MaterialTheme.colorScheme.primary,
+                icon = Icons.Filled.Warning,
+            )
+        }
+
         if (current.enabled) {
             StatusRow("Car Bluetooth device", current.deviceName ?: "Not set")
             val deviceSource = remember { MutableInteractionSource() }

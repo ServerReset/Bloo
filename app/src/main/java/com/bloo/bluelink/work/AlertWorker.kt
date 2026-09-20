@@ -124,7 +124,7 @@ class AlertWorker(context: Context, params: WorkerParameters) : CoroutineWorker(
                         settings, v, status, prefs,
                         canDeliver = Notifications.hasPermission(applicationContext),
                     ).forEach {
-                        Notifications.post(applicationContext, it.id, it.title, it.text, it.actions)
+                        Notifications.post(applicationContext, it.id, it.title, it.text, it.actions, it.channelId)
                     }
                 }
                 // The live charging bar rides the same 30-minute poll so it

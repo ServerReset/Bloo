@@ -80,6 +80,7 @@ class UpdateCheckWorker(context: Context, params: WorkerParameters) : CoroutineW
             title = "Bloo update available",
             text = (run.displayTitle?.takeIf { it.isNotBlank() } ?: "Build #${run.runNumber}") +
                 " — open Bloo to download and install.",
+            channelId = Notifications.CHANNEL_UPDATES,
         )
         if (posted) store.setLastNotifiedRun(run.runNumber)
         return Result.success()

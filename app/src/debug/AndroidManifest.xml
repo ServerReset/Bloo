@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Debug-only additions. This manifest is merged into debug builds only, so nothing here
+     ships in a release APK. -->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <application>
+        <!-- Developer trigger for AutoLock: lets an adb command exercise the whole
+             background flow (fallback record -> countdown notification -> walk-away
+             confirmation -> deadline -> dry-run outcome notification) without physically
+             leaving a car. See its own doc. -->
+        <receiver
+            android:name=".autolock.AutoLockDebugReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="com.bloo.bluelink.DEBUG_AUTOLOCK" />
+            </intent-filter>
+        </receiver>
+    </application>
+</manifest>
