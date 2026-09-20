@@ -625,7 +625,11 @@ class EuApi(private val brand: Brand) {
     /** Runs [request] on [httpClient] and returns the parsed JSON body. Throws on
      *  non-2xx (401 -> [EuRepository] refreshes + retries) and on an in-band
      *  `retCode == "F"` error. The failing method+path is included in the message. */
+    /** See [ResponseFraming]: GET-only retry on a fresh connection for an unframable body. */
     private fun call(request: Request, httpClient: OkHttpClient = this.client): JsonElement =
+        ResponseFraming.retryOnceOnFreshConnection(request) { rawCall(it, httpClient) }
+
+    private fun rawCall(request: Request, httpClient: OkHttpClient): JsonElement =
         httpClient.newCall(request).execute().use { resp ->
             // See BlueLinkApi.call's own doc for why this is measured separately from the
             // HttpLoggingInterceptor's own (headers-only) timing: `.string()` is what actually

@@ -446,6 +446,15 @@ class BlueLinkApi(private val brand: Brand = Brand.HYUNDAI) {
             AppLog.log("Retrying ${request.method} ${request.url.encodedPath} after ${e.code}…")
             delay(1500)
             call(request)
+        } catch (t: Throwable) {
+            // A response whose body cannot be framed (see ResponseFraming) fails while READING
+            // the body, so the server already answered and the connection is the suspect.
+            // GETs only: re-sending a command POST could fire it twice.
+            if (ResponseFraming.isFramingFailure(t)) {
+                ResponseFraming.retryOnceOnFreshConnection(request) { call(it) }
+            } else {
+                throw t
+            }
         }
     }
 

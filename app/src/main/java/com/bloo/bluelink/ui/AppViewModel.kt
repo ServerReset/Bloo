@@ -1051,7 +1051,13 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         val vehiclesFetchStartedAt = System.currentTimeMillis()
         val fetched = repos.values.toList().flatMap { r ->
             runCatching { statusMutex.withLock { r.vehicles() } }.getOrElse { e ->
-                val msg = e.message ?: "Couldn't load vehicles"
+                // A malformed response (see ResponseFraming) would otherwise surface okio's
+                // parser text -- "Expected leading [0-9a-fA-F] character but was 0x7b" -- as the
+                // user-facing reason, which tells a person nothing. It is retried once inside the
+                // API layer; this is the wording for when the retry also fails.
+                val msg = com.bloo.bluelink.data.ResponseFraming.userMessage(e)
+                    ?: e.message
+                    ?: "Couldn't load vehicles"
                 AppLog.log("⚠ $msg")
                 lastError = msg
                 emptyList()
@@ -1901,7 +1907,9 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 }
                 logSuccess?.let { AppLog.log(it()) }
             } catch (e: Exception) {
-                val msg = e.message ?: errorMessage
+                val msg = com.bloo.bluelink.data.ResponseFraming.userMessage(e)
+                    ?: e.message
+                    ?: errorMessage
                 AppLog.log("⚠ ${v.name}: $msg")
                 if (surfaceErrors) _state.update { it.copy(message = "${v.name}: $msg", messageType = "error") }
             } finally {
