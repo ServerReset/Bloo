@@ -58,6 +58,10 @@ class BlooApplication : Application(), Configuration.Provider {
      */
     override fun attachBaseContext(base: Context) {
         super.attachBaseContext(base)
+        // Set BEFORE the first mark, not in onCreate: otherwise attachBaseContext's own
+        // mark and onCreate's "begin" mark are emitted while the flag is still at its
+        // default, so a release build logged exactly those two lines and then went quiet.
+        StartupTrace.logcatEnabled = BuildConfig.DEBUG
         StartupTrace.mark("Application.attachBaseContext")
         // Begin collecting per-frame timings as early as a Looper exists; the monitor is
         // idempotent and self-terminating (see its own doc), so starting it here rather
@@ -87,10 +91,6 @@ class BlooApplication : Application(), Configuration.Provider {
     override fun onCreate() {
         StartupTrace.mark("Application.onCreate: begin")
         super.onCreate()
-        // Keep the startup trace quiet in a release build (the in-memory AppLog copy and
-        // the marks themselves remain available); a debug build is where logcat timing
-        // is actually read.
-        StartupTrace.logcatEnabled = BuildConfig.DEBUG
         installStartupStrictMode()
         StartupTrace.mark("Application.super.onCreate done")
         BatterySaverState.ensureInitialized(this)
