@@ -284,7 +284,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
      */
     private suspend fun checkAlerts(v: Vehicle, status: VehicleStatus) {
         val alerts = CarAlerts.evaluate(settingsStore, v, status)
-        alerts.forEach { Notifications.post(getApplication(), it.id, it.title, it.text, it.actions) }
+        alerts.forEach { Notifications.post(getApplication(), it.id, it.title, it.text, it.actions, it.channelId) }
         alerts.firstOrNull()?.let { a -> _state.update { it.copy(message = a.text, messageType = "error") } }
     }
 
@@ -430,8 +430,27 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 logStartup("Credentials loaded in ${System.currentTimeMillis() - credsStartedAt}ms: ${accounts.size} account(s)")
                 _state.update { it.copy(accounts = accounts) }
                 val appearance = settingsStore.appearance.first()
-                val lockMechanisms = (appearance.biometricLock && canUseBiometrics()) || pinInstalled()
-                refreshPinState()
+                // Both halves of this decision touch CredentialStore's lazy encrypted
+                // preferences, and on a cold start that lazy is STILL UNSET -- so the
+                // first read here is the one that builds EncryptedSharedPreferences
+                // (AndroidKeystore key lookup + Tink keyset parse) and decrypts. Measured
+                // on the main thread as an EncryptedSharedPreferences.create plus a Tink
+                // encrypt inside getPinFailures, all while the first frame was due. Taken
+                // on IO as ONE block (the capability check is a binder call too) and
+                // applied in a single state update.
+                val (lockMechanisms, appPinSet, lockout) = withContext(Dispatchers.IO) {
+                    val pinSet = credentialStore.getPinRecord() != null
+                    Triple(
+                        (appearance.biometricLock && canUseBiometrics()) || pinSet,
+                        pinSet,
+                        PinLockout(
+                            credentialStore.getPinFailures(),
+                            credentialStore.getPinLockedUntil(),
+                            credentialStore.getPinLockedUntilElapsed(),
+                        ),
+                    )
+                }
+                _state.update { it.copy(appPinSet = appPinSet, pinLockout = lockout) }
                 if (lockMechanisms) {
                     logStartup("Cold start: lock screen required, deferring garage load until unlock")
                     _state.update { it.copy(locked = true) }
@@ -807,8 +826,10 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             val a = settingsStore.appearance.first()
             // Either mechanism re-arms the lock: the biometric lock when the
-            // device has usable biometrics, or the app PIN when one is set.
-            if (!((a.biometricLock && canUseBiometrics()) || pinInstalled())) return@launch
+            // device has usable biometrics, or the app PIN when one is set. The PIN
+            // half reads the encrypted prefs, so the whole check is taken on IO.
+            val armed = withContext(Dispatchers.IO) { (a.biometricLock && canUseBiometrics()) || pinInstalled() }
+            if (!armed) return@launch
             val elapsed = System.currentTimeMillis() - backgroundedAtMs
             // See LockTiming.wireKey (exhaustive, so a new enum value must be mapped) and
             // shouldRelockAfter's own doc for the legacy wire keys it still honours.
@@ -851,15 +872,18 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     /** Re-mirrors PIN presence + lockout state from the credential store
      *  into [UiState] (called on cold start and after every mutation). */
     fun refreshPinState() {
-        _state.update {
-            it.copy(
-                appPinSet = credentialStore.getPinRecord() != null,
-                pinLockout = PinLockout(
-                    credentialStore.getPinFailures(),
-                    credentialStore.getPinLockedUntil(),
-                    credentialStore.getPinLockedUntilElapsed(),
-                ),
+        // Reads CredentialStore's lazy encrypted prefs (Tink/AndroidKeystore), so this
+        // runs on IO: every caller is a state refresh, none of them can observe the
+        // result synchronously, and doing it on Main.immediate put the first
+        // EncryptedSharedPreferences construction on the cold-start critical path.
+        viewModelScope.launch(Dispatchers.IO) {
+            val pinSet = credentialStore.getPinRecord() != null
+            val lockout = PinLockout(
+                credentialStore.getPinFailures(),
+                credentialStore.getPinLockedUntil(),
+                credentialStore.getPinLockedUntilElapsed(),
             )
+            _state.update { it.copy(appPinSet = pinSet, pinLockout = lockout) }
         }
     }
 

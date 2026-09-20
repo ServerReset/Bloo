@@ -116,12 +116,24 @@ class MainActivity : FragmentActivity() {
             // presenting a newer build via notification instead of the in-app tile.
             UpdateCheckWorker.schedule(applicationContext)
         }
-        // Shizuku (optional silent-install path): lift the runtime non-SDK block once
-        // so the reflected PackageInstaller/IntentSender constructors are callable, and
-        // listen for the permission-grant result. Both are guarded — no-ops (and no
-        // Shizuku classes touched beyond a cheap ping) when Shizuku isn't installed.
+        // Shizuku (optional silent-install path): lift the runtime non-SDK block once so
+        // the reflected PackageInstaller/IntentSender constructors are callable, and listen
+        // for the permission-grant result. Both are guarded — no-ops (and no Shizuku classes
+        // touched beyond a cheap ping) when Shizuku isn't installed.
+        //
+        // ON IO, not here: HiddenApiBypass's class initializer builds a CoreOjClassLoader,
+        // which reads the APK's dex entries off disk. StrictMode measured that as
+        // 86-169ms x5 of MAIN-THREAD disk I/O on every cold start (measured at this very
+        // line), all of it before setContent, for a capability that is only needed when a
+        // user actually taps Install in the self-update flow. The listener registration
+        // below stays on main (it is a cheap binder-independent add), and the exemptions
+        // only have to be in place before an install, which is always user-initiated.
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-            runCatching { HiddenApiBypass.addHiddenApiExemptions("") }
+            lifecycleScope.launch(Dispatchers.Default) {
+                StartupTrace.trace("HiddenApiBypass.addHiddenApiExemptions") {
+                    runCatching { HiddenApiBypass.addHiddenApiExemptions("") }
+                }
+            }
         }
         // Register unconditionally (binder-independent, cheap): if Shizuku is started
         // AFTER launch and the user later grants permission, the result still routes to

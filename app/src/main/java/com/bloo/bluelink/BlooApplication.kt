@@ -95,6 +95,23 @@ class BlooApplication : Application(), Configuration.Provider {
         StartupTrace.mark("Application.super.onCreate done")
         BatterySaverState.ensureInitialized(this)
         StartupTrace.mark("BatterySaverState.ensureInitialized done")
+        // Warm the biggest data classes off the main thread. SettingsStore() measured
+        // ~50ms on Main on the first launch after install (1ms once warm) -- that is
+        // class-load/JIT of a very large class, not its fields, and it lands inside
+        // AppViewModel's constructor, i.e. before the first frame. Touching the classes
+        // here, on Default, moves that cost off the critical path; a failure to warm in
+        // time is harmless (the constructor simply pays it as before).
+        Thread {
+            runCatching {
+                StartupTrace.trace("class warm-up (stores)") {
+                    val app = applicationContext
+                    com.bloo.bluelink.data.SettingsStore(app)
+                    com.bloo.bluelink.data.SnapshotStore(app)
+                    com.bloo.bluelink.data.StatusCache(app)
+                    com.bloo.bluelink.data.SessionStore(app)
+                }
+            }
+        }.apply { priority = Thread.MIN_PRIORITY }.start()
         AppLog.log("▶ App starting -- ${deviceSummary()}")
         StartupTrace.mark("Application.onCreate: end")
         Thread.setDefaultUncaughtExceptionHandler { thread, throwable ->
