@@ -1,11 +1,13 @@
 package com.bloo.bluelink
 
 import android.app.Application
+import android.content.Context
 import android.content.Intent
 import android.os.Build
 import android.util.Log
 import androidx.work.Configuration
 import com.bloo.bluelink.data.AppLog
+import com.bloo.bluelink.data.StartupTrace
 import com.bloo.bluelink.ui.BatterySaverState
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -48,8 +50,30 @@ import java.util.Locale
  * screen (every glass surface, every battery-saver-aware spring).
  */
 class BlooApplication : Application(), Configuration.Provider {
+
+    /**
+     * Earliest hook the process gets -- runs before [onCreate] and before any
+     * ContentProvider (WorkManager's initializer among them, were it still installed).
+     * Instrumented because anything that lands here is invisible to every later mark.
+     */
+    override fun attachBaseContext(base: Context) {
+        super.attachBaseContext(base)
+        StartupTrace.mark("Application.attachBaseContext")
+        // Begin collecting per-frame timings as early as a Looper exists; the monitor is
+        // idempotent and self-terminating (see its own doc), so starting it here rather
+        // than at setContent() means the very first Compose frames are inside the window.
+        StartupFrameMonitor.start()
+        // And schedule the self-summarising gap report for once startup has settled.
+        StartupTrace.scheduleSummary()
+    }
+
     override val workManagerConfiguration: Configuration
-        get() = Configuration.Builder().build()
+        get() = Configuration.Builder().build().also {
+            // Reached the first time ANY caller asks WorkManager for an instance, which
+            // self-initializes its Room database + executors on that thread. Timed
+            // because it is the one piece of lazy init that can land on the main thread.
+            StartupTrace.mark("WorkManager configuration requested (lazy init)")
+        }
 
     // @SuppressLint("DefaultUncaughtExceptionDelegation") is deliberate, not an oversight:
     // this handler does NOT chain to the previously-installed default handler. It owns the
@@ -61,9 +85,18 @@ class BlooApplication : Application(), Configuration.Provider {
     // conventional delegate-and-return shape; this handler cannot use it.
     @android.annotation.SuppressLint("DefaultUncaughtExceptionDelegation")
     override fun onCreate() {
+        StartupTrace.mark("Application.onCreate: begin")
         super.onCreate()
+        // Keep the startup trace quiet in a release build (the in-memory AppLog copy and
+        // the marks themselves remain available); a debug build is where logcat timing
+        // is actually read.
+        StartupTrace.logcatEnabled = BuildConfig.DEBUG
+        installStartupStrictMode()
+        StartupTrace.mark("Application.super.onCreate done")
         BatterySaverState.ensureInitialized(this)
+        StartupTrace.mark("BatterySaverState.ensureInitialized done")
         AppLog.log("▶ App starting -- ${deviceSummary()}")
+        StartupTrace.mark("Application.onCreate: end")
         Thread.setDefaultUncaughtExceptionHandler { thread, throwable ->
             val trace = Log.getStackTraceString(throwable)
             Log.e("BlooCrash", "Uncaught exception on ${thread.name}:\n$trace")
@@ -122,6 +155,38 @@ class BlooApplication : Application(), Configuration.Provider {
             // buttons need anyway, not this dying one.
             android.os.Process.killProcess(android.os.Process.myPid())
             Runtime.getRuntime().exit(10)
+        }
+    }
+
+    /**
+     * Debug-only StrictMode: reports every main-thread disk read/write and network call to
+     * logcat (tag "StrictMode"), which is the fastest way to attribute a startup stall to
+     * the thread it happened on. A cold start that blocks the main thread on a DataStore
+     * read, a SharedPreferences load or an OkHttp call shows up here as the offending
+     * stack, next to its own BlooStartup phase mark. VmPolicy also flags leaked
+     * closeables/Activities. Never enabled in release: the checks themselves cost time,
+     * and their whole purpose is to be read by a developer with logcat attached.
+     */
+    private fun installStartupStrictMode() {
+        if (!BuildConfig.DEBUG) return
+        runCatching {
+            android.os.StrictMode.setThreadPolicy(
+                android.os.StrictMode.ThreadPolicy.Builder()
+                    .detectDiskReads()
+                    .detectDiskWrites()
+                    .detectNetwork()
+                    .detectCustomSlowCalls()
+                    .penaltyLog()
+                    .build(),
+            )
+            android.os.StrictMode.setVmPolicy(
+                android.os.StrictMode.VmPolicy.Builder()
+                    .detectLeakedClosableObjects()
+                    .detectLeakedSqlLiteObjects()
+                    .penaltyLog()
+                    .build(),
+            )
+            StartupTrace.mark("StrictMode installed (debug): main-thread disk/network will be logged")
         }
     }
 

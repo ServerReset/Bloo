@@ -273,6 +273,7 @@ class SnapshotStore(private val context: Context) {
      *  latest emission and then stops collecting), for callers that don't
      *  need to keep observing. */
     suspend fun current(): SnapshotData = withContext(Dispatchers.IO) {
+        StartupTrace.markIfStarting("SnapshotStore.current(): begin (disk read)")
         // withContext for the same reason as `payload` above: .first() resumes on the CALLER's
         // dispatcher, and the caller is often the main thread. StatusCache.load already does
         // exactly this; this store -- the one every module reads -- had been missed.

@@ -781,7 +781,16 @@ internal fun HeroVisual(
             contentDescription = v.model,
             contentScale = if (transparent) ContentScale.Fit else ContentScale.Crop,
             onState = { state ->
-                if (state is AsyncImagePainter.State.Success) loadedFrom = state.result.dataSource
+                if (state is AsyncImagePainter.State.Success) {
+                    loadedFrom = state.result.dataSource
+                    // Cold-start: when the car photo actually finished DECODING and is
+                    // being drawn, not when the request was dispatched. A hero photo
+                    // arriving late is one of the few startup costs that visibly pops in.
+                    com.bloo.bluelink.data.StartupTrace.once(
+                        "hero-photo-decoded",
+                        "hero photo decoded (${state.result.dataSource})",
+                    )
+                }
             },
             modifier = sizeModifier
                 .then(if (transparent) Modifier else Modifier.clip(RoundedCornerShape(corner)))

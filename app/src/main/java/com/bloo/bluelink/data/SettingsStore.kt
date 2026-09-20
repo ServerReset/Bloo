@@ -733,7 +733,12 @@ class SettingsStore(private val context: Context) {
      * a caller that reached for the raw key itself would be the drift this store exists to
      * prevent.
      */
-    suspend fun snapshot(): Preferences = context.settingsDataStore.data.first()
+    suspend fun snapshot(): Preferences {
+        com.bloo.bluelink.data.StartupTrace.markIfStarting("SettingsStore.snapshot(): DataStore data.first() begin")
+        val prefs = context.settingsDataStore.data.first()
+        com.bloo.bluelink.data.StartupTrace.markIfStarting("SettingsStore.snapshot(): DataStore data.first() done")
+        return prefs
+    }
 
     suspend fun imageUrl(vin: String): String? = imageUrl(vin, context.settingsDataStore.data.first())
 

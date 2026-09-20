@@ -72,6 +72,7 @@ class SessionStore(private val context: Context) {
      * half-populated [Session].
      */
     suspend fun load(brand: Brand): Session? {
+        StartupTrace.markIfStarting("SessionStore.load(${brand.name}): begin")
         migrateLegacy()
         val p = context.dataStore.data.first()
         val access = p[key(brand, "access")] ?: return null

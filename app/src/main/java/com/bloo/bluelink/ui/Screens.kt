@@ -104,6 +104,7 @@ import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.roundToInt
 import android.content.ClipData
+import androidx.compose.runtime.withFrameNanos
 
 
 /**
@@ -126,6 +127,15 @@ import android.content.ClipData
  */
 @Composable
 fun BlooApp(vm: AppViewModel) {
+    // Cold-start instrumentation: "first composition" is the moment Compose starts
+    // running this root, and the withFrameNanos below is the moment a frame is actually
+    // produced -- the pair separates "compose is slow" from "the frame clock is late",
+    // which the frame monitor's own numbers alone cannot distinguish.
+    com.bloo.bluelink.data.StartupTrace.once("compose-root", "BlooApp: first composition")
+    LaunchedEffect(Unit) {
+        withFrameNanos { }
+        com.bloo.bluelink.data.StartupTrace.once("compose-first-frame", "BlooApp: first frame callback")
+    }
     val state by vm.state.collectAsStateWithLifecycle()
     val appearance by vm.appearance.collectAsStateWithLifecycle()
     // Shared by GarageScreen, SettingsScreen and SearchLayer below -- see either
@@ -422,8 +432,12 @@ fun BlooApp(vm: AppViewModel) {
                 // frame of a cold start painted before this screen existed
                 // (LoginScreen used it too), so this is strictly less work
                 // than before, not more.
-                Screen.Loading -> LoadingScreen(Modifier.padding(padding))
+                Screen.Loading -> {
+                    com.bloo.bluelink.data.StartupTrace.once("screen-loading", "screen: Loading composed")
+                    LoadingScreen(Modifier.padding(padding))
+                }
                 Screen.Login -> Box(Modifier.padding(padding)) {
+                    com.bloo.bluelink.data.StartupTrace.once("screen-login", "screen: Login composed")
                     LoginScreen(
                         loading = state.loading,
                         onLogin = vm::login,
@@ -442,6 +456,7 @@ fun BlooApp(vm: AppViewModel) {
                 Screen.Onboarding -> OnboardingScreen(vm)
                 is Screen.CarSetup -> CarSetupWizardScreen(vm, screen.vins)
                 Screen.Garage -> {
+                    com.bloo.bluelink.data.StartupTrace.once("screen-garage", "screen: Garage composed (first garage frame next)")
                     // Reuses the outer `appearance` (already collected once above
                     // for the CompositionLocalProvider) instead of re-subscribing
                     // to the same StateFlow a second time here.

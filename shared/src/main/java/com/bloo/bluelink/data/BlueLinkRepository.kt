@@ -34,11 +34,19 @@ interface VehicleRepository {
  * ([KiaRepository]); the three Canada brands share [CanadaApi]; Europe (CCS2)
  * rides [EuApi]; Hyundai/Genesis US share the Hyundai-shaped [BlueLinkApi].
  */
-fun repositoryFor(brand: Brand, store: SessionStore, credentials: CredentialStore): VehicleRepository = when {
-    brand == Brand.KIA -> KiaRepository(KiaUsaApi(), store, credentials)
-    brand.isCanada -> CanadaRepository(CanadaApi(brand), store, brand, credentials)
-    brand.isEurope -> EuRepository(EuApi(brand), store, brand, credentials)
-    else -> BlueLinkRepository(BlueLinkApi(brand), store, brand)
+fun repositoryFor(brand: Brand, store: SessionStore, credentials: CredentialStore): VehicleRepository {
+    // Timed as a whole: constructing an Api builds an OkHttpClient (dispatcher, thread
+    // pools, interceptors), which is real work and, for the cold-start path, lands on
+    // whichever thread first calls a repository -- the main thread for a cold auto-login.
+    val started = StartupTrace.begin()
+    val repo = when {
+        brand == Brand.KIA -> KiaRepository(KiaUsaApi(), store, credentials)
+        brand.isCanada -> CanadaRepository(CanadaApi(brand), store, brand, credentials)
+        brand.isEurope -> EuRepository(EuApi(brand), store, brand, credentials)
+        else -> BlueLinkRepository(BlueLinkApi(brand), store, brand)
+    }
+    StartupTrace.end("repositoryFor(${brand.name}) [Api+OkHttp+repo]", started)
+    return repo
 }
 
 /**

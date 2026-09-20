@@ -61,6 +61,7 @@ class StatusCache(private val context: Context) {
      * rather than throwing, so a bad cache never blocks app startup.
      */
     suspend fun load(): Cached = withContext(Dispatchers.IO) {
+        StartupTrace.markIfStarting("StatusCache.load(): begin")
         // withContext, because the caller is a viewModelScope.launch on Main.immediate: the
         // .first() suspends and RESUMES on the main thread, so the decode of every cached
         // vehicle status, location and place name -- which grows with the number of cars and is

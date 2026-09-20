@@ -151,14 +151,21 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
      *  meaningful number once the app has been open and used for a while. */
     private fun logStartup(message: String) {
         AppLog.log("$message (+${System.currentTimeMillis() - coldStartAt}ms)")
+        // Same breadcrumb on the greppable startup trace, so one logcat filter shows the
+        // ViewModel's phases interleaved with Application/Activity/frame marks.
+        com.bloo.bluelink.data.StartupTrace.markIfStarting(message)
     }
 
-    private val store = SessionStore(app)
-    private val settingsStore = SettingsStore(app)
-    private val credentialStore = CredentialStore(app)
-    private val snapshotStore = SnapshotStore(app)
-    private val statusCache = StatusCache(app)
-    private val ai = com.bloo.bluelink.data.Ai(app)
+    // Each store construction is timed individually: the ViewModel is constructed
+    // synchronously on the main thread by MainActivity's `viewModels()` dereference, so
+    // anything a constructor does (opening SharedPreferences, resolving DataStore files,
+    // building an ML Kit client) is on the critical path to the first frame.
+    private val store = com.bloo.bluelink.data.StartupTrace.trace("SessionStore()") { SessionStore(app) }
+    private val settingsStore = com.bloo.bluelink.data.StartupTrace.trace("SettingsStore()") { SettingsStore(app) }
+    private val credentialStore = com.bloo.bluelink.data.StartupTrace.trace("CredentialStore()") { CredentialStore(app) }
+    private val snapshotStore = com.bloo.bluelink.data.StartupTrace.trace("SnapshotStore()") { SnapshotStore(app) }
+    private val statusCache = com.bloo.bluelink.data.StartupTrace.trace("StatusCache()") { StatusCache(app) }
+    private val ai = com.bloo.bluelink.data.StartupTrace.trace("Ai()") { com.bloo.bluelink.data.Ai(app) }
     // One repository per signed-in brand (any mix of brands can be active).
     private val repos = mutableMapOf<Brand, VehicleRepository>()
 
@@ -349,6 +356,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         // per cold start (debounced internally — see UpdateChecker). Also
         // re-run on every user-triggered refresh, see refreshStatus below.
         checkForUpdate()
+        com.bloo.bluelink.data.StartupTrace.markIfStarting("AppViewModel init block: synchronous tail done")
         // Restore the last-known status/location from disk so the UI shows
         // stale-but-useful data immediately, before any network call returns.
         viewModelScope.launch {
@@ -975,6 +983,9 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         // own doc; this is the "whenever the app... opened" half of that, refreshStatus
         // covers "whenever the app refreshed".
         refreshDeviceLocation()
+        com.bloo.bluelink.data.StartupTrace.markIfStarting(
+            "loadGarageInner: refreshDeviceLocation() dispatched (repos=${repos.size})",
+        )
         // "Every minute or two while inside the app" -- reported directly, correcting
         // the previous every-5-seconds design: started once per app open (this
         // ViewModel's own lifetime is "inside the app"; there is no explicit stop,
@@ -982,6 +993,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         // one -- Android tears the subscription down with the process). See
         // beginLiveDeviceLocation's own doc.
         beginLiveDeviceLocation()
+        com.bloo.bluelink.data.StartupTrace.markIfStarting("loadGarageInner: live device location started")
         // Merge vehicles from every signed-in brand; one brand failing shouldn't
         // hide the others. Track failures separately from "this account
         // genuinely has zero vehicles" -- collapsing both into the same empty
@@ -1023,6 +1035,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             // session -- bootstrapDriveSync is idempotent (AtomicBoolean guard),
             // so the non-empty path below calling it again is a no-op.
             bootstrapDriveSync()
+            com.bloo.bluelink.data.StartupTrace.markIfStarting("loadGarageInner: publishing empty garage")
             _state.update {
                 it.copy(
                     vehicles = emptyList(),
@@ -1059,7 +1072,9 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         val vehicles = applyOrder(fetched, settingsStore.vehicleOrder(prefs))
         // The 16 per-car/per-tile config fields, shared with refreshLocalCarConfig via
         // perCarConfig so the two can't drift. firstRun's empty-collapsed rule lives inside it.
+        com.bloo.bluelink.data.StartupTrace.markIfStarting("loadGarageInner: prefs snapshot + order applied, perCarConfig starting")
         val cfg = perCarConfig(vehicles, prefs)
+        com.bloo.bluelink.data.StartupTrace.markIfStarting("loadGarageInner: perCarConfig done")
         // All three read the SAME prefs snapshot taken just above (the Preferences-taking
         // overloads), not their own suspend re-fetch of the DataStore -- isCarConfigured in
         // particular used to be one full data.first() round trip PER VEHICLE, sequentially, on
@@ -1276,7 +1291,9 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         val prefs = settingsStore.snapshot()
         val vehicles = _state.value.vehicles
         if (vehicles.isEmpty()) return
+        com.bloo.bluelink.data.StartupTrace.markIfStarting("loadGarageInner: prefs snapshot + order applied, perCarConfig starting")
         val cfg = perCarConfig(vehicles, prefs)
+        com.bloo.bluelink.data.StartupTrace.markIfStarting("loadGarageInner: perCarConfig done")
         _state.update { cfg.apply(it) }
         // Quick-tile / shortcut changes must also re-push the launcher shortcuts,
         // exactly as loadGarageInner does, so an imported shortcut-set change is
@@ -1328,6 +1345,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     private fun bootstrapDriveSync() {
         if (!driveSyncBootstrapped.compareAndSet(false, true)) return
+        com.bloo.bluelink.data.StartupTrace.markIfStarting("bootstrapDriveSync: entered")
         // Restore auto-sync Drive URI and last sync timestamp from preferences.
         viewModelScope.launch {
             // One DataStore round trip for the whole bootstrap instead of ~10
@@ -1335,6 +1353,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             // suspend read here was a small, compounding hit to how fast the
             // garage could show up.
             val snap = settingsStore.snapshot()
+            com.bloo.bluelink.data.StartupTrace.markIfStarting("bootstrapDriveSync: prefs snapshot read")
             val uri = settingsStore.syncUri(snap)
             val lastSync = settingsStore.lastSyncMs(snap)
             // Restores a failure the background periodic worker hit while the
@@ -1371,7 +1390,9 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             // Still seeded from here for the normal cold start (vehicles are already in state by
             // the time this coroutine runs), and now ALSO from loadGarage so a first load that
             // returned nothing cannot leave it empty for the process.
+            com.bloo.bluelink.data.StartupTrace.markIfStarting("seedDefaultClimatePresets: starting")
             seedDefaultClimatePresets()
+            com.bloo.bluelink.data.StartupTrace.markIfStarting("seedDefaultClimatePresets: done")
             _state.update {
                 it.copy(
                     syncUri = uri, lastSyncMs = lastSync, syncError = lastError, syncWifiOnly = wifiOnly,
@@ -3435,6 +3456,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
      *  init and on warm resume, so starting Shizuku while the app is open reveals the
      *  "Updates" toggle without needing a cold restart. */
     fun refreshShizukuAvailable() {
+        com.bloo.bluelink.data.StartupTrace.markIfStarting("Shizuku probe: begin")
         viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
             val avail = com.bloo.bluelink.update.ShizukuInstaller.isAvailable()
             _state.update { it.copy(shizukuAvailable = avail) }

@@ -26,6 +26,7 @@ import org.lsposed.hiddenapibypass.HiddenApiBypass
 import rikka.shizuku.Shizuku
 import androidx.core.content.pm.ShortcutManagerCompat
 import com.bloo.bluelink.data.brand
+import com.bloo.bluelink.data.StartupTrace
 
 /**
  * The app's single Activity: hosts the Compose UI tree ([BlooApp]) and owns the
@@ -35,6 +36,19 @@ import com.bloo.bluelink.data.brand
  * class is deliberately thin plumbing around the Android Activity lifecycle.
  */
 class MainActivity : FragmentActivity() {
+
+    companion object {
+        /**
+         * The most recently created MainActivity, for system-level integrations that have
+         * no view of their own -- currently only [StartupFrameMonitor] calling the
+         * platform's own `reportFullyDrawn()` once the first frame lands, which turns the
+         * app's internal timing into the same "fully drawn" number `adb shell am start -W`
+         * prints. Weak, so it never keeps an Activity alive past its own lifecycle.
+         */
+        @Volatile
+        var current: MainActivity? = null
+            private set
+    }
 
     private val viewModel: AppViewModel by viewModels()
 
@@ -67,7 +81,10 @@ class MainActivity : FragmentActivity() {
      * whole UI recomposes live if theme/appearance settings change while it's open.
      */
     override fun onCreate(savedInstanceState: Bundle?) {
+        StartupTrace.mark("MainActivity.onCreate: begin")
         super.onCreate(savedInstanceState)
+        current = this
+        StartupTrace.mark("MainActivity.super.onCreate done")
         // Fully transparent system bars so the app's gradient shows through and
         // content can draw edge-to-edge behind the status & navigation bars.
         enableEdgeToEdge(
@@ -123,6 +140,7 @@ class MainActivity : FragmentActivity() {
             handleShortcutIntent(intent)
             setIntent(Intent())
         }
+        StartupTrace.mark("MainActivity: pre-setContent work done")
         // Touched HERE, before setContent, and deliberately not for its value. `by viewModels()`
         // is lazy, and the first dereference used to be inside the composition lambda below --
         // so AppViewModel's constructor and its whole init block ran synchronously in the middle
@@ -132,6 +150,8 @@ class MainActivity : FragmentActivity() {
         // "first pixel", which is the part the user sees as a stutter.
         @Suppress("UNUSED_EXPRESSION")
         viewModel
+        StartupTrace.mark("MainActivity: AppViewModel constructed (the `viewModel` deref)")
+        StartupTrace.mark("MainActivity: setContent begin")
         setContent {
             val appearance by viewModel.appearance.collectAsState()
             // Memoize palette lookup to avoid repeated linear search through custom palettes
@@ -180,6 +200,7 @@ class MainActivity : FragmentActivity() {
      * backgrounded ([backgroundedAt]).
      */
     override fun onStart() {
+        StartupTrace.mark("MainActivity.onStart")
         super.onStart()
         // Cold start is handled by the ViewModel; only re-evaluate on warm resumes.
         if (!firstStart) {
@@ -191,8 +212,15 @@ class MainActivity : FragmentActivity() {
         firstStart = false
     }
 
+    override fun onResume() {
+        StartupTrace.mark("MainActivity.onResume: begin")
+        super.onResume()
+        StartupTrace.mark("MainActivity.onResume: end")
+    }
+
     /** Remove the Shizuku listener so it doesn't leak past this Activity instance. */
     override fun onDestroy() {
+        if (current === this) current = null
         runCatching { Shizuku.removeRequestPermissionResultListener(shizukuPermissionListener) }
         super.onDestroy()
     }
