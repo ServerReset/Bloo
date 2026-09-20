@@ -67,6 +67,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
@@ -76,7 +77,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.SideEffect
 import dev.chrisbanes.haze.HazeState
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -136,8 +136,28 @@ fun BlooApp(vm: AppViewModel) {
         withFrameNanos { }
         com.bloo.bluelink.data.StartupTrace.once("compose-first-frame", "BlooApp: first frame callback")
     }
-    val state by vm.state.collectAsStateWithLifecycle()
+    val stateHolder = vm.state.collectAsStateWithLifecycle()
+    val state by stateHolder
     val appearance by vm.appearance.collectAsStateWithLifecycle()
+    // Narrow derived reads of the collected state.
+    //
+    // Reading these fields straight off `state` in this body subscribed the WHOLE app root --
+    // the Scaffold, the screen dispatch, every child -- to every UiState emission: a status
+    // poll for one car, a location tick, an AI probe, a weather refresh. Each of these values
+    // changes far less often than the state object does, and a derived state only invalidates
+    // its reader when the value really changed, so an unrelated emission no longer recomposes
+    // the root (and, through it, the screen it is showing).
+    val screen by remember { derivedStateOf { state.screen } }
+    val locked by remember { derivedStateOf { state.locked } }
+    val loading by remember { derivedStateOf { state.loading } }
+    val refreshing by remember { derivedStateOf { state.refreshing } }
+    val message by remember { derivedStateOf { state.message } }
+    val messageType by remember { derivedStateOf { state.messageType } }
+    val addingAccount by remember { derivedStateOf { state.addingAccount } }
+    val accounts by remember { derivedStateOf { state.accounts } }
+    val kiaOtp by remember { derivedStateOf { state.kiaOtp } }
+    val canadaOtp by remember { derivedStateOf { state.canadaOtp } }
+    val onSettingsPageSlot by remember { derivedStateOf { state.onSettingsPageSlot } }
     // Shared by GarageScreen, SettingsScreen and SearchLayer below -- see either
     // screen's own `hazeState` parameter doc for why: SearchLayer floats above
     // whichever of the two is actually showing, so its own glass fill needs ONE
@@ -167,7 +187,7 @@ fun BlooApp(vm: AppViewModel) {
     // STARTED lifecycle state: a backgrounded Activity keeps its composition
     // (and its LaunchedEffects) alive, so without the gate a slow command kept
     // vibrating the phone in the user's pocket after they switched apps.
-    val busy = state.loading || state.pending.isNotEmpty()
+    val busy by remember { derivedStateOf { state.loading || state.pending.isNotEmpty() } }
     // androidx.lifecycle.compose.LocalLifecycleOwner -- the compose-ui platform
     // spelling is deprecated and slated for removal.
     val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
@@ -193,9 +213,9 @@ fun BlooApp(vm: AppViewModel) {
     // colour while still on screen (a failed refresh turning blue mid-display as
     // the update check's info message queued behind it). The type has to travel
     // WITH its own message, so it rides in custom visuals the host reads back.
-    LaunchedEffect(state.message) {
-        state.message?.let { msg ->
-            val visuals = BlooSnackbarVisuals(msg, state.messageType)
+    LaunchedEffect(message) {
+        message?.let { msg ->
+            val visuals = BlooSnackbarVisuals(msg, messageType)
             scope.launch { snackbar.showSnackbar(visuals) }
             vm.clearMessage()
         }
@@ -247,9 +267,9 @@ fun BlooApp(vm: AppViewModel) {
     // Neither is visible as a change: the lock screen paints its own scrim, and a frozen
     // backdrop is indistinguishable for the ~1s this window lasts on hardware (~0 on a fast
     // device, where the garage's first frame is a few ms).
-    var contentSettled by remember { mutableStateOf(state.screen == Screen.Garage) }
-    LaunchedEffect(state.screen) {
-        if (state.screen == Screen.Garage) {
+    var contentSettled by remember { mutableStateOf(screen == Screen.Garage) }
+    LaunchedEffect(screen) {
+        if (screen == Screen.Garage) {
             // Two frames, not a wall-clock delay: on hardware the garage's first frame is a
             // few milliseconds, so the blur is back essentially immediately, while a device
             // that needs 2.5s for that frame (the software-rendered emulator) keeps the
@@ -259,7 +279,7 @@ fun BlooApp(vm: AppViewModel) {
             contentSettled = true
         }
     }
-    LockBlurLayer(locked = state.locked && contentSettled) {
+    LockBlurLayer(locked = locked && contentSettled) {
     Box(
         Modifier
             .fillMaxSize()
@@ -410,7 +430,7 @@ fun BlooApp(vm: AppViewModel) {
         },
     ) { padding ->
         // Adding an account shows the login form even while already signed in.
-        val target = if (state.addingAccount) Screen.Login else state.screen
+        val target = if (addingAccount) Screen.Login else screen
         // Shared with the search layer and the garage aurora: while the search
         // panel is open the blurred aurora beneath it pauses (see
         // AuroraBackground's `paused`), so typing/panel frames don't contend
@@ -461,12 +481,12 @@ fun BlooApp(vm: AppViewModel) {
                 Screen.Login -> Box(Modifier.padding(padding)) {
                     com.bloo.bluelink.data.StartupTrace.once("screen-login", "screen: Login composed")
                     LoginScreen(
-                        loading = state.loading,
+                        loading = loading,
                         onLogin = vm::login,
-                        onCancel = if (state.accounts.isNotEmpty()) ({ vm.cancelAddAccount() }) else null,
+                        onCancel = if (accounts.isNotEmpty()) ({ vm.cancelAddAccount() }) else null,
                     )
-                    state.kiaOtp?.let { otp -> KiaOtpDialog(otp, loading = state.loading, vm = vm) }
-                    state.canadaOtp?.let { otp -> CanadaOtpDialog(otp, loading = state.loading, vm = vm) }
+                    kiaOtp?.let { otp -> KiaOtpDialog(otp, loading = loading, vm = vm) }
+                    canadaOtp?.let { otp -> CanadaOtpDialog(otp, loading = loading, vm = vm) }
                 }
                 // Shown once, right after sign-in resolves at least one vehicle for
                 // a first-run device -- before Onboarding -- so a second phone (or
@@ -488,8 +508,8 @@ fun BlooApp(vm: AppViewModel) {
                         // scrolling) the ambient drift would otherwise keep
                         // redrawing the blurred backdrop underneath at ~12fps --
                         // real contention on exactly the frames search is using.
-                        if (appearance.auroraBackground) AuroraBackground(Modifier.matchParentSize(), appearance, refreshing = state.refreshing, paused = searchOpen)
-                        GarageScreen(rememberUpdatedState(state), vm, hazeState = searchHazeState)
+                        if (appearance.auroraBackground) AuroraBackground(Modifier.matchParentSize(), appearance, refreshing = refreshing, paused = searchOpen)
+                        GarageScreen(stateHolder, vm, hazeState = searchHazeState)
                     }
                 }
             }
@@ -514,8 +534,8 @@ fun BlooApp(vm: AppViewModel) {
         // preference (search could disappear entirely there for anyone with
         // that off) and the search element itself stayed shaped like a garage
         // "bubble" instead of morphing into the settings "pill".
-        val effectivelyInSettings = state.onSettingsPageSlot
-        if (searchable && !state.locked && (appearance.showSearch || effectivelyInSettings)) {
+        val effectivelyInSettings = onSettingsPageSlot
+        if (searchable && !locked && (appearance.showSearch || effectivelyInSettings)) {
             // fillMaxSize() alone, no `.padding(padding)` -- SearchLayer already
             // reads WindowInsets itself for every edge it cares about (its own
             // `bottomInset`, `insetTopDp` for the compact docked band), the same
@@ -532,7 +552,7 @@ fun BlooApp(vm: AppViewModel) {
             Box(Modifier.fillMaxSize()) {
                 SearchLayer(
                     vm = vm,
-                    state = state,
+                    state = stateHolder,
                     appearance = appearance,
                     notif = notifPrefs,
                     onSettings = effectivelyInSettings && !cover,
@@ -546,7 +566,7 @@ fun BlooApp(vm: AppViewModel) {
     }
     }
         // Biometric lock overlay, drawn over the blurred app; fades out on unlock.
-        LockAlphaOverlay(locked = state.locked, vm = vm, opaqueBackdrop = !contentSettled)
+        LockAlphaOverlay(locked = locked, vm = vm, opaqueBackdrop = !contentSettled)
     }
     }
 

@@ -57,6 +57,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -462,7 +463,13 @@ internal fun LockOverlay(vm: AppViewModel, opaqueBackdrop: Boolean = false) {
  */
 @Composable
 internal fun GarageStatusCard(state: State<UiState>, vm: AppViewModel, hazeState: HazeState? = null) {
-    val s = state.value
+    // Derived reads rather than `val s = state.value`: this card is a pager page, so a body
+    // read subscribed it (and its first-paint Animatable effects) to every UiState emission.
+    // It draws exactly four fields; only those four can invalidate it now.
+    val accounts by remember { derivedStateOf { state.value.accounts } }
+    val garageLoadError by remember { derivedStateOf { state.value.garageLoadError } }
+    val garageLoadOffline by remember { derivedStateOf { state.value.garageLoadOffline } }
+    val loading by remember { derivedStateOf { state.value.loading } }
     val scheme = MaterialTheme.colorScheme
 
     // Four distinct causes used to collapse into the same "No vehicles found" /
@@ -477,10 +484,10 @@ internal fun GarageStatusCard(state: State<UiState>, vm: AppViewModel, hazeState
     // happens while the device IS online (an auth failure, Hyundai/Kia's own
     // API returning a 500, etc.) keeps the more specific message since that
     // one might actually help.
-    val loadFailed = s.accounts.isNotEmpty() && s.garageLoadError != null
-    val offline = loadFailed && s.garageLoadOffline
+    val loadFailed = accounts.isNotEmpty() && garageLoadError != null
+    val offline = loadFailed && garageLoadOffline
     val (icon, headline, body) = when {
-        s.accounts.isEmpty() -> Triple(
+        accounts.isEmpty() -> Triple(
             Icons.Filled.CloudOff,
             "Not signed in",
             "Sign in to your Hyundai, Kia, or Genesis account -- swipe right for Settings.",
@@ -493,7 +500,7 @@ internal fun GarageStatusCard(state: State<UiState>, vm: AppViewModel, hazeState
         loadFailed -> Triple(
             Icons.Filled.WifiOff,
             "Couldn't load your vehicles",
-            "${s.garageLoadError}\n\nPull down to try again.",
+            "${garageLoadError}\n\nPull down to try again.",
         )
         else -> Triple(
             Icons.Filled.DirectionsCar,
@@ -515,7 +522,7 @@ internal fun GarageStatusCard(state: State<UiState>, vm: AppViewModel, hazeState
     // covers a single car's own status fetch) -- that's the flag this card's
     // pull gesture needs to reflect for the indicator/release behaviour to
     // track the request it actually triggers.
-    Refreshable(refreshing = s.loading, onRefresh = { vm.loadGarage() }, hazeState = hazeState) {
+    Refreshable(refreshing = loading, onRefresh = { vm.loadGarage() }, hazeState = hazeState) {
         Box(
             Modifier
                 .fillMaxSize()

@@ -72,6 +72,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableFloatStateOf
@@ -141,7 +142,7 @@ internal enum class SearchForm { BUBBLE, PILL, BAR }
 @Composable
 internal fun SearchLayer(
     vm: AppViewModel,
-    state: UiState,
+    state: State<UiState>,
     appearance: SettingsStore.Appearance,
     notif: SettingsStore.NotificationPrefs,
     onSettings: Boolean,
@@ -444,7 +445,7 @@ internal fun SearchLayer(
                         // a scrollable list you cannot see the bottom of is
                         // worse than a short list you can.
                         SettingsSearchResults(
-                            query, submitted, vm, state, appearance, notif,
+                            query, submitted, vm, state.value, appearance, notif,
                             // The cover screen with the keyboard up is the
                             // hard case: a ~260dp square, most of it keyboard.
                             // Two results that are fully visible beat six you
@@ -457,7 +458,7 @@ internal fun SearchLayer(
                             hazeState = hazeState,
                         )
                     } else {
-                        SearchSuggestions(state, compact = compact || keyboardUp) { picked ->
+                        SearchSuggestions(state.value, compact = compact || keyboardUp) { picked ->
                             query = picked
                             submitted = picked
                         }
