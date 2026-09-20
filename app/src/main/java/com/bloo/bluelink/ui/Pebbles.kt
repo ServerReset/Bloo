@@ -119,6 +119,8 @@ import kotlin.math.roundToInt
 import com.bloo.uicommon.ReorderColumn
 import com.bloo.uicommon.animatePlacement
 import dev.chrisbanes.haze.HazeState
+import androidx.compose.runtime.mutableStateSetOf
+import androidx.compose.runtime.derivedStateOf
 
 /** A friendly label for a pebble/section id. */
 internal fun sectionLabel(section: String): String = when (section) {
@@ -604,12 +606,22 @@ internal fun PebbleList(
     // per frame spreads that same total work across however many non-eager pebbles there
     // are, so no single frame pays for more than one pebble's worth of composition,
     // regardless of how many cars share the page.
-    var filledCount by remember(v.vin) { mutableIntStateOf(0) }
+    // A snapshot SET of the non-eager sections that have been filled in so far, read through
+    // a PER-SECTION derived boolean below.
+    //
+    // It was a shared `filledCount` int, and the content lambda read it for every item -- so
+    // each one-pebble-per-frame tick invalidated the whole list and recomposed EVERY pebble,
+    // including the eager ones that had been ready since frame one. Measured on the API 34
+    // emulator: ~570KB allocated per tick across just the three eager pebbles, every 300-600ms
+    // for the whole fill, which is the churn that filled a 192MB heap. The mechanism's own
+    // point is to spread one pebble's composition per frame; a shared counter made every frame
+    // pay for all of them. Derived per section, a tick invalidates exactly one item.
+    val filledSections = remember(v.vin) { mutableStateSetOf<String>() }
     LaunchedEffect(v.vin, sections.size) {
-        val remaining = (sections.size - EAGER_PEBBLES).coerceAtLeast(0)
-        repeat(remaining) {
+        // One per frame, in list order, first-below-the-fold first.
+        sections.drop(EAGER_PEBBLES).forEach { section ->
             withFrameNanos { }
-            filledCount++
+            filledSections.add(section)
         }
     }
     val eager = remember(sections) { sections.take(EAGER_PEBBLES).toSet() }
@@ -642,12 +654,11 @@ internal fun PebbleList(
         staggerInOnColdStart = true,
         introKey = v.vin,
     ) { section, dragHandle, _ ->
-        // This section's own position among the NON-eager ones, so filledCount (which
-        // ticks up by one per frame) can unlock them in list order, first-below-the-fold
-        // first -- sections.indexOf is O(n) on an 8-10 item list, negligible next to the
-        // pebble composition this whole mechanism exists to defer.
-        val nonEagerIndex = sections.indexOf(section) - EAGER_PEBBLES
-        if (section in eager || nonEagerIndex < filledCount) {
+        // Each item watches ONLY its own readiness, so filling one pebble composes one pebble.
+        val ready by remember(section) {
+            derivedStateOf { section in eager || section in filledSections }
+        }
+        if (ready) {
             SinglePebble(section, v, state, vm, dragHandle, onExpand = onExpand)
         } else {
             // Off-screen placeholder, up to a few frames now rather than always exactly
@@ -702,7 +713,12 @@ internal fun stateSlice(state: State<UiState>, vararg keys: Any?): UiState =
 
 @Composable
 internal fun SinglePebble(section: String, v: Vehicle, state: State<UiState>, vm: AppViewModel, dragHandle: Modifier, onExpand: (() -> Unit)? = null) {
-    val status = state.value.statusFor(v)
+    // Narrow, derived read: this pebble only cares about ITS car's status. Reading
+    // `state.value` here (as this line did) subscribed every pebble to EVERY UiState emission,
+    // so a status poll for another car, a device-location tick or a weather refresh
+    // recomposed the whole pebble stack -- the per-pebble `stateSlice` calls below exist to
+    // stop exactly that, and this one line was undoing them for the pebble's own scope.
+    val status by remember(v.vin) { derivedStateOf { state.value.statuses[v.vin] } }
     val metric = LocalAppearance.current.unitSystem == "metric"
     when (section) {
         "summary" -> {

@@ -192,7 +192,19 @@ internal fun LockOverlay(vm: AppViewModel, opaqueBackdrop: Boolean = false) {
         // Fresh overlay (re-lock, cold start) → clear any stale rejection.
         vm.acknowledgePinRejection()
         if (!usePinMode) authenticateBiometric()
-        while (true) {
+    }
+    // Tick ONLY while a rejection window is actually counting down.
+    //
+    // This loop used to be `while (true)` inside the effect above -- two state writes every
+    // 250ms for as long as the lock screen was composed, i.e. 4Hz forever, on a countdown that
+    // is only ever on screen during a lockout. Its own comment already claimed the conditional
+    // behaviour it did not have. Every tick invalidated every reader of `nowTick`/
+    // `elapsedTick` (the countdown line and the keypad's own enablement), and the writes are
+    // what made the whole lock screen -- and anything sharing its scope -- recompose four
+    // times a second for no reason, which is exactly the shape of churn the heap profile
+    // showed during a locked cold start.
+    LaunchedEffect(rejected) {
+        while (rejected) {
             delay(250)
             nowTick = System.currentTimeMillis()
             elapsedTick = android.os.SystemClock.elapsedRealtime()
