@@ -733,6 +733,19 @@ class SettingsStore(private val context: Context) {
      * a caller that reached for the raw key itself would be the drift this store exists to
      * prevent.
      */
+    /**
+     * Force the settings DataStore's first load now.
+     *
+     * Its very first read is the expensive one -- opening the file, parsing the preferences
+     * protobuf -- and on the cold-start path the auto-login's own `appearance.first()` was
+     * paying it, measured at 452ms on the API 34 emulator, directly between the credential
+     * load and the garage load. DataStore caches the parsed data in memory after that first
+     * read, so loading it on the startup warm-up thread makes the real read ~free.
+     */
+    suspend fun warmUp() {
+        runCatching { context.settingsDataStore.data.first() }
+    }
+
     suspend fun snapshot(): Preferences {
         com.bloo.bluelink.data.StartupTrace.markIfStarting("SettingsStore.snapshot(): DataStore data.first() begin")
         val prefs = context.settingsDataStore.data.first()

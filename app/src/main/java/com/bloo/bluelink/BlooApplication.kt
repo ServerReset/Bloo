@@ -127,6 +127,16 @@ class BlooApplication : Application(), Configuration.Provider {
                 StartupTrace.trace("okhttp class warm-up") {
                     okhttp3.OkHttpClient.Builder().build()
                 }
+                // Settings DataStore first read (file open + preferences protobuf parse),
+                // which the auto-login's own appearance.first() otherwise pays on the path to
+                // the garage -- 452ms measured on the API 34 emulator. DataStore caches the
+                // parsed data after this, so the real read becomes ~free. runBlocking on this
+                // background thread is fine; it is not the main thread.
+                StartupTrace.trace("settings datastore warm-up") {
+                    kotlinx.coroutines.runBlocking {
+                        com.bloo.bluelink.data.SettingsStore(applicationContext).warmUp()
+                    }
+                }
             }
         }.apply { priority = Thread.MIN_PRIORITY }.start()
         AppLog.log("▶ App starting -- ${deviceSummary()}")
