@@ -118,6 +118,15 @@ class BlooApplication : Application(), Configuration.Provider {
                 StartupTrace.trace("credential crypto warm-up") {
                     com.bloo.bluelink.data.CredentialStore(applicationContext).warmUp()
                 }
+                // OkHttp's class graph (Dispatcher, ExecutorService, ConnectionPool, route
+                // database, the whole interceptor/JSON chain) is the heaviest class-load
+                // chain in the app, and the cold-start auto-login builds a shared client per
+                // signed-in brand on the path to the garage (timed as "Repos constructed",
+                // 270-530ms). Building a throwaway client here loads that graph on this
+                // thread instead; the repos' own clients are then construction-only.
+                StartupTrace.trace("okhttp class warm-up") {
+                    okhttp3.OkHttpClient.Builder().build()
+                }
             }
         }.apply { priority = Thread.MIN_PRIORITY }.start()
         AppLog.log("▶ App starting -- ${deviceSummary()}")
