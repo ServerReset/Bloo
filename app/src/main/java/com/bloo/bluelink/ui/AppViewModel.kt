@@ -63,6 +63,8 @@ import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -420,24 +422,32 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 // the heaviest class-load chains in the app and it was running on Main.immediate
                 // during cold start, once per signed-in brand, three lines above a call that was
                 // already moved off for being cheaper than this one.
-                val reposStartedAt = System.currentTimeMillis()
-                withContext(Dispatchers.IO) { brands.forEach { repoFor(it) } }
-                logStartup("Repos constructed in ${System.currentTimeMillis() - reposStartedAt}ms")
-                // Off the main thread: loadAll() touches CredentialStore's lazy
-                // `prefs`, which on first access does real work (MasterKey
-                // generation/lookup + EncryptedSharedPreferences setup) --
-                // exactly the "relatively expensive" cost that property's own
-                // doc comment warns about. This whole launch block otherwise
-                // runs on Main.immediate (viewModelScope's default dispatcher,
-                // which coroutine resumption doesn't change), and this is the
-                // one call in the cold-start auto-login path -- the app's
-                // everyday launch, for any returning user -- that actually did
-                // blocking work on it.
-                val credsStartedAt = System.currentTimeMillis()
-                val accounts = withContext(Dispatchers.IO) { credentialStore.loadAll() }
-                logStartup("Credentials loaded in ${System.currentTimeMillis() - credsStartedAt}ms: ${accounts.size} account(s)")
+                // These three are independent, and each used to be awaited before the
+                // next was even started -- so the cold-start path paid their SUM:
+                //  * repo construction per signed-in brand (each builds a shared OkHttp
+                //    client: Dispatcher, ExecutorService, ConnectionPool, route database,
+                //    plus the whole OkHttp class graph),
+                //  * the encrypted credential load (CredentialStore's lazy prefs: MasterKey
+                //    lookup + EncryptedSharedPreferences + Tink keyset parse),
+                //  * the settings DataStore's first read.
+                // All three are blocking IO/keystore/DataStore work that does not belong on
+                // Main (this block runs on Main.immediate), and none depends on another.
+                // Started together, the path pays the slowest instead of the sum.
+                val parallelIoStartedAt = System.currentTimeMillis()
+                val (accounts, appearance) = withContext(Dispatchers.IO) {
+                    coroutineScope {
+                        val repos = async { brands.forEach { repoFor(it) } }
+                        val creds = async { credentialStore.loadAll() }
+                        val appearanceDeferred = async { settingsStore.appearance.first() }
+                        repos.await()
+                        creds.await() to appearanceDeferred.await()
+                    }
+                }
+                logStartup(
+                    "Cold start: repos + credentials + settings loaded in " +
+                        "${System.currentTimeMillis() - parallelIoStartedAt}ms: ${accounts.size} account(s)",
+                )
                 _state.update { it.copy(accounts = accounts) }
-                val appearance = settingsStore.appearance.first()
                 // Both halves of this decision touch CredentialStore's lazy encrypted
                 // preferences, and on a cold start that lazy is STILL UNSET -- so the
                 // first read here is the one that builds EncryptedSharedPreferences
