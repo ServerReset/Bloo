@@ -415,47 +415,12 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             // per-brand error handling -- see loadGarageInner) must not leave
             // the user stuck looking at it forever.
             try {
-                // Off the main thread for the same reason loadAll() below is. repoFor()
-                // constructs a brand's API object, and each of those companion objects builds a
-                // shared OkHttpClient -- a Dispatcher, an ExecutorService, a ConnectionPool and
-                // a route database, plus loading the whole OkHttp class graph. That is one of
-                // the heaviest class-load chains in the app and it was running on Main.immediate
-                // during cold start, once per signed-in brand, three lines above a call that was
-                // already moved off for being cheaper than this one.
-                // These three are independent, and each used to be awaited before the
-                // next was even started -- so the cold-start path paid their SUM:
-                //  * repo construction per signed-in brand (each builds a shared OkHttp
-                //    client: Dispatcher, ExecutorService, ConnectionPool, route database,
-                //    plus the whole OkHttp class graph),
-                //  * the encrypted credential load (CredentialStore's lazy prefs: MasterKey
-                //    lookup + EncryptedSharedPreferences + Tink keyset parse),
-                //  * the settings DataStore's first read.
-                // All three are blocking IO/keystore/DataStore work that does not belong on
-                // Main (this block runs on Main.immediate), and none depends on another.
-                // Started together, the path pays the slowest instead of the sum.
-                val parallelIoStartedAt = System.currentTimeMillis()
-                val (accounts, appearance) = withContext(Dispatchers.IO) {
-                    coroutineScope {
-                        val repos = async { brands.forEach { repoFor(it) } }
-                        val creds = async { credentialStore.loadAll() }
-                        val appearanceDeferred = async { settingsStore.appearance.first() }
-                        repos.await()
-                        creds.await() to appearanceDeferred.await()
-                    }
-                }
-                logStartup(
-                    "Cold start: repos + credentials + settings loaded in " +
-                        "${System.currentTimeMillis() - parallelIoStartedAt}ms: ${accounts.size} account(s)",
-                )
-                _state.update { it.copy(accounts = accounts) }
-                // Both halves of this decision touch CredentialStore's lazy encrypted
-                // preferences, and on a cold start that lazy is STILL UNSET -- so the
-                // first read here is the one that builds EncryptedSharedPreferences
-                // (AndroidKeystore key lookup + Tink keyset parse) and decrypts. Measured
-                // on the main thread as an EncryptedSharedPreferences.create plus a Tink
-                // encrypt inside getPinFailures, all while the first frame was due. Taken
-                // on IO as ONE block (the capability check is a binder call too) and
-                // applied in a single state update.
+                // The LOCK decision first: it is what puts the lock screen on the glass, the
+                // first thing a returning user sees, and it needs only the appearance (warmed
+                // DataStore) and the PIN record (warmed crypto) -- NOT the repo construction or
+                // the full credential list, which feed the garage, not the lock. Those run in
+                // parallel just below, behind the lock screen.
+                val appearance = settingsStore.appearance.first()
                 val (lockMechanisms, appPinSet, lockout) = withContext(Dispatchers.IO) {
                     val pinSet = credentialStore.getPinRecord() != null
                     Triple(
@@ -473,6 +438,26 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                     logStartup("Cold start: lock screen required, deferring garage load until unlock")
                     _state.update { it.copy(locked = true) }
                 }
+                // The garage load's two independent blocking pieces, started together. Repo
+                // construction builds a shared OkHttp client per brand (Dispatcher,
+                // ExecutorService, ConnectionPool, route database, the whole OkHttp class
+                // graph); the encrypted credential load is CredentialStore's lazy prefs
+                // (MasterKey + EncryptedSharedPreferences + Tink keyset parse). Both belong off
+                // Main (this block runs on Main.immediate) and neither depends on the other.
+                val parallelIoStartedAt = System.currentTimeMillis()
+                val accounts = withContext(Dispatchers.IO) {
+                    coroutineScope {
+                        val repos = async { brands.forEach { repoFor(it) } }
+                        val creds = async { credentialStore.loadAll() }
+                        repos.await()
+                        creds.await()
+                    }
+                }
+                logStartup(
+                    "Cold start: repos + credentials loaded in " +
+                        "${System.currentTimeMillis() - parallelIoStartedAt}ms: ${accounts.size} account(s)",
+                )
+                _state.update { it.copy(accounts = accounts) }
                 logStartup("Cold start: calling loadGarage()")
                 loadGarage()
             } catch (e: Exception) {

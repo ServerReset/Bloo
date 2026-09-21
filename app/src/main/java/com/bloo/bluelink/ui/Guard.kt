@@ -218,16 +218,25 @@ internal fun LockOverlay(vm: AppViewModel, opaqueBackdrop: Boolean = false) {
     val haptics = LocalHaptics.current
     val noRipple = remember { MutableInteractionSource() }
     val showBiometric = bioAvailable && !usePinMode
+    // The backdrop animates between fully opaque (the first frames of a cold start, before
+    // the content underneath has settled -- see LockBlurLayer's own note) and the 45% scrim.
+    // It used to snap between the two the instant `opaqueBackdrop` flipped, which read as the
+    // whole lock screen "going transparent" in one frame; a short cross-fade makes the
+    // hand-off to the blurred garage imperceptible.
+    val backdropAlpha by animateFloatAsState(
+        targetValue = if (opaqueBackdrop) 1f else 0.45f,
+        animationSpec = tween(320),
+        label = "lockBackdropAlpha",
+    )
     Box(
         Modifier
             .fillMaxSize()
             // Darken the blur for legibility, and swallow taps to the app behind. While the
             // backdrop is NOT blurred (the first frames of a cold start, before the app
-            // underneath has finished composing -- see LockBlurLayer's own note) this is
-            // fully opaque instead: a 45% scrim over a sharp garage would show car names,
-            // plates and status through the lock screen, which is the one thing it exists to
-            // prevent. The blur snaps in as this returns to its translucent value.
-            .background(Color.Black.copy(alpha = if (opaqueBackdrop) 1f else 0.45f))
+            // underneath has finished composing) this is fully opaque instead: a 45% scrim
+            // over a sharp garage would show car names, plates and status through the lock
+            // screen, which is the one thing it exists to prevent.
+            .background(Color.Black.copy(alpha = backdropAlpha))
             .clickable(interactionSource = noRipple, indication = null) {},
     ) {
         // Floating back arrow -> login: the same FloatingIcon every other floating
