@@ -409,29 +409,38 @@ internal fun WeatherStripe(weather: Weather, fahrenheit: Boolean, caption: Strin
 @Composable
 internal fun WeatherDetail(weather: Weather, fahrenheit: Boolean, metric: Boolean) {
     val tint = weatherTint(weather.condition, weather.isDay)
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(16.dp),
-    ) {
-        Icon(
-            weatherIcon(weather.condition, weather.isDay),
-            contentDescription = weather.condition.label,
-            tint = tint,
-            modifier = Modifier.size(64.dp),
-        )
-        Column(Modifier.weight(1f)) {
-            RollingNumber(
-                text = weather.tempLabel(fahrenheit),
-                style = MaterialTheme.typography.displaySmall,
-                fontWeight = FontWeight.Bold,
+    // ONE child, not five. This is rendered inside [PopVisible]'s AnimatedVisibility, and
+    // AnimatedVisibility's own layout places every root composable it is given at the SAME
+    // origin -- it is a slot for one child (or for a container that stacks several). A bare
+    // Row followed by four StatusRows therefore stacked all five on top of each other, which
+    // is the reported "overlap on tons of the text" in the weather stats. A Column gives the
+    // slot the single child it expects, and spaces the rows by the same 12dp the location
+    // pebble's own Column was providing before this AnimatedVisibility sat between them.
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(16.dp),
+        ) {
+            Icon(
+                weatherIcon(weather.condition, weather.isDay),
+                contentDescription = weather.condition.label,
+                tint = tint,
+                modifier = Modifier.size(64.dp),
             )
-            Text(weather.condition.label, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+            Column(Modifier.weight(1f)) {
+                RollingNumber(
+                    text = weather.tempLabel(fahrenheit),
+                    style = MaterialTheme.typography.displaySmall,
+                    fontWeight = FontWeight.Bold,
+                )
+                Text(weather.condition.label, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+            }
         }
+        StatusRow("Feels like", weather.feelsLikeLabel(fahrenheit))
+        weather.highLowLabel(fahrenheit)?.let { StatusRow("High / low", it) }
+        weather.humidity?.let { StatusRow("Humidity", "$it%") }
+        StatusRow("Wind", formatSpeed(weather.windKph, metric))
     }
-    StatusRow("Feels like", weather.feelsLikeLabel(fahrenheit))
-    weather.highLowLabel(fahrenheit)?.let { StatusRow("High / low", it) }
-    weather.humidity?.let { StatusRow("Humidity", "$it%") }
-    StatusRow("Wind", formatSpeed(weather.windKph, metric))
 }
 
 /** Zoom bounds for [CarMap]'s zoom, pinch or button-driven -- 3 is "half the
