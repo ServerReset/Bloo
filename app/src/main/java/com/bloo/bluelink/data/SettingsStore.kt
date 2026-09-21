@@ -116,14 +116,16 @@ fun resolvePowertrain(v: Vehicle, override: Powertrain?): Powertrain =
  */
 enum class VehiclePlatform { GEN5W, CCNC }
 
-/** When the biometric app-lock re-engages after the app leaves the foreground.
- *
- *  Used to also offer 1/5/10-minute grace periods; cut down to the one meaningful choice
- *  -- lock immediately, or not at all -- since nobody consciously calibrates a numeric grace
- *  period and [shouldRelockAfter] still honours a legacy "1min"/"5min"/"10min" wire key for
- *  anyone who had one of those stored already. */
+/** When the biometric app-lock re-engages after the app leaves the foreground. */
 enum class LockTiming(val label: String) {
+    /** Never re-lock after launch. */
     OFF("Off"),
+
+    /** Re-lock only when the screen actually turns off while the app is away -- a brief
+     *  backgrounding (a system prompt, a quick app switch) leaves it unlocked. */
+    SCREEN_OFF("Screen off"),
+
+    /** Re-lock the moment the app is backgrounded, however briefly. */
     IMMEDIATE("Immediate"),
 }
 
@@ -136,6 +138,7 @@ enum class LockTiming(val label: String) {
 val LockTiming.wireKey: String
     get() = when (this) {
         LockTiming.OFF -> "off"
+        LockTiming.SCREEN_OFF -> "screen_off"
         LockTiming.IMMEDIATE -> "immediate"
     }
 

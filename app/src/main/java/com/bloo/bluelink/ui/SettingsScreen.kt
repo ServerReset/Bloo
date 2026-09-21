@@ -1259,77 +1259,82 @@ internal fun SettingsScreen(
                 )
                 Spacer(Modifier.height(SettingsGapGroup))
                 if (canBio) {
+                    // One control, three states. This used to be a "require fingerprint"
+                    // on/off toggle plus a separate lock-timing row, which let people save
+                    // contradictory combinations (lock ON with "never re-lock", or a lock
+                    // timing shown while the lock itself was OFF). A single group keeps the
+                    // flag and its timing as one decision:
+                    //   Off        -> no lock at all
+                    //   Screen off -> lock on launch, re-lock when the screen turns off
+                    //   Immediate  -> lock on launch, re-lock the moment it's backgrounded
+                    val timingOn = appearance.biometricLock
                     SettingsSegmentedRow(
-                        label = "Require fingerprint to open",
+                        label = "App lock",
                         options = listOf(
-                            SegmentOption("off", "Off", null),
-                            SegmentOption("on", "On", null),
+                            SegmentOption("off", LockTiming.OFF.label, null),
+                            SegmentOption("screen_off", LockTiming.SCREEN_OFF.label, null),
+                            SegmentOption("immediate", LockTiming.IMMEDIATE.label, null),
                         ),
-                        selectedKey = if (appearance.biometricLock) "on" else "off",
+                        selectedKey = when {
+                            !timingOn -> "off"
+                            appearance.lockTiming == LockTiming.IMMEDIATE -> "immediate"
+                            else -> "screen_off"
+                        },
                         onSelect = { key ->
-                            if (key == "on") {
-                                context.findFragmentActivity()?.let { activity ->
-                                    showBiometricPrompt(
-                                        activity = activity,
-                                        title = "Enable fingerprint lock",
-                                        subtitle = "Confirm to require it on launch",
-                                        onSuccess = { vm.setBiometricLock(true) },
-                                        onError = { },
-                                    )
+                            when (key) {
+                                "off" -> {
+                                    // Turning the lock OFF needs the same authentication
+                                    // turning it on does, otherwise reaching Settings from an
+                                    // already-unlocked app lets a single unauthenticated tap
+                                    // permanently remove the lock on future cold launches --
+                                    // turning momentary physical access into standing access
+                                    // to unlocking the car. Failing to authenticate keeps the
+                                    // lock on.
+                                    val activity = context.findFragmentActivity()
+                                    if (activity == null) {
+                                        // Fail closed -- keep the lock -- but say so,
+                                        // rather than leaving the control looking stuck.
+                                        vm.reportInfo("Couldn't verify it's you. The lock is still on.")
+                                    } else {
+                                        showBiometricPrompt(
+                                            activity = activity,
+                                            title = "Disable fingerprint lock",
+                                            subtitle = "Confirm to stop requiring it",
+                                            onSuccess = { vm.setBiometricLock(false) },
+                                            onError = { },
+                                        )
+                                    }
                                 }
-                            } else {
-                                // Turning the lock OFF now needs the same
-                                // authentication turning it on does. It used to be a
-                                // bare setBiometricLock(false) -- one tap, no prompt
-                                // -- which had the confirmation on the wrong
-                                // direction: enabling a lock is the harmless half.
-                                //
-                                // Reaching this screen does NOT prove the person
-                                // holding the phone ever authenticated. LockTiming.OFF
-                                // never re-locks after launch at all, so an app that is
-                                // open or was recently backgrounded is simply past the
-                                // lock. From there a single unauthenticated tap removed it
-                                // permanently, including on future cold launches --
-                                // turning momentary physical access to an unlocked
-                                // phone into standing access to unlocking someone's
-                                // car, starting its climate, and reading where it is.
-                                //
-                                // No new lockout risk: the overlay that gates entering
-                                // the app uses this same prompt, so anyone who cannot
-                                // satisfy it cannot get in here to begin with, and
-                                // un-enrolling biometrics makes canUseBiometrics()
-                                // false, which stops the lock applying at all. That
-                                // remains the escape hatch it always was.
-                                val activity = context.findFragmentActivity()
-                                if (activity == null) {
-                                    // Fail closed -- keep the lock -- but say so,
-                                    // rather than leaving the control looking stuck.
-                                    vm.reportInfo("Couldn't verify it's you. The lock is still on.")
-                                } else {
-                                    showBiometricPrompt(
-                                        activity = activity,
-                                        title = "Disable fingerprint lock",
-                                        subtitle = "Confirm to stop requiring it",
-                                        onSuccess = { vm.setBiometricLock(false) },
-                                        onError = { },
-                                    )
+                                else -> {
+                                    val timing = if (key == "immediate") LockTiming.IMMEDIATE else LockTiming.SCREEN_OFF
+                                    if (timingOn) {
+                                        // Already locked: changing *when* it re-locks needs no
+                                        // extra proof -- the user just proved who they are to
+                                        // be in here, and tightening the timing is harmless.
+                                        vm.setLockTiming(timing)
+                                    } else {
+                                        // Turning the lock ON proves who you are first, then
+                                        // both arms it and sets when it re-locks.
+                                        val activity = context.findFragmentActivity()
+                                        if (activity == null) {
+                                            vm.reportInfo("Couldn't verify it's you. The lock wasn't turned on.")
+                                        } else {
+                                            showBiometricPrompt(
+                                                activity = activity,
+                                                title = "Enable fingerprint lock",
+                                                subtitle = "Confirm to require it on launch",
+                                                onSuccess = {
+                                                    vm.setBiometricLock(true)
+                                                    vm.setLockTiming(timing)
+                                                },
+                                                onError = { },
+                                            )
+                                        }
+                                    }
                                 }
                             }
                         },
                     )
-                    // PopVisible, not a bare `if` -- same consistency fix as the
-                    // Notifications card's minute fields right above this one.
-                    PopVisible(visible = appearance.biometricLock) {
-                        Column {
-                            Spacer(Modifier.height(SettingsGapHairline))
-                            SettingsSegmentedRow(
-                                label = "Lock the app",
-                                options = LockTiming.entries.map { t -> SegmentOption(t.name, t.label, null) },
-                                selectedKey = appearance.lockTiming.name,
-                                onSelect = { key -> runCatching { vm.setLockTiming(LockTiming.valueOf(key)) } },
-                            )
-                        }
-                    }
                 } else {
                     Text(
                         "No fingerprint/biometric is enrolled on this device.",

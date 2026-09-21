@@ -824,7 +824,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
      * protection at all -- if screen-off-locks-immediately is wanted, it is a new
      * LockTiming option, not a hidden override of the existing ones.
      */
-    fun maybeRelock(backgroundedAtMs: Long) {
+    fun maybeRelock(backgroundedAtMs: Long, screenTurnedOff: Boolean = false) {
         if (_state.value.locked) return
         viewModelScope.launch {
             val a = settingsStore.appearance.first()
@@ -836,7 +836,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             val elapsed = System.currentTimeMillis() - backgroundedAtMs
             // See LockTiming.wireKey (exhaustive, so a new enum value must be mapped) and
             // shouldRelockAfter's own doc for the legacy wire keys it still honours.
-            if (shouldRelockAfter(elapsed, a.lockTiming.wireKey)) _state.update { it.copy(locked = true) }
+            if (shouldRelockAfter(elapsed, a.lockTiming.wireKey, screenTurnedOff)) _state.update { it.copy(locked = true) }
         }
         // Prompt to refresh if data is stale after returning from background.
         if (backgroundedAtMs > 0 && System.currentTimeMillis() - backgroundedAtMs > STALE_STATUS_MS) {

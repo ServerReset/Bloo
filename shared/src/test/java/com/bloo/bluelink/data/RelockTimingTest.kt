@@ -52,6 +52,16 @@ class RelockTimingTest {
     }
 
     @Test
+    fun screenOffLocksOnlyWhenTheScreenTurnedOff() {
+        // Elapsed is irrelevant for "screen off": it re-locks only when the screen actually
+        // turned off while the app was away.
+        assertFalse(shouldRelockAfter(0L, "screen_off", screenTurnedOff = false))
+        assertFalse(shouldRelockAfter(Long.MAX_VALUE, "screen_off", screenTurnedOff = false))
+        assertTrue(shouldRelockAfter(0L, "screen_off", screenTurnedOff = true))
+        assertTrue(shouldRelockAfter(Long.MAX_VALUE, "screen_off", screenTurnedOff = true))
+    }
+
+    @Test
     fun unknownKeyFailsSafeToLocked() {
         // An unrecognised key (a future typo, or a value from a newer peer) locks rather than
         // silently staying open -- the safe direction for a security control.
@@ -70,5 +80,6 @@ class RelockTimingTest {
         assertFalse(shouldRelockAfter(0L, "1min"))
         assertFalse(shouldRelockAfter(0L, "5min"))
         assertFalse(shouldRelockAfter(0L, "10min"))
+        assertFalse(shouldRelockAfter(0L, "screen_off"))
     }
 }

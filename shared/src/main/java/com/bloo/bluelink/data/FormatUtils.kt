@@ -647,9 +647,10 @@ fun parseOdometerMiles(odometer: String?): Int? =
  * instead of falling through to the `else` fail-safe. `else` maps to "lock" (an unrecognised
  * key means re-lock rather than silently stay open).
  */
-fun shouldRelockAfter(elapsedMs: Long, timingKey: String): Boolean = when (timingKey) {
+fun shouldRelockAfter(elapsedMs: Long, timingKey: String, screenTurnedOff: Boolean = false): Boolean = when (timingKey) {
     "off" -> false
     "immediate" -> true
+    "screen_off" -> screenTurnedOff
     "1min" -> elapsedMs >= 60_000L
     "5min" -> elapsedMs >= 300_000L
     "10min" -> elapsedMs >= 600_000L

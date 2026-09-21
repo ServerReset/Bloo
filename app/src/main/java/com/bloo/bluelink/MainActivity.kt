@@ -1,6 +1,9 @@
 package com.bloo.bluelink
 
+import android.content.BroadcastReceiver
+import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.content.res.Configuration
 import android.graphics.Color
 import android.os.Build
@@ -24,6 +27,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import org.lsposed.hiddenapibypass.HiddenApiBypass
 import rikka.shizuku.Shizuku
+import androidx.core.content.ContextCompat
 import androidx.core.content.pm.ShortcutManagerCompat
 import com.bloo.bluelink.data.brand
 import com.bloo.bluelink.data.StartupTrace
@@ -64,6 +68,19 @@ class MainActivity : FragmentActivity() {
     private var backgroundedAt = 0L
     private var firstStart = true
 
+    // Wall-clock time the screen last turned off, for LockTiming.SCREEN_OFF. The re-lock
+    // predicate only counts a screen-off that happened AFTER the app was backgrounded
+    // (screenOffAt > backgroundedAt), so a screen timeout while the user is actively using
+    // the app never re-locks it.
+    @Volatile
+    private var screenOffAt = 0L
+
+    private val screenOffReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context, intent: Intent) {
+            if (intent.action == Intent.ACTION_SCREEN_OFF) screenOffAt = System.currentTimeMillis()
+        }
+    }
+
     // Shizuku runtime-permission result → forward to the ViewModel so the update flow
     // can proceed once the user grants it. Registered only while Shizuku is present.
     private val shizukuPermissionListener = Shizuku.OnRequestPermissionResultListener { requestCode, grantResult ->
@@ -85,6 +102,13 @@ class MainActivity : FragmentActivity() {
         super.onCreate(savedInstanceState)
         current = this
         StartupTrace.mark("MainActivity.super.onCreate done")
+        // ACTION_SCREEN_OFF is a protected broadcast (a manifest receiver never sees it) but a
+        // runtime-registered one does. Exported so the SYSTEM can deliver it. Registered here
+        // for the Activity's whole life and removed in onDestroy -- it only stamps a timestamp,
+        // so it is cheaper to leave on than to juggle around the app-lock timing check.
+        ContextCompat.registerReceiver(
+            this, screenOffReceiver, IntentFilter(Intent.ACTION_SCREEN_OFF), ContextCompat.RECEIVER_EXPORTED,
+        )
         // Fully transparent system bars so the app's gradient shows through and
         // content can draw edge-to-edge behind the status & navigation bars.
         enableEdgeToEdge(
@@ -216,7 +240,7 @@ class MainActivity : FragmentActivity() {
         super.onStart()
         // Cold start is handled by the ViewModel; only re-evaluate on warm resumes.
         if (!firstStart) {
-            viewModel.maybeRelock(backgroundedAt)
+            viewModel.maybeRelock(backgroundedAt, screenOffAt > backgroundedAt)
             // The user may have started Shizuku while away (its own app / ADB); re-probe
             // so the "Updates" toggle appears without a cold restart. Off-main-thread.
             viewModel.refreshShizukuAvailable()
@@ -233,6 +257,7 @@ class MainActivity : FragmentActivity() {
     /** Remove the Shizuku listener so it doesn't leak past this Activity instance. */
     override fun onDestroy() {
         if (current === this) current = null
+        runCatching { unregisterReceiver(screenOffReceiver) }
         runCatching { Shizuku.removeRequestPermissionResultListener(shizukuPermissionListener) }
         super.onDestroy()
     }
