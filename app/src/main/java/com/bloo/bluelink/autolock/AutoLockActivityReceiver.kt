@@ -25,13 +25,6 @@ class AutoLockActivityReceiver : BroadcastReceiver() {
         // hand the confirmation to the deadline receiver, which locks now instead of at the
         // deadline. Without this the fallback would always wait out the full grace period.
         val ctx = context.applicationContext
-        AutoLockPending.all(ctx).forEach { record ->
-            AutoLockPending.markWalkConfirmed(ctx, record.vin)
-            ctx.sendBroadcast(
-                Intent(ctx, AutoLockAlarmReceiver::class.java)
-                    .putExtra(AutoLockAlarmReceiver.EXTRA_VIN, record.vin)
-                    .putExtra(AutoLockAlarmReceiver.EXTRA_WALK_CONFIRMED, true),
-            )
-        }
+        AutoLockPending.all(ctx).forEach { record -> AutoLockTrigger.onWalkConfirmed(ctx, record.vin) }
     }
 }

@@ -98,6 +98,19 @@ internal object AutoLockAlarm {
      *  controller cancels this alarm the moment it reaches any terminal state. */
     fun servicePathDeadlineMs(graceSeconds: Int): Long =
         AutoLockController.CONFIRM_TIMEOUT_MS + graceSeconds * 1000L + 20_000L
+
+    /**
+     * How long the ALARM path waits before its deadline fires: the same walk-confirmation
+     * window the service path gives, plus the grace countdown it would then run.
+     *
+     * This is the value the disconnect receiver arms the alarm with, and it is NOT zero --
+     * arming at zero fired the deadline immediately, which found no walk-away confirmation
+     * yet, took the "may still be sitting in the car" skip branch, and cleared the pending
+     * record before the real confirmation could ever arrive. The fallback therefore never
+     * locked: the one path that works with the phone in a pocket on Android 12+ did nothing.
+     */
+    fun alarmPathDeadlineMs(graceSeconds: Int): Long =
+        AutoLockController.CONFIRM_TIMEOUT_MS + graceSeconds * 1000L
 }
 
 /**
@@ -163,8 +176,12 @@ class AutoLockAlarmReceiver : BroadcastReceiver() {
 
         // Cached status only (refresh = false), matching AlertWorker and the service path:
         // never wake the car for the pre-lock check.
+        // Capped well inside the ~10s a BroadcastReceiver may hold the process for via
+        // goAsync(): a status read that outlives that window can have this process killed
+        // mid-flight, which would lose the lock entirely (worse than skipping). 8s leaves
+        // room for the lock command itself below.
         val status = runCatching {
-            withTimeoutOrNull(30_000) {
+            withTimeoutOrNull(STATUS_READ_TIMEOUT_MS) {
                 BlueLinkGate.statusMutex.withLock {
                     repositoryFor(
                         Brand.fromIndicator(vehicle.brandIndicator),
@@ -217,5 +234,8 @@ class AutoLockAlarmReceiver : BroadcastReceiver() {
     companion object {
         const val EXTRA_VIN = "vin"
         const val EXTRA_WALK_CONFIRMED = "walk_confirmed"
+
+        /** See the status read's own comment: kept inside the goAsync window. */
+        private const val STATUS_READ_TIMEOUT_MS = 8_000L
     }
 }
