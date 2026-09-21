@@ -1007,6 +1007,46 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             caps.hasCapability(android.net.NetworkCapabilities.NET_CAPABILITY_VALIDATED)
     }
 
+    /**
+     * Publish the last-known garage from disk, before [loadGarageInner]'s network round trip.
+     *
+     * The vehicle LIST is a network fetch, and it used to gate the garage being shown at all:
+     * a returning user watched Screen.Loading for the whole round trip. [SnapshotStore]
+     * already holds every car's identity from the last session, and [StatusCache]'s own
+     * restore (a separate launch) fills in their statuses, so there is nothing to wait for.
+     * The fetch in [loadGarageInner] replaces this with fresh data a moment later; if it
+     * fails, the cached garage stays (the better failure mode: last-known cars plus the
+     * error banner, not an empty garage).
+     *
+     * Only fires on the cold-start path (screen still Loading) and only when the resolved
+     * screen is Garage, so a first run or a car still needing its powertrain/seats set up
+     * keeps going through SyncChoice/CarSetup exactly as before.
+     */
+    private suspend fun publishCachedGarage() {
+        if (_state.value.screen != Screen.Loading) return
+        val cached = runCatching { snapshotStore.current() }.getOrNull() ?: return
+        if (cached.vehicles.isEmpty()) return
+        val cachedVehicles = cached.vehicles.map { it.toVehicle() }
+        val prefs = settingsStore.snapshot()
+        if (resolveScreen(cachedVehicles, prefs) != Screen.Garage) return
+        val cfg = perCarConfig(cachedVehicles, prefs)
+        val lastVin = settingsStore.lastVehicleVin(prefs)
+        val index = cachedVehicles.indexOfFirst { it.vin == lastVin }.let { if (it < 0) 0 else it }
+        val defaultPresets = cachedVehicles.associate { v ->
+            v.vin to (settingsStore.defaultClimatePreset(v.vin, prefs) ?: "smart")
+        }
+        _state.update {
+            cfg.apply(it).copy(
+                vehicles = cachedVehicles,
+                screen = Screen.Garage,
+                garageLoadError = null,
+                defaultClimatePresets = defaultPresets,
+            )
+        }
+        _currentIndex.value = index
+        AppLog.log("⚡ Cached garage shown before the network: ${cachedVehicles.size} vehicle(s)")
+    }
+
     private suspend fun loadGarageInner() {
         logStartup("loadGarageInner: started")
         // Fire-and-forget, in parallel with the vehicle fetch below (its own
@@ -1026,6 +1066,12 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         // beginLiveDeviceLocation's own doc.
         beginLiveDeviceLocation()
         com.bloo.bluelink.data.StartupTrace.markIfStarting("loadGarageInner: live device location started")
+        // Show the last-known garage NOW, before the vehicle-list fetch below. That fetch is
+        // a network round trip and it was the gate on the garage being shown at all: the UI
+        // sat on Screen.Loading for its whole duration (measured 2.1s on the API 34
+        // emulator, and that is before the garage's own first composition). The list is
+        // already on disk from the last session -- see publishCachedGarage's own doc.
+        publishCachedGarage()
         // Merge vehicles from every signed-in brand; one brand failing shouldn't
         // hide the others. Track failures separately from "this account
         // genuinely has zero vehicles" -- collapsing both into the same empty
@@ -1076,7 +1122,12 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             com.bloo.bluelink.data.StartupTrace.markIfStarting("loadGarageInner: publishing empty garage")
             _state.update {
                 it.copy(
-                    vehicles = emptyList(),
+                    // Whatever cars are already on screen -- the cached garage published
+                    // above, if any -- rather than blanking them: a failed fetch should
+                    // leave the last-known cars visible with the error banner, not replace
+                    // a perfectly good garage with an empty one. On a genuine first run
+                    // this is still empty, so the status card is unchanged.
+                    vehicles = it.vehicles,
                     // Garage, not a separate empty screen -- GarageScreen folds
                     // the "no connection"/"not signed in"/"no vehicles" status
                     // card in as a page of its own pager instead.
