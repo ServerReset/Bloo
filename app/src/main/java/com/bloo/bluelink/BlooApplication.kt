@@ -110,6 +110,14 @@ class BlooApplication : Application(), Configuration.Provider {
                     com.bloo.bluelink.data.StatusCache(app)
                     com.bloo.bluelink.data.SessionStore(app)
                 }
+                // Encrypted-prefs warm-up (MasterKey + EncryptedSharedPreferences + Tink).
+                // See CredentialStore.warmUp's own doc: this is the ~470ms the cold-start
+                // auto-login otherwise pays on the critical path, right ahead of the app-lock
+                // check and the garage load. Runs here, over a second earlier, on this same
+                // background thread.
+                StartupTrace.trace("credential crypto warm-up") {
+                    com.bloo.bluelink.data.CredentialStore(applicationContext).warmUp()
+                }
             }
         }.apply { priority = Thread.MIN_PRIORITY }.start()
         AppLog.log("▶ App starting -- ${deviceSummary()}")
