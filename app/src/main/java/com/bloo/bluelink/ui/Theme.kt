@@ -21,7 +21,11 @@ import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.staticCompositionLocalOf
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
@@ -402,20 +406,38 @@ fun BlooTheme(
     }
 
     val context = LocalContext.current
-    // Memoize color scheme computation: dynamicDarkColorScheme/dynamicLightColorScheme
-    // can be expensive (wallpaper extraction), and vibrancy saturation involves HSV
-    // conversions. Only recompute when inputs actually change.
-    val scheme = remember(
-        dark, dynamicColor, colorPalette, customPalette, vibrancy
-    ) {
+    // The STATIC scheme is cheap and is what the FIRST frame paints. The dynamic (Material You)
+    // scheme extracts the user's wallpaper colours -- a synchronous binder call that can take
+    // well over a second on a cold start -- and was being computed in a `remember` on the main
+    // thread, i.e. ON the first frame. It is now resolved off the main thread and swapped in
+    // when ready; until then the static scheme is on screen, so a cold start no longer waits on
+    // the wallpaper for its first pixels.
+    val staticScheme = remember(dark, colorPalette, customPalette, vibrancy) {
         blooColorScheme(
             context = context,
             dark = dark,
-            dynamicColor = dynamicColor,
+            dynamicColor = false,
             colorPalette = colorPalette,
             customPalette = customPalette,
             vibrancy = vibrancy,
         )
+    }
+    val scheme by produceState(
+        initialValue = staticScheme,
+        dark, dynamicColor, colorPalette, customPalette, vibrancy,
+    ) {
+        if (dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            value = withContext(Dispatchers.Default) {
+                blooColorScheme(
+                    context = context,
+                    dark = dark,
+                    dynamicColor = true,
+                    colorPalette = colorPalette,
+                    customPalette = customPalette,
+                    vibrancy = vibrancy,
+                )
+            }
+        }
     }
 
     // Deliberately NOT density.fontScale * uiScale any more. That multiplied the
