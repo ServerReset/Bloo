@@ -1246,8 +1246,14 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         // this fold does not affect that path since it never reaches this line either.
         // One-time: start the Drive auto-sync bootstrap + collector.
         bootstrapDriveSync()
-        // Keep the app-icon long-press shortcuts in sync with the current cars.
-        com.bloo.bluelink.Shortcuts.refresh(getApplication(), vehicles, shortcutSet)
+        // Keep the app-icon long-press shortcuts in sync with the current cars. Dispatched
+        // off the main thread: ShortcutManagerCompat does a synchronous binder round trip per
+        // call, and this lands on the very frame the garage first draws -- it has no ordering
+        // relationship with the shortcut ROUTING below, which reads the intent that launched
+        // this Activity, not the shortcut list.
+        viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+            runCatching { com.bloo.bluelink.Shortcuts.refresh(getApplication(), vehicles, shortcutSet) }
+        }
         // Run any shortcut that was tapped before the garage finished loading.
         tryRunPendingShortcut()
         // Set the defer flag if the app is locked (or will be locked shortly by maybeRelock).

@@ -135,6 +135,7 @@ class BlooApplication : Application(), Configuration.Provider {
                 StartupTrace.trace("settings datastore warm-up") {
                     kotlinx.coroutines.runBlocking {
                         com.bloo.bluelink.data.SettingsStore(applicationContext).warmUp()
+                        com.bloo.bluelink.data.StatusCache(applicationContext).warmUp()
                     }
                 }
             }
