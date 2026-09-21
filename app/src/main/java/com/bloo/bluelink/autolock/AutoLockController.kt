@@ -120,14 +120,21 @@ object AutoLockController {
      *  [cancel]ling and leaving stale [DetectionState.ABORTED] entries and machines behind
      *  for VINs that no longer exist. Settings' own persisted config is cleared separately
      *  (see [com.bloo.bluelink.data.SettingsStore.clearAllAutoLockConfigs]). */
-    fun forgetAll(vins: Collection<String>) {
+    fun forgetAll(context: Context, vins: Collection<String>) {
         if (vins.isEmpty()) return
+        val ctx = context.applicationContext
         vins.forEach { vin ->
             jobs.remove(vin)?.cancel()
             locks.remove(vin)
             machines.remove(vin)
             skipGrace.remove(vin)
             walkAwayConfirmed.remove(vin)
+            // The persisted fallback record and its armed deadline alarm are NOT part of the
+            // in-memory state above. A sign-out has to clear them too: otherwise a deadline
+            // scheduled for a car whose account is gone stays armed, and its alarm would fire
+            // later and try to lock a car the app can no longer even find.
+            AutoLockPending.clear(ctx, vin)
+            AutoLockAlarm.cancel(ctx, vin)
         }
         _state.update { it - vins.toSet() }
     }

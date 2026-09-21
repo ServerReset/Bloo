@@ -704,7 +704,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 // vehicle AutoLockController can now never find. See both functions' own docs.
                 runCatching {
                     val autoLockVins = settingsStore.autoLockConfiguredVins()
-                    com.bloo.bluelink.autolock.AutoLockController.forgetAll(autoLockVins)
+                    com.bloo.bluelink.autolock.AutoLockController.forgetAll(getApplication(), autoLockVins)
                     settingsStore.clearAllAutoLockConfigs()
                 }
                 // `sessionFetched` is add-only and lives for the ViewModel's life, and

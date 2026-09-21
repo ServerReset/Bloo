@@ -118,8 +118,19 @@ class AutoLockService : Service() {
         // racing a "Simulate leaving" tap, say) must still only ever start one collector.
         observeJobs.computeIfAbsent(vin) {
             scope.launch {
+                // Whether this car has ever had a state in the map. Its own evaluation sets
+                // that on its first step, so the very first emission arriving before that must
+                // not be read as "forgotten" -- but a map entry that GOES AWAY (forgetAll on
+                // sign-out) is exactly that, and this service must not sit in the foreground
+                // watching a car nothing will ever evaluate again.
+                var sawState = false
                 AutoLockController.state.collect { all ->
-                    val s = all[vin] ?: return@collect
+                    val s = all[vin]
+                    if (s == null) {
+                        if (sawState) finishTracking(vin)
+                        return@collect
+                    }
+                    sawState = true
                     startForegroundCompat(vin, s.detection, s.graceRemaining)
                     if (s.detection.isTerminal) {
                         // Let the user glance at the result, then tear this car's notification
