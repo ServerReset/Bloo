@@ -669,7 +669,12 @@ internal fun SearchPill(
             // one shared fill everywhere, the same direction this goes further in.
             color = glassTint(blurred = canBlur),
             contentColor = scheme.onSurface,
-            tonalElevation = if (expanded) 10.dp else 6.dp,
+            // No tonalElevation: it is a per-frame spot shadow baked into this Surface's
+            // layer, and the pill's whole layer is scaled by the entrance/press graphicsLayer
+            // above, so the shadow re-rasterized on every frame of the pop. The border below
+            // carries the depth; the shadow was a second, redundant depth cue on a control
+            // that is animated constantly.
+            tonalElevation = 0.dp,
             border = BorderStroke(
                 if (expanded) 1.5.dp else 1.dp,
                 // Static. This is an argument to Surface, i.e. COMPOSITION

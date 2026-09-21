@@ -89,15 +89,16 @@ import kotlin.math.max
 
 @Composable
 internal fun LockBlurLayer(locked: Boolean, content: @Composable () -> Unit) {
-    // Asymmetric on purpose. Blurring IN is instant: the lock screen's own UI covers the
-    // content at that moment, so nobody can see the blur arrive, while animating the radius
-    // would force the whole app tree to be re-rasterized at 22dp on EVERY frame of the
-    // animation -- measured on the API 34 emulator as a 2.3s frame, of which ~1s was this
-    // blur (disabling it dropped the same frame to 1.33s). Unlocking still animates: there
-    // the blur is being revealed, and a snap would be visible.
+    // Both directions SNAP, neither animates the radius. Animating a full-screen 22dp blur
+    // radius means re-rasterizing the whole app tree at a different radius on EVERY frame of
+    // the animation -- measured on the API 34 emulator as a 2.3s frame of which ~1s was this
+    // blur -- and on real devices the unlock then still chugs for the whole 450ms. Locking
+    // snaps in anyway (the lock's own UI covers the content), and on unlock the 450ms fade is
+    // carried by LockAlphaOverlay's own alpha, so the blur snapping off behind it is not a
+    // visible pop -- the lock UI is what is fading, not the blur.
     val lockBlur = remember { Animatable(0f) }
     LaunchedEffect(locked) {
-        if (locked) lockBlur.snapTo(LOCK_BLUR_DP) else lockBlur.animateTo(0f, tween(450))
+        lockBlur.snapTo(if (locked) LOCK_BLUR_DP else 0f)
     }
     // The blur modifier is applied only while there IS one. Modifier.blur(0.dp) installs no
     // RenderEffect, but it still forces the whole app tree into its own graphicsLayer on every

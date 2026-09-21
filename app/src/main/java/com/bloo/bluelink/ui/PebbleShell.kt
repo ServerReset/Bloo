@@ -453,6 +453,12 @@ internal fun PebbleShell(
                 // bolder border this shares instead is what makes toggling it visible.
                 .pebbleCardEdge(pebbleShape, pebbleOutline),
             shape = pebbleShape,
+            // No shadow elevation: the whole card is scaled by ReorderColumn's drag lift and
+            // the cold-start intro (a graphicsLayer on the pebble's own Box above), and the
+            // default 1dp shadow is a spot shadow baked into that layer -- so it re-rasterized
+            // on every frame of the lift, which is exactly the drag/float chug. The border
+            // already carries the depth.
+            elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
             colors = CardDefaults.cardColors(
                 containerColor = containerColor,
                 contentColor = contentColorFor(containerColor),
