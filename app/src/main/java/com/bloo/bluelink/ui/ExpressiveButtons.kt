@@ -8,6 +8,7 @@ import androidx.compose.foundation.interaction.PressInteraction
 import androidx.compose.foundation.layout.Box
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.Stable
@@ -436,6 +437,22 @@ fun ExpressiveButtonGroup(
     // stutter an earlier version of this shipped). Nothing needs to react to it -- the very
     // next measure pass reads it directly.
     val naturals = remember { NaturalWidths() }
+    // Invalidate the natural-width cache whenever the CONTENT this group composes re-runs.
+    //
+    // The members' intrinsic widths depend only on that content, never on the constraints of a
+    // given measure pass -- but the measure block below used to recompute them on every RESTING
+    // pass (`resting || ...`), and resting is true for essentially every pass that is not
+    // mid-press. So every measure of every group in the app re-walked each member's intrinsic
+    // width, and a button's intrinsic width runs a real text layout for its label (that is what
+    // `MorphButtonLabel.maxIntrinsicWidth` is). Inside a lazy layout -- which re-measures on
+    // every scroll and every content-size change -- that was a text layout per member per frame,
+    // forever: the allocation that filled the heap (the OOM dump is dominated by
+    // MeasuredParagraph/MeasuredText/TextPaint). SideEffect fires after every successful
+    // (re)composition, which is exactly when the content could have changed.
+    SideEffect {
+        naturals.content = null
+        naturals.compact = null
+    }
     Layout(
         content = {
             CompositionLocalProvider(LocalExpressiveGroup provides true) {
@@ -465,8 +482,6 @@ fun ExpressiveButtonGroup(
             val weight = FloatArray(n) { i ->
                 (measurables[i].parentData as? ExpressiveGroupData)?.weight ?: 0f
             }
-            val resting = press.all { it <= 0.001f }
-
             // Natural widths come from maxIntrinsicWidth rather than from a trial measure.
             // That is not a micro-optimisation, it is what makes filling possible at all: a
             // child may only be measured once per pass, so measuring to learn the natural width
@@ -474,7 +489,7 @@ fun ExpressiveButtonGroup(
             // bug the trial measure had -- inside a parent that forces a width, the "natural"
             // width recorded WAS that forced width, so the button had nothing to grow from.
             val h = if (constraints.hasBoundedHeight) constraints.maxHeight else 0
-            if (resting || naturals.content?.size != n) {
+            if (naturals.content == null || naturals.content!!.size != n) {
                 naturals.content = IntArray(n) { measurables[it].maxIntrinsicWidth(h).coerceAtLeast(0) }
                 // Invalidated, not recomputed here -- see the lazy read below for why.
                 naturals.compact = null
