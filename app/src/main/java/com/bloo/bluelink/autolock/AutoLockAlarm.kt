@@ -143,6 +143,17 @@ class AutoLockAlarmReceiver : BroadcastReceiver() {
         }
         if (walkConfirmed) AutoLockPending.markWalkConfirmed(context, vin)
 
+        // If the in-process controller is actively evaluating this car, IT owns the outcome --
+        // this deadline must not race it. That is the normal case for the service path: the
+        // controller is mid-CONFIRMING/GRACE when the walk confirmation is forwarded here, and
+        // it will lock after its own grace. The guard only passes when the controller has no
+        // live evaluation (the fallback path, or a service-path evaluation whose process died
+        // and left this record behind), which is exactly when this deadline should act.
+        if (AutoLockController.stateFor(vin).detection.isControllerOwned) {
+            android.util.Log.i("AutoLockAlarm", "controller still evaluating $vin — leaving it to the controller")
+            return
+        }
+
         val cfg = runCatching { SettingsStore(context).autoLockConfig(vin) }.getOrNull() ?: run {
             android.util.Log.w("AutoLockAlarm", "no config for $vin")
             return

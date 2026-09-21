@@ -31,3 +31,14 @@ sealed interface DetectionEvent {
     data object WalkingConfirmed : DetectionEvent
     data object UserCancelled : DetectionEvent
 }
+
+/**
+ * True while the in-process [AutoLockController] is the live owner of an evaluation for a car:
+ * it has an active job and will reach a terminal state on its own. Used by the fallback deadline
+ * receiver to stand down rather than racing that job to the same lock command.
+ */
+val DetectionState.isControllerOwned: Boolean
+    get() = this == DetectionState.CONFIRMING ||
+        this == DetectionState.GRACE ||
+        this == DetectionState.VERIFYING ||
+        this == DetectionState.LOCKING

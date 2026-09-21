@@ -36,24 +36,29 @@ internal object AutoLockTrigger {
         val ctx = context.applicationContext
         val graceSeconds = settings.graceSeconds
         val started = !forceFallback && AutoLockService.start(ctx, vin)
+        // The persisted record is written on BOTH paths, not just the fallback. On the
+        // fallback it is the mechanism; on the service path it is what makes the safety-net
+        // alarm below able to do anything at all -- without it, a process killed mid-evaluation
+        // left the deadline alarm firing into an empty record store and locking nothing. The
+        // alarm receiver's own controller-state guard (see there) is what stops the two paths
+        // from both acting on it.
+        val carName = SnapshotStore(ctx).current().vehicles.firstOrNull { it.vin == vin }?.name
+        AutoLockPending.begin(
+            ctx,
+            AutoLockPending.Record(
+                vin = vin,
+                carName = carName,
+                deadlineMs = System.currentTimeMillis() +
+                    if (started) AutoLockAlarm.servicePathDeadlineMs(graceSeconds)
+                    else AutoLockAlarm.alarmPathDeadlineMs(graceSeconds),
+                dryRun = settings.dryRun,
+            ),
+        )
         if (!started) {
-            // No service, so this receiver owns the whole countdown. The record has to be
-            // persisted because the walk-away confirmation and the deadline can land in a
-            // later process.
-            val carName = SnapshotStore(ctx).current().vehicles.firstOrNull { it.vin == vin }?.name
-            AutoLockPending.begin(
-                ctx,
-                AutoLockPending.Record(
-                    vin = vin,
-                    carName = carName,
-                    deadlineMs = System.currentTimeMillis() +
-                        AutoLockAlarm.alarmPathDeadlineMs(graceSeconds),
-                    dryRun = settings.dryRun,
-                ),
-            )
-            // Same mandatory walk-away confirmation the service path waits for; the
-            // transition is delivered to AutoLockActivityReceiver, which forwards it to the
-            // alarm receiver for an immediate lock.
+            // No service, so this receiver owns the whole countdown. Same mandatory
+            // walk-away confirmation the service path waits for; the transition is delivered
+            // to AutoLockActivityReceiver, which forwards it to the alarm receiver for an
+            // immediate lock.
             ActivityRecognitionManager.start(ctx)
             // The countdown the user can actually see and cancel. Its Cancel / Lock now
             // actions are user interaction, which DOES permit the service start, so they keep
