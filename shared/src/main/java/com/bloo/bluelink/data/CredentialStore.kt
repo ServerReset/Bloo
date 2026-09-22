@@ -33,7 +33,7 @@ class CredentialStore(context: Context) {
 
     /**
      * Force the lazy [prefs] (MasterKey generation/lookup + EncryptedSharedPreferences +
-     * Tink keyset parse) to initialize now.
+     * Tink keyset parse) to initialize now, and cache the decrypted account list.
      *
      * Called from the startup warm-up thread in BlooApplication, which starts well over a
      * second before the cold-start auto-login first touches credentials. That first real
@@ -41,13 +41,13 @@ class CredentialStore(context: Context) {
      * check and the garage load -- and it measures ~470ms on the API 34 emulator. Warming it
      * on the background thread moves that cost off the path to the first screen. A failure
      * here is harmless: the lazy simply retries on the next real access.
+     *
+     * It also caches the DECRYPTED account list, because EncryptedSharedPreferences re-decrypts
+     * every value on every read (there is no plaintext cache inside it): the ~500ms this warm-up
+     * spends decrypting was otherwise thrown away and loadAll() re-paid it on the garage path.
      */
     fun warmUp() {
-        // `.all`, not just `prefs`: forcing the lazy builds the store (MasterKey lookup +
-        // EncryptedSharedPreferences.create), but the values are decrypted per read, and
-        // loadAll()/the PIN reads are what the critical path actually pays. `.all` decrypts
-        // every stored value here instead, so the real access finds it warm.
-        runCatching { prefs.all }
+        runCatching { cachedAccounts = loadAllUncached() }
     }
 
     /**
@@ -68,6 +68,7 @@ class CredentialStore(context: Context) {
             .putString("${b}_pin", credentials.pin)
             .putStringSet(KEY_BRANDS, brands)
             .apply()
+        cachedAccounts = null
     }
 
     /**
@@ -91,8 +92,13 @@ class CredentialStore(context: Context) {
      * Uses `runCatching { Brand.valueOf(name) }.getOrNull()` so a stale/unknown brand
      * name left over from a removed enum constant is silently skipped instead of
      * throwing and losing every other account.
+     *
+     * Returns the warm-up's cached result when one exists (see [warmUp]); any write
+     * invalidates it, so this is only ever a cache hit on the read-only cold-start path.
      */
-    fun loadAll(): List<Credentials> {
+    fun loadAll(): List<Credentials> = cachedAccounts ?: loadAllUncached().also { cachedAccounts = it }
+
+    private fun loadAllUncached(): List<Credentials> {
         migrateLegacy()
         return brandSet().mapNotNull { name ->
             runCatching { Brand.valueOf(name) }.getOrNull()?.let { load(it) }
@@ -102,6 +108,7 @@ class CredentialStore(context: Context) {
     /** Overwrites just the stored PIN for [brand], leaving email/password untouched. */
     fun updatePin(brand: Brand, pin: String) {
         prefs.edit().putString("${brand.name}_pin", pin).apply()
+        cachedAccounts = null
     }
 
     /** Removes one brand's stored credentials and drops it from the [KEY_BRANDS] set. */
@@ -112,6 +119,7 @@ class CredentialStore(context: Context) {
             .remove("${b}_email").remove("${b}_password").remove("${b}_pin")
             .putStringSet(KEY_BRANDS, brands)
             .apply()
+        cachedAccounts = null
     }
 
     // --- App PIN (device app-lock, unrelated to any car's service PIN) ----
@@ -163,6 +171,7 @@ class CredentialStore(context: Context) {
     /** Wipes the entire encrypted prefs file — all brands, all accounts. */
     fun clearAll() {
         prefs.edit().clear().apply()
+        cachedAccounts = null
     }
 
     // The set of brand names that currently have credentials stored, used to drive
@@ -189,6 +198,7 @@ class CredentialStore(context: Context) {
             .putStringSet(KEY_BRANDS, setOf(brand))
             .remove("email").remove("password").remove("pin").remove("brand")
             .apply()
+        cachedAccounts = null
     }
 
     private companion object {
@@ -202,6 +212,11 @@ class CredentialStore(context: Context) {
 
         @Volatile
         private var cachedPrefs: SharedPreferences? = null
+
+        /** Process-wide cache of the decrypted account list, populated by [warmUp] and
+         *  invalidated by every write, so the read-only cold-start load is a plain cache hit. */
+        @Volatile
+        private var cachedAccounts: List<Credentials>? = null
 
         /** The process-wide [EncryptedSharedPreferences], built once on first access. */
         fun sharedPrefs(context: Context): SharedPreferences =
