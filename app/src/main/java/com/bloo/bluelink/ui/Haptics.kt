@@ -19,18 +19,25 @@ class Haptics(context: Context) {
 
     // API 31 (S) moved vibrator access behind VibratorManager; below that the vibrator
     // is fetched directly from the Context (deprecated but still the only path pre-S).
-    private val vibrator: Vibrator? = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-        (context.getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as? VibratorManager)?.defaultVibrator
-    } else {
-        @Suppress("DEPRECATION")
-        context.getSystemService(Context.VIBRATOR_SERVICE) as? Vibrator
+    // LAZY, not eager: the vibrator service lookup and its capability probes (hasVibrator /
+    // areAllPrimitivesSupported / hasAmplitudeControl) are synchronous Binder calls that used
+    // to run inside Haptics' constructor -- i.e. in the middle of BlooApp's first composition,
+    // on the cold-start critical path, for a capability nothing needs until the user actually
+    // triggers a haptic. Deferring them to first use keeps the first frame free of them.
+    private val vibrator: Vibrator? by lazy {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            (context.getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as? VibratorManager)?.defaultVibrator
+        } else {
+            @Suppress("DEPRECATION")
+            context.getSystemService(Context.VIBRATOR_SERVICE) as? Vibrator
+        }
     }
 
     @Volatile
     var enabled: Boolean = true
 
     /** Rich composition primitives are available (API 31+ with hardware support). */
-    private val composes: Boolean =
+    private val composes: Boolean by lazy {
         Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && (vibrator?.hasVibrator() == true) &&
             runCatching {
                 vibrator?.areAllPrimitivesSupported(
@@ -38,10 +45,11 @@ class Haptics(context: Context) {
                     VibrationEffect.Composition.PRIMITIVE_CLICK,
                 ) == true
             }.getOrDefault(false)
+    }
 
     /** Whether the motor can vary vibration strength, not just on/off -- gates whether
      *  [oneShot]/[waveform] pass through a real amplitude or fall back to DEFAULT_AMPLITUDE. */
-    private val hasAmplitude = vibrator?.hasAmplitudeControl() == true
+    private val hasAmplitude: Boolean by lazy { vibrator?.hasAmplitudeControl() == true }
 
     /** Central gate every effect funnels through: skips entirely if haptics are disabled,
      *  there's no effect to play, or the device genuinely has no vibrator motor. Any
