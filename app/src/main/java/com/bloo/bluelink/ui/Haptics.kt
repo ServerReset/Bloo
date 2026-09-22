@@ -36,9 +36,16 @@ class Haptics(context: Context) {
     @Volatile
     var enabled: Boolean = true
 
-    /** Rich composition primitives are available (API 31+ with hardware support). */
-    private val composes: Boolean by lazy {
-        Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && (vibrator?.hasVibrator() == true) &&
+    /** Rich composition primitives are available (API 31+ with hardware support). The SDK
+     *  check stays eager (so the API-30 `add` guard is visible to lint); the hardware probes
+     *  are synchronous Binder calls deferred to first use. */
+    private val composes: Boolean
+        @androidx.annotation.ChecksSdkIntAtLeast(api = android.os.Build.VERSION_CODES.S)
+        get() = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && compositionHardware
+
+    private val compositionHardware: Boolean by lazy {
+        Build.VERSION.SDK_INT >= Build.VERSION_CODES.R &&
+            (vibrator?.hasVibrator() == true) &&
             runCatching {
                 vibrator?.areAllPrimitivesSupported(
                     VibrationEffect.Composition.PRIMITIVE_TICK,
