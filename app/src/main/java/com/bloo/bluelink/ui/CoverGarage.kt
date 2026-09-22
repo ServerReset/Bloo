@@ -526,11 +526,6 @@ internal fun CompactCar(
     LaunchedEffect(vPager, tiles.size) {
         snapshotFlow { vPager.settledPage }.collect { vWrap.recenterIfNearEdge() }
     }
-    // The `currentTile = { vWrap.currentReal }` lambda was removed. It existed to hand the
-    // live tile index to the right-edge dot rail WITHOUT reading it in this scope, and that
-    // rail is gone (see the bottom of this function). With no consumer it was a closure nobody
-    // called -- and the position it deliberately avoided reading is still not read here, which
-    // is the part that mattered.
     // Per-tile scroll states, keyed by tile name so position persists across
     // pager recycling AND reordering. Tall tiles scroll their own content; the
     // VerticalPager then nested-scrolls to the next/previous tile once a tile is

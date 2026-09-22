@@ -608,13 +608,6 @@ internal val FieldShape: androidx.compose.foundation.shape.RoundedCornerShape
 internal const val MIN_CARD_DP = 320
 
 /**
- * The four car/tile pagers in this file (expanded, collapsed grid, cover
- * car-switch, cover tile-switch) all use the same infinite-wrap scheme: a huge
- * virtual page range (realCount * [WRAP_MULTIPLIER]) started at its midpoint,
- * with each virtual page mapped back onto a real index by modulo. These
- * primitives factor that out so the wrap math lives in exactly one place.
- */
-/**
  * Snackbar payload that carries its own severity, so the host colours each
  * message from ITS OWN type rather than from a shared variable that the next
  * queued message may already have overwritten. [type] matches
@@ -628,52 +621,3 @@ private class BlooSnackbarVisuals(
     override val duration: SnackbarDuration = SnackbarDuration.Short
     override val withDismissAction: Boolean = false
 }
-
-
-// (coverScaled removed: its one caller -- a .padding(coverScaled(16.dp)) on
-// the compact cover layout -- was removed in a later pass and nothing else
-// ever called it, leaving this pure dead weight: a real, working function
-// with a full doc comment for a question nothing in the file asks any more.)
-
-// (cameraBumpPadding removed: it was a thin PaddingValues-rewrap of
-// cutoutClearanceDp()'s own EdgeDp, and its one remaining caller,
-// CoverManageOnPhoneCard, has moved onto CoverScaffold -- which already calls
-// cutoutClearanceDp() directly and merges it with every other inset source via
-// max(), not additively. The "why does this exist at all" explanation that used
-// to live on this wrapper (Samsung flip COVER displays reporting the front
-// camera via displayCutout.boundingRects but exposing zero WINDOW insets for
-// it, so windowInsetsPadding(displayCutout) alone reserves nothing and content
-// sits under the bump) now lives on [cutoutClearanceDp] itself, the function
-// that actually does the work.
-//
-// (CameraEdge / cameraEdgeOf removed: cover-screen cutout avoidance is now driven
-// by native WindowInsets.displayCutout — corner-safe and recomposition-aware —
-// rather than hand-picking a single edge from a boundingRect margin comparison.)
-
-
-
-
-// The cover reuses the phone's pebble CARDS: CompactCar's vertical tile pager
-// renders SinglePebble(section) under LocalForceExpanded/PebbleFillHeight/
-// CoverScrollState, so each pebble draws as an always-expanded, height-filling
-// card. (The bespoke CoverTile toolkit + Cover*Tile faces were removed — they
-// looked off-brand; the cover is back to the polished pebble-card design.)
-
-
-
-
-
-
-// --- Trips (trip history) --------------------------------------------------
-
-
-
-// --- Location -------------------------------------------------------------
-
-
-// --- Photo crop -----------------------------------------------------------
-
-
-// BlooDialog (the legacy second dialog shell) was removed here — every dialog now
-// routes through the single GlassAlertDialog shell above. Its one caller
-// (rename-device) was migrated in the same change.

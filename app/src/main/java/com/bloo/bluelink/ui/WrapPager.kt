@@ -161,7 +161,6 @@ internal fun wrapPageToward(currentPage: Int, pageCount: Int, realCount: Int, ta
 @Stable
 internal class WrapPagerState(val pager: PagerState, val realCount: Int) {
     fun real(page: Int): Int = wrapRealIndex(page, realCount)
-    val currentReal: Int get() = real(pager.currentPage)
 
     // Pages are keyed by their RAW virtual index (`key = { page }`) at every pager call
     // site, never by `real(page)`. Keying by the real item let two virtual copies of the

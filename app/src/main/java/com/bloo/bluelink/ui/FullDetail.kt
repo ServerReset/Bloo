@@ -123,7 +123,7 @@ internal fun VehicleDetailContent(
             // topInset alone, no extra breathing room, so the name sits right at
             // the status bar's own edge instead of noticeably below it.
             Spacer(Modifier.height(topInset))
-            CarHeaderRow(v, state, hideName = true, hazeState = hazeState)
+            CarHeaderRow(v, state, hazeState = hazeState)
             // Single column has no separate "hero info column" to pin anything into --
             // that's a wide/dual-column-only concept (ExpandedCar's own HotspotSlot,
             // with its drag-to-pin secondary slot and "Add a pebble" call to action).
@@ -215,7 +215,7 @@ internal fun ExpandedCar(
     // everywhere else in the app. hideName = true here, matching
     // VehicleDetailContent's own CarHeaderRow call exactly.
     val controls: @Composable ColumnScope.() -> Unit = {
-        CarHeaderRow(v, state, hideName = true, hazeState = hazeState)
+        CarHeaderRow(v, state, hazeState = hazeState)
         CriticalContent(v, state, vm, onCollapse = onCollapse)
         HotspotSlot(v, hotspots, state, vm)
     }
@@ -312,24 +312,16 @@ internal fun ExpandedCar(
 
 
 /**
- * A row of small fact chips (model/powertrain, "updated x ago"). [hideName] is
- * true from every real caller now ([VehicleDetailContent] and [ExpandedCar]
- * both pass it, the car's name is only ever drawn ONCE, live, on the hero
- * photo card, so a second copy here would be the same name twice on screen at
- * once), which makes this row's ENTIRE content the chips, not a name plus a
- * caption underneath it.
+ * A row of small fact chips (model/powertrain, "updated x ago"). The car's name
+ * is only ever drawn ONCE, live, on the hero photo card, so a second copy here
+ * would be the same name twice on screen at once -- this row's entire content
+ * is the chips, not a name plus a caption underneath it.
  *
  * The "expand to full screen" button that used to float here (and "back to
  * all cars"/"flip columns" as separate screen-level floating icons) all moved
  * onto the hero card's own header instead -- see [HeroHeader]'s `expandAction`
  * -- so this row is chips only now, CenterVertically since there is no longer
  * a taller icon beside them to align against.
- *
- * [hideName] itself (and the name [Text] it would draw) stays as an escape
- * hatch rather than being deleted outright -- nothing currently calls it
- * false, but the option to draw a title-sized line above the chips again
- * (with its own top-aligned pairing) is cheap to keep and expensive to
- * reconstruct if a future caller needs it.
  */
 @Composable
 internal fun CarHeaderRow(
@@ -342,7 +334,6 @@ internal fun CarHeaderRow(
      * it actually shows change, and not when some other car's weather ticks.
      */
     state: State<UiState>,
-    hideName: Boolean = false,
     /** The screen's own [HazeState] (see GarageScreen's own `hazeSource` doc) -- threaded
      *  through so these chips get a real backdrop blur instead of the flat-tint fallback
      *  every [GlassSurface] uses with no hazeState in scope. */
@@ -352,19 +343,10 @@ internal fun CarHeaderRow(
     val fetchedAt by remember(v) { derivedStateOf { state.value.fetchedAt(v) } }
     Row(
         Modifier.fillMaxWidth(),
-        verticalAlignment = if (hideName) Alignment.CenterVertically else Alignment.Top,
+        verticalAlignment = Alignment.CenterVertically,
     ) {
         Column(Modifier.weight(1f)) {
-            if (!hideName) {
-                Text(
-                    v.name,
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface,
-                )
-            }
             FlowRow(
-                modifier = Modifier.padding(top = if (hideName) 0.dp else 6.dp),
                 horizontalArrangement = Arrangement.spacedBy(6.dp),
                 verticalArrangement = Arrangement.spacedBy(6.dp),
             ) {

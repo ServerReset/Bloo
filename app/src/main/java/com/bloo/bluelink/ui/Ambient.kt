@@ -950,6 +950,18 @@ internal fun AuroraBackground(
     // draw-phase-only convention as explodeAlpha, so it costs nothing beyond what already redraws.
     val appear = remember { Animatable(0f) }
     LaunchedEffect(Unit) { appear.animateTo(1f, tween(320)) }
+    // Defer the blur itself past the first frame, not just the blob alpha (`appear` above).
+    // The blobs are at alpha 0 for the first ~320ms, so a full-screen 44dp blur of a flat
+    // surface on the very first frame is pure wasted GPU work -- and on a cold start that
+    // first frame is the one that decides "how long did the app take to open". A flat
+    // surface blurred is the same flat surface and the blobs aren't visible yet, so the
+    // blur snapping on one frame in is invisible. (This is the same "settled" trick the
+    // lock screen's blur already uses; Aurora just never got it.)
+    var blurOn by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) {
+        withFrameNanos { }
+        blurOn = true
+    }
     // Read inside drawBehind, not here. p1/p2/p3 and the tilt were already moved into draw
     // scope; this one stayed in composition AND fed the blur radius argument, so every frame of
     // the refresh spring recomposed AuroraBackground and rebuilt the full-screen RenderEffect --
@@ -1011,7 +1023,7 @@ internal fun AuroraBackground(
             // A CONSTANT radius. Animating it meant rebuilding the window's RenderEffect on
             // every frame of the spring; the pulse is carried by the blobs' own alpha, size and
             // spread below, which are draw-phase and cost nothing to animate.
-            .blur(44.dp, edgeTreatment = BlurredEdgeTreatment.Unbounded)
+            .then(if (blurOn) Modifier.blur(44.dp, edgeTreatment = BlurredEdgeTreatment.Unbounded) else Modifier)
             .drawBehind {
                 drawRect(scheme.surface)
                 fun blob(c: Color, fx: Float, fy: Float, r: Float) =
