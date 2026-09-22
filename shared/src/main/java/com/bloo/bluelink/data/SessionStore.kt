@@ -82,6 +82,16 @@ class SessionStore(private val context: Context) {
     }
 
     /**
+     * Force this store's first DataStore read now -- same file-open + protobuf-parse cost as
+     * [SettingsStore.warmUp], moved onto the startup warm-up thread. [load] is the first thing
+     * the cold-start auto-login does after the cached garage, so paying the file-open here takes
+     * that disk read out of the garage path entirely.
+     */
+    suspend fun warmUp() {
+        runCatching { context.dataStore.data.first() }
+    }
+
+    /**
      * Parses the CSV [brandsKey] value back into [Brand] enum values, dropping (via
      * `mapNotNull` + `runCatching`) any stored name that no longer maps to a known
      * [Brand] constant instead of throwing.

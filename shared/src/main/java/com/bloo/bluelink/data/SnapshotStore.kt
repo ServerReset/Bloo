@@ -281,6 +281,17 @@ class SnapshotStore(private val context: Context) {
     }
 
     /**
+     * Force this store's first DataStore read now -- the same file-open + protobuf-parse cost
+     * [SettingsStore.warmUp] and [StatusCache.warmUp] exist for, moved onto the startup warm-up
+     * thread. [current] is the first thing the cold-start garage publish reads, so paying the
+     * file-open here (over a second earlier, in the background) takes that disk read out of the
+     * garage path entirely.
+     */
+    suspend fun warmUp() {
+        runCatching { context.snapshotDataStore.data.first() }
+    }
+
+    /**
      * Replace the vehicle LIST while keeping each surviving car's last-known status.
      *
      * For the "we just re-fetched the account's vehicles" case, which knows every

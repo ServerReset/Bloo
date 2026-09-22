@@ -136,6 +136,11 @@ class BlooApplication : Application(), Configuration.Provider {
                     kotlinx.coroutines.runBlocking {
                         com.bloo.bluelink.data.SettingsStore(applicationContext).warmUp()
                         com.bloo.bluelink.data.StatusCache(applicationContext).warmUp()
+                        // The snapshot (cached garage) and session stores feed the two reads
+                        // publishCachedGarage/loadGarageInner make right after this, so their
+                        // file-open belongs here too -- a warm read is ~free vs a cold one.
+                        com.bloo.bluelink.data.SnapshotStore(applicationContext).warmUp()
+                        com.bloo.bluelink.data.SessionStore(applicationContext).warmUp()
                     }
                 }
             }
