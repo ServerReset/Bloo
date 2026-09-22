@@ -40,7 +40,7 @@ object AutoLockEventNotifier {
 
     /** The bundled car-door-lock clip as a notification-sound URI. */
     fun carLockSound(context: Context): Uri =
-        "android.resource://${context.packageName}/raw/car_door_lock".toUri()
+        "android.resource://${context.packageName}/${R.raw.car_door_lock}".toUri()
 
     private fun ensureChannel(context: Context) {
         if (channelEnsured) return
