@@ -21,18 +21,16 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
-import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -60,7 +58,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
@@ -223,61 +220,69 @@ internal fun StatusHeaderRow(icon: ImageVector, tint: Color, title: String, stat
 }
 
 /**
- * Settings' own in-content header: title + a short context line, using
- * headlineSmall/Bold for the name (bodySmall/onSurfaceVariant subtitle) --
- * matching the base [PebbleShell] scales its own hero title from, not
- * [CarHeaderRow][com.bloo.bluelink.ui]'s own titleLarge name text.
- *
- * The "Settings" title is real, static content here -- there is no floating corner badge that
- * takes over once it scrolls out of view any more (there used to be, on every screen that had
- * one; removed as unwanted UI).
+ * Settings' page-top hero card: the app's own identity (name, version/build,
+ * update status) in the same big-number hero language the garage's photo hero
+ * uses for %/range. It plays the role a car page's hero photo plays, so the
+ * Settings page reads as one standard page in the pager -- hero up top, cards
+ * below -- instead of a header bolted onto a grid.
  */
 @Composable
-internal fun SettingsHeaderRow(state: UiState, compact: Boolean = false) {
-    // Entrance animation: the page header slides up and fades in (same motion
-    // the empty screen and hero use) instead of appearing with no motion --
-    // "the settings header is not animated".
-    val headerAppear = remember { Animatable(0f) }
-    LaunchedEffect(Unit) { headerAppear.animateTo(1f, tween(400)) }
-    Column(
-        Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 4.dp)
-            .graphicsLayer {
-                alpha = headerAppear.value
-                translationY = (1f - headerAppear.value) * 12.dp.toPx()
-            },
+internal fun SettingsHeroCard(state: UiState, vm: AppViewModel, compact: Boolean) {
+    val number = vm.currentBuildNumber
+    val label = com.bloo.bluelink.data.buildLabel(number, com.bloo.bluelink.BuildConfig.BUILD_BRANCH)
+    val carCount = state.vehicles.size
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(if (compact) 18.dp else 22.dp),
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            // Tonal icon badge, the same visual language every SettingsCard
-            // header uses -- the page top previously stood bare next to cards
-            // that all carry this badge, reading as a leftover plain heading.
-            Box(
-                Modifier
-                    .size(if (compact) 36.dp else 46.dp)
-                    .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.85f)),
-                contentAlignment = Alignment.Center,
-            ) {
-                Icon(
-                    Icons.Filled.Settings,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onSecondaryContainer,
-                )
+        Column(Modifier.padding(if (compact) 16.dp else 20.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(
+                    Modifier
+                        .size(if (compact) 40.dp else 48.dp)
+                        .clip(CircleShape)
+                        .background(MaterialTheme.colorScheme.secondaryContainer),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        Icons.Filled.Settings,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                    )
+                }
+                Spacer(Modifier.width(12.dp))
+                Column(Modifier.weight(1f)) {
+                    Text(
+                        "Bloo",
+                        style = if (compact) MaterialTheme.typography.titleLarge else MaterialTheme.typography.headlineSmall,
+                        fontWeight = FontWeight.Bold,
+                    )
+                    Text(
+                        if (carCount == 0) "No vehicles yet" else "$carCount car${if (carCount == 1) "" else "s"}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                UpdateStatusChip(state)
             }
-            Column {
-            Text(
-                "Settings",
-                style = if (compact) MaterialTheme.typography.titleLarge else MaterialTheme.typography.headlineSmall,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSurface,
-            )
-            val carCount = state.vehicles.size
-            Text(
-                "$carCount car${if (carCount == 1) "" else "s"}",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+            Spacer(Modifier.height(if (compact) 12.dp else 16.dp))
+            // The build number is the app's real version here (versionName stays
+            // "0.1" on purpose), so it carries the hero stat the same way a car's
+            // charge % or range does -- with the full label as its caption.
+            Row(verticalAlignment = Alignment.Bottom) {
+                RollingNumber(
+                    text = if (number > 0) "$number" else "dev",
+                    style = MaterialTheme.typography.displaySmall,
+                    fontWeight = FontWeight.Bold,
+                )
+                Spacer(Modifier.width(10.dp))
+                Text(
+                    label,
+                    modifier = Modifier.padding(bottom = 6.dp),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
             }
         }
     }

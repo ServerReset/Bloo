@@ -289,7 +289,9 @@ internal fun CompactGarage(state: State<UiState>, vm: AppViewModel, appearance: 
             // purely to stop two DIFFERENT virtual pages from ever resolving to the
             // same real item while simultaneously composed.
             beyondViewportPageCount = ((total - 1) / 2).coerceIn(0, 1),
-            key = { page -> wrap.keyFor(page, ((total - 1) / 2).coerceIn(0, 1)) },
+            // Raw page index as the key (never the modulo real item) -- see GarageScreen's
+            // own key comment for the crash this avoids.
+            key = { page -> page },
         ) { page ->
             val real = realCar(page)
             if (real == slots) {
@@ -656,11 +658,11 @@ internal fun CompactCar(
             // sections (tiles.size <= 2, e.g. most sections hidden) would compose the same
             // tile twice at once through the exact wrap-collision this whole fix targets.
             // Most cars have well more than 2 tiles, so this is a rare-but-real edge rather
-            // than the everyday case the horizontal car pager's own fix is. NOT tied to
-            // keyFor's own key choice any more -- see keyFor's doc for why it always uses the
-            // raw page index now regardless of this value.
+            // than the everyday case the horizontal car pager's own fix is.
             beyondViewportPageCount = ((tiles.size - 1) / 2).coerceIn(0, 1),
-            key = { page -> vWrap.keyFor(page, ((tiles.size - 1) / 2).coerceIn(0, 1)) },
+            // Raw page index as the key (never the modulo real item) -- see GarageScreen's
+            // own key comment for the crash this avoids.
+            key = { page -> page },
         ) { page ->
             val i = vWrap.real(page)
             val tileScroll = tileScrollStates.getOrPut(tiles[i]) { ScrollState(0) }

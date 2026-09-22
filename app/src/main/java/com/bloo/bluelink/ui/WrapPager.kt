@@ -163,36 +163,11 @@ internal class WrapPagerState(val pager: PagerState, val realCount: Int) {
     fun real(page: Int): Int = wrapRealIndex(page, realCount)
     val currentReal: Int get() = real(pager.currentPage)
 
-    /**
-     * The [HorizontalPager]/[VerticalPager] `key` for [page]: always the raw virtual page
-     * index, deliberately NEVER [real] any more.
-     *
-     * This file spent three separate attempts trying to key by [real] instead -- letting
-     * Compose treat every virtual copy of the same real item as ONE composition slot, so a
-     * [recenterIfNearEdge] jump could reuse it (scroll position, `remember` state, no fresh
-     * enter animation) instead of composing a brand-new one. Each attempt computed a
-     * theoretically-safe threshold for when that's collision-free (a pigeonhole argument over
-     * how many virtual pages this pager can EVER hold composed at once), and each one shipped
-     * a real, reported "Key already used" crash anyway, on a different [realCount] each time --
-     * most recently even after deriving [beyondViewportPageCount] itself from the same margin
-     * (see the removed `safeBeyond`, once here). That is three independent, wrong answers for
-     * exactly how much wider than `perPage + 2*beyondViewportPageCount` Compose's Pager can
-     * transiently make its own composed window during a settle/recenter -- without a device or
-     * emulator to actually observe that window (this sandbox has neither), there is no fourth
-     * guess worth shipping. A crash is categorically worse than the jank this was trying to
-     * remove, so the trade is no longer close.
-     *
-     * The raw page index is always unique per virtual page by construction -- Compose's own
-     * pager measure loop invokes this at most once per virtual page per pass, full stop, with
-     * no dependency on any arithmetic this file gets to guess at. [recenterIfNearEdge] still
-     * does its job (keeping the virtual page counter from drifting toward either end of the
-     * -- large but finite -- [WRAP_MULTIPLIER]-sized range), it just composes a fresh page
-     * when it jumps, the same "pre-existing, uncrashable" behaviour this file's own history
-     * (see [WRAP_MULTIPLIER]'s doc) already describes from before real-index keying was ever
-     * tried the first time. [RECENTER_MARGIN_CYCLES] keeps that jump rare in practice (tens of
-     * same-direction swipes per occurrence, not a per-swipe cost).
-     */
-    fun keyFor(page: Int, beyondViewportPageCount: Int, perPage: Int = 1): Any = page
+    // Pages are keyed by their RAW virtual index (`key = { page }`) at every pager call
+    // site, never by `real(page)`. Keying by the real item let two virtual copies of the
+    // same item share one composition slot and crashed ("Key already used"); the raw
+    // index is unique by construction. [recenterIfNearEdge] composes a fresh page when it
+    // jumps, which is rare and uncrashable -- see [WRAP_MULTIPLIER]'s own doc.
     // settledReal was removed: zero readers. Both places that care about a SETTLE go through
     // `snapshotFlow { pager.settledPage }.collect { real(it) }` instead (GarageScreen's and
     // CompactGarage's pager-settle effects), because they need the settle as an EVENT, not as

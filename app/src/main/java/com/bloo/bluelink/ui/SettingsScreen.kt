@@ -163,8 +163,8 @@ import androidx.compose.runtime.rememberCoroutineScope
  * 14.6k-line monolith), and then had its pure search/index logic, its card
  * bodies, its search surface and its settings-widget cluster extracted into
  * SettingsIndex.kt, SettingsSearch.kt, SettingsCards.kt and
- * SettingsWidgets.kt. What remains is the screen itself: the floating
- * SettingsHeaderRow, the simple/advanced mode harness and its stagger, and
+ * SettingsWidgets.kt. What remains is the screen itself: the page hero card
+ * (SettingsHeroCard), the simple/advanced mode harness and its stagger, and
  * the one long scrolling [Column] of [SettingsCard]s that is what this file
  * exists to own.
  *
@@ -338,11 +338,12 @@ internal fun SettingsScreen(
             item(span = StaggeredGridItemSpan.FullLine) {
                 Spacer(Modifier.height(topInset + (if (compact) 42.dp else 56.dp)))
             }
-            // Settings' own in-content header -- same visual weight a car page's own
-            // CarHeaderRow has, so this reads as another page in the pager instead of
-            // a differently-designed screen bolted on.
+            // Settings' own page hero -- the same role a car page's hero photo card
+            // plays (a glanceable top card), here showing the app identity, version and
+            // build instead of a car's photo and charge. Makes this read as another
+            // standard page in the pager rather than a differently-designed screen.
             item(span = StaggeredGridItemSpan.FullLine) {
-                SettingsHeaderRow(state, compact)
+                SettingsHeroCard(state, vm, compact)
             }
             run {
                 val advanced = state.settingsMode == "advanced"
@@ -2042,8 +2043,8 @@ internal fun SettingsScreen(
         // Same blurred scrim GarageScreen uses behind the system clock/battery
         // icons -- this content scrolls behind the status bar too (see the
         // No more floating "Settings" corner badge -- removed as unwanted UI (see the floating
-        // car-name pill's own removal). The "Settings" title is real, static content on
-        // SettingsHeaderRow now; it just scrolls off with the rest of the grid.
+        // car-name pill's own removal). The "Bloo" title is real, static content on
+        // SettingsHeroCard now; it just scrolls off with the rest of the grid.
         //
         // No StatusBarScrim or floating back-arrow here at all any more: this page always
         // sits inside GarageScreen's/CompactGarage's own HorizontalPager now, which already
