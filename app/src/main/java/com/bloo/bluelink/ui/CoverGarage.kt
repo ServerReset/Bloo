@@ -305,14 +305,22 @@ internal fun CompactGarage(state: State<UiState>, vm: AppViewModel, appearance: 
                 // one-time "built for a taller phone" nudge shows here too, the
                 // only place cover Settings is reached now.
                 //
-                // Deferred until the pager actually settles here -- same reasoning and
-                // report as GarageScreen's matching gate (its own doc has the full
-                // history): CoverSettingsGate's SettingsScreen is the heaviest page in
-                // this wrap too, and composing it as a pre-warmed neighbour paid for a
-                // full LazyVerticalStaggeredGrid build on the very first car-switch
-                // swipe of a single-car account.
+                // Deferred until the pager actually settles here, OR until this page
+                // becomes the pager's own `currentPage` -- same fix and reasoning as
+                // GarageScreen's matching gate (its own doc has the full history): without
+                // the `currentPage` check, an active drag onto this page showed as a blank
+                // void (the app's own background alone) until release, since `settledPage`
+                // only updates on settle. `currentPage` flips as soon as the drag crosses
+                // the halfway point, and only changes once per crossing (not every drag
+                // frame), so this is still a plain state read here, not inside
+                // graphicsLayer{}. Still deferred while this page is merely the
+                // beyondViewportPageCount=1 pre-warmed NEIGHBOUR of whatever page is
+                // actually current: CoverSettingsGate's SettingsScreen is the heaviest page
+                // in this wrap too, and composing it as a pre-warmed neighbour paid for a
+                // full LazyVerticalStaggeredGrid build on the very first car-switch swipe of
+                // a single-car account.
                 Box(Modifier.fillMaxSize().pagerDepth(pager, page)) {
-                    if (onSettingsPageSlot) {
+                    if (onSettingsPageSlot || pager.currentPage == page) {
                         CoverSettingsGate(vm)
                     }
                 }

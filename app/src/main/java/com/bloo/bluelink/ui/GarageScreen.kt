@@ -633,18 +633,28 @@ internal fun GarageScreen(
                                 // single column at this page's width (one car-column)
                                 // instead of spreading wider.
                                 //
-                                // Deferred until the pager actually SETTLES on Settings:
-                                // SettingsScreen is the single heaviest page in the wrap
-                                // (a whole LazyVerticalStaggeredGrid of cards), and it sits
-                                // exactly where the first car-swipe needs it as its
-                                // beyondViewportPageCount=1 pre-warmed neighbour. Composing it
-                                // there meant every cold-start's FIRST swipe paid for a full
-                                // SettingsScreen build on the drag frame -- the "switching cards
-                                // janks for a second, then it's fine" report. Compose nothing
-                                // (the app's own gradient shows through) until the user is
-                                // actually on Settings; the settle swap is a one-time cost on a
-                                // screen the user chose to visit, not a tax on every car-swipe.
-                                if (onSettingsPageSlot) {
+                                // Deferred until the pager actually SETTLES on Settings, OR
+                                // (added after this page showed as a blank void with just the
+                                // app's own background visible through an active drag -- "it
+                                // doesn't show until you let go") until this page becomes the
+                                // pager's own `currentPage`. `currentPage` flips as soon as the
+                                // drag crosses the halfway point toward this page, well before
+                                // release/settle -- unlike `settledPage`, it's a plain state
+                                // read here (not inside graphicsLayer{}), but it only changes
+                                // ONCE per crossing, not every drag frame, so this does not
+                                // reintroduce a per-frame recompose of SettingsScreen.
+                                //
+                                // Still deferred (neither condition true) while this page is
+                                // merely the beyondViewportPageCount=1 pre-warmed NEIGHBOUR of
+                                // whatever page is actually current -- SettingsScreen is the
+                                // single heaviest page in the wrap (a whole
+                                // LazyVerticalStaggeredGrid of cards), and composing it just for
+                                // being pre-warmed meant every cold-start's FIRST swipe paid for
+                                // a full SettingsScreen build on the drag frame -- the "switching
+                                // cards janks for a second, then it's fine" report. Compose
+                                // nothing (the app's own gradient shows through) until the drag
+                                // has actually crossed onto this page.
+                                if (onSettingsPageSlot || pager.currentPage == page) {
                                     SettingsScreen(vm)
                                 }
                             } else if (count == 0) {
