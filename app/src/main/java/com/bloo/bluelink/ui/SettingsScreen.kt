@@ -44,10 +44,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.pager.HorizontalPager
-import androidx.compose.foundation.lazy.staggeredgrid.LazyVerticalStaggeredGrid
-import androidx.compose.foundation.lazy.staggeredgrid.StaggeredGridCells
-import androidx.compose.foundation.lazy.staggeredgrid.StaggeredGridItemSpan
-import androidx.compose.foundation.lazy.staggeredgrid.rememberLazyStaggeredGridState
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -251,13 +249,10 @@ internal fun SettingsScreen(
     // below (Logs card's Copy, Debug panel's report copy).
     val clipboardScope = rememberCoroutineScope()
     val canBio = remember { vm.canUseBiometrics() }
-    // LazyVerticalStaggeredGrid, not a plain scrolling Column -- see the grid's
-    // own comment below for why. StaggeredGridCells.Adaptive naturally resolves
-    // to exactly one column on a phone-width screen (the same visual result the
-    // old Column gave every existing install) and multiple side by side once
-    // there's genuinely room, so this one grid covers both instead of two
-    // separate layouts to keep in sync.
-    val settingsGridState = rememberLazyStaggeredGridState()
+    // LazyColumn, not a plain scrolling Column -- see the list's own comment
+    // below for why (many more, and heavier, collapsible sections than a car
+    // page's own pebble list).
+    val settingsListState = rememberLazyListState()
     var pickTarget by remember { mutableStateOf<String?>(null) }
     var cropUri by remember { mutableStateOf<Uri?>(null) }
     // System photo picker (crash-free), then our own Compose crop step.
@@ -285,58 +280,56 @@ internal fun SettingsScreen(
   // same pattern GarageScreen.kt uses for its own two pagers. See StatusBarScrim's
   // own doc for why plain Modifier.blur never worked here.
   BackdropHost {
-        // A real multi-column grid on wide screens (tablets, landscape, foldables
-        // unfolded) instead of one narrow centred column with empty space on
-        // both sides -- Adaptive(380.dp) resolves to exactly one column at
-        // ordinary phone widths (the same layout every existing install already
-        // had) and grows to two or three side by side once there's genuinely
-        // room, so cards actually use the space a tablet has instead of just
-        // stretching the same single stack wider. Staggered (masonry), not a
-        // fixed-row grid: every SettingsCard is independently collapsible, so
-        // neighbouring cards are almost never the same height, and a fixed-row
-        // grid would force every card in a row to the tallest one's height --
-        // exactly the "wrong tool" a masonry layout exists to avoid.
+        // A single scrolling column, exactly the shape VehicleDetailContent's own
+        // (CarHeaderRow + PebbleList) page is -- Settings is a page in the same car
+        // pager, not a differently-built screen, and the pager already pins every one
+        // of its pages (this one included) to a single car-column's width, so the
+        // wide-screen multi-column masonry grid this used to be had no width left to
+        // ever actually spread into. LazyColumn instead of a plain Column for the same
+        // reason a car page could get away with a plain one and this can't: Settings
+        // holds many more, and heavier, independently-collapsible sections than a
+        // single car's pebble list, so composing every one of them unconditionally
+        // (a plain Column's only option) would be real, avoidable work paid on every
+        // visit regardless of which sections are actually open.
         Box(
             Modifier
                 .fillMaxSize(),
             contentAlignment = Alignment.TopCenter
         ) {
-        // Hoisted OUT of the grid's item content, which is not a composable scope and so could
+        // Hoisted OUT of the list's item content, which is not a composable scope and so could
         // never have called this. That hoist is what lets an advanced-only card be skipped as a
-        // grid ITEM rather than merely rendered empty -- see rememberAdvancedVisibility for why
-        // an empty item is not free (it keeps its slot, and the grid's verticalItemSpacing with
+        // list ITEM rather than merely rendered empty -- see rememberAdvancedVisibility for why
+        // an empty item is not free (it keeps its slot, and the list's own item spacing with
         // it, which is the gap left behind all over simple mode).
         val advVisible = rememberAdvancedVisibility(state.settingsMode == "advanced", ADVANCED_CARD_COUNT)
-        // Same reason advVisible itself lives out here and not in the grid content below:
+        // Same reason advVisible itself lives out here and not in the list content below:
         // rememberGridItemVisibility calls remember(), so it needs a real composable scope,
-        // which LazyStaggeredGridScope's content lambda is not. One transition per gated
+        // which LazyListScope's content lambda is not. One transition per gated
         // card, hoisted together so none of the five item{} sites below has to break that rule.
         val advTransition0 = rememberGridItemVisibility(advVisible[0])
         val advTransition1 = rememberGridItemVisibility(advVisible[1])
         val advTransition2 = rememberGridItemVisibility(advVisible[2])
-        LazyVerticalStaggeredGrid(
-            columns = StaggeredGridCells.Adaptive(minSize = 380.dp),
-            state = settingsGridState,
+        LazyColumn(
+            state = settingsListState,
             modifier = Modifier
                 .widthIn(max = 1100.dp)
                 .fillMaxWidth()
                 .hazeSource(hazeState)
                 .padding(horizontal = if (compact) 10.dp else 16.dp),
-            verticalItemSpacing = if (compact) 8.dp else 12.dp,
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalArrangement = Arrangement.spacedBy(if (compact) 8.dp else 12.dp),
         ) {
             // Content scrolls behind the status bar; clear the floating back-arrow/
-            // segmented-toggle bar above. Full-line: this is the grid's own leading
-            // spacer, not a card, so it needs the full row rather than being squeezed
-            // into one column.
-            item(span = StaggeredGridItemSpan.FullLine) {
+            // segmented-toggle bar above. This is the list's own leading spacer, not
+            // a card, but a single-column list needs no separate "full width" marker
+            // for that the way the old grid's span did.
+            item {
                 Spacer(Modifier.height(topInset + (if (compact) 42.dp else 56.dp)))
             }
             // Settings' own page hero -- the same role a car page's hero photo card
             // plays (a glanceable top card), here showing the app identity, version and
             // build instead of a car's photo and charge. Makes this read as another
             // standard page in the pager rather than a differently-designed screen.
-            item(span = StaggeredGridItemSpan.FullLine) {
+            item {
                 SettingsHeroCard(state, vm, compact)
             }
             run {
@@ -364,9 +357,9 @@ internal fun SettingsScreen(
             // identical trap; this was the same mistake, once, here.
             //
             // Each card below is its own `item {}` rather than a bare child of a Column --
-            // see the LazyVerticalStaggeredGrid this whole sequence now lives in, above --
-            // so the grid can place it in whichever column has room, independent of every
-            // other card's height. `advanced`, declared here in this enclosing `run {}`,
+            // see the LazyColumn this whole sequence now lives in, above -- so only the
+            // cards actually scrolled into view are ever composed, same as every other
+            // lazy list in the app. `advanced`, declared here in this enclosing `run {}`,
             // stays in scope for all of them exactly as it did before.
             item {
             // Accounts (one per brand; Hyundai + Genesis can both be signed in).
@@ -1773,9 +1766,9 @@ internal fun SettingsScreen(
                     }
                 }
             }
-          // Full-line, same reason as the leading spacer above: this is the
-          // grid's own trailing footer, not a card.
-          item(span = StaggeredGridItemSpan.FullLine) {
+          // Same reason as the leading spacer above: this is the list's own
+          // trailing footer, not a card.
+          item {
           Column {
           // About / installed build — the one place the phone shows which build it's
           // running (the update tile shows the AVAILABLE build; this shows the current

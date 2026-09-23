@@ -101,14 +101,14 @@ internal const val ADVANCED_CARD_COUNT = 3
 
 /**
  * The same staggered reveal as [staggeredAdvancedVisible], but for ALL advanced cards at once,
- * hoisted OUT of the lazy grid's item content and into the screen's own composition.
+ * hoisted OUT of the lazy list's item content and into the screen's own composition.
  *
  * That hoist is the point. Read from inside `item { AnimatedVisibility(visible = ...) }`, the
  * visibility can only ever hide a card's CONTENT -- the `item {}` itself still occupies a slot
- * in the LazyVerticalStaggeredGrid, and the grid still applies its `verticalItemSpacing` around
+ * in the LazyColumn, and the list still applies its own item spacing around
  * that now zero-height slot. Every advanced-only card left a phantom gap behind in simple mode,
  * which is what "bad spacing when pebbles are hidden" is: not one wrong padding, but eight
- * invisible items each holding a grid gap open. Returned as a plain list the grid's DSL can
+ * invisible items each holding a list gap open. Returned as a plain list the list's DSL can
  * read, the screen can decide not to emit the item at all -- no slot, no spacing, no gap.
  */
 @Composable

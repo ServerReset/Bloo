@@ -177,7 +177,7 @@ internal fun CompactGarage(state: State<UiState>, vm: AppViewModel, appearance: 
     val locked by remember { derivedStateOf { state.value.locked } }
     // Settled-on-Settings signal -- see GarageScreen's matching read for why this defers
     // CoverSettingsGate's own SettingsScreen body until the pager actually settles there,
-    // instead of paying for a full LazyVerticalStaggeredGrid build as its pre-warmed
+    // instead of paying for a full LazyColumn build as its pre-warmed
     // neighbour on the FIRST car-switch swipe of a single-car cover account.
     val onSettingsPageSlot by remember { derivedStateOf { state.value.onSettingsPageSlot } }
     val count = vehicles.size
@@ -317,7 +317,7 @@ internal fun CompactGarage(state: State<UiState>, vm: AppViewModel, appearance: 
                 // beyondViewportPageCount=1 pre-warmed NEIGHBOUR of whatever page is
                 // actually current: CoverSettingsGate's SettingsScreen is the heaviest page
                 // in this wrap too, and composing it as a pre-warmed neighbour paid for a
-                // full LazyVerticalStaggeredGrid build on the very first car-switch swipe of
+                // full LazyColumn build on the very first car-switch swipe of
                 // a single-car account.
                 Box(Modifier.fillMaxSize().pagerDepth(pager, page)) {
                     if (onSettingsPageSlot || pager.currentPage == page) {

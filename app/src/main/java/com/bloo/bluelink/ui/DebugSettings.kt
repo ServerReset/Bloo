@@ -212,7 +212,7 @@ fun DebugSettingsPanel(
         Spacer(Modifier.height(SettingsGapRow))
 
         // heightIn is NOT optional here. This panel is rendered inside the Settings screen's
-        // LazyVerticalStaggeredGrid item{}, which measures its content with an UNBOUNDED max
+        // LazyColumn item{}, which measures its content with an UNBOUNDED max
         // height, and a vertically scrollable component measured with an infinite max height
         // throws outright -- so entering Advanced mode, which is the only way this card is
         // composed, crashed the screen every time. The Logs card already caps itself at

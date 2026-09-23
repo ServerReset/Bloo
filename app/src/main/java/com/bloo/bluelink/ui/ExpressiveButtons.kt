@@ -34,7 +34,7 @@ import kotlinx.coroutines.launch
  *
  * - [SafeExpansiveButton] -- the general one, used by ~80 call sites all over the app. Paint
  *   only: it scales what is DRAWN and never touches layout, so it is safe absolutely anywhere,
- *   including inside a `LazyVerticalStaggeredGrid` item (which every Settings card is).
+ *   including inside a `LazyColumn` item (which every Settings card is).
  * - [ExpressiveButtonGroup] -- for buttons that sit side by side and should genuinely shove
  *   each other around on press. Real widths, but redistributed WITHIN the group, whose own
  *   outer footprint never changes.
@@ -44,8 +44,8 @@ import kotlinx.coroutines.launch
  * Growing one button's real width pushes its neighbours only because the size change propagates
  * outward -- the Row remeasures, then its parent, and so on up. That is the whole point of the
  * effect and also exactly what makes it dangerous applied indiscriminately: on the Settings
- * screen these buttons live inside `LazyVerticalStaggeredGrid` items, and an item that changes
- * its own measured size during a scroll is a well-known way to crash a lazy staggered grid
+ * screen these buttons live inside `LazyColumn` items, and an item that changes
+ * its own measured size during a scroll is a well-known way to crash a lazy layout
  * (reported here as "the logs pebble crashes when scrolled over" -- the Logs card's
  * Copy/Clear/Show buttons are these). A second attempt cached the natural width in a
  * `mutableIntStateOf` and wrote it from inside the measure block; writing snapshot state during

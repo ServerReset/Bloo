@@ -1246,8 +1246,8 @@ internal fun SplitExpandButton(
     // buttons that should physically shove each other on press (they are a single connected
     // pill), and the group is what makes that safe -- it redistributes width BETWEEN the halves
     // so its own outer size never changes, which matters because this header also renders inside
-    // Settings' LazyVerticalStaggeredGrid items, where a size change during scroll crashes the
-    // grid. See ExpressiveButtons.kt for the full why.
+    // Settings' LazyColumn items, where a size change during scroll crashes a lazy layout.
+    // See ExpressiveButtons.kt for the full why.
     ExpressiveButtonGroup(
         modifier = modifier
             // A fixed 52dp target (the old content-driven ~40dp pill read as

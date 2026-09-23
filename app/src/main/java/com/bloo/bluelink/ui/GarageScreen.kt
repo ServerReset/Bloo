@@ -419,8 +419,8 @@ internal fun GarageScreen(
                 // always rendered at exactly one car-column's width (see
                 // `pageWidth` below) -- so on a wide/multi-car screen Settings is
                 // never wider than one car's column, however many share the
-                // screen with it, and SettingsScreen's own LazyVerticalStaggeredGrid
-                // naturally collapses to a single column at that width.
+                // screen with it, and SettingsScreen's own LazyColumn is a single
+                // column at any width to begin with.
                 //
                 // ONE ITEM PER PAGE -- a car, the status card with none, or (index
                 // `slots`) the folded-in Settings page -- exactly the model a phone
@@ -629,9 +629,9 @@ internal fun GarageScreen(
                             if (real == slots) {
                                 // The folded-in Settings item, always the last one --
                                 // it's a page in this pager, not a route, so its own
-                                // LazyVerticalStaggeredGrid naturally collapses to a
-                                // single column at this page's width (one car-column)
-                                // instead of spreading wider.
+                                // LazyColumn is already a single column at this page's
+                                // width (one car-column) regardless of how wide the
+                                // screen sharing it is.
                                 //
                                 // Deferred until the pager actually SETTLES on Settings, OR
                                 // (added after this page showed as a blank void with just the
@@ -648,7 +648,7 @@ internal fun GarageScreen(
                                 // merely the beyondViewportPageCount=1 pre-warmed NEIGHBOUR of
                                 // whatever page is actually current -- SettingsScreen is the
                                 // single heaviest page in the wrap (a whole
-                                // LazyVerticalStaggeredGrid of cards), and composing it just for
+                                // LazyColumn of cards), and composing it just for
                                 // being pre-warmed meant every cold-start's FIRST swipe paid for
                                 // a full SettingsScreen build on the drag frame -- the "switching
                                 // cards janks for a second, then it's fine" report. Compose
