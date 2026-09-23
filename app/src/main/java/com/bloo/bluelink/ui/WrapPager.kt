@@ -20,7 +20,6 @@ import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
@@ -37,51 +36,72 @@ import androidx.compose.ui.unit.dp
 import kotlin.math.floor
 import kotlin.math.abs
 
-// The long history of this constant and the keying scheme it goes with (kept because
-// the reasoning matters more than the number, and because this has genuinely gone wrong
-// in more than one distinct way):
+// Was 1000, "big enough that a user could never swipe to the edge in one
+// sitting" -- which meant every DISTINCT virtual page a user ever swiped onto
+// became its own permanent composition (a whole SettingsScreen, a whole
+// VehicleDetailContent) with no explicit `key` to let Compose reuse one across
+// wraps, retained for the life of the process. Reported directly as a real
+// OOM (heap exhausted shortly after unlock, a trivial 32-byte allocation the
+// one that finally failed). A first fix (`key = { page -> wrap.real(page) }`,
+// letting every virtual copy of the same real item share one identity) was
+// tried and reverted -- it collided ("Key \"1\" was already used") because
+// TWO simultaneously-composed virtual pages can map to the SAME real index
+// whenever `realCount` is small relative to how many pages a pager holds
+// alive at once (beyondViewportPageCount, and perPage on the multi-column
+// pager) -- not a HorizontalPager internals mystery, just this fix skipping
+// that collision check the first time around. A follow-up mitigation just
+// shrunk this constant to 30, capping the leak's ceiling instead of removing
+// it -- still real growth, just bounded, and a real (if very unlikely) dead
+// end once a user actually swiped that far. Real-index keying, collision
+// check and all, was tried a second time (gated on the exact inequality that
+// makes it collision-free) and STILL crashed a different way ("Key 1 was
+// already used") on a real device; it was abandoned for good after that and
+// every call site now keys by the raw virtual page index instead (see
+// [WrapPagerState] below) -- unconditionally safe, at the cost of a recenter
+// jump no longer reusing a composition the way real-index keying would have.
 //
-// v1: virtual range = realCount x 1000, raw-index keys. Every DISTINCT virtual page a
-// user ever swiped onto became its own permanent SaveableStateHolder entry, never
-// reused, retained for the life of the pager's composition -- a real OOM (heap
-// exhausted shortly after unlock) on a live device.
+// This is the actual fix: recenter ([WrapPagerState.recenterIfNearEdge],
+// called after every settle) silently jumps back toward the middle once the
+// pager drifts within [RECENTER_MARGIN_CYCLES] real-item-widths of either
+// edge -- the destination page has the IDENTICAL real index, so the content
+// shown doesn't change, and the pager keeps having room to go. This is what
+// actually bounds the leak (the old huge-range trick just hoped nobody
+// swiped far enough to need bounding at all). A recenter jump IS a fresh
+// composition of that destination page now (raw-index keying, immediately
+// above, is what makes that safe rather than a repeat of the "Key already
+// used" crash) -- a real if minor cost, paid rarely enough (see
+// [RECENTER_MARGIN_CYCLES]'s own doc) that it isn't worth trading back for.
 //
-// v2: real-index keys (`key = { page -> wrap.real(page) }`), so every virtual copy of
-// one real item shares ONE entry -- the actual fix for v1's leak. Reverted after
-// crashing ("Key already used") on a real device: two simultaneously-composed virtual
-// pages could map to the SAME real index whenever `realCount` was small relative to how
-// many pages a pager holds alive at once (beyondViewportPageCount, perPage on the
-// multi-column pager).
+// First shipped with this constant at 10, "so recentering can only ever
+// retain a small number of compositions" -- but that shrank the SAFE ZONE
+// (the number of one-directional swipes before recentering triggers) down
+// with it, especially for the common case of a small `realCount` (one or two
+// cars): with realCount=2 and this at 10, recentering could trigger after
+// as few as 3-4 swipes in one direction, which is exactly the "swipe the
+// same way repeatedly to see if it loops" motion anyone testing this feature
+// would make -- reported directly as "very obvious when it doesn't infinite
+// scroll and goes around."
 //
-// v3: real-index keys again, this time with beyondViewportPageCount at every call site
-// solving `perPage + 2*beyond <= realCount` -- provably collision-free in steady state.
-// STILL crashed on a real device, immediately at cold start rather than after any
-// swiping, which ruled out the steady-state formula itself. The actual cause: this
-// composable let the underlying PagerState survive a `realCount` change (only the
-// WrapPagerState wrapper was rebuilt), which is harmless for raw keys but not for
-// real-index ones -- the pager's own `currentPage` kept whatever raw value it had under
-// the OLD realCount, and reinterpreting that value's real()/beyond-window under a
-// DIFFERENT realCount has no reason to land on a collision-free arrangement. realCount
-// changes exactly at cold start (0 vehicles while nothing has loaded yet, then however
-// many actually exist) -- reachable within the first couple of frames, hence no swiping
-// needed. Reverted rather than patched further given two real-device failures already.
-//
-// v4 (current): real-index keys, PLUS reseeding the PagerState (via [key], not just
-// rebuilding the wrapper) whenever [rememberWrapPager]'s own `resizeKey` changes -- not
-// just `realCount`. v3's own fix only reseeded on a `realCount` change; it missed that
-// GarageScreen's collapsed pager also recomputes `beyondViewportPageCount` from
-// `perPage`, which changes on a fold/unfold or rotation WITHOUT `realCount` (the car
-// count) changing at all -- the exact gap a foldable owner would hit on every fold,
-// independent of and in addition to the cold-start case v3 fixed. Every call site now
-// passes whatever of its OWN beyond-window inputs can change independently of realCount
-// as `resizeKey`, so ANY of them reseeds instead of reinterpreting stale state.
-//
-// This still could not be verified against a real device in this sandbox. If "Key
-// already used" recurs a fourth time, the next candidate is [recenterIfNearEdge]'s own
-// jump (see its updated doc) -- the one operation real-index keying was never able to
-// prove collision-free even in v3, just made astronomically rare by the multiplier
-// below.
-private const val WRAP_MULTIPLIER = 1_000_000
+// Raising it all the way to 1000 traded that bug for a real OutOfMemoryError
+// (a heap-exhaustion crash on a live device, not a hypothetical): with
+// realCount=2 that let the pager retain up to 1000x2 = 2000 distinct virtual
+// pages before recentering ever became reachable, and each one is a whole
+// VehicleDetailContent/SettingsScreen subtree, not a lightweight row --
+// nowhere near the "bounded and self-correcting" ceiling that number was
+// asserted to be when 1000 was chosen; it was never actually measured
+// against a device heap. 80 is the compromise: still a wide safe zone
+// (realCount x (40 - RECENTER_MARGIN_CYCLES) one-directional swipes before a
+// recenter is reachable -- 60 for two cars, comfortably past any "does this
+// loop" test), while capping the worst case at 80x[realCount] retained
+// pages instead of 1000x -- an order of magnitude smaller ceiling for
+// whatever in a page's subtree scales with distinct-pages-ever-visited.
+// This is a bound on the ceiling, not a fix for a confirmed root cause: this
+// sandbox can't run the app or take a heap dump, so the exact mechanism
+// retaining those pages (composition-slot retention, an image cache, a
+// per-page coroutine that's never cancelled) hasn't been isolated. If the
+// OOM recurs, that measurement -- not another guess at this constant -- is
+// the next step.
+private const val WRAP_MULTIPLIER = 80
 /** Recenter once the pager drifts within this many real-item-widths of
  *  either edge of the virtual range -- see [WRAP_MULTIPLIER]'s own doc. This
  *  only needs to be big enough that a single fling can't overshoot past it in
@@ -93,14 +113,14 @@ private const val RECENTER_MARGIN_CYCLES = 10
 private const val PAGER_SHRINK = 0.06f
 
 /**
- * Wraps a [PagerState] whose page space is a huge, FIXED virtual range, exposing the
- * real (modulo) index, a delta-jump that moves to a real index without an animated
- * fly-through across it, [WrapPagerState.keyFor] -- what actually makes the wrap feel
- * infinite, by letting every virtual copy of one real item reuse the same composition --
- * and [WrapPagerState.recenterIfNearEdge], an edge-of-range backstop that in practice
- * never fires. See [WRAP_MULTIPLIER]'s own doc for the full reasoning. [realCount] is
- * the number of real items the pages cycle through (cars, car-blocks, or tiles depending
- * on the site); when it is <= 1 there is no wrap and [WrapPagerState.real] is always 0.
+ * Wraps a [PagerState] whose page space is a small, FIXED virtual range,
+ * exposing the real (modulo) index, a delta-jump that moves to a real index
+ * without an animated fly-through across it, and [recenterIfNearEdge] --
+ * called after every settle -- which is what actually makes the wrap feel
+ * infinite (see [WRAP_MULTIPLIER]'s own doc for why this replaced a much
+ * bigger fake range). [realCount] is the number of real items the pages
+ * cycle through (cars, car-blocks, or tiles depending on the site); when it
+ * is <= 1 there is no wrap and [real] is always 0.
  */
 /**
  * Pure wrap arithmetic: the real item index a virtual page maps to.
@@ -140,24 +160,11 @@ internal fun wrapPageToward(currentPage: Int, pageCount: Int, realCount: Int, ta
 internal class WrapPagerState(val pager: PagerState, val realCount: Int) {
     fun real(page: Int): Int = wrapRealIndex(page, realCount)
 
-    /**
-     * The key every pager call site's `key = { page -> wrap.keyFor(page) }` uses: the
-     * REAL item index, not the raw virtual page. This is what makes a swipe back to a
-     * car (or the Settings page) you've already visited reuse its existing composition
-     * -- its scroll position, its expanded pebbles, its in-flight image loads -- instead
-     * of building it from scratch every time.
-     *
-     * Provably collision-free in ordinary use: every call site computes its own
-     * `beyondViewportPageCount` to satisfy `perPage + 2*beyond <= realCount`, which is
-     * exactly the condition under which no two SIMULTANEOUSLY composed virtual pages can
-     * ever resolve to the same real index. That invariant depends on `realCount` AND
-     * whatever else feeds a call site's own `beyond` formula staying stable across the
-     * composed window -- see [rememberWrapPager]'s `resizeKey` for why a call site whose
-     * `perPage` can change independently (a fold/unfold, a rotation) must pass it there
-     * too, not just rely on `realCount`.
-     */
-    fun keyFor(page: Int): Int = real(page)
-
+    // Pages are keyed by their RAW virtual index (`key = { page }`) at every pager call
+    // site, never by `real(page)`. Keying by the real item let two virtual copies of the
+    // same item share one composition slot and crashed ("Key already used"); the raw
+    // index is unique by construction. [recenterIfNearEdge] composes a fresh page when it
+    // jumps, which is rare and uncrashable -- see [WRAP_MULTIPLIER]'s own doc.
     // settledReal was removed: zero readers. Both places that care about a SETTLE go through
     // `snapshotFlow { pager.settledPage }.collect { real(it) }` instead (GarageScreen's and
     // CompactGarage's pager-settle effects), because they need the settle as an EVENT, not as
@@ -174,31 +181,28 @@ internal class WrapPagerState(val pager: PagerState, val realCount: Int) {
 
     /**
      * Call after every settle (never mid-drag -- see each call site's own
-     * `snapshotFlow { pager.settledPage }` collector): if the pager has drifted within
-     * [RECENTER_MARGIN_CYCLES] real-item-widths of either edge of the virtual range,
-     * silently jump back to the page nearest the middle that maps to the SAME real
-     * index -- so nothing visibly changes, but the pager has room to keep going in
-     * either direction.
-     *
-     * With [keyFor] keying by real index, this is no longer what makes the wrap feel
-     * infinite (ordinary swiping already reuses each real item's one composition,
-     * unconditionally) or what bounds memory (a real-index key costs the same whether
-     * the virtual range is 100 pages or 100 million). Its only remaining job is a
-     * backstop against [WRAP_MULTIPLIER] eventually running out -- reachable only after
-     * an amount of one-directional swiping no real session produces. See
-     * [WRAP_MULTIPLIER]'s own doc for why that makes this call, when it does fire, a
-     * different and far smaller risk than it used to be.
+     * `snapshotFlow { pager.settledPage }` collector): if the pager has
+     * drifted within [RECENTER_MARGIN_CYCLES] real-item-widths of either edge
+     * of the (small, fixed) virtual range, silently jump back to the page
+     * nearest the middle that maps to the SAME real index -- so nothing
+     * visibly changes, but the pager has room to keep going in either
+     * direction. This -- not a huge fake page count -- is what makes the
+     * wrap feel genuinely infinite while keeping the number of distinct
+     * virtual pages this pager can ever compose small and constant, instead
+     * of growing with how long or how far someone swipes. See
+     * [WRAP_MULTIPLIER]'s own doc for the full reasoning.
      */
     suspend fun recenterIfNearEdge() {
         if (realCount <= 1) return
         val margin = realCount * RECENTER_MARGIN_CYCLES
         val page = pager.currentPage
         val count = pager.pageCount
-        // Comfortably inside both edges already -- nothing to do. Note this margin is
-        // measured off the pager's OWN current pageCount, not a value cached at
-        // creation -- though in practice a realCount/resizeKey change gets an entirely
-        // fresh, freshly-seeded PagerState now (see rememberWrapPager's own doc), so
-        // this method only ever runs against a pageCount that matches the CURRENT inputs.
+        // Comfortably inside both edges already -- nothing to do. Note this
+        // margin is measured off the pager's OWN current pageCount, not a
+        // value cached at creation, so it stays correct even if realCount
+        // (and therefore pageCount) changes later -- see rememberWrapPager's
+        // `remember(pager, realCount)` for why a realCount change re-seeds
+        // this whole wrapper anyway, landing back at a fresh center.
         if (page in margin..(count - 1 - margin)) return
         val center = count / 2
         val target = center - (center % realCount) + real(page)
@@ -208,41 +212,18 @@ internal class WrapPagerState(val pager: PagerState, val realCount: Int) {
 
 /**
  * Creates a [WrapPagerState] seeded at the middle of the virtual range plus
- * [initialRealIndex], so the pager opens on that real item and can wrap in both
- * directions. Falls back to a plain single-page state when [realCount] <= 1.
- *
- * The underlying [PagerState] is recreated (via [key], not just re-wrapped) whenever
- * [realCount] OR [resizeKey] changes, landing back on a freshly-seeded, correctly
- * mid-range position -- the fix for a real "Key 0 was already used" crash that
- * real-index keying ([WrapPagerState.keyFor]) hit twice: letting the SAME PagerState
- * instance survive such a change (only the wrapper was rebuilt) is harmless under
- * raw-index keys (any page index is valid for any realCount) but breaks the real-index
- * invariant outright -- `currentPage` keeps whatever raw value it had under the OLD
- * inputs, and re-interpreting that value's `real()`/beyond-window under DIFFERENT ones
- * has no reason to land on a collision-free arrangement.
- *
- * [resizeKey] exists because `realCount` alone doesn't cover every input a call site's
- * own `beyondViewportPageCount` formula depends on: GarageScreen's collapsed pager also
- * derives it from `perPage` (how many cars fit side by side), which changes on a
- * fold/unfold or rotation WITHOUT `realCount` (the car count) changing at all -- a gap
- * the first version of this reseed fix missed entirely, since it only keyed on
- * `realCount` and that specific crash reproduced at cold start, not on a fold. A call
- * site whose own beyond-window math can shift independently of `realCount` MUST pass
- * that value here too; one that can't (a flat `beyondViewportPageCount = 0`, or a
- * `perPage` that's always exactly 1) can safely leave it null.
- *
- * The cost: a genuine realCount or resizeKey change now visibly resets scroll position
- * to the freshly-seeded middle instead of preserving mid-swipe state across it --
- * correct trade for turning a crash into, at most, a snap back to center on the rare
- * frame this actually happens.
+ * [initialRealIndex], so the pager opens on that real item and can wrap in
+ * both directions. Falls back to a plain single-page state when [realCount]
+ * <= 1. The underlying [PagerState] survives recomposition; the wrapper is
+ * re-created only when [realCount] changes (it holds no scroll state itself).
  */
 @Composable
-internal fun rememberWrapPager(realCount: Int, initialRealIndex: Int = 0, resizeKey: Any? = null): WrapPagerState {
+internal fun rememberWrapPager(realCount: Int, initialRealIndex: Int = 0): WrapPagerState {
     val loop = realCount > 1
     val virtualCount = if (loop) realCount * WRAP_MULTIPLIER else realCount.coerceAtLeast(1)
     val start = (if (loop) virtualCount / 2 else 0) + initialRealIndex.coerceIn(0, (realCount - 1).coerceAtLeast(0))
-    val pager = key(realCount, resizeKey) { rememberPagerState(initialPage = start) { virtualCount } }
-    return remember(pager) { WrapPagerState(pager, realCount) }
+    val pager = rememberPagerState(initialPage = start) { virtualCount }
+    return remember(pager, realCount) { WrapPagerState(pager, realCount) }
 }
 
 /**

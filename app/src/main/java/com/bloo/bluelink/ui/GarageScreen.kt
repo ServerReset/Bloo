@@ -292,15 +292,14 @@ internal fun GarageScreen(
     // synchronously from the very first frame, while boxWidthPx starts at 0 and only catches
     // up once that Box's first onSizeChanged fires a layout pass later. This briefly WAS
     // sourced from boxWidthPx instead, to fix a real "Key already used" pager crash caused by
-    // perPage/pageWidth disagreeing for one frame after a rotation. Two reasons it stays on
-    // widthDp now: first, every cold start on a wide/multi-column screen (a large foldable,
-    // unfolded) rendered ONE frame as a single column before reflowing into its real column
-    // count the instant boxWidthPx caught up -- a visible hitch on every single launch,
-    // reported directly. Second, and now more important: `perPage` also drives `wrap`'s own
-    // `resizeKey` (below), and boxWidthPx's own one-frame-late catch-up would fire an EXTRA,
-    // spurious pager reseed on every plain cold start -- a scroll-position reset for no real
-    // size change at all, not just the column-count hitch. widthDp being correct and stable
-    // from frame one avoids both.
+    // perPage/pageWidth disagreeing for one frame after a rotation -- but the pager below no
+    // longer keys pages by real index at all (key = { page -> page }, unconditionally), so
+    // that mismatch can no longer cause a crash regardless of which value perPage comes from.
+    // Sourcing it from
+    // boxWidthPx anyway meant every cold start on a wide/multi-column screen (a large
+    // foldable, unfolded) rendered ONE frame as a single column before reflowing into its
+    // real column count the instant boxWidthPx caught up -- a visible hitch on every single
+    // launch, reported directly. widthDp being correct from frame one is what avoids it.
     val perPage = (widthDp / MIN_CARD_DP.dp).toInt().coerceIn(1, slots)
     // Expanding to the dual-column view only makes sense on a wide screen.
     val canExpand = large && count > 1
@@ -365,7 +364,7 @@ internal fun GarageScreen(
                         // below for why).
                         beyondViewportPageCount = 0,
                         pageSize = androidx.compose.foundation.pager.PageSize.Fill,
-                        key = { page -> exWrap.keyFor(page) },
+                        key = { page -> page },
                     ) { page ->
                         // Read the continuous pager offset ONLY inside graphicsLayer{}
                         // below (draw-phase, never triggers recomposition) -- reading
@@ -455,13 +454,9 @@ internal fun GarageScreen(
                 // this pager opens there, never on the Settings page at the end of it.
                 val initialItem = currentIndex.coerceIn(0, slots - 1)
                 // Infinite wrap-around: WrapPagerState.realCount is `total` --
-                // one virtual page per real item -- and the real item for a page
-                // is realItem(page) itself. resizeKey = perPage: this pager's own
-                // beyondViewportPageCount (below) is derived from perPage, which
-                // changes on a fold/unfold or rotation without `total` changing --
-                // see rememberWrapPager's own doc for why real-index keying needs
-                // a fresh PagerState on THAT change too, not just a `total` one.
-                val wrap = rememberWrapPager(total, initialItem, resizeKey = perPage)
+                // one virtual page per real item, no window multiplier of any
+                // kind -- and the real item for a page is realItem(page) itself.
+                val wrap = rememberWrapPager(total, initialItem)
                 val pager = wrap.pager
                 fun realItem(virtualPage: Int) = wrap.real(virtualPage)
                 // Keyed on total, not perPage: perPage only ever affected the old
@@ -610,23 +605,18 @@ internal fun GarageScreen(
                         // total` for the largest safe integer beyond (capped at 1, since 1
                         // pre-warmed neighbour is already all PebbleList's own lazy-fill needs
                         // to hide, per this parameter's own history) gives the formula below.
-                        // This is what makes keying by real index (below) provably
-                        // collision-free: perPage + 2*beyond <= total, satisfied by
-                        // construction, means no two simultaneously-composed virtual pages
-                        // can ever resolve to the same real item -- PROVIDED perPage/total
-                        // don't change out from under an already-composed window, which is
-                        // exactly what `wrap`'s own `resizeKey = perPage` (above) exists to
-                        // prevent by reseeding the pager instead. See WrapPager.kt's own
-                        // WrapPagerState.keyFor doc for the one operation that's still an
-                        // exception (recenterIfNearEdge's jump) and why that's handled by
-                        // making it unreachable rather than by keeping this raw.
+                        // NOT tied to the key below at all -- every page is keyed by its raw
+                        // index regardless of this value (see WrapPager.kt's own doc for why);
+                        // this beyond still exists purely to stop two DIFFERENT virtual pages
+                        // from ever resolving to the same real item while simultaneously
+                        // composed, independent of what key either of them is given.
                         beyondViewportPageCount = ((total - perPage) / 2).coerceIn(0, 1),
-                        // Real (modulo) item index, not the raw page: swiping back to a car
-                        // (or Settings) already visited reuses its existing composition --
-                        // scroll position, expanded pebbles, in-flight image loads -- instead
-                        // of rebuilding it every time, which is what "infinite scroll" that
-                        // actually feels infinite requires.
-                        key = { page -> wrap.keyFor(page) },
+                        // Raw page index as the key, NEVER the real (modulo) item: keying by
+                        // real index made two virtual copies of one item share a composition
+                        // slot and crashed ("Key already used"). The raw page is unique by
+                        // construction. (beyondViewportPageCount above is what keeps two pages
+                        // from resolving to the same real item while composed, not the key.)
+                        key = { page -> page },
                     ) { page ->
                         // Same fade/scale transition the expanded single-car pager
                         // above uses (see its own comment for why: the continuous

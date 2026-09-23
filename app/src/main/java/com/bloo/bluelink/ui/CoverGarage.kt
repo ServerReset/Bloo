@@ -288,17 +288,15 @@ internal fun CompactGarage(state: State<UiState>, vm: AppViewModel, appearance: 
             // flat beyond=1 guarantees two of those three pages resolve to the
             // SAME real item (the folded-in Settings page) and mount it TWICE
             // at once. (total - 1) / 2, capped at 1, is the largest beyond that
-            // can never revisit an item within one full cycle -- which is exactly
-            // what makes keying by real index (below) provably collision-free. Safe
-            // to leave `wrap`'s own resizeKey null (see rememberWrapPager's doc):
-            // perPage is implicitly 1 here, always, so nothing besides `total` can
-            // ever move this formula. See WrapPager.kt's own WrapPagerState.keyFor doc.
+            // can never revisit an item within one full cycle. NOT tied to the key
+            // below at all -- every page is keyed by its raw index regardless of this
+            // value (see WrapPager.kt's own doc for why); this beyond still exists
+            // purely to stop two DIFFERENT virtual pages from ever resolving to the
+            // same real item while simultaneously composed.
             beyondViewportPageCount = ((total - 1) / 2).coerceIn(0, 1),
-            // Real (modulo) item index, not the raw page -- see GarageScreen's own
-            // matching key comment for why this is what makes the wrap actually feel
-            // infinite (reusing each real item's composition) rather than just
-            // wrapping without crashing.
-            key = { page -> wrap.keyFor(page) },
+            // Raw page index as the key (never the modulo real item) -- see GarageScreen's
+            // own key comment for the crash this avoids.
+            key = { page -> page },
         ) { page ->
             val real = realCar(page)
             if (real == slots) {
@@ -671,11 +669,9 @@ internal fun CompactCar(
             // Most cars have well more than 2 tiles, so this is a rare-but-real edge rather
             // than the everyday case the horizontal car pager's own fix is.
             beyondViewportPageCount = ((tiles.size - 1) / 2).coerceIn(0, 1),
-            // Real (modulo) tile index, not the raw page -- see GarageScreen's own
-            // matching key comment for why this is what makes scrubbing back to a
-            // tile reuse its own scroll position instead of resetting it. Safe to
-            // leave `vWrap`'s own resizeKey null: perPage is implicitly 1 here too.
-            key = { page -> vWrap.keyFor(page) },
+            // Raw page index as the key (never the modulo real item) -- see GarageScreen's
+            // own key comment for the crash this avoids.
+            key = { page -> page },
         ) { page ->
             val i = vWrap.real(page)
             val tileScroll = tileScrollStates.getOrPut(tiles[i]) { ScrollState(0) }
