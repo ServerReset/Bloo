@@ -288,9 +288,9 @@ internal fun CompactGarage(state: State<UiState>, vm: AppViewModel, appearance: 
             // flat beyond=1 guarantees two of those three pages resolve to the
             // SAME real item (the folded-in Settings page) and mount it TWICE
             // at once. (total - 1) / 2, capped at 1, is the largest beyond that
-            // can never revisit an item within one full cycle. NOT tied to keyFor's
-            // own key choice any more -- see keyFor's doc for why it always uses the
-            // raw page index now regardless of this value; this beyond still exists
+            // can never revisit an item within one full cycle. NOT tied to the key
+            // below at all -- every page is keyed by its raw index regardless of this
+            // value (see WrapPager.kt's own doc for why); this beyond still exists
             // purely to stop two DIFFERENT virtual pages from ever resolving to the
             // same real item while simultaneously composed.
             beyondViewportPageCount = ((total - 1) / 2).coerceIn(0, 1),

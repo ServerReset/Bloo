@@ -292,9 +292,10 @@ internal fun GarageScreen(
     // synchronously from the very first frame, while boxWidthPx starts at 0 and only catches
     // up once that Box's first onSizeChanged fires a layout pass later. This briefly WAS
     // sourced from boxWidthPx instead, to fix a real "Key already used" pager crash caused by
-    // perPage/pageWidth disagreeing for one frame after a rotation -- but keyFor (below) no
-    // longer keys pages by real index at all (see its own doc for why), so that mismatch can
-    // no longer cause a crash regardless of which value perPage comes from. Sourcing it from
+    // perPage/pageWidth disagreeing for one frame after a rotation -- but the pager below no
+    // longer keys pages by real index at all (key = { page -> page }, unconditionally), so
+    // that mismatch can no longer cause a crash regardless of which value perPage comes from.
+    // Sourcing it from
     // boxWidthPx anyway meant every cold start on a wide/multi-column screen (a large
     // foldable, unfolded) rendered ONE frame as a single column before reflowing into its
     // real column count the instant boxWidthPx caught up -- a visible hitch on every single
@@ -555,8 +556,8 @@ internal fun GarageScreen(
                     // Ceiling division, not floor: `perPage` pages of a FLOORED width sum to
                     // LESS than boxWidthPx (a leftover gap up to perPage-1 px at the right
                     // edge), which forces the viewport to need a (perPage+1)-th page composed
-                    // to cover that gap during a scroll -- silently breaking every
-                    // beyondViewportPageCount/keyFor formula below, all of which assume
+                    // to cover that gap during a scroll -- silently breaking the
+                    // beyondViewportPageCount formula below, which assumes
                     // exactly perPage pages are ever on-screen at once. Rounding up instead
                     // means perPage pages together are always >= boxWidthPx (they may overhang
                     // the edge by a sub-pixel amount instead), which is what actually keeps
@@ -604,8 +605,8 @@ internal fun GarageScreen(
                         // total` for the largest safe integer beyond (capped at 1, since 1
                         // pre-warmed neighbour is already all PebbleList's own lazy-fill needs
                         // to hide, per this parameter's own history) gives the formula below.
-                        // NOT tied to keyFor's own key choice any more -- see keyFor's doc for
-                        // why it always uses the raw page index now regardless of this value;
+                        // NOT tied to the key below at all -- every page is keyed by its raw
+                        // index regardless of this value (see WrapPager.kt's own doc for why);
                         // this beyond still exists purely to stop two DIFFERENT virtual pages
                         // from ever resolving to the same real item while simultaneously
                         // composed, independent of what key either of them is given.

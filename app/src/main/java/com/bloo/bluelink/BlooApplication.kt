@@ -6,6 +6,7 @@ import android.content.Intent
 import android.os.Build
 import android.util.Log
 import androidx.work.Configuration
+import coil.imageLoader
 import com.bloo.bluelink.data.AppLog
 import com.bloo.bluelink.data.StartupTrace
 import com.bloo.bluelink.ui.BatterySaverState
@@ -173,6 +174,16 @@ class BlooApplication : Application(), Configuration.Provider, coil.ImageLoaderF
                 // thread instead; the repos' own clients are then construction-only.
                 StartupTrace.trace("okhttp class warm-up") {
                     okhttp3.OkHttpClient.Builder().build()
+                }
+                // Coil's singleton ImageLoader (now built by newImageLoader() above) is
+                // otherwise lazily constructed on whatever thread first touches
+                // context.imageLoader -- CarMap's first tile request, on the main thread,
+                // the instant a car with a location renders. Building it here instead pays
+                // its own class-load plus the disk cache directory's first mkdir off that
+                // path; a caller reaching context.imageLoader before this finishes just
+                // gets the same singleton construction inline, same as if this didn't exist.
+                StartupTrace.trace("coil image loader warm-up") {
+                    applicationContext.imageLoader
                 }
                 // Settings DataStore first read (file open + preferences protobuf parse),
                 // which the auto-login's own appearance.first() otherwise pays on the path to

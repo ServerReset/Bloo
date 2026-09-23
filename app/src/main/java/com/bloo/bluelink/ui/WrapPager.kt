@@ -52,10 +52,13 @@ import kotlin.math.abs
 // that collision check the first time around. A follow-up mitigation just
 // shrunk this constant to 30, capping the leak's ceiling instead of removing
 // it -- still real growth, just bounded, and a real (if very unlikely) dead
-// end once a user actually swiped that far. The key IS back now (see
-// [WrapPagerState.keyFor]), this time gated on the exact inequality that
-// makes it collision-free, with every call site falling back to the old
-// unkeyed behaviour below that threshold.
+// end once a user actually swiped that far. Real-index keying, collision
+// check and all, was tried a second time (gated on the exact inequality that
+// makes it collision-free) and STILL crashed a different way ("Key 1 was
+// already used") on a real device; it was abandoned for good after that and
+// every call site now keys by the raw virtual page index instead (see
+// [WrapPagerState] below) -- unconditionally safe, at the cost of a recenter
+// jump no longer reusing a composition the way real-index keying would have.
 //
 // This is the actual fix: recenter ([WrapPagerState.recenterIfNearEdge],
 // called after every settle) silently jumps back toward the middle once the
@@ -63,16 +66,11 @@ import kotlin.math.abs
 // edge -- the destination page has the IDENTICAL real index, so the content
 // shown doesn't change, and the pager keeps having room to go. This is what
 // actually bounds the leak (the old huge-range trick just hoped nobody
-// swiped far enough to need bounding at all) -- but recentering jumps to a
-// DIFFERENT virtual page than the one just left, which USED TO BE a distinct
-// Compose slot (fresh scroll position, fresh enter animations, whatever
-// per-composition state that page holds), so a recenter was not perfectly
-// invisible the way sliding to a genuinely neighbouring page is. See
-// [WrapPagerState.keyFor]: every call site now keys its pages by REAL index
-// (where it's provably safe to), so a recenter jump reuses the very same
-// composition instead of creating a fresh one -- the jump is now actually
-// invisible, not just rare, which is most of why this constant no longer
-// needs to be huge to hide it.
+// swiped far enough to need bounding at all). A recenter jump IS a fresh
+// composition of that destination page now (raw-index keying, immediately
+// above, is what makes that safe rather than a repeat of the "Key already
+// used" crash) -- a real if minor cost, paid rarely enough (see
+// [RECENTER_MARGIN_CYCLES]'s own doc) that it isn't worth trading back for.
 //
 // First shipped with this constant at 10, "so recentering can only ever
 // retain a small number of compositions" -- but that shrank the SAFE ZONE
