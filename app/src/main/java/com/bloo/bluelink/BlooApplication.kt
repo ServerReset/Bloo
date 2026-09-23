@@ -185,6 +185,25 @@ class BlooApplication : Application(), Configuration.Provider, coil.ImageLoaderF
                 StartupTrace.trace("coil image loader warm-up") {
                     applicationContext.imageLoader
                 }
+                // Compose's own animation class graph (Spring/Animatable/AnimationVector,
+                // the machinery every lowPowerAwareSpring() call and every pressed/expanded
+                // state transition in the app rides on) had never been touched before the
+                // FIRST real animation the user ever triggers -- typically the very first
+                // card they tap to expand, which is also usually still inside the first
+                // several seconds of a cold process, i.e. exactly the window ART hasn't
+                // finished JIT-warming yet. This only pays the one-time class-verification/
+                // linking cost (a real but small slice of "why does the first tap feel
+                // choppy") -- it does NOT eliminate ART's own interpreter-to-JIT warm-up
+                // curve for the actual per-frame animation math, which is a genuinely
+                // different cost this can't reach without a baseline profile (a real device/
+                // emulator to generate one against, which this environment doesn't have).
+                // Constructing these off-main is still strictly better than paying even
+                // the small part of it inline on the user's first tap.
+                StartupTrace.trace("compose animation class warm-up") {
+                    androidx.compose.animation.core.Animatable(0f)
+                    androidx.compose.animation.core.spring<Float>()
+                    androidx.compose.animation.core.tween<Float>(140)
+                }
                 // Settings DataStore first read (file open + preferences protobuf parse),
                 // which the auto-login's own appearance.first() otherwise pays on the path to
                 // the garage -- 452ms measured on the API 34 emulator. DataStore caches the
