@@ -723,6 +723,15 @@ internal fun HeroVisual(
      *  wants. Requires a bounded parent, which the cover tile is (its Card fills height). */
     fill: Boolean = false,
 ) {
+    // Cold-start diagnostic: a real device report showed a single ~1.8s frame with a
+    // ~280MB heap jump right as the garage first composed for a real (non-empty)
+    // account -- the "black screen for a second or two" symptom. Local photos are
+    // already downsampled to at most 1080px on save (see the crop screen's own export),
+    // which should rule them out, but this records exactly when THIS composable enters
+    // (and what the heap already was) so the next such report can confirm or rule that
+    // out directly instead of guessing again. Keyed per-VIN, not once-only, so both
+    // cars in a 2-car account show up distinctly.
+    com.bloo.bluelink.data.StartupTrace.once("hero-visual-${v.vin}", "HeroVisual composing for ${v.name}")
     val sizeModifier = when {
         fill -> Modifier.fillMaxSize()
         aspectRatio != null -> Modifier.fillMaxWidth().aspectRatio(aspectRatio)

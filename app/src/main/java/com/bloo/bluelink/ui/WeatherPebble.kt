@@ -684,6 +684,10 @@ internal fun CarMap(
     deviceLocation: GeoLocation? = null,
 ) {
     val context = LocalContext.current
+    // Cold-start diagnostic -- see HeroVisual's matching mark for why. If the map is
+    // expanded by default, its tile fetches (real network + decode work, if slower than
+    // expected) are another candidate for the "black screen for a second or two" report.
+    com.bloo.bluelink.data.StartupTrace.once("carmap-composing", "CarMap composing (first one)")
 
     // The car's own pin uses the app's actual dynamic/custom-palette primary --
     // not a fixed semantic role like `error` -- so a car with its own custom

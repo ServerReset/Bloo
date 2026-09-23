@@ -105,6 +105,12 @@ internal fun VehicleDetailContent(
     /** See [CarHeaderRow]'s own doc -- forwarded through so its chips can blur. */
     hazeState: HazeState? = null,
 ) {
+    // Cold-start diagnostic -- see HeroVisual's matching mark for why. This is the outer
+    // per-car page; if its own mark and HeroVisual's/CarMap's are close together but the
+    // heap jump happens BEFORE any of them, the cause is something else entirely (pebble
+    // list construction, JSON-derived state, Compose's own first-composition overhead for
+    // this page's subtree) rather than any one image.
+    com.bloo.bluelink.data.StartupTrace.once("vehicle-detail-${v.vin}", "VehicleDetailContent composing for ${v.name}")
     val topInset = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
     val bottomInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
     val scroll = rememberScrollState()
