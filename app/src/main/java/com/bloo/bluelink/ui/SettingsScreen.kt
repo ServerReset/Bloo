@@ -7,19 +7,16 @@
 
 package com.bloo.bluelink.ui
 
-import android.content.Intent
 import android.os.Build
 import android.net.Uri
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.core.net.toUri
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -76,7 +73,6 @@ import androidx.compose.material.icons.filled.CloudOff
 import androidx.compose.material.icons.filled.CloudDone
 import androidx.compose.material.icons.filled.CloudSync
 import androidx.compose.material.icons.filled.Description
-import androidx.compose.material.icons.filled.SystemUpdate
 import androidx.compose.material.icons.automirrored.filled.OpenInNew
 import androidx.compose.material.icons.filled.Map
 import androidx.compose.material.icons.filled.BlurOn
@@ -93,7 +89,6 @@ import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.BugReport
 import androidx.compose.material.icons.filled.Notifications
-import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Warning
@@ -132,7 +127,6 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.platform.ClipEntry
 import androidx.compose.ui.platform.LocalContext
@@ -607,8 +601,8 @@ internal fun SettingsScreen(
             }
             if (advTransition0.targetState || !advTransition0.isIdle) item {
 
-            // (The "Updates" card now lives after Notifications — its natural home —
-            // ungated so its controls show with or without Shizuku. See below.)
+            // Updates used to have its own card here; it's folded into SettingsHeroCard
+            // at the top of this grid now -- see that composable's own doc for why.
 
             // App-icon shortcuts (long-press the launcher icon)
             AnimatedVisibility(visibleState = advTransition0, enter = collapseEnter(), exit = collapseExit()) {
@@ -1575,242 +1569,6 @@ internal fun SettingsScreen(
                     Spacer(Modifier.height(SettingsGapRow))
                     ToggleRow("Pebble outline", appearance.pebbleOutline) { vm.setPebbleOutline(it) }
                   }
-                }
-            }
-            }
-            item {
-
-            // Updates — always shown (the update tile still auto-appears under the
-            // hero, but this is the manual home: which build you're on, a force-check,
-            // a browser fallback source, and the optional Shizuku silent-install toggle
-            // gated to just its row so the card itself never vanishes).
-            SettingsCard("Updates", Icons.Filled.SystemUpdate, vm) {
-                // The installed build number carries the card as a hero stat, the
-                // same big-number language the garage hero uses for %/range —
-                // instead of a label/value row buried under a paragraph. The state
-                // rides alongside as a tonal chip rather than a second text line.
-                //
-                // Its own tonal Surface, not a bare Row on the card's own background --
-                // gives the hero stat visual depth/separation from the buttons below it,
-                // the same "carved-out" treatment the update PEBBLE gives its own numbers.
-                Surface(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(16.dp),
-                    color = MaterialTheme.colorScheme.surfaceContainerHighest,
-                ) {
-                    Row(Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Column(Modifier.weight(1f)) {
-                            RollingNumber(
-                                text = if (vm.currentBuildNumber > 0) "${vm.currentBuildNumber}" else "dev",
-                                style = MaterialTheme.typography.displaySmall,
-                                fontWeight = FontWeight.Bold,
-                            )
-                            // Branch only when it isn't the mainline the app normally
-                            // builds from — buildLabel already encodes that rule, so
-                            // reuse it rather than re-deriving "is this main?" here.
-                            val branchSuffix = com.bloo.bluelink.data
-                                .buildLabel(vm.currentBuildNumber, com.bloo.bluelink.BuildConfig.BUILD_BRANCH)
-                                .substringAfter(" · ", "")
-                            Text(
-                                if (branchSuffix.isNotBlank()) "this build · $branchSuffix" else "this build",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
-                        Spacer(Modifier.width(12.dp))
-                        UpdateStatusChip(state)
-                    }
-                }
-                Spacer(Modifier.height(SettingsGapGroup))
-                // Both update sources share one row instead of two stacked
-                // full-width pills: the in-app checker (primary) and the GitHub
-                // Releases page (a second source that still works when the
-                // checker says up-to-date or GitHub's API is flaky).
-                ExpressiveButtonRow(modifier = Modifier.fillMaxWidth(), spacing = 8.dp) {
-                    val checkSource = remember { MutableInteractionSource() }
-                    SafeExpansiveButton(
-                        interactionSource = checkSource,
-                        enabled = !state.updateChecking,
-                    ) {
-                        MorphButton(
-                            onClick = { vm.checkForUpdateManually() },
-                            interactionSource = checkSource,
-                            enabled = !state.updateChecking,
-                            // NOT active = true. That was here purely to get the primary
-                            // tint (MorphButtonCore's own doc: "the highlight colour IS
-                            // the active state") -- but active ALSO pins the button
-                            // permanently at its morphed rounded-square corner, the exact
-                            // same rule Charge's "Stop" and Lock/Unlock's "highlighted"
-                            // state rely on to STAY square while genuinely toggled on.
-                            // "Check" isn't a toggle -- it never has an "on" state to stay
-                            // morphed for -- so it sat permanently square with nothing left
-                            // to morph FROM, the one button in the row (next to a normal
-                            // pill-at-rest "GitHub") that never played the press animation
-                            // everything else in the app does. Reported directly: "the
-                            // animation isn't right, not the same as the others." Setting
-                            // the container/content colours directly gets the identical
-                            // primary look without borrowing the toggle semantics, so this
-                            // rests as a pill and morphs on press exactly like GitHub does.
-                            containerColor = MaterialTheme.colorScheme.primary,
-                            contentColor = MaterialTheme.colorScheme.onPrimary,
-                        ) {
-                            // Label deliberately does NOT change to "Checking…" -- it stays
-                            // "Check" the whole time, and pending=true alone swaps the icon
-                            // to a spinner (MorphButtonGlyph). This button lives inside an
-                            // ExpressiveButtonRow alongside "GitHub": MorphButtonLabel feeds
-                            // its own measured width into that group's intrinsics-based
-                            // fit check on every recomposition, and this button's own
-                            // width-growth animation is a SEPARATE spring already running on
-                            // press/release (see expressivePressFraction). A label that also
-                            // changed length right as that press fired -- and animateContentSize
-                            // is deliberately OFF for group members, see MorphButtonCore's own
-                            // comment, so that length change would have SNAPPED rather than
-                            // eased -- stacked a second, uncoordinated width change on top of
-                            // the first and could shove "GitHub" sideways or force the whole
-                            // row to compact, right when you tap it. Reported as jank on this
-                            // exact button. A fixed label removes the second width change
-                            // entirely; the spinner alone communicates "in progress" just as
-                            // clearly.
-                            MorphButtonLabel(
-                                icon = Icons.Filled.Refresh,
-                                label = "Check",
-                                pending = state.updateChecking,
-                            )
-                        }
-                    }
-                    val githubSource = remember { MutableInteractionSource() }
-                    SafeExpansiveButton(
-                        interactionSource = githubSource,
-                        enabled = true,
-                    ) {
-                        MorphTextButton(
-                            "GitHub",
-                            interactionSource = githubSource,
-                            onClick = {
-                                runCatching {
-                                    context.startActivity(
-                                        Intent(Intent.ACTION_VIEW, com.bloo.bluelink.data.UpdateApi.RELEASES_URL.toUri())
-                                            .apply { addFlags(Intent.FLAG_ACTIVITY_NEW_TASK) },
-                                    )
-                                }
-                            },
-                        )
-                    }
-                }
-                // Shizuku silent-install: the ROW is gated on Shizuku being present, but
-                // the card is not — so the update controls above always show.
-                if (state.shizukuAvailable) {
-                    Spacer(Modifier.height(SettingsGapHairline))
-                    // Not "Install updates seamlessly": the card is already titled
-                    // "Updates", so the word was doing no work in the row beneath it.
-                    ToggleRow("Install seamlessly (Shizuku)", appearance.seamlessInstallShizuku) {
-                        vm.setSeamlessInstallShizuku(it)
-                    }
-                }
-                // --- The full download -> install flow, right here in the card ---
-                // The old card stopped at "Check": it could tell you an update existed
-                // and then point at GitHub. Now the card drives the same state machine
-                // the update pebble does -- download, progress, install -- rendered
-                // through the shared UpdateStatusLine so neither surface can drift.
-                val updateInfo = state.updateAvailable
-                if (updateInfo != null && !state.updateTileDismissed) {
-                    Spacer(Modifier.height(SettingsGapGroup))
-                    // The whole "there's something new" section now lives in its own outlined
-                    // container, separate from the "your current build" stat/buttons above --
-                    // it used to just keep stacking onto the same undifferentiated card
-                    // background, so nothing marked where "current state" ended and "here's
-                    // what's new" began. Outlined, not filled: UpdateReleaseNotes below already
-                    // fills with surfaceContainerHighest, and nesting two same-tone fills inside
-                    // each other would have read as flat padding rather than a real boundary.
-                    Surface(
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(16.dp),
-                        color = Color.Transparent,
-                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-                    ) {
-                    Column(Modifier.padding(14.dp)) {
-                    Text(
-                        "Update available",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurface,
-                    )
-                    val newLabel = com.bloo.bluelink.data.buildLabel(updateInfo.run.runNumber)
-                    val deltaLabel = if (vm.currentBuildNumber > 0) {
-                        "${com.bloo.bluelink.data.buildLabel(vm.currentBuildNumber)} → $newLabel"
-                    } else newLabel
-                    val seamless = appearance.seamlessInstallShizuku && state.shizukuAvailable
-                    Spacer(Modifier.height(SettingsGapHairline))
-                    // Same tonal Surface the update PEBBLE wraps this exact shared composable
-                    // in (UpdateTile.kt) -- this card used to drop UpdateStatusLine bare onto
-                    // its own outlined container with no fill of its own, while
-                    // UpdateReleaseNotes right below it (and every status line anywhere else
-                    // in the app) got the carved-out surfaceContainerHighest treatment. Same
-                    // shared composable, same chrome around it, in both places now.
-                    Surface(
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(12.dp),
-                        color = MaterialTheme.colorScheme.surfaceContainerHighest,
-                        contentColor = MaterialTheme.colorScheme.onSurface,
-                    ) {
-                        Column(Modifier.padding(12.dp)) {
-                            UpdateStatusLine(
-                                deltaLabel, seamless, state, vm,
-                                // The card's own heading two rows up is "Update available", not
-                                // the delta, so unlike the pebble this surface always has room
-                                // for it.
-                                showDelta = true,
-                            )
-                        }
-                    }
-                    Spacer(Modifier.height(SettingsGapGroup))
-                    // Label, glyph and branch all come from the shared updateAction /
-                    // runUpdateAction, so this button and the pebble's header action cannot
-                    // disagree about what the update flow is currently offering. Only the
-                    // chrome differs: full width here, a header pill there.
-                    val act = updateAction(state, updateInfo, seamless)
-                    val updateSource = remember { MutableInteractionSource() }
-                    SafeExpansiveButton(
-                        interactionSource = updateSource,
-                        enabled = !state.updateInstalling && !state.updateDownloading,
-                    ) {
-                        // Content width, standard padding -- same fix as Backup & sync's own
-                        // setup button just above. `active` still marks it as the ready-to-go
-                        // state; fillMaxWidth was the oversized, one-off treatment.
-                        MorphButton(
-                            onClick = { runUpdateAction(state, vm, updateInfo, context) },
-                            active = act.ready,
-                            activeContainerColor = com.bloo.bluelink.ui.ChargeGreen,
-                            activeContentColor = Color.White,
-                            enabled = !state.updateInstalling && !state.updateDownloading,
-                            interactionSource = updateSource,
-                        ) {
-                            MorphButtonLabel(act.icon, act.label, pending = false)
-                        }
-                    }
-                    // Shared with the update pebble -- see UpdateReleaseNotes. The two used
-                    // to keep a copy each, identical but for the excerpt length and one of them
-                    // forgetting FLAG_ACTIVITY_NEW_TASK on the intent.
-                    Spacer(Modifier.height(SettingsGapRow))
-                    UpdateReleaseNotes(updateInfo, maxLines = 3)
-                    Spacer(Modifier.height(SettingsGapRow))
-                    Row(Modifier.fillMaxWidth()) {
-                        Spacer(Modifier.weight(1f))
-                        val notNowSource = remember { MutableInteractionSource() }
-                        SafeExpansiveButton(
-                            interactionSource = notNowSource,
-                            enabled = !state.updateDownloading && !state.updateInstalling,
-                        ) {
-                            MorphTextButton(
-                                "Not now",
-                                interactionSource = notNowSource,
-                                onClick = vm::dismissUpdate,
-                                enabled = !state.updateDownloading && !state.updateInstalling,
-                            )
-                        }
-                    }
-                    }
-                    }
                 }
             }
             }

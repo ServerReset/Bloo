@@ -606,7 +606,7 @@ internal fun MetaChip(text: String, modifier: Modifier = Modifier, icon: ImageVe
 /**
  * The tinted sibling of [MetaChip]: a small pill for a LIVE status readout -- something
  * that changes while you are looking at it and whose colour carries meaning (AutoLock's
- * detection state, the Updates card's check result).
+ * detection state, [SettingsHeroCard]'s update-check result).
  *
  * Separate from [MetaChip] rather than a `tint` parameter on it, because the two answer
  * different questions. MetaChip is a static fact over unpredictable content (a photo, the
@@ -615,9 +615,9 @@ internal fun MetaChip(text: String, modifier: Modifier = Modifier, icon: ImageVe
  * is tinted on purpose.
  *
  * It exists because two screens had hand-rolled the same pill at different sizes and fills:
- * AutoLock's detection state as a solid `primaryContainer` [Surface] at 12/6 padding, the
- * Updates card's status as a 0.15-alpha tint at 12/8. Same content, same place in the app
- * (both are Settings cards), two chips -- so both route through this now. The 0.15-alpha
+ * AutoLock's detection state as a solid `primaryContainer` [Surface] at 12/6 padding,
+ * [SettingsHeroCard]'s update status as a 0.15-alpha tint at 12/8. Same content, same place
+ * in the app (both are Settings cards), two chips -- so both route through this now. The 0.15-alpha
  * fill is the one that survived: a status chip has to work in any of the tints a caller
  * passes (tertiary, error, a muted onSurfaceVariant "nothing to report"), and only the
  * alpha-of-the-tint form has a matching container tone for every one of them.
@@ -628,10 +628,10 @@ internal fun StatusChip(text: String, tint: Color, modifier: Modifier = Modifier
 }
 
 /**
- * [StatusChip] with the label as a slot, for the callers that animate the text itself (the
- * Updates card crossfades between "Checking…" / "Build N ready" / "Up to date"). The style
- * and the tint are still applied here, through LocalContentColor / LocalTextStyle, so an
- * animating caller cannot drift away from a static one.
+ * [StatusChip] with the label as a slot, for the callers that animate the text itself
+ * ([SettingsHeroCard]'s own chip crossfades between "Checking…" / "Build N ready" /
+ * "Up to date"). The style and the tint are still applied here, through LocalContentColor /
+ * LocalTextStyle, so an animating caller cannot drift away from a static one.
  */
 @Composable
 internal fun StatusChip(
@@ -662,7 +662,7 @@ internal fun StatusChip(
 }
 
 /**
- * The Updates card's tonal status chip, split out of the card body so the
+ * [SettingsHeroCard]'s tonal update-status chip, split out of the card body so the
  * spring-animated tint (`updateTint`) only recomposes this small Row/Icon/Text
  * scope on every animation frame, instead of the whole card content lambda
  * (which also hosts the RollingNumber hero stat and outer Surface/Row layout).

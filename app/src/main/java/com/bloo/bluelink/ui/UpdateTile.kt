@@ -10,7 +10,7 @@ package com.bloo.bluelink.ui
 /**
  * Update surfaces split out of Hero.kt: [UpdateAvailableTile], the standalone
  * update tile pinned below the hero tile, and [UpdateStatusLine], the shared
- * live-status row used by the tile and the Settings Updates card.
+ * live-status row used by the tile and [SettingsHeroCard]'s expanded body.
  */
 
 import android.content.Intent
@@ -378,11 +378,11 @@ internal fun UpdateAvailableTile(
 /**
  * The release notes block: "What's new", an excerpt, and a link to the full notes.
  *
- * Shared by the update pebble and the Settings Updates card, which had a copy each -- same
- * Surface, same header row, same "Full notes" button, differing only in how many lines of the
- * excerpt they showed and in one of them forgetting FLAG_ACTIVITY_NEW_TASK on the intent. That
- * is the shape of drift this exists to stop: two blocks that are the same idea, kept in step by
- * hand until one of them quietly is not.
+ * Shared by the update pebble and [SettingsHeroCard]'s expanded body, which had a copy each --
+ * same Surface, same header row, same "Full notes" button, differing only in how many lines of
+ * the excerpt they showed and in one of them forgetting FLAG_ACTIVITY_NEW_TASK on the intent.
+ * That is the shape of drift this exists to stop: two blocks that are the same idea, kept in
+ * step by hand until one of them quietly is not.
  *
  * fillMaxWidth() is load-bearing, not decoration: this can sit inside a PopVisible, and with a
  * weight()-bearing Text in the header row and no explicit width anywhere in the chain, that Text
@@ -399,7 +399,7 @@ internal fun UpdateReleaseNotes(
     if (notes.isBlank()) return
     val context = LocalContext.current
     // Glass surface with unified blur styling. shadow = false -- shared by the
-    // pebble body AND the Settings Updates card (this composable's own doc),
+    // pebble body AND SettingsHeroCard's expanded body (this composable's own doc),
     // both of which already nest this inside another elevated card/group; see
     // glassEdge's own doc for why a nested panel skips the second shadow.
     GlassSurface(
@@ -503,7 +503,7 @@ internal fun runUpdateAction(
  * file's own PebbleHeaderAction) -- it used to also repeat here AND next to
  * the bar below, reported directly as the same number appearing three times.
  *
- * Shared by the update pebble's body and the Settings Updates card, so the
+ * Shared by the update pebble's body and [SettingsHeroCard]'s expanded body, so the
  * two can never drift apart -- this is the same state machine rendered the
  * same way in both places, exactly the "one implementation" rule the
  * Settings card's remake is about.
