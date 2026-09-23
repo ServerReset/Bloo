@@ -19,6 +19,7 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -38,6 +39,7 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -697,6 +699,63 @@ internal fun UpdateStatusChip(state: UiState) {
         ) { text -> Text(text) }
     }
 }
+
+/**
+ * The small "there's something new" notification dot every update card now wears on
+ * its own top-end corner -- [SettingsHeroCard] and the garage's [UpdateAvailableTile]
+ * pebble both host it identically, via [Modifier.updateAvailableBadge], rather than the
+ * card's own full status chip/summary text being the only cue: a glance at either
+ * card's corner, even collapsed, should say "go look at this" the same way an app
+ * icon's own unread badge would, without needing to read anything.
+ *
+ * A plain dot, not a count -- there is only ever "an update" or not, never a number of
+ * them, so a badge count would just be a fixed 1 with extra ceremony.
+ */
+@Composable
+private fun UpdateAvailableDot(modifier: Modifier = Modifier) {
+    Box(
+        modifier
+            .size(12.dp)
+            .background(UpdateAvailableAmber, CircleShape)
+            // A hairline ring in the card's own container tone -- otherwise the dot's
+            // edge, sitting right at the card's rounded corner, has nothing separating
+            // it from whatever happens to be directly behind that corner (status bar
+            // icons, another card peeking from the next page over).
+            .border(2.dp, MaterialTheme.colorScheme.surfaceContainerHigh, CircleShape),
+    )
+}
+
+/**
+ * Wraps [content] in a [Box] and overlays [UpdateAvailableDot] on its top-end corner,
+ * scaling in/out as [visible] flips -- the shared entry point both update-card call
+ * sites ([SettingsHeroCard], [UpdateAvailableTile]) use so the badge's position, size,
+ * offset and pop animation can't drift between them.
+ *
+ * The dot sits slightly outside the corner (a small negative offset on both axes)
+ * rather than flush against it, the same "notification badge overlaps the icon's own
+ * edge" placement Android's own app-icon badges use -- flush against a card's own
+ * ROUNDED corner would have the dot's bottom-left quarter sitting on the transparent
+ * area the corner radius cuts away, reading as clipped rather than round.
+ */
+@Composable
+internal fun UpdateBadgedCard(visible: Boolean, modifier: Modifier = Modifier, content: @Composable () -> Unit) {
+    Box(modifier) {
+        content()
+        androidx.compose.animation.AnimatedVisibility(
+            visible = visible,
+            enter = androidx.compose.animation.scaleIn(
+                lowPowerAwareSpring(dampingRatio = PebbleBounceDamping, stiffness = PebbleBounceStiffness),
+            ) + androidx.compose.animation.fadeIn(),
+            exit = androidx.compose.animation.scaleOut() + androidx.compose.animation.fadeOut(),
+            modifier = Modifier
+                .align(Alignment.TopEnd)
+                .offset(x = 4.dp, y = (-4).dp),
+        ) {
+            UpdateAvailableDot()
+        }
+    }
+}
+
 
 /** "Updated x ago" fact, as a [MetaChip]. Null (renders nothing) until a
  *  first fetch has actually landed for [v]. */

@@ -75,6 +75,13 @@ import androidx.compose.ui.unit.dp
 internal val ChargeGreen = Color(com.bloo.bluelink.data.BlooColors.chargeGreen)
 internal val ChargeGreenDark = Color(com.bloo.bluelink.data.BlooColors.chargeGreenDark)
 
+/** The one "there's something new" colour -- the small notification dot on an update
+ *  card's corner when a build is available, unread-count orange rather than a
+ *  theme-relative tint, so it reads the same "you should look at this" way regardless
+ *  of the active colour palette (unlike ChargeGreen/error, this isn't standing in for a
+ *  car state the theme might reasonably recolour). */
+internal val UpdateAvailableAmber = Color(0xFFFF9800)
+
 /** The charge bar's "topped up" state: the pack has reached its own configured limit,
  *  so the fill reads as done rather than still climbing. See ChargeSegmentBar. */
 internal val ChargeBlue = Color(com.bloo.bluelink.data.BlooColors.chargeBlue)

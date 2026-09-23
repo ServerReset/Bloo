@@ -259,6 +259,7 @@ internal fun SettingsHeroCard(state: UiState, vm: AppViewModel, compact: Boolean
     val expanded = "$SETTINGS_CARD_VIN:Updates" !in collapsed
     val context = LocalContext.current
     val appearance = LocalAppearance.current
+    UpdateBadgedCard(visible = state.updateAvailable != null, modifier = Modifier.fillMaxWidth()) {
     Surface(
         modifier = Modifier.fillMaxWidth().semantics { heading() },
         shape = RoundedCornerShape(if (compact) 18.dp else 22.dp),
@@ -385,7 +386,21 @@ internal fun SettingsHeroCard(state: UiState, vm: AppViewModel, compact: Boolean
                     // install -- rendered through the shared UpdateStatusLine so neither
                     // surface can drift.
                     val updateInfo = state.updateAvailable
-                    if (updateInfo != null && !state.updateTileDismissed) {
+                    // PopVisible, not a bare `if`: this used to just appear the instant a
+                    // manual "Check" landed on a hit, which was jarring right in the middle
+                    // of an already-open card -- every other piece of content that arrives
+                    // into an open card (a weather stripe, a status line) pops in, and this
+                    // was the one exception. sizeAnimated = true because the card ABOVE this
+                    // (a car's own detail page, or another Settings card below it in the
+                    // grid) needs to make room for the height this adds, not just fade/scale
+                    // in place. Column, not a bare PopVisible body: PopVisible measures its
+                    // content as ONE child, and this emits a Spacer + a Surface as two
+                    // siblings -- see WeatherDetail's own history for exactly this bug
+                    // (AnimatedVisibility stacks multiple un-grouped children on top of each
+                    // other instead of one after another).
+                    PopVisible(visible = updateInfo != null && !state.updateTileDismissed, sizeAnimated = true) {
+                    if (updateInfo != null) {
+                    Column {
                         Spacer(Modifier.height(SettingsGapGroup))
                         // Its own outlined container, separate from the check/GitHub/Shizuku
                         // controls above -- marks where "current state" ends and "here's
@@ -476,8 +491,11 @@ internal fun SettingsHeroCard(state: UiState, vm: AppViewModel, compact: Boolean
                         }
                         }
                     }
+                    }
+                    }
                 }
             }
         }
+    }
     }
 }

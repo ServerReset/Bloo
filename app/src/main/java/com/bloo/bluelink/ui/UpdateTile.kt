@@ -136,6 +136,11 @@ internal fun UpdateAvailableTile(
         // checkForUpdate's sameBuild check) starts collapsed again rather
         // than inheriting whatever expand state an earlier build was left in.
         var expanded by rememberSaveable(info.run.runNumber) { mutableStateOf(false) }
+        // Always visible=true: this whole composable only ever renders once an update
+        // actually exists (the AnimatedVisibility above gates that), so the badge and
+        // the card's own existence say the same thing -- consistent with SettingsHeroCard
+        // wearing the identical dot, rather than this being the one update surface without it.
+        UpdateBadgedCard(visible = true, modifier = Modifier.fillMaxWidth()) {
         PebbleShell(
             expanded = expanded,
             onToggle = { expanded = !expanded },
@@ -371,6 +376,7 @@ internal fun UpdateAvailableTile(
                     }
                 }
             }
+        }
         }
     }
 }
