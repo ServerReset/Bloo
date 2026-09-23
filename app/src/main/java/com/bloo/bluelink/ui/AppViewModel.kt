@@ -1091,7 +1091,23 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         // path anyway.
         val vehiclesFetchStartedAt = System.currentTimeMillis()
         val fetched = repos.values.toList().flatMap { r ->
-            runCatching { statusMutex.withLock { r.vehicles() } }.getOrElse { e ->
+            runCatching {
+                // Cold-start diagnostic: isolates how long THIS call spent merely waiting
+                // for statusMutex (held by some other concurrent account/status call, if
+                // anything) from how long r.vehicles() itself actually took once it had the
+                // lock -- a real device log showed loadGarageInner's own overall vehicle-list
+                // timer running ~1.5s longer than every timed sub-step inside r.vehicles()
+                // (dispatch onto IO, store.load(), the network body read) summed together,
+                // and mutex contention was one of the untimed gaps that could hide in.
+                val lockWaitStartedAt = System.currentTimeMillis()
+                statusMutex.withLock {
+                    val lockWaitMs = System.currentTimeMillis() - lockWaitStartedAt
+                    if (lockWaitMs > 200) {
+                        AppLog.log("loadGarageInner: waited ${lockWaitMs}ms for statusMutex before fetching vehicles")
+                    }
+                    r.vehicles()
+                }
+            }.getOrElse { e ->
                 // A malformed response (see ResponseFraming) would otherwise surface okio's
                 // parser text -- "Expected leading [0-9a-fA-F] character but was 0x7b" -- as the
                 // user-facing reason, which tells a person nothing. It is retried once inside the

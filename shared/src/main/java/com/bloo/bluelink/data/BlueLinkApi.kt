@@ -154,8 +154,22 @@ class BlueLinkApi(private val brand: Brand = Brand.HYUNDAI) {
             .header("payloadGenerated", "20200226171938")
             .header("includeNonConnectedVehicles", "Y")
             .build()
-        val parsed = json.decodeFromString(EnrollmentResponse.serializer(), call(request))
-        parsed.enrolledVehicleDetails.map { it.vehicleDetails.toVehicle(brand) }
+        val body = call(request)
+        // Cold-start diagnostic: a real device log showed this whole suspend function
+        // (dispatch onto IO + call() + this) taking ~2.1s total while call()'s own body-
+        // read logged only 644ms of that -- ~1.5s unaccounted for. call() already times
+        // connect+headers+body-read as one number, so it can't say which SIDE of that gap
+        // the rest is on. This isolates JSON decode + the vehicleDetails->Vehicle mapping
+        // as their own number, so the next such report says directly whether kotlinx.
+        // serialization (cold serializer init, in particular) is the hidden cost or not.
+        val decodeStartedAt = System.currentTimeMillis()
+        val parsed = json.decodeFromString(EnrollmentResponse.serializer(), body)
+        val vehicles = parsed.enrolledVehicleDetails.map { it.vehicleDetails.toVehicle(brand) }
+        val decodeMs = System.currentTimeMillis() - decodeStartedAt
+        if (decodeMs > 200) {
+            AppLog.log("BlueLinkApi.vehicles(): decode + map took ${decodeMs}ms")
+        }
+        vehicles
     }
 
     // --- Commands --------------------------------------------------------
