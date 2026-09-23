@@ -707,6 +707,47 @@ internal fun HeroPhotoBackdrop(
     }
 }
 
+/**
+ * Spaces out hero photo loads that start within a short window of each other, so a
+ * multi-car account's cars don't all decode and upload their (still individually
+ * capped, see [HeroVisual]'s own `.size(1080, 1080)`) hero bitmaps on the very same
+ * frame.
+ *
+ * A real device report showed a single ~2.3s frame with a ~255MB heap jump the
+ * instant two cars' hero photos both composed for the first time on a wide/dual-
+ * column layout (this device's Z Fold showing two cars side by side) -- worse than
+ * the single-photo version of this same report, which the per-request `.size()` cap
+ * was already added for. That cap bounds each decode's OWN cost, but does nothing
+ * about two independently-bounded decodes landing in the same frame: Coil already
+ * decodes off the main thread, but two large bitmaps finishing at once still forces
+ * two GPU texture uploads and two full page recompositions into the same Choreographer
+ * frame, which is what actually froze the UI.
+ *
+ * Coalescing, not a flat per-instance index: a car expanded much later in the same
+ * session (long after cold start) must load its photo immediately, not wait out a
+ * delay computed from how many hero photos have EVER loaded this process. Only a
+ * request that starts within [COALESCE_WINDOW_MS] of the previous one is treated as
+ * "the same burst" and pushed back by [STAGGER_STEP_MS]; anything after a quiet gap
+ * starts immediately and resets the burst.
+ */
+private object HeroLoadStagger {
+    private const val COALESCE_WINDOW_MS = 80L
+    private const val STAGGER_STEP_MS = 220L
+    private val lock = Any()
+    private var lastClaimAtMs = 0L
+    private var burstSlot = 0
+
+    /** Call once per actual load attempt (i.e. from inside a `remember(model) {}`), never
+     *  from a plain composable body -- see the class doc for why this must not be charged
+     *  against every recomposition. */
+    fun claimDelayMs(): Long = synchronized(lock) {
+        val now = android.os.SystemClock.uptimeMillis()
+        burstSlot = if (now - lastClaimAtMs < COALESCE_WINDOW_MS) burstSlot + 1 else 0
+        lastClaimAtMs = now
+        burstSlot * STAGGER_STEP_MS
+    }
+}
+
 /** Default = a clean brand gradient. If the user set a photo, show that instead. */
 @Composable
 internal fun HeroVisual(
@@ -777,6 +818,16 @@ internal fun HeroVisual(
                 else -> entrance.animateTo(1f, tween(360, easing = FastOutSlowInEasing))
             }
         }
+        // See HeroLoadStagger's own doc: claimed once per model (a fresh photo, not every
+        // recomposition), and only actually delays anything when another hero load just
+        // started within the same short burst window -- an isolated load (expanding one
+        // car well after cold start, say) claims 0ms and starts immediately.
+        var staggerReady by remember(model) { mutableStateOf(false) }
+        LaunchedEffect(model) {
+            val delayMs = HeroLoadStagger.claimDelayMs()
+            if (delayMs > 0) delay(delayMs)
+            staggerReady = true
+        }
         // Memoized like the map tiles: creating a fresh ImageRequest every recomposition
         // would trigger unnecessary reloads and cause visible flicker/jank.
         val context = LocalContext.current
@@ -801,37 +852,50 @@ internal fun HeroVisual(
                 .size(1080, 1080)
                 .build()
         }
-        AsyncImage(
-            model = imageRequest,
-            contentDescription = v.model,
-            contentScale = if (transparent) ContentScale.Fit else ContentScale.Crop,
-            onState = { state ->
-                if (state is AsyncImagePainter.State.Success) {
-                    loadedFrom = state.result.dataSource
-                    // Cold-start: when the car photo actually finished DECODING and is
-                    // being drawn, not when the request was dispatched. A hero photo
-                    // arriving late is one of the few startup costs that visibly pops in.
-                    com.bloo.bluelink.data.StartupTrace.once(
-                        "hero-photo-decoded",
-                        "hero photo decoded (${state.result.dataSource})",
-                    )
-                }
-            },
-            modifier = sizeModifier
-                .then(if (transparent) Modifier else Modifier.clip(RoundedCornerShape(corner)))
-                .graphicsLayer {
-                    alpha = entrance.value
-                    // A short upward drift, not a full ReorderColumn-sized 28dp one -- this
-                    // is a photo arriving into place it already occupies, not a row sliding
-                    // in from off-list, so the motion is a hint of settling rather than a
-                    // real journey. Same reasoning for the scale: 0.97->1 reads as the photo
-                    // gently coming forward, not a distracting zoom.
-                    translationY = (1f - entrance.value) * 10.dp.toPx()
-                    val s = 0.97f + 0.03f * entrance.value
-                    scaleX = s
-                    scaleY = s
+        if (!staggerReady) {
+            // Same tonal fallback the no-photo branch above shows -- a car whose hero
+            // load is being held back by the stagger looks exactly like one that simply
+            // hasn't loaded yet, for the brief window (a couple hundred ms, at most, and
+            // only when another hero just started loading) until its turn comes.
+            val scheme = MaterialTheme.colorScheme
+            Box(
+                sizeModifier
+                    .clip(RoundedCornerShape(corner))
+                    .background(carTonalBrush(scheme)),
+            )
+        } else {
+            AsyncImage(
+                model = imageRequest,
+                contentDescription = v.model,
+                contentScale = if (transparent) ContentScale.Fit else ContentScale.Crop,
+                onState = { state ->
+                    if (state is AsyncImagePainter.State.Success) {
+                        loadedFrom = state.result.dataSource
+                        // Cold-start: when the car photo actually finished DECODING and is
+                        // being drawn, not when the request was dispatched. A hero photo
+                        // arriving late is one of the few startup costs that visibly pops in.
+                        com.bloo.bluelink.data.StartupTrace.once(
+                            "hero-photo-decoded",
+                            "hero photo decoded (${state.result.dataSource})",
+                        )
+                    }
                 },
-        )
+                modifier = sizeModifier
+                    .then(if (transparent) Modifier else Modifier.clip(RoundedCornerShape(corner)))
+                    .graphicsLayer {
+                        alpha = entrance.value
+                        // A short upward drift, not a full ReorderColumn-sized 28dp one -- this
+                        // is a photo arriving into place it already occupies, not a row sliding
+                        // in from off-list, so the motion is a hint of settling rather than a
+                        // real journey. Same reasoning for the scale: 0.97->1 reads as the photo
+                        // gently coming forward, not a distracting zoom.
+                        translationY = (1f - entrance.value) * 10.dp.toPx()
+                        val s = 0.97f + 0.03f * entrance.value
+                        scaleX = s
+                        scaleY = s
+                    },
+            )
+        }
     }
 }
 
