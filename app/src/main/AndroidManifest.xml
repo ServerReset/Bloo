@@ -79,6 +79,14 @@
         </intent>
     </queries>
 
+    <!-- android:largeHeap below: a larger Dalvik/ART heap ceiling than the platform
+         default (256MB on the devices seen in this app's own crash reports). The real
+         fix for the OOM this is a backstop for is HeroVisual's own explicit Coil
+         size() cap (see its own doc) -- this is defense-in-depth headroom on top of
+         that fix, not a substitute for it, for whatever other single large allocation
+         this app hits that a fixed image-decode cap wouldn't reach (a big JSON
+         payload, a wide multi-car grid composing at once, a large screen's own
+         RenderEffect buffers). -->
     <application
         android:name=".BlooApplication"
         android:allowBackup="false"
@@ -86,6 +94,7 @@
         android:fullBackupContent="@xml/backup_rules"
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
+        android:largeHeap="true"
         android:roundIcon="@mipmap/ic_launcher"
         android:supportsRtl="true"
         android:theme="@style/Theme.Bloo">

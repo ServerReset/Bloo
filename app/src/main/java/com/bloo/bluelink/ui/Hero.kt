@@ -783,6 +783,22 @@ internal fun HeroVisual(
         val imageRequest = remember(model) {
             ImageRequest.Builder(context)
                 .data(model)
+                // Explicit upper bound, not left to Coil's automatic view-constraint
+                // sizing: a real device report showed a ~280MB heap spike and a
+                // ~1.4s main-thread stall the instant two cars' hero photos first
+                // composed for a real account with photos actually set. The crop
+                // screen's own export already caps a NEWLY saved photo at 1080px
+                // wide, but that cap does nothing for a photo saved by an OLDER
+                // build (this app ships a fresh build on every commit; nothing
+                // re-processes a file already on disk), a Drive-synced photo from
+                // another device, or automatic view-based sizing simply not
+                // engaging the way it's expected to for this Modifier chain. This
+                // bounds the decode itself to roughly the crop export's own target
+                // regardless of what the source file on disk actually is, the same
+                // "never trust the input, always cap the output" rule
+                // downscaledJpegBytes (SettingsStore.kt) already follows for the
+                // Drive-sync path.
+                .size(1080, 1080)
                 .build()
         }
         AsyncImage(
