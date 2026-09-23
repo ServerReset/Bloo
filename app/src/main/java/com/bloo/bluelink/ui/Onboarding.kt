@@ -48,7 +48,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -136,8 +135,8 @@ internal data class WizardPage(
  * [com.bloo.bluelink.data.platformOverridable] is true -- see that
  * property's own doc; there's nothing to confirm for the rest), then SEATS,
  * then STEERING, in that order. The resulting list drives a single
- * [HorizontalPager] in [CarSetupWizardScreen], so a multi-car setup becomes
- * one continuous swipe sequence instead of nested per-car flows.
+ * [AnimatedContent] in [CarSetupWizardScreen], so a multi-car setup becomes
+ * one continuous Back/Next sequence instead of nested per-car flows.
  */
 internal fun buildSetupPages(vehicles: List<com.bloo.bluelink.data.Vehicle>): List<WizardPage> = buildList {
     vehicles.forEach { v ->
