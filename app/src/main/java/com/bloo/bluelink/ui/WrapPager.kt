@@ -20,6 +20,7 @@ import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
@@ -191,12 +192,11 @@ internal class WrapPagerState(val pager: PagerState, val realCount: Int) {
         val margin = realCount * RECENTER_MARGIN_CYCLES
         val page = pager.currentPage
         val count = pager.pageCount
-        // Comfortably inside both edges already -- nothing to do. Note this
-        // margin is measured off the pager's OWN current pageCount, not a
-        // value cached at creation, so it stays correct even if realCount
-        // (and therefore pageCount) changes later -- see rememberWrapPager's
-        // `remember(pager, realCount)` for why a realCount change re-seeds
-        // this whole wrapper anyway, landing back at a fresh center.
+        // Comfortably inside both edges already -- nothing to do. Note this margin is
+        // measured off the pager's OWN current pageCount, not a value cached at
+        // creation -- though in practice a realCount change gets an entirely fresh,
+        // freshly-seeded PagerState now (see rememberWrapPager's own doc), so this
+        // method only ever runs against a pageCount that matches the CURRENT realCount.
         if (page in margin..(count - 1 - margin)) return
         val center = count / 2
         val target = center - (center % realCount) + real(page)
@@ -208,16 +208,37 @@ internal class WrapPagerState(val pager: PagerState, val realCount: Int) {
  * Creates a [WrapPagerState] seeded at the middle of the virtual range plus
  * [initialRealIndex], so the pager opens on that real item and can wrap in
  * both directions. Falls back to a plain single-page state when [realCount]
- * <= 1. The underlying [PagerState] survives recomposition; the wrapper is
- * re-created only when [realCount] changes (it holds no scroll state itself).
+ * <= 1.
+ *
+ * The underlying [PagerState] is now recreated (via [key], not just re-wrapped)
+ * whenever [realCount] itself changes, landing back on a freshly-seeded, correctly
+ * mid-range position for the NEW real count -- this is the actual fix for the "Key 0
+ * was already used" crash that real-index keying ([WrapPagerState.keyFor]) kept
+ * hitting even with [WRAP_MULTIPLIER] made enormous: this composable used to let the
+ * SAME PagerState instance survive a realCount change (only the wrapper was rebuilt,
+ * per this doc's own previous claim that the PagerState "holds no scroll state" worth
+ * reseeding), which is harmless under raw-index keys (any page index is valid for any
+ * realCount) but breaks the real-index keying invariant outright: `currentPage` kept
+ * whatever raw value it had under the OLD realCount, and re-interpreting that same raw
+ * value's `real()`/beyond-window under a DIFFERENT realCount has no reason to land on a
+ * collision-free arrangement -- the safe-formula proof (perPage + 2*beyond <= total)
+ * assumes total is stable across the composed window, not changing out from under it.
+ * realCount changes exactly when this was most likely to bite: cold start, as the
+ * garage goes from 0 vehicles (nothing loaded yet) to however many actually exist,
+ * often within the first couple of frames.
+ *
+ * The cost: a genuine realCount change (a car added/removed, or this same 0-vehicles-
+ * then-N transition) now visibly resets scroll position to the freshly-seeded middle
+ * instead of preserving mid-swipe state across it -- correct trade for turning a crash
+ * into, at most, a snap back to center on the rare frame this actually happens.
  */
 @Composable
 internal fun rememberWrapPager(realCount: Int, initialRealIndex: Int = 0): WrapPagerState {
     val loop = realCount > 1
     val virtualCount = if (loop) realCount * WRAP_MULTIPLIER else realCount.coerceAtLeast(1)
     val start = (if (loop) virtualCount / 2 else 0) + initialRealIndex.coerceIn(0, (realCount - 1).coerceAtLeast(0))
-    val pager = rememberPagerState(initialPage = start) { virtualCount }
-    return remember(pager, realCount) { WrapPagerState(pager, realCount) }
+    val pager = key(realCount) { rememberPagerState(initialPage = start) { virtualCount } }
+    return remember(pager) { WrapPagerState(pager, realCount) }
 }
 
 /**
