@@ -110,6 +110,14 @@ internal fun GarageScreen(
     val expandedIndex by remember { derivedStateOf { state.value.expandedIndex } }
     val deviceLocation by remember { derivedStateOf { state.value.deviceLocation } }
     val showSettingsHint by remember { derivedStateOf { state.value.showSettingsHint } }
+    // Settled-on-Settings signal, narrowed so only the folded-in Settings PAGE's own
+    // composition (and not the whole pager) reacts when it flips. Read below to defer
+    // SettingsScreen's heavy body until the pager actually settles on it -- this was
+    // added once already (the "switching cards janks for a second, then it's fine"
+    // report) and lost as accidental collateral damage of an unrelated cleanup (the
+    // commit that stripped the old keyFor() indirection re-touched this same block and
+    // dropped the gate along with it). Restored: reported again, verbatim.
+    val onSettingsPageSlot by remember { derivedStateOf { state.value.onSettingsPageSlot } }
     // No more early return on an empty garage: a zero-vehicle account is now
     // just another state of this SAME screen (see `slots`/GarageStatusCard
     // below), not a separate standalone Screen.Empty route -- reported
@@ -623,7 +631,21 @@ internal fun GarageScreen(
                                 // LazyVerticalStaggeredGrid naturally collapses to a
                                 // single column at this page's width (one car-column)
                                 // instead of spreading wider.
-                                SettingsScreen(vm)
+                                //
+                                // Deferred until the pager actually SETTLES on Settings:
+                                // SettingsScreen is the single heaviest page in the wrap
+                                // (a whole LazyVerticalStaggeredGrid of cards), and it sits
+                                // exactly where the first car-swipe needs it as its
+                                // beyondViewportPageCount=1 pre-warmed neighbour. Composing it
+                                // there meant every cold-start's FIRST swipe paid for a full
+                                // SettingsScreen build on the drag frame -- the "switching cards
+                                // janks for a second, then it's fine" report. Compose nothing
+                                // (the app's own gradient shows through) until the user is
+                                // actually on Settings; the settle swap is a one-time cost on a
+                                // screen the user chose to visit, not a tax on every car-swipe.
+                                if (onSettingsPageSlot) {
+                                    SettingsScreen(vm)
+                                }
                             } else if (count == 0) {
                                 // No cars at all: the status card takes this pager's
                                 // one other slot instead of a car -- see

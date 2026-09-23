@@ -175,6 +175,11 @@ internal fun CompactGarage(state: State<UiState>, vm: AppViewModel, appearance: 
     val vehicles by remember { derivedStateOf { state.value.vehicles } }
     val refreshing by remember { derivedStateOf { state.value.refreshing } }
     val locked by remember { derivedStateOf { state.value.locked } }
+    // Settled-on-Settings signal -- see GarageScreen's matching read for why this defers
+    // CoverSettingsGate's own SettingsScreen body until the pager actually settles there,
+    // instead of paying for a full LazyVerticalStaggeredGrid build as its pre-warmed
+    // neighbour on the FIRST car-switch swipe of a single-car cover account.
+    val onSettingsPageSlot by remember { derivedStateOf { state.value.onSettingsPageSlot } }
     val count = vehicles.size
     // At least one non-Settings page even with zero cars: the "no connection"/
     // "not signed in"/"no vehicles" status card takes that one slot instead of
@@ -299,8 +304,17 @@ internal fun CompactGarage(state: State<UiState>, vm: AppViewModel, appearance: 
                 // CoverSettingsGate rather than SettingsScreen directly, so the
                 // one-time "built for a taller phone" nudge shows here too, the
                 // only place cover Settings is reached now.
+                //
+                // Deferred until the pager actually settles here -- same reasoning and
+                // report as GarageScreen's matching gate (its own doc has the full
+                // history): CoverSettingsGate's SettingsScreen is the heaviest page in
+                // this wrap too, and composing it as a pre-warmed neighbour paid for a
+                // full LazyVerticalStaggeredGrid build on the very first car-switch
+                // swipe of a single-car account.
                 Box(Modifier.fillMaxSize().pagerDepth(pager, page)) {
-                    CoverSettingsGate(vm)
+                    if (onSettingsPageSlot) {
+                        CoverSettingsGate(vm)
+                    }
                 }
                 return@HorizontalPager
             }
