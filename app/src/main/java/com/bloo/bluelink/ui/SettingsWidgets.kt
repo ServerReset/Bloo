@@ -251,10 +251,12 @@ internal fun SettingsCard(
     status: String? = null,
     content: @Composable () -> Unit,
 ) {
-    // Open/closed now lives where a car pebble's does -- the same collapse set, persisted to the
-    // same store under a reserved pseudo-VIN (see AppViewModel.toggleSettingsCard). This used to
-    // be a local `rememberSaveable`, which is why a Settings card forgot whether it was open
-    // whenever the process was killed while a car's pebble two screens away remembered.
+    // Open/closed now lives where a car pebble's does -- the literal same collapse set and
+    // TOGGLE FUNCTION (togglePebble, via the placeholder SettingsPseudoVehicle), not a
+    // separate toggleSettingsCard that used to duplicate togglePebble's own body byte for
+    // byte under SETTINGS_CARD_VIN. This used to be a local `rememberSaveable`, which is why
+    // a Settings card forgot whether it was open whenever the process was killed while a
+    // car's pebble two screens away remembered.
     val collapsed by vm.collapsedSections.collectAsStateWithLifecycle()
     val inline = inlineSetting != null
     val expanded = !inline && "$SETTINGS_CARD_VIN:$title" !in collapsed
@@ -280,7 +282,7 @@ internal fun SettingsCard(
     ) {
         PebbleShell(
             expanded = expanded,
-            onToggle = { if (!inline) vm.toggleSettingsCard(title) },
+            onToggle = { if (!inline) vm.togglePebble(SettingsPseudoVehicle, title) },
             icon = icon ?: Icons.Filled.Settings,
             title = title,
             canToggle = !inline,

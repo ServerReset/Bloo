@@ -240,12 +240,12 @@ internal fun StatusHeaderRow(icon: ImageVector, tint: Color, title: String, stat
  * an at-a-glance update chip, so a whole second card just to act on it read as
  * the same information twice with the action bolted onto the wrong copy.
  * Collapsed, this card is unchanged -- identity, car count, update chip, big
- * build number. Expanded (the same chevron/[AppViewModel.toggleSettingsCard]
- * persistence every other card uses, under the "Updates" key so a prior
- * collapse/expand choice carries over), it reveals the Check/GitHub row, the
- * Shizuku toggle, and -- only when one is actually available -- the full
- * download/install flow with release notes, exactly what the old card showed
- * once opened.
+ * build number. Expanded (the same chevron/[AppViewModel.togglePebble]
+ * persistence every other card and every car pebble uses, under the "Updates"
+ * key so a prior collapse/expand choice carries over), it reveals the
+ * Check/GitHub row, the Shizuku toggle, and -- only when one is actually
+ * available -- the full download/install flow with release notes, exactly
+ * what the old card showed once opened.
  */
 @Composable
 internal fun SettingsHeroCard(state: UiState, vm: AppViewModel, compact: Boolean) {
@@ -297,7 +297,7 @@ internal fun SettingsHeroCard(state: UiState, vm: AppViewModel, compact: Boolean
                 Spacer(Modifier.width(4.dp))
                 MorphExpandButton(
                     expanded = expanded,
-                    onToggle = { vm.toggleSettingsCard("Updates") },
+                    onToggle = { vm.togglePebble(SettingsPseudoVehicle, "Updates") },
                 )
             }
             Spacer(Modifier.height(if (compact) 12.dp else 16.dp))

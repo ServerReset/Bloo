@@ -78,6 +78,25 @@ sealed interface Screen {
 internal const val SETTINGS_CARD_VIN = "__settings__"
 
 /**
+ * A placeholder [Vehicle] that exists for exactly one reason: so [SettingsCard] can call
+ * [AppViewModel.togglePebble] -- the literal same expand/collapse toggle function every
+ * car pebble uses, keyed on `v.vin` -- instead of carrying its own separate
+ * `toggleSettingsCard` that duplicated its body byte for byte under [SETTINGS_CARD_VIN].
+ * Only `vin` is ever read off it (`togglePebble` doesn't touch any other field); the rest
+ * are empty/false placeholders that must never be shown anywhere, since this vehicle
+ * doesn't correspond to anything real.
+ */
+internal val SettingsPseudoVehicle = Vehicle(
+    vin = SETTINGS_CARD_VIN,
+    regId = "",
+    name = "",
+    model = "",
+    generation = "",
+    brandIndicator = "",
+    isEv = false,
+)
+
+/**
  * PERF, and it matters more than it looks: every pebble on every live car-pager
  * page takes this whole object as a parameter. Kotlin's `List`/`Map`/`Set` are
  * interfaces, so without this annotation the Compose compiler infers UiState as

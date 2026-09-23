@@ -2245,22 +2245,13 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         .stateIn(viewModelScope, SharingStarted.Eagerly, emptySet())
 
     /**
-     * The Settings-screen counterpart of [togglePebble], keyed by card title under a reserved
-     * pseudo-VIN. Same state, same store, same persistence -- so a Settings card remembers
-     * whether it was open across launches exactly the way a car's pebble does, rather than
-     * through a local rememberSaveable that a process death throws away.
+     * Settings cards call this exact function too, via the placeholder
+     * [SettingsPseudoVehicle] (its `vin` is the only field [togglePebble] ever reads) --
+     * not a separate `toggleSettingsCard` that used to duplicate this whole body under
+     * [SETTINGS_CARD_VIN] by hand. Same state, same store, same persistence -- so a
+     * Settings card remembers whether it was open across launches exactly the way a
+     * car's pebble does, through the literal same code path rather than a lookalike.
      */
-    fun toggleSettingsCard(title: String) {
-        val key = "$SETTINGS_CARD_VIN:$title"
-        val collapsedNow = key !in _state.value.collapsedPebbles
-        _state.update {
-            it.copy(
-                collapsedPebbles = if (collapsedNow) it.collapsedPebbles + key else it.collapsedPebbles - key,
-            )
-        }
-        viewModelScope.launch { settingsStore.setSectionCollapsed(SETTINGS_CARD_VIN, title, collapsedNow) }
-    }
-
     fun togglePebble(v: Vehicle, section: String) {
         val key = "${v.vin}:$section"
         val collapsedNow = key !in _state.value.collapsedPebbles
