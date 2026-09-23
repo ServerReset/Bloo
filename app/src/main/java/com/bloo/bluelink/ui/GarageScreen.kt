@@ -110,14 +110,6 @@ internal fun GarageScreen(
     val expandedIndex by remember { derivedStateOf { state.value.expandedIndex } }
     val deviceLocation by remember { derivedStateOf { state.value.deviceLocation } }
     val showSettingsHint by remember { derivedStateOf { state.value.showSettingsHint } }
-    // Settled-on-Settings signal, narrowed so only the folded-in Settings PAGE's own
-    // composition (and not the whole pager) reacts when it flips. Read below to defer
-    // SettingsScreen's heavy body until the pager actually settles on it -- this was
-    // added once already (the "switching cards janks for a second, then it's fine"
-    // report) and lost as accidental collateral damage of an unrelated cleanup (the
-    // commit that stripped the old keyFor() indirection re-touched this same block and
-    // dropped the gate along with it). Restored: reported again, verbatim.
-    val onSettingsPageSlot by remember { derivedStateOf { state.value.onSettingsPageSlot } }
     // No more early return on an empty garage: a zero-vehicle account is now
     // just another state of this SAME screen (see `slots`/GarageStatusCard
     // below), not a separate standalone Screen.Empty route -- reported
@@ -633,30 +625,21 @@ internal fun GarageScreen(
                                 // width (one car-column) regardless of how wide the
                                 // screen sharing it is.
                                 //
-                                // Deferred until the pager actually SETTLES on Settings, OR
-                                // (added after this page showed as a blank void with just the
-                                // app's own background visible through an active drag -- "it
-                                // doesn't show until you let go") until this page becomes the
-                                // pager's own `currentPage`. `currentPage` flips as soon as the
-                                // drag crosses the halfway point toward this page, well before
-                                // release/settle -- unlike `settledPage`, it's a plain state
-                                // read here (not inside graphicsLayer{}), but it only changes
-                                // ONCE per crossing, not every drag frame, so this does not
-                                // reintroduce a per-frame recompose of SettingsScreen.
-                                //
-                                // Still deferred (neither condition true) while this page is
-                                // merely the beyondViewportPageCount=1 pre-warmed NEIGHBOUR of
-                                // whatever page is actually current -- SettingsScreen is the
-                                // single heaviest page in the wrap (a whole
-                                // LazyColumn of cards), and composing it just for
-                                // being pre-warmed meant every cold-start's FIRST swipe paid for
-                                // a full SettingsScreen build on the drag frame -- the "switching
-                                // cards janks for a second, then it's fine" report. Compose
-                                // nothing (the app's own gradient shows through) until the drag
-                                // has actually crossed onto this page.
-                                if (onSettingsPageSlot || pager.currentPage == page) {
-                                    SettingsScreen(vm)
-                                }
+                                // Always composed here, the same as any other page in this
+                                // pager (a car's VehicleDetailContent is never deferred either)
+                                // -- this used to be gated behind onSettingsPageSlot/currentPage
+                                // specifically to avoid paying for a full SettingsScreen build
+                                // on the drag frame the FIRST time it's pre-warmed as a neighbour
+                                // near cold start. That deferral traded one *off-screen*, one-time
+                                // jank for a reproducible *on-screen* one: every real swipe onto
+                                // Settings now showed a black void (just the app's own background)
+                                // for as long as that same build took, however that build was
+                                // gated -- moving the gate earlier (currentPage instead of
+                                // settledPage) shrank the window but could not make the build
+                                // itself faster, so the void was still directly reported. Building
+                                // it as a pre-warmed neighbour instead means that cost is paid
+                                // while the page isn't visible yet, exactly like every other page.
+                                SettingsScreen(vm)
                             } else if (count == 0) {
                                 // No cars at all: the status card takes this pager's
                                 // one other slot instead of a car -- see

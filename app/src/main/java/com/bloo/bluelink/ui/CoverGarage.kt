@@ -175,11 +175,6 @@ internal fun CompactGarage(state: State<UiState>, vm: AppViewModel, appearance: 
     val vehicles by remember { derivedStateOf { state.value.vehicles } }
     val refreshing by remember { derivedStateOf { state.value.refreshing } }
     val locked by remember { derivedStateOf { state.value.locked } }
-    // Settled-on-Settings signal -- see GarageScreen's matching read for why this defers
-    // CoverSettingsGate's own SettingsScreen body until the pager actually settles there,
-    // instead of paying for a full LazyColumn build as its pre-warmed
-    // neighbour on the FIRST car-switch swipe of a single-car cover account.
-    val onSettingsPageSlot by remember { derivedStateOf { state.value.onSettingsPageSlot } }
     val count = vehicles.size
     // At least one non-Settings page even with zero cars: the "no connection"/
     // "not signed in"/"no vehicles" status card takes that one slot instead of
@@ -305,24 +300,17 @@ internal fun CompactGarage(state: State<UiState>, vm: AppViewModel, appearance: 
                 // one-time "built for a taller phone" nudge shows here too, the
                 // only place cover Settings is reached now.
                 //
-                // Deferred until the pager actually settles here, OR until this page
-                // becomes the pager's own `currentPage` -- same fix and reasoning as
-                // GarageScreen's matching gate (its own doc has the full history): without
-                // the `currentPage` check, an active drag onto this page showed as a blank
-                // void (the app's own background alone) until release, since `settledPage`
-                // only updates on settle. `currentPage` flips as soon as the drag crosses
-                // the halfway point, and only changes once per crossing (not every drag
-                // frame), so this is still a plain state read here, not inside
-                // graphicsLayer{}. Still deferred while this page is merely the
-                // beyondViewportPageCount=1 pre-warmed NEIGHBOUR of whatever page is
-                // actually current: CoverSettingsGate's SettingsScreen is the heaviest page
-                // in this wrap too, and composing it as a pre-warmed neighbour paid for a
-                // full LazyColumn build on the very first car-switch swipe of
-                // a single-car account.
+                // Always composed here, the same as any other page in this pager -- see
+                // GarageScreen's matching site for why: deferring this build until the
+                // pager settled (or later, until it merely reached `currentPage`) traded
+                // one off-screen, one-time jank (paying for a full CoverSettingsGate/
+                // SettingsScreen build while pre-warmed as a neighbour, before the user
+                // could see it) for a reproducible ON-screen black void every real swipe
+                // onto Settings -- directly reported. Composing it as a pre-warmed
+                // neighbour, unconditionally, means that cost is paid before this page
+                // is visible, exactly like every other page.
                 Box(Modifier.fillMaxSize().pagerDepth(pager, page)) {
-                    if (onSettingsPageSlot || pager.currentPage == page) {
-                        CoverSettingsGate(vm)
-                    }
+                    CoverSettingsGate(vm)
                 }
                 return@HorizontalPager
             }
