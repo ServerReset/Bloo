@@ -49,7 +49,7 @@ import java.util.Locale
  * [com.bloo.bluelink.ui.isBatterySaverOn] -- which is now dozens of them per
  * screen (every glass surface, every battery-saver-aware spring).
  */
-class BlooApplication : Application(), Configuration.Provider {
+class BlooApplication : Application(), Configuration.Provider, coil.ImageLoaderFactory {
 
     /**
      * Earliest hook the process gets -- runs before [onCreate] and before any
@@ -78,6 +78,53 @@ class BlooApplication : Application(), Configuration.Provider {
             // because it is the one piece of lazy init that can land on the main thread.
             StartupTrace.mark("WorkManager configuration requested (lazy init)")
         }
+
+    /**
+     * A firm, explicit cap on Coil's own in-memory bitmap cache, replacing the library's
+     * singleton default (built the first time any `context.imageLoader` call resolves it,
+     * with no factory to override it -- which is what every AsyncImage in this app,
+     * chiefly [com.bloo.bluelink.ui.CarMap]'s per-tile grid, was doing).
+     *
+     * WHY this exists: a Pixel 10 Pro crash report showed heap climbing from ~5MB at cold
+     * start to 220-255MB over one real session with nothing else in [AppLog] that could
+     * plausibly account for it (the network calls in that window were failing DNS
+     * lookups, so no vehicle-status payload was ever large; WorkManager's own periodic
+     * fetch ran fine at that same inflated heap size, so it wasn't the leak), eventually
+     * OOM-ing on a routine coroutine-cancellation string concat -- i.e. the crash itself
+     * was just whatever tiny allocation happened to land after the heap was already
+     * effectively full. This app has no `android:largeHeap`, so its process heap ceiling
+     * here was 256MB -- and it is also the one app screen that keeps requesting genuinely
+     * NEW images for as long as it's open: panning/driving crosses into fresh map tiles
+     * continuously, each a real cache MISS, not a repeat of something already shown.
+     * Coil's own default cache sizes itself off `ActivityManager.getMemoryClass()`, which
+     * already reflects this same 256MB ceiling -- so in principle its default 25% share
+     * (~64MB) should have self-limited well under the crash's 220MB+, but with no factory
+     * here to make that bound explicit and verifiable, this app had no code-level
+     * guarantee of it at all, only whatever the library's own heuristic happened to
+     * decide. This makes the limit an explicit, deliberate constant instead of an
+     * inherited default this app never actually chose.
+     *
+     * `maxSizeBytes` (a fixed 48MB), not `maxSizePercent`: percent-of-available-memory is
+     * the right default for a typical app showing a handful of images at a time, but this
+     * app's one heavy consumer is an effectively-unbounded STREAM of same-sized 256x256
+     * tiles for as long as a map is on screen, where the right cap is "how many tiles is
+     * it reasonable to hold at once" (48MB / ~256KB decoded per tile ≈ 190 tiles -- several
+     * screens' worth in every direction), not a fraction of whatever this specific device
+     * happens to report as available.
+     */
+    override fun newImageLoader(): coil.ImageLoader = coil.ImageLoader.Builder(this)
+        .memoryCache {
+            coil.memory.MemoryCache.Builder(this)
+                .maxSizeBytes(48 * 1024 * 1024)
+                .build()
+        }
+        .diskCache {
+            coil.disk.DiskCache.Builder()
+                .directory(cacheDir.resolve("coil_disk_cache"))
+                .maxSizeBytes(100 * 1024 * 1024)
+                .build()
+        }
+        .build()
 
     // @SuppressLint("DefaultUncaughtExceptionDelegation") is deliberate, not an oversight:
     // this handler does NOT chain to the previously-installed default handler. It owns the
