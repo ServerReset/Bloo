@@ -3317,6 +3317,51 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
      *  re-emits this. */
     fun setMapExpanded(value: Boolean) {
         if (_state.value.mapExpanded != value) _state.update { it.copy(mapExpanded = value) }
+        // The map itself just collapsed: drop whatever charger state belonged to
+        // it, so the next car's map (or this same one reopened) starts from
+        // "chargers not shown" rather than inheriting the last car's toggle.
+        if (!value && _state.value.chargersVisible) {
+            _state.update { it.copy(chargersVisible = false) }
+        }
+    }
+
+    /** The expanded map's "Chargers" [MapFeature] -- toggles the layer on/off, and on
+     *  the way ON, fetches around [around] if nothing's loaded yet (or [force]s a
+     *  fresh fetch regardless, for a genuine re-search after panning far away). A
+     *  filter-only change (speed/network) never calls this -- see
+     *  [setChargerMinKw]/[toggleChargerNetwork], which re-filter the already-fetched
+     *  list instead of re-fetching. */
+    fun toggleChargersVisible(around: GeoLocation, force: Boolean = false) {
+        val showing = !_state.value.chargersVisible
+        _state.update { it.copy(chargersVisible = showing) }
+        if (showing && (force || _state.value.chargers.isEmpty())) loadNearbyChargers(around)
+    }
+
+    /** Fetches Open Charge Map stations around [around] and replaces [UiState.chargers]
+     *  wholesale -- see [com.bloo.bluelink.data.ChargerApi.nearby]'s own doc for why a
+     *  failure surfaces as an empty list rather than an error the UI has to branch on. */
+    fun loadNearbyChargers(around: GeoLocation) {
+        _state.update { it.copy(chargersLoading = true) }
+        viewModelScope.launch {
+            val stations = com.bloo.bluelink.data.ChargerApi.nearby(around.latitude, around.longitude)
+            _state.update { it.copy(chargers = stations, chargersLoading = false) }
+        }
+    }
+
+    /** 0 clears the speed filter entirely ("any speed"). */
+    fun setChargerMinKw(kw: Int) {
+        _state.update { it.copy(chargerFilters = it.chargerFilters.copy(minKw = kw)) }
+    }
+
+    /** Toggles one network name in/out of the filter's allow-list -- an empty
+     *  resulting set means "any network", not "no networks match", matching
+     *  [com.bloo.bluelink.data.ChargerFilters]'s own doc. */
+    fun toggleChargerNetwork(network: String) {
+        _state.update {
+            val current = it.chargerFilters.networks
+            val next = if (network in current) current - network else current + network
+            it.copy(chargerFilters = it.chargerFilters.copy(networks = next))
+        }
     }
 
     // Appearance/preference setters (setThemeMode through setColorPalette,

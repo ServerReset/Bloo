@@ -238,6 +238,22 @@ data class UiState(
      *  two overlapped and clipped into each other, reported directly from a
      *  screenshot. */
     val mapExpanded: Boolean = false,
+    /** Whether the expanded map's "nearby chargers" layer is currently toggled on --
+     *  see [com.bloo.bluelink.ui.ExpandableMapLayer]'s own "Chargers" [com.bloo.bluelink.ui.MapFeature].
+     *  Reset to false whenever the map itself collapses (alongside [mapExpanded]),
+     *  so reopening a different car's map never inherits a stale "was showing
+     *  chargers" state from whichever car was expanded last. */
+    val chargersVisible: Boolean = false,
+    /** True while [chargers] is being (re)fetched from [com.bloo.bluelink.data.ChargerApi]. */
+    val chargersLoading: Boolean = false,
+    /** The last-fetched nearby chargers, centred on whichever car's map requested
+     *  them -- UNFILTERED. [com.bloo.bluelink.data.ChargerFilters] narrows what
+     *  actually draws on the map from this same list, so changing a filter never
+     *  needs a fresh network call. */
+    val chargers: List<com.bloo.bluelink.data.ChargerStation> = emptyList(),
+    /** User-set narrowing (minimum speed, network) for [chargers] -- see
+     *  [com.bloo.bluelink.data.ChargerFilters]'s own doc. */
+    val chargerFilters: com.bloo.bluelink.data.ChargerFilters = com.bloo.bluelink.data.ChargerFilters(),
     /** Gentle hint shown on the garage right after onboarding, nudging the user
      *  toward Settings to fine-tune each car. */
     val showSettingsHint: Boolean = false,

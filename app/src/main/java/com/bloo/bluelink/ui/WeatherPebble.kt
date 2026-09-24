@@ -59,6 +59,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.EvStation
 import androidx.compose.material.icons.filled.Fullscreen
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Map
@@ -128,6 +129,9 @@ import dev.chrisbanes.haze.hazeSource
 import coil.compose.AsyncImage
 import coil.imageLoader
 import coil.request.ImageRequest
+import com.bloo.bluelink.data.ChargerFilters
+import com.bloo.bluelink.data.ChargerStation
+import com.bloo.bluelink.data.matches
 import com.bloo.bluelink.data.GeoLocation
 import com.bloo.bluelink.data.MapTiles
 import com.bloo.bluelink.data.Vehicle
@@ -682,6 +686,14 @@ internal fun CarMap(
      * omits the marker.
      */
     deviceLocation: GeoLocation? = null,
+    /** Nearby EV chargers to plot alongside the car/device pins -- see
+     *  [com.bloo.bluelink.data.ChargerApi]'s own doc. Empty (the default) for every
+     *  caller that hasn't opted into the "Chargers" map feature. */
+    chargers: List<ChargerStation> = emptyList(),
+    /** Tapping a charger pin -- null (the default) draws them but ignores taps,
+     *  for a caller (like the compact pebble map) that never populates [chargers]
+     *  in the first place. */
+    onChargerClick: ((ChargerStation) -> Unit)? = null,
 ) {
     val context = LocalContext.current
     // Cold-start diagnostic -- see HeroVisual's matching mark for why. If the map is
@@ -1056,6 +1068,41 @@ internal fun CarMap(
                         .background(Color.White, CircleShape)
                         .padding(3.dp)
                         .background(deviceLocationColor, CircleShape),
+                )
+            }
+        }
+        // Nearby chargers, each going through the SAME full tile-coordinate
+        // conversion the device dot above does (its own tile position minus the
+        // car's, in pixels, plus however far the user has panned) -- there can be
+        // dozens of these, unlike the one device dot, so key() gives each pin a
+        // stable identity across recompositions the way the tile loop above already
+        // does for tiles. A fixed, always-visible green -- not a theme role like the
+        // car/device pins -- since it needs to read as "a charger" against any
+        // palette the car pin/device dot happen to be using today.
+        for (charger in chargers) {
+            key(charger.id) {
+                val dx = (MapTiles.tileX(charger.longitude, zoom) - xTileF) * tilePx
+                val dy = (MapTiles.tileY(charger.latitude, zoom) - yTileF) * tilePx
+                Icon(
+                    Icons.Filled.EvStation,
+                    contentDescription = charger.name,
+                    tint = ChargeGreen,
+                    modifier = Modifier
+                        .align(Alignment.Center)
+                        .offset { IntOffset((state.panX + dx).roundToInt(), (state.panY + dy).roundToInt()) }
+                        .size(28.dp)
+                        .offset(y = (-14).dp)
+                        .then(
+                            if (onChargerClick != null) {
+                                Modifier.clickable(
+                                    interactionSource = remember { MutableInteractionSource() },
+                                    indication = null,
+                                    onClickLabel = charger.name,
+                                ) { onChargerClick(charger) }
+                            } else {
+                                Modifier
+                            },
+                        ),
                 )
             }
         }
@@ -1456,6 +1503,17 @@ internal fun ExpandableMapLayer(
     /** See [MapTopBar]'s own doc -- the real command-pending flag, not a guess. */
     refreshing: Boolean = false,
     onDismiss: () -> Unit,
+    /** The "Chargers" [MapFeature] -- see [ChargerFinder]'s own doc for the whole
+     *  group. All default to "off"/"nothing loaded" so every OTHER existing caller's
+     *  behaviour is unchanged; GarageScreen's own call site is the only one that
+     *  wires these to real state today. */
+    chargersVisible: Boolean = false,
+    chargersLoading: Boolean = false,
+    chargers: List<ChargerStation> = emptyList(),
+    chargerFilters: ChargerFilters = ChargerFilters(),
+    onToggleChargersVisible: () -> Unit = {},
+    onSetChargerMinKw: (Int) -> Unit = {},
+    onToggleChargerNetwork: (String) -> Unit = {},
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -1500,6 +1558,11 @@ internal fun ExpandableMapLayer(
     // Same reason as dragSpring above -- read here, not inside the scope.launch{} in close().
     val closeSpring = lowPowerAwareSpring<Float>(dampingRatio = 0.95f, stiffness = Spring.StiffnessMedium)
     var closing by remember { mutableStateOf(false) }
+    // Which charger pin (if any) the user just tapped -- see the info card below.
+    // Cleared whenever the layer itself is hidden so reopening it never shows a
+    // stale popup for a pin that isn't even drawn any more.
+    var selectedCharger by remember { mutableStateOf<ChargerStation?>(null) }
+    LaunchedEffect(chargersVisible) { if (!chargersVisible) selectedCharger = null }
 
     fun close() {
         if (closing) return
@@ -1605,6 +1668,13 @@ internal fun ExpandableMapLayer(
                     Modifier.fillMaxSize().hazeSource(mapHazeState),
                     state = mapState,
                     deviceLocation = deviceLocation,
+                    // Filtered here, not passed raw: CarMap draws exactly what's handed to
+                    // it and has no notion of ChargerFilters of its own -- keeping that
+                    // narrowing at this call site is what lets every OTHER caller (the
+                    // compact pebble map, the cover screen) stay on CarMap's plain
+                    // empty-list default with nothing to opt out of.
+                    chargers = if (chargersVisible) chargers.filter { it.matches(chargerFilters) } else emptyList(),
+                    onChargerClick = { selectedCharger = it },
                 )
             }
 
@@ -1652,21 +1722,55 @@ internal fun ExpandableMapLayer(
                 )
             }
 
-            // Bottom buttons (appear when expanded)
+            // Bottom buttons (appear when expanded), plus -- above them, in the same
+            // bottom-anchored column -- the charger info popup and/or filter bar,
+            // whichever are relevant right now. Stacking them in one Column rather
+            // than each with its own hand-placed padding is what lets the filter
+            // bar's own height (it wraps, so it's taller with a network row than
+            // without) push the buttons down naturally instead of the two
+            // overlapping whenever the bar grows.
             if (isExpanded && expandFraction.value > 0.1f) {
-                MapFeatureRow(
-                    features = listOf(
-                        MapFeature(Icons.Filled.MyLocation, "Recentre") { mapState.recenter() },
-                        MapFeature(Icons.Filled.Map, "Open in Maps") {
-                            openInExternalMaps(context, location, vehicleName)
-                        },
-                    ),
+                Column(
                     modifier = Modifier
                         .align(Alignment.BottomCenter)
                         .fillMaxWidth()
                         .navigationBarsPadding()
                         .graphicsLayer { alpha = expandFraction.value.coerceIn(0f, 1f) },
-                )
+                ) {
+                    selectedCharger?.let { charger ->
+                        ChargerInfoCard(
+                            charger = charger,
+                            mapHazeState = mapHazeState,
+                            onDismiss = { selectedCharger = null },
+                            modifier = Modifier
+                                .align(Alignment.CenterHorizontally)
+                                .padding(horizontal = 16.dp, vertical = 8.dp),
+                        )
+                    }
+                    if (chargersVisible) {
+                        ChargerFilterBar(
+                            chargers = chargers,
+                            filters = chargerFilters,
+                            loading = chargersLoading,
+                            mapHazeState = mapHazeState,
+                            onSetMinKw = onSetChargerMinKw,
+                            onToggleNetwork = onToggleChargerNetwork,
+                            modifier = Modifier
+                                .align(Alignment.CenterHorizontally)
+                                .padding(horizontal = 16.dp, vertical = 8.dp),
+                        )
+                    }
+                    MapFeatureRow(
+                        features = listOf(
+                            MapFeature(Icons.Filled.MyLocation, "Recentre") { mapState.recenter() },
+                            MapFeature(Icons.Filled.EvStation, "Chargers") { onToggleChargersVisible() },
+                            MapFeature(Icons.Filled.Map, "Open in Maps") {
+                                openInExternalMaps(context, location, vehicleName)
+                            },
+                        ),
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                }
             }
         }
     }

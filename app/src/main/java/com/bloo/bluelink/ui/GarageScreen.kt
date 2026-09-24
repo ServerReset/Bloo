@@ -109,6 +109,10 @@ internal fun GarageScreen(
     val refreshing by remember { derivedStateOf { state.value.refreshing } }
     val expandedIndex by remember { derivedStateOf { state.value.expandedIndex } }
     val deviceLocation by remember { derivedStateOf { state.value.deviceLocation } }
+    val chargersVisible by remember { derivedStateOf { state.value.chargersVisible } }
+    val chargersLoading by remember { derivedStateOf { state.value.chargersLoading } }
+    val chargers by remember { derivedStateOf { state.value.chargers } }
+    val chargerFilters by remember { derivedStateOf { state.value.chargerFilters } }
     val showSettingsHint by remember { derivedStateOf { state.value.showSettingsHint } }
     // No more early return on an empty garage: a zero-vehicle account is now
     // just another state of this SAME screen (see `slots`/GarageStatusCard
@@ -738,6 +742,13 @@ internal fun GarageScreen(
                 // tracks the in-flight fetch this same button just kicked off.
                 refreshing = state.value.isPending(expandedVehicle.vin, "locate"),
                 onDismiss = { expandedMap.vin = null },
+                chargersVisible = chargersVisible,
+                chargersLoading = chargersLoading,
+                chargers = chargers,
+                chargerFilters = chargerFilters,
+                onToggleChargersVisible = { vm.toggleChargersVisible(expandedLocation) },
+                onSetChargerMinKw = { vm.setChargerMinKw(it) },
+                onToggleChargerNetwork = { vm.toggleChargerNetwork(it) },
             )
         }
     }
