@@ -1279,6 +1279,20 @@ internal fun SettingsScreen(
                                     // to unlocking the car. Failing to authenticate keeps the
                                     // lock on.
                                     val activity = context.findFragmentActivity()
+                                    // The cold-start lock decision is (biometricLock && canBio)
+                                    // OR a PIN being set (see AppViewModel's own doc) -- clearing
+                                    // ONLY biometricLock here used to leave the app locking on
+                                    // every launch anyway whenever a PIN was also set, reported
+                                    // directly as "turn off locking, it still asks every time".
+                                    // "App lock: Off" is this control's own promise that the app
+                                    // stops asking at all, so it has to clear BOTH mechanisms --
+                                    // the same biometric confirmation already required to get
+                                    // here is treated as proof of identity everywhere else in
+                                    // this screen (enabling/disabling the lock itself), so
+                                    // reusing it to also drop the PIN isn't a weaker gate than
+                                    // the PIN removal dialog's own "enter the current PIN" check,
+                                    // just a different, already-trusted proof of the same thing.
+                                    val pinAlsoSet = state.appPinSet
                                     if (activity == null) {
                                         // Fail closed -- keep the lock -- but say so,
                                         // rather than leaving the control looking stuck.
@@ -1286,9 +1300,16 @@ internal fun SettingsScreen(
                                     } else {
                                         showBiometricPrompt(
                                             activity = activity,
-                                            title = "Disable fingerprint lock",
-                                            subtitle = "Confirm to stop requiring it",
-                                            onSuccess = { vm.setBiometricLock(false) },
+                                            title = "Turn off app lock",
+                                            subtitle = if (pinAlsoSet) {
+                                                "Confirm to stop requiring it -- this also removes your PIN"
+                                            } else {
+                                                "Confirm to stop requiring it"
+                                            },
+                                            onSuccess = {
+                                                vm.setBiometricLock(false)
+                                                if (pinAlsoSet) vm.removeAppPin()
+                                            },
                                             onError = { },
                                         )
                                     }
