@@ -228,6 +228,7 @@ class SettingsStore(private val context: Context) {
         val LAST_VIN = stringPreferencesKey("last_vehicle_vin")
         val ORDER = stringPreferencesKey("vehicle_order")
         val SETTINGS_MODE = stringPreferencesKey("settings_mode")
+        val CHARGER_API_KEY = stringPreferencesKey("charger_api_key")
         /** Per-VIN default climate preset ID for the one-tap Start button in advanced mode. */
         const val DEFAULT_CLIMATE_PRESET_PREFIX = "default_climate_preset_"
     }
@@ -300,6 +301,13 @@ class SettingsStore(private val context: Context) {
         /** Opt-in "liquid glass" appearance. Off by default = current look; when
          *  on, floating chrome and cards use real backdrop refraction (API 31+)
          *  or an enhanced-frosted fallback below that. */
+        /** User's own free Open Charge Map API key (openchargemap.org), or null if
+         *  never set. OCM requires one per-caller now -- see ChargerApi's own doc --
+         *  and this app has no business shipping one embedded for every install to
+         *  share (a single key's rate limit split across every Bloo user would starve
+         *  fast). Entered inline from the expanded map's charger filter bar the first
+         *  time a search fails for lack of one. */
+        val chargerApiKey: String? = null,
     )
 
     // A reactive view of every appearance-related preference at once: each time
@@ -356,6 +364,7 @@ class SettingsStore(private val context: Context) {
             coverSettingsHintDismissed = prefs[Keys.COVER_SETTINGS_HINT]?.toBooleanStrictOrNull() ?: false,
             showSearch = prefs[Keys.SHOW_SEARCH]?.toBooleanStrictOrNull() ?: true,
             seamlessInstallShizuku = prefs[Keys.SEAMLESS_INSTALL_SHIZUKU]?.toBooleanStrictOrNull() ?: false,
+            chargerApiKey = prefs[Keys.CHARGER_API_KEY],
         )
     }
         // Off the main thread. This is a ~40-field decode including two JSON parses (custom
@@ -2486,6 +2495,16 @@ class SettingsStore(private val context: Context) {
             mut.remove(stringPreferencesKey("sync_dirty_keys"))
         }
         return true
+    }
+
+    // --- Chargers ----------------------------------------------------------
+
+    /** Sets or clears (blank/null) the user's own Open Charge Map API key -- see
+     *  [Appearance.chargerApiKey]'s own doc. */
+    suspend fun setChargerApiKey(key: String?) {
+        editTracked {
+            if (key.isNullOrBlank()) it.remove(Keys.CHARGER_API_KEY) else it[Keys.CHARGER_API_KEY] = key.trim()
+        }
     }
 
     // --- Weather ---------------------------------------------------------

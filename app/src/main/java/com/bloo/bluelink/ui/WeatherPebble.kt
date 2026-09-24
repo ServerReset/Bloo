@@ -1149,11 +1149,21 @@ internal data class MapFeature(
  * rather than being re-typed inline here.
  */
 @Composable
-private fun MapFeatureRow(features: List<MapFeature>, modifier: Modifier = Modifier) {
+private fun MapFeatureRow(
+    features: List<MapFeature>,
+    modifier: Modifier = Modifier,
+    /** False for three-plus features: rather than wrapping a lone last button onto
+     *  its own full-width second line (reported directly from a screenshot, once
+     *  "Chargers" became a third feature here), the whole row compacts to icon-only
+     *  buttons instead -- see [ExpressiveButtonRow]'s own `wrap` doc. Still true (the
+     *  default) for the two-feature rows this always fit fine. */
+    wrap: Boolean = true,
+) {
     ExpressiveButtonRow(
         modifier = modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp),
         spacing = 10.dp,
         equalWidths = true,
+        wrap = wrap,
     ) {
         features.forEach { feature ->
             val source = remember { MutableInteractionSource() }
@@ -1509,11 +1519,17 @@ internal fun ExpandableMapLayer(
      *  wires these to real state today. */
     chargersVisible: Boolean = false,
     chargersLoading: Boolean = false,
+    /** Set only on a genuine fetch failure (network/auth/parse) -- see
+     *  [com.bloo.bluelink.data.ChargerApi.nearby]'s own doc for why that's kept
+     *  distinct from [chargers] simply being empty. */
+    chargersError: String? = null,
     chargers: List<ChargerStation> = emptyList(),
     chargerFilters: ChargerFilters = ChargerFilters(),
     onToggleChargersVisible: () -> Unit = {},
+    onRetryChargers: () -> Unit = {},
     onSetChargerMinKw: (Int) -> Unit = {},
     onToggleChargerNetwork: (String) -> Unit = {},
+    onSetChargerApiKey: (String?) -> Unit = {},
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -1737,27 +1753,45 @@ internal fun ExpandableMapLayer(
                         .navigationBarsPadding()
                         .graphicsLayer { alpha = expandFraction.value.coerceIn(0f, 1f) },
                 ) {
-                    selectedCharger?.let { charger ->
-                        ChargerInfoCard(
-                            charger = charger,
-                            mapHazeState = mapHazeState,
-                            onDismiss = { selectedCharger = null },
-                            modifier = Modifier
-                                .align(Alignment.CenterHorizontally)
-                                .padding(horizontal = 16.dp, vertical = 8.dp),
-                        )
+                    // lastSelectedCharger, not selectedCharger directly, inside the PopVisible
+                    // content below: PopVisible's exit animation still has to render SOMETHING
+                    // while it fades/shrinks out, and selectedCharger itself goes null the
+                    // instant it's dismissed -- rendering that null directly would blank the
+                    // card the moment the exit starts instead of letting it visibly fade away.
+                    var lastSelectedCharger by remember { mutableStateOf<ChargerStation?>(null) }
+                    LaunchedEffect(selectedCharger) {
+                        selectedCharger?.let { lastSelectedCharger = it }
                     }
-                    if (chargersVisible) {
+                    PopVisible(
+                        visible = selectedCharger != null,
+                        sizeAnimated = true,
+                        modifier = Modifier.align(Alignment.CenterHorizontally),
+                    ) {
+                        lastSelectedCharger?.let { charger ->
+                            ChargerInfoCard(
+                                charger = charger,
+                                mapHazeState = mapHazeState,
+                                onDismiss = { selectedCharger = null },
+                                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                            )
+                        }
+                    }
+                    PopVisible(
+                        visible = chargersVisible,
+                        sizeAnimated = true,
+                        modifier = Modifier.align(Alignment.CenterHorizontally),
+                    ) {
                         ChargerFilterBar(
                             chargers = chargers,
                             filters = chargerFilters,
                             loading = chargersLoading,
+                            error = chargersError,
                             mapHazeState = mapHazeState,
                             onSetMinKw = onSetChargerMinKw,
                             onToggleNetwork = onToggleChargerNetwork,
-                            modifier = Modifier
-                                .align(Alignment.CenterHorizontally)
-                                .padding(horizontal = 16.dp, vertical = 8.dp),
+                            onRetry = onRetryChargers,
+                            onSaveApiKey = onSetChargerApiKey,
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
                         )
                     }
                     MapFeatureRow(
@@ -1769,6 +1803,7 @@ internal fun ExpandableMapLayer(
                             },
                         ),
                         modifier = Modifier.fillMaxWidth(),
+                        wrap = false,
                     )
                 }
             }

@@ -17,18 +17,25 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.EvStation
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.bloo.bluelink.data.ChargerFilters
@@ -64,9 +71,16 @@ internal fun ChargerFilterBar(
     chargers: List<ChargerStation>,
     filters: ChargerFilters,
     loading: Boolean,
+    /** Set only on a genuine fetch failure -- see [com.bloo.bluelink.data.ChargerApi.nearby]'s
+     *  own doc. Switches this whole bar to a compact error state (message + retry + an inline
+     *  API key field, since a missing/invalid key is the single most likely cause) instead of
+     *  the normal speed/network controls. */
+    error: String?,
     mapHazeState: HazeState,
     onSetMinKw: (Int) -> Unit,
     onToggleNetwork: (String) -> Unit,
+    onRetry: () -> Unit,
+    onSaveApiKey: (String?) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     // Recomputed only when the fetch itself changes (a new List instance), not on every
@@ -79,40 +93,83 @@ internal fun ChargerFilterBar(
         modifier = modifier.fillMaxWidth().widthIn(max = 520.dp),
     ) {
         Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp)) {
-            Text(
-                when {
-                    loading -> "Searching for chargers…"
-                    matchCount == 1 -> "1 charger nearby"
-                    else -> "$matchCount chargers nearby"
-                },
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-            Spacer(Modifier.height(8.dp))
-            MorphSegmented(
-                options = listOf(
-                    SegmentOption("0", "Any speed", null),
-                    SegmentOption("50", "50kW+", null),
-                    SegmentOption("150", "150kW+", null),
-                ),
-                selectedKey = filters.minKw.toString(),
-                onSelect = { key -> onSetMinKw(key.toIntOrNull() ?: 0) },
-            )
-            if (networks.isNotEmpty()) {
+            if (error != null) {
+                Text(
+                    error,
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.error,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    "Open Charge Map needs a free API key per app. Register one at " +
+                        "openchargemap.org (My Profile → My Apps), then paste it below.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(Modifier.height(10.dp))
+                var keyInput by remember { mutableStateOf("") }
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    OutlinedTextField(
+                        value = keyInput,
+                        onValueChange = { keyInput = it },
+                        placeholder = { Text("API key") },
+                        singleLine = true,
+                        shape = FieldShape,
+                        colors = borderlessFieldColors(),
+                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                        keyboardActions = KeyboardActions(onDone = {
+                            if (keyInput.isNotBlank()) onSaveApiKey(keyInput)
+                        }),
+                        modifier = Modifier.weight(1f),
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    MorphTextButton(
+                        "Save",
+                        onClick = { onSaveApiKey(keyInput) },
+                        enabled = keyInput.isNotBlank(),
+                        showIcon = false,
+                    )
+                }
                 Spacer(Modifier.height(8.dp))
-                Row(
-                    Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    networks.forEach { network ->
-                        MorphChip(
-                            selected = network in filters.networks,
-                            onClick = { onToggleNetwork(network) },
-                            label = network,
-                        )
+                MorphTextButton("Retry", onClick = onRetry, showIcon = false, modifier = Modifier.fillMaxWidth())
+            } else {
+                Text(
+                    when {
+                        loading -> "Searching for chargers…"
+                        matchCount == 1 -> "1 charger nearby"
+                        else -> "$matchCount chargers nearby"
+                    },
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Spacer(Modifier.height(8.dp))
+                MorphSegmented(
+                    options = listOf(
+                        SegmentOption("0", "Any speed", null),
+                        SegmentOption("50", "50kW+", null),
+                        SegmentOption("150", "150kW+", null),
+                    ),
+                    selectedKey = filters.minKw.toString(),
+                    onSelect = { key -> onSetMinKw(key.toIntOrNull() ?: 0) },
+                )
+                if (networks.isNotEmpty()) {
+                    Spacer(Modifier.height(8.dp))
+                    Row(
+                        Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        networks.forEach { network ->
+                            MorphChip(
+                                selected = network in filters.networks,
+                                onClick = { onToggleNetwork(network) },
+                                label = network,
+                            )
+                        }
                     }
                 }
             }

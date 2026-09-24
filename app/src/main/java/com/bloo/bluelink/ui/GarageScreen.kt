@@ -111,6 +111,7 @@ internal fun GarageScreen(
     val deviceLocation by remember { derivedStateOf { state.value.deviceLocation } }
     val chargersVisible by remember { derivedStateOf { state.value.chargersVisible } }
     val chargersLoading by remember { derivedStateOf { state.value.chargersLoading } }
+    val chargersError by remember { derivedStateOf { state.value.chargersError } }
     val chargers by remember { derivedStateOf { state.value.chargers } }
     val chargerFilters by remember { derivedStateOf { state.value.chargerFilters } }
     val showSettingsHint by remember { derivedStateOf { state.value.showSettingsHint } }
@@ -744,11 +745,14 @@ internal fun GarageScreen(
                 onDismiss = { expandedMap.vin = null },
                 chargersVisible = chargersVisible,
                 chargersLoading = chargersLoading,
+                chargersError = chargersError,
                 chargers = chargers,
                 chargerFilters = chargerFilters,
                 onToggleChargersVisible = { vm.toggleChargersVisible(expandedLocation) },
+                onRetryChargers = { vm.loadNearbyChargers(expandedLocation) },
                 onSetChargerMinKw = { vm.setChargerMinKw(it) },
                 onToggleChargerNetwork = { vm.toggleChargerNetwork(it) },
+                onSetChargerApiKey = { vm.setChargerApiKey(it, expandedLocation) },
             )
         }
     }

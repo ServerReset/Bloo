@@ -57,11 +57,23 @@ fun ChargerStation.matches(filters: ChargerFilters): Boolean {
 
 /**
  * Nearby EV charging stations from Open Charge Map (https://openchargemap.org), a
- * free, community-maintained, key-less global charger database -- deliberately NOT
- * something this app curates or maintains itself, the same reasoning [WeatherApi]'s
- * own doc gives for Open-Meteo: a nearby-charger list is exactly the kind of thing a
+ * free, community-maintained global charger database -- deliberately NOT something
+ * this app curates or maintains itself, the same reasoning [WeatherApi]'s own doc
+ * gives for Open-Meteo: a nearby-charger list is exactly the kind of thing a
  * dedicated third party already does well (and keeps current as stations open, close
  * or change networks) that this app has no business trying to replicate.
+ *
+ * NOT key-less, unlike [WeatherApi]/[MapTiles] -- OCM now requires a per-caller API
+ * key on every `/poi` request (a query param or an `X-API-Key` header), confirmed
+ * against its own OpenAPI spec after an early version of this client shipped without
+ * one and every search silently came back empty (a bare 401, previously swallowed by
+ * collapsing every failure to an empty list -- see [nearby]'s own doc for why that
+ * shape changed). This app has no business embedding ONE key for every install to
+ * share, either -- OCM's own rate limits are per key, and a single shared key split
+ * across however many people run this app would starve fast. Callers pass whatever
+ * the user entered in Settings (null/blank = try anonymously anyway, since OCM's own
+ * docs don't say a keyless request is hard-rejected everywhere, just that a key is
+ * how you get a real per-caller rate limit).
  */
 object ChargerApi {
 
@@ -126,11 +138,17 @@ object ChargerApi {
     }
 
     /**
-     * Fetch stations within [radiusMiles] of [lat]/[lon], or an empty list on any
-     * failure -- same collapse-every-failure-to-one-result shape as [WeatherApi.fetch],
-     * so callers only ever handle "got some (maybe zero)" rather than distinguishing
-     * network/parse/empty-response failures from a search that genuinely found
-     * nothing nearby.
+     * Fetch stations within [radiusMiles] of [lat]/[lon]. Returns null on any actual
+     * failure (network/IO exception, a non-2xx response -- including the 401 an
+     * invalid/missing [apiKey] gets -- or malformed JSON), and only ever an empty
+     * list for a genuine "the search worked, nothing is nearby" result. This is
+     * DELIBERATELY not the same collapse-everything-to-one-result shape
+     * [WeatherApi.fetch] uses: weather silently falling back to "no reading" is a
+     * minor, low-stakes UI gap, but a bare auth failure collapsing to the same empty
+     * list a real zero-result search returns is exactly the bug an earlier version
+     * of this function had -- "0 chargers nearby" shown for a dense urban search,
+     * reported directly, that was actually a silently-swallowed 401 for lack of an
+     * API key. Callers can now tell the two apart and say so.
      *
      * `compact=false` (keeps the OperatorInfo/ConnectionType reference objects this
      * needs for network/connector names, instead of OCM's default of collapsing them
@@ -138,23 +156,28 @@ object ChargerApi {
      * this has no use for) together keep the response small without losing anything
      * the filter UI or the map pin actually reads.
      */
-    suspend fun nearby(lat: Double, lon: Double, radiusMiles: Double = 25.0, maxResults: Int = 150): List<ChargerStation> =
+    suspend fun nearby(
+        lat: Double,
+        lon: Double,
+        apiKey: String?,
+        radiusMiles: Double = 25.0,
+        maxResults: Int = 150,
+    ): List<ChargerStation>? =
         withContext(Dispatchers.IO) {
             runCatching {
                 val url = "https://api.openchargemap.io/v3/poi/" +
                     "?output=json&latitude=$lat&longitude=$lon" +
                     "&distance=$radiusMiles&distanceunit=Miles" +
                     "&maxresults=$maxResults&compact=false&verbose=false"
-                val request = Request.Builder()
+                val builder = Request.Builder()
                     .url(url)
                     .header("User-Agent", MapTiles.userAgent("Android"))
-                    .get()
-                    .build()
-                client.newCall(request).execute().use { resp ->
-                    if (!resp.isSuccessful) return@use emptyList()
-                    val body = resp.body?.string() ?: return@use emptyList()
+                if (!apiKey.isNullOrBlank()) builder.header("X-API-Key", apiKey)
+                client.newCall(builder.get().build()).execute().use { resp ->
+                    if (!resp.isSuccessful) return@use null
+                    val body = resp.body?.string() ?: return@use null
                     json.decodeFromString(ListSerializer(Poi.serializer()), body).mapNotNull { it.toStation() }
                 }
-            }.getOrDefault(emptyList())
+            }.getOrNull()
         }
 }

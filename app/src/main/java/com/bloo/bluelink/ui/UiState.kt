@@ -246,6 +246,10 @@ data class UiState(
     val chargersVisible: Boolean = false,
     /** True while [chargers] is being (re)fetched from [com.bloo.bluelink.data.ChargerApi]. */
     val chargersLoading: Boolean = false,
+    /** Set when the last charger fetch genuinely failed (network/auth/parse) --
+     *  distinct from [chargers] simply being empty, which means the search worked
+     *  and found nothing nearby. Cleared at the start of every new fetch. */
+    val chargersError: String? = null,
     /** The last-fetched nearby chargers, centred on whichever car's map requested
      *  them -- UNFILTERED. [com.bloo.bluelink.data.ChargerFilters] narrows what
      *  actually draws on the map from this same list, so changing a filter never

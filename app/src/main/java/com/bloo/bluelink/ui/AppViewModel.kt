@@ -3338,13 +3338,35 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     /** Fetches Open Charge Map stations around [around] and replaces [UiState.chargers]
-     *  wholesale -- see [com.bloo.bluelink.data.ChargerApi.nearby]'s own doc for why a
-     *  failure surfaces as an empty list rather than an error the UI has to branch on. */
+     *  wholesale. A genuine failure (see [com.bloo.bluelink.data.ChargerApi.nearby]'s
+     *  own doc -- null, not an empty list) surfaces as [UiState.chargersError] instead
+     *  of silently looking like "zero chargers nearby": that exact confusion is a real
+     *  report, from a search that actually failed for lack of an API key. */
     fun loadNearbyChargers(around: GeoLocation) {
-        _state.update { it.copy(chargersLoading = true) }
+        _state.update { it.copy(chargersLoading = true, chargersError = null) }
         viewModelScope.launch {
-            val stations = com.bloo.bluelink.data.ChargerApi.nearby(around.latitude, around.longitude)
-            _state.update { it.copy(chargers = stations, chargersLoading = false) }
+            val stations = com.bloo.bluelink.data.ChargerApi.nearby(
+                around.latitude,
+                around.longitude,
+                apiKey = appearance.value.chargerApiKey,
+            )
+            _state.update {
+                if (stations != null) {
+                    it.copy(chargers = stations, chargersLoading = false, chargersError = null)
+                } else {
+                    it.copy(chargersLoading = false, chargersError = "Couldn't reach the charger directory")
+                }
+            }
+        }
+    }
+
+    /** Saves the user's own Open Charge Map API key (blank/null clears it) and
+     *  re-runs the last search with it -- see [SettingsStore.setChargerApiKey]'s and
+     *  [SettingsStore.Appearance.chargerApiKey]'s own docs. */
+    fun setChargerApiKey(key: String?, around: GeoLocation) {
+        viewModelScope.launch {
+            settingsStore.setChargerApiKey(key)
+            loadNearbyChargers(around)
         }
     }
 
