@@ -764,28 +764,7 @@ internal fun HeroVisual(
      *  wants. Requires a bounded parent, which the cover tile is (its Card fills height). */
     fill: Boolean = false,
 ) {
-    // Cold-start diagnostic: a real device report showed a single ~1.8s frame with a
-    // ~280MB heap jump right as the garage first composed for a real (non-empty)
-    // account -- the "black screen for a second or two" symptom. Local photos are
-    // already downsampled to at most 1080px on save (see the crop screen's own export),
-    // which should rule them out, but this records exactly when THIS composable enters
-    // (and what the heap already was) so the next such report can confirm or rule that
-    // out directly instead of guessing again. Keyed per-VIN, not once-only, so both
-    // cars in a 2-car account show up distinctly.
     com.bloo.bluelink.data.StartupTrace.once("hero-visual-${v.vin}", "HeroVisual composing for ${v.name}")
-    // Cold-start diagnostic: see VehicleDetailContent's own matching mark for why this is
-    // a bounded per-instance counter, not an unconditional log on every recomposition --
-    // an earlier, unconditional version of this same mark helped confirm a genuine tight
-    // recomposition loop on a real device (VehicleDetailContent recomposing hundreds of
-    // times a second), but logging on every one of those iterations was itself adding
-    // allocation overhead to the loop it was trying to measure, on a report that ended in
-    // a crash. This still shows whether heap has ALREADY jumped by the time control
-    // reaches HeroVisual specifically during that loop, or only climbs later.
-    val recomposeCount = remember(v.vin) { android.util.MutableInt(0) }
-    recomposeCount.value++
-    if (recomposeCount.value == 1 || recomposeCount.value % 50 == 0) {
-        com.bloo.bluelink.data.StartupTrace.markIfStarting("HeroVisual recompose #${recomposeCount.value} for ${v.vin}")
-    }
     val sizeModifier = when {
         fill -> Modifier.fillMaxSize()
         aspectRatio != null -> Modifier.fillMaxWidth().aspectRatio(aspectRatio)

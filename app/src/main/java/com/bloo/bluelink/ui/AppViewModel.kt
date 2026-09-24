@@ -6,7 +6,6 @@ import androidx.biometric.BiometricManager
 import androidx.compose.runtime.Stable
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import coil.imageLoader
 import com.bloo.bluelink.data.AppLog
 import com.bloo.bluelink.data.BlueLinkException
 import com.bloo.bluelink.data.BlueLinkRepository
@@ -1195,11 +1194,6 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         // object). vehicles/prefs are already both in scope here, so there's no reason
         // this needs its own trip through the StateFlow at all on the cold-start path.
         val defaultPresets = vehicles.associate { v -> v.vin to (settingsStore.defaultClimatePreset(v.vin, prefs) ?: "smart") }
-        // Cold-start diagnostic: an anchor point for VehicleDetailContent's/HeroVisual's own
-        // matching marks -- this state publish is what actually SCHEDULES the real-data
-        // recomposition (Compose applies it on the next frame, not synchronously here), so
-        // this mark's own heap reading is the "before" baseline those two compare against.
-        com.bloo.bluelink.data.StartupTrace.markIfStarting("loadGarageInner: publishing real vehicle data")
         _state.update {
             // Shared config first, then the fields only the full garage load owns.
             cfg.apply(it).copy(
@@ -1215,26 +1209,6 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         // during the very first frame" -- something the earlier per-brand/per-car error logs
         // in this function don't cover on their own since they only fire on FAILURE.
         AppLog.log("✓ Garage loaded: ${vehicles.size} vehicle(s), screen=$screen")
-        // Cold-start diagnostic: every device report of the climbing-heap/OOM pattern so far
-        // has shown the SAME correlation (a 250-400MB+ jump exactly when hero photos/map tiles
-        // first compose) without settling the actual question of whether that memory is INSIDE
-        // Coil's own (48MB-capped) cache or something else entirely retaining it -- onTrimMemory
-        // (BlooApplication.kt) can only clear what Coil itself is holding, so this is what tells
-        // the next such report which side of that line the real number is on. Delayed 5s so
-        // hero photos and the first screen's worth of map tiles have actually finished
-        // decoding by the time this reads Coil's own accounting of itself.
-        viewModelScope.launch {
-            delay(5_000)
-            runCatching {
-                val loader = getApplication<android.app.Application>().imageLoader
-                val mem = loader.memoryCache
-                val disk = loader.diskCache
-                AppLog.log(
-                    "Coil cache check: memory ${(mem?.size ?: 0) / 1024}KB / ${(mem?.maxSize ?: 0) / 1024}KB, " +
-                        "disk ${(disk?.size ?: 0) / 1024}KB / ${(disk?.maxSize ?: 0) / 1024}KB",
-                )
-            }
-        }
         val shortcutSet = cfg.shortcutSet
         // Restores the last-selected car. This used to ride along inside the
         // copy() above; it lives in its own flow now (see currentIndex), so it

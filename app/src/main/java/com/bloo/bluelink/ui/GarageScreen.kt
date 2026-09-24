@@ -551,13 +551,27 @@ internal fun GarageScreen(
                     // real extra composition pass -- the same "measured size via a
                     // plain layout callback instead" trade this codebase already
                     // makes everywhere else performance-sensitive (CarMap's tile
-                    // box, PebbleShell's own row height). Zero-width for the one
-                    // frame before the real size lands is safe: pageSize.Fixed(0.dp)
-                    // just renders nothing that first frame rather than picking a
-                    // wrong layout decision. Local to this Box (not hoisted up to
-                    // `perPage`'s own declaration any more -- see its doc for why):
-                    // this value only feeds `pageWidth` below now.
-                    var boxWidthPx by remember { mutableIntStateOf(0) }
+                    // box, PebbleShell's own row height).
+                    //
+                    // Seeded from windowInfo.containerSize.width (the same source `widthDp`
+                    // above already uses, available synchronously on the very first frame),
+                    // NOT 0 -- a real device log caught what 0 actually does here: with
+                    // pageSize = PageSize.Fixed(0.dp), HorizontalPager doesn't just "render
+                    // nothing that first frame" as this comment used to claim -- it tries to
+                    // fill the viewport with zero-width pages, which never satisfies "enough
+                    // width composed yet", so it keeps composing pages until it runs out of
+                    // them: the entire virtual range (WRAP_MULTIPLIER x realCount, up to 160
+                    // pages), each one a full VehicleDetailContent/HeroVisual, alternating
+                    // real items by the wrap modulo -- exactly the "recompose #1, never
+                    // incrementing, alternating VINs" burst a real cold-start log showed,
+                    // and very plausibly the true source of this app's whole OOM history
+                    // (every one of those pages allocates real heap; onSizeChanged's first
+                    // real measurement only arrives and corrects pageWidth AFTER that burst
+                    // already ran). Seeding from the window's own size instead means
+                    // pageWidth is already correct (or within a sub-pixel inset difference,
+                    // fixed the instant onSizeChanged fires) on the very first frame, so
+                    // Fixed(0.dp) is never reachable at all.
+                    var boxWidthPx by remember { mutableIntStateOf(windowInfo.containerSize.width) }
                     val density = LocalDensity.current
                     // Ceiling division, not floor: `perPage` pages of a FLOORED width sum to
                     // LESS than boxWidthPx (a leftover gap up to perPage-1 px at the right
