@@ -158,6 +158,7 @@ fun BlooApp(vm: AppViewModel) {
     val kiaOtp by remember { derivedStateOf { state.kiaOtp } }
     val canadaOtp by remember { derivedStateOf { state.canadaOtp } }
     val onSettingsPageSlot by remember { derivedStateOf { state.onSettingsPageSlot } }
+    val mapExpanded by remember { derivedStateOf { state.mapExpanded } }
     // Shared by GarageScreen, SettingsScreen and SearchLayer below -- see either
     // screen's own `hazeState` parameter doc for why: SearchLayer floats above
     // whichever of the two is actually showing, so its own glass fill needs ONE
@@ -535,7 +536,11 @@ fun BlooApp(vm: AppViewModel) {
         // that off) and the search element itself stayed shaped like a garage
         // "bubble" instead of morphing into the settings "pill".
         val effectivelyInSettings = onSettingsPageSlot
-        if (searchable && !locked && (appearance.showSearch || effectivelyInSettings)) {
+        // !mapExpanded: a car's full-screen map overlay has its own bottom action row
+        // (Recentre/Open in Maps) sitting in the same corner the floating search bubble
+        // does -- the two overlapped and clipped into each other, reported directly from
+        // a screenshot. See UiState.mapExpanded's own doc.
+        if (searchable && !locked && !mapExpanded && (appearance.showSearch || effectivelyInSettings)) {
             // fillMaxSize() alone, no `.padding(padding)` -- SearchLayer already
             // reads WindowInsets itself for every edge it cares about (its own
             // `bottomInset`, `insetTopDp` for the compact docked band), the same

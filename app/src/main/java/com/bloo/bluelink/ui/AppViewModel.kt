@@ -3311,6 +3311,14 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         if (_state.value.onSettingsPageSlot != value) _state.update { it.copy(onSettingsPageSlot = value) }
     }
 
+    /** Kept in sync by GarageScreen's own `LaunchedEffect(expandedMap.vin)` -- see
+     *  [UiState.mapExpanded]'s own doc. Guarded the same way [setOnSettingsPageSlot]
+     *  is, so panning/zooming the expanded map (which doesn't change `vin`) never
+     *  re-emits this. */
+    fun setMapExpanded(value: Boolean) {
+        if (_state.value.mapExpanded != value) _state.update { it.copy(mapExpanded = value) }
+    }
+
     // Appearance/preference setters (setThemeMode through setColorPalette,
     // and again setPebbleOutline/setAuroraBackground/.../setUnitSystem further
     // below): each just writes one field to SettingsStore's DataStore and

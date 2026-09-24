@@ -274,6 +274,15 @@ internal fun GarageScreen(
     // rather than a copy fading in. One instance for the whole screen: only one
     // car's map can be expanded at a time regardless of which page it's on.
     val expandedMap = remember { ExpandedMapState() }
+    // Mirrors expandedMap.vin into shared UiState -- see UiState.mapExpanded's own doc --
+    // so Screens.kt (a sibling of this screen, not a descendant, and so unable to read
+    // expandedMap/LocalExpandedMap directly) can hide the floating search bubble while
+    // the map sheet covers the same corner its own bottom action row occupies. Reset on
+    // dispose for the same reason setOnSettingsPageSlot's matching effect is: leaving a
+    // stale `true` behind with nothing left to correct it once this screen itself goes
+    // away would otherwise hide search permanently.
+    LaunchedEffect(expandedMap.vin) { vm.setMapExpanded(expandedMap.vin != null) }
+    DisposableEffect(Unit) { onDispose { vm.setMapExpanded(false) } }
     // How many full-height cards fit side by side; pages advance by this many.
     // `slots`, not `count`: coerceIn(1, 0) throws (min > max) with zero cars,
     // and there is exactly one non-Settings page to show anyway in that case

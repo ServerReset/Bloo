@@ -230,6 +230,14 @@ data class UiState(
      *  at Settings" signal now (there is no standalone Settings route or
      *  screen any more), and drives SearchLayer's floating bubble/pill morph. */
     val onSettingsPageSlot: Boolean = false,
+    /** True while a car's full-screen map overlay (ExpandableMapLayer, from tapping
+     *  a location pebble's compact map) is expanded. Kept in sync by GarageScreen's
+     *  own [com.bloo.bluelink.ui.ExpandedMapState]; used to hide the floating search
+     *  bubble while the map sheet is up -- the map's own bottom action row
+     *  (Recentre/Open in Maps) sits in the same corner the bubble floats in, and the
+     *  two overlapped and clipped into each other, reported directly from a
+     *  screenshot. */
+    val mapExpanded: Boolean = false,
     /** Gentle hint shown on the garage right after onboarding, nudging the user
      *  toward Settings to fine-tune each car. */
     val showSettingsHint: Boolean = false,
