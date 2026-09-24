@@ -1613,6 +1613,14 @@ internal fun ExpandableMapLayer(
     // stale popup for a pin that isn't even drawn any more.
     var selectedCharger by remember { mutableStateOf<ChargerStation?>(null) }
     LaunchedEffect(chargersVisible) { if (!chargersVisible) selectedCharger = null }
+    // Also cleared the moment the selected pin itself stops matching the active
+    // filters (or drops out of a fresh fetch entirely) -- its pin is no longer
+    // drawn on the map at that point (see the `chargers.filter { it.matches(...) }`
+    // passed to CarMap below), so leaving the info card up would keep describing a
+    // charger the user can no longer even see.
+    LaunchedEffect(chargerFilters, chargers) {
+        selectedCharger?.let { sel -> if (sel !in chargers || !sel.matches(chargerFilters)) selectedCharger = null }
+    }
 
     fun close() {
         if (closing) return

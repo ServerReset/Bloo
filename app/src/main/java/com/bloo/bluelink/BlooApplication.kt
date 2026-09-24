@@ -303,12 +303,22 @@ class BlooApplication : Application(), Configuration.Provider, coil.ImageLoaderF
      */
     override fun onTrimMemory(level: Int) {
         super.onTrimMemory(level)
+        // The system calls this on the MAIN thread. memoryCache.clear() is an in-memory
+        // bookkeeping op (cheap, safe to run inline), but diskCache.clear() is real
+        // synchronous file I/O (Coil has no async variant) -- running that inline here
+        // would block the main thread on disk access precisely while the OS already
+        // considers the process under enough memory pressure to be trimming it, which
+        // is exactly the wrong moment to also risk a janked/ANR'd frame. Off-loaded to
+        // a plain background thread instead, since Application has no coroutine scope
+        // of its own to launch this on.
         if (level >= android.content.ComponentCallbacks2.TRIM_MEMORY_RUNNING_LOW) {
             AppLog.log("onTrimMemory($level): clearing Coil's memory cache")
             runCatching { imageLoader.memoryCache?.clear() }
         }
         if (level >= android.content.ComponentCallbacks2.TRIM_MEMORY_RUNNING_CRITICAL) {
-            runCatching { imageLoader.diskCache?.clear() }
+            kotlin.concurrent.thread(name = "coil-trim-disk-cache") {
+                runCatching { imageLoader.diskCache?.clear() }
+            }
         }
     }
 

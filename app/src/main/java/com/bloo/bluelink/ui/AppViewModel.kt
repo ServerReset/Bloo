@@ -2884,6 +2884,10 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     private var liveLocationJob: kotlinx.coroutines.Job? = null
 
+    /** Monotonic guard for [loadNearbyChargers] -- see its own doc for why a plain
+     *  "last response wins" shape isn't safe here. */
+    private var chargerRequestId = 0
+
     /**
      * Starts a continuous [UiState.deviceLocation] subscription -- see
      * [com.bloo.bluelink.autolock.LocationHelper.liveUpdates] -- for the rest
@@ -3334,10 +3338,15 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     fun setMapExpanded(value: Boolean) {
         if (_state.value.mapExpanded != value) _state.update { it.copy(mapExpanded = value) }
         // The map itself just collapsed: drop whatever charger state belonged to
-        // it, so the next car's map (or this same one reopened) starts from
-        // "chargers not shown" rather than inheriting the last car's toggle.
-        if (!value && _state.value.chargersVisible) {
-            _state.update { it.copy(chargersVisible = false) }
+        // it -- the toggle AND the fetched list/error, not just the toggle -- so
+        // the next car's map (or this same one reopened) starts completely fresh
+        // instead of `toggleChargersVisible`'s own `chargers.isEmpty()` check
+        // seeing a non-empty list left over from a DIFFERENT car's location and
+        // skipping the fetch, silently showing that other car's stations (wrong
+        // pins, wrong distances, wrong count) as though they were near this one.
+        val s = _state.value
+        if (!value && (s.chargersVisible || s.chargers.isNotEmpty() || s.chargersError != null)) {
+            _state.update { it.copy(chargersVisible = false, chargers = emptyList(), chargersError = null) }
         }
     }
 
@@ -3359,6 +3368,13 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
      *  of silently looking like "zero chargers nearby": that exact confusion is a real
      *  report, from a search that actually failed for lack of an API key. */
     fun loadNearbyChargers(around: GeoLocation) {
+        // Guards against a slower, SUPERSEDED fetch overwriting a newer one's result --
+        // reachable from a quick double-tap on "Chargers" (off/on before the first
+        // fetch lands) or two "Retry" taps in a row, since neither cancels the
+        // in-flight call. Without this, whichever response happens to arrive LAST
+        // wins regardless of which request was actually issued last, which can leave
+        // the wrong car's/location's stations (or a stale error) on screen.
+        val requestId = ++chargerRequestId
         _state.update { it.copy(chargersLoading = true, chargersError = null) }
         viewModelScope.launch {
             val stations = com.bloo.bluelink.data.ChargerApi.nearby(
@@ -3366,6 +3382,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 around.longitude,
                 apiKey = appearance.value.chargerApiKey,
             )
+            if (requestId != chargerRequestId) return@launch
             _state.update {
                 if (stations != null) {
                     it.copy(chargers = stations, chargersLoading = false, chargersError = null)
