@@ -724,6 +724,12 @@ internal fun GarageScreen(
         val originBounds = expandedVehicle?.vin?.let { expandedMap.originBoundsFor(it).value }
 
         if (expandedVehicle != null && expandedLocation != null && originBounds != null) {
+            // rememberLocateAction, not a bare vm.locate(expandedVehicle) call -- see its own
+            // doc for why: this exact call site used to skip the ACCESS_FINE_LOCATION request
+            // entirely, so anyone who only ever used the expanded map's own refresh icon (never
+            // the compact pebble's matching button) could never grant it and never saw the
+            // device's own location dot, reported directly a second time against this screen.
+            val locateExpandedVehicle = rememberLocateAction(vm, expandedVehicle)
             ExpandableMapLayer(
                 isExpanded = true,
                 originBounds = originBounds,
@@ -732,12 +738,7 @@ internal fun GarageScreen(
                 deviceLocation = deviceLocation,
                 mapState = expandedMap.mapStateFor(expandedVehicle.vin),
                 hazeState = hazeState,
-                // Same entry point the pebble's own "Locate" button uses --
-                // refreshes the car's position AND (see AppViewModel.
-                // refreshDeviceLocation's own doc) the device's, from the one
-                // fused-location fix both the map's dot and the weather
-                // pebble now share.
-                onRefreshLocation = { vm.locate(expandedVehicle) },
+                onRefreshLocation = locateExpandedVehicle,
                 // The real command-pending flag, not a guessed timer -- see
                 // MapTopBar's own doc -- so the refresh icon's spin genuinely
                 // tracks the in-flight fetch this same button just kicked off.

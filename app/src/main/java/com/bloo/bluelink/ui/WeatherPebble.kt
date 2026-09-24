@@ -154,32 +154,52 @@ import kotlin.math.floor
 import kotlin.math.roundToInt
 
 
+/**
+ * A "Locate" action for [v] that requests ACCESS_FINE_LOCATION first if it isn't already
+ * granted, instead of calling [AppViewModel.locate] straight into a permission check that
+ * silently returns nothing.
+ *
+ * ACCESS_FINE_LOCATION is what backs the map's own "device location" blue dot
+ * ([UiState.deviceLocation], via [com.bloo.bluelink.autolock.LocationHelper] -- see its own
+ * doc), and is otherwise only ever requested from AutoLock's settings screen -- a user who's
+ * never touched AutoLock had no way to grant it at all, so the dot silently never appeared:
+ * not a rendering bug, [AppViewModel.refreshDeviceLocation] was faithfully calling
+ * LocationHelper every refresh and getting null back every single time from a permission
+ * check that had nothing to request it. Reported directly as "the map is also not showing
+ * the person's location" -- tying the request to a "Locate" action means granting it happens
+ * as a direct result of something the user already does, not a surprise prompt.
+ *
+ * Originally only wired into [LocationPebble]'s own compact map -- GarageScreen's
+ * full-screen [ExpandableMapLayer] had its OWN "Locate" (the top bar's refresh icon) calling
+ * [AppViewModel.locate] directly, bypassing this permission check entirely. Anyone who only
+ * ever used the expanded map (never the compact pebble's own button) could never be prompted
+ * at all, reported directly a second time against that exact screen. Hoisted here so both
+ * call sites share the one request flow instead of it living on only one of them.
+ */
+@Composable
+internal fun rememberLocateAction(vm: AppViewModel, v: Vehicle): () -> Unit {
+    val context = LocalContext.current
+    val fineLocationLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.RequestPermission(),
+    ) { granted -> if (granted) vm.locate(v) }
+    return {
+        val granted = androidx.core.content.ContextCompat.checkSelfPermission(
+            context, android.Manifest.permission.ACCESS_FINE_LOCATION,
+        ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+        if (granted) vm.locate(v) else fineLocationLauncher.launch(android.Manifest.permission.ACCESS_FINE_LOCATION)
+    }
+}
+
 @Composable
 internal fun LocationPebble(v: Vehicle, state: UiState, vm: AppViewModel, dragHandle: Modifier) {
     val context = LocalContext.current
     val appearance = LocalAppearance.current
     val fahrenheit = appearance.useFahrenheit
     val location = state.locations[v.vin]
-    // ACCESS_FINE_LOCATION -- needed for the map's own "device location" blue dot
-    // ([UiState.deviceLocation], via LocationHelper -- see its own doc) -- is
-    // otherwise only ever requested from AutoLock's settings screen. A user who
-    // has never touched AutoLock had no way to grant it at all, so the dot
-    // silently never appeared: not a rendering bug, [AppViewModel.refreshDeviceLocation]
-    // was faithfully calling LocationHelper every refresh and getting null back
-    // every single time from a permission check that had nothing to request it.
-    // Reported directly as "the map is also not showing the person's location" --
-    // tying the request to this pebble's own existing "Locate" action means
-    // granting it happens as a direct result of something the user already does
-    // to use this card, not a surprise prompt the moment it renders.
-    val fineLocationLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
-        androidx.activity.result.contract.ActivityResultContracts.RequestPermission(),
-    ) { granted -> if (granted) vm.locate(v) }
-    fun locateWithPermission() {
-        val granted = androidx.core.content.ContextCompat.checkSelfPermission(
-            context, android.Manifest.permission.ACCESS_FINE_LOCATION,
-        ) == android.content.pm.PackageManager.PERMISSION_GRANTED
-        if (granted) vm.locate(v) else fineLocationLauncher.launch(android.Manifest.permission.ACCESS_FINE_LOCATION)
-    }
+    // See rememberLocateAction's own doc -- ACCESS_FINE_LOCATION is otherwise only ever
+    // requested from AutoLock's settings screen, so tying the request to a "Locate" action
+    // is what lets a user who's never touched AutoLock grant it at all.
+    val locateWithPermission = rememberLocateAction(vm, v)
     // On the cover, this becomes the identity pill's own headline, riding beside the car name
     // ("810 Devonshire Way, Sunnyvale  ·  Daisy") -- the long form there reliably wrapped
     // that pill onto two lines, a real reported "looks bad" bug. The compact form (street +
@@ -1159,11 +1179,20 @@ private fun MapFeatureRow(
      *  buttons instead -- see [ExpressiveButtonRow]'s own `wrap` doc. Still true (the
      *  default) for the two-feature rows this always fit fine. */
     wrap: Boolean = true,
+    /** False alongside [wrap] = false: once a button compacts to just its glyph,
+     *  giving it an EQUAL share of the row (this group's default, right for two
+     *  same-shaped text+icon buttons) stretched it back out to the same width as
+     *  the button next to it still showing its label -- a small icon adrift in a
+     *  mostly-empty pill, reported directly from a screenshot. A button should be
+     *  exactly as wide as what it's actually showing: full pill with room for its
+     *  label, or just the glyph plus its own padding once compacted -- never
+     *  stretched to match a neighbour showing something else. */
+    equalWidths: Boolean = true,
 ) {
     ExpressiveButtonRow(
         modifier = modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp),
         spacing = 10.dp,
-        equalWidths = true,
+        equalWidths = equalWidths,
         wrap = wrap,
     ) {
         features.forEach { feature ->
@@ -1812,6 +1841,7 @@ internal fun ExpandableMapLayer(
                         ),
                         modifier = Modifier.fillMaxWidth(),
                         wrap = false,
+                        equalWidths = false,
                     )
                 }
             }
