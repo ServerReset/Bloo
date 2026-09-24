@@ -12,6 +12,23 @@ package com.bloo.bluelink.ui
 /** How long a cached weather reading is considered fresh (15 minutes). */
 internal const val WEATHER_TTL_MS = 15 * 60 * 1000L
 
+// Floor between two published UiState.deviceLocation updates from the live fused-location
+// collector (AppViewModel.beginLiveDeviceLocation) -- a real device OOM crash traced back to
+// this: a fused provider can deliver a BURST of fixes well inside its own requested interval
+// (GPS jitter while stationary, or "catching up" right after its first-ever fix, which is
+// exactly what happens the moment ACCESS_FINE_LOCATION is freshly granted), each one
+// structurally different enough (a few meters of jitter is still a different Double) that
+// LocationPebble's own stateSlice treated every single one as a genuine change -- hundreds of
+// recompositions in under a second, each allocating a full page's worth of objects. A skipped
+// fix is never truly lost: the collector's own request interval (90s) still governs the
+// NORMAL cadence this floor is never even reached at; this only clamps a burst.
+internal const val MIN_DEVICE_LOCATION_INTERVAL_MS = 5000L
+
+/** Paired with [MIN_DEVICE_LOCATION_INTERVAL_MS] -- a fix under this floor is skipped only if
+ *  it ALSO hasn't moved meaningfully, so a genuine fast-moving car/phone (a passenger, a
+ *  bike) still gets a fresh dot rather than being throttled purely by the clock. */
+internal const val MIN_DEVICE_LOCATION_MOVE_METERS = 15f
+
 // Debounce window for the auto-push-on-change collector: a burst of edits (e.g.
 // dragging pebbles, sliding a value) coalesces into one Drive write this long
 // after the LAST change. Short enough to feel instant, long enough not to write

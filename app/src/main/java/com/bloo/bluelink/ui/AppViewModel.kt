@@ -2924,7 +2924,23 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     fun beginLiveDeviceLocation() {
         if (liveLocationJob?.isActive == true) return
         liveLocationJob = viewModelScope.launch {
+            // See MIN_DEVICE_LOCATION_INTERVAL_MS/_MOVE_METERS' own doc -- a real device OOM
+            // crash traced back to this collector publishing every raw fused-location callback
+            // verbatim, which a burst of near-identical fixes (GPS jitter, or the provider
+            // "catching up" right after its first-ever fix) turned into hundreds of genuinely
+            // distinct GeoLocation values in under a second, each one recomposing LocationPebble
+            // (and, on a real report, its whole host page) via its own stateSlice.
+            var lastPublished: android.location.Location? = null
+            var lastPublishedAtMs = 0L
             com.bloo.bluelink.autolock.LocationHelper.liveUpdates(getApplication()).collect { loc ->
+                val now = System.currentTimeMillis()
+                val last = lastPublished
+                val tooSoonAndTooClose = last != null &&
+                    now - lastPublishedAtMs < MIN_DEVICE_LOCATION_INTERVAL_MS &&
+                    last.distanceTo(loc) < MIN_DEVICE_LOCATION_MOVE_METERS
+                if (tooSoonAndTooClose) return@collect
+                lastPublished = loc
+                lastPublishedAtMs = now
                 _state.update {
                     it.copy(
                         deviceLocation = GeoLocation(

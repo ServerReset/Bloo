@@ -113,17 +113,23 @@ internal fun VehicleDetailContent(
     com.bloo.bluelink.data.StartupTrace.once("vehicle-detail-${v.vin}", "VehicleDetailContent composing for ${v.name}")
     // Cold-start diagnostic: the meminfo breakdown from a real device report ruled out
     // images entirely (Bitmap allocations totaled ~15MB; the actual ~450MB was on the
-    // DALVIK heap, plain JVM objects) -- so the suspect shifted from "a photo decoding"
-    // to "a recomposition allocating a lot". The `.once()` mark above only ever fires for
-    // the FIRST composition (the cached/placeholder garage, shown before the network
-    // returns) and stays silent for every later recomposition -- including the one where
-    // this page gets swapped from cached to REAL fetched data, which is exactly the
-    // recomposition most likely to be the expensive one and the one this diagnostic had
-    // no visibility into. markIfStarting has no such dedup, so it logs (with its own
-    // heap=/native= reading, same as every other mark) on every recomposition during the
-    // startup window -- comparing the cached-pass reading against the real-data-pass
-    // reading directly answers whether THIS recomposition is where the jump happens.
-    com.bloo.bluelink.data.StartupTrace.markIfStarting("VehicleDetailContent recompose for ${v.vin}")
+    // DALVIK heap, plain JVM objects), and an UNCONDITIONAL markIfStarting mark placed
+    // here (an earlier version of this diagnostic) directly caught this composable
+    // recomposing HUNDREDS of times in under a second, alternating between both cars,
+    // confirming a genuine tight recomposition loop -- not a one-time expensive pass.
+    // That unconditional version is gone: logging (a String format, an AppLog append)
+    // on every one of those hundreds of iterations was itself adding real allocation
+    // overhead to the very loop it was measuring, on a real device report that ended
+    // in a crash. A bounded per-instance counter instead logs only at milestones, so
+    // the NEXT report still shows how many times this ran (and how fast) without the
+    // diagnostic itself being a contributor to the number it is trying to measure.
+    val recomposeCount = remember(v.vin) { android.util.MutableInt(0) }
+    recomposeCount.value++
+    if (recomposeCount.value == 1 || recomposeCount.value % 50 == 0) {
+        com.bloo.bluelink.data.StartupTrace.markIfStarting(
+            "VehicleDetailContent recompose #${recomposeCount.value} for ${v.vin}",
+        )
+    }
     val topInset = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
     val bottomInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
     val scroll = rememberScrollState()

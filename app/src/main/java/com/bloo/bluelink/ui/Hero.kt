@@ -773,14 +773,19 @@ internal fun HeroVisual(
     // out directly instead of guessing again. Keyed per-VIN, not once-only, so both
     // cars in a 2-car account show up distinctly.
     com.bloo.bluelink.data.StartupTrace.once("hero-visual-${v.vin}", "HeroVisual composing for ${v.name}")
-    // Cold-start diagnostic: see VehicleDetailContent's own matching mark for why -- a
-    // real device's meminfo dump ruled out images (Bitmap allocations totaled ~15MB of a
-    // ~450MB Dalvik-heap jump), so this now exists to show whether heap has ALREADY
-    // jumped by the time control reaches this composable during the real-data
-    // recomposition (pointing at VehicleDetailContent's own body -- PebbleList, most
-    // likely) or jumps HERE (pointing back at this composable after all, just not via
-    // bitmap allocation).
-    com.bloo.bluelink.data.StartupTrace.markIfStarting("HeroVisual recompose for ${v.vin}")
+    // Cold-start diagnostic: see VehicleDetailContent's own matching mark for why this is
+    // a bounded per-instance counter, not an unconditional log on every recomposition --
+    // an earlier, unconditional version of this same mark helped confirm a genuine tight
+    // recomposition loop on a real device (VehicleDetailContent recomposing hundreds of
+    // times a second), but logging on every one of those iterations was itself adding
+    // allocation overhead to the loop it was trying to measure, on a report that ended in
+    // a crash. This still shows whether heap has ALREADY jumped by the time control
+    // reaches HeroVisual specifically during that loop, or only climbs later.
+    val recomposeCount = remember(v.vin) { android.util.MutableInt(0) }
+    recomposeCount.value++
+    if (recomposeCount.value == 1 || recomposeCount.value % 50 == 0) {
+        com.bloo.bluelink.data.StartupTrace.markIfStarting("HeroVisual recompose #${recomposeCount.value} for ${v.vin}")
+    }
     val sizeModifier = when {
         fill -> Modifier.fillMaxSize()
         aspectRatio != null -> Modifier.fillMaxWidth().aspectRatio(aspectRatio)
