@@ -111,6 +111,19 @@ internal fun VehicleDetailContent(
     // list construction, JSON-derived state, Compose's own first-composition overhead for
     // this page's subtree) rather than any one image.
     com.bloo.bluelink.data.StartupTrace.once("vehicle-detail-${v.vin}", "VehicleDetailContent composing for ${v.name}")
+    // Cold-start diagnostic: the meminfo breakdown from a real device report ruled out
+    // images entirely (Bitmap allocations totaled ~15MB; the actual ~450MB was on the
+    // DALVIK heap, plain JVM objects) -- so the suspect shifted from "a photo decoding"
+    // to "a recomposition allocating a lot". The `.once()` mark above only ever fires for
+    // the FIRST composition (the cached/placeholder garage, shown before the network
+    // returns) and stays silent for every later recomposition -- including the one where
+    // this page gets swapped from cached to REAL fetched data, which is exactly the
+    // recomposition most likely to be the expensive one and the one this diagnostic had
+    // no visibility into. markIfStarting has no such dedup, so it logs (with its own
+    // heap=/native= reading, same as every other mark) on every recomposition during the
+    // startup window -- comparing the cached-pass reading against the real-data-pass
+    // reading directly answers whether THIS recomposition is where the jump happens.
+    com.bloo.bluelink.data.StartupTrace.markIfStarting("VehicleDetailContent recompose for ${v.vin}")
     val topInset = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
     val bottomInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
     val scroll = rememberScrollState()

@@ -1195,6 +1195,11 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         // object). vehicles/prefs are already both in scope here, so there's no reason
         // this needs its own trip through the StateFlow at all on the cold-start path.
         val defaultPresets = vehicles.associate { v -> v.vin to (settingsStore.defaultClimatePreset(v.vin, prefs) ?: "smart") }
+        // Cold-start diagnostic: an anchor point for VehicleDetailContent's/HeroVisual's own
+        // matching marks -- this state publish is what actually SCHEDULES the real-data
+        // recomposition (Compose applies it on the next frame, not synchronously here), so
+        // this mark's own heap reading is the "before" baseline those two compare against.
+        com.bloo.bluelink.data.StartupTrace.markIfStarting("loadGarageInner: publishing real vehicle data")
         _state.update {
             // Shared config first, then the fields only the full garage load owns.
             cfg.apply(it).copy(
