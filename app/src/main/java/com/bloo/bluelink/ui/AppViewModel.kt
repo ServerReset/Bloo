@@ -2884,9 +2884,9 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     private var liveLocationJob: kotlinx.coroutines.Job? = null
 
-    /** Monotonic guard for [loadNearbyChargers] -- see its own doc for why a plain
-     *  "last response wins" shape isn't safe here. */
-    private var chargerRequestId = 0
+    /** The in-flight [loadNearbyChargers] fetch, if any -- see its own doc for why a
+     *  superseded one is cancelled outright rather than just having its result ignored. */
+    private var chargerJob: kotlinx.coroutines.Job? = null
 
     /**
      * Starts a continuous [UiState.deviceLocation] subscription -- see
@@ -3368,21 +3368,19 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
      *  of silently looking like "zero chargers nearby": that exact confusion is a real
      *  report, from a search that actually failed for lack of an API key. */
     fun loadNearbyChargers(around: GeoLocation) {
-        // Guards against a slower, SUPERSEDED fetch overwriting a newer one's result --
-        // reachable from a quick double-tap on "Chargers" (off/on before the first
-        // fetch lands) or two "Retry" taps in a row, since neither cancels the
-        // in-flight call. Without this, whichever response happens to arrive LAST
-        // wins regardless of which request was actually issued last, which can leave
-        // the wrong car's/location's stations (or a stale error) on screen.
-        val requestId = ++chargerRequestId
+        // Cancels a still-running SUPERSEDED fetch outright -- reachable from a quick
+        // double-tap on "Chargers" (off/on before the first fetch lands) or two "Retry"
+        // taps in a row -- rather than letting it complete and just discarding its
+        // result: the same liveLocationJob/pushJob shape already used elsewhere in this
+        // class for "a newer call supersedes an in-flight one."
+        chargerJob?.cancel()
         _state.update { it.copy(chargersLoading = true, chargersError = null) }
-        viewModelScope.launch {
+        chargerJob = viewModelScope.launch {
             val stations = com.bloo.bluelink.data.ChargerApi.nearby(
                 around.latitude,
                 around.longitude,
                 apiKey = appearance.value.chargerApiKey,
             )
-            if (requestId != chargerRequestId) return@launch
             _state.update {
                 if (stations != null) {
                     it.copy(chargers = stations, chargersLoading = false, chargersError = null)

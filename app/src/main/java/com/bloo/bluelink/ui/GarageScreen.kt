@@ -567,10 +567,11 @@ internal fun GarageScreen(
                     // and very plausibly the true source of this app's whole OOM history
                     // (every one of those pages allocates real heap; onSizeChanged's first
                     // real measurement only arrives and corrects pageWidth AFTER that burst
-                    // already ran). Seeding from the window's own size instead means
-                    // pageWidth is already correct (or within a sub-pixel inset difference,
-                    // fixed the instant onSizeChanged fires) on the very first frame, so
-                    // Fixed(0.dp) is never reachable at all.
+                    // already ran). Seeding from the window's own size instead means pageWidth
+                    // is already correct (or within a sub-pixel inset difference, fixed the
+                    // instant onSizeChanged fires) on the very first frame -- `pageWidth`'s own
+                    // coerceAtLeast(1) below is what makes Fixed(0.dp) structurally unreachable
+                    // regardless, rather than resting solely on this seed being non-zero.
                     var boxWidthPx by remember { mutableIntStateOf(windowInfo.containerSize.width) }
                     val density = LocalDensity.current
                     // Ceiling division, not floor: `perPage` pages of a FLOORED width sum to
@@ -582,7 +583,17 @@ internal fun GarageScreen(
                     // means perPage pages together are always >= boxWidthPx (they may overhang
                     // the edge by a sub-pixel amount instead), which is what actually keeps
                     // that assumption true.
-                    val pageWidth = with(density) { ((boxWidthPx + perPage - 1) / perPage).toDp() }
+                    // coerceAtLeast(1), not just a better seed above: a zero (or degenerate)
+                    // width here is what actually lets PageSize.Fixed(0.dp) reach
+                    // HorizontalPager, which doesn't render nothing for that frame as this
+                    // comment used to claim -- with no width to satisfy "have I composed
+                    // enough to fill the viewport", it keeps composing pages until it runs
+                    // out, up to this pager's entire virtual range (see WrapPager.kt's
+                    // WRAP_MULTIPLIER doc), each one a full car page. Seeding boxWidthPx from
+                    // windowInfo above makes that statistically rare, not impossible -- this
+                    // floor is what makes it structurally unreachable regardless of what
+                    // seeds or later updates boxWidthPx.
+                    val pageWidth = with(density) { ((boxWidthPx + perPage - 1) / perPage).coerceAtLeast(1).toDp() }
                     HorizontalPager(
                         state = pager,
                         modifier = Modifier.fillMaxSize().hazeSource(hazeState)

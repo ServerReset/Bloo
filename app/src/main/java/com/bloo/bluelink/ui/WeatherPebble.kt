@@ -1179,10 +1179,6 @@ private fun MapFeatureRow(
      *  buttons instead -- see [ExpressiveButtonRow]'s own `wrap` doc. Still true (the
      *  default) for the two-feature rows this always fit fine. */
     wrap: Boolean = true,
-    /** See [ExpressiveButtonGroup]'s own doc for why an equal share is now capped at each
-     *  member's own content need once a line compacts to glyphs -- true (full-width,
-     *  Material's connected-group look) is safe here regardless of feature count. */
-    equalWidths: Boolean = true,
     /** [Alignment.CenterHorizontally] when the row can compact to icon-only glyphs (three
      *  or more features): once those glyphs are capped at their own small size (see
      *  [ExpressiveButtonGroup]'s equalWidths doc) rather than stretched to fill the row, a
@@ -1195,7 +1191,7 @@ private fun MapFeatureRow(
     ExpressiveButtonRow(
         modifier = modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp),
         spacing = 10.dp,
-        equalWidths = equalWidths,
+        equalWidths = true,
         wrap = wrap,
         horizontalAlignment = horizontalAlignment,
     ) {
@@ -1621,6 +1617,14 @@ internal fun ExpandableMapLayer(
     LaunchedEffect(chargerFilters, chargers) {
         selectedCharger?.let { sel -> if (sel !in chargers || !sel.matches(chargerFilters)) selectedCharger = null }
     }
+    // Memoized, not recomputed inline at the CarMap call site below: this composable
+    // also recomposes on drag/pan/expand-animation state that has nothing to do with
+    // chargers, chargersVisible or chargerFilters, and re-filtering the whole list on
+    // every one of those frames would be pure waste -- the same reasoning ChargerFilterBar
+    // (below) already applies to its own equivalent filter/count.
+    val visibleChargers = remember(chargersVisible, chargers, chargerFilters) {
+        if (chargersVisible) chargers.filter { it.matches(chargerFilters) } else emptyList()
+    }
 
     fun close() {
         if (closing) return
@@ -1731,7 +1735,7 @@ internal fun ExpandableMapLayer(
                     // narrowing at this call site is what lets every OTHER caller (the
                     // compact pebble map, the cover screen) stay on CarMap's plain
                     // empty-list default with nothing to opt out of.
-                    chargers = if (chargersVisible) chargers.filter { it.matches(chargerFilters) } else emptyList(),
+                    chargers = visibleChargers,
                     onChargerClick = { selectedCharger = it },
                 )
             }
