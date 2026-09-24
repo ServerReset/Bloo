@@ -1179,21 +1179,25 @@ private fun MapFeatureRow(
      *  buttons instead -- see [ExpressiveButtonRow]'s own `wrap` doc. Still true (the
      *  default) for the two-feature rows this always fit fine. */
     wrap: Boolean = true,
-    /** False alongside [wrap] = false: once a button compacts to just its glyph,
-     *  giving it an EQUAL share of the row (this group's default, right for two
-     *  same-shaped text+icon buttons) stretched it back out to the same width as
-     *  the button next to it still showing its label -- a small icon adrift in a
-     *  mostly-empty pill, reported directly from a screenshot. A button should be
-     *  exactly as wide as what it's actually showing: full pill with room for its
-     *  label, or just the glyph plus its own padding once compacted -- never
-     *  stretched to match a neighbour showing something else. */
+    /** See [ExpressiveButtonGroup]'s own doc for why an equal share is now capped at each
+     *  member's own content need once a line compacts to glyphs -- true (full-width,
+     *  Material's connected-group look) is safe here regardless of feature count. */
     equalWidths: Boolean = true,
+    /** [Alignment.CenterHorizontally] when the row can compact to icon-only glyphs (three
+     *  or more features): once those glyphs are capped at their own small size (see
+     *  [ExpressiveButtonGroup]'s equalWidths doc) rather than stretched to fill the row, a
+     *  left-packed cluster reads as broken/half-empty -- centering it in the full row width
+     *  reads as one intentional, compact strip instead. Two-feature rows never compact, so
+     *  their default `Start` never differs from Center in practice; left as `Start` (the
+     *  group's own default) rather than changed for every existing caller. */
+    horizontalAlignment: Alignment.Horizontal = Alignment.Start,
 ) {
     ExpressiveButtonRow(
         modifier = modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp),
         spacing = 10.dp,
         equalWidths = equalWidths,
         wrap = wrap,
+        horizontalAlignment = horizontalAlignment,
     ) {
         features.forEach { feature ->
             val source = remember { MutableInteractionSource() }
@@ -1841,7 +1845,7 @@ internal fun ExpandableMapLayer(
                         ),
                         modifier = Modifier.fillMaxWidth(),
                         wrap = false,
-                        equalWidths = false,
+                        horizontalAlignment = Alignment.CenterHorizontally,
                     )
                 }
             }

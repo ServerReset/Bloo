@@ -615,12 +615,28 @@ fun ExpressiveButtonGroup(
                 // Equal shares: the Material 3 connected-group look. TWO or more members --
                 // "an equal share" of a line is meaningless for a single button, and taking it
                 // literally is what turned a lone action into a pill spanning a whole panel.
+                //
+                // Capped at the member's OWN natLine (its real content need, full or compact)
+                // once the fit rule has picked `compact` for this line -- an equal share of the
+                // FULL room can easily still be wider than one compacted button's own glyph+
+                // padding needs, and MorphButtonLabel measures each member against exactly the
+                // width it is actually given, with no notion of "the group meant this to stay
+                // icon-only" -- so a generous equal share quietly let the label back in on
+                // whichever buttons had one short enough to fit their own slice, even though the
+                // line-wide fit rule had just decided none of them should show one. Reported
+                // directly: a button's label reappearing once its equal share (or a press's
+                // small growth on top of it) happened to clear its own text width, contradicting
+                // the compact verdict the whole row had just agreed to. Uncapped when the line
+                // fits its labels (`basis === full`): every member already wants its own real
+                // content width there, so equal-sharing UP to fill the row is the intended
+                // Material 3 look, not a bug to guard against.
                 val base = DoubleArray(n)
                 val total: Int
                 if (equalWidths && constraints.hasBoundedWidth && memberIdx.size > 1) {
                     val each = room.toDouble() / memberIdx.size
-                    for (i in memberIdx) base[i] = each
-                    total = room
+                    val isCompact = basis !== full
+                    for (i in memberIdx) base[i] = if (isCompact) minOf(each, natLine[i].toDouble()) else each
+                    total = if (isCompact) memberIdx.sumOf { base[it] }.roundToInt() else room
                 } else {
                     // Members that declare a weight stretch to fill whatever the line leaves
                     // over. This is what lets a split pill span its row AND still redistribute
