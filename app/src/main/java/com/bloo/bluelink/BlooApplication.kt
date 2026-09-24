@@ -287,6 +287,32 @@ class BlooApplication : Application(), Configuration.Provider, coil.ImageLoaderF
     }
 
     /**
+     * A real device report showed the heap climbing to 400-500MB at cold start (the
+     * known hero-photo/vehicle-fetch spike -- see HeroLoadStagger's own doc) and then
+     * NEVER coming back down for the rest of a 500+ second session, eventually OOMing
+     * on a routine coroutine resume with under 1% of a 512MB (largeHeap) heap free
+     * *after* a GC -- i.e. genuinely retained, not just garbage waiting for the next
+     * collection. `newImageLoader()`'s own doc already caps Coil's in-memory bitmap
+     * cache at 48MB explicitly for exactly this class of report, but a cap on how much
+     * Coil is WILLING to hold is not the same as the OS telling it to actually let go
+     * under real pressure -- this is that second half: [ComponentCallbacks2]'s own
+     * ladder of "how bad is it" levels, forwarded to Coil's memory cache (and, at the
+     * worst levels, the disk cache too, since a disk write under this much pressure is
+     * itself a cost worth avoiding) so cached bitmaps are the first thing given up
+     * before the OS has to start killing things -- including this process.
+     */
+    override fun onTrimMemory(level: Int) {
+        super.onTrimMemory(level)
+        if (level >= android.content.ComponentCallbacks2.TRIM_MEMORY_RUNNING_LOW) {
+            AppLog.log("onTrimMemory($level): clearing Coil's memory cache")
+            runCatching { imageLoader.memoryCache?.clear() }
+        }
+        if (level >= android.content.ComponentCallbacks2.TRIM_MEMORY_RUNNING_CRITICAL) {
+            runCatching { imageLoader.diskCache?.clear() }
+        }
+    }
+
+    /**
      * Debug-only StrictMode: reports every main-thread disk read/write and network call to
      * logcat (tag "StrictMode"), which is the fastest way to attribute a startup stall to
      * the thread it happened on. A cold start that blocks the main thread on a DataStore
