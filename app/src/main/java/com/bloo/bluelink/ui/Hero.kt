@@ -823,9 +823,17 @@ internal fun HeroVisual(
         // started within the same short burst window -- an isolated load (expanding one
         // car well after cold start, say) claims 0ms and starts immediately.
         var staggerReady by remember(model) { mutableStateOf(false) }
+        // Cold-start diagnostic: when AsyncImage actually starts (right after the stagger
+        // delay, if any), so the Success callback below can log how long THIS photo's own
+        // decode took -- distinct from `hero photo decoded`'s old single shared key, which
+        // could only ever report the FIRST of a multi-car account's photos (StartupTrace.once
+        // dedupes by key, and every car used the same one), leaving every later photo's own
+        // timing invisible in every report so far.
+        var loadStartedAtMs by remember(model) { mutableStateOf(0L) }
         LaunchedEffect(model) {
             val delayMs = HeroLoadStagger.claimDelayMs()
             if (delayMs > 0) delay(delayMs)
+            loadStartedAtMs = System.currentTimeMillis()
             staggerReady = true
         }
         // Memoized like the map tiles: creating a fresh ImageRequest every recomposition
@@ -874,9 +882,23 @@ internal fun HeroVisual(
                         // Cold-start: when the car photo actually finished DECODING and is
                         // being drawn, not when the request was dispatched. A hero photo
                         // arriving late is one of the few startup costs that visibly pops in.
+                        // Keyed per-VIN (not one shared key) and carrying its own elapsed time
+                        // and source file size -- a real device log showed a ~270MB heap jump
+                        // and ~188MB of NATIVE heap growth (a bitmap-decode signature, not a
+                        // JSON-parse one) in this same window despite the `.size(1080, 1080)`
+                        // decode cap, which two properly-capped ARGB_8888 bitmaps could never
+                        // need (under 10MB combined). Either that cap isn't taking effect for
+                        // these particular files, or the source files themselves are large
+                        // enough that decode needs far more transient memory than the final
+                        // bitmap does -- this is what will actually show which.
+                        val elapsedMs = if (loadStartedAtMs > 0) System.currentTimeMillis() - loadStartedAtMs else -1
+                        val sourceSize = (model as? java.io.File)?.let {
+                            runCatching { it.length() }.getOrNull()
+                        }
                         com.bloo.bluelink.data.StartupTrace.once(
-                            "hero-photo-decoded",
-                            "hero photo decoded (${state.result.dataSource})",
+                            "hero-photo-decoded-${v.vin}",
+                            "hero photo decoded for ${v.name} (${state.result.dataSource}) in " +
+                                "${elapsedMs}ms, source=${sourceSize?.let { "${it / 1024}KB local file" } ?: "remote/unknown"}",
                         )
                     }
                 },
