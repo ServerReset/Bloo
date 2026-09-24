@@ -39,6 +39,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -315,6 +316,15 @@ internal fun SettingsScreen(
                 .widthIn(max = 1100.dp)
                 .fillMaxWidth()
                 .hazeSource(hazeState)
+                // The app runs edge-to-edge (MainActivity's enableEdgeToEdge()), which turns
+                // off the manifest's own adjustResize for every surface -- without this, a
+                // text field low in this list (license plate, a custom weather location) sat
+                // right where the keyboard covered it, with nothing left to shrink the list's
+                // own visible area and let Compose's built-in "scroll the focused field into
+                // view" behavior actually reveal it. imePadding shrinks the list itself when
+                // the keyboard opens, same fix as ExpandableMapLayer's own bottom column got
+                // for its charger API key field, reported from the same screenshot.
+                .imePadding()
                 .padding(horizontal = if (compact) 10.dp else 16.dp),
             verticalArrangement = Arrangement.spacedBy(if (compact) 8.dp else 12.dp),
         ) {

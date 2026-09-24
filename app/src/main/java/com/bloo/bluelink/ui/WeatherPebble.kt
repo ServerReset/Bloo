@@ -43,6 +43,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -1751,6 +1752,13 @@ internal fun ExpandableMapLayer(
                         .align(Alignment.BottomCenter)
                         .fillMaxWidth()
                         .navigationBarsPadding()
+                        // This whole app runs edge-to-edge (MainActivity's enableEdgeToEdge()),
+                        // which turns off the manifest's own adjustResize for every surface --
+                        // each one has to lift itself above the keyboard explicitly now. This
+                        // column is the one that actually needs it: the charger API key field
+                        // inside ChargerFilterBar sits right where the keyboard covers it,
+                        // reported directly from a screenshot.
+                        .imePadding()
                         .graphicsLayer { alpha = expandFraction.value.coerceIn(0f, 1f) },
                 ) {
                     // lastSelectedCharger, not selectedCharger directly, inside the PopVisible
