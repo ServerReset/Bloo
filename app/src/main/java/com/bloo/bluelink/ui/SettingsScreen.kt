@@ -927,10 +927,12 @@ internal fun SettingsScreen(
                     // name) -- redundant chrome with nothing to expand,
                     // collapse or reorder underneath it.
                     val v = state.vehicles[0]
-                    // Same gap-lives-inside-the-card fix SettingsCard's own wrapper
-                    // uses (see its doc comment) and the same heading() semantics,
-                    // reproduced by hand since this bypasses SettingsCard itself.
-                    Box(Modifier.fillMaxWidth().padding(bottom = SettingsCardGap).semantics { heading() }) {
+                    // The exact same wrapper SettingsCard itself uses (gap + heading()
+                    // semantics), via settingsCardSlot() -- this bypasses SettingsCard to
+                    // avoid stacking two pebble headers for one car, but still wants its
+                    // outer chrome, so it shares that one definition instead of a second
+                    // hand-written copy.
+                    Box(Modifier.settingsCardSlot()) {
                         CarSettingsCard(
                             v = v, state = state, vm = vm,
                             expanded = true, dragging = false, dragHandle = Modifier,
