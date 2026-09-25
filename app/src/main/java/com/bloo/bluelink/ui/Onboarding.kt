@@ -819,7 +819,7 @@ internal fun OnboardingSetupCard(
 ) {
     val scheme = MaterialTheme.colorScheme
     Surface(
-        shape = RoundedCornerShape(20.dp),
+        shape = LargeShape,
         color = scheme.surfaceContainerHigh,
         modifier = Modifier.fillMaxWidth(),
     ) {

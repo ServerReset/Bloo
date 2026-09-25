@@ -87,7 +87,7 @@ internal fun ChargerFilterBar(
     val networks = remember(chargers) { chargers.mapNotNull { it.network }.distinct().sorted() }
     val matchCount = remember(chargers, filters) { chargers.count { it.matches(filters) } }
     GlassSurface(
-        shape = RoundedCornerShape(20.dp),
+        shape = LargeShape,
         hazeState = mapHazeState,
         modifier = modifier.fillMaxWidth().widthIn(max = 520.dp),
     ) {
@@ -166,7 +166,7 @@ internal fun ChargerInfoCard(
     modifier: Modifier = Modifier,
 ) {
     GlassSurface(
-        shape = RoundedCornerShape(20.dp),
+        shape = LargeShape,
         hazeState = mapHazeState,
         modifier = modifier.fillMaxWidth().widthIn(max = 520.dp),
     ) {

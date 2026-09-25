@@ -28,6 +28,7 @@ import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Text
 // No `motionScheme` import: it is a member of the MaterialTheme object (verified as
@@ -169,6 +170,15 @@ internal val SettingsGapGroup = 12.dp
 internal val SettingsGapSection = 16.dp
 
 internal val SettingsCardGap = 10.dp
+
+// ---- Shapes ---------------------------------------------------------------------
+//
+// Common corner radius values used throughout the app, extracted for consistency.
+// When a shape needs updating, only change it here instead of across 12+ files.
+internal val SmallShape = SmallShape   // Smaller components, chips
+internal val StandardShape = RoundedCornerShape(16.dp) // Buttons, most cards
+internal val LargeShape = LargeShape   // Large cards, sheets
+internal val ExtraLargeShape = ExtraLargeShape // Modal dialogs
 
 // ---- Blur -----------------------------------------------------------------------
 //

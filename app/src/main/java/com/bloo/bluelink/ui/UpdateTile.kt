@@ -222,7 +222,7 @@ internal fun UpdateAvailableTile(
         // reported directly from a screenshot.
         GlassSurface(
             modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(12.dp),
+            shape = SmallShape,
             hazeState = hazeState,
             shadow = false,
         ) {
@@ -270,7 +270,7 @@ internal fun UpdateAvailableTile(
                     // get a second full-strength drop shadow.
                     GlassSurface(
                         modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(12.dp),
+                        shape = SmallShape,
                         hazeState = hazeState,
                         shadow = false,
                     ) {
@@ -410,7 +410,7 @@ internal fun UpdateReleaseNotes(
     // glassEdge's own doc for why a nested panel skips the second shadow.
     GlassSurface(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(12.dp),
+        shape = SmallShape,
         hazeState = hazeState,
         shadow = false,
     ) {

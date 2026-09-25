@@ -901,7 +901,7 @@ internal fun SettingsScreen(
                             Column(
                                 Modifier
                                     .fillMaxWidth()
-                                    .clip(RoundedCornerShape(16.dp))
+                                    .clip(StandardShape)
                                     // glassTint, not a one-off surfaceContainerHighest/0.5f literal --
                                     // the same shared neutral fill every other glass surface in the
                                     // app uses, not a fourth slightly-different copy of the same idea.

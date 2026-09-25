@@ -546,7 +546,7 @@ internal fun GarageStatusCard(state: State<UiState>, vm: AppViewModel, hazeState
             // lock overlay's own PIN card) -- blurring the real Aurora behind it, exactly
             // like a real car page's own content does.
             GlassSurface(
-                shape = RoundedCornerShape(28.dp),
+                shape = ExtraLargeShape,
                 modifier = Modifier
                     .widthIn(max = 400.dp)
                     .fillMaxWidth()

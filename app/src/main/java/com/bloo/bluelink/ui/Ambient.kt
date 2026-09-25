@@ -699,7 +699,7 @@ internal fun GlassAlertDialog(
     titleTrailing: (@Composable () -> Unit)? = null,
 ) {
     val scheme = MaterialTheme.colorScheme
-    val shape = RoundedCornerShape(28.dp)
+    val shape = ExtraLargeShape
     Dialog(onDismissRequest = onDismissRequest) {
         // Dialog() opens its own platform Window, which doesn't inherit the
         // app's forceDarkAllowed=false the way the main Activity window does

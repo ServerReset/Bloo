@@ -979,7 +979,7 @@ internal fun DriveSyncSetupDialog(
                 Column(
                     Modifier
                         .fillMaxWidth()
-                        .clip(RoundedCornerShape(16.dp))
+                        .clip(StandardShape)
                         .background(scheme.errorContainer.copy(alpha = 0.5f))
                         .padding(14.dp),
                     verticalArrangement = Arrangement.spacedBy(10.dp),
