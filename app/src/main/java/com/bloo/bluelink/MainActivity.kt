@@ -20,6 +20,7 @@ import androidx.lifecycle.lifecycleScope
 import com.bloo.bluelink.ui.AppViewModel
 import com.bloo.bluelink.ui.BlooApp
 import com.bloo.bluelink.ui.BlooTheme
+import com.bloo.bluelink.ui.refreshShizukuAvailable
 import com.bloo.bluelink.work.AlertWorker
 import com.bloo.bluelink.work.MainToMainSyncWorker
 import com.bloo.bluelink.work.UpdateCheckWorker

@@ -1,5 +1,6 @@
 package com.bloo.bluelink.ui
 
+import androidx.lifecycle.viewModelScope
 import com.bloo.bluelink.data.GeoLocation
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch

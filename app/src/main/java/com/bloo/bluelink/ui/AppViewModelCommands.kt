@@ -1,5 +1,6 @@
 package com.bloo.bluelink.ui
 
+import androidx.lifecycle.viewModelScope
 import com.bloo.bluelink.data.AppLog
 import com.bloo.bluelink.data.BlueLinkException
 import com.bloo.bluelink.data.ClimateRequest

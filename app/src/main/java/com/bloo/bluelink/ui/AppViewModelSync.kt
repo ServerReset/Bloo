@@ -1,5 +1,6 @@
 package com.bloo.bluelink.ui
 
+import androidx.lifecycle.viewModelScope
 import com.bloo.bluelink.data.AppLog
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.update
