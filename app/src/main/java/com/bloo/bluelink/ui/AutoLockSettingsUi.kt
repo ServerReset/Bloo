@@ -94,13 +94,11 @@ internal fun AutoLockSettingsGroup(v: Vehicle, vm: AppViewModel) {
     }
 
     SettingsGroup("AutoLock") {
-        Text(
+        MutedText(
             "Automatically locks ${v.name} once your phone disconnects from its paired " +
                 "Bluetooth and Activity Recognition confirms you're walking away. Starts " +
                 "disabled and in dry-run mode -- it decides what it would do but never sends " +
                 "a real lock command until you turn that off.",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         ToggleRow("Enabled", current.enabled, onChange = ::onEnabledChanged)
 
@@ -179,10 +177,8 @@ internal fun AutoLockSettingsGroup(v: Vehicle, vm: AppViewModel) {
                 valueRange = 5f..120f,
                 steps = 22,
             )
-            Text(
+            LabelSmallText(
                 "Wait this long before locking — taps \"Lock now\" to skip the countdown.",
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
 
             ToggleRow(
@@ -205,10 +201,8 @@ internal fun AutoLockSettingsGroup(v: Vehicle, vm: AppViewModel) {
                 )
             }
             if (!current.isUsable) {
-                Text(
+                LabelSmallText(
                     "Choose the car's Bluetooth device above to try this.",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
 
@@ -271,12 +265,8 @@ internal fun AutoLockSettingsGroup(v: Vehicle, vm: AppViewModel) {
                             // M3's ListItem drew its own surface fill and its own type scale
                             // inside the dialog; the name/address pair is the same
                             // label-over-caption rhythm every settings row in the app uses.
-                            Text(device.name, style = MaterialTheme.typography.bodyMedium)
-                            Text(
-                                device.address,
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
+                            BodyMediumText(device.name)
+                            LabelSmallText(device.address)
                         }
                     }
                 }
