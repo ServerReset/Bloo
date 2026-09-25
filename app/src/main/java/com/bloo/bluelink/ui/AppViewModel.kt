@@ -3391,13 +3391,15 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    /** Saves the user's own Open Charge Map API key (blank/null clears it) and
-     *  re-runs the last search with it -- see [SettingsStore.setChargerApiKey]'s and
-     *  [SettingsStore.Appearance.chargerApiKey]'s own docs. */
-    fun setChargerApiKey(key: String?, around: GeoLocation) {
+    /** Saves the user's own Open Charge Map API key (blank/null clears it) and, when
+     *  [around] is known (the map's retry UI has a location; Settings' own "save key"
+     *  field doesn't), re-runs the last search with it -- see
+     *  [SettingsStore.setChargerApiKey]'s and [SettingsStore.Appearance.chargerApiKey]'s
+     *  own docs. */
+    fun setChargerApiKey(key: String?, around: GeoLocation?) {
         viewModelScope.launch {
             settingsStore.setChargerApiKey(key)
-            loadNearbyChargers(around)
+            if (around != null) loadNearbyChargers(around)
         }
     }
 
