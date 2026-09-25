@@ -285,7 +285,12 @@ fun MorphSegmented(
                         translationX = indicatorXPx.value
                         alpha = indicatorAlpha
                     }
-                    .background(indicatorColor, RoundedCornerShape(14.dp)),
+                    // 12.dp, not an arbitrary rounder value: the outer track is 16.dp with a
+                    // 4.dp inset (trackPad) around this indicator, and a nested shape only
+                    // reads as concentric with its container when inner = outer - inset. A
+                    // mismatched inner radius (this was 14.dp) leaves a visible sliver where
+                    // the two curves diverge instead of tracing the same arc.
+                    .background(indicatorColor, RoundedCornerShape(12.dp)),
             )
             // The row of segment labels/icons, layered on top of the indicator Box
             // above and hosting the single pointerInput gesture detector that drives
@@ -396,7 +401,7 @@ fun MorphSegmented(
                         modifier = Modifier
                             .width(segWidth)
                             .fillMaxHeight()
-                            .clip(RoundedCornerShape(14.dp))
+                            .clip(RoundedCornerShape(12.dp))
                             // The whole control's touch/drag handling lives in
                             // the parent Row's single pointerInput above (a
                             // real clickable/selectable here would register its
