@@ -590,7 +590,7 @@ internal fun SettingsScreen(
             run { // scope kept so the gate above is the only edit; the check now lives on `item`
                 SettingsCard(
                     "AI",
-                    Icons.Filled.AutoAwesome,
+                    AppIcons.AutoAwesome,
                     vm,
                     // The card is inline whenever the CURRENT mode leaves it holding one
                     // setting. In simple mode the auto-summarize toggle below is hidden, so
@@ -610,7 +610,7 @@ internal fun SettingsScreen(
                     // Same icon-badge + status-line header as the rest of this pass.
                     val aiTint = if (state.aiEnabled) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.onSurfaceVariant
                     StatusHeaderRow(
-                        icon = Icons.Filled.AutoAwesome,
+                        icon = AppIcons.AutoAwesome,
                         tint = aiTint,
                         title = "On-device AI",
                         status = if (state.aiEnabled) "On" else "Off",
@@ -1089,7 +1089,7 @@ internal fun SettingsScreen(
 
             // Logs
             AnimatedVisibility(visibleState = advTransition2, enter = expandEnter(), exit = expandExit()) {
-            SettingsCard("Logs", Icons.Filled.Info, vm) {
+            SettingsCard("Logs", AppIcons.Info, vm) {
                 // No local expand state any more. The card's OWN chevron (PebbleShell's, via
                 // SettingsCard) already governs this body -- nothing inside a collapsed card is
                 // composed at all -- so the "Show"/"Hide" button that used to live on this row
