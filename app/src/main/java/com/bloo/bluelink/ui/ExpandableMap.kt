@@ -815,50 +815,10 @@ internal fun ExpandableMapLayer(
 }
 
 /**
- * The same map, expanded to fill most of the screen, WITHOUT a Dialog -- reached
- * from a Location pebble's own compact map when its host provides an
- * [ExpandedMapState] (currently only [GarageScreen]). Rendered as a plain overlay
- * in that host's own composition (a sibling Box drawn last, so it's on top of
- * everything else) instead of a system Dialog: being in the SAME window as the
- * compact map is what lets it share that map's own [CarMapState] ([mapState] here
- * is [ExpandedMapState.mapStateFor], not a fresh one) instead of starting over at
- * a blank pan/zoom and re-fetching tiles Coil already has cached from the compact
- * view -- reported directly as wanting "literally that same component" to expand,
- * not a copy fading in. It also means [hazeState] can give the visible strip of
- * app above the sheet a REAL blur of the actual content behind it (the same
- * technique [StatusBarScrim] already uses) -- something a separate Dialog window
- * has no access to at all, so [CarMapSheet]'s own Dialog fallback above still just
- * dims that strip instead.
- */
-@Composable
-internal fun CarMapExpandedOverlay(
-    location: GeoLocation,
-    vehicleName: String,
-    deviceLocation: GeoLocation?,
-    mapState: CarMapState,
-    originBounds: Rect?,
-    hazeState: HazeState?,
-    onDismiss: () -> Unit,
-) {
-    CarMapSheetBody(
-        location = location,
-        vehicleName = vehicleName,
-        deviceLocation = deviceLocation,
-        mapState = mapState,
-        originBounds = originBounds,
-        hazeState = hazeState,
-        onDismiss = onDismiss,
-    )
-}
-
-/**
- * The map, expanded into a bottom sheet -- reached from [CarMap]'s own corner button,
- * either via [CarMapSheet] (a Dialog, for hosts with no [ExpandedMapState]) or
- * [CarMapExpandedOverlay] (an in-tree overlay, for [GarageScreen]). Shared body for
- * both: everything about the sheet itself -- its slide-in/out, scrim, drag-to-
- * dismiss, chrome -- is identical either way; only how it's HOSTED (a separate
- * Dialog window vs. a plain overlay in the same composition) differs between the
- * two callers, and that's entirely their own concern, not this one's.
+ * The map, expanded into a bottom sheet -- reached from [CarMap]'s own corner
+ * button via [CarMapSheet] (a Dialog). Everything about the sheet itself -- its
+ * slide-in/out, scrim, drag-to-dismiss, chrome -- lives here, entirely separate
+ * from how [CarMapSheet] hosts it.
  *
  * A hand-rolled overlay, NOT [androidx.compose.material3.ModalBottomSheet] -- that
  * was the second attempt here (the first was a hand-rolled [Dialog] driving its own
@@ -895,10 +855,11 @@ private fun CarMapSheetBody(
     deviceLocation: GeoLocation?,
     mapState: CarMapState,
     originBounds: Rect?,
-    /** Non-null (only from [CarMapExpandedOverlay]) blurs the visible strip of app
-     *  above the sheet for real -- see this function's own doc. Null (the Dialog
-     *  path) falls back to a plain darkened scrim, since Haze cannot reach across
-     *  windows. */
+    /** Always null: this body is only ever hosted via [CarMapSheet]'s Dialog, and
+     *  Haze cannot reach across windows, so the scrim below always falls back to a
+     *  plain darkened one. Kept as a real parameter (not hardcoded null internally)
+     *  since a future non-Dialog host is exactly the kind of thing this shared body
+     *  exists to support -- see this function's own doc. */
     hazeState: HazeState?,
     /** Null (the default) omits the refresh icon entirely -- see [MapTopBar]'s
      *  own doc. */
@@ -1070,8 +1031,7 @@ private fun CarMapSheetBody(
             // One consolidated top bar -- name + drag handle, sharing one floating
             // pill background instead of two separate pieces of glass (see
             // MapTopBar's own doc). Refresh is whatever this sheet's own caller
-            // passed in (null omits it entirely, same as before -- CarMapExpandedOverlay's
-            // dead-code call site never wires one up). Also the ONLY thing on this sheet
+            // passed in (null omits it entirely). Also the ONLY thing on this sheet
             // a user can pull down to dismiss (see [dragPx]'s own doc up top) -- the
             // whole bar is now the drag target, not just a slim strip above it.
             MapTopBar(
