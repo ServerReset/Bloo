@@ -1115,11 +1115,7 @@ internal fun CarMap(
                         .offset(y = (-14).dp)
                         .then(
                             if (onChargerClick != null) {
-                                Modifier.clickable(
-                                    interactionSource = remember { MutableInteractionSource() },
-                                    indication = null,
-                                    onClickLabel = charger.name,
-                                ) { onChargerClick(charger) }
+                                Modifier.noRippleClickable(onClickLabel = charger.name) { onChargerClick(charger) }
                             } else {
                                 Modifier
                             },
@@ -1654,14 +1650,7 @@ internal fun ExpandableMapLayer(
         // strip the sheet itself doesn't reach.
         if (isExpanded) {
             ScrimBlur(hazeState = hazeState, progress = { expandFraction.value })
-            Box(
-                Modifier
-                    .fillMaxSize()
-                    .clickable(
-                        interactionSource = remember { MutableInteractionSource() },
-                        indication = null,
-                    ) { close() }
-            )
+            Box(Modifier.fillMaxSize().noRippleClickable { close() })
         }
 
         // The sheet: bottom-anchored, full-width, 85% of the screen's height --
@@ -2040,14 +2029,7 @@ private fun CarMapSheetBody(
             // of at composition time (see ScrimBlur's own doc for why that distinction
             // is load-bearing here, not stylistic).
             ScrimBlur(hazeState = hazeState, progress = { visible.value })
-            Box(
-                Modifier
-                    .fillMaxSize()
-                    .clickable(
-                        interactionSource = remember { MutableInteractionSource() },
-                        indication = null,
-                    ) { close() },
-            )
+            Box(Modifier.fillMaxSize().noRippleClickable { close() })
         }
         // The sheet itself: bottom-anchored and full-width on EVERY screen size --
         // see this function's own doc for why. `translationY` (not a plain offset)
@@ -2068,11 +2050,7 @@ private fun CarMapSheetBody(
                 // content is what made a boxed dialog card read as a floating card
                 // rather than a sheet. The map below fills this box edge to edge on
                 // its own; nothing else here needs a background to sit on.
-                .clickable(
-                    interactionSource = remember { MutableInteractionSource() },
-                    indication = null,
-                    onClick = {}, // swallow taps so they don't fall through to the scrim behind
-                ),
+                .noRippleClickable { /* swallow taps so they don't fall through to the scrim behind */ },
         ) {
             // The map fills the WHOLE sheet, edge to edge -- no boxed-in margin --
             // with the header and toolbar floating semi-transparently ON TOP of it

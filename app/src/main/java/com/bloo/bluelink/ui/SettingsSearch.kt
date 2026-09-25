@@ -403,10 +403,7 @@ internal fun SearchLayer(
                 Modifier
                     .fillMaxSize()
                     .background(MaterialTheme.colorScheme.scrim.copy(alpha = 0.32f))
-                    .clickable(
-                        interactionSource = remember { MutableInteractionSource() },
-                        indication = null,
-                    ) { query = ""; focused = false },
+                    .noRippleClickable { query = ""; focused = false },
             )
         }
 

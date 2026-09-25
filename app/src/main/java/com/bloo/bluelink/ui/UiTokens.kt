@@ -26,6 +26,8 @@ import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
@@ -63,6 +65,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.remember
 // State<T>'s `by` delegate isn't a member -- it resolves to this file-scope operator
 // extension, which the compiler will not find without an explicit import (unlike most of
 // this file's other extension functions, which show up as unresolved-reference errors
@@ -1013,6 +1016,23 @@ internal fun IconLeadRow(
 internal fun SectionDivider(modifier: Modifier = Modifier, alpha: Float = 0.3f) {
     HorizontalDivider(modifier = modifier, color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = alpha))
 }
+
+/**
+ * `Modifier.clickable` with the ripple suppressed and a fresh, unshared interaction
+ * source -- the app's standard "tappable but no visual press feedback" treatment for
+ * full-bleed scrims and tap-swallowing surfaces (a sheet's backdrop, a lock screen's
+ * backdrop, a sheet's own body eating taps so they don't fall through to the scrim
+ * behind it). Copy-pasted as the same `interactionSource = remember { MutableInteractionSource() },
+ * indication = null` pair at 8 separate call sites before this existed.
+ */
+@Composable
+internal fun Modifier.noRippleClickable(onClickLabel: String? = null, onClick: () -> Unit): Modifier =
+    clickable(
+        interactionSource = remember { MutableInteractionSource() },
+        indication = null,
+        onClickLabel = onClickLabel,
+        onClick = onClick,
+    )
 
 /**
  * Consolidates the most-repeated padding patterns. Used instead of

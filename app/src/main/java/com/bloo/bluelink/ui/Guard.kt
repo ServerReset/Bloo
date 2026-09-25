@@ -216,7 +216,6 @@ internal fun LockOverlay(vm: AppViewModel, opaqueBackdrop: Boolean = false) {
     // biometric prompt stays on the biometric UI; PIN always returns here on
     // the next lock anyway (fresh overlay remounts at the default mode).
     val haptics = LocalHaptics.current
-    val noRipple = remember { MutableInteractionSource() }
     val showBiometric = bioAvailable && !usePinMode
     // The backdrop animates between fully opaque (the first frames of a cold start, before
     // the content underneath has settled -- see LockBlurLayer's own note) and the 45% scrim.
@@ -237,7 +236,7 @@ internal fun LockOverlay(vm: AppViewModel, opaqueBackdrop: Boolean = false) {
             // over a sharp garage would show car names, plates and status through the lock
             // screen, which is the one thing it exists to prevent.
             .background(Color.Black.copy(alpha = backdropAlpha))
-            .clickable(interactionSource = noRipple, indication = null) {},
+            .noRippleClickable {},
     ) {
         // Floating back arrow -> login: the same FloatingIcon every other floating
         // circular button in the app uses, with the lock scrim's plain-white

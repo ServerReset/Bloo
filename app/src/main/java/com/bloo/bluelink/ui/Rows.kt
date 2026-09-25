@@ -472,28 +472,35 @@ internal fun SettingsCaption(
  * inline card and an expanded one are the same control in two places rather than two controls
  * that happen to look alike.
  */
+/**
+ * The `toggleable` (not `clickable`, for the checked/Role.Switch semantics node) + no-ripple
+ * + toggle-haptics boilerplate both [InlineToggle] and [ToggleRowControl] wrapped around
+ * their track/row -- one copy instead of two.
+ */
+@Composable
+private fun Modifier.hapticToggleable(checked: Boolean, onChange: (Boolean) -> Unit): Modifier {
+    val haptics = LocalHaptics.current
+    return toggleable(
+        value = checked,
+        interactionSource = remember { MutableInteractionSource() },
+        indication = null,
+        role = Role.Switch,
+    ) {
+        val next = !checked
+        if (next) haptics?.toggleOn() else haptics?.toggleOff()
+        onChange(next)
+    }
+}
+
 @Composable
 internal fun InlineToggle(checked: Boolean, onChange: (Boolean) -> Unit) {
-    val haptics = LocalHaptics.current
-    Box(
-        Modifier.toggleable(
-            value = checked,
-            interactionSource = remember { MutableInteractionSource() },
-            indication = null,
-            role = Role.Switch,
-        ) {
-            val next = !checked
-            if (next) haptics?.toggleOn() else haptics?.toggleOff()
-            onChange(next)
-        },
-    ) {
+    Box(Modifier.hapticToggleable(checked, onChange)) {
         MorphToggleTrack(checked)
     }
 }
 
 @Composable
 private fun ToggleRowControl(label: String, checked: Boolean, onChange: (Boolean) -> Unit) {
-    val haptics = LocalHaptics.current
     Row(
         Modifier
             .fillMaxWidth()
@@ -503,16 +510,7 @@ private fun ToggleRowControl(label: String, checked: Boolean, onChange: (Boolean
             // instead of two adjacent focus stops (a generic "double tap to
             // activate" for the row, then the real on/off announcement for the
             // track a swipe later).
-            .toggleable(
-                value = checked,
-                interactionSource = remember { MutableInteractionSource() },
-                indication = null,
-                role = Role.Switch,
-            ) {
-                val next = !checked
-                if (next) haptics?.toggleOn() else haptics?.toggleOff()
-                onChange(next)
-            }
+            .hapticToggleable(checked, onChange)
             .padding(vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
