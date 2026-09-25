@@ -78,6 +78,7 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.round
 import androidx.compose.ui.unit.dp
 import com.bloo.bluelink.data.SettingsStore
+import com.bloo.uicommon.rememberConfirmArm
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlin.math.abs
@@ -443,13 +444,7 @@ internal fun PaletteEditorDialog(
     // palette -- same "tap again to confirm" + 4s auto-reset pattern as the
     // climate preset delete nub, so this destructive action isn't one
     // mis-tap away from losing work either.
-    var confirmDelete by remember(editing) { mutableStateOf(false) }
-    LaunchedEffect(confirmDelete) {
-        if (confirmDelete) {
-            delay(4000)
-            confirmDelete = false
-        }
-    }
+    val confirmDeleteArm = rememberConfirmArm()
     // Standardized on the shared GlassAlertDialog shell. No leading icon (the
     // dialog is title-led); the delete affordance rides the shell's titleTrailing
     // slot; the shell already scrolls its body (max 360dp), so the inner
@@ -460,12 +455,12 @@ internal fun PaletteEditorDialog(
         titleTrailing = if (editing != null) {
             {
                 MorphIconButton(onClick = {
-                    if (confirmDelete) { onDelete(paletteId); onDismiss() } else { confirmDelete = true }
+                    if (confirmDeleteArm.armed) { onDelete(paletteId); onDismiss() } else { confirmDeleteArm.arm() }
                 }) {
                     Icon(
                         Icons.Filled.Close,
-                        contentDescription = if (confirmDelete) "Confirm delete palette" else "Delete palette",
-                        tint = if (confirmDelete) MaterialTheme.colorScheme.error else LocalContentColor.current,
+                        contentDescription = if (confirmDeleteArm.armed) "Confirm delete palette" else "Delete palette",
+                        tint = if (confirmDeleteArm.armed) MaterialTheme.colorScheme.error else LocalContentColor.current,
                     )
                 }
             }

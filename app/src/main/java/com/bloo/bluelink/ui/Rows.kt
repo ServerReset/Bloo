@@ -109,6 +109,7 @@ import androidx.compose.ui.unit.dp
 import androidx.core.graphics.createBitmap
 import androidx.core.net.toUri
 import com.bloo.uicommon.dropShadow
+import com.bloo.uicommon.rememberConfirmArm
 import com.bloo.bluelink.data.Weather
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -893,31 +894,20 @@ internal fun SyncDeviceRow(
             // destructive action in the app (account sign-out, palette/preset
             // delete) -- one accidental tap on a device you use daily should
             // never kick it, but a real kick shouldn't need a whole dialog either.
-            var confirmRemove by remember(device.id) { mutableStateOf(false) }
-            LaunchedEffect(confirmRemove) {
-                if (confirmRemove) {
-                    delay(4000)
-                    confirmRemove = false
-                }
-            }
+            val confirmRemove = rememberConfirmArm()
             MorphIconButton(
                 onClick = {
-                    if (confirmRemove) {
-                        onRemove()
-                        confirmRemove = false
-                    } else {
-                        confirmRemove = true
-                    }
+                    if (confirmRemove.armed) onRemove() else confirmRemove.arm()
                 },
             ) {
                 Icon(
                     AppIcons.Close,
-                    contentDescription = if (confirmRemove) {
+                    contentDescription = if (confirmRemove.armed) {
                         "Tap again to remove ${device.name.ifBlank { "this device" }}"
                     } else {
                         "Remove ${device.name.ifBlank { "this device" }} from synced devices"
                     },
-                    tint = if (confirmRemove) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
+                    tint = if (confirmRemove.armed) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.size(18.dp),
                 )
             }
