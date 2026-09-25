@@ -107,16 +107,6 @@ internal fun GarageScreen(
     // the pager entirely.
     val vehicles by remember { derivedStateOf { state.value.vehicles } }
     val refreshing by remember { derivedStateOf { state.value.refreshing } }
-    // NOT the same flag the per-car pull-to-refresh badges use: those track a
-    // status refresh (state.refreshing), but this button's own onClick calls
-    // vm.loadGarage(), which goes through launchBusy and sets state.loading --
-    // the same field Guard.kt's GarageStatusCard already binds its own
-    // loadGarage() refresh indicator to. Binding this button to `refreshing`
-    // instead would leave it never actually showing busy for its own tap (that
-    // action never touches `refreshing` at all) while still lighting up
-    // whenever an unrelated per-car refresh happened to be in flight --
-    // reported directly as the button appearing to spin "randomly".
-    val loading by remember { derivedStateOf { state.value.loading } }
     val expandedIndex by remember { derivedStateOf { state.value.expandedIndex } }
     val deviceLocation by remember { derivedStateOf { state.value.deviceLocation } }
     val chargersVisible by remember { derivedStateOf { state.value.chargersVisible } }
@@ -716,37 +706,13 @@ internal fun GarageScreen(
                     // wanting it to always be there.
                     StatusBarScrim(hazeState = hazeState)
                     // Pager dots removed: user requested no page indicators at the top of the screen
-                    // A single global refresh control, floating above every page in this pager
-                    // (every car page AND the folded-in Settings page) instead of being tied to
-                    // whichever page happens to be showing -- standardized from what used to be
-                    // the multi-car grid's own perPage>1-only RefreshIndicatorBadge (a passive
-                    // slide-in spinner with no tap target of its own, and invisible everywhere
-                    // else). Settings has no pull gesture of its own to trigger a refresh with at
-                    // all -- reported directly as wanting to "even refresh on the settings page"
-                    // -- and grid mode still has the same "count <= perPage, no per-card pull
-                    // gesture visibly fires" gap this replaces. `shift = false`: a persistent nav
-                    // target, not page chrome (see floatingOverlay's own doc for the Settings-cog
-                    // example), so it doesn't slide along with a pull gesture on whichever page
-                    // happens to be showing. `fade = false`: this is the one piece of chrome that
-                    // must stay visible exactly when the rest of it fades out -- it IS the refresh.
-                    //
-                    // Gated on the map NOT being expanded: the expanded map is a full-screen
-                    // overlay with its own dedicated refresh icon (MapTopBar, tied to that car's
-                    // own "locate" command, a different action entirely from this button's
-                    // vm.loadGarage()) -- composed later/on top, so this button is normally
-                    // covered regardless, but the map's own top strip is a translucent Haze
-                    // blur, not an opaque fill, so this button was visibly bleeding through
-                    // underneath it: two refresh-looking controls stacked at the top of the
-                    // expanded map, reported directly as confusing.
-                    if (expandedMap.vin == null) FloatingIcon(
-                        icon = AppIcons.Refresh,
-                        description = if (loading) "Refreshing" else "Refresh",
-                        onClick = { vm.loadGarage() },
-                        busy = loading,
-                        hazeState = hazeState,
-                        modifier = Modifier.align(Alignment.TopCenter)
-                            .floatingOverlay(FloatingIds.RefreshIndicator, fade = false, shift = false),
-                    )
+                    // No global refresh indicator here for now -- a floating button standing in
+                    // for the multi-car grid's own perPage>1-only RefreshIndicatorBadge caused a
+                    // string of real, reported visual bugs (a stuck "blob" look from a busy-state
+                    // binding mismatch, then bleeding through underneath the expanded map's own
+                    // translucent top bar even after that was fixed) -- pulled out entirely rather
+                    // than keep patching a design that kept finding new ways to look broken. The
+                    // per-car pull-to-refresh (Refreshable, on each car's own page) is untouched.
                     // No floating name badge here at all any more -- removed as unwanted UI.
                 }
             }
