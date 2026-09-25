@@ -952,10 +952,7 @@ internal fun PebbleShell(
                             if (summary != null) {
                                 AnimatedContent(
                                     targetState = summary,
-                                    transitionSpec = {
-                                        (fadeIn(tween(180)) + slideInVertically { it / 3 }) togetherWith
-                                        (fadeOut(tween(120)) + slideOutVertically { -it / 3 })
-                                    },
+                                    transitionSpec = { expandContentTransform() },
                                     label = "pebbleSummary",
                                 ) { s ->
                                     Text(

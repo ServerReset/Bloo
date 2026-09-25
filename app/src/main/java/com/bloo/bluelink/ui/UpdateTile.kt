@@ -111,8 +111,8 @@ internal fun UpdateAvailableTile(
     // updateTileDismissed truly hides it.
     AnimatedVisibility(
         visible = info != null && !state.updateTileDismissed,
-        enter = collapseEnter(Alignment.Bottom),
-        exit = collapseExit(Alignment.Bottom),
+        enter = expandEnter(Alignment.Bottom),
+        exit = expandExit(Alignment.Bottom),
     ) {
         if (info == null) return@AnimatedVisibility
         val context = LocalContext.current
@@ -578,10 +578,7 @@ internal fun UpdateStatusLine(
         }
         AnimatedContent(
             targetState = statusKind,
-            transitionSpec = {
-                (fadeIn(tween(180)) + slideInVertically { it / 3 }) togetherWith
-                    (fadeOut(tween(120)) + slideOutVertically { -it / 3 })
-            },
+            transitionSpec = { expandContentTransform() },
             label = "updateStatusText",
             modifier = Modifier.weight(1f),
         ) { kind ->

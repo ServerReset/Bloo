@@ -214,10 +214,7 @@ internal fun StatusHeaderRow(icon: ImageVector, tint: Color, title: String, stat
             Text(title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
             AnimatedContent(
                 targetState = status,
-                transitionSpec = {
-                    (fadeIn(tween(180)) + slideInVertically { it / 3 }) togetherWith
-                        (fadeOut(tween(120)) + slideOutVertically { -it / 3 })
-                },
+                transitionSpec = { expandContentTransform() },
                 label = "statusHeaderText",
             ) { s ->
                 Text(s, style = MaterialTheme.typography.labelMedium, color = animTint, fontWeight = FontWeight.Medium)

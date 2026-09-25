@@ -2,8 +2,10 @@
 
 package com.bloo.bluelink.ui
 
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.AnimatedVisibilityScope
+import androidx.compose.animation.ContentTransform
 import androidx.compose.animation.EnterExitState
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
@@ -19,6 +21,10 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
 import androidx.compose.animation.shrinkVertically
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.togetherWith
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.size
@@ -432,13 +438,40 @@ internal val PebbleBounceStiffness = Spring.StiffnessLow
 internal const val WizardProgressDurationMs = 300
 internal const val WizardStepFadeInDurationMs = 220
 
-@Composable
+/**
+ * Standard enter animation for expanding surfaces: a gentle fade-in combined with a slide
+ * offset so content appears to emerge from the direction of expansion. Used when pebbles,
+ * tiles, or sections become visible. Matches the update pebble's animation language.
+ */
+internal fun expandEnter(expandFrom: Alignment.Vertical = Alignment.Top): EnterTransition =
+    fadeIn(tween(180)) + slideInVertically {
+        if (expandFrom == Alignment.Top) -it / 3 else it / 3
+    }
+
 internal fun collapseEnter(expandFrom: Alignment.Vertical = Alignment.Top): EnterTransition =
     fadeIn(MaterialTheme.motionScheme.defaultEffectsSpec<Float>()) +
         expandVertically(
             lowPowerAwareSpring(dampingRatio = PebbleBounceDamping, stiffness = PebbleBounceStiffness),
             expandFrom = expandFrom,
         )
+
+/**
+ * Standard exit animation for expanding surfaces: mirrors [expandEnter] but in reverse,
+ * fading out while sliding back in the direction of collapse. Keeps the same 120ms timing
+ * as the update pebble's exit for consistency.
+ */
+internal fun expandExit(shrinkTowards: Alignment.Vertical = Alignment.Top): ExitTransition =
+    fadeOut(tween(120)) + slideOutVertically {
+        if (shrinkTowards == Alignment.Top) -it / 3 else it / 3
+    }
+
+/**
+ * Transition spec for [AnimatedContent] that uses the standardized expand animation:
+ * used by status updates and other inline content that changes state. Pairs [expandEnter]
+ * and [expandExit] for a cohesive, snappy feel consistent across the app.
+ */
+internal fun <T> expandContentTransform(): ContentTransform =
+    expandEnter() togetherWith expandExit()
 
 /**
  * Mirror of [collapseEnter]; see there for why the CLOSE direction settles calmly
