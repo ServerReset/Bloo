@@ -662,10 +662,8 @@ internal fun SyncDevicesSection(state: UiState, vm: AppViewModel) {
         )
     }
     Spacer(Modifier.height(2.dp))
-    Text(
+    BodySmallText(
         "Drag to reorder. The top device is primary, the source of truth the others follow.",
-        style = MaterialTheme.typography.bodySmall,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
     )
     Spacer(Modifier.height(10.dp))
 
@@ -721,9 +719,8 @@ internal fun SyncDevicesSection(state: UiState, vm: AppViewModel) {
             icon = Icons.Filled.Smartphone,
             title = "Rename this device",
             text = {
-                Text(
+                BodyMediumText(
                     "Shown in the devices list on all your synced devices.",
-                    style = MaterialTheme.typography.bodyMedium,
                     color = scheme.onSurfaceVariant,
                 )
                 // FieldShape with the DEFAULT outlined colours -- the same field
@@ -914,7 +911,7 @@ internal fun SyncDeviceRow(
                 },
             ) {
                 Icon(
-                    Icons.Filled.Close,
+                    AppIcons.Close,
                     contentDescription = if (confirmRemove) {
                         "Tap again to remove ${device.name.ifBlank { "this device" }}"
                     } else {
@@ -959,9 +956,8 @@ internal fun DriveSyncSetupDialog(
         icon = Icons.Filled.Cloud,
         title = "Google Drive sync",
         text = {
-            Text(
+            BodyMediumText(
                 "Keep your settings in sync across devices with one file in Google Drive.",
-                style = MaterialTheme.typography.bodyMedium,
                 color = scheme.onSurfaceVariant,
             )
             // Join first — it's the correct choice when another device already set

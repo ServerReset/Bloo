@@ -403,7 +403,7 @@ internal fun OnboardingScreen(vm: AppViewModel) {
                         // FontWeight.Bold, where every other button label in the app (including
                         // this one's own "Back" neighbour) uses SemiBold.
                         MorphButtonLabel(
-                            if (isLast) Icons.Filled.CheckCircle else Icons.Filled.Check,
+                            if (isLast) AppIcons.CheckCircle else AppIcons.Check,
                             when {
                                 isLast -> "Enter Bloo"
                                 pageIndex == 0 -> "Get started"
@@ -538,7 +538,7 @@ internal fun OnboardingIntroPage() {
         subtitle = "Control your Hyundai, Genesis, or Kia from your phone -- lock, climate, " +
             "charge status, and more. Let's get your car set up.",
         tips = listOf(
-            Triple(Icons.Filled.Bolt, "Live status", "Battery, fuel, and lock state at a glance"),
+            Triple(AppIcons.Bolt, "Live status", "Battery, fuel, and lock state at a glance"),
             Triple(Icons.Filled.Thermostat, "Remote climate", "Warm it up or cool it down before you get in"),
             Triple(Icons.Filled.SwapHoriz, "Multiple cars", "Swipe between every car on your account"),
         ),
@@ -594,7 +594,7 @@ internal fun OnboardingSetupPage(vm: AppViewModel, state: UiState, context: andr
                 contentPadding = PaddingValues(vertical = 12.dp),
             ) {
                 MorphButtonLabel(
-                    if (notifGranted) Icons.Filled.CheckCircle else Icons.Filled.Notifications,
+                    if (notifGranted) AppIcons.CheckCircle else Icons.Filled.Notifications,
                     if (notifGranted) "Enabled" else "Enable notifications",
                     pending = false,
                 )
@@ -629,7 +629,7 @@ internal fun OnboardingSetupPage(vm: AppViewModel, state: UiState, context: andr
                 contentPadding = PaddingValues(vertical = 12.dp),
             ) {
                 MorphButtonLabel(
-                    if (bioEnabled) Icons.Filled.CheckCircle else Icons.Filled.Fingerprint,
+                    if (bioEnabled) AppIcons.CheckCircle else Icons.Filled.Fingerprint,
                     if (bioEnabled) "Enabled" else "Enable fingerprint lock",
                     pending = false,
                 )
@@ -643,7 +643,7 @@ internal fun OnboardingSetupPage(vm: AppViewModel, state: UiState, context: andr
     // On biometric devices it's the optional backup PIN.
     if (!canBio || !state.appPinSet) {
         OnboardingSetupCard(
-            icon = Icons.Filled.Lock,
+            icon = AppIcons.Lock,
             title = if (canBio) "Backup PIN" else "PIN lock",
             body = if (canBio)
                 "Add a 4-8 digit PIN as a backup for days fingerprint sensors act up."
@@ -706,7 +706,7 @@ internal fun OnboardingSetupPage(vm: AppViewModel, state: UiState, context: andr
         ) { enabled ->
             if (enabled) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Filled.CheckCircle, contentDescription = null, tint = scheme.primary, modifier = Modifier.size(18.dp))
+                    Icon(AppIcons.CheckCircle, contentDescription = null, tint = scheme.primary, modifier = Modifier.size(18.dp))
                     Spacer(Modifier.width(8.dp))
                     Text("Drive sync enabled", fontWeight = FontWeight.SemiBold, color = scheme.primary)
                 }
@@ -800,7 +800,7 @@ internal fun OnboardingPinForm(
             contentPadding = PaddingValues(vertical = 12.dp),
             enabled = pin.isNotEmpty() && confirm.isNotEmpty(),
         ) {
-            MorphButtonLabel(Icons.Filled.Lock, if (existing) "Replace PIN" else "Save PIN", pending = false)
+            MorphButtonLabel(AppIcons.Lock, if (existing) "Replace PIN" else "Save PIN", pending = false)
         }
     }
 }
@@ -829,7 +829,7 @@ internal fun OnboardingSetupCard(
                     contentAlignment = Alignment.Center,
                 ) {
                     Icon(
-                        if (done) Icons.Filled.CheckCircle else icon,
+                        if (done) AppIcons.CheckCircle else icon,
                         contentDescription = null,
                         tint = if (done) scheme.onPrimaryContainer else scheme.primary,
                         modifier = Modifier.size(20.dp),
@@ -1015,7 +1015,7 @@ internal fun OnboardingCrashCoursePage() {
             Triple(Icons.Filled.SwapHoriz, "Swipe between cars", "If you have more than one, swipe left or right on the garage screen"),
             Triple(Icons.Filled.DragHandle, "Tap to expand, hold to reorder", "Tap any pebble for details, or hold and drag to rearrange them"),
             Triple(Icons.Filled.Refresh, "Hold to refresh", "Press and hold the refresh control to pull the latest status from your car"),
-            Triple(Icons.Filled.Settings, "Tune it anytime", "Powertrain, seats, and lock settings all live in Settings if things change"),
+            Triple(AppIcons.Settings, "Tune it anytime", "Powertrain, seats, and lock settings all live in Settings if things change"),
         ),
     )
 }
@@ -1034,11 +1034,11 @@ internal fun OnboardingCrashCoursePage() {
 @Composable
 internal fun OnboardingFeaturesPage(state: UiState) {
     val tips = buildList {
-        add(Triple(Icons.Filled.Lock, "AutoLock", "Locks your car on its own soon after you walk away, confirmed by a Bluetooth disconnect -- turn it on anytime in each car's Settings"))
-        add(Triple(Icons.Filled.Bolt, "Live charging updates", "Watch an EV's charge progress right from your lock screen while it's plugged in"))
-        add(Triple(Icons.Filled.Search, "Just ask", "Search for things like \"lock my car\" or \"start climate at 70\" and it runs right from the search bar"))
+        add(Triple(AppIcons.Lock, "AutoLock", "Locks your car on its own soon after you walk away, confirmed by a Bluetooth disconnect -- turn it on anytime in each car's Settings"))
+        add(Triple(AppIcons.Bolt, "Live charging updates", "Watch an EV's charge progress right from your lock screen while it's plugged in"))
+        add(Triple(AppIcons.Search, "Just ask", "Search for things like \"lock my car\" or \"start climate at 70\" and it runs right from the search bar"))
         if (state.aiSupported) {
-            add(Triple(Icons.Filled.AutoAwesome, "On-device AI summaries", "Get a plain-language summary of your car's status, generated right on your phone -- nothing leaves the device"))
+            add(Triple(AppIcons.AutoAwesome, "On-device AI summaries", "Get a plain-language summary of your car's status, generated right on your phone -- nothing leaves the device"))
         }
     }
     OnboardingTipListPage(
@@ -1209,7 +1209,7 @@ internal fun CarFeatureWizard(
                         val isLast = pageIndex == pages.lastIndex
                         // MorphButtonLabel, not a hand-rolled Icon+Spacer+Text.
                         MorphButtonLabel(
-                            if (isLast) Icons.Filled.CheckCircle else Icons.Filled.Check,
+                            if (isLast) AppIcons.CheckCircle else AppIcons.Check,
                             if (isLast) "Done" else "Next",
                             pending = false,
                         )
@@ -1272,7 +1272,7 @@ internal fun WizardPowertrainPage(
                     Text(label, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
                     Text(desc, style = MaterialTheme.typography.bodySmall, color = if (selected) scheme.onPrimaryContainer.copy(alpha = 0.7f) else scheme.onSurfaceVariant)
                 }
-                if (selected) Icon(Icons.Filled.CheckCircle, null, tint = scheme.primary, modifier = Modifier.size(24.dp))
+                if (selected) Icon(AppIcons.CheckCircle, null, tint = scheme.primary, modifier = Modifier.size(24.dp))
                 }
             }
         }
@@ -1326,7 +1326,7 @@ internal fun WizardPlatformPage(
                     Text(label, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
                     Text(desc, style = MaterialTheme.typography.bodySmall, color = if (selected) scheme.onPrimaryContainer.copy(alpha = 0.7f) else scheme.onSurfaceVariant)
                 }
-                if (selected) Icon(Icons.Filled.CheckCircle, null, tint = scheme.primary, modifier = Modifier.size(24.dp))
+                if (selected) Icon(AppIcons.CheckCircle, null, tint = scheme.primary, modifier = Modifier.size(24.dp))
             }
         }
     }

@@ -516,10 +516,8 @@ internal fun ClimatePebble(
             enter = expandEnter(Alignment.Bottom),
             exit = expandExit(Alignment.Bottom),
         ) {
-            Text(
+            LabelSmallText(
                 "Sent as ${climateChunksLabel(duration)}, continued automatically",
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
 
@@ -904,7 +902,7 @@ internal fun PresetPill(
             modifier = Modifier.fillMaxHeight(),
         ) {
             Icon(
-                Icons.Filled.Close,
+                AppIcons.Close,
                 contentDescription = if (confirm.armed) "Confirm delete $name" else "Delete $name",
                 modifier = Modifier.size(15.dp),
             )
@@ -926,7 +924,7 @@ internal fun ChargeLimitPill(
     limit: Int,
     pending: Boolean,
     enabled: Boolean,
-    icon: ImageVector = Icons.Filled.Bolt,
+    icon: ImageVector = AppIcons.Bolt,
     onValueChange: (Int) -> Unit,
     onApply: () -> Unit,
 ) {
