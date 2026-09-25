@@ -486,7 +486,7 @@ internal fun SyncChoiceScreen(vm: AppViewModel) {
             BodyMediumText(
                 "Already use Bloo somewhere else with sync turned on? Bring that " +
                     "setup in here instead of answering everything again.",
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                color = scheme.onSurfaceVariant,
             )
             Spacer(Modifier.height(28.dp))
 
@@ -565,12 +565,11 @@ internal fun OnboardingSetupPage(vm: AppViewModel, state: UiState, context: andr
         fontWeight = FontWeight.Black,
         color = scheme.onSurface,
     )
-    Text(
+    BodyMediumText(
         if (canBio)
             "All optional -- skip anything here and turn it on later in Settings."
         else
             "Everything here is optional -- except one thing: this device has no fingerprint sensor, so a PIN is required to lock the app.",
-        style = MaterialTheme.typography.bodyMedium,
         color = scheme.onSurfaceVariant,
     )
     Spacer(Modifier.height(SettingsGapHairline))
