@@ -481,9 +481,8 @@ internal fun PaletteEditorDialog(
                 )
 
                 // Primary colour picker
-                Text(
+                LabelLargeText(
                     "Primary colour",
-                    style = MaterialTheme.typography.labelLarge,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 ColorPickerCanvas(primaryColor, { primaryColor = it })
@@ -496,9 +495,8 @@ internal fun PaletteEditorDialog(
                 ToggleRow("Custom secondary", useSecondary) { useSecondary = it }
                 AnimatedVisibility(useSecondary, enter = expandEnter(), exit = expandExit()) {
                     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Text(
+                        LabelLargeText(
                             "Secondary colour",
-                            style = MaterialTheme.typography.labelLarge,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                         ColorPickerCanvas(secondaryColor, { secondaryColor = it })
@@ -513,9 +511,8 @@ internal fun PaletteEditorDialog(
                 ToggleRow("Custom tertiary", useTertiary) { useTertiary = it }
                 AnimatedVisibility(useTertiary, enter = expandEnter(), exit = expandExit()) {
                     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Text(
+                        LabelLargeText(
                             "Tertiary colour",
-                            style = MaterialTheme.typography.labelLarge,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                         ColorPickerCanvas(tertiaryColor, { tertiaryColor = it })
