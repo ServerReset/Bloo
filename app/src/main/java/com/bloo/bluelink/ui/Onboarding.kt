@@ -1367,9 +1367,8 @@ internal fun WizardSeatsPage(
                 { vm.setSeatFlag(vehicle, pos.heatKey, it) }, { vm.setSeatFlag(vehicle, pos.coolKey, it) })
         }
     }
-    Text(
+    BodySmallText(
                 "You can change these any time in Settings under your car card.",
-        style = MaterialTheme.typography.bodySmall,
         color = scheme.onSurfaceVariant,
     )
 }
@@ -1427,9 +1426,8 @@ internal fun WizardSteeringPage(
             description = "Warm the steering wheel via the remote climate command",
         ) { vm.setSeatFlag(vehicle, "sw", it) }
     }
-    Text(
+    BodySmallText(
         "That's it for ${vehicle.name}. Tap Next to continue.",
-        style = MaterialTheme.typography.bodySmall,
         color = scheme.onSurfaceVariant,
     )
 }
