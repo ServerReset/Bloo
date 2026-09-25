@@ -514,71 +514,6 @@ internal fun SettingsScreen(
                 )
             }
             }
-            // Gates the ITEM for the same reason the AI card does: with no cars yet
-            // (fresh install, before the first sign-in) this composed nothing but still held a
-            // slot and a gap open at the top of Settings.
-            if (state.vehicles.isNotEmpty()) item {
-
-            // Cars: drag to reorder, tap a car to expand its setup + photo. With a
-            // single car there's nothing to order, so it's just shown expanded.
-            // Always visible, in both Simple and Advanced -- this used to be
-            // wrapped in the same advanced-only AnimatedVisibility as the
-            // power-user cards below it, which hid the whole section (photo,
-            // powertrain, seat/climate features, everything) from anyone in
-            // Simple mode, the app's default. The two genuinely power-user
-            // groups inside CarSettingsCard (default climate preset, palette
-            // override) already have their own `state.settingsMode ==
-            // "advanced"` checks, so gating the section as a whole here was
-            // redundant with those AND too broad.
-            run { // scope kept so the gate above is the only edit; the check now lives on `item`
-                var expandedCar by remember { mutableStateOf<String?>(null) }
-                val single = state.vehicles.size == 1
-                val pick: (String) -> Unit = { vin ->
-                    pickTarget = vin
-                    photoLauncher.launch(
-                        PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly),
-                    )
-                }
-                if (single) {
-                    // With one car, CarSettingsCard IS the section's card --
-                    // forceExpanded already gives it the exact same always-open,
-                    // no-chevron header every other top-level SettingsCard has.
-                    // Wrapping it in another SettingsCard("Car") on top used to
-                    // stack two pebble headers both announcing the same car for
-                    // no reason (one titled "Car", the other the car's own
-                    // name) -- redundant chrome with nothing to expand,
-                    // collapse or reorder underneath it.
-                    val v = state.vehicles[0]
-                    // Same gap-lives-inside-the-card fix SettingsCard's own wrapper
-                    // uses (see its doc comment) and the same heading() semantics,
-                    // reproduced by hand since this bypasses SettingsCard itself.
-                    Box(Modifier.fillMaxWidth().padding(bottom = SettingsCardGap).semantics { heading() }) {
-                        CarSettingsCard(
-                            v = v, state = state, vm = vm,
-                            expanded = true, dragging = false, dragHandle = Modifier,
-                            collapsible = false,
-                            onToggle = {}, onPickPhoto = { pick(v.vin) },
-                        )
-                    }
-                } else {
-                    SettingsCard("Cars", vm = vm) {
-                        ReorderColumn(
-                            items = state.vehicles,
-                            keyOf = { it.vin },
-                            onReorder = { vm.reorderVehicles(it) },
-                            spacing = 8.dp,
-                        ) { v, dragHandle, dragging ->
-                            CarSettingsCard(
-                                v = v, state = state, vm = vm,
-                                expanded = expandedCar == v.vin, dragging = dragging, dragHandle = dragHandle,
-                                onToggle = { expandedCar = if (expandedCar == v.vin) null else v.vin },
-                                onPickPhoto = { pick(v.vin) },
-                            )
-                        }
-                    }
-                }
-            }
-            }
             // The support check gates the ITEM, not just its contents. A grid item that
             // composes nothing is not free: it still takes a slot and the grid's
             // verticalItemSpacing with it, so a device without Gemini Nano got a phantom gap
@@ -661,45 +596,6 @@ internal fun SettingsScreen(
                             ) { vm.setShortcutEnabled(v.vin, cmd, it) }
                         }
                     }
-                }
-            }
-            }
-            item {
-
-            // Map & Navigation
-            SettingsCard("Map & Navigation", Icons.Filled.Map, vm) {
-                Text(
-                    "Open Charge Map API Key",
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface,
-                )
-                BodySmallText(
-                    "Required to show nearby EV chargers on the expanded map. Get a free key at openchargemap.org (My Profile → My Apps).",
-                )
-                Spacer(Modifier.height(SettingsGapRow))
-                var keyInput by remember { mutableStateOf(appearance.chargerApiKey ?: "") }
-                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                    OutlinedTextField(
-                        value = keyInput,
-                        onValueChange = { keyInput = it },
-                        placeholder = { Text("Paste API key here") },
-                        singleLine = true,
-                        shape = FieldShape,
-                        colors = borderlessFieldColors(),
-                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
-                        keyboardActions = KeyboardActions(onDone = {
-                            vm.setChargerApiKey(if (keyInput.isBlank()) null else keyInput, null)
-                        }),
-                        modifier = Modifier.weight(1f),
-                    )
-                    Spacer(Modifier.width(8.dp))
-                    MorphTextButton(
-                        "Save",
-                        onClick = { vm.setChargerApiKey(if (keyInput.isBlank()) null else keyInput, null) },
-                        enabled = keyInput.isNotBlank() && keyInput != (appearance.chargerApiKey ?: ""),
-                        showIcon = false,
-                    )
                 }
             }
             }
@@ -996,6 +892,71 @@ internal fun SettingsScreen(
                 }
             }
             }
+            // Gates the ITEM for the same reason the AI card does: with no cars yet
+            // (fresh install, before the first sign-in) this composed nothing but still held a
+            // slot and a gap open at the top of Settings.
+            if (state.vehicles.isNotEmpty()) item {
+
+            // Cars: drag to reorder, tap a car to expand its setup + photo. With a
+            // single car there's nothing to order, so it's just shown expanded.
+            // Always visible, in both Simple and Advanced -- this used to be
+            // wrapped in the same advanced-only AnimatedVisibility as the
+            // power-user cards below it, which hid the whole section (photo,
+            // powertrain, seat/climate features, everything) from anyone in
+            // Simple mode, the app's default. The two genuinely power-user
+            // groups inside CarSettingsCard (default climate preset, palette
+            // override) already have their own `state.settingsMode ==
+            // "advanced"` checks, so gating the section as a whole here was
+            // redundant with those AND too broad.
+            run { // scope kept so the gate above is the only edit; the check now lives on `item`
+                var expandedCar by remember { mutableStateOf<String?>(null) }
+                val single = state.vehicles.size == 1
+                val pick: (String) -> Unit = { vin ->
+                    pickTarget = vin
+                    photoLauncher.launch(
+                        PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly),
+                    )
+                }
+                if (single) {
+                    // With one car, CarSettingsCard IS the section's card --
+                    // forceExpanded already gives it the exact same always-open,
+                    // no-chevron header every other top-level SettingsCard has.
+                    // Wrapping it in another SettingsCard("Car") on top used to
+                    // stack two pebble headers both announcing the same car for
+                    // no reason (one titled "Car", the other the car's own
+                    // name) -- redundant chrome with nothing to expand,
+                    // collapse or reorder underneath it.
+                    val v = state.vehicles[0]
+                    // Same gap-lives-inside-the-card fix SettingsCard's own wrapper
+                    // uses (see its doc comment) and the same heading() semantics,
+                    // reproduced by hand since this bypasses SettingsCard itself.
+                    Box(Modifier.fillMaxWidth().padding(bottom = SettingsCardGap).semantics { heading() }) {
+                        CarSettingsCard(
+                            v = v, state = state, vm = vm,
+                            expanded = true, dragging = false, dragHandle = Modifier,
+                            collapsible = false,
+                            onToggle = {}, onPickPhoto = { pick(v.vin) },
+                        )
+                    }
+                } else {
+                    SettingsCard("Cars", vm = vm) {
+                        ReorderColumn(
+                            items = state.vehicles,
+                            keyOf = { it.vin },
+                            onReorder = { vm.reorderVehicles(it) },
+                            spacing = 8.dp,
+                        ) { v, dragHandle, dragging ->
+                            CarSettingsCard(
+                                v = v, state = state, vm = vm,
+                                expanded = expandedCar == v.vin, dragging = dragging, dragHandle = dragHandle,
+                                onToggle = { expandedCar = if (expandedCar == v.vin) null else v.vin },
+                                onPickPhoto = { pick(v.vin) },
+                            )
+                        }
+                    }
+                }
+            }
+            }
             if (advTransition1.targetState || !advTransition1.isIdle) item {
 
             // Debug -- app/device diagnostics for support troubleshooting. A power-user
@@ -1087,6 +1048,124 @@ internal fun SettingsScreen(
                 }
             }
             }
+            item {
+
+            // Location -- was titled "Weather" and talked only about weather, even though
+            // choosing "My location" here does more than that: it sets
+            // Appearance.weatherFollowsDevice, and AppViewModel.refreshDeviceLocation()
+            // (the same place that keeps the map's own "you are here" dot and the Location
+            // pebble's distance-to-car current) re-syncs this location to that live fix on
+            // every refresh -- see WeatherController.refreshDeviceLocationForWeather's own
+            // doc. So "My location" was already one location feeding both weather and the
+            // map; this card just never said so.
+            SettingsCard("Location", Icons.Filled.LocationOn, vm) {
+                BodySmallText(
+                    "Where \"my location\" points for weather -- and, once set that way, the " +
+                        "same live position the map's own device dot and \"distance to car\" use.",
+                )
+                Spacer(Modifier.height(SettingsGapRow))
+                var weatherQuery by remember { mutableStateOf("") }
+                val locationPermission = rememberLauncherForActivityResult(
+                    ActivityResultContracts.RequestPermission(),
+                ) { granted ->
+                    if (granted) vm.useDeviceLocationForWeather()
+                    else vm.reportError("Location permission denied. Type a place instead")
+                }
+                // PopVisible, not a bare `?.let` -- was snapping in/out with zero
+                // animation whenever a place got set or cleared.
+                PopVisible(visible = appearance.weatherLabel != null) {
+                  Column(Modifier.fillMaxWidth()) {
+                    // fillMaxWidth() on the Row, not just the Column: a weighted child
+                    // needs its immediate parent to actually claim the available width,
+                    // not just an ancestor further up -- without it here, the place-name
+                    // Text (weight(1f)) had no real width to size against and wrapped
+                    // character-by-character ("S/u/n/n/y/v/a/l/e" one letter per line),
+                    // ballooning the whole card's height. Same class of bug StatusRow's
+                    // own doc warns about; maxLines/ellipsis added as the same guard.
+                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                        ThemedIcon(Icons.Filled.LocationOn, tint = MaterialTheme.colorScheme.primary, size = 18.dp)
+                        Spacer(Modifier.width(6.dp))
+                        Text(
+                            appearance.weatherLabel.orEmpty(),
+                            Modifier.weight(1f),
+                            fontWeight = FontWeight.SemiBold,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                        val weatherClearSource = remember { MutableInteractionSource() }
+                        SafeExpansiveButton(
+                            interactionSource = weatherClearSource,
+                            enabled = true,
+                        ) {
+                            MorphTextButton(
+                                "Clear",
+                                onClick = { vm.clearWeatherLocation() },
+                                interactionSource = weatherClearSource,
+                            )
+                        }
+                    }
+                    Spacer(Modifier.height(SettingsGapRow))
+                  }
+                }
+                OutlinedTextField(
+                    value = weatherQuery,
+                    onValueChange = { weatherQuery = it },
+                    label = { Text("City or place") },
+                    singleLine = true,
+                    shape = FieldShape,
+                    modifier = Modifier.fillMaxWidth(),
+                    keyboardOptions = KeyboardOptions(imeAction = androidx.compose.ui.text.input.ImeAction.Search),
+                )
+                Spacer(Modifier.height(SettingsGapRow))
+                // FlowRow, not a fixed 50/50 Row: at a large display/font size each
+                // half was too narrow for "Set place" / "My location", clipping them
+                // to "Set a…". FlowRow keeps them side-by-side when they fit and wraps
+                // the second button onto its own full-width line when they don't, so
+                // the labels stay whole at any font scale.
+                FlowRow(
+                    Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    val setPlaceSource = remember { MutableInteractionSource() }
+                    // weight on the WRAPPER: it is the FlowRow's child, and the button inside
+                    // it is not, so the weight there was read by nobody and these two never
+                    // split the line evenly the way the FlowRow note above assumes.
+                    SafeExpansiveButton(
+                        interactionSource = setPlaceSource,
+                        enabled = weatherQuery.isNotBlank(),
+                        modifier = Modifier.weight(1f),
+                    ) {
+                        // Both halves of this pair are the shared MorphActionButton now. They
+                        // sit in one row doing the same kind of thing, and were a text button
+                        // beside a default-filled one -- the mismatch reads as two different
+                        // controls when it is one choice with two answers.
+                        MorphActionButton(
+                            label = "Set place",
+                            icon = Icons.Filled.Place,
+                            modifier = Modifier.fillMaxWidth(),
+                            interactionSource = setPlaceSource,
+                            enabled = weatherQuery.isNotBlank(),
+                            onClick = { vm.setWeatherPlace(weatherQuery); weatherQuery = "" },
+                        )
+                    }
+                    val myLocationSource = remember { MutableInteractionSource() }
+                    SafeExpansiveButton(
+                        interactionSource = myLocationSource,
+                        enabled = true,
+                        modifier = Modifier.weight(1f),
+                    ) {
+                        MorphActionButton(
+                            label = "My location",
+                            icon = Icons.Filled.MyLocation,
+                            onClick = { locationPermission.launch(android.Manifest.permission.ACCESS_COARSE_LOCATION) },
+                            modifier = Modifier.fillMaxWidth(),
+                            interactionSource = myLocationSource,
+                        )
+                    }
+                }
+            }
+            }
             if (advTransition2.targetState || !advTransition2.isIdle) item {
 
             // Logs
@@ -1166,6 +1245,45 @@ internal fun SettingsScreen(
                             )
                         }
                     }
+                }
+            }
+            }
+            item {
+
+            // Map & Navigation
+            SettingsCard("Map & Navigation", Icons.Filled.Map, vm) {
+                Text(
+                    "Open Charge Map API Key",
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+                BodySmallText(
+                    "Required to show nearby EV chargers on the expanded map. Get a free key at openchargemap.org (My Profile → My Apps).",
+                )
+                Spacer(Modifier.height(SettingsGapRow))
+                var keyInput by remember { mutableStateOf(appearance.chargerApiKey ?: "") }
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    OutlinedTextField(
+                        value = keyInput,
+                        onValueChange = { keyInput = it },
+                        placeholder = { Text("Paste API key here") },
+                        singleLine = true,
+                        shape = FieldShape,
+                        colors = borderlessFieldColors(),
+                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                        keyboardActions = KeyboardActions(onDone = {
+                            vm.setChargerApiKey(if (keyInput.isBlank()) null else keyInput, null)
+                        }),
+                        modifier = Modifier.weight(1f),
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    MorphTextButton(
+                        "Save",
+                        onClick = { vm.setChargerApiKey(if (keyInput.isBlank()) null else keyInput, null) },
+                        enabled = keyInput.isNotBlank() && keyInput != (appearance.chargerApiKey ?: ""),
+                        showIcon = false,
+                    )
                 }
             }
             }
@@ -1647,124 +1765,6 @@ internal fun SettingsScreen(
                     Spacer(Modifier.height(SettingsGapRow))
                     ToggleRow("Pebble outline", appearance.pebbleOutline) { vm.setPebbleOutline(it) }
                   }
-                }
-            }
-            }
-            item {
-
-            // Location -- was titled "Weather" and talked only about weather, even though
-            // choosing "My location" here does more than that: it sets
-            // Appearance.weatherFollowsDevice, and AppViewModel.refreshDeviceLocation()
-            // (the same place that keeps the map's own "you are here" dot and the Location
-            // pebble's distance-to-car current) re-syncs this location to that live fix on
-            // every refresh -- see WeatherController.refreshDeviceLocationForWeather's own
-            // doc. So "My location" was already one location feeding both weather and the
-            // map; this card just never said so.
-            SettingsCard("Location", Icons.Filled.LocationOn, vm) {
-                BodySmallText(
-                    "Where \"my location\" points for weather -- and, once set that way, the " +
-                        "same live position the map's own device dot and \"distance to car\" use.",
-                )
-                Spacer(Modifier.height(SettingsGapRow))
-                var weatherQuery by remember { mutableStateOf("") }
-                val locationPermission = rememberLauncherForActivityResult(
-                    ActivityResultContracts.RequestPermission(),
-                ) { granted ->
-                    if (granted) vm.useDeviceLocationForWeather()
-                    else vm.reportError("Location permission denied. Type a place instead")
-                }
-                // PopVisible, not a bare `?.let` -- was snapping in/out with zero
-                // animation whenever a place got set or cleared.
-                PopVisible(visible = appearance.weatherLabel != null) {
-                  Column(Modifier.fillMaxWidth()) {
-                    // fillMaxWidth() on the Row, not just the Column: a weighted child
-                    // needs its immediate parent to actually claim the available width,
-                    // not just an ancestor further up -- without it here, the place-name
-                    // Text (weight(1f)) had no real width to size against and wrapped
-                    // character-by-character ("S/u/n/n/y/v/a/l/e" one letter per line),
-                    // ballooning the whole card's height. Same class of bug StatusRow's
-                    // own doc warns about; maxLines/ellipsis added as the same guard.
-                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                        ThemedIcon(Icons.Filled.LocationOn, tint = MaterialTheme.colorScheme.primary, size = 18.dp)
-                        Spacer(Modifier.width(6.dp))
-                        Text(
-                            appearance.weatherLabel.orEmpty(),
-                            Modifier.weight(1f),
-                            fontWeight = FontWeight.SemiBold,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                        val weatherClearSource = remember { MutableInteractionSource() }
-                        SafeExpansiveButton(
-                            interactionSource = weatherClearSource,
-                            enabled = true,
-                        ) {
-                            MorphTextButton(
-                                "Clear",
-                                onClick = { vm.clearWeatherLocation() },
-                                interactionSource = weatherClearSource,
-                            )
-                        }
-                    }
-                    Spacer(Modifier.height(SettingsGapRow))
-                  }
-                }
-                OutlinedTextField(
-                    value = weatherQuery,
-                    onValueChange = { weatherQuery = it },
-                    label = { Text("City or place") },
-                    singleLine = true,
-                    shape = FieldShape,
-                    modifier = Modifier.fillMaxWidth(),
-                    keyboardOptions = KeyboardOptions(imeAction = androidx.compose.ui.text.input.ImeAction.Search),
-                )
-                Spacer(Modifier.height(SettingsGapRow))
-                // FlowRow, not a fixed 50/50 Row: at a large display/font size each
-                // half was too narrow for "Set place" / "My location", clipping them
-                // to "Set a…". FlowRow keeps them side-by-side when they fit and wraps
-                // the second button onto its own full-width line when they don't, so
-                // the labels stay whole at any font scale.
-                FlowRow(
-                    Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    val setPlaceSource = remember { MutableInteractionSource() }
-                    // weight on the WRAPPER: it is the FlowRow's child, and the button inside
-                    // it is not, so the weight there was read by nobody and these two never
-                    // split the line evenly the way the FlowRow note above assumes.
-                    SafeExpansiveButton(
-                        interactionSource = setPlaceSource,
-                        enabled = weatherQuery.isNotBlank(),
-                        modifier = Modifier.weight(1f),
-                    ) {
-                        // Both halves of this pair are the shared MorphActionButton now. They
-                        // sit in one row doing the same kind of thing, and were a text button
-                        // beside a default-filled one -- the mismatch reads as two different
-                        // controls when it is one choice with two answers.
-                        MorphActionButton(
-                            label = "Set place",
-                            icon = Icons.Filled.Place,
-                            modifier = Modifier.fillMaxWidth(),
-                            interactionSource = setPlaceSource,
-                            enabled = weatherQuery.isNotBlank(),
-                            onClick = { vm.setWeatherPlace(weatherQuery); weatherQuery = "" },
-                        )
-                    }
-                    val myLocationSource = remember { MutableInteractionSource() }
-                    SafeExpansiveButton(
-                        interactionSource = myLocationSource,
-                        enabled = true,
-                        modifier = Modifier.weight(1f),
-                    ) {
-                        MorphActionButton(
-                            label = "My location",
-                            icon = Icons.Filled.MyLocation,
-                            onClick = { locationPermission.launch(android.Manifest.permission.ACCESS_COARSE_LOCATION) },
-                            modifier = Modifier.fillMaxWidth(),
-                            interactionSource = myLocationSource,
-                        )
-                    }
                 }
             }
             }
