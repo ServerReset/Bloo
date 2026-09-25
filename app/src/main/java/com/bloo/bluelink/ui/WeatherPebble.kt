@@ -233,8 +233,8 @@ internal fun LocationPebble(v: Vehicle, state: UiState, vm: AppViewModel, dragHa
         val coverGlance = LocalForceExpanded.current
         AnimatedVisibility(
             visible = location == null,
-            enter = expandEnter(Alignment.Bottom),
-            exit = expandExit(Alignment.Bottom),
+            enter = expandEnterSized(Alignment.Bottom),
+            exit = expandExitSized(Alignment.Bottom),
         ) {
             Text("Tap Locate to query the car's current position.")
         }
@@ -242,8 +242,8 @@ internal fun LocationPebble(v: Vehicle, state: UiState, vm: AppViewModel, dragHa
         // pebble, same boolean flip, only the empty side had the treatment.
         AnimatedVisibility(
             visible = location != null,
-            enter = expandEnter(Alignment.Bottom),
-            exit = expandExit(Alignment.Bottom),
+            enter = expandEnterSized(Alignment.Bottom),
+            exit = expandExitSized(Alignment.Bottom),
         ) {
             val loc = location
             if (loc != null) {

@@ -390,8 +390,8 @@ internal fun LoginScreen(
                     // even though its sign-in also goes through OTP).
                     AnimatedVisibility(
                         visible = brand.requiresPin,
-                        enter = expandEnter(Alignment.Bottom),
-                        exit = expandExit(Alignment.Bottom),
+                        enter = expandEnterSized(Alignment.Bottom),
+                        exit = expandExitSized(Alignment.Bottom),
                     ) {
                         Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
                             MutedText("Service PIN")

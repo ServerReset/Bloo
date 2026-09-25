@@ -418,8 +418,8 @@ internal fun ClimatePebble(
         // Show the set temperature when climate is running, with an animated entrance.
         AnimatedVisibility(
             visible = climateOn,
-            enter = expandEnter(),
-            exit = expandExit(),
+            enter = expandEnterSized(),
+            exit = expandExitSized(),
         ) {
             Row(Modifier.fillMaxWidth().padding(bottom = 6.dp), horizontalArrangement = Arrangement.SpaceBetween) {
                 MutedText("Set temperature")
@@ -513,8 +513,8 @@ internal fun ClimatePebble(
         )
         AnimatedVisibility(
             visible = duration > CLIMATE_DURATION_RANGE.last,
-            enter = expandEnter(Alignment.Bottom),
-            exit = expandExit(Alignment.Bottom),
+            enter = expandEnterSized(Alignment.Bottom),
+            exit = expandExitSized(Alignment.Bottom),
         ) {
             LabelSmallText(
                 "Sent as ${climateChunksLabel(duration)}, continued automatically",
@@ -720,8 +720,8 @@ internal fun ClimatePresetSection(
 
     AnimatedVisibility(
         visible = presets.isNotEmpty(),
-        enter = expandEnter(Alignment.Bottom),
-        exit = expandExit(Alignment.Bottom),
+        enter = expandEnterSized(Alignment.Bottom),
+        exit = expandExitSized(Alignment.Bottom),
     ) {
         Column(modifier = Modifier.fillMaxWidth()) {
             // The heading lives INSIDE the visibility gate. Outside it, a user with no saved

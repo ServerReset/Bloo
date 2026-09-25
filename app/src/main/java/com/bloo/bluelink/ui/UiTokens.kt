@@ -536,6 +536,29 @@ internal fun expandExit(shrinkTowards: Alignment.Vertical = Alignment.Top, fade:
     }
 
 /**
+ * [expandEnter] plus real container-height growth via [expandVertically]. Plain
+ * `AnimatedVisibility` accordion/disclosure sites -- a pebble's body, a settings section, a
+ * toggled color picker -- sit inline in a Column: when their content appears with only
+ * [expandEnter]'s fade+slide and no actual size transition, the surrounding layout snaps to
+ * the revealed height on the very first frame instead of growing into it, and on the way out
+ * ([expandExitSized]) the container sits at full height for the ENTIRE fade+slide before
+ * cutting to zero in one frame the instant the exit finishes -- reported as "the closing
+ * animation is broken" (a pebble's body looked like it did nothing, then vanished).
+ *
+ * Deliberately NOT folded into [expandEnter]/[expandExit] themselves: [expandContentTransform]
+ * (AnimatedContent) builds on those too, and AnimatedContent already owns its own size
+ * interpolation via its `sizeTransform` -- adding a second, competing size animation there
+ * would fight it rather than fix anything. Use this pair only where you're building
+ * `AnimatedVisibility`'s `enter=`/`exit=` directly.
+ */
+internal fun expandEnterSized(expandFrom: Alignment.Vertical = Alignment.Top): EnterTransition =
+    expandEnter(expandFrom) + expandVertically(expandFrom = expandFrom)
+
+/** Mirror of [expandEnterSized]; see there for why this exists separately from [expandExit]. */
+internal fun expandExitSized(shrinkTowards: Alignment.Vertical = Alignment.Top, fade: Boolean = true): ExitTransition =
+    expandExit(shrinkTowards, fade) + shrinkVertically(shrinkTowards = shrinkTowards)
+
+/**
  * Transition spec for [AnimatedContent] that uses the standardized expand animation:
  * used by status updates and other inline content that changes state. Pairs [expandEnter]
  * and [expandExit] for a cohesive, snappy feel consistent across the app.

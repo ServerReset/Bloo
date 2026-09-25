@@ -693,8 +693,8 @@ internal fun SettingsSearchResults(
         val reply = state.aiSearchReply
         AnimatedVisibility(
             visible = thinking || reply != null,
-            enter = expandEnter(Alignment.Bottom),
-            exit = expandExit(Alignment.Bottom),
+            enter = expandEnterSized(Alignment.Bottom),
+            exit = expandExitSized(Alignment.Bottom),
         ) {
             GlassSurface(
                 shape = resultCardShape,
