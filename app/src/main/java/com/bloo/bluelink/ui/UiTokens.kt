@@ -29,6 +29,20 @@ import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.filled.Bolt
+import androidx.compose.material.icons.filled.Build
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.DirectionsCar
+import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.LockOpen
+import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Thermostat
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Text
 // No `motionScheme` import: it is a member of the MaterialTheme object (verified as
@@ -175,10 +189,32 @@ internal val SettingsCardGap = 10.dp
 //
 // Common corner radius values used throughout the app, extracted for consistency.
 // When a shape needs updating, only change it here instead of across 12+ files.
-internal val SmallShape = SmallShape   // Smaller components, chips
+internal val SmallShape = RoundedCornerShape(12.dp)   // Smaller components, chips
 internal val StandardShape = RoundedCornerShape(16.dp) // Buttons, most cards
-internal val LargeShape = LargeShape   // Large cards, sheets
-internal val ExtraLargeShape = ExtraLargeShape // Modal dialogs
+internal val LargeShape = RoundedCornerShape(20.dp)   // Large cards, sheets
+internal val ExtraLargeShape = RoundedCornerShape(28.dp) // Modal dialogs
+
+// ---- Icons ----------------------------------------------------------------------
+//
+// Commonly-used icons imported in 16+ files are centralized here to reduce
+// duplicate imports across the codebase. Use AppIcons.Settings instead of
+// importing Icons.Filled.Settings in 16 different files.
+object AppIcons {
+  val Settings = Settings
+  val Lock = Lock
+  val Bolt = Bolt
+  val Close = Close
+  val Build = Build
+  val Search = Search
+  val Refresh = Refresh
+  val Check = Check
+  val LockOpen = LockOpen
+  val Info = Info
+  val DirectionsCar = DirectionsCar
+  val AutoAwesome = AutoAwesome
+  val Warning = Warning
+  val Thermostat = Thermostat
+}
 
 // ---- Blur -----------------------------------------------------------------------
 //
