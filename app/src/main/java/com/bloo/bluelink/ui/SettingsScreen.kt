@@ -1795,7 +1795,7 @@ internal fun SettingsScreen(
                                     "i5-AutoLock",
                                     "AutoLock ported from Vel-San's original reference implementation.",
                                     "https://github.com/Vel-San/i5-AutoLock",
-                                    Icons.Filled.Lock,
+                                    AppIcons.Lock,
                                 ),
                                 CreditEntry(
                                     "Jetpack Compose",
