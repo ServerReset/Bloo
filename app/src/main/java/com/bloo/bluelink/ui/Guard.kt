@@ -276,7 +276,7 @@ internal fun LockOverlay(vm: AppViewModel, opaqueBackdrop: Boolean = false) {
                     fontWeight = FontWeight.Bold,
                     color = Color.White,
                 )
-                Spacer(Modifier.height(4.dp))
+                Spacer(Modifier.height(SettingsGapHairline))
                 Text(
                     if (appState.appPinSet) "Confirm it's you, or use your PIN." else "Confirm it's you to reach your vehicles.",
                     style = MaterialTheme.typography.bodyMedium,
@@ -304,7 +304,7 @@ internal fun LockOverlay(vm: AppViewModel, opaqueBackdrop: Boolean = false) {
                     }
                 }
                 if (appState.appPinSet) {
-                    Spacer(Modifier.height(12.dp))
+                    Spacer(Modifier.height(SettingsGapGroup))
                     val pinSource = remember { MutableInteractionSource() }
                     SafeExpansiveButton(
                         interactionSource = pinSource,
@@ -404,7 +404,7 @@ internal fun LockOverlay(vm: AppViewModel, opaqueBackdrop: Boolean = false) {
                             }
                         }
                         if (bioAvailable) {
-                            Spacer(Modifier.height(8.dp))
+                            Spacer(Modifier.height(SettingsGapRow))
                             val bioSource = remember { MutableInteractionSource() }
                             SafeExpansiveButton(
                                 interactionSource = bioSource,
@@ -437,7 +437,7 @@ internal fun LockOverlay(vm: AppViewModel, opaqueBackdrop: Boolean = false) {
                     fontWeight = FontWeight.Bold,
                     color = Color.White,
                 )
-                Spacer(Modifier.height(4.dp))
+                Spacer(Modifier.height(SettingsGapHairline))
                 Text(
                     "Please try opening Bloo again.",
                     style = MaterialTheme.typography.bodyMedium,

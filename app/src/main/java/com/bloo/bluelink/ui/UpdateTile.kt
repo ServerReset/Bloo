@@ -312,7 +312,7 @@ internal fun UpdateAvailableTile(
                         interactionSource = keepSource,
                     )
                 }
-                Spacer(Modifier.height(4.dp))
+                Spacer(Modifier.height(SettingsGapHairline))
             }
             // Dismiss / undo / remind — hierarchy: during the undo window "Keep it" is
             // the recoverable emphasis; otherwise "Remind me" (deferral) is emphasized
@@ -622,7 +622,7 @@ internal fun UpdateStatusLine(
         // SettingsScreen.kt's Weather-card place-name Row for the same bug, confirmed by
         // screenshot (text wrapped one character per line).
         Column(Modifier.fillMaxWidth()) {
-            Spacer(Modifier.height(8.dp))
+            Spacer(Modifier.height(SettingsGapRow))
             // No trailing percentage beside the bar -- this doc's own note above already
             // says that copy was removed as a redundant third place the same number showed
             // (with the header pill and the "Downloading" line), but the Text survived here.

@@ -272,7 +272,7 @@ internal fun OnboardingScreen(vm: AppViewModel) {
                 .statusBarsPadding()
                 .navigationBarsPadding(),
         ) {
-            Spacer(Modifier.height(8.dp))
+            Spacer(Modifier.height(SettingsGapRow))
 
             // --- Progress: an animated bar plus a small step counter ---
             val progress = if (steps.size > 1) pageIndex.toFloat() / lastIndex.toFloat() else 1f
@@ -477,14 +477,14 @@ internal fun SyncChoiceScreen(vm: AppViewModel) {
             verticalArrangement = Arrangement.Center,
         ) {
             Text("🔄", style = MaterialTheme.typography.displaySmall)
-            Spacer(Modifier.height(12.dp))
+            Spacer(Modifier.height(SettingsGapGroup))
             Text(
                 "Set up this device",
                 style = MaterialTheme.typography.headlineMedium,
                 fontWeight = FontWeight.Black,
                 color = scheme.onSurface,
             )
-            Spacer(Modifier.height(4.dp))
+            Spacer(Modifier.height(SettingsGapHairline))
             Text(
                 "Already use Bloo somewhere else with sync turned on? Bring that " +
                     "setup in here instead of answering everything again.",
@@ -576,7 +576,7 @@ internal fun OnboardingSetupPage(vm: AppViewModel, state: UiState, context: andr
         style = MaterialTheme.typography.bodyMedium,
         color = scheme.onSurfaceVariant,
     )
-    Spacer(Modifier.height(4.dp))
+    Spacer(Modifier.height(SettingsGapHairline))
 
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
         var notifGranted by remember {
@@ -998,10 +998,10 @@ internal fun OnboardingTipListPage(
 ) {
     val scheme = MaterialTheme.colorScheme
     Text(emoji, style = MaterialTheme.typography.displayMedium)
-    Spacer(Modifier.height(4.dp))
+    Spacer(Modifier.height(SettingsGapHairline))
     Text(title, style = titleStyle, fontWeight = FontWeight.Black, color = scheme.onSurface)
     Text(subtitle, style = MaterialTheme.typography.bodyLarge, color = scheme.onSurfaceVariant)
-    Spacer(Modifier.height(4.dp))
+    Spacer(Modifier.height(SettingsGapHairline))
     tips.forEach { (icon, cardTitle, body) ->
         OnboardingTipCard(icon, cardTitle, body)
     }

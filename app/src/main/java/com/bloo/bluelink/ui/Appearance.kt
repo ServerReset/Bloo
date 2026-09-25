@@ -135,7 +135,7 @@ internal fun PaletteSwatch(
                 )
             }
         }
-        Spacer(Modifier.height(4.dp))
+        Spacer(Modifier.height(SettingsGapHairline))
         Text(
             palette.label,
             style = MaterialTheme.typography.labelSmall,

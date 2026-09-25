@@ -126,7 +126,7 @@ internal fun CoverSettingsGate(vm: AppViewModel) {
                         modifier = Modifier.fillMaxWidth(),
                     ) { Text("Continue on the cover", fontWeight = FontWeight.SemiBold) }
                 }
-                Spacer(Modifier.height(8.dp))
+                Spacer(Modifier.height(SettingsGapRow))
                 val dismissSource = remember { MutableInteractionSource() }
                 SafeExpansiveButton(
                     interactionSource = dismissSource,

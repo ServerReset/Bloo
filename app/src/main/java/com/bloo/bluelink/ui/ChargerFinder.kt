@@ -100,13 +100,13 @@ internal fun ChargerFilterBar(
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
-                Spacer(Modifier.height(4.dp))
+                Spacer(Modifier.height(SettingsGapHairline))
                 Text(
                     "Open Charge Map needs a free API key per app. Add it in Settings > Map & Navigation.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-                Spacer(Modifier.height(8.dp))
+                Spacer(Modifier.height(SettingsGapRow))
                 MorphTextButton("Retry", onClick = onRetry, showIcon = false, modifier = Modifier.fillMaxWidth())
             } else {
                 Text(
@@ -120,7 +120,7 @@ internal fun ChargerFilterBar(
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
-                Spacer(Modifier.height(8.dp))
+                Spacer(Modifier.height(SettingsGapRow))
                 MorphSegmented(
                     options = listOf(
                         SegmentOption("0", "Any speed", null),
@@ -131,7 +131,7 @@ internal fun ChargerFilterBar(
                     onSelect = { key -> onSetMinKw(key.toIntOrNull() ?: 0) },
                 )
                 if (networks.isNotEmpty()) {
-                    Spacer(Modifier.height(8.dp))
+                    Spacer(Modifier.height(SettingsGapRow))
                     Row(
                         Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
                         horizontalArrangement = Arrangement.spacedBy(8.dp),

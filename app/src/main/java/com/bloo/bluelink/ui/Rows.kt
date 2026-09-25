@@ -646,7 +646,7 @@ internal fun SyncDevicesSection(state: UiState, vm: AppViewModel) {
         )
     }
 
-    Spacer(Modifier.height(12.dp))
+    Spacer(Modifier.height(SettingsGapGroup))
     Row(verticalAlignment = Alignment.CenterVertically) {
         Icon(
             Icons.Filled.Devices,
@@ -694,7 +694,7 @@ internal fun SyncDevicesSection(state: UiState, vm: AppViewModel) {
     val now = System.currentTimeMillis()
     val stalePeer = devices.any { it.id != state.thisDeviceId && it.lastSeenMs > 0 && now - it.lastSeenMs > STALE_DEVICE_MS }
     if (stalePeer) {
-        Spacer(Modifier.height(8.dp))
+        Spacer(Modifier.height(SettingsGapRow))
         Row(verticalAlignment = Alignment.Top) {
             Icon(
                 Icons.Filled.ErrorOutline,

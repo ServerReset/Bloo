@@ -731,7 +731,7 @@ internal fun ClimatePresetSection(
             // screen spent announcing an empty section. It also means the label animates away
             // with the last preset instead of being left behind.
             SectionLabel("Presets")
-            Spacer(Modifier.height(4.dp))
+            Spacer(Modifier.height(SettingsGapHairline))
             // Full-width reorderable rows: drag handle to re-rank, tap to apply.
             ReorderColumn(
                 items = presets,
@@ -765,7 +765,7 @@ internal fun ClimatePresetSection(
                     )
                 }
             }
-            Spacer(Modifier.height(4.dp))
+            Spacer(Modifier.height(SettingsGapHairline))
         }
     }
 }

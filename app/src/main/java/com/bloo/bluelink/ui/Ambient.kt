@@ -768,7 +768,7 @@ internal fun GlassAlertDialog(
                         titleTrailing()
                     }
                 }
-                Spacer(Modifier.height(8.dp))
+                Spacer(Modifier.height(SettingsGapRow))
                 Column(
                     Modifier.heightIn(max = 360.dp).verticalScroll(rememberScrollState()),
                     verticalArrangement = Arrangement.spacedBy(12.dp),
