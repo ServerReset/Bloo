@@ -1627,7 +1627,7 @@ internal fun SettingsScreen(
                                         Icon(Icons.Filled.Add, contentDescription = "New custom palette")
                                     }
                                     Spacer(Modifier.height(SettingsGapHairline))
-                                    Text("New", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    LabelSmallText("New")
                                 }
                             }
                             if (showPaletteEditor) {
@@ -1659,11 +1659,9 @@ internal fun SettingsScreen(
             // doc. So "My location" was already one location feeding both weather and the
             // map; this card just never said so.
             SettingsCard("Location", Icons.Filled.LocationOn, vm) {
-                Text(
+                BodySmallText(
                     "Where \"my location\" points for weather -- and, once set that way, the " +
                         "same live position the map's own device dot and \"distance to car\" use.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 Spacer(Modifier.height(SettingsGapRow))
                 var weatherQuery by remember { mutableStateOf("") }
@@ -1938,12 +1936,10 @@ private fun CreditRow(entry: CreditEntry) {
             Icon(entry.icon, contentDescription = null, modifier = Modifier.padding(10.dp).size(20.dp))
         }
         Column(Modifier.weight(1f)) {
-            Text(entry.name, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
+            Text(entry.name, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
             Spacer(Modifier.height(2.dp))
-            Text(
+            BodySmallText(
                 entry.description,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Spacer(Modifier.height(6.dp))
             // The actual link, styled and tappable -- not a caption-coloured, inert
