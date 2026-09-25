@@ -1097,7 +1097,7 @@ internal fun SettingsScreen(
                 // again. One control, the outer one.
                 val lineCount = logs.size
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    ThemedIcon(Icons.Filled.Info, tint = MaterialTheme.colorScheme.onSurfaceVariant, size = 18.dp)
+                    ThemedIcon(AppIcons.Info, tint = MaterialTheme.colorScheme.onSurfaceVariant, size = 18.dp)
                     Spacer(Modifier.width(8.dp))
                     BodyMediumText(
                         "Activity log  ·  $lineCount lines",
@@ -1229,7 +1229,7 @@ internal fun SettingsScreen(
                                 text = "Allow background",
                                 onClick = { LiveCharge.requestBackgroundUnrestricted(ctx) },
                                 contentColor = MaterialTheme.colorScheme.primary,
-                                icon = Icons.Filled.Warning,
+                                icon = AppIcons.Warning,
                             )
                             Spacer(Modifier.height(SettingsGapRow))
                         }
@@ -1242,7 +1242,7 @@ internal fun SettingsScreen(
                                 text = "Open system settings",
                                 onClick = { LiveCharge.openLiveUpdateSettings(ctx) },
                                 contentColor = MaterialTheme.colorScheme.primary,
-                                icon = Icons.Filled.Warning,
+                                icon = AppIcons.Warning,
                             )
                             Spacer(Modifier.height(SettingsGapRow))
                         }
@@ -1255,7 +1255,7 @@ internal fun SettingsScreen(
                     MorphTextButton(
                         text = "Troubleshooting steps",
                         onClick = { showTroubleshoot = true },
-                        icon = Icons.Filled.Info,
+                        icon = AppIcons.Info,
                     )
                     Spacer(Modifier.height(SettingsGapRow))
                     if (showTroubleshoot) {
