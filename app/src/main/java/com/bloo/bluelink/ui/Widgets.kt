@@ -56,6 +56,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
+import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -365,6 +366,11 @@ internal fun FloatingIcon(
      *  own hazeState becomes available here, the same gradual-adoption shape
      *  [StatusBarScrim]'s own `hazeState` param already uses. */
     hazeState: HazeState? = null,
+    /** Swaps the static [icon] for a spinning [LoadingIndicator] and ignores taps --
+     *  the same "icon becomes its own busy state" pattern [PebbleHeaderAction.pending]
+     *  uses, for a floating button whose action is itself already in flight (the
+     *  global refresh button while [AppViewModel]'s own `refreshing` is true). */
+    busy: Boolean = false,
 ) {
     val haptics = LocalHaptics.current
     val interaction = remember { MutableInteractionSource() }
@@ -395,9 +401,13 @@ internal fun FloatingIcon(
         contentColor = contentColor,
         contentDescription = description,
         interactionSource = interaction,
-        onClick = { haptics?.click(); onClick() },
+        onClick = { if (!busy) { haptics?.click(); onClick() } },
     ) {
-        Icon(icon, contentDescription = null)
+        if (busy) {
+            LoadingIndicator(Modifier.size(22.dp))
+        } else {
+            Icon(icon, contentDescription = null)
+        }
     }
 }
 

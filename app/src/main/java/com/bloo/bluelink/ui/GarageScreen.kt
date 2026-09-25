@@ -706,32 +706,28 @@ internal fun GarageScreen(
                     // wanting it to always be there.
                     StatusBarScrim(hazeState = hazeState)
                     // Pager dots removed: user requested no page indicators at the top of the screen
-                    // Grid mode (perPage > 1, wide/large screens) hides each
-                    // card's own pull-to-refresh indicator above -- state.value.refreshing
-                    // is one app-wide flag, not per-car, so leaving them unhidden
-                    // would light up every visible card's spinner for a refresh
-                    // that only touched one of them. But that left a real gap:
-                    // count <= perPage (every car already fits on one page, common
-                    // on tablets) meant pulling to refresh in the grid had *zero*
-                    // visual feedback of any kind. RefreshIndicatorBadge (Pebbles.kt)
-                    // -- the one shared refresh badge every pull-to-refresh surface in
-                    // the app now uses -- covers every grid case. There's no drag
-                    // gesture to follow here, so its progress just animates 0->1 off
-                    // the plain `refreshing` boolean instead of a live pull distance.
-                    if (perPage > 1) {
-                        val gridRefreshProgress by animateFloatAsState(
-                            targetValue = if (refreshing) 1f else 0f,
-                            animationSpec = tween(if (refreshing) 150 else 200),
-                            label = "gridRefreshProgress",
-                        )
-                        RefreshIndicatorBadge(
-                            hazeState = hazeState,
-                            // fade = false: this is the one piece of chrome that must stay
-                            // visible exactly when the rest of it fades out -- it IS the refresh.
-                            modifier = Modifier.align(Alignment.TopCenter)
-                                .floatingOverlay(FloatingIds.RefreshIndicator, fade = false),
-                        ) { gridRefreshProgress }
-                    }
+                    // A single global refresh control, floating above every page in this pager
+                    // (every car page AND the folded-in Settings page) instead of being tied to
+                    // whichever page happens to be showing -- standardized from what used to be
+                    // the multi-car grid's own perPage>1-only RefreshIndicatorBadge (a passive
+                    // slide-in spinner with no tap target of its own, and invisible everywhere
+                    // else). Settings has no pull gesture of its own to trigger a refresh with at
+                    // all -- reported directly as wanting to "even refresh on the settings page"
+                    // -- and grid mode still has the same "count <= perPage, no per-card pull
+                    // gesture visibly fires" gap this replaces. `shift = false`: a persistent nav
+                    // target, not page chrome (see floatingOverlay's own doc for the Settings-cog
+                    // example), so it doesn't slide along with a pull gesture on whichever page
+                    // happens to be showing. `fade = false`: this is the one piece of chrome that
+                    // must stay visible exactly when the rest of it fades out -- it IS the refresh.
+                    FloatingIcon(
+                        icon = AppIcons.Refresh,
+                        description = if (refreshing) "Refreshing" else "Refresh",
+                        onClick = { vm.loadGarage() },
+                        busy = refreshing,
+                        hazeState = hazeState,
+                        modifier = Modifier.align(Alignment.TopCenter)
+                            .floatingOverlay(FloatingIds.RefreshIndicator, fade = false, shift = false),
+                    )
                     // No floating name badge here at all any more -- removed as unwanted UI.
                 }
             }
