@@ -1297,7 +1297,7 @@ internal fun SettingsScreen(
             item {
 
             // Security
-            SettingsCard("Security", Icons.Filled.Lock, vm) {
+            SettingsCard("Security", AppIcons.Lock, vm) {
                 // Same icon-badge + status-line header Notifications/Backup & sync use --
                 // this card used to open straight into a segmented row with no glanceable
                 // read of whether the app lock is actually on.
@@ -1309,7 +1309,7 @@ internal fun SettingsScreen(
                     else -> "Not locked"
                 }
                 StatusHeaderRow(
-                    icon = if (locked) Icons.Filled.Lock else Icons.Filled.LockOpen,
+                    icon = if (locked) AppIcons.Lock else AppIcons.LockOpen,
                     tint = securityTint,
                     title = "App lock",
                     status = securityStatus,
@@ -1430,7 +1430,7 @@ internal fun SettingsScreen(
                 var pinDialog by remember { mutableStateOf<String?>(null) }
                 val pinSet = state.appPinSet
                 StatusHeaderRow(
-                    icon = if (pinSet) Icons.Filled.Lock else Icons.Filled.Pin,
+                    icon = if (pinSet) AppIcons.Lock else Icons.Filled.Pin,
                     tint = if (pinSet) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.onSurfaceVariant,
                     title = "App PIN",
                     status = if (pinSet) "On · 4-8 digits" else "Off",
@@ -1454,7 +1454,7 @@ internal fun SettingsScreen(
                         // meaning, so the OTHER half is what had to move onto the standard look.
                         MorphActionButton(
                             label = if (pinSet) "Change PIN" else "Set up PIN",
-                            icon = if (pinSet) Icons.Filled.LockReset else Icons.Filled.Lock,
+                            icon = if (pinSet) Icons.Filled.LockReset else AppIcons.Lock,
                             onClick = { pinDialog = "set" },
                             interactionSource = pinSource,
                         )
@@ -1775,7 +1775,7 @@ internal fun SettingsScreen(
                 // to be enabled. OpenStreetMap's own tile usage policy in particular expects
                 // a visible attribution; this is that, even if it isn't literally overlaid
                 // on the map itself.
-                SettingsCard("Credits", Icons.Filled.Info, vm) {
+                SettingsCard("Credits", AppIcons.Info, vm) {
                     Column {
                         val credits = remember {
                             listOf(
