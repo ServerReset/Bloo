@@ -934,14 +934,18 @@ internal fun ThemedIcon(
 }
 
 /**
- * A circular tinted badge, the "icon gets its own coloured circle" treatment used all over
- * the app (settings card headers, onboarding steps, search result rows, the update pebble).
- * [content] is a plain [Icon] in the common case, but takes a full `@Composable` slot so
- * sites that animate the icon (e.g. `AnimatedContent` between install-state icons) can still
- * share the same circle/size/tint chrome instead of hand-rolling it.
+ * The circular tinted container [IconBadge] draws itself into -- pulled out under its own,
+ * non-overloaded name (rather than a second `IconBadge` overload) after that overload was the
+ * trigger for a Kotlin "recursive type checking" compiler error at several call sites that fed
+ * it a conditional (`if (x) iconA else iconB`) [ImageVector]: overload resolution across a
+ * lambda-slot and an icon+tint overload, combined with a branch whose two arms' common
+ * supertype the compiler has to infer, sent K2 into that recursive loop. [content] is a plain
+ * [Icon] in the common case, but takes a full `@Composable` slot so sites that animate the icon
+ * (e.g. `AnimatedContent` between install-state icons) can still share the same
+ * circle/size/tint chrome instead of hand-rolling it.
  */
 @Composable
-internal fun IconBadge(
+internal fun IconBadgeContainer(
     modifier: Modifier = Modifier,
     containerColor: Color,
     size: Dp = 40.dp,
@@ -955,10 +959,12 @@ internal fun IconBadge(
 }
 
 /**
- * [IconBadge] pre-filled with a single centered [Icon] -- the common case. [containerColor]
- * defaults to a 14%-alpha tint of [tint] itself (the "soft tonal chip" look used by search
- * results and the update pebble); pass an explicit container colour (e.g. a *Container role)
- * for the "solid tonal circle" look settings headers and onboarding steps use instead.
+ * [IconBadgeContainer] pre-filled with a single centered [Icon] -- the common case, and the
+ * only thing named `IconBadge` (see [IconBadgeContainer]'s own doc for why the lambda-slot
+ * version is not a second overload of this name). [containerColor] defaults to a 14%-alpha
+ * tint of [tint] itself (the "soft tonal chip" look used by search results and the update
+ * pebble); pass an explicit container colour (e.g. a *Container role) for the "solid tonal
+ * circle" look settings headers and onboarding steps use instead.
  */
 @Composable
 internal fun IconBadge(
@@ -969,7 +975,7 @@ internal fun IconBadge(
     size: Dp = 40.dp,
     iconSize: Dp = size * 0.5f,
 ) {
-    IconBadge(modifier = modifier, containerColor = containerColor, size = size) {
+    IconBadgeContainer(modifier = modifier, containerColor = containerColor, size = size) {
         Icon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(iconSize))
     }
 }

@@ -402,13 +402,15 @@ internal fun OnboardingScreen(vm: AppViewModel) {
                         // MorphButtonLabel, not a hand-rolled Icon+Spacer+Text -- that Text used
                         // FontWeight.Bold, where every other button label in the app (including
                         // this one's own "Back" neighbour) uses SemiBold.
+                        val nextIcon: ImageVector = if (isLast) AppIcons.CheckCircle else AppIcons.Check
+                        val nextText: String = when {
+                            isLast -> "Enter Bloo"
+                            pageIndex == 0 -> "Get started"
+                            else -> "Next"
+                        }
                         MorphButtonLabel(
-                            if (isLast) AppIcons.CheckCircle else AppIcons.Check,
-                            when {
-                                isLast -> "Enter Bloo"
-                                pageIndex == 0 -> "Get started"
-                                else -> "Next"
-                            },
+                            nextIcon,
+                            nextText,
                             pending = false,
                         )
                     }
@@ -593,9 +595,11 @@ internal fun OnboardingSetupPage(vm: AppViewModel, state: UiState, context: andr
                 modifier = Modifier.fillMaxWidth(),
                 contentPadding = PaddingValues(vertical = 12.dp),
             ) {
+                val notificationIcon: ImageVector = if (notifGranted) AppIcons.CheckCircle else Icons.Filled.Notifications
+                val notificationText: String = if (notifGranted) "Enabled" else "Enable notifications"
                 MorphButtonLabel(
-                    if (notifGranted) AppIcons.CheckCircle else Icons.Filled.Notifications,
-                    if (notifGranted) "Enabled" else "Enable notifications",
+                    notificationIcon,
+                    notificationText,
                     pending = false,
                 )
             }
@@ -628,9 +632,11 @@ internal fun OnboardingSetupPage(vm: AppViewModel, state: UiState, context: andr
                 modifier = Modifier.fillMaxWidth(),
                 contentPadding = PaddingValues(vertical = 12.dp),
             ) {
+                val biometricIcon: ImageVector = if (bioEnabled) AppIcons.CheckCircle else Icons.Filled.Fingerprint
+                val biometricText: String = if (bioEnabled) "Enabled" else "Enable fingerprint lock"
                 MorphButtonLabel(
-                    if (bioEnabled) AppIcons.CheckCircle else Icons.Filled.Fingerprint,
-                    if (bioEnabled) "Enabled" else "Enable fingerprint lock",
+                    biometricIcon,
+                    biometricText,
                     pending = false,
                 )
             }
@@ -703,7 +709,7 @@ internal fun OnboardingSetupPage(vm: AppViewModel, state: UiState, context: andr
                     .using(SizeTransform(clip = false))
             },
             label = "onboardingSyncDone",
-        ) { enabled ->
+        ) { enabled: Boolean ->
             if (enabled) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(AppIcons.CheckCircle, contentDescription = null, tint = scheme.primary, modifier = Modifier.size(18.dp))
@@ -800,7 +806,8 @@ internal fun OnboardingPinForm(
             contentPadding = PaddingValues(vertical = 12.dp),
             enabled = pin.isNotEmpty() && confirm.isNotEmpty(),
         ) {
-            MorphButtonLabel(AppIcons.Lock, if (existing) "Replace PIN" else "Save PIN", pending = false)
+            val pinLabel: String = if (existing) "Replace PIN" else "Save PIN"
+            MorphButtonLabel(AppIcons.Lock, pinLabel, pending = false)
         }
     }
 }
@@ -926,15 +933,20 @@ internal fun OnboardingCarPage(
                 .background(scheme.surfaceContainerHigh)
                 .padding(horizontal = 12.dp, vertical = 4.dp),
         ) {
-            SeatPositions.forEachIndexed { i, pos ->
+            SeatPositions.forEachIndexed { i: Int, pos: SeatPosition ->
                 if (i > 0) SectionDivider(alpha = 0.35f)
                 // The shared SeatConfigRow (Rows.kt) -- the exact row, with the exact
                 // signature, that the per-car Settings card renders. The wizard used to keep
                 // its own copy (WizardSeatRow + WizardToggleChip): same label + Heat/Cool
                 // pair, but on half-height bespoke pills instead of MorphChip, and its "Cool"
                 // chip carried a ❄️ the Settings one never had. One row, two places.
-                SeatConfigRow(pos.label, pos.heat(sc), pos.cool(sc),
-                    { vm.setSeatFlag(vehicle, pos.heatKey, it) }, { vm.setSeatFlag(vehicle, pos.coolKey, it) })
+                SeatConfigRow(
+                    pos.label,
+                    pos.heat(sc),
+                    pos.cool(sc),
+                    onHeat = { enabled: Boolean -> vm.setSeatFlag(vehicle, pos.heatKey, enabled) },
+                    onCool = { enabled: Boolean -> vm.setSeatFlag(vehicle, pos.coolKey, enabled) },
+                )
             }
         }
     }
@@ -1017,7 +1029,7 @@ internal fun OnboardingCrashCoursePage() {
  */
 @Composable
 internal fun OnboardingFeaturesPage(state: UiState) {
-    val tips = buildList {
+    val tips = buildList<Triple<ImageVector, String, String>> {
         add(Triple(AppIcons.Lock, "AutoLock", "Locks your car on its own soon after you walk away, confirmed by a Bluetooth disconnect -- turn it on anytime in each car's Settings"))
         add(Triple(AppIcons.Bolt, "Live charging updates", "Watch an EV's charge progress right from your lock screen while it's plugged in"))
         add(Triple(AppIcons.Search, "Just ask", "Search for things like \"lock my car\" or \"start climate at 70\" and it runs right from the search bar"))
@@ -1192,9 +1204,11 @@ internal fun CarFeatureWizard(
                     ) {
                         val isLast = pageIndex == pages.lastIndex
                         // MorphButtonLabel, not a hand-rolled Icon+Spacer+Text.
+                        val wizardNextIcon: ImageVector = if (isLast) AppIcons.CheckCircle else AppIcons.Check
+                        val wizardNextText: String = if (isLast) "Done" else "Next"
                         MorphButtonLabel(
-                            if (isLast) AppIcons.CheckCircle else AppIcons.Check,
-                            if (isLast) "Done" else "Next",
+                            wizardNextIcon,
+                            wizardNextText,
                             pending = false,
                         )
                     }
@@ -1343,12 +1357,17 @@ internal fun WizardSeatsPage(
             .padding16(),
         verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
-        SeatPositions.forEachIndexed { i, pos ->
+        SeatPositions.forEachIndexed { i: Int, pos: SeatPosition ->
             if (i > 0) SectionDivider(alpha = 0.5f)
             // SeatConfigRow (Rows.kt), as on the car page above -- see its comment there
             // for why the wizard no longer keeps its own copy of this row.
-            SeatConfigRow(pos.label, pos.heat(seats), pos.cool(seats),
-                { vm.setSeatFlag(vehicle, pos.heatKey, it) }, { vm.setSeatFlag(vehicle, pos.coolKey, it) })
+            SeatConfigRow(
+                pos.label,
+                pos.heat(seats),
+                pos.cool(seats),
+                onHeat = { enabled: Boolean -> vm.setSeatFlag(vehicle, pos.heatKey, enabled) },
+                onCool = { enabled: Boolean -> vm.setSeatFlag(vehicle, pos.coolKey, enabled) },
+            )
         }
     }
     BodySmallText(

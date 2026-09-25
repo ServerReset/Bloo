@@ -557,7 +557,7 @@ internal fun UpdateStatusLine(
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
         // A tonal badge behind the icon, not a bare glyph -- the same "icon gets its
         // own coloured circle" weight CoverHero gives every stat it leads with.
-        IconBadge(containerColor = animatedStatusTint.copy(alpha = 0.15f), size = 36.dp) {
+        IconBadgeContainer(containerColor = animatedStatusTint.copy(alpha = 0.15f), size = 36.dp) {
             // AnimatedContent, not a bare Icon swap -- installing -> downloading ->
             // ready is a real sequence of distinct states, and a plain `when` cut
             // between their icons on one frame while everything else on this card is

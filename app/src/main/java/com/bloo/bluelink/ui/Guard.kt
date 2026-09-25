@@ -333,7 +333,7 @@ internal fun LockOverlay(vm: AppViewModel, opaqueBackdrop: Boolean = false) {
                     Column(Modifier.padding(horizontal = 24.dp, vertical = 20.dp)) {
                         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
                             IconBadge(
-                                AppIcons.Lock,
+                                icon = AppIcons.Lock,
                                 tint = MaterialTheme.colorScheme.onPrimaryContainer,
                                 containerColor = MaterialTheme.colorScheme.primaryContainer,
                                 size = 46.dp,
