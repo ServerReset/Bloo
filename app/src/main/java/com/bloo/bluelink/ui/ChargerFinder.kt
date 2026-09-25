@@ -80,7 +80,6 @@ internal fun ChargerFilterBar(
     onSetMinKw: (Int) -> Unit,
     onToggleNetwork: (String) -> Unit,
     onRetry: () -> Unit,
-    onSaveApiKey: (String?) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     // Recomputed only when the fetch itself changes (a new List instance), not on every
@@ -103,35 +102,10 @@ internal fun ChargerFilterBar(
                 )
                 Spacer(Modifier.height(4.dp))
                 Text(
-                    "Open Charge Map needs a free API key per app. Register one at " +
-                        "openchargemap.org (My Profile → My Apps), then paste it below.",
+                    "Open Charge Map needs a free API key per app. Add it in Settings > Map & Navigation.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-                Spacer(Modifier.height(10.dp))
-                var keyInput by remember { mutableStateOf("") }
-                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                    OutlinedTextField(
-                        value = keyInput,
-                        onValueChange = { keyInput = it },
-                        placeholder = { Text("API key") },
-                        singleLine = true,
-                        shape = FieldShape,
-                        colors = borderlessFieldColors(),
-                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
-                        keyboardActions = KeyboardActions(onDone = {
-                            if (keyInput.isNotBlank()) onSaveApiKey(keyInput)
-                        }),
-                        modifier = Modifier.weight(1f),
-                    )
-                    Spacer(Modifier.width(8.dp))
-                    MorphTextButton(
-                        "Save",
-                        onClick = { onSaveApiKey(keyInput) },
-                        enabled = keyInput.isNotBlank(),
-                        showIcon = false,
-                    )
-                }
                 Spacer(Modifier.height(8.dp))
                 MorphTextButton("Retry", onClick = onRetry, showIcon = false, modifier = Modifier.fillMaxWidth())
             } else {

@@ -639,6 +639,46 @@ internal fun SettingsScreen(
             }
             item {
 
+            // Map & Navigation
+            SettingsCard("Map & Navigation", Icons.Filled.Map, vm) {
+                Text(
+                    "Open Charge Map API Key",
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Bold,
+                )
+                Text(
+                    "Required to show nearby EV chargers on the expanded map. Get a free key at openchargemap.org (My Profile → My Apps).",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(Modifier.height(SettingsGapRow))
+                var keyInput by remember { mutableStateOf(appearance.chargerApiKey ?: "") }
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    OutlinedTextField(
+                        value = keyInput,
+                        onValueChange = { keyInput = it },
+                        placeholder = { Text("Paste API key here") },
+                        singleLine = true,
+                        shape = FieldShape,
+                        colors = borderlessFieldColors(),
+                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                        keyboardActions = KeyboardActions(onDone = {
+                            vm.setChargerApiKey(if (keyInput.isBlank()) null else keyInput, null)
+                        }),
+                        modifier = Modifier.weight(1f),
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    MorphTextButton(
+                        "Save",
+                        onClick = { vm.setChargerApiKey(if (keyInput.isBlank()) null else keyInput, null) },
+                        enabled = keyInput.isNotBlank() && keyInput != (appearance.chargerApiKey ?: ""),
+                        showIcon = false,
+                    )
+                }
+            }
+            }
+            item {
+
             // Backup / Sync
             SettingsCard("Backup & sync", Icons.Filled.CloudSync, vm) {
                 var showDriveDialog by remember { mutableStateOf(false) }

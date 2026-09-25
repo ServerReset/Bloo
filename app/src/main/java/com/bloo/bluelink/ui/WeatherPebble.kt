@@ -1502,9 +1502,10 @@ private fun MapTopBar(
                 // was 36dp against a 44dp reservation, a mismatched pair (see the
                 // Text's own comment). Centred in the 48dp-tall bar the same way the
                 // drag handle and the name both are, so all three read as one row.
+                // Extra right padding pushes the button further right (away from the edges).
                 GlassSurface(
                     shape = CircleShape,
-                    modifier = Modifier.align(Alignment.CenterEnd).size(40.dp),
+                    modifier = Modifier.align(Alignment.CenterEnd).size(40.dp).padding(end = 12.dp),
                     hazeState = mapHazeState,
                     onClick = onRefreshLocation,
                     contentDescription = "Refresh location",
@@ -1843,7 +1844,6 @@ internal fun ExpandableMapLayer(
                             onSetMinKw = onSetChargerMinKw,
                             onToggleNetwork = onToggleChargerNetwork,
                             onRetry = onRetryChargers,
-                            onSaveApiKey = onSetChargerApiKey,
                             modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
                         )
                     }
