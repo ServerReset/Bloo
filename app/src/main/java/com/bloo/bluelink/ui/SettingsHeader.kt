@@ -211,7 +211,7 @@ internal fun StatusHeaderRow(icon: ImageVector, tint: Color, title: String, stat
         }
         Spacer(Modifier.width(12.dp))
         Column {
-            Text(title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+            TitleSmallText(title)
             AnimatedContent(
                 targetState = status,
                 transitionSpec = { expandContentTransform() },

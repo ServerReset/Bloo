@@ -648,7 +648,7 @@ private fun AccountsCardContent(state: UiState, vm: AppViewModel) {
                         }
                     }
                     Column(verticalArrangement = Arrangement.spacedBy(SettingsGapRow)) {
-                        Text(creds.brand.label, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
+                        TitleSmallText(creds.brand.label)
                         StatusRow("Email", creds.email)
                         SecretRow("Password", creds.password)
                         // Kia US has no service PIN; commands are session-keyed.
@@ -783,7 +783,7 @@ private fun AppShortcutsCardContent(state: UiState, vm: AppViewModel) {
                     Spacer(Modifier.height(SettingsGapRow))
                     state.vehicles.forEach { v ->
                         Spacer(Modifier.height(SettingsGapHairline))
-                        Text(v.name, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                        TitleSmallText(v.name)
                         com.bloo.bluelink.Shortcuts.ACTIONS.forEach { cmd ->
                             ToggleRow(
                                 com.bloo.bluelink.Shortcuts.actionLabel(cmd),
@@ -1430,12 +1430,7 @@ private fun LogsCardContent(logs: List<String>, vm: AppViewModel, clipboardScope
 @Composable
 private fun MapNavigationCardContent(appearance: SettingsStore.Appearance, vm: AppViewModel) {
             SettingsCard("Map & Navigation", Icons.Filled.Map, vm) {
-                Text(
-                    "Open Charge Map API Key",
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface,
-                )
+                TitleSmallText("Open Charge Map API Key")
                 BodySmallText(
                     "Required to show nearby EV chargers on the expanded map. Get a free key at openchargemap.org (My Profile → My Apps).",
                 )

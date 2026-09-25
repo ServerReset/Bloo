@@ -835,7 +835,7 @@ internal fun OnboardingSetupCard(
                     iconSize = 20.dp,
                 )
                 Column(Modifier.weight(1f)) {
-                    Text(title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = scheme.onSurface)
+                    TitleSmallText(title, color = scheme.onSurface)
                     MutedText(body)
                 }
             }

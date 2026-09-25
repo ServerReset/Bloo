@@ -160,11 +160,7 @@ internal fun SyncDevicesSection(state: UiState, vm: AppViewModel) {
             modifier = Modifier.size(18.dp),
         )
         Spacer(Modifier.width(8.dp))
-        Text(
-            "Synced devices",
-            style = MaterialTheme.typography.titleSmall,
-            fontWeight = FontWeight.Bold,
-        )
+        TitleSmallText("Synced devices")
     }
     Spacer(Modifier.height(2.dp))
     BodySmallText(
@@ -521,7 +517,7 @@ internal fun DriveSyncChoiceRow(
         Icon(icon, contentDescription = null, modifier = Modifier.size(ButtonIconSize))
         Spacer(Modifier.width(ButtonIconGap))
         Column(horizontalAlignment = Alignment.Start) {
-            Text(title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+            TitleSmallText(title)
             Text(subtitle, style = MaterialTheme.typography.bodySmall)
         }
     }

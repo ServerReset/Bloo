@@ -365,11 +365,9 @@ internal fun StatusRow(label: String, value: String, valueMono: Boolean = false)
 /** A small bold group heading used inside the Car-info pebble. */
 @Composable
 internal fun SectionLabel(text: String) {
-    Text(
+    TitleSmallText(
         text,
         modifier = Modifier.padding(top = 2.dp),
-        style = MaterialTheme.typography.titleSmall,
-        fontWeight = FontWeight.Bold,
         color = LocalContentColor.current.copy(alpha = 0.85f),
     )
 }

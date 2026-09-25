@@ -435,7 +435,7 @@ internal fun SettingsSearchResults(
                         )
                         Spacer(Modifier.width(12.dp))
                         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Text(e.title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                            TitleSmallText(e.title)
                             e.content()
                         }
                     }
@@ -460,7 +460,7 @@ internal fun SettingsSearchResults(
                     )
                     Spacer(Modifier.width(12.dp))
                     Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                        Text(cmd.title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                        TitleSmallText(cmd.title)
                         Text(cmd.description, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
@@ -569,7 +569,7 @@ internal fun SettingsSearchResults(
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(Icons.Filled.Bolt, contentDescription = null, modifier = Modifier.size(18.dp))
                     Spacer(Modifier.width(8.dp))
-                    Text("Action", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                    TitleSmallText("Action")
                 }
                 Text(
                     when {
@@ -623,7 +623,7 @@ internal fun SettingsSearchResults(
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Icon(Icons.Filled.Bolt, contentDescription = null, modifier = Modifier.size(18.dp))
                         Spacer(Modifier.width(8.dp))
-                        Text("Did you mean?", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                        TitleSmallText("Did you mean?")
                     }
                     Text(
                         ran ?: "${aiCommandLabel(p.first)} ${car?.name ?: "your car"}",
@@ -705,7 +705,7 @@ internal fun SettingsSearchResults(
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Icon(Icons.Filled.AutoAwesome, contentDescription = null, modifier = Modifier.size(18.dp))
                         Spacer(Modifier.width(8.dp))
-                        Text("AI answer", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                        TitleSmallText("AI answer")
                     }
                     if (reply != null) {
                         Text(reply, style = MaterialTheme.typography.bodyMedium)

@@ -177,15 +177,24 @@ internal fun LabelLargeText(text: String, modifier: Modifier = Modifier, color: 
 }
 
 /**
- * Title text (titleSmall) -- section headers, card titles (15 sites).
+ * Title text (titleSmall) -- section headers, card titles. Bold by default:
+ * every real call site pairs titleSmall with FontWeight.Bold (or SemiBold),
+ * which the original signature had no parameter for at all -- the actual
+ * reason this had zero adopters despite the "15 sites" this doc once claimed.
  */
 @Composable
-internal fun TitleSmallText(text: String, modifier: Modifier = Modifier, color: Color = MaterialTheme.colorScheme.onSurface) {
+internal fun TitleSmallText(
+    text: String,
+    modifier: Modifier = Modifier,
+    color: Color = MaterialTheme.colorScheme.onSurface,
+    fontWeight: FontWeight = FontWeight.Bold,
+) {
     Text(
         text,
         modifier = modifier,
         style = MaterialTheme.typography.titleSmall,
         color = color,
+        fontWeight = fontWeight,
     )
 }
 
@@ -281,7 +290,7 @@ internal fun IconLeadRow(
     ) {
         IconBadge(icon, tint, containerColor = containerColor, size = badgeSize)
         Column(Modifier.weight(1f)) {
-            Text(title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = titleColor)
+            TitleSmallText(title, color = titleColor)
             if (subtitle != null) MutedText(subtitle)
         }
         trailing?.invoke()
