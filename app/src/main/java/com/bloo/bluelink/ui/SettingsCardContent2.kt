@@ -284,7 +284,7 @@ internal fun LogsCardContent(logs: List<String>, vm: AppViewModel, clipboardScop
                 // was a second disclosure for the same content: open the card, then open the log
                 // again. One control, the outer one.
                 val lineCount = logs.size
-                Row(verticalAlignment = Alignment.CenterVertically) {
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                     ThemedIcon(AppIcons.Info, tint = MaterialTheme.colorScheme.onSurfaceVariant, size = 18.dp)
                     Spacer(Modifier.width(8.dp))
                     BodyMediumText(

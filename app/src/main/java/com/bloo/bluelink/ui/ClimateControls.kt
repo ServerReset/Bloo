@@ -464,7 +464,7 @@ internal fun ChargeLimitPill(
                         }
                     },
             ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                     Icon(icon, contentDescription = null, modifier = Modifier.size(ButtonIconSize))
                     Spacer(Modifier.width(ButtonIconGap))
                     Text(

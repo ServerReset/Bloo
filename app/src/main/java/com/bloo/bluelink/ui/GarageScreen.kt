@@ -107,6 +107,16 @@ internal fun GarageScreen(
     // the pager entirely.
     val vehicles by remember { derivedStateOf { state.value.vehicles } }
     val refreshing by remember { derivedStateOf { state.value.refreshing } }
+    // NOT the same flag the per-car pull-to-refresh badges use: those track a
+    // status refresh (state.refreshing), but this button's own onClick calls
+    // vm.loadGarage(), which goes through launchBusy and sets state.loading --
+    // the same field Guard.kt's GarageStatusCard already binds its own
+    // loadGarage() refresh indicator to. Binding this button to `refreshing`
+    // instead would leave it never actually showing busy for its own tap (that
+    // action never touches `refreshing` at all) while still lighting up
+    // whenever an unrelated per-car refresh happened to be in flight --
+    // reported directly as the button appearing to spin "randomly".
+    val loading by remember { derivedStateOf { state.value.loading } }
     val expandedIndex by remember { derivedStateOf { state.value.expandedIndex } }
     val deviceLocation by remember { derivedStateOf { state.value.deviceLocation } }
     val chargersVisible by remember { derivedStateOf { state.value.chargersVisible } }
@@ -719,11 +729,20 @@ internal fun GarageScreen(
                     // example), so it doesn't slide along with a pull gesture on whichever page
                     // happens to be showing. `fade = false`: this is the one piece of chrome that
                     // must stay visible exactly when the rest of it fades out -- it IS the refresh.
-                    FloatingIcon(
+                    //
+                    // Gated on the map NOT being expanded: the expanded map is a full-screen
+                    // overlay with its own dedicated refresh icon (MapTopBar, tied to that car's
+                    // own "locate" command, a different action entirely from this button's
+                    // vm.loadGarage()) -- composed later/on top, so this button is normally
+                    // covered regardless, but the map's own top strip is a translucent Haze
+                    // blur, not an opaque fill, so this button was visibly bleeding through
+                    // underneath it: two refresh-looking controls stacked at the top of the
+                    // expanded map, reported directly as confusing.
+                    if (expandedMap.vin == null) FloatingIcon(
                         icon = AppIcons.Refresh,
-                        description = if (refreshing) "Refreshing" else "Refresh",
+                        description = if (loading) "Refreshing" else "Refresh",
                         onClick = { vm.loadGarage() },
-                        busy = refreshing,
+                        busy = loading,
                         hazeState = hazeState,
                         modifier = Modifier.align(Alignment.TopCenter)
                             .floatingOverlay(FloatingIds.RefreshIndicator, fade = false, shift = false),

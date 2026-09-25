@@ -211,7 +211,7 @@ internal fun GlassAlertDialog(
                     }
                     Spacer(Modifier.height(16.dp))
                 }
-                Row(verticalAlignment = Alignment.CenterVertically) {
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                     Text(
                         title,
                         style = MaterialTheme.typography.headlineSmall,
