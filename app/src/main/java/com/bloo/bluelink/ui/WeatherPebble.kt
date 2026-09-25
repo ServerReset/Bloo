@@ -181,7 +181,29 @@ internal fun rememberLocateAction(vm: AppViewModel, v: Vehicle): () -> Unit {
     val context = LocalContext.current
     val fineLocationLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
         androidx.activity.result.contract.ActivityResultContracts.RequestPermission(),
-    ) { granted -> if (granted) vm.locate(v) }
+    ) { granted ->
+        if (granted) {
+            // A fresh grant, not the "already had it" path below -- restart the live
+            // subscription now that it can actually produce something (see
+            // beginLiveDeviceLocation's own doc for why the plain no-arg call can't
+            // recover a job that started permission-less).
+            vm.beginLiveDeviceLocation(restart = true)
+            vm.locate(v)
+        } else {
+            // Silently doing nothing here was its own bug: a denial (including a PERMANENT
+            // one, where Android won't show this dialog again at all) looked identical to
+            // the dot just never appearing, with no way for the user to tell WHY or how to
+            // fix it -- reported as "the map still doesn't show the location of the phone"
+            // with no further symptom to go on. A permanent denial can only be undone from
+            // the system's own app-info screen, not from another in-app prompt, so the toast
+            // points there instead of re-asking.
+            android.widget.Toast.makeText(
+                context,
+                "Location permission denied. Enable it in system Settings > Apps > Bloo > Permissions to see your position on the map.",
+                android.widget.Toast.LENGTH_LONG,
+            ).show()
+        }
+    }
     return {
         val granted = androidx.core.content.ContextCompat.checkSelfPermission(
             context, android.Manifest.permission.ACCESS_FINE_LOCATION,

@@ -2898,9 +2898,20 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
      * from [loadGarageInner] (app open); no matching stop call exists on
      * purpose -- same as the one-shot [refreshDeviceLocation], this rides out
      * the process's own lifetime rather than a composable's.
+     *
+     * [restart] forces a fresh subscription even if one is already "active". Needed
+     * because [com.bloo.bluelink.autolock.LocationHelper.liveUpdates] emits nothing at
+     * all without permission but never actually completes either (its own doc explains
+     * why) -- so a job started before the user had granted ACCESS_FINE_LOCATION sits
+     * "active" forever, silently producing nothing, and the plain no-arg guard below
+     * would refuse to ever replace it even once permission exists. [rememberLocateAction]
+     * passes true right after a fresh grant so the live dot actually starts working that
+     * same session instead of needing an app restart -- reported as "the map still
+     * doesn't show the location of the phone" even after granting the permission.
      */
-    fun beginLiveDeviceLocation() {
-        if (liveLocationJob?.isActive == true) return
+    fun beginLiveDeviceLocation(restart: Boolean = false) {
+        if (!restart && liveLocationJob?.isActive == true) return
+        liveLocationJob?.cancel()
         liveLocationJob = viewModelScope.launch {
             // See MIN_DEVICE_LOCATION_INTERVAL_MS/_MOVE_METERS' own doc -- a real device OOM
             // crash traced back to this collector publishing every raw fused-location callback
