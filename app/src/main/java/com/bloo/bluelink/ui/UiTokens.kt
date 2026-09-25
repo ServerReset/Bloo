@@ -828,6 +828,73 @@ internal fun LabelText(text: String, modifier: Modifier = Modifier) {
 }
 
 /**
+ * Body text (bodySmall, onSurfaceVariant) -- muted/secondary content.
+ * Consolidates the single most common text pattern (54 sites).
+ */
+@Composable
+internal fun BodySmallText(text: String, modifier: Modifier = Modifier, color: Color = MaterialTheme.colorScheme.onSurfaceVariant) {
+    Text(
+        text,
+        modifier = modifier,
+        style = MaterialTheme.typography.bodySmall,
+        color = color,
+    )
+}
+
+/**
+ * Body text (bodyMedium, onSurface) -- regular secondary content.
+ * Used for descriptions, supplementary text (41 sites).
+ */
+@Composable
+internal fun BodyMediumText(text: String, modifier: Modifier = Modifier, color: Color = MaterialTheme.colorScheme.onSurface) {
+    Text(
+        text,
+        modifier = modifier,
+        style = MaterialTheme.typography.bodyMedium,
+        color = color,
+    )
+}
+
+/**
+ * Label text (labelSmall) -- compact labels and captions (27 sites).
+ */
+@Composable
+internal fun LabelSmallText(text: String, modifier: Modifier = Modifier, color: Color = MaterialTheme.colorScheme.onSurfaceVariant) {
+    Text(
+        text,
+        modifier = modifier,
+        style = MaterialTheme.typography.labelSmall,
+        color = color,
+    )
+}
+
+/**
+ * Label text (labelLarge) -- prominent labels and tags (16 sites).
+ */
+@Composable
+internal fun LabelLargeText(text: String, modifier: Modifier = Modifier, color: Color = MaterialTheme.colorScheme.onSurface) {
+    Text(
+        text,
+        modifier = modifier,
+        style = MaterialTheme.typography.labelLarge,
+        color = color,
+    )
+}
+
+/**
+ * Title text (titleSmall) -- section headers, card titles (15 sites).
+ */
+@Composable
+internal fun TitleSmallText(text: String, modifier: Modifier = Modifier, color: Color = MaterialTheme.colorScheme.onSurface) {
+    Text(
+        text,
+        modifier = modifier,
+        style = MaterialTheme.typography.titleSmall,
+        color = color,
+    )
+}
+
+/**
  * Icon with a single color and size. Consolidates the most-repeated icon pattern.
  * Used for: status icons, nav icons, control icons throughout the app.
  */
