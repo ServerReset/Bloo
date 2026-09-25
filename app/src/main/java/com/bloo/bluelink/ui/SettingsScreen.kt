@@ -277,9 +277,9 @@ internal fun SettingsScreen(
         icon = Icons.Filled.Smartphone,
         title = "Settings on the cover",
         text = {
-          Text(
+          BodySmallText(
             "Unfold your phone to access settings. This screen is designed for a larger display where all buttons are visible.",
-            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurface,
           )
         },
         buttons = {

@@ -407,7 +407,7 @@ internal fun SettingsHeroCard(state: UiState, vm: AppViewModel, compact: Boolean
                         // rather than a real boundary.
                         Surface(
                             modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(16.dp),
+                            shape = StandardShape,
                             color = Color.Transparent,
                             border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
                         ) {

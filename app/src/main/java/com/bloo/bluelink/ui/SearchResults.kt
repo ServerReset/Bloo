@@ -387,7 +387,7 @@ internal fun SettingsSearchResults(
     // Floating search results use GlassSurface, the same unified glass chrome
     // as every other floating surface (dialogs, overlays, status bar).
     // This replaces the old plain Card + tonal elevation approach.
-    val resultCardShape = RoundedCornerShape(16.dp)
+    val resultCardShape = StandardShape
 
     // Command suggestions from CommandIndex when available
     val suggestedCommands = remember(query) {

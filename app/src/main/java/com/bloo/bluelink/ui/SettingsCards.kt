@@ -397,7 +397,7 @@ internal fun SettingsGroup(title: String, content: @Composable ColumnScope.() ->
     Column(
         Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(16.dp))
+            .clip(StandardShape)
             .background(MaterialTheme.colorScheme.surfaceColorAtElevation(6.dp))
             .padding(12.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
