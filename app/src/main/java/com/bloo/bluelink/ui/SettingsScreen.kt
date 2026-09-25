@@ -9,6 +9,7 @@ package com.bloo.bluelink.ui
 
 import android.os.Build
 import android.net.Uri
+import android.content.Context
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
@@ -129,6 +130,7 @@ import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalClipboard
+import androidx.compose.ui.platform.Clipboard
 import androidx.compose.ui.platform.ClipEntry
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.AnnotatedString
@@ -147,6 +149,7 @@ import com.bloo.bluelink.data.Weather
 import com.bloo.bluelink.data.links
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.CoroutineScope
 import kotlin.math.max
 import com.bloo.uicommon.ReorderColumn
 import android.content.ClipData
@@ -407,6 +410,209 @@ internal fun SettingsScreen(
             // stays in scope for all of them exactly as it did before.
             item {
             // Accounts (one per brand; Hyundai + Genesis can both be signed in).
+                AccountsCardContent(state, vm)
+            }
+            // The support check gates the ITEM, not just its contents. A grid item that
+            // composes nothing is not free: it still takes a slot and the grid's
+            // verticalItemSpacing with it, so a device without Gemini Nano got a phantom gap
+            // where the AI card would be. Same mechanism, same fix as the advanced-only cards
+            // (see rememberAdvancedVisibility); this condition had simply been missed.
+            if (state.aiSupported) item {
+
+            // On-device AI - only when the device supports Gemini Nano. Always
+            // shown (not advanced-only): it's a headline feature, not a power-
+            // user knob, and hiding it behind Advanced made it easy to miss.
+            run { // scope kept so the gate above is the only edit; the check now lives on `item`
+                AiCardContent(state, advanced, vm)
+            }
+            }
+            if (advTransition0.targetState || !advTransition0.isIdle) item {
+
+            // Updates used to have its own card here; it's folded into SettingsHeroCard
+            // at the top of this grid now -- see that composable's own doc for why.
+
+            // App-icon shortcuts (long-press the launcher icon)
+            AnimatedVisibility(visibleState = advTransition0, enter = expandEnterSized(), exit = expandExitSized()) {
+                AppShortcutsCardContent(state, vm)
+            }
+            }
+            item {
+
+            // Backup / Sync
+            BackupSyncCardContent(state, vm, context, advanced)
+            }
+            // Gates the ITEM for the same reason the AI card does: with no cars yet
+            // (fresh install, before the first sign-in) this composed nothing but still held a
+            // slot and a gap open at the top of Settings.
+            if (state.vehicles.isNotEmpty()) item {
+
+            // Cars: drag to reorder, tap a car to expand its setup + photo. With a
+            // single car there's nothing to order, so it's just shown expanded.
+            // Always visible, in both Simple and Advanced -- this used to be
+            // wrapped in the same advanced-only AnimatedVisibility as the
+            // power-user cards below it, which hid the whole section (photo,
+            // powertrain, seat/climate features, everything) from anyone in
+            // Simple mode, the app's default. The two genuinely power-user
+            // groups inside CarSettingsCard (default climate preset, palette
+            // override) already have their own `state.settingsMode ==
+            // "advanced"` checks, so gating the section as a whole here was
+            // redundant with those AND too broad.
+            CarsCardContent(
+                state = state,
+                vm = vm,
+                pick = { vin ->
+                    pickTarget = vin
+                    photoLauncher.launch(
+                        PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly),
+                    )
+                },
+            )
+            }
+            if (advTransition1.targetState || !advTransition1.isIdle) item {
+
+            // Debug -- app/device diagnostics for support troubleshooting. A power-user
+            // diagnostic card like Logs, and it takes its OWN slot in this screen's stagger
+            // sequence rather than sharing Logs': the two animate independently.
+            AnimatedVisibility(visibleState = advTransition1, enter = expandEnterSized(), exit = expandExitSized()) {
+            DebugCardContent(vm, clipboardScope, clipboard)
+            }
+            }
+            item {
+
+            // Display scale
+            DisplayCardContent(appearance, advanced, vm)
+            }
+            item {
+
+            // Font
+            // SIMPLE, not advanced. This card is where Atkinson Hyperlegible
+            // lives -- a typeface designed for low vision -- and an
+            // accessibility choice behind a mode called "advanced" is a
+            // choice the people who need it are least likely to find. The
+            // rest of the card costs nothing to show alongside it.
+            FontCardContent(appearance, vm)
+            }
+            item {
+
+            // Location -- was titled "Weather" and talked only about weather, even though
+            // choosing "My location" here does more than that: it sets
+            // Appearance.weatherFollowsDevice, and AppViewModel.refreshDeviceLocation()
+            // (the same place that keeps the map's own "you are here" dot and the Location
+            // pebble's distance-to-car current) re-syncs this location to that live fix on
+            // every refresh -- see WeatherController.refreshDeviceLocationForWeather's own
+            // doc. So "My location" was already one location feeding both weather and the
+            // map; this card just never said so.
+            LocationCardContent(appearance, vm)
+            }
+            if (advTransition2.targetState || !advTransition2.isIdle) item {
+
+            // Logs
+            AnimatedVisibility(visibleState = advTransition2, enter = expandEnterSized(), exit = expandExitSized()) {
+            LogsCardContent(logs, vm, clipboardScope, clipboard)
+            }
+            }
+            item {
+
+            // Map & Navigation
+            MapNavigationCardContent(appearance, vm)
+            }
+            item {
+
+            // Notifications
+            NotificationsCardContent(notif, vm)
+            }
+            item {
+
+            // Security
+            SecurityCardContent(state, vm, canBio, context, appearance)
+            }
+            item {
+
+            // Sounds & vibration
+            // The whole card is one switch, so it renders as one row: title on the left, the
+            // switch on the right, no chevron and nothing to expand into. See SettingsCard's
+            // inlineSetting.
+            SoundsVibrationCardContent(appearance, vm)
+            }
+            item {
+
+            // Theme
+            ThemeCardContent(appearance, advanced, vm)
+            }
+        }
+            item {
+                // Every third-party project/API this app draws on, in one place -- moved
+                // here from a Surface+Text that used to sit inside AutoLock's own settings
+                // (see AutoLockSettingsUi.kt's own comment), which was the ONLY place any
+                // of them were credited and only showed up while that one feature happened
+                // to be enabled. OpenStreetMap's own tile usage policy in particular expects
+                // a visible attribution; this is that, even if it isn't literally overlaid
+                // on the map itself.
+                CreditsCardContent(vm)
+            }
+          // Same reason as the leading spacer above: this is the list's own
+          // trailing footer, not a card.
+          item {
+          Column {
+          // About / installed build — the one place the phone shows which build it's
+          // running (the update tile shows the AVAILABLE build; this shows the current
+          // one). Based on the GitHub Actions run number baked in at CI build time;
+          // "dev build" for a local build. buildLabel is the canonical formatter shared
+          // with the update tile's delta.
+          Spacer(Modifier.height(SettingsGapRow))
+          Text(
+              "Bloo · " + com.bloo.bluelink.data.buildLabel(vm.currentBuildNumber, com.bloo.bluelink.BuildConfig.BUILD_BRANCH),
+              style = MaterialTheme.typography.labelSmall,
+              color = MaterialTheme.colorScheme.onSurfaceVariant,
+              textAlign = TextAlign.Center,
+              modifier = Modifier.fillMaxWidth(),
+          )
+          // The search bar itself now floats fixed to the screen's bottom
+          // edge (see below, outside this scrolling column) -- reserve exactly as much
+          // space as its own live reported bounds say it needs, not a flat guess.
+          Spacer(Modifier.height(searchBarClearance(fallback = bottomInset + 132.dp)))
+          }
+          }
+        }
+        } // Box (wide-screen centering)
+        // Same blurred scrim GarageScreen uses behind the system clock/battery
+        // icons -- this content scrolls behind the status bar too (see the
+        // No more floating "Settings" corner badge -- removed as unwanted UI (see the floating
+        // car-name pill's own removal). The "Bloo" title is real, static content on
+        // SettingsHeroCard now; it just scrolls off with the rest of the grid.
+        //
+        // No StatusBarScrim or floating back-arrow here at all any more: this page always
+        // sits inside GarageScreen's/CompactGarage's own HorizontalPager now, which already
+        // draws its own StatusBarScrim on top of every page in it (cars and the status card
+        // included) -- a second one here stacked as a subtly darker/hazier status-bar band
+        // than every other page beside it. A back arrow makes even less sense: reaching this
+        // page IS swiping, so leaving it is swiping back, not tapping anything.
+        //
+        // Settings mode toggle as a tab-like element below the status bar,
+        // positioned at the top-right, styled like it's hanging from the status bar.
+        SettingsModeTab(
+            settingsMode = state.settingsMode,
+            onSettingsModeChange = { vm.setSettingsMode(it) },
+            hazeState = hazeState,
+        )
+        cropUri?.let { uri ->
+            val target = pickTarget
+            if (target != null) {
+                CropScreen(
+                    vin = target,
+                    uriString = uri.toString(),
+                    onCancel = { cropUri = null; pickTarget = null },
+                    onSave = { path -> vm.setVehicleImage(target, path); cropUri = null; pickTarget = null },
+                )
+            }
+        }
+  }
+}
+
+
+/** "Accounts" card content -- see the call site in [SettingsScreen] for context. */
+@Composable
+private fun AccountsCardContent(state: UiState, vm: AppViewModel) {
             SettingsCard("Accounts", Icons.Filled.Person, vm) {
                 // Same icon-badge + status-line header as every other card that's had
                 // this pass applied -- was straight into "Not signed in" or a wall of
@@ -513,18 +719,11 @@ internal fun SettingsScreen(
                     modifier = Modifier.padding(top = 8.dp),
                 )
             }
-            }
-            // The support check gates the ITEM, not just its contents. A grid item that
-            // composes nothing is not free: it still takes a slot and the grid's
-            // verticalItemSpacing with it, so a device without Gemini Nano got a phantom gap
-            // where the AI card would be. Same mechanism, same fix as the advanced-only cards
-            // (see rememberAdvancedVisibility); this condition had simply been missed.
-            if (state.aiSupported) item {
+}
 
-            // On-device AI - only when the device supports Gemini Nano. Always
-            // shown (not advanced-only): it's a headline feature, not a power-
-            // user knob, and hiding it behind Advanced made it easy to miss.
-            run { // scope kept so the gate above is the only edit; the check now lives on `item`
+/** "AI" card content -- see the call site in [SettingsScreen] for context. */
+@Composable
+private fun AiCardContent(state: UiState, advanced: Boolean, vm: AppViewModel) {
                 SettingsCard(
                     "AI",
                     AppIcons.AutoAwesome,
@@ -564,15 +763,11 @@ internal fun SettingsScreen(
                             "command -- everything runs privately on your device.",
                     )
                 }
-            }
-            }
-            if (advTransition0.targetState || !advTransition0.isIdle) item {
+}
 
-            // Updates used to have its own card here; it's folded into SettingsHeroCard
-            // at the top of this grid now -- see that composable's own doc for why.
-
-            // App-icon shortcuts (long-press the launcher icon)
-            AnimatedVisibility(visibleState = advTransition0, enter = expandEnterSized(), exit = expandExitSized()) {
+/** "App shortcuts" card content -- see the call site in [SettingsScreen] for context. */
+@Composable
+private fun AppShortcutsCardContent(state: UiState, vm: AppViewModel) {
                 SettingsCard("App shortcuts", AppIcons.Bolt, vm) {
                     // No inner MorphExpandButton any more -- this used to have its
                     // own second chevron gating the per-vehicle toggles below,
@@ -597,11 +792,16 @@ internal fun SettingsScreen(
                         }
                     }
                 }
-            }
-            }
-            item {
+}
 
-            // Backup / Sync
+/** "Backup & sync" card content -- see the call site in [SettingsScreen] for context. */
+@Composable
+private fun BackupSyncCardContent(
+    state: UiState,
+    vm: AppViewModel,
+    context: Context,
+    advanced: Boolean,
+) {
             SettingsCard("Backup & sync", Icons.Filled.CloudSync, vm) {
                 var showDriveDialog by remember { mutableStateOf(false) }
                 val settingsImportLauncher = rememberLauncherForActivityResult(
@@ -891,32 +1091,21 @@ internal fun SettingsScreen(
                   }
                 }
             }
-            }
-            // Gates the ITEM for the same reason the AI card does: with no cars yet
-            // (fresh install, before the first sign-in) this composed nothing but still held a
-            // slot and a gap open at the top of Settings.
-            if (state.vehicles.isNotEmpty()) item {
+}
 
-            // Cars: drag to reorder, tap a car to expand its setup + photo. With a
-            // single car there's nothing to order, so it's just shown expanded.
-            // Always visible, in both Simple and Advanced -- this used to be
-            // wrapped in the same advanced-only AnimatedVisibility as the
-            // power-user cards below it, which hid the whole section (photo,
-            // powertrain, seat/climate features, everything) from anyone in
-            // Simple mode, the app's default. The two genuinely power-user
-            // groups inside CarSettingsCard (default climate preset, palette
-            // override) already have their own `state.settingsMode ==
-            // "advanced"` checks, so gating the section as a whole here was
-            // redundant with those AND too broad.
-            run { // scope kept so the gate above is the only edit; the check now lives on `item`
+/**
+ * "Cars" section content -- see the call site in [SettingsScreen] for context.
+ * `expandedCar`/`single` are genuinely local to this section (nothing else reads
+ * them), so they're declared here rather than threaded down as parameters. [pick]
+ * is the one piece of behavior this section needs from its caller: it reaches into
+ * `pickTarget`/`photoLauncher`, both of which live in [SettingsScreen] itself (the
+ * crop flow below the scrolling list also reads `pickTarget`), so it's passed in
+ * explicitly instead of being redeclared here.
+ */
+@Composable
+private fun CarsCardContent(state: UiState, vm: AppViewModel, pick: (String) -> Unit) {
                 var expandedCar by remember { mutableStateOf<String?>(null) }
                 val single = state.vehicles.size == 1
-                val pick: (String) -> Unit = { vin ->
-                    pickTarget = vin
-                    photoLauncher.launch(
-                        PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly),
-                    )
-                }
                 if (single) {
                     // With one car, CarSettingsCard IS the section's card --
                     // forceExpanded already gives it the exact same always-open,
@@ -957,14 +1146,11 @@ internal fun SettingsScreen(
                         }
                     }
                 }
-            }
-            }
-            if (advTransition1.targetState || !advTransition1.isIdle) item {
+}
 
-            // Debug -- app/device diagnostics for support troubleshooting. A power-user
-            // diagnostic card like Logs, and it takes its OWN slot in this screen's stagger
-            // sequence rather than sharing Logs': the two animate independently.
-            AnimatedVisibility(visibleState = advTransition1, enter = expandEnterSized(), exit = expandExitSized()) {
+/** "Debug" card content -- see the call site in [SettingsScreen] for context. */
+@Composable
+private fun DebugCardContent(vm: AppViewModel, clipboardScope: CoroutineScope, clipboard: Clipboard) {
             SettingsCard("Debug", Icons.Filled.BugReport, vm) {
                 DebugSettingsPanel(
                     onCopyToClipboard = { text ->
@@ -974,11 +1160,11 @@ internal fun SettingsScreen(
                     },
                 )
             }
-            }
-            }
-            item {
+}
 
-            // Display scale
+/** "Display" card content -- see the call site in [SettingsScreen] for context. */
+@Composable
+private fun DisplayCardContent(appearance: SettingsStore.Appearance, advanced: Boolean, vm: AppViewModel) {
             SettingsCard(
                 "Display",
                 Icons.Filled.Straighten,
@@ -1016,15 +1202,11 @@ internal fun SettingsScreen(
                     onSelect = { vm.setUnitSystem(it) },
                 )
             }
-            }
-            item {
+}
 
-            // Font
-            // SIMPLE, not advanced. This card is where Atkinson Hyperlegible
-            // lives -- a typeface designed for low vision -- and an
-            // accessibility choice behind a mode called "advanced" is a
-            // choice the people who need it are least likely to find. The
-            // rest of the card costs nothing to show alongside it.
+/** "Font" card content -- see the call site in [SettingsScreen] for context. */
+@Composable
+private fun FontCardContent(appearance: SettingsStore.Appearance, vm: AppViewModel) {
             SettingsCard(
                 "Font",
                 Icons.Filled.TextFields,
@@ -1049,17 +1231,11 @@ internal fun SettingsScreen(
                     }
                 }
             }
-            }
-            item {
+}
 
-            // Location -- was titled "Weather" and talked only about weather, even though
-            // choosing "My location" here does more than that: it sets
-            // Appearance.weatherFollowsDevice, and AppViewModel.refreshDeviceLocation()
-            // (the same place that keeps the map's own "you are here" dot and the Location
-            // pebble's distance-to-car current) re-syncs this location to that live fix on
-            // every refresh -- see WeatherController.refreshDeviceLocationForWeather's own
-            // doc. So "My location" was already one location feeding both weather and the
-            // map; this card just never said so.
+/** "Location" card content -- see the call site in [SettingsScreen] for context. */
+@Composable
+private fun LocationCardContent(appearance: SettingsStore.Appearance, vm: AppViewModel) {
             SettingsCard("Location", Icons.Filled.LocationOn, vm) {
                 BodySmallText(
                     "Where \"my location\" points for weather -- and, once set that way, the " +
@@ -1167,11 +1343,11 @@ internal fun SettingsScreen(
                     }
                 }
             }
-            }
-            if (advTransition2.targetState || !advTransition2.isIdle) item {
+}
 
-            // Logs
-            AnimatedVisibility(visibleState = advTransition2, enter = expandEnterSized(), exit = expandExitSized()) {
+/** "Logs" card content -- see the call site in [SettingsScreen] for context. */
+@Composable
+private fun LogsCardContent(logs: List<String>, vm: AppViewModel, clipboardScope: CoroutineScope, clipboard: Clipboard) {
             SettingsCard("Logs", AppIcons.Info, vm) {
                 // No local expand state any more. The card's OWN chevron (PebbleShell's, via
                 // SettingsCard) already governs this body -- nothing inside a collapsed card is
@@ -1248,11 +1424,11 @@ internal fun SettingsScreen(
                         }
                     }
                 }
-            }
-            }
-            item {
+}
 
-            // Map & Navigation
+/** "Map & Navigation" card content -- see the call site in [SettingsScreen] for context. */
+@Composable
+private fun MapNavigationCardContent(appearance: SettingsStore.Appearance, vm: AppViewModel) {
             SettingsCard("Map & Navigation", Icons.Filled.Map, vm) {
                 Text(
                     "Open Charge Map API Key",
@@ -1288,10 +1464,11 @@ internal fun SettingsScreen(
                     )
                 }
             }
-            }
-            item {
+}
 
-            // Notifications
+/** "Notifications" card content -- see the call site in [SettingsScreen] for context. */
+@Composable
+private fun NotificationsCardContent(notif: SettingsStore.NotificationPrefs, vm: AppViewModel) {
             SettingsCard("Notifications", Icons.Filled.Notifications, vm) {
                 // Icon-badge + status-line header, matching Backup & sync/Updates --
                 // this card used to open straight into a wall of toggles with no
@@ -1415,10 +1592,17 @@ internal fun SettingsScreen(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
-            }
-            item {
+}
 
-            // Security
+/** "Security" card content -- see the call site in [SettingsScreen] for context. */
+@Composable
+private fun SecurityCardContent(
+    state: UiState,
+    vm: AppViewModel,
+    canBio: Boolean,
+    context: Context,
+    appearance: SettingsStore.Appearance,
+) {
             SettingsCard("Security", AppIcons.Lock, vm) {
                 // Same icon-badge + status-line header Notifications/Backup & sync use --
                 // this card used to open straight into a segmented row with no glanceable
@@ -1605,23 +1789,22 @@ internal fun SettingsScreen(
                     canBio = canBio,
                 )
             }
-            }
-            item {
+}
 
-            // Sounds & vibration
-            // The whole card is one switch, so it renders as one row: title on the left, the
-            // switch on the right, no chevron and nothing to expand into. See SettingsCard's
-            // inlineSetting.
+/** "Sounds & vibration" card content -- see the call site in [SettingsScreen] for context. */
+@Composable
+private fun SoundsVibrationCardContent(appearance: SettingsStore.Appearance, vm: AppViewModel) {
             SettingsCard(
                 "Sounds & vibration",
                 Icons.Filled.Vibration,
                 vm,
                 inlineSetting = { InlineToggle(appearance.hapticsEnabled) { vm.setHapticsEnabled(it) } },
             ) {}
-            }
-            item {
+}
 
-            // Theme
+/** "Theme" card content -- see the call site in [SettingsScreen] for context. */
+@Composable
+private fun ThemeCardContent(appearance: SettingsStore.Appearance, advanced: Boolean, vm: AppViewModel) {
             SettingsCard("Theme", Icons.Filled.Palette, vm) {
                 // Same icon-badge + status-line header as the rest of this pass.
                 val themeTint = MaterialTheme.colorScheme.tertiary
@@ -1769,16 +1952,11 @@ internal fun SettingsScreen(
                   }
                 }
             }
-            }
-        }
-            item {
-                // Every third-party project/API this app draws on, in one place -- moved
-                // here from a Surface+Text that used to sit inside AutoLock's own settings
-                // (see AutoLockSettingsUi.kt's own comment), which was the ONLY place any
-                // of them were credited and only showed up while that one feature happened
-                // to be enabled. OpenStreetMap's own tile usage policy in particular expects
-                // a visible attribution; this is that, even if it isn't literally overlaid
-                // on the map itself.
+}
+
+/** "Credits" card content -- see the call site in [SettingsScreen] for context. */
+@Composable
+private fun CreditsCardContent(vm: AppViewModel) {
                 SettingsCard("Credits", AppIcons.Info, vm) {
                     Column {
                         val credits = remember {
@@ -1850,64 +2028,6 @@ internal fun SettingsScreen(
                         }
                     }
                 }
-            }
-          // Same reason as the leading spacer above: this is the list's own
-          // trailing footer, not a card.
-          item {
-          Column {
-          // About / installed build — the one place the phone shows which build it's
-          // running (the update tile shows the AVAILABLE build; this shows the current
-          // one). Based on the GitHub Actions run number baked in at CI build time;
-          // "dev build" for a local build. buildLabel is the canonical formatter shared
-          // with the update tile's delta.
-          Spacer(Modifier.height(SettingsGapRow))
-          Text(
-              "Bloo · " + com.bloo.bluelink.data.buildLabel(vm.currentBuildNumber, com.bloo.bluelink.BuildConfig.BUILD_BRANCH),
-              style = MaterialTheme.typography.labelSmall,
-              color = MaterialTheme.colorScheme.onSurfaceVariant,
-              textAlign = TextAlign.Center,
-              modifier = Modifier.fillMaxWidth(),
-          )
-          // The search bar itself now floats fixed to the screen's bottom
-          // edge (see below, outside this scrolling column) -- reserve exactly as much
-          // space as its own live reported bounds say it needs, not a flat guess.
-          Spacer(Modifier.height(searchBarClearance(fallback = bottomInset + 132.dp)))
-          }
-          }
-        }
-        } // Box (wide-screen centering)
-        // Same blurred scrim GarageScreen uses behind the system clock/battery
-        // icons -- this content scrolls behind the status bar too (see the
-        // No more floating "Settings" corner badge -- removed as unwanted UI (see the floating
-        // car-name pill's own removal). The "Bloo" title is real, static content on
-        // SettingsHeroCard now; it just scrolls off with the rest of the grid.
-        //
-        // No StatusBarScrim or floating back-arrow here at all any more: this page always
-        // sits inside GarageScreen's/CompactGarage's own HorizontalPager now, which already
-        // draws its own StatusBarScrim on top of every page in it (cars and the status card
-        // included) -- a second one here stacked as a subtly darker/hazier status-bar band
-        // than every other page beside it. A back arrow makes even less sense: reaching this
-        // page IS swiping, so leaving it is swiping back, not tapping anything.
-        //
-        // Settings mode toggle as a tab-like element below the status bar,
-        // positioned at the top-right, styled like it's hanging from the status bar.
-        SettingsModeTab(
-            settingsMode = state.settingsMode,
-            onSettingsModeChange = { vm.setSettingsMode(it) },
-            hazeState = hazeState,
-        )
-        cropUri?.let { uri ->
-            val target = pickTarget
-            if (target != null) {
-                CropScreen(
-                    vin = target,
-                    uriString = uri.toString(),
-                    onCancel = { cropUri = null; pickTarget = null },
-                    onSave = { path -> vm.setVehicleImage(target, path); cropUri = null; pickTarget = null },
-                )
-            }
-        }
-  }
 }
 
 /** One entry in the Credits card -- see [CreditRow]. */
