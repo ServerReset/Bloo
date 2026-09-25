@@ -267,38 +267,32 @@ internal fun SettingsScreen(
   val bottomInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
 
   // On very small cover displays (not the compact phone layout, but the outer cover
-  // of a foldable), buttons overflow and become unreachable. Block with an early message.
+  // of a foldable), buttons overflow and become unreachable. Block with a standard dialog.
   val onTinyScreen = isCompactCoverScreen()
   if (onTinyScreen && !compact) {
-    Box(
-      Modifier.fillMaxSize().padding(16.dp),
-      contentAlignment = Alignment.Center
-    ) {
-      Column(
-        horizontalAlignment = Alignment.CenterHorizontally,
-        modifier = Modifier.fillMaxWidth()
-      ) {
-        Icon(
-          Icons.Filled.Smartphone,
-          contentDescription = null,
-          modifier = Modifier.size(48.dp),
-          tint = MaterialTheme.colorScheme.primary
-        )
-        Spacer(Modifier.height(16.dp))
-        Text(
-          "Settings on the cover",
-          style = MaterialTheme.typography.titleMedium,
-          fontWeight = FontWeight.SemiBold,
-          textAlign = TextAlign.Center
-        )
-        Spacer(Modifier.height(12.dp))
-        Text(
-          "Unfold your phone to access settings. This screen is designed for a larger display where all buttons are visible.",
-          style = MaterialTheme.typography.bodySmall,
-          color = MaterialTheme.colorScheme.onSurfaceVariant,
-          textAlign = TextAlign.Center
-        )
-      }
+    var dismissBlock by remember { mutableStateOf(true) }
+    if (dismissBlock) {
+      GlassAlertDialog(
+        onDismissRequest = { dismissBlock = false },
+        icon = Icons.Filled.Smartphone,
+        title = "Settings on the cover",
+        text = {
+          Text(
+            "Unfold your phone to access settings. This screen is designed for a larger display where all buttons are visible.",
+            style = MaterialTheme.typography.bodySmall,
+          )
+        },
+        buttons = {
+          val dismissSource = remember { MutableInteractionSource() }
+          SafeExpansiveButton(interactionSource = dismissSource, enabled = true) {
+            MorphButton(
+              onClick = { dismissBlock = false },
+              interactionSource = dismissSource,
+              modifier = Modifier.fillMaxWidth(),
+            ) { Text("OK", fontWeight = FontWeight.SemiBold) }
+          }
+        }
+      )
     }
     return
   }
