@@ -317,8 +317,8 @@ internal fun SettingsHeroCard(state: UiState, vm: AppViewModel, compact: Boolean
             }
             AnimatedVisibility(
                 visible = expanded,
-                enter = collapseEnter(),
-                exit = collapseExit(fade = false),
+                enter = expandEnter(),
+                exit = expandExit(fade = false),
             ) {
                 Column {
                     Spacer(Modifier.height(SettingsGapGroup))

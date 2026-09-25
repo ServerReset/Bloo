@@ -344,7 +344,7 @@ internal fun HeroHeader(
                     // called by the animation, not composed), so the px distance is
                     // converted with a plain captured Density rather than
                     // LocalDensity.current inside the lambda.
-                    enter = collapseEnter() +
+                    enter = expandEnter() +
                         slideInVertically(
                             animationSpec = spring(
                                 dampingRatio = Spring.DampingRatioLowBouncy,
@@ -358,7 +358,7 @@ internal fun HeroHeader(
                                 stiffness = Spring.StiffnessMediumLow,
                             ),
                         ),
-                    exit = collapseExit() +
+                    exit = expandExit() +
                         slideOutVertically(
                             animationSpec = MaterialTheme.motionScheme.defaultSpatialSpec(),
                         ) { with(heroPhotoDensity) { -HeroPhotoSlideDistance.roundToPx() } } +

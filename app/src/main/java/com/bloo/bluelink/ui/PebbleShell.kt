@@ -1030,8 +1030,8 @@ internal fun PebbleShell(
                     // content animation at all).
                     AnimatedVisibility(
                         visible = expanded,
-                        enter = collapseEnter(),
-                        exit = collapseExit(fade = false),
+                        enter = expandEnter(),
+                        exit = expandExit(fade = false),
                     ) {
                         // StaggeredRevealColumn, not a plain Column: every row pops in/out on
                         // its own as this cascades open/closed, instead of every row appearing

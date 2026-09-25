@@ -547,8 +547,8 @@ internal fun ControlsPebble(v: Vehicle, state: UiState, vm: AppViewModel, dragHa
             // history yet is indistinguishable from the gesture not existing.
             AnimatedVisibility(
                 visible = showHistory,
-                enter = collapseEnter(Alignment.Top),
-                exit = collapseExit(Alignment.Top),
+                enter = expandEnter(Alignment.Top),
+                exit = expandExit(Alignment.Top),
             ) {
                 RemoteActionsInline(history)
             }
@@ -1180,10 +1180,7 @@ internal fun StateControl(
                 }
                 else -> AnimatedContent(
                     targetState = stateText,
-                    transitionSpec = {
-                        fadeIn(tween(200)) + slideInVertically { -it / 3 } togetherWith
-                        fadeOut(tween(150)) + slideOutVertically { it / 3 }
-                    },
+                    transitionSpec = { expandContentTransform() },
                     label = "stateTextAnim",
                 ) { text ->
                     Text(

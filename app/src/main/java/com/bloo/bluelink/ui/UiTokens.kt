@@ -448,20 +448,16 @@ internal fun expandEnter(expandFrom: Alignment.Vertical = Alignment.Top): EnterT
         if (expandFrom == Alignment.Top) -it / 3 else it / 3
     }
 
-internal fun collapseEnter(expandFrom: Alignment.Vertical = Alignment.Top): EnterTransition =
-    fadeIn(MaterialTheme.motionScheme.defaultEffectsSpec<Float>()) +
-        expandVertically(
-            lowPowerAwareSpring(dampingRatio = PebbleBounceDamping, stiffness = PebbleBounceStiffness),
-            expandFrom = expandFrom,
-        )
-
 /**
  * Standard exit animation for expanding surfaces: mirrors [expandEnter] but in reverse,
  * fading out while sliding back in the direction of collapse. Keeps the same 120ms timing
  * as the update pebble's exit for consistency.
+ *
+ * [fade] defaults true (standard behavior); set false for nested content with its own
+ * per-row fades (e.g., StaggeredRevealColumn rows with individual fade animations).
  */
-internal fun expandExit(shrinkTowards: Alignment.Vertical = Alignment.Top): ExitTransition =
-    fadeOut(tween(120)) + slideOutVertically {
+internal fun expandExit(shrinkTowards: Alignment.Vertical = Alignment.Top, fade: Boolean = true): ExitTransition =
+    (if (fade) fadeOut(tween(120)) else ExitTransition.None) + slideOutVertically {
         if (shrinkTowards == Alignment.Top) -it / 3 else it / 3
     }
 
@@ -472,29 +468,6 @@ internal fun expandExit(shrinkTowards: Alignment.Vertical = Alignment.Top): Exit
  */
 internal fun <T> expandContentTransform(): ContentTransform =
     expandEnter() togetherWith expandExit()
-
-/**
- * Mirror of [collapseEnter]; see there for why the CLOSE direction settles calmly
- * ([PebbleCloseDamping]) rather than bouncing like the open one does.
- *
- * [fade] defaults true (every other caller of this wants the whole block to fade as it
- * leaves, same as always), but [PebbleShell] passes false for its own body: that body's rows
- * now own their OWN fade individually (see [StaggeredRevealColumn]), and running the
- * block-level fadeOut here AT THE SAME TIME as that per-row fade meant two overlapping
- * opacity animations landing on the same pixels at once -- the coarser, whole-block one
- * dominated what was actually visible, and the finer per-row cascade underneath it was
- * indistinguishable from noise. That is what "closing has no animation on the content" was:
- * a real animation, rendered invisible by a redundant one sitting on top of it. With [fade]
- * off here, the per-row fade is the ONLY thing animating opacity, so it's what's actually seen.
- */
-@Composable
-internal fun collapseExit(shrinkTowards: Alignment.Vertical = Alignment.Top, fade: Boolean = true): ExitTransition {
-    val shrink = shrinkVertically(
-        lowPowerAwareSpring(dampingRatio = PebbleCloseDamping, stiffness = PebbleBounceStiffness),
-        shrinkTowards = shrinkTowards,
-    )
-    return if (fade) fadeOut(MaterialTheme.motionScheme.defaultEffectsSpec<Float>()) + shrink else shrink
-}
 
 /**
  * Independent pop-in/pop-out for ONE row-level element that appears or disappears while its

@@ -415,8 +415,8 @@ internal fun SearchLayer(
         // never has to chase a bubble around the screen.
         AnimatedVisibility(
             visible = open,
-            enter = collapseEnter(Alignment.Bottom),
-            exit = collapseExit(Alignment.Bottom),
+            enter = expandEnter(Alignment.Bottom),
+            exit = expandExit(Alignment.Bottom),
             modifier = Modifier.align(Alignment.BottomCenter)
                 .padding(bottom = barH + edge + bottomInset + 10.dp),
         ) {

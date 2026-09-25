@@ -494,7 +494,7 @@ internal fun PaletteEditorDialog(
                 // toggleOn/toggleOff haptics and the single-focus-stop TalkBack
                 // semantics that every other boolean setting in the app has.
                 ToggleRow("Custom secondary", useSecondary) { useSecondary = it }
-                AnimatedVisibility(useSecondary, enter = collapseEnter(), exit = collapseExit()) {
+                AnimatedVisibility(useSecondary, enter = expandEnter(), exit = expandExit()) {
                     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         Text(
                             "Secondary colour",
@@ -511,7 +511,7 @@ internal fun PaletteEditorDialog(
                 // toggleOn/toggleOff haptics and the single-focus-stop TalkBack
                 // semantics that every other boolean setting in the app has.
                 ToggleRow("Custom tertiary", useTertiary) { useTertiary = it }
-                AnimatedVisibility(useTertiary, enter = collapseEnter(), exit = collapseExit()) {
+                AnimatedVisibility(useTertiary, enter = expandEnter(), exit = expandExit()) {
                     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         Text(
                             "Tertiary colour",

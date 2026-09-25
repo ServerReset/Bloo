@@ -178,8 +178,8 @@ import androidx.compose.runtime.rememberCoroutineScope
  * Two things apply globally across the whole screen:
  *  - Simple vs. Advanced mode (`state.settingsMode`): every advanced-only
  *    card/section is wrapped in `AnimatedVisibility(visible =
- *    staggeredAdvancedVisible(advanced, index), enter = collapseEnter(),
- *    exit = collapseExit())` -- the SAME bounce-open/calm-close springs every
+ *    staggeredAdvancedVisible(advanced, index), enter = expandEnter(),
+ *    exit = expandExit())` -- the SAME bounce-open/calm-close springs every
  *    pebble in the garage uses, with `staggeredAdvancedVisible` giving each
  *    card a small index-based head start so switching into Advanced mode
  *    cascades card by card instead of all seven overshooting on the same
@@ -344,7 +344,7 @@ internal fun SettingsScreen(
             }
             run {
                 val advanced = state.settingsMode == "advanced"
-            // Every advanced-only card now uses the SAME collapseEnter()/collapseExit()
+            // Every advanced-only card now uses the SAME expandEnter()/expandExit()
             // every pebble in the garage uses (see UiTokens.kt) -- this used to be its
             // own bespoke, calmer spec (AdvancedModeStiffness) kept deliberately apart
             // from the pebble bounce because "it reveals a lot at once." That reasoning
@@ -356,7 +356,7 @@ internal fun SettingsScreen(
             // No `Arrangement.spacedBy` -- SettingsCard carries the gap itself, see there.
             //
             // And no `animateContentSize` on any of it either. Every card that changes
-            // height here already animates its own (collapseEnter/collapseExit's
+            // height here already animates its own (expandEnter/expandExit's
             // expandVertically/shrinkVertically, plus PebbleShell's own internal reveal --
             // SettingsCard is a thin wrapper around it now). Stacking a second,
             // independently-sprung height animation over one of these `item {}` blocks
@@ -608,7 +608,7 @@ internal fun SettingsScreen(
             // at the top of this grid now -- see that composable's own doc for why.
 
             // App-icon shortcuts (long-press the launcher icon)
-            AnimatedVisibility(visibleState = advTransition0, enter = collapseEnter(), exit = collapseExit()) {
+            AnimatedVisibility(visibleState = advTransition0, enter = expandEnter(), exit = expandExit()) {
                 SettingsCard("App shortcuts", Icons.Filled.Bolt, vm) {
                     // No inner MorphExpandButton any more -- this used to have its
                     // own second chevron gating the per-vehicle toggles below,
@@ -861,8 +861,8 @@ internal fun SettingsScreen(
                     }
                     AnimatedVisibility(
                         visible = showSyncDiagnostics,
-                        enter = collapseEnter(Alignment.Bottom),
-                        exit = collapseExit(Alignment.Bottom),
+                        enter = expandEnter(Alignment.Bottom),
+                        exit = expandExit(Alignment.Bottom),
                     ) {
                         Column {
                             Spacer(Modifier.height(SettingsGapRow))
@@ -928,7 +928,7 @@ internal fun SettingsScreen(
                 // fallback (moving settings by hand, a local backup outside
                 // Drive) next to the always-on automatic sync above, which is
                 // what most people actually want and shouldn't be buried.
-                AnimatedVisibility(visible = staggeredAdvancedVisible(advanced, 1), enter = collapseEnter(), exit = collapseExit()) {
+                AnimatedVisibility(visible = staggeredAdvancedVisible(advanced, 1), enter = expandEnter(), exit = expandExit()) {
                   Column {
                     Spacer(Modifier.height(SettingsGapGroup))
                     HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
@@ -978,7 +978,7 @@ internal fun SettingsScreen(
             // Debug -- app/device diagnostics for support troubleshooting. A power-user
             // diagnostic card like Logs, and it takes its OWN slot in this screen's stagger
             // sequence rather than sharing Logs': the two animate independently.
-            AnimatedVisibility(visibleState = advTransition1, enter = collapseEnter(), exit = collapseExit()) {
+            AnimatedVisibility(visibleState = advTransition1, enter = expandEnter(), exit = expandExit()) {
             SettingsCard("Debug", Icons.Filled.BugReport, vm) {
                 DebugSettingsPanel(
                     onCopyToClipboard = { text ->
@@ -1067,7 +1067,7 @@ internal fun SettingsScreen(
             if (advTransition2.targetState || !advTransition2.isIdle) item {
 
             // Logs
-            AnimatedVisibility(visibleState = advTransition2, enter = collapseEnter(), exit = collapseExit()) {
+            AnimatedVisibility(visibleState = advTransition2, enter = expandEnter(), exit = expandExit()) {
             SettingsCard("Logs", Icons.Filled.Info, vm) {
                 // No local expand state any more. The card's OWN chevron (PebbleShell's, via
                 // SettingsCard) already governs this body -- nothing inside a collapsed card is
@@ -1518,7 +1518,7 @@ internal fun SettingsScreen(
                 // Aurora's motion sub-option is power-user territory, not
                 // something a simple-mode user needs (the built-in solid-surface
                 // background covers everyone else).
-                AnimatedVisibility(visible = staggeredAdvancedVisible(advanced, 5), enter = collapseEnter(), exit = collapseExit()) {
+                AnimatedVisibility(visible = staggeredAdvancedVisible(advanced, 5), enter = expandEnter(), exit = expandExit()) {
                   Column {
                     Spacer(Modifier.height(SettingsGapRow))
                     ToggleRow("Aurora background", appearance.auroraBackground) { vm.setAuroraBackground(it) }
@@ -1533,8 +1533,8 @@ internal fun SettingsScreen(
                     // toggle above flipped on.
                     AnimatedVisibility(
                         visible = appearance.auroraBackground,
-                        enter = collapseEnter(),
-                        exit = collapseExit(),
+                        enter = expandEnter(),
+                        exit = expandExit(),
                     ) {
                         Column {
                             Spacer(Modifier.height(SettingsGapRow))
@@ -1552,7 +1552,7 @@ internal fun SettingsScreen(
                     }
                   }
                 }
-                AnimatedVisibility(visible = staggeredAdvancedVisible(advanced, 6), enter = collapseEnter(), exit = collapseExit()) {
+                AnimatedVisibility(visible = staggeredAdvancedVisible(advanced, 6), enter = expandEnter(), exit = expandExit()) {
                   // AnimatedVisibility lays out a single child, not an implicit
                   // Column of its content lambda's composables -- without this
                   // wrapper the Spacer/Divider/Toggle/Slider siblings below would
@@ -1569,8 +1569,8 @@ internal fun SettingsScreen(
                     )
                     AnimatedVisibility(
                         visible = !appearance.dynamicColor,
-                        enter = collapseEnter(),
-                        exit = collapseExit(),
+                        enter = expandEnter(),
+                        exit = expandExit(),
                     ) {
                         Column {
                             Spacer(Modifier.height(SettingsGapRow))

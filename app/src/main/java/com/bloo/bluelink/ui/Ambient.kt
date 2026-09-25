@@ -390,8 +390,8 @@ internal fun LoginScreen(
                     // even though its sign-in also goes through OTP).
                     AnimatedVisibility(
                         visible = brand.requiresPin,
-                        enter = collapseEnter(Alignment.Bottom),
-                        exit = collapseExit(Alignment.Bottom),
+                        enter = expandEnter(Alignment.Bottom),
+                        exit = expandExit(Alignment.Bottom),
                     ) {
                         Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
                             Text("Service PIN", style = MaterialTheme.typography.bodySmall, color = scheme.onSurfaceVariant)
