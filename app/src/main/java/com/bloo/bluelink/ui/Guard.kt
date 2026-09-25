@@ -333,15 +333,13 @@ internal fun LockOverlay(vm: AppViewModel, opaqueBackdrop: Boolean = false) {
                 ) {
                     Column(Modifier.padding(horizontal = 24.dp, vertical = 20.dp)) {
                         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-                            Box(
-                                Modifier
-                                    .size(46.dp)
-                                    .clip(CircleShape)
-                                    .background(MaterialTheme.colorScheme.primaryContainer),
-                                contentAlignment = Alignment.Center,
-                            ) {
-                                Icon(Icons.Filled.Lock, contentDescription = null, tint = MaterialTheme.colorScheme.onPrimaryContainer)
-                            }
+                            IconBadge(
+                                AppIcons.Lock,
+                                tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                                containerColor = MaterialTheme.colorScheme.primaryContainer,
+                                size = 46.dp,
+                                iconSize = 24.dp,
+                            )
                             Column {
                                 Text(
                                     "Enter your PIN",
@@ -568,19 +566,13 @@ internal fun GarageStatusCard(state: State<UiState>, vm: AppViewModel, hazeState
                     // SettingsHeader.kt) -- one badge treatment for "an icon summarizing this
                     // card's state," not a one-off radial-gradient glow of its own.
                     val badgeTint = if (loadFailed) scheme.error else scheme.onSurfaceVariant
-                    Box(
-                        Modifier
-                            .size(64.dp)
-                            .background(badgeTint.copy(alpha = 0.15f), CircleShape),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        Icon(
-                            icon,
-                            contentDescription = null,
-                            modifier = Modifier.size(32.dp),
-                            tint = badgeTint,
-                        )
-                    }
+                    IconBadge(
+                        icon,
+                        tint = badgeTint,
+                        containerColor = badgeTint.copy(alpha = 0.15f),
+                        size = 64.dp,
+                        iconSize = 32.dp,
+                    )
                     Text(
                         headline,
                         style = MaterialTheme.typography.headlineSmall,

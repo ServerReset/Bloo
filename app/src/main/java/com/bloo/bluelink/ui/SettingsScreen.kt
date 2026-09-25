@@ -93,6 +93,7 @@ import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material.icons.filled.MyLocation
 import androidx.compose.material.icons.filled.Place
+import androidx.compose.material.icons.filled.Smartphone
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.onClick
 import androidx.compose.ui.semantics.heading
@@ -954,7 +955,7 @@ internal fun SettingsScreen(
                 AnimatedVisibility(visible = staggeredAdvancedVisible(advanced, 1), enter = expandEnter(), exit = expandExit()) {
                   Column {
                     Spacer(Modifier.height(SettingsGapGroup))
-                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
+                    SectionDivider()
                     Spacer(Modifier.height(SettingsGapGroup))
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         ThemedIcon(Icons.Filled.Description, tint = MaterialTheme.colorScheme.onSurfaceVariant, size = 20.dp)
@@ -1141,7 +1142,7 @@ internal fun SettingsScreen(
                 }
                 Column {
                     Spacer(Modifier.height(SettingsGapHairline))
-                        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
+                        SectionDivider()
                         Spacer(Modifier.height(SettingsGapHairline))
                         val logScroll = rememberScrollState()
                         SelectionContainer {
@@ -1263,7 +1264,7 @@ internal fun SettingsScreen(
                     }
                     }
                 }
-                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+                SectionDivider(alpha = 0.5f)
                 Spacer(Modifier.height(SettingsGapRow))
 
                 ToggleRow("Service due alerts", notif.service) { vm.setNotifyService(it) }
@@ -1425,7 +1426,7 @@ internal fun SettingsScreen(
                 // Separate from the biometric rows above because it is a second,
                 // independent mechanism, not a mode of the first one.
                 Spacer(Modifier.height(SettingsGapGroup))
-                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+                SectionDivider(alpha = 0.4f)
                 Spacer(Modifier.height(SettingsGapHairline))
                 var pinDialog by remember { mutableStateOf<String?>(null) }
                 val pinSet = state.appPinSet
@@ -1573,7 +1574,7 @@ internal fun SettingsScreen(
                   // all stack on top of each other instead of flowing vertically.
                   Column {
                     Spacer(Modifier.height(SettingsGapGroup))
-                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
+                    SectionDivider()
                     Spacer(Modifier.height(SettingsGapRow))
                     ToggleRow("Dynamic color (Material You)", appearance.dynamicColor) { vm.setDynamicColor(it) }
                     BodySmallText(
@@ -1928,13 +1929,13 @@ private fun CreditRow(entry: CreditEntry) {
         Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(14.dp),
     ) {
-        Surface(
-            shape = CircleShape,
-            color = MaterialTheme.colorScheme.secondaryContainer,
-            contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
-        ) {
-            Icon(entry.icon, contentDescription = null, modifier = Modifier.padding(10.dp).size(20.dp))
-        }
+        IconBadge(
+            entry.icon,
+            tint = MaterialTheme.colorScheme.onSecondaryContainer,
+            containerColor = MaterialTheme.colorScheme.secondaryContainer,
+            size = 40.dp,
+            iconSize = 20.dp,
+        )
         Column(Modifier.weight(1f)) {
             Text(entry.name, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
             Spacer(Modifier.height(2.dp))

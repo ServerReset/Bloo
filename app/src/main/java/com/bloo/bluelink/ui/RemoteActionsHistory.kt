@@ -160,10 +160,7 @@ internal fun RemoteActionsInline(actions: List<RemoteAction>, max: Int = 6) {
     ) {
         // A hairline between the controls and the history, so the revealed panel reads as a
         // second section of the same pebble rather than loose text under the buttons.
-        HorizontalDivider(
-            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f),
-            modifier = Modifier.padding(bottom = 6.dp),
-        )
+        SectionDivider(alpha = 0.35f, modifier = Modifier.padding(bottom = 6.dp))
         if (actions.isEmpty()) {
             // NOT nothing. This panel is revealed by pressing the pebble's background -- a
             // gesture with no chrome to announce it -- so drawing nothing for a car that has

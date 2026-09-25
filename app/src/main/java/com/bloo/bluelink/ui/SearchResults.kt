@@ -427,20 +427,12 @@ internal fun SettingsSearchResults(
                         // the update pebble and settings hero stats use -- these cards used
                         // to open straight on bold text with nothing to distinguish a
                         // toggle-able setting from an informational readout at a glance.
-                        Box(
-                            Modifier
-                                .size(28.dp)
-                                .clip(CircleShape)
-                                .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.14f)),
-                            contentAlignment = Alignment.Center,
-                        ) {
-                            Icon(
-                                Icons.Filled.Search,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.size(15.dp),
-                            )
-                        }
+                        IconBadge(
+                            AppIcons.Search,
+                            tint = MaterialTheme.colorScheme.primary,
+                            size = 28.dp,
+                            iconSize = 15.dp,
+                        )
                         Spacer(Modifier.width(12.dp))
                         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                             Text(e.title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
@@ -460,20 +452,12 @@ internal fun SettingsSearchResults(
                 modifier = Modifier.fillMaxWidth(),
             ) {
                 Row(Modifier.padding(16.dp)) {
-                    Box(
-                        Modifier
-                            .size(28.dp)
-                            .clip(CircleShape)
-                            .background(MaterialTheme.colorScheme.secondary.copy(alpha = 0.14f)),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        Icon(
-                            cmd.icon,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.secondary,
-                            modifier = Modifier.size(15.dp),
-                        )
-                    }
+                    IconBadge(
+                        cmd.icon,
+                        tint = MaterialTheme.colorScheme.secondary,
+                        size = 28.dp,
+                        iconSize = 15.dp,
+                    )
                     Spacer(Modifier.width(12.dp))
                     Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                         Text(cmd.title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)

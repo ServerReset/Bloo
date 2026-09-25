@@ -264,19 +264,13 @@ internal fun SettingsHeroCard(state: UiState, vm: AppViewModel, compact: Boolean
     ) {
         Column(Modifier.padding(if (compact) 16.dp else 20.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Box(
-                    Modifier
-                        .size(if (compact) 40.dp else 48.dp)
-                        .clip(CircleShape)
-                        .background(MaterialTheme.colorScheme.secondaryContainer),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Icon(
-                        Icons.Filled.Settings,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onSecondaryContainer,
-                    )
-                }
+                IconBadge(
+                    AppIcons.Settings,
+                    tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                    containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                    size = if (compact) 40.dp else 48.dp,
+                    iconSize = 24.dp,
+                )
                 Spacer(Modifier.width(12.dp))
                 Column(Modifier.weight(1f)) {
                     Text(

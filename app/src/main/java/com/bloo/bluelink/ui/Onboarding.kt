@@ -821,20 +821,12 @@ internal fun OnboardingSetupCard(
     ) {
         Column(Modifier.padding16(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                Box(
-                    Modifier
-                        .size(40.dp)
-                        .clip(CircleShape)
-                        .background(if (done) scheme.primaryContainer else scheme.surfaceContainerHighest),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Icon(
-                        if (done) AppIcons.CheckCircle else icon,
-                        contentDescription = null,
-                        tint = if (done) scheme.onPrimaryContainer else scheme.primary,
-                        modifier = Modifier.size(20.dp),
-                    )
-                }
+                IconBadge(
+                    if (done) AppIcons.CheckCircle else icon,
+                    tint = if (done) scheme.onPrimaryContainer else scheme.primary,
+                    containerColor = if (done) scheme.primaryContainer else scheme.surfaceContainerHighest,
+                    iconSize = 20.dp,
+                )
                 Column(Modifier.weight(1f)) {
                     Text(title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = scheme.onSurface)
                     MutedText(body)
@@ -864,25 +856,17 @@ internal fun OnboardingTipCard(icon: ImageVector, title: String, body: String) {
         color = scheme.surfaceContainerHigh,
         modifier = Modifier.fillMaxWidth(),
     ) {
-        Row(
-            Modifier.padding(14.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(14.dp),
-        ) {
-            // The same leading-circle icon badge the search results list, the update pebble,
-            // and the settings hero stats all already use -- a bare tinted icon here was the
-            // one place left still doing it differently for no reason tied to this screen.
-            Box(
-                Modifier.size(28.dp).clip(CircleShape).background(scheme.primary.copy(alpha = 0.14f)),
-                contentAlignment = Alignment.Center,
-            ) {
-                Icon(icon, contentDescription = null, tint = scheme.primary, modifier = Modifier.size(15.dp))
-            }
-            Column {
-                Text(title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
-                MutedText(body)
-            }
-        }
+        // The same leading-circle icon badge the search results list, the update pebble,
+        // and the settings hero stats all already use -- a bare tinted icon here was the
+        // one place left still doing it differently for no reason tied to this screen.
+        IconLeadRow(
+            icon,
+            tint = scheme.primary,
+            title = title,
+            subtitle = body,
+            badgeSize = 28.dp,
+            modifier = Modifier.padding(14.dp),
+        )
     }
 }
 
@@ -943,7 +927,7 @@ internal fun OnboardingCarPage(
                 .padding(horizontal = 12.dp, vertical = 4.dp),
         ) {
             SeatPositions.forEachIndexed { i, pos ->
-                if (i > 0) HorizontalDivider(color = scheme.outlineVariant.copy(alpha = 0.35f))
+                if (i > 0) SectionDivider(alpha = 0.35f)
                 // The shared SeatConfigRow (Rows.kt) -- the exact row, with the exact
                 // signature, that the per-car Settings card renders. The wizard used to keep
                 // its own copy (WizardSeatRow + WizardToggleChip): same label + Heat/Cool
@@ -1360,7 +1344,7 @@ internal fun WizardSeatsPage(
         verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
         SeatPositions.forEachIndexed { i, pos ->
-            if (i > 0) HorizontalDivider(color = scheme.outlineVariant.copy(alpha = 0.5f))
+            if (i > 0) SectionDivider(alpha = 0.5f)
             // SeatConfigRow (Rows.kt), as on the car page above -- see its comment there
             // for why the wizard no longer keeps its own copy of this row.
             SeatConfigRow(pos.label, pos.heat(seats), pos.cool(seats),

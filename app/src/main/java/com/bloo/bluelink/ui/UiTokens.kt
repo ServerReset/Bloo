@@ -25,14 +25,26 @@ import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxScope
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.weight
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.DirectionsCar
 import androidx.compose.material.icons.filled.Info
@@ -58,12 +70,15 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.TransformOrigin
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.layout.Measured
 import androidx.compose.ui.layout.VerticalAlignmentLine
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 
@@ -208,6 +223,7 @@ object AppIcons {
   val Search = Search
   val Refresh = Refresh
   val Check = Check
+  val CheckCircle = CheckCircle
   val LockOpen = LockOpen
   val Info = Info
   val DirectionsCar = DirectionsCar
@@ -912,6 +928,90 @@ internal fun ThemedIcon(
         modifier = modifier.size(size),
         tint = tint,
     )
+}
+
+/**
+ * A circular tinted badge, the "icon gets its own coloured circle" treatment used all over
+ * the app (settings card headers, onboarding steps, search result rows, the update pebble).
+ * [content] is a plain [Icon] in the common case, but takes a full `@Composable` slot so
+ * sites that animate the icon (e.g. `AnimatedContent` between install-state icons) can still
+ * share the same circle/size/tint chrome instead of hand-rolling it.
+ */
+@Composable
+internal fun IconBadge(
+    modifier: Modifier = Modifier,
+    containerColor: Color,
+    size: Dp = 40.dp,
+    content: @Composable BoxScope.() -> Unit,
+) {
+    Box(
+        modifier.size(size).clip(CircleShape).background(containerColor),
+        contentAlignment = Alignment.Center,
+        content = content,
+    )
+}
+
+/**
+ * [IconBadge] pre-filled with a single centered [Icon] -- the common case. [containerColor]
+ * defaults to a 14%-alpha tint of [tint] itself (the "soft tonal chip" look used by search
+ * results and the update pebble); pass an explicit container colour (e.g. a *Container role)
+ * for the "solid tonal circle" look settings headers and onboarding steps use instead.
+ */
+@Composable
+internal fun IconBadge(
+    icon: ImageVector,
+    tint: Color,
+    modifier: Modifier = Modifier,
+    containerColor: Color = tint.copy(alpha = 0.14f),
+    size: Dp = 40.dp,
+    iconSize: Dp = size * 0.5f,
+) {
+    IconBadge(modifier = modifier, containerColor = containerColor, size = size) {
+        Icon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(iconSize))
+    }
+}
+
+/**
+ * The "[IconBadge] leading a title + optional muted subtitle, with the text column claiming
+ * the rest of the row" skeleton -- copied verbatim across settings card headers, onboarding
+ * step rows, search results and the guard PIN prompt before this existed. [trailing] is an
+ * optional slot after the text column (a chevron, a switch, a status chip).
+ */
+@Composable
+internal fun IconLeadRow(
+    icon: ImageVector,
+    tint: Color,
+    title: String,
+    modifier: Modifier = Modifier,
+    subtitle: String? = null,
+    containerColor: Color = tint.copy(alpha = 0.14f),
+    badgeSize: Dp = 40.dp,
+    titleColor: Color = MaterialTheme.colorScheme.onSurface,
+    trailing: @Composable (() -> Unit)? = null,
+) {
+    Row(
+        modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        IconBadge(icon, tint, containerColor = containerColor, size = badgeSize)
+        Column(Modifier.weight(1f)) {
+            Text(title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = titleColor)
+            if (subtitle != null) MutedText(subtitle)
+        }
+        trailing?.invoke()
+    }
+}
+
+/**
+ * A [HorizontalDivider] at the app's standard faint weight. [SettingsScreen] alone had this
+ * spelled out inline six separate times with the alpha drifting between 0.3/0.4/0.5 from
+ * site to site with no apparent reason -- one call site, one alpha, chosen as the most
+ * common of the three.
+ */
+@Composable
+internal fun SectionDivider(modifier: Modifier = Modifier, alpha: Float = 0.3f) {
+    HorizontalDivider(modifier = modifier, color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = alpha))
 }
 
 /**
