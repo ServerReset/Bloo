@@ -418,9 +418,8 @@ internal fun SettingsScreen(
                 )
                 Spacer(Modifier.height(SettingsGapGroup))
                 if (state.accounts.isEmpty()) {
-                    Text(
+                    BodyMediumText(
                         "Not signed in",
-                        style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
@@ -441,7 +440,7 @@ internal fun SettingsScreen(
                         }
                     }
                     Column(verticalArrangement = Arrangement.spacedBy(SettingsGapRow)) {
-                        Text(creds.brand.label, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                        Text(creds.brand.label, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
                         StatusRow("Email", creds.email)
                         SecretRow("Password", creds.password)
                         // Kia US has no service PIN; commands are session-keyed.
@@ -506,11 +505,9 @@ internal fun SettingsScreen(
                         interactionSource = addAccountSource,
                     )
                 }
-                Text(
+                BodySmallText(
                     "If commands fail with a locked PIN, fix the Service PIN above. Too " +
                         "many wrong-PIN attempts lock it for a few minutes server-side.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(top = 8.dp),
                 )
             }
@@ -623,13 +620,11 @@ internal fun SettingsScreen(
                     // says "On-device AI" with its own on/off status, so a third "On-device
                     // AI" here said the same thing a third time and told you nothing new.
                     ToggleRow("Gemini Nano", state.aiEnabled) { vm.setAiEnabled(it) }
-                    Text(
+                    BodySmallText(
                         "Adds an AI summary pebble to each car and lets you ask the search " +
                             "box plain questions like \"what's the odometer\". Summaries refresh " +
                             "on their own when you open a car, refresh its status, or send a " +
                             "command -- everything runs privately on your device.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
             }
@@ -641,7 +636,7 @@ internal fun SettingsScreen(
 
             // App-icon shortcuts (long-press the launcher icon)
             AnimatedVisibility(visibleState = advTransition0, enter = expandEnter(), exit = expandExit()) {
-                SettingsCard("App shortcuts", Icons.Filled.Bolt, vm) {
+                SettingsCard("App shortcuts", AppIcons.Bolt, vm) {
                     // No inner MorphExpandButton any more -- this used to have its
                     // own second chevron gating the per-vehicle toggles below,
                     // stacked directly under the card's own PebbleShell chevron
@@ -650,10 +645,8 @@ internal fun SettingsScreen(
                     // toggle was the ONLY way to fold this away). Now that the
                     // card itself opens and closes, a second tap just to see the
                     // toggles it opened FOR was two controls doing one job.
-                    Text(
+                    BodySmallText(
                         "Quick-access shortcuts from the launcher icon",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                     Spacer(Modifier.height(SettingsGapRow))
                     state.vehicles.forEach { v ->
@@ -677,11 +670,10 @@ internal fun SettingsScreen(
                     "Open Charge Map API Key",
                     style = MaterialTheme.typography.titleSmall,
                     fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface,
                 )
-                Text(
+                BodySmallText(
                     "Required to show nearby EV chargers on the expanded map. Get a free key at openchargemap.org (My Profile → My Apps).",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 Spacer(Modifier.height(SettingsGapRow))
                 var keyInput by remember { mutableStateOf(appearance.chargerApiKey ?: "") }
@@ -823,9 +815,8 @@ internal fun SettingsScreen(
                                 modifier = Modifier.size(18.dp),
                             )
                             Spacer(Modifier.width(10.dp))
-                            Text(
+                            BodySmallText(
                                 err,
-                                style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onErrorContainer,
                                 modifier = Modifier.weight(1f),
                             )
@@ -968,13 +959,11 @@ internal fun SettingsScreen(
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         ThemedIcon(Icons.Filled.Description, tint = MaterialTheme.colorScheme.onSurfaceVariant, size = 20.dp)
                         Spacer(Modifier.width(8.dp))
-                        Text("Manual backup", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
+                        Text("Manual backup", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
                     }
                     Spacer(Modifier.height(SettingsGapRow))
-                    Text(
+                    BodySmallText(
                         "A one-time snapshot file. Credentials are never included.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                     Spacer(Modifier.height(SettingsGapRow))
                     ExpressiveButtonRow(modifier = Modifier.fillMaxWidth(), spacing = 8.dp) {
@@ -1110,10 +1099,9 @@ internal fun SettingsScreen(
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     ThemedIcon(Icons.Filled.Info, tint = MaterialTheme.colorScheme.onSurfaceVariant, size = 18.dp)
                     Spacer(Modifier.width(8.dp))
-                    Text(
+                    BodyMediumText(
                         "Activity log  ·  $lineCount lines",
-                        Modifier.weight(1f),
-                        style = MaterialTheme.typography.bodyMedium,
+                        modifier = Modifier.weight(1f),
                     )
                     // Always present now: they used to appear only once the inner disclosure
                     // was opened, which is exactly the second step that made this card feel
@@ -1170,9 +1158,8 @@ internal fun SettingsScreen(
                         }
                         Spacer(Modifier.height(SettingsGapHairline))
                         if (lineCount > 0) {
-                            Text(
+                            LabelSmallText(
                                 "Earliest entries at the top. The newest $lineCount lines are shown.",
-                                style = MaterialTheme.typography.labelSmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
                             )
                         }
@@ -1427,9 +1414,8 @@ internal fun SettingsScreen(
                         },
                     )
                 } else {
-                    Text(
+                    BodyMediumText(
                         "No fingerprint/biometric is enrolled on this device.",
-                        style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
@@ -1450,13 +1436,11 @@ internal fun SettingsScreen(
                     status = if (pinSet) "On · 4-8 digits" else "Off",
                 )
                 Spacer(Modifier.height(SettingsGapHairline))
-                Text(
+                BodySmallText(
                     if (canBio)
                         "A 4-8 digit PIN that works as a backup when fingerprints aren't available."
                     else
                         "This device has no fingerprints, so the app unlocks with this PIN.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 Spacer(Modifier.height(SettingsGapGroup))
                 ExpressiveButtonRow(spacing = 8.dp) {
@@ -1554,10 +1538,8 @@ internal fun SettingsScreen(
                   Column {
                     Spacer(Modifier.height(SettingsGapRow))
                     ToggleRow("Aurora background", appearance.auroraBackground) { vm.setAuroraBackground(it) }
-                    Text(
+                    BodySmallText(
                         "Show a gradient aurora behind the content instead of a solid surface.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                     // Same AnimatedVisibility-wraps-a-Column idiom as the dynamic-
                     // color section below, instead of a bare `if` -- this whole
@@ -1594,10 +1576,8 @@ internal fun SettingsScreen(
                     HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
                     Spacer(Modifier.height(SettingsGapRow))
                     ToggleRow("Dynamic color (Material You)", appearance.dynamicColor) { vm.setDynamicColor(it) }
-                    Text(
+                    BodySmallText(
                         "Uses your wallpaper palette on Android 12+. Turn off to choose a built-in palette below.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                     AnimatedVisibility(
                         visible = !appearance.dynamicColor,

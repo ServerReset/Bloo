@@ -543,7 +543,7 @@ internal fun UpdateStatusLine(
         state.updateDownloading -> Triple(Icons.Filled.Download, "downloading", scheme.onSurfaceVariant)
         state.updateApkReady && seamless -> Triple(Icons.Filled.CheckCircle, "ready_seamless", ChargeGreen)
         state.updateApkReady -> Triple(Icons.Filled.CheckCircle, "ready", ChargeGreen)
-        seamless -> Triple(Icons.Filled.Bolt, "seamless", scheme.onSurfaceVariant)
+        seamless -> Triple(AppIcons.Bolt, "seamless", scheme.onSurfaceVariant)
         else -> Triple(Icons.Filled.SystemUpdate, "update", scheme.primary)
     }
     // Sprung, not a snap -- the tint is what carries "this got a step further along"
