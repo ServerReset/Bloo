@@ -80,6 +80,10 @@ internal fun ChargerFilterBar(
     onSetMinKw: (Int) -> Unit,
     onToggleNetwork: (String) -> Unit,
     onRetry: () -> Unit,
+    /** Saves a new Open Charge Map API key and re-runs the search -- see
+     *  [AppViewModel.setChargerApiKey]'s own doc. Blank/no-op until the field holds
+     *  something, since an empty key would just fail the retry the same way. */
+    onSetApiKey: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     // Recomputed only when the fetch itself changes (a new List instance), not on every
@@ -101,11 +105,37 @@ internal fun ChargerFilterBar(
                     overflow = TextOverflow.Ellipsis,
                 )
                 Spacer(Modifier.height(SettingsGapHairline))
-                Text(
-                    "Open Charge Map needs a free API key per app. Add it in Settings > Map & Navigation.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
+                MutedText("Open Charge Map needs a free API key per app -- paste one below.")
+                Spacer(Modifier.height(SettingsGapRow))
+                // Inline, not a bounce to Settings: a missing/invalid key is the single most
+                // likely cause of this exact error, and the whole point of surfacing it here
+                // (rather than just the error string) is to let it be fixed without losing the
+                // map's own current pan/zoom to a screen navigation. Save re-runs the search
+                // immediately (onSetApiKey -> AppViewModel.setChargerApiKey's own `around`),
+                // so a good key clears this error on the very next frame.
+                var apiKeyInput by remember(error) { mutableStateOf("") }
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    OutlinedTextField(
+                        value = apiKeyInput,
+                        onValueChange = { apiKeyInput = it },
+                        placeholder = { Text("Paste API key") },
+                        singleLine = true,
+                        shape = FieldShape,
+                        colors = borderlessFieldColors(),
+                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                        keyboardActions = KeyboardActions(onDone = {
+                            if (apiKeyInput.isNotBlank()) onSetApiKey(apiKeyInput)
+                        }),
+                        modifier = Modifier.weight(1f),
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    MorphTextButton(
+                        "Save",
+                        onClick = { onSetApiKey(apiKeyInput) },
+                        enabled = apiKeyInput.isNotBlank(),
+                        showIcon = false,
+                    )
+                }
                 Spacer(Modifier.height(SettingsGapRow))
                 MorphTextButton("Retry", onClick = onRetry, showIcon = false, modifier = Modifier.fillMaxWidth())
             } else {

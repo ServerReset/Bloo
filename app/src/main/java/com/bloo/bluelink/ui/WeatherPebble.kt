@@ -1833,6 +1833,7 @@ internal fun ExpandableMapLayer(
                             onSetMinKw = onSetChargerMinKw,
                             onToggleNetwork = onToggleChargerNetwork,
                             onRetry = onRetryChargers,
+                            onSetApiKey = onSetChargerApiKey,
                             modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
                         )
                     }

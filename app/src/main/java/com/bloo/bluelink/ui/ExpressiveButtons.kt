@@ -751,8 +751,22 @@ fun ExpressiveButtonGroup(
                 lineHeight[li] = idx.maxOf { out[it]!!.height }
             }
 
-            val width = (lineWidth.maxOrNull() ?: 0)
-                .coerceIn(constraints.minWidth, constraints.maxWidth)
+            // Bounded (e.g. Modifier.fillMaxWidth()) means the caller handed this group a real
+            // width to occupy -- [horizontalAlignment]'s own doc is explicit that this is exactly
+            // the "content narrower than the space it was given" case it exists to handle. Using
+            // `lineWidth` (the members' own summed content width) here instead of the given room
+            // was the bug: whenever the fit rule above compacted members down to icon-only (or
+            // any other case that leaves room unclaimed, e.g. no weighted member to soak up spare
+            // space), this Layout reported itself as content-sized, so a `fillMaxWidth()` row of
+            // buttons silently shrank to a narrow content-hugging cluster instead of actually
+            // spanning the width its parent gave it -- reported directly as the expanded map's
+            // bottom button row (which compacts to icon-only once a third feature is added) no
+            // longer stretching full width.
+            val width = if (constraints.hasBoundedWidth) {
+                constraints.maxWidth.coerceAtLeast(constraints.minWidth)
+            } else {
+                (lineWidth.maxOrNull() ?: 0).coerceIn(constraints.minWidth, constraints.maxWidth)
+            }
             val height = (lineHeight.sum() + lineGapPx * (lines.size - 1).coerceAtLeast(0))
                 .coerceIn(constraints.minHeight, constraints.maxHeight)
             layout(width, height) {
