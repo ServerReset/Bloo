@@ -278,7 +278,7 @@ internal fun OnboardingScreen(vm: AppViewModel) {
             val progress = if (steps.size > 1) pageIndex.toFloat() / lastIndex.toFloat() else 1f
             val animatedProgress by animateFloatAsState(progress, tween(WizardProgressDurationMs), label = "onboardProgress")
             Row(
-                Modifier.fillMaxWidth().padding(horizontal = 24.dp),
+                Modifier.fillMaxWidth().paddingHorizontal24(),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Box(
@@ -320,7 +320,7 @@ internal fun OnboardingScreen(vm: AppViewModel) {
                     Modifier
                         .fillMaxSize()
                         .verticalScroll(rememberScrollState())
-                        .padding(horizontal = 24.dp),
+                        .paddingHorizontal24(),
                 ) {
                     Column(
                         Modifier.fillMaxWidth().padding(top = 20.dp, bottom = 110.dp),
@@ -345,7 +345,7 @@ internal fun OnboardingScreen(vm: AppViewModel) {
             Row(
                 Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 24.dp, vertical = 16.dp),
+                    .paddingHorizontal24Vertical16(),
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 AnimatedVisibility(
@@ -473,7 +473,7 @@ internal fun SyncChoiceScreen(vm: AppViewModel) {
                 .statusBarsPadding()
                 .navigationBarsPadding()
                 .verticalScroll(rememberScrollState())
-                .padding(horizontal = 24.dp),
+                .paddingHorizontal24(),
             verticalArrangement = Arrangement.Center,
         ) {
             Text("🔄", style = MaterialTheme.typography.displaySmall)
@@ -823,7 +823,7 @@ internal fun OnboardingSetupCard(
         color = scheme.surfaceContainerHigh,
         modifier = Modifier.fillMaxWidth(),
     ) {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Column(Modifier.padding16(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 Box(
                     Modifier
@@ -1144,7 +1144,7 @@ internal fun CarFeatureWizard(
                 val pg = pages.getOrNull(idx) ?: return@AnimatedContent
                 val veh = pg.vin?.let { vin -> state.vehicles.firstOrNull { it.vin == vin } }
                 val sc = veh?.let { state.seatConfigs[it.vin] } ?: com.bloo.bluelink.data.SeatConfig()
-                Box(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(24.dp)) {
+                Box(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding24()) {
                     Column(
                         Modifier.fillMaxWidth().padding(bottom = 100.dp),
                         verticalArrangement = Arrangement.spacedBy(20.dp),
@@ -1163,7 +1163,7 @@ internal fun CarFeatureWizard(
             Row(
                 Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 24.dp, vertical = 16.dp),
+                    .paddingHorizontal24Vertical16(),
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 AnimatedVisibility(
@@ -1360,7 +1360,7 @@ internal fun WizardSeatsPage(
             .fillMaxWidth()
             .clip(RoundedCornerShape(16.dp))
             .background(scheme.surfaceContainerHigh)
-            .padding(16.dp),
+            .padding16(),
         verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
         SeatPositions.forEachIndexed { i, pos ->
@@ -1418,7 +1418,7 @@ internal fun WizardSteeringPage(
             .background(scheme.surfaceContainerHigh)
             // The horizontal inset used to live on the hand-rolled row itself; ToggleRow
             // (like every settings control) leaves its container to supply it.
-            .padding(horizontal = 16.dp, vertical = 12.dp),
+            .paddingHorizontal16Vertical12(),
     ) {
         // ToggleRow with its own `description`, not the hand-rolled WizardFeatureToggle
         // that used to live below this: that row already drew MorphToggleTrack and
