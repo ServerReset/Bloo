@@ -348,7 +348,7 @@ internal fun LoginScreen(
                         },
                         label = "emailLabel",
                     ) { label ->
-                        Text(label, style = MaterialTheme.typography.bodySmall, color = scheme.onSurfaceVariant)
+                        MutedText(label)
                     }
                     OutlinedTextField(
                         value = email,
@@ -362,7 +362,7 @@ internal fun LoginScreen(
                         modifier = Modifier.fillMaxWidth(),
                     )
 
-                    Text("Password", style = MaterialTheme.typography.bodySmall, color = scheme.onSurfaceVariant)
+                    MutedText("Password")
                     OutlinedTextField(
                         value = password,
                         onValueChange = { password = it },
@@ -394,7 +394,7 @@ internal fun LoginScreen(
                         exit = expandExit(Alignment.Bottom),
                     ) {
                         Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
-                            Text("Service PIN", style = MaterialTheme.typography.bodySmall, color = scheme.onSurfaceVariant)
+                            MutedText("Service PIN")
                             OutlinedTextField(
                                 value = pin,
                                 onValueChange = { pin = it },
