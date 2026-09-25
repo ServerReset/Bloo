@@ -163,7 +163,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     // anything a constructor does (opening SharedPreferences, resolving DataStore files,
     // building an ML Kit client) is on the critical path to the first frame.
     private val store = com.bloo.bluelink.data.StartupTrace.trace("SessionStore()") { SessionStore(app) }
-    private val settingsStore = com.bloo.bluelink.data.StartupTrace.trace("SettingsStore()") { SettingsStore(app) }
+    internal val settingsStore = com.bloo.bluelink.data.StartupTrace.trace("SettingsStore()") { SettingsStore(app) }
     private val credentialStore = com.bloo.bluelink.data.StartupTrace.trace("CredentialStore()") { CredentialStore(app) }
     private val snapshotStore = com.bloo.bluelink.data.StartupTrace.trace("SnapshotStore()") { SnapshotStore(app) }
     private val statusCache = com.bloo.bluelink.data.StartupTrace.trace("StatusCache()") { StatusCache(app) }
@@ -171,7 +171,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     // One repository per signed-in brand (any mix of brands can be active).
     private val repos = mutableMapOf<Brand, VehicleRepository>()
 
-    private fun repoFor(brand: Brand): VehicleRepository =
+    internal fun repoFor(brand: Brand): VehicleRepository =
         repos.getOrPut(brand) { com.bloo.bluelink.data.repositoryFor(brand, store, credentialStore) }
 
     private fun kiaRepo(): KiaRepository = repoFor(Brand.KIA) as KiaRepository
@@ -181,7 +181,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     private fun brandOf(v: Vehicle): Brand =
         Brand.fromIndicator(v.brandIndicator)
 
-    private fun repoFor(v: Vehicle): VehicleRepository = repoFor(brandOf(v))
+    internal fun repoFor(v: Vehicle): VehicleRepository = repoFor(brandOf(v))
 
     @Volatile
     private var loadingGarage = false
@@ -201,7 +201,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     @Volatile
     private var deferredStatusLoad = false
 
-    private val _state = MutableStateFlow(UiState())
+    internal val _state = MutableStateFlow(UiState())
     val state: StateFlow<UiState> = _state.asStateFlow()
 
     /**
@@ -209,7 +209,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
      * worker via [com.bloo.bluelink.data.BlueLinkGate]). Blue Link rejects
      * overlapping requests with `502 ... a previous request is pending`.
      */
-    private val statusMutex = com.bloo.bluelink.data.BlueLinkGate.statusMutex
+    internal val statusMutex = com.bloo.bluelink.data.BlueLinkGate.statusMutex
 
     /** Status requests currently queued or running, keyed "vin:refresh"
      *  (de-dupes; a live refresh=true isn't dropped behind a background
@@ -327,7 +327,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     fun setNotifyChargeComplete(v: Boolean) = viewModelScope.launch { settingsStore.setNotifyChargeComplete(v) }
 
     /** Write the current live status/location maps to disk (survives restart). */
-    private fun persistCache() {
+    internal fun persistCache() {
         val s = _state.value
         viewModelScope.launch {
             statusCache.save(s.statuses, s.locations, s.placeNames, s.lastFetched)
@@ -1391,7 +1391,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
      *  shortcut set the caller needs separately for [com.bloo.bluelink.Shortcuts.refresh]. */
     private class PerCarConfig(val apply: (UiState) -> UiState, val shortcutSet: Set<String>?)
 
-    private suspend fun refreshLocalCarConfig() {
+    internal suspend fun refreshLocalCarConfig() {
         // ONE Preferences read for every per-car setting below, instead of one per
         // getter per car. See SettingsStore.snapshot().
         val prefs = settingsStore.snapshot()
@@ -2063,7 +2063,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    private suspend fun persistSnapshots(vehicles: List<Vehicle> = _state.value.vehicles) {
+    internal suspend fun persistSnapshots(vehicles: List<Vehicle> = _state.value.vehicles) {
         snapshotStore.saveVehicles(vehicles.map { snapshotOf(it, _state.value.statuses[it.vin], _state.value) })
         refreshLiveChargeBar(vehicles)
     }
@@ -2560,7 +2560,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
      * Silent: no "refresh first" nudge and no error toast, since the user didn't
      * explicitly ask — they can always tap Summarize for the surfaced version.
      */
-    private fun autoSummarize(v: Vehicle) {
+    internal fun autoSummarize(v: Vehicle) {
         val s = _state.value
         if (!s.aiSupported || !s.aiEnabled) return
         if (v.vin in s.aiBusy) return
@@ -2860,7 +2860,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
      * "Locate" only ever refreshed the CAR's position, leaving this one stale until the
      * next unrelated refresh happened to touch it.
      */
-    private fun refreshDeviceLocation() {
+    internal fun refreshDeviceLocation() {
         viewModelScope.launch {
             val loc = com.bloo.bluelink.autolock.LocationHelper.currentLocation(getApplication()) ?: return@launch
             _state.update {
@@ -2882,128 +2882,13 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    private var liveLocationJob: kotlinx.coroutines.Job? = null
+    internal var liveLocationJob: kotlinx.coroutines.Job? = null
 
     /** The in-flight [loadNearbyChargers] fetch, if any -- see its own doc for why a
      *  superseded one is cancelled outright rather than just having its result ignored. */
-    private var chargerJob: kotlinx.coroutines.Job? = null
+    internal var chargerJob: kotlinx.coroutines.Job? = null
 
-    /**
-     * Starts a continuous [UiState.deviceLocation] subscription -- see
-     * [com.bloo.bluelink.autolock.LocationHelper.liveUpdates] -- for the rest
-     * of this ViewModel's (i.e. the app's) lifetime. Reported directly: the
-     * map's own "you are here" dot and weather's distance-to-car only ever
-     * reflected wherever the phone was at the last pull-to-refresh, not
-     * "every minute or two while inside the app" as asked for. Called once
-     * from [loadGarageInner] (app open); no matching stop call exists on
-     * purpose -- same as the one-shot [refreshDeviceLocation], this rides out
-     * the process's own lifetime rather than a composable's.
-     *
-     * [restart] forces a fresh subscription even if one is already "active". Needed
-     * because [com.bloo.bluelink.autolock.LocationHelper.liveUpdates] emits nothing at
-     * all without permission but never actually completes either (its own doc explains
-     * why) -- so a job started before the user had granted ACCESS_FINE_LOCATION sits
-     * "active" forever, silently producing nothing, and the plain no-arg guard below
-     * would refuse to ever replace it even once permission exists. [rememberLocateAction]
-     * passes true right after a fresh grant so the live dot actually starts working that
-     * same session instead of needing an app restart -- reported as "the map still
-     * doesn't show the location of the phone" even after granting the permission.
-     */
-    fun beginLiveDeviceLocation(restart: Boolean = false) {
-        if (!restart && liveLocationJob?.isActive == true) return
-        liveLocationJob?.cancel()
-        liveLocationJob = viewModelScope.launch {
-            // See MIN_DEVICE_LOCATION_INTERVAL_MS/_MOVE_METERS' own doc -- a real device OOM
-            // crash traced back to this collector publishing every raw fused-location callback
-            // verbatim, which a burst of near-identical fixes (GPS jitter, or the provider
-            // "catching up" right after its first-ever fix) turned into hundreds of genuinely
-            // distinct GeoLocation values in under a second, each one recomposing LocationPebble
-            // (and, on a real report, its whole host page) via its own stateSlice.
-            var lastPublished: android.location.Location? = null
-            var lastPublishedAtMs = 0L
-            com.bloo.bluelink.autolock.LocationHelper.liveUpdates(getApplication()).collect { loc ->
-                val now = System.currentTimeMillis()
-                val last = lastPublished
-                val tooSoonAndTooClose = last != null &&
-                    now - lastPublishedAtMs < MIN_DEVICE_LOCATION_INTERVAL_MS &&
-                    last.distanceTo(loc) < MIN_DEVICE_LOCATION_MOVE_METERS
-                if (tooSoonAndTooClose) return@collect
-                lastPublished = loc
-                lastPublishedAtMs = now
-                _state.update {
-                    it.copy(
-                        deviceLocation = GeoLocation(
-                            loc.latitude,
-                            loc.longitude,
-                            if (loc.hasSpeed()) loc.speed.toDouble() else null,
-                        ),
-                    )
-                }
-                weather.refreshDeviceLocationForWeather(loc)
-            }
-        }
-    }
-
-    fun locate(v: Vehicle) = runCommand(v.vin, "locate", "Location updated", optimistic = null) {
-        // "Locate" is the one button whose entire job is refreshing a position -- the
-        // car's, below -- so it refreshes the DEVICE's own right alongside it. Fire-and-
-        // forget: a slow/missing device fix must not delay or fail the car locate this
-        // command exists for.
-        refreshDeviceLocation()
-        // The GPS rides along with a status refresh (this is what the official app
-        // uses); prefer it over the heavily rate-limited findMyCar, which is the
-        // thing that throws "exceeded the daily remote service request limit".
-        val s = repoFor(v).status(v, refresh = true)
-        s?.let { st ->
-            // Advance lastFetched too (like loadStatus does) -- otherwise the
-            // card's "updated X ago" stays stuck at the old time and maybeRelock's
-            // stale check can wrongly nudge "pull to refresh" right after a Locate.
-            _state.update {
-                it.copy(
-                    statuses = it.statuses + (v.vin to st),
-                    lastFetched = it.lastFetched + (v.vin to System.currentTimeMillis()),
-                )
-            }
-        }
-        val statusLoc = s.toGeoLocation()
-        // Only hit the rate-limited findMyCar if the status carried no GPS. If it
-        // then fails (e.g. the daily locate limit) but we already have a fix, keep
-        // showing that rather than throwing a scary error.
-        val hadCached = _state.value.locations[v.vin] != null
-        val loc = statusLoc ?: try {
-            repoFor(v).location(v)
-        } catch (e: BlueLinkException) {
-            if (hadCached) null else throw e
-        }
-        when {
-            loc != null -> {
-                _state.update { it.copy(locations = it.locations + (v.vin to loc)) }
-                reverseGeocode(loc)?.let { place ->
-                    _state.update {
-                        it.copy(
-                            placeNames = it.placeNames + (v.vin to place.full),
-                            placeZips = it.placeZips + (v.vin to place.compact),
-                        )
-                    }
-                }
-                loadCarWeather(v, force = true)
-                persistCache()
-                // persistCache() writes the PHONE's own status cache (statusCache) so the
-                // next cold start shows this fix. It does not touch SnapshotStore, which is
-                // what the snapshot surfaces read -- so Locate updated the
-                // map on screen and nothing else, until the next status refresh happened to
-                // run persistSnapshots() for another reason. Publish it here too.
-                persistSnapshots()
-            }
-            hadCached -> _state.update {
-                it.copy(message = "Showing last-known location. A live locate is over today's limit. Try again later.", messageType = "info")
-            }
-            else -> throw BlueLinkException(
-                "Couldn't get the car's location. It may be asleep, out of coverage, or over " +
-                    "the daily location-lookup limit. Try again later.",
-            )
-        }
-    }
+    // beginLiveDeviceLocation / locate moved to AppViewModelCommands.kt.
 
     /**
      * Turn a lat/lon into a short human-readable place name (a neighbourhood or city).
@@ -3021,314 +2906,12 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
      * timeout it was defending could not fire around a blocking call anyway. Both
      * points are addressed where the implementation now lives.
      */
-    private suspend fun reverseGeocode(loc: GeoLocation): com.bloo.bluelink.data.GeocodedPlace? =
+    internal suspend fun reverseGeocode(loc: GeoLocation): com.bloo.bluelink.data.GeocodedPlace? =
         com.bloo.bluelink.data.reverseGeocode(getApplication(), loc.latitude, loc.longitude)
 
-    // --- Commands (per-action pending + optimistic state flip) -----------
-    //
-    // Every remote command below (lock/unlock, lights, climate, charging) is a
-    // thin one-liner that just calls runCommand with:
-    //   - a "vin:action" key so its own pending-spinner / MIN_COMMAND_LOCK_MS
-    //     double-tap guard is independent of every other action on the car
-    //     (locking doesn't block a simultaneous climate command, etc.),
-    //   - a success message logged to AppLog and surfaced as a toast,
-    //   - an optional "optimistic" lambda that patches the cached
-    //     VehicleStatus immediately (before the network call returns) so the
-    //     UI flips state right away instead of waiting out a full round trip
-    //     -- null for commands with no simple boolean to flip (lights,
-    //     charge-limit), and
-    //   - the suspend `block` that actually calls the repository.
-    // See runCommand's own doc comment below for exactly how the pending set,
-    // the optimistic patch, the statusMutex serialization, and the failure
-    // rollback (a follow-up refreshStatus) all fit together.
-
-    /**
-     * The endpoint family (EV vs ICE) is chosen from [v.isEv], but the user can
-     * mark a car as a plug-in hybrid that the API reports as gas. Honour that so
-     * PHEVs use the EV climate/charge endpoints.
-     */
-
-    // Lock/unlock share the "doors" action key, so a lock command in flight
-    // blocks a rapid-fire unlock (and vice versa) rather than letting them
-    // race each other through the API. Each optimistically flips
-    // VehicleStatus.doorLock the instant the command is accepted.
-    fun lock(v: Vehicle) = runCommand(v.vin, "doors", "Locked", { it.copy(doorLock = true) }) { repoFor(v).lock(v) }
-    fun unlock(v: Vehicle) = runCommand(v.vin, "doors", "Unlocked", { it.copy(doorLock = false) }) { repoFor(v).unlock(v) }
-
-    // Both share the "hornLights" action key (only one can run at a time) and
-    // have no boolean toggle to optimistically flip -- these are momentary
-    // actions (the car doesn't have a persistent "lights are flashing" state
-    // worth reflecting), so `optimistic` is null and the UI only shows the
-    // pending spinner until the command completes.
-    fun flashLights(v: Vehicle) = runCommand(v.vin, "hornLights", "Lights flashing", null) { repoFor(v).flashLights(v) }
-    fun hornAndLights(v: Vehicle) = runCommand(v.vin, "hornLights", "Horn & lights", null) { repoFor(v).hornAndLights(v) }
-
-    /** Turn climate off; optimistically flips [VehicleStatus.airCtrlOn] to
-     *  false so the climate toggle in the UI responds immediately. Also cancels
-     *  any pending [ClimateExtendWorker] chain for this car -- otherwise a
-     *  scheduled follow-up command from an earlier, longer request could fire
-     *  minutes later and silently turn climate back on after the user just
-     *  turned it off. */
-    fun stopClimate(v: Vehicle) =
-        runCommand(v.vin, "climate", "Climate off", { it.copy(airCtrlOn = false) }) {
-            com.bloo.bluelink.work.ClimateExtendWorker.cancel(getApplication(), v.vin)
-            repoFor(v).stopClimate(v)
-        }
-
-    /**
-     * Start climate with the given [req] (temp/duration/defrost/seat
-     * heating/etc). Shares the "climate" action key with [stopClimate] so
-     * starting and stopping can't race each other on the same car.
-     *
-     * The vendor API caps a single remote-start command's duration at
-     * [com.bloo.bluelink.data.CLIMATE_DURATION_RANGE]'s upper bound (10
-     * minutes) -- there's no such thing as a car-side "run for 25 minutes"
-     * command. A longer [req.durationMinutes] (the "Run time" slider now goes
-     * up to [com.bloo.bluelink.data.CLIMATE_EXTENDED_DURATION_RANGE]'s 30) is
-     * chained instead: [com.bloo.bluelink.data.climateChunks] splits it into
-     * chunks the car CAN run one at a time, this sends the first chunk right
-     * now same as ever, and schedules [ClimateExtendWorker] to send each
-     * following chunk the moment the one before it elapses -- so from the
-     * car's perspective climate just keeps running past what any single
-     * command could hold it at.
-     */
-    fun startClimate(v: Vehicle, req: ClimateRequest) =
-        // degLabel, not an inline "°F". req.tempF is a °F Int, but this status label was
-        // appending "°F" unconditionally -- so a metric user saw "Climate on (72°F)" while every
-        // other temperature in the app respected their unit. degLabel converts and suffixes per
-        // the chosen unit, and owns the rounding rule the rest of the app already routes through.
-        runCommand(
-            v.vin,
-            "climate",
-            "Climate on (${com.bloo.bluelink.data.degLabel(
-                req.tempF.toString(),
-                fahrenheit = appearance.value.unitSystem != "metric",
-            )})",
-            { it.copy(airCtrlOn = true) },
-        ) {
-            val chunks = com.bloo.bluelink.data.climateChunks(req.durationMinutes)
-            // Unchanged behavior for every request already within the single-
-            // command cap: chunks is just [req.durationMinutes] and this is
-            // the same call it always was.
-            repoFor(v).startClimate(v, req.copy(durationMinutes = chunks.first()))
-            val remaining = chunks.drop(1).sum()
-            val ctx = getApplication<android.app.Application>()
-            if (remaining > 0) {
-                com.bloo.bluelink.work.ClimateExtendWorker.schedule(
-                    context = ctx,
-                    vin = v.vin,
-                    remainingMinutes = remaining,
-                    tempF = req.tempF,
-                    defrost = req.defrost,
-                    steeringWheelHeat = req.steeringWheelHeat.apiValue,
-                    seatFrontLeft = req.seatFrontLeft.apiValue,
-                    seatFrontRight = req.seatFrontRight.apiValue,
-                    seatRearLeft = req.seatRearLeft.apiValue,
-                    seatRearRight = req.seatRearRight.apiValue,
-                    delayMinutes = chunks.first(),
-                )
-            } else {
-                // This request alone covers everything -- clear any chain a
-                // PRIOR, longer-running request might still have pending, so
-                // it can't extend climate past what this shorter run intends.
-                com.bloo.bluelink.work.ClimateExtendWorker.cancel(ctx, v.vin)
-            }
-        }
-
-    // startCharge/stopCharge/setChargeLimits all route the vehicle through
-    // electric(v) before calling the repository -- unlike the commands above,
-    // these hit EV-only endpoints, so a car the user has manually marked as a
-    // PHEV (which the API itself may still report as gas/isEv=false) needs
-    // isEv forced true here or the call would go to the wrong (ICE) endpoint.
-
-    /**
-     * One-tap climate, for surfaces with no room for the full Climate pebble
-     * (the flip cover's action bar).
-     *
-     * Starting climate needs a whole [ClimateRequest]; every other one-tap
-     * surface resolves that the same way, from the car's last-saved settings (see
-     * [com.bloo.bluelink.data.CarAction.TOGGLE_CLIMATE]). This does the same
-     * rather than inventing a second answer, falling back to a plain 72F /
-     * 10-minute run only when the car has never had climate configured at all.
-     */
-    fun toggleClimate(v: Vehicle) {
-        if (_state.value.statusFor(v)?.airCtrlOn == true) {
-            stopClimate(v)
-            return
-        }
-        viewModelScope.launch {
-            val saved = runCatching { loadSavedClimate(v) }.getOrNull()
-            startClimate(v, saved ?: ClimateRequest(tempF = 72, defrost = false, durationMinutes = 10))
-        }
-    }
-
-    /** Begin charging; optimistically sets [VehicleStatus.evStatus]'s
-     *  batteryCharge to true (a no-op patch if evStatus is itself null, since
-     *  the nested `?.copy` on a null receiver stays null). */
-    fun startCharge(v: Vehicle) =
-        runCommand(v.vin, "charge", "Charging", { it.copy(evStatus = it.evStatus?.copy(batteryCharge = true)) }) {
-            repoFor(v).startCharge(electric(v, _state.value))
-        }
-
-    /** Stop charging; mirrors [startCharge]'s optimistic-patch shape but with
-     *  the flag flipped false. Shares the "charge" action key with it. */
-    fun stopCharge(v: Vehicle) =
-        runCommand(v.vin, "charge", "Charging stopped", { it.copy(evStatus = it.evStatus?.copy(batteryCharge = false)) }) {
-            repoFor(v).stopCharge(electric(v, _state.value))
-        }
-
-    /** Set the AC (slow/L2) and DC (fast) charge-target percentages. Its own
-     *  "chargeLimit" action key (distinct from "charge") so setting limits
-     *  doesn't block a concurrent start/stop-charge tap, and vice versa; no
-     *  optimistic patch since VehicleStatus doesn't carry a single field that
-     *  maps cleanly onto "the limits are now X/Y" the way charging on/off does. */
-    fun setChargeLimits(v: Vehicle, acPercent: Int, dcPercent: Int) =
-        runCommand(
-            v.vin, "chargeLimit", "Charge limits set (AC $acPercent% / DC $dcPercent%)",
-            // Optimistic, like every other command here. The limit isn't just a
-            // number in a settings row any more -- it's the seam in the hero's
-            // charge bar, and the Point on the live notification. Waiting for a round-trip and
-            // a poll before any of those move makes tapping Set look like it
-            // did nothing. Reverted locally by runCommand if the car refuses.
-            { st ->
-                val ev = st.evStatus
-                if (ev == null) {
-                    st
-                } else {
-                    st.copy(
-                        evStatus = ev.copy(
-                            // Replaced wholesale rather than merged: these two
-                            // plug types are the entire list the API reports,
-                            // and setChargeTargets always sends both.
-                            reservChargeInfos = ReservChargeInfos(
-                                listOf(
-                                    TargetSOC(plugType = 0, targetSOClevel = dcPercent),
-                                    TargetSOC(plugType = 1, targetSOClevel = acPercent),
-                                ),
-                            ),
-                        ),
-                    )
-                }
-            },
-        ) {
-            repoFor(v).setChargeTargets(electric(v, _state.value), acPercent, dcPercent)
-        }
-
-    /**
-     * Runs a command tracking a per-action spinner. On success it logs, shows a
-     * message, and optimistically flips the cached status so the toggle updates.
-     */
-    private fun runCommand(
-        vin: String,
-        action: String,
-        success: String,
-        optimistic: ((VehicleStatus) -> VehicleStatus)?,
-        block: suspend () -> Unit,
-    ) {
-        val key = "$vin:$action"
-        viewModelScope.launch {
-            val startedAt = System.currentTimeMillis()
-            _state.update { it.copy(pending = it.pending + key, message = null) }
-            // Snapshot the pre-command status so a failed command can be reverted
-            // LOCALLY (no network) — see the catch block. Without this, a command
-            // that fails offline left the optimistic value ("Locked") persisted to
-            // the snapshot with no way back except a successful poll.
-            val prior = _state.value.statuses[vin]
-            // Apply the optimistic state and persist it immediately so the
-            // snapshot reflects the expected outcome before the network round-trip completes.
-            if (optimistic != null) {
-                _state.update { st ->
-                    if (st.statuses[vin] != null) {
-                        st.copy(statuses = st.statuses + (vin to optimistic(st.statuses.getValue(vin))))
-                    } else st
-                }
-                persistSnapshots()
-            }
-            try {
-                // Serialize with status fetches: Hyundai rejects overlapping
-                // requests with "a previous request is pending".
-                statusMutex.withLock { block() }
-                AppLog.log(success)
-                recordRemoteAction(vin, success, status = "Success")
-                // Confirm the optimistic state (or reapply if it wasn't set above).
-                _state.update { st ->
-                    val statuses = if (optimistic != null && st.statuses[vin] != null) {
-                        st.statuses + (vin to optimistic(st.statuses.getValue(vin)))
-                    } else {
-                        st.statuses
-                    }
-                    st.copy(statuses = statuses)
-                }
-                persistSnapshots()
-                // Auto-AI: a command changed the car's state, refresh the summary.
-                _state.value.vehicles.firstOrNull { it.vin == vin }?.let { autoSummarize(it) }
-            } catch (e: Exception) {
-                val msg = e.message ?: "Command failed"
-                recordRemoteAction(vin, success, status = "Failed", details = msg)
-                AppLog.log("⚠ $msg")
-                _state.update { it.copy(message = msg, messageType = "error") }
-                // Revert the optimistic flip LOCALLY first, then re-persist, so every
-                // surface (app + snapshot) returns to last-known-good
-                // immediately — without depending on a network refresh that will
-                // usually fail for the same reason the command did. Guarded on
-                // `prior != null` (a null prior means nothing was flipped, since the
-                // optimistic patch only applies when statuses[vin] != null; leave state
-                // untouched rather than dropping a status a concurrent poll just added).
-                if (optimistic != null && prior != null) {
-                    _state.update { st -> st.copy(statuses = st.statuses + (vin to prior)) }
-                    persistSnapshots()
-                }
-                // Still schedule a refresh as follow-up reconciliation: `prior` may be
-                // slightly stale vs live data, but if the refresh also fails/returns
-                // null every surface now sits at last-known-good, not the wrong value.
-                viewModelScope.launch {
-                    _state.value.vehicles.firstOrNull { it.vin == vin }?.let { refreshStatus(it) }
-                }
-            } finally {
-                // Keep the control locked for at least MIN_COMMAND_LOCK_MS after a
-                // command so a quick double-tap can't fire an overlapping request
-                // (which Hyundai rejects as "a previous request is pending").
-                val elapsed = System.currentTimeMillis() - startedAt
-                if (elapsed < MIN_COMMAND_LOCK_MS) {
-                    kotlinx.coroutines.delay(MIN_COMMAND_LOCK_MS - elapsed)
-                }
-                _state.update { it.copy(pending = it.pending - key) }
-            }
-        }
-    }
-
-    /** Appends one entry to [UiState.remoteActionHistory] for [vin], newest
-     *  first, keeping a rolling [REMOTE_ACTION_HISTORY_DAYS]-day window. Called from the two
-     *  places [runCommand] resolves (success/catch) -- every remote command
-     *  the app issues passes through there, so this one hook covers all of
-     *  them without touching each individual call site. */
-    private fun recordRemoteAction(vin: String, action: String, status: String, details: String? = null) {
-        val entry = RemoteAction(
-            id = java.util.UUID.randomUUID().toString(),
-            action = action,
-            timestamp = java.time.Instant.now().toString(),
-            status = status,
-            details = details,
-        )
-        // Pruned by AGE on every write, which is also what retires entries for a car that is
-        // simply not being used any more -- there is no other sweep, so if this did not do it
-        // nothing would. An unparseable timestamp is KEPT rather than dropped: it can only come
-        // from an entry this app wrote, and silently deleting history because a string did not
-        // parse is worse than carrying one stale row until the count backstop takes it.
-        val cutoff = java.time.Instant.now().minus(
-            java.time.Duration.ofDays(REMOTE_ACTION_HISTORY_DAYS),
-        )
-        _state.update { st ->
-            val existing = st.remoteActionHistory[vin].orEmpty()
-            val kept = (listOf(entry) + existing)
-                .filter { a ->
-                    runCatching { java.time.Instant.parse(a.timestamp).isAfter(cutoff) }
-                        .getOrDefault(true)
-                }
-                .take(REMOTE_ACTION_HISTORY_MAX)
-            st.copy(remoteActionHistory = st.remoteActionHistory + (vin to kept))
-        }
-    }
+    // lock / unlock / flashLights / hornAndLights / stopClimate / startClimate /
+    // toggleClimate / startCharge / stopCharge / setChargeLimits / runCommand /
+    // recordRemoteAction moved to AppViewModelCommands.kt.
 
     // --- Settings / nav --------------------------------------------------
 
@@ -3361,74 +2944,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    /** The expanded map's "Chargers" [MapFeature] -- toggles the layer on/off, and on
-     *  the way ON, fetches around [around] if nothing's loaded yet (or [force]s a
-     *  fresh fetch regardless, for a genuine re-search after panning far away). A
-     *  filter-only change (speed/network) never calls this -- see
-     *  [setChargerMinKw]/[toggleChargerNetwork], which re-filter the already-fetched
-     *  list instead of re-fetching. */
-    fun toggleChargersVisible(around: GeoLocation, force: Boolean = false) {
-        val showing = !_state.value.chargersVisible
-        _state.update { it.copy(chargersVisible = showing) }
-        if (showing && (force || _state.value.chargers.isEmpty())) loadNearbyChargers(around)
-    }
-
-    /** Fetches Open Charge Map stations around [around] and replaces [UiState.chargers]
-     *  wholesale. A genuine failure (see [com.bloo.bluelink.data.ChargerApi.nearby]'s
-     *  own doc -- null, not an empty list) surfaces as [UiState.chargersError] instead
-     *  of silently looking like "zero chargers nearby": that exact confusion is a real
-     *  report, from a search that actually failed for lack of an API key. */
-    fun loadNearbyChargers(around: GeoLocation) {
-        // Cancels a still-running SUPERSEDED fetch outright -- reachable from a quick
-        // double-tap on "Chargers" (off/on before the first fetch lands) or two "Retry"
-        // taps in a row -- rather than letting it complete and just discarding its
-        // result: the same liveLocationJob/pushJob shape already used elsewhere in this
-        // class for "a newer call supersedes an in-flight one."
-        chargerJob?.cancel()
-        _state.update { it.copy(chargersLoading = true, chargersError = null) }
-        chargerJob = viewModelScope.launch {
-            val stations = com.bloo.bluelink.data.ChargerApi.nearby(
-                around.latitude,
-                around.longitude,
-                apiKey = appearance.value.chargerApiKey,
-            )
-            _state.update {
-                if (stations != null) {
-                    it.copy(chargers = stations, chargersLoading = false, chargersError = null)
-                } else {
-                    it.copy(chargersLoading = false, chargersError = "Couldn't reach the charger directory")
-                }
-            }
-        }
-    }
-
-    /** Saves the user's own Open Charge Map API key (blank/null clears it) and, when
-     *  [around] is known (the map's retry UI has a location; Settings' own "save key"
-     *  field doesn't), re-runs the last search with it -- see
-     *  [SettingsStore.setChargerApiKey]'s and [SettingsStore.Appearance.chargerApiKey]'s
-     *  own docs. */
-    fun setChargerApiKey(key: String?, around: GeoLocation?) {
-        viewModelScope.launch {
-            settingsStore.setChargerApiKey(key)
-            if (around != null) loadNearbyChargers(around)
-        }
-    }
-
-    /** 0 clears the speed filter entirely ("any speed"). */
-    fun setChargerMinKw(kw: Int) {
-        _state.update { it.copy(chargerFilters = it.chargerFilters.copy(minKw = kw)) }
-    }
-
-    /** Toggles one network name in/out of the filter's allow-list -- an empty
-     *  resulting set means "any network", not "no networks match", matching
-     *  [com.bloo.bluelink.data.ChargerFilters]'s own doc. */
-    fun toggleChargerNetwork(network: String) {
-        _state.update {
-            val current = it.chargerFilters.networks
-            val next = if (network in current) current - network else current + network
-            it.copy(chargerFilters = it.chargerFilters.copy(networks = next))
-        }
-    }
+    // toggleChargersVisible / loadNearbyChargers / setChargerApiKey / setChargerMinKw /
+    // toggleChargerNetwork moved to AppViewModelChargers.kt (extension functions).
 
     // Appearance/preference setters (setThemeMode through setColorPalette,
     // and again setPebbleOutline/setAuroraBackground/.../setUnitSystem further
@@ -3438,186 +2955,14 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     // picks up the change automatically once the DataStore write completes
     // and that Flow re-emits. setDynamicColor is the exception
     // that does extra work (see its own comment).
-    fun setThemeMode(mode: ThemeMode) = viewModelScope.launch {
-        settingsStore.setThemeMode(mode)
-    }
-    fun setFontChoice(choice: FontChoice) = viewModelScope.launch { settingsStore.setFontChoice(choice) }
-    fun setDynamicColor(enabled: Boolean) = viewModelScope.launch { settingsStore.setDynamicColor(enabled) }
-    fun setColorPalette(palette: ColorPalette) = viewModelScope.launch { settingsStore.setColorPalette(palette) }
-    fun saveCustomPalette(palette: CustomPaletteData) = viewModelScope.launch { settingsStore.saveCustomPalette(palette) }
-    fun deleteCustomPalette(id: String) = viewModelScope.launch { settingsStore.deleteCustomPalette(id) }
-    fun setActiveCustomPaletteId(id: String?) = viewModelScope.launch { settingsStore.setActiveCustomPaletteId(id) }
+    // setThemeMode / setFontChoice / setDynamicColor / setColorPalette / saveCustomPalette /
+    // deleteCustomPalette / setActiveCustomPaletteId moved to AppViewModelAppearance.kt.
 
-    /**
-     * Share a full settings backup (includes colours and palettes) via the share
-     * sheet, as a real file — not raw EXTRA_TEXT, which most file-saving targets
-     * (Drive, Files, email attachments) don't accept as a share destination at
-     * all, silently limiting "Export" to text-only apps and defeating the whole
-     * point of producing something "Restore" can later read back in.
-     */
-    fun exportSettings(context: android.content.Context) = viewModelScope.launch {
-        val json = settingsStore.exportSettingsJson()
-        val uri = withContext(Dispatchers.IO) {
-            runCatching {
-                val dir = java.io.File(context.cacheDir, "exports").apply { mkdirs() }
-                val file = java.io.File(dir, "bloo_settings_backup.json")
-                file.writeText(json)
-                androidx.core.content.FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
-            }.getOrNull()
-        }
-        if (uri == null) {
-            _state.update { it.copy(message = "Couldn't prepare the backup file") }
-            return@launch
-        }
-        runCatching {
-            val intent = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
-                type = "application/json"
-                putExtra(android.content.Intent.EXTRA_STREAM, uri)
-                putExtra(android.content.Intent.EXTRA_SUBJECT, "Bloo settings backup")
-                addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
-            }
-            context.startActivity(
-                android.content.Intent.createChooser(intent, "Export settings")
-                    .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK),
-            )
-            AppLog.log("Settings exported")
-        }.onFailure { _state.update { s -> s.copy(message = "Couldn't open the share sheet") } }
-    }
-
-    /** Restore a full settings backup from a user-picked JSON file. */
-    fun importSettings(context: android.content.Context, uri: android.net.Uri) = viewModelScope.launch {
-        val json = withContext(Dispatchers.IO) {
-            runCatching { context.contentResolver.openInputStream(uri)?.use { it.bufferedReader().readText() } }.getOrNull()
-        }
-        if (json == null) {
-            _state.update { it.copy(message = "Couldn't read that file") }
-            AppLog.log("⚠ Settings import: could not read file")
-            return@launch
-        }
-        val error = settingsStore.importSettingsJson(json)
-        AppLog.log(if (error == null) "Settings imported from backup" else "⚠ Settings import: $error")
-        _state.update { it.copy(message = error ?: "Settings restored", messageType = if (error == null) "success" else "error") }
-        if (error == null) {
-            // Refresh the already-loaded vehicles' local config (seats, powertrain,
-            // photo, ...) so the UI reflects the restore immediately instead of
-            // waiting for some unrelated event to trigger a full garage reload.
-            refreshLocalCarConfig()
-        }
-    }
-
-    /** Set up auto-sync: store a Drive URI for automatic backup on each refresh. */
-    fun setSyncUri(uri: android.net.Uri) = viewModelScope.launch {
-        val granted = runCatching {
-            getApplication<android.app.Application>().contentResolver.takePersistableUriPermission(
-                uri,
-                android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION or android.content.Intent.FLAG_GRANT_WRITE_URI_PERMISSION,
-            )
-        }.isSuccess
-        if (!granted) {
-            // Without a PERSISTED grant, this session's temporary read/write
-            // access from the picker intent works until the process dies, then
-            // every sync attempt fails with a SecurityException forever with no
-            // obvious fix in sight -- refuse to enable sync at all instead of
-            // silently setting up something that's guaranteed to break later.
-            AppLog.log("⚠ Drive sync: couldn't get persistent access to that file")
-            _state.update { it.copy(message = "Couldn't get lasting access to that file. Try picking it again", messageType = "error") }
-            return@launch
-        }
-        AppLog.log("Drive auto-sync enabled")
-        // Reset per-file sync gate state BEFORE pointing at the (possibly new) file:
-        // stale hash/synced-ever/lastSync/dirty from a previous file would block
-        // adoption of and convergence with this one. This also re-arms join-adopt
-        // (synced_ever=false), so if the picked file already has content (e.g. the
-        // user pointed "Save to Drive" at an existing Bloo file) this device adopts
-        // it; a brand-new empty file has nothing to adopt and just receives our
-        // upload — either way correct.
-        settingsStore.resetSyncStateForNewFile()
-        settingsStore.setSyncUri(uri.toString())
-        _state.update { it.copy(syncUri = uri.toString()) }
-        // Push this device's settings to the file right away instead of
-        // waiting for the next unrelated refresh cycle to complete -- see
-        // runDriveSyncNow's doc comment for why that matters.
-        runDriveSyncNow()
-    }
-
-    /** Disable auto-sync. */
-    fun clearSyncUri() = viewModelScope.launch {
-        settingsStore.setSyncUri(null)
-        // Also drop any stale error (in-memory AND persisted) so re-enabling
-        // sync later doesn't briefly show an error from the previous, now-
-        // disabled setup before the first new sync attempt completes.
-        settingsStore.setLastSyncError(null)
-        _state.update { it.copy(syncUri = null, syncError = null) }
-        AppLog.log("Drive auto-sync disabled")
-    }
-
-    /** Join an existing Drive sync file and set up auto-sync to it.
-     *
-     * Adoption now happens through [SettingsStore.performMainToMainSync]'s **join-adopt**
-     * path (a device that has never synced THIS file fully adopts it as the source
-     * of truth), NOT a separate up-front `importSettingsJson`. That's the actual bug
-     * fix: the old explicit import routed through `editTracked`, which marked every
-     * imported key dirty, so the very first sync pass then "protected" all of them
-     * and the device never converged with the primary. We only need to (1) confirm
-     * the file is readable, (2) take a persisted grant, (3) reset per-file gate state
-     * so join-adopt arms, then (4) run one pass. */
-    fun importSettingsAndSync(context: android.content.Context, uri: android.net.Uri) = viewModelScope.launch {
-        importSettingsAndSyncSuspend(context, uri)
-    }
-
-    /**
-     * Suspending body of [importSettingsAndSync], split out so
-     * [restoreFromSyncThenContinue] can await the whole join (read, persisted
-     * grant, join-adopt pass, local-config refresh) before it re-resolves
-     * which screen to land on -- a plain `viewModelScope.launch` gives no way
-     * to know when that's actually finished. Returns whether the join
-     * succeeded (a persisted grant was obtained and the sync pass ran), not
-     * whether the picked file actually had anything to adopt.
-     */
-    private suspend fun importSettingsAndSyncSuspend(context: android.content.Context, uri: android.net.Uri): Boolean {
-        // Read once purely to confirm the file is reachable; do NOT import it here.
-        val readable = withContext(Dispatchers.IO) {
-            runCatching { context.contentResolver.openInputStream(uri)?.use { it.bufferedReader().readText() } }.isSuccess
-        }
-        if (!readable) AppLog.log("⚠ Drive sync: couldn't read the picked file (will still try to enable sync)")
-        val granted = runCatching {
-            getApplication<android.app.Application>().contentResolver.takePersistableUriPermission(
-                uri,
-                android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION or android.content.Intent.FLAG_GRANT_WRITE_URI_PERMISSION,
-            )
-        }.isSuccess
-        if (!granted) {
-            // Without a persisted grant, sync is guaranteed to start failing the
-            // moment this process dies, so don't claim auto-sync is enabled.
-            AppLog.log("⚠ Drive sync: couldn't get persistent access to that file")
-            _state.update {
-                it.copy(message = "Couldn't get lasting access to that file. Try picking it again", messageType = "error")
-            }
-            return false
-        }
-        // Reset per-file gate state so join-adopt arms for this file (synced_ever
-        // cleared), then point sync at it.
-        settingsStore.resetSyncStateForNewFile()
-        settingsStore.setSyncUri(uri.toString())
-        _state.update { it.copy(syncUri = uri.toString(), message = "Auto-sync enabled", messageType = "success") }
-        // One real pass now: performMainToMainSync join-adopts the file's settings (if it
-        // has any) and uploads. refreshLocalCarConfig() below reflects an adopted
-        // import into the already-loaded vehicles (seats/powertrain/photo) right away.
-        runDriveSyncNow()
-        if (_state.value.syncError == null) refreshLocalCarConfig()
-        return true
-    }
-
-    /** Set Wi-Fi only vs any network for auto-sync. */
-    fun setSyncWifiOnly(wifiOnly: Boolean) = viewModelScope.launch {
-        AppLog.log("Drive sync: ${if (wifiOnly) "Wi-Fi only" else "any network"}")
-        settingsStore.setSyncWifiOnly(wifiOnly)
-        _state.update { it.copy(syncWifiOnly = wifiOnly) }
-    }
+    // exportSettings / importSettings / setSyncUri / clearSyncUri / importSettingsAndSync /
+    // importSettingsAndSyncSuspend / setSyncWifiOnly moved to AppViewModelSync.kt.
 
     // --- Weather ---------------------------------------------------------
-    private val weather = WeatherController(getApplication(), settingsStore, _state, viewModelScope)
+    internal val weather = WeatherController(getApplication(), settingsStore, _state, viewModelScope)
 
     fun clearWeatherLocation() = weather.clearWeatherLocation()
     fun setWeatherPlace(query: String) = weather.setWeatherPlace(query)
@@ -3625,68 +2970,10 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     fun loadHomeWeather(force: Boolean = false) = weather.loadHomeWeather(force)
     fun loadCarWeather(v: Vehicle, force: Boolean = false) = weather.loadCarWeather(v, force)
 
-    /** Swap which dual-column side the "hot spot" pebble lives on. */
-    fun setColumnsFlipped(flipped: Boolean) = viewModelScope.launch { settingsStore.setColumnsFlipped(flipped) }
-
-    // Deferred variants for the settings sliders: these two values recompose
-    // ~the whole app (colorScheme / LocalDensity), so the commit waits a beat
-    // past slider release to let the settle-bounce animation get a clean run.
-    // In viewModelScope, not a screen-tied scope, so closing Settings inside
-    // that beat can't drop the change.
-    fun setUiScaleSoon(value: Float) =
-        viewModelScope.launch { settingsStore.setUiScale(value) }
-    fun setVibrancySoon(value: Float) =
-        viewModelScope.launch { settingsStore.setVibrancy(value) }
-    fun setHapticsEnabled(value: Boolean) = viewModelScope.launch { settingsStore.setHapticsEnabled(value) }
-
-    // More of the same appearance-setter pattern described above the
-    // setThemeMode group: DataStore write only, UI updates via the
-    // `appearance` StateFlow mirror. setAuroraMotion configures the animated
-    // background's speed; its colors always derive from the current theme.
-    fun setPebbleOutline(value: Boolean) = viewModelScope.launch { settingsStore.setPebbleOutline(value) }
-    fun setShowSearch(value: Boolean) = viewModelScope.launch { settingsStore.setShowSearch(value) }
-
-    /** Where the cover screen's floating search bubble was last dragged to (fractions
-     *  of its own drag range), or null if never dragged. See SettingsStore's own doc. */
-    suspend fun searchBubblePosition(): Pair<Float, Float>? = settingsStore.searchBubblePosition()
-    fun setSearchBubblePosition(xFrac: Float, yFrac: Float) =
-        viewModelScope.launch { settingsStore.setSearchBubblePosition(xFrac, yFrac) }
-
-    /** Toggle the opt-in Shizuku silent-install path (device-local; see SettingsStore).
-     *  Turning it ON prompts for the Shizuku permission immediately — that request is
-     *  also what makes Bloo appear in the Shizuku manager's app list (declaring the
-     *  provider alone isn't enough). If Shizuku isn't running, guide the user. */
-    fun setSeamlessInstallShizuku(value: Boolean) {
-        viewModelScope.launch { settingsStore.setSeamlessInstallShizuku(value) }
-        if (value) {
-            val installer = com.bloo.bluelink.update.ShizukuInstaller
-            if (installer.hasPermission()) return
-            val queued = installer.requestPermissionOnEnable(SHIZUKU_INSTALL_REQUEST_CODE)
-            if (!queued && !installer.isAvailable()) {
-                _state.update {
-                    it.copy(message = "Start Shizuku, then Bloo can install updates silently.", messageType = "info")
-                }
-            }
-        }
-    }
-
-    /** Re-probe Shizuku availability off the main thread (binder ping). Called from
-     *  init and on warm resume, so starting Shizuku while the app is open reveals the
-     *  "Updates" toggle without needing a cold restart. */
-    fun refreshShizukuAvailable() {
-        com.bloo.bluelink.data.StartupTrace.markIfStarting("Shizuku probe: begin")
-        viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
-            val avail = com.bloo.bluelink.update.ShizukuInstaller.isAvailable()
-            _state.update { it.copy(shizukuAvailable = avail) }
-        }
-    }
-
-    fun setAuroraBackground(value: Boolean) = viewModelScope.launch { settingsStore.setAuroraBackground(value) }
-
-    fun setAuroraMotion(value: String) = viewModelScope.launch { settingsStore.setAuroraMotion(value) }
-
-    /** Imperial vs. metric display throughout the app. */
-    fun setUnitSystem(value: String) = viewModelScope.launch { settingsStore.setUnitSystem(value) }
+    // setColumnsFlipped / setUiScaleSoon / setVibrancySoon / setHapticsEnabled /
+    // setPebbleOutline / setShowSearch / searchBubblePosition / setSearchBubblePosition /
+    // setSeamlessInstallShizuku / refreshShizukuAvailable / setAuroraBackground /
+    // setAuroraMotion / setUnitSystem moved to AppViewModelAppearance.kt.
 
     /** Wipe the in-memory activity log shown in Settings (not persisted, so
      *  nothing to clear on disk). */
@@ -3736,115 +3023,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    /** Manual "Sync now": force a full Drive push/pull right now. Available
-     *  whenever sync is configured (not just after a failure) so the user can
-     *  deliberately trigger a sync without waiting for a refresh or the 2h
-     *  worker tick. Surfaces the outcome as a snackbar. */
-    fun syncNow() {
-        if (_state.value.syncUri == null) return
-        viewModelScope.launch {
-            runDriveSyncNow()
-            val err = _state.value.syncError
-            if (err == null) reportInfo("Synced with Drive") else reportError("Sync failed: $err")
-        }
-    }
-
-    /** Designate [id] as the primary device (source of truth + tiebreaker). Persists
-     *  locally and writes it into the Drive file on the sync pass that follows, so
-     *  the choice propagates to every other device. */
-    fun setPrimaryDevice(id: String) {
-        viewModelScope.launch {
-            settingsStore.setPrimaryDevice(id)
-            _state.update { it.copy(syncPrimaryId = id) }
-            runDriveSyncNow()
-        }
-    }
-
-    /** "Pull from primary now": force this device to fully adopt the file's settings
-     *  on the next pass (the primary is the source of truth), then run it. */
-    fun pullFromPrimary() {
-        if (_state.value.syncUri == null) return
-        viewModelScope.launch {
-            settingsStore.requestPullFromPrimary()
-            runDriveSyncNow()
-            val err = _state.value.syncError
-            if (err == null) reportInfo("Pulled the latest settings") else reportError("Couldn't pull: $err")
-        }
-    }
-
-    /** Rename THIS device in the sync registry. Persists locally and republishes on
-     *  the next sync pass (name changes ride the registry heartbeat). */
-    fun renameThisDevice(name: String) {
-        viewModelScope.launch {
-            settingsStore.setSyncDeviceName(name)
-            _state.update { it.copy(syncDeviceName = name.trim()) }
-            runDriveSyncNow()
-        }
-    }
-
-    /**
-     * "Kick" [id] out of the synced-devices list -- see [SettingsStore.removeSyncedDevice]'s
-     * own doc for why this is a courtesy prune (a device that syncs again simply
-     * reappears in the list, the same way a stale one would after 90 days) rather
-     * than a permanent ban. Persists locally for instant UI feedback (the row
-     * disappears before any round trip completes) and writes the removal into the
-     * Drive file on the sync pass that follows -- same shape as setPrimaryDevice
-     * and renameThisDevice above.
-     */
-    fun removeSyncedDevice(id: String) {
-        viewModelScope.launch {
-            settingsStore.removeSyncedDevice(id)
-            _state.update { it.copy(syncDevices = it.syncDevices.filterNot { d -> d.id == id }) }
-            runDriveSyncNow()
-        }
-    }
-
-    /** Settings "Test sync" diagnostic: runs a non-destructive end-to-end
-     *  round-trip against the real Drive file (permission → read → write →
-     *  verify) and reports pass/fail as a snackbar, so the user can confirm
-     *  sync actually works on their device/provider in one tap. Writes the
-     *  file's own bytes back verbatim, so no settings are changed. */
-    fun testSync() {
-        viewModelScope.launch {
-            val result = withContext(Dispatchers.IO) { settingsStore.testSyncRoundTrip() }
-            if (result.ok) reportInfo(result.message) else reportError(result.message)
-        }
-    }
-
-    /** Runs one [SettingsStore.performMainToMainSync] pass right now and folds the
-     *  outcome into [UiState]. Both [setSyncUri] and [importSettingsAndSync]
-     *  used to just flip the syncUri pref and wait for the passive
-     *  refreshing-transition collector in [bootstrapDriveSync] to notice --
-     *  which meant "enable sync" didn't actually upload or download anything
-     *  until the next unrelated data refresh happened to complete, sometimes
-     *  never in the session (e.g. backgrounding right after setup). That's
-     *  exactly why a second device picking the same file moments later found
-     *  nothing real there yet. Calling this immediately after either flow
-     *  makes "enable sync" actually push/pull data right away. */
-    private suspend fun runDriveSyncNow() {
-        val outcome = withContext(Dispatchers.IO) { settingsStore.performMainToMainSync() }
-        // Recompute the file fingerprint each pass so it appears the moment sync is
-        // set up / the file is changed (it's derived purely from the persisted URI).
-        val fingerprint = withContext(Dispatchers.IO) { settingsStore.syncFileFingerprint() }
-        if (outcome.ran) {
-            if (outcome.imported) refreshLocalCarConfig()
-            _state.update {
-                it.copy(
-                    lastSyncMs = outcome.syncedAtMs,
-                    syncError = outcome.error,
-                    // On a transient download failure the outcome carries an empty
-                    // device list (nothing could be read this pass) — don't blank the
-                    // Settings "Synced devices" list; keep whatever we last showed.
-                    syncDevices = outcome.devices.ifEmpty { it.syncDevices },
-                    syncPrimaryId = outcome.primaryDeviceId ?: it.syncPrimaryId,
-                    thisDeviceId = outcome.selfDeviceId ?: it.thisDeviceId,
-                    syncFileFingerprint = fingerprint,
-                )
-            }
-        } else {
-            _state.update { it.copy(syncFileFingerprint = fingerprint) }
-        }
-    }
+    // syncNow / setPrimaryDevice / pullFromPrimary / renameThisDevice / removeSyncedDevice /
+    // testSync / runDriveSyncNow moved to AppViewModelSync.kt.
 
     /**
      * Shared wrapper for the handful of operations that should show the
