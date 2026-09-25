@@ -415,10 +415,8 @@ internal fun OnboardingScreen(vm: AppViewModel) {
                 }
                 if (pinRequired) {
                     Spacer(Modifier.height(6.dp))
-                    Text(
+                    BodySmallText(
                         "Set your PIN above to continue.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = scheme.onSurfaceVariant,
                     )
                 }
             }
@@ -485,11 +483,10 @@ internal fun SyncChoiceScreen(vm: AppViewModel) {
                 color = scheme.onSurface,
             )
             Spacer(Modifier.height(SettingsGapHairline))
-            Text(
+            BodyMediumText(
                 "Already use Bloo somewhere else with sync turned on? Bring that " +
                     "setup in here instead of answering everything again.",
-                style = MaterialTheme.typography.bodyMedium,
-                color = scheme.onSurfaceVariant,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Spacer(Modifier.height(28.dp))
 
