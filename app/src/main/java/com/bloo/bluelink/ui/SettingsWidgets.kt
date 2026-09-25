@@ -223,6 +223,20 @@ fun SettingsSegmentedRow(
  * of its own to begin with.
  */
 
+/**
+ * The outer wrapper every top-level Settings pebble sits in: full width, the inter-card
+ * gap, and TalkBack heading semantics -- see [SettingsCard]'s own body for why each of
+ * those three lives specifically on this wrapper rather than PebbleShell itself or the
+ * parent Column. Pulled out so the single-car special case in SettingsScreen (which
+ * renders a bare [CarSettingsCard] instead of wrapping it in [SettingsCard], to avoid
+ * stacking two pebble headers for one car) gets the exact same wrapper by calling this,
+ * instead of hand-reproducing it a second time.
+ */
+internal fun Modifier.settingsCardSlot(): Modifier =
+    fillMaxWidth()
+        .padding(bottom = SettingsCardGap)
+        .semantics { heading() }
+
 @Composable
 internal fun SettingsCard(
     title: String,
@@ -265,21 +279,16 @@ internal fun SettingsCard(
     // instead. PebbleShell's header row is already ONE merged TalkBack stop (tap-to-toggle),
     // so marking that whole stop as a heading preserves the "headings" navigation shortcut
     // across Settings' ~15 cards that the old Card-based header set up explicitly for.
-    Box(
-        Modifier
-            .fillMaxWidth()
-            // The inter-card gap lives HERE, inside this wrapper, and not as the parent
-            // Column's `Arrangement.spacedBy`. That is not a style preference, it is the
-            // fix for the Advanced->Simple collapse leaving gaps behind: `spacedBy` inserts
-            // its spacing between EVERY pair of children regardless of their height, so an
-            // advanced-only card shrunk to zero by its own outer AnimatedVisibility still
-            // contributed a full gap that `spacedBy` held open on its own schedule and then
-            // dropped in one frame once the node left composition -- "extra space between
-            // the cards, then it snaps". Living on this wrapper instead means the gap sits
-            // INSIDE that same outer AnimatedVisibility and shrinks away with the card.
-            .padding(bottom = SettingsCardGap)
-            .semantics { heading() },
-    ) {
+    // The inter-card gap lives on this wrapper (via settingsCardSlot()), not as the parent
+    // Column's `Arrangement.spacedBy`. That is not a style preference, it is the fix for
+    // the Advanced->Simple collapse leaving gaps behind: `spacedBy` inserts its spacing
+    // between EVERY pair of children regardless of their height, so an advanced-only card
+    // shrunk to zero by its own outer AnimatedVisibility still contributed a full gap that
+    // `spacedBy` held open on its own schedule and then dropped in one frame once the node
+    // left composition -- "extra space between the cards, then it snaps". Living on this
+    // wrapper instead means the gap sits INSIDE that same outer AnimatedVisibility and
+    // shrinks away with the card.
+    Box(Modifier.settingsCardSlot()) {
         PebbleShell(
             expanded = expanded,
             onToggle = { if (!inline) vm.togglePebble(SettingsPseudoVehicle, title) },
