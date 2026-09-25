@@ -900,7 +900,7 @@ internal fun WizardPageHeader(eyebrow: String, title: String, body: String) {
     val scheme = MaterialTheme.colorScheme
     Text(eyebrow, style = MaterialTheme.typography.labelLarge, color = scheme.primary, fontWeight = FontWeight.Bold)
     Text(title, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Black, color = scheme.onSurface)
-    Text(body, style = MaterialTheme.typography.bodyMedium, color = scheme.onSurfaceVariant)
+    BodyMediumText(body, color = scheme.onSurfaceVariant)
 }
 
 @Composable
