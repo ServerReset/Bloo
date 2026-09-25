@@ -42,6 +42,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.Build
@@ -218,21 +219,30 @@ internal val ExtraLargeShape = RoundedCornerShape(28.dp) // Modal dialogs
 // duplicate imports across the codebase. Use AppIcons.Settings instead of
 // importing Icons.Filled.Settings in 16 different files.
 object AppIcons {
-  val Settings = Settings
-  val Lock = Lock
-  val Bolt = Bolt
-  val Close = Close
-  val Build = Build
-  val Search = Search
-  val Refresh = Refresh
-  val Check = Check
-  val CheckCircle = CheckCircle
-  val LockOpen = LockOpen
-  val Info = Info
-  val DirectionsCar = DirectionsCar
-  val AutoAwesome = AutoAwesome
-  val Warning = Warning
-  val Thermostat = Thermostat
+  // Icons.Filled.X (not a bare `X`): each of these is an extension property on
+  // `Icons.Filled`, not a plain top-level symbol, so a bare `val Settings = Settings`
+  // here doesn't resolve to the imported icon at all -- with no other `Settings` in
+  // scope to supply the `Icons.Filled` receiver, Kotlin resolves the right-hand side
+  // back to this very property, a property whose initializer referenced itself. That
+  // shipped for a while unnoticed (nothing here could be verified against a real
+  // Kotlin compiler until CI actually ran it) and was the true cause of the
+  // "recursive type checking" errors CI reported across every file that touched
+  // AppIcons -- not the IconBadge overload an earlier pass blamed and fixed first.
+  val Settings = Icons.Filled.Settings
+  val Lock = Icons.Filled.Lock
+  val Bolt = Icons.Filled.Bolt
+  val Close = Icons.Filled.Close
+  val Build = Icons.Filled.Build
+  val Search = Icons.Filled.Search
+  val Refresh = Icons.Filled.Refresh
+  val Check = Icons.Filled.Check
+  val CheckCircle = Icons.Filled.CheckCircle
+  val LockOpen = Icons.Filled.LockOpen
+  val Info = Icons.Filled.Info
+  val DirectionsCar = Icons.Filled.DirectionsCar
+  val AutoAwesome = Icons.Filled.AutoAwesome
+  val Warning = Icons.Filled.Warning
+  val Thermostat = Icons.Filled.Thermostat
 }
 
 // ---- Blur -----------------------------------------------------------------------
