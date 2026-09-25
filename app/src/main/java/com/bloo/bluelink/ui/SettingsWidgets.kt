@@ -178,11 +178,7 @@ fun SettingsSegmentedRow(
     onSelect: (String) -> Unit,
 ) {
     Column(Modifier.fillMaxWidth()) {
-        Text(
-            label,
-            style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
+        LabelText(label)
         Spacer(Modifier.height(SettingsGapRow))
         MorphSegmented(options = options, selectedKey = selectedKey, onSelect = onSelect)
         if (description != null) SettingsCaption(description)

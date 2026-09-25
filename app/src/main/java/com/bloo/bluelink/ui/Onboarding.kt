@@ -297,11 +297,7 @@ internal fun OnboardingScreen(vm: AppViewModel) {
                     )
                 }
                 Spacer(Modifier.width(10.dp))
-                Text(
-                    "${pageIndex + 1}/${steps.size}",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = scheme.onSurfaceVariant,
-                )
+                LabelText("${pageIndex + 1}/${steps.size}")
             }
 
             // --- Slide/fade animated step content ---
