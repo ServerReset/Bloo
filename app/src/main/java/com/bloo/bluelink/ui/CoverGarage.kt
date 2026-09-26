@@ -48,7 +48,6 @@ import androidx.compose.foundation.pager.VerticalPager
 import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Smartphone
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.ui.semantics.onClick
@@ -103,48 +102,7 @@ import kotlin.math.max
  */
 @Composable
 internal fun CoverSettingsGate(vm: AppViewModel) {
-    val appearance = LocalAppearance.current
-    var promptOpen by remember { mutableStateOf(true) }
     SettingsScreen(vm, compact = true)
-    if (promptOpen && !appearance.coverSettingsHintDismissed) {
-        GlassAlertDialog(
-            onDismissRequest = { promptOpen = false },
-            title = "Settings on the cover",
-            icon = Icons.Filled.Smartphone,
-            text = {
-                Text("This screen is designed for a taller phone display. You can scroll through everything here, but unfolding the phone makes settings much easier to read and tweak.")
-            },
-            buttons = {
-                val continueSource = remember { MutableInteractionSource() }
-                SafeExpansiveButton(
-                    interactionSource = continueSource,
-                    enabled = true,
-                ) {
-                    MorphButton(
-                        onClick = { promptOpen = false },
-                        interactionSource = continueSource,
-                        modifier = Modifier.fillMaxWidth(),
-                    ) { Text("Continue on the cover", fontWeight = FontWeight.SemiBold) }
-                }
-                Spacer(Modifier.height(SettingsGapRow))
-                val dismissSource = remember { MutableInteractionSource() }
-                SafeExpansiveButton(
-                    interactionSource = dismissSource,
-                    enabled = true,
-                ) {
-                    MorphTextButton(
-                        "Don't show this again",
-                        onClick = {
-                            promptOpen = false
-                            vm.setCoverSettingsHintDismissed(true)
-                        },
-                        interactionSource = dismissSource,
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-                }
-            },
-        )
-    }
 }
 
 /**
