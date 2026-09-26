@@ -213,11 +213,10 @@ internal fun CompactGarage(state: State<UiState>, vm: AppViewModel, appearance: 
     // passes its own hazeState through -- ultimately Screens.kt's shared searchHazeState,
     // the SAME instance the floating search bar/results panel and the app-wide snackbar
     // blur whatever's currently on screen through (see GarageScreen's own hazeState doc).
-    // With the shadowed local in place, every blur INSIDE this screen (the band chip, the
-    // per-car pager, RefreshIndicatorBadge) still worked fine against each other, but
-    // nothing outside it -- a snackbar or the search overlay shown while the cover screen
-    // was up -- ever saw this screen's content as a hazeSource at all, so THEIR glass
-    // silently fell back to a flat tint instead of a real blur specifically on this screen.
+    // With the shadowed local in place, blurs inside this screen worked fine against each
+    // other, but nothing outside it -- a snackbar or the search overlay shown while the
+    // cover screen was up -- ever saw this screen's content as a hazeSource at all, so
+    // their glass silently fell back to a flat tint instead of a real blur.
     Box(Modifier.fillMaxSize()) {
         // Measured once and shared by every reader below: the tiles' car-name label, the band
         // itself, and the search dock. Hoisted ABOVE the pager because the tiles need to know
@@ -438,10 +437,9 @@ internal fun CompactCar(
     v: Vehicle,
     state: State<UiState>,
     vm: AppViewModel,
-    /** Same shared instance the pager marks as its own hazeSource -- see
-     *  [RefreshIndicatorBadge]'s own doc for why this needs to be a REAL blur of
-     *  the tile behind it, not the flat-tint fallback a null/mismatched
-     *  hazeState would fall back to. */
+    /** Shared hazeState instance for glass effects. Must match the pager's hazeSource
+     *  so floating elements overlay this screen with a real blur of the tile content
+     *  behind them, not a flat-tint fallback. */
     hazeState: HazeState,
 ) {
     // The State itself now, not rememberUpdatedState(value): the caller no longer reads
