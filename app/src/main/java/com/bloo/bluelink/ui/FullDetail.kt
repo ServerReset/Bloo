@@ -95,7 +95,6 @@ internal fun VehicleDetailContent(
     state: State<UiState>,
     vm: AppViewModel,
     onExpand: (() -> Unit)? = null,
-    hideIndicator: Boolean = false,
     // reserveTopForDots and reserveHeaderEnd were removed the same way: each reserved room for
     // a floating button that no longer exists (the pager dots, then CarHeaderRow's own
     // Fullscreen icon -- see its doc), each reduced to "no longer used but kept for API
@@ -112,7 +111,7 @@ internal fun VehicleDetailContent(
     // Narrowed, not `state.value.refreshing`: a bare read here would subscribe this whole page
     // -- all three of them live at once in the pager -- to every UiState emission.
     val refreshing by remember { derivedStateOf { state.value.refreshing } }
-    Refreshable(refreshing, onRefresh = { vm.refreshStatus(v) }, hideIndicator = hideIndicator, hazeState = hazeState) {
+    Refreshable(refreshing, onRefresh = { vm.refreshStatus(v) }, hazeState = hazeState) {
         Column(
             Modifier
                 .fillMaxSize()
@@ -225,12 +224,6 @@ internal fun ExpandedCar(
         PebbleList(v, state, vm, exclude = setOf("summary"))
     }
     CompositionLocalProvider(LocalHotSeatDrag provides hotDrag) {
-    // Was hardcoded hideIndicator = true -- the same "grid-only" flag that
-    // hid the pull-to-refresh spinner in the single-car view (fixed in
-    // a944a91) also hid it here, in the expanded/wide dual-column detail
-    // view, unconditionally. This is a single car's own detail screen, not
-    // the multi-car grid the flag was meant for, so the real M3 Expressive
-    // indicator should show here too.
     Refreshable(refreshing, onRefresh = { vm.refreshStatus(v) }, hazeState = hazeState) {
         // Animate the swap when the columns are flipped. Same spring the
         // expand/collapse transition (GarageScreen) and the collapsed

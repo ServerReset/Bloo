@@ -271,37 +271,6 @@ internal fun SettingsScreen(
   val topInset = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
   val bottomInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
 
-  // On very small cover displays (not the compact phone layout, but the outer cover
-  // of a foldable), buttons overflow and become unreachable. Block with a standard dialog.
-  val onTinyScreen = isCompactCoverScreen()
-  if (onTinyScreen && !compact) {
-    var dismissBlock by remember { mutableStateOf(true) }
-    if (dismissBlock) {
-      GlassAlertDialog(
-        onDismissRequest = { dismissBlock = false },
-        icon = Icons.Filled.Smartphone,
-        title = "Settings on the cover",
-        text = {
-          BodySmallText(
-            "Unfold your phone to access settings. This screen is designed for a larger display where all buttons are visible.",
-            color = MaterialTheme.colorScheme.onSurface,
-          )
-        },
-        buttons = {
-          val dismissSource = remember { MutableInteractionSource() }
-          SafeExpansiveButton(interactionSource = dismissSource, enabled = true) {
-            MorphButton(
-              onClick = { dismissBlock = false },
-              interactionSource = dismissSource,
-              modifier = Modifier.fillMaxWidth(),
-            ) { Text("OK", fontWeight = FontWeight.SemiBold) }
-          }
-        }
-      )
-    }
-    return
-  }
-
   // Search no longer lives on this screen -- it is one app-root element now
   // (see SearchLayer), so its query, its focus and its own back handling went
   // with it. SearchLayer composes after this screen, so while search is open

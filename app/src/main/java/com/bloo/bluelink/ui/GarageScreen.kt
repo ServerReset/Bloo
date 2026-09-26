@@ -689,12 +689,6 @@ internal fun GarageScreen(
                                 VehicleDetailContent(
                                     gv, state, vm,
                                     onExpand = if (canExpand) ({ vm.expand(real) }) else null,
-                                    // Only hide the per-car pull indicator in the
-                                    // multi-car grid (perPage > 1) -- state.refreshing
-                                    // is one app-wide flag, not per-car, so leaving
-                                    // it unhidden would light up every visible car's
-                                    // spinner for a refresh that only touched one.
-                                    hideIndicator = perPage > 1,
                                     hazeState = hazeState,
                                 )
                             }

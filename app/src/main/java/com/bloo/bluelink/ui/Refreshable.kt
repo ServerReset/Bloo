@@ -126,58 +126,11 @@ import androidx.compose.runtime.derivedStateOf
 internal val RefreshPullShift = 96.dp
 
 /**
- * The one shared "refreshing" badge: a [GlassSurface] circle (real backdrop
- * blur when [hazeState] is supplied, the same flat-tint fallback every other
- * glass surface uses otherwise) holding a spinner, sliding down from fully
- * off-screen above the content at `progress = 0` to just below the status bar
- * at `progress = 1`. Used by both [Refreshable]'s per-car pull gesture
- * (`progress` tracks the live pull distance, so it follows the user's finger)
- * and the multi-car grid's own "still refreshing" badge (GarageScreen.kt,
- * which has no pull gesture of its own and just animates `progress` between 0
- * and 1 off the plain `refreshing` boolean) -- previously two independently
- * hand-rolled indicators with different sizes, positioning math, and
- * containers (one a flat-tinted `PullToRefreshDefaults` widget, the other a
- * real-blur `GlassSurface`).
- *
- * [progress] is a LAMBDA, not a plain Float: [Refreshable] needs to read a
- * live drag distance (`ptrState.distanceFraction`) on every frame of a pull
- * gesture, and a plain parameter would be read at composition time -- which
- * would recompose the whole caller (its entire `content()`, one whole car
- * card) on every pixel of the drag. Deferring the read into this offset{}
- * lambda keeps that a pure layout-phase relayout of just this small badge.
- */
-@Composable
-internal fun RefreshIndicatorBadge(
-    hazeState: HazeState?,
-    modifier: Modifier = Modifier,
-    progress: () -> Float,
-) {
-    val topInset = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
-    GlassSurface(
-        shape = CircleShape,
-        hazeState = hazeState,
-        modifier = modifier
-            .size(HeaderButtonSize)
-            .offset {
-                val p = progress().coerceIn(0f, 1f)
-                val offScreenPx = -(topInset + 56.dp).roundToPx()
-                val onScreenPx = (topInset + 28.dp).roundToPx()
-                IntOffset(0, offScreenPx + ((onScreenPx - offScreenPx) * p).roundToInt())
-            },
-    ) {
-        LoadingIndicator()
-    }
-}
-
-/**
- * Wraps content with the pull-to-refresh gesture with an overlay indicator.
- * Delegates the actual gesture recognition/animation state to Material 3's
- * [rememberPullToRefreshState] (`ptrState`); this composable's own job is
- * publishing that pull distance out to [LocalPullFraction] (so sibling
- * overlays elsewhere in [GarageScreen] can react to the live pull, not just
- * the boolean `state.refreshing`), and driving [RefreshIndicatorBadge] off
- * that same distance so it can slide fully off-screen above the content when
- * idle and only ease into view as the user pulls.
+ * Wraps content with the pull-to-refresh gesture -- no visual indicator of its
+ * own any more (removed app-wide after several rounds of real, reported visual
+ * bugs across its different call sites: a stuck "blob" look, bleed-through
+ * under the expanded map, and the same shared badge misfiring elsewhere). The
+ * gesture and [onRefresh] still fire normally; only the badge is gone.
  *
  * [onRefresh] is a plain lambda, not a fixed `vm.refreshStatus(v)` call, so
  * this same wrapper also covers [GarageStatusCard] (Guard.kt) -- the "no
@@ -194,7 +147,6 @@ internal fun Refreshable(
     // the callers' State<UiState> indirection exists to avoid.
     refreshing: Boolean,
     onRefresh: () -> Unit,
-    hideIndicator: Boolean = false,
     hazeState: HazeState? = null,
     content: @Composable BoxScope.() -> Unit,
 ) {
@@ -218,18 +170,5 @@ internal fun Refreshable(
     ) {
         // Content stays full-size and edge-to-edge; never shifted down.
         content()
-        // Indicator floats above content as a z-elevated overlay. The
-        // progress read (ptrState.distanceFraction) happens inside
-        // RefreshIndicatorBadge's own offset{} lambda, which only runs in the
-        // layout phase -- reading it directly in THIS composable's body would
-        // recompose this entire Box (and everything content() renders, the
-        // whole car card) on every pixel of the pull gesture, not just
-        // re-layout the small indicator.
-        if (!hideIndicator) {
-            RefreshIndicatorBadge(
-                hazeState = hazeState,
-                modifier = Modifier.align(Alignment.TopCenter),
-            ) { if (refreshing) 1f else ptrState.distanceFraction }
-        }
     }
 }

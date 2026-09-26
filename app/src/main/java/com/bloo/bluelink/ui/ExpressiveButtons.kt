@@ -762,8 +762,20 @@ fun ExpressiveButtonGroup(
             // spanning the width its parent gave it -- reported directly as the expanded map's
             // bottom button row (which compacts to icon-only once a third feature is added) no
             // longer stretching full width.
-            val width = if (constraints.hasBoundedWidth) {
-                constraints.maxWidth.coerceAtLeast(constraints.minWidth)
+            //
+            // `minWidth == maxWidth`, not just [hasBoundedWidth] -- that first fix over-claimed:
+            // a bounded-but-loose maxWidth (minWidth 0) is exactly what a plain Row hands its own
+            // NON-weighted children while measuring them against its total budget, not a command
+            // to consume all of it. Treating that as "fill everything" starved this group's own
+            // weighted SIBLING in that same Row of any space at all once this group sat next to
+            // one -- e.g. the Settings "Logs" card's header (an icon + a weight(1f) summary label
+            // + this Copy/Clear button pair): the label collapsed to zero width and wrapped every
+            // character onto its own line, the same failure mode the very first version of this
+            // function had, just from the opposite direction. A genuinely tight constraint (what
+            // `Modifier.fillMaxWidth()` applied DIRECTLY to this group actually produces, min ==
+            // max) is the only case that means "you were given exactly this width, use it."
+            val width = if (constraints.hasBoundedWidth && constraints.minWidth == constraints.maxWidth) {
+                constraints.maxWidth
             } else {
                 (lineWidth.maxOrNull() ?: 0).coerceIn(constraints.minWidth, constraints.maxWidth)
             }

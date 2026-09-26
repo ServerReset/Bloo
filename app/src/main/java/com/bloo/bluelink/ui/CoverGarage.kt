@@ -499,7 +499,6 @@ internal fun CompactCar(
     // "controls" has no cover tile so it falls away. If summary was somehow
     // dropped, "main" is prepended so the cover screen always has a home tile.
     val hasBattery by remember(v.vin) { derivedStateOf { state.value.hasBattery(v) } }
-    val refreshing by remember { derivedStateOf { state.value.refreshing } }
     // A derived computation, not remember(keys): the keys used to be exactly the state slices
     // this predicate reads, but reading them in the composition body to form the key still
     // subscribed CompactCar to every emission. As a derived state it only invalidates when the
@@ -786,23 +785,8 @@ internal fun CompactCar(
             }
         }
         // Vertical page dots removed: user requested no page indicators
-        // Same shared RefreshIndicatorBadge (Pebbles.kt) every other refresh surface in the
-        // app uses -- a real GlassSurface blur of the tile behind it via `hazeState`, not a
-        // flat tint. The cover screen had NO visual feedback at all once refreshStatus() above
-        // actually fired (only the edge-trace RING, which tracks the GESTURE, not the network
-        // call it triggers) -- reported directly as wanting every refresh indicator in the app
-        // to look the same. No live pull distance to follow here (VerticalPager owns the drag,
-        // there is no pull-to-refresh gesture on this screen), so progress is just animated
-        // between 0 and 1 off the plain `state.refreshing` boolean, the same way GarageScreen's
-        // own grid-mode badge (no per-car pull gesture either) already does it.
-        val coverRefreshProgress by animateFloatAsState(
-            targetValue = if (refreshing) 1f else 0f,
-            animationSpec = tween(if (refreshing) 150 else 200),
-            label = "coverRefreshProgress",
-        )
-        RefreshIndicatorBadge(
-            hazeState = hazeState,
-            modifier = Modifier.align(Alignment.TopCenter),
-        ) { coverRefreshProgress }
+        // No refresh indicator badge here any more -- removed app-wide after several
+        // rounds of real, reported visual bugs. The edge-trace ring above still tracks
+        // the pull gesture itself.
     }
 }
