@@ -587,7 +587,7 @@ internal fun CompactCar(
                             val dy = abs(change.position.y - down.position.y)
                             if (dx > slop || dy > slop) break
                         }
-                    } finally { if (edgeTraceHolding) edgeTraceHolding = false }
+                    } finally { edgeTraceHolding = false }
                 }
             },
     ) {
