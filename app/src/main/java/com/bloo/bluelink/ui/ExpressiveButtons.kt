@@ -21,6 +21,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.layout.ParentDataModifier
 import androidx.compose.ui.layout.Placeable
+import androidx.compose.ui.semantics.disabled
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -264,7 +267,19 @@ fun SafeExpansiveButton(
             // is still being smoothly driven, by the group's seam-reserve layout instead of this
             // file's standalone one, so MorphButton's animateContentSize still needs to step
             // aside for the same reason.
-            CompositionLocalProvider(LocalExpressiveGroup provides false, LocalExpressiveGrowth provides true) { content() }
+            CompositionLocalProvider(LocalExpressiveGroup provides false, LocalExpressiveGrowth provides true) {
+                if (enabled) {
+                    content()
+                } else {
+                    Box(
+                        Modifier
+                            .alpha(0.5f)
+                            .semantics(mergeDescendants = true) { disabled() }
+                    ) {
+                        content()
+                    }
+                }
+            }
         }
         return
     }
@@ -281,7 +296,21 @@ fun SafeExpansiveButton(
     // these same cards does it); there was never anything here to be afraid of.
     val naturals = remember { NaturalWidths() }
     Layout(
-        content = { CompositionLocalProvider(LocalExpressiveGrowth provides true) { content() } },
+        content = {
+            CompositionLocalProvider(LocalExpressiveGrowth provides true) {
+                if (enabled) {
+                    content()
+                } else {
+                    Box(
+                        Modifier
+                            .alpha(0.5f)
+                            .semantics(mergeDescendants = true) { disabled() }
+                    ) {
+                        content()
+                    }
+                }
+            }
+        },
         modifier = modifier,
         measurePolicy = { measurables, constraints ->
             if (measurables.isEmpty()) return@Layout layout(0, 0) {}
