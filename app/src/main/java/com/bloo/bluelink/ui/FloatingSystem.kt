@@ -66,14 +66,6 @@ object FloatingIds {
      * about how it is placed belongs in this system. See SearchLayer.
      */
     val Search = FloatingId("search")
-    /** The pull-to-refresh spinner. */
-    val RefreshIndicator = FloatingId("refreshIndicator")
-    // TileRail was removed. It named the cover screen's right-edge tile scrubber, and that
-    // control is gone along with every page indicator in the app ("Vertical page dots removed:
-    // user requested no page indicators", CompactCar) -- so no element ever registered under
-    // it and nothing ever read its bounds. An id in here is a claim that two pieces of chrome
-    // currently negotiate over space, per this object's own doc; an id for chrome that does
-    // not exist is just a name.
 }
 
 @Stable
