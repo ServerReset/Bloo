@@ -343,7 +343,7 @@ internal fun WeatherStripe(weather: Weather, fahrenheit: Boolean, caption: Strin
     Row(
         Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(16.dp))
+            .clip(StandardShape)
             .background(MaterialTheme.colorScheme.surfaceContainerHigh)
             .padding(horizontal = 14.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,

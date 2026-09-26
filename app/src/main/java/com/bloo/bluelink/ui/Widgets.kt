@@ -46,7 +46,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.SystemUpdate
@@ -282,7 +281,7 @@ internal fun SettingsModeTab(
         contentAlignment = Alignment.TopEnd,
     ) {
         GlassSurface(
-            shape = RoundedCornerShape(16.dp),
+            shape = StandardShape,
             modifier = Modifier.width(172.dp),
             hazeState = hazeState,
         ) {

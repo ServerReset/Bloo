@@ -50,7 +50,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -437,7 +436,7 @@ internal fun WizardSeatsPage(
     Column(
         Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(16.dp))
+            .clip(StandardShape)
             .background(scheme.surfaceContainerHigh)
             .padding16(),
         verticalArrangement = Arrangement.spacedBy(4.dp),
@@ -497,7 +496,7 @@ internal fun WizardSteeringPage(
     Column(
         Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(16.dp))
+            .clip(StandardShape)
             .background(scheme.surfaceContainerHigh)
             // The horizontal inset used to live on the hand-rolled row itself; ToggleRow
             // (like every settings control) leaves its container to supply it.

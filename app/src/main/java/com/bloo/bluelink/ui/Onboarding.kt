@@ -855,7 +855,7 @@ internal fun OnboardingSetupCard(
 internal fun OnboardingTipCard(icon: ImageVector, title: String, body: String) {
     val scheme = MaterialTheme.colorScheme
     Surface(
-        shape = RoundedCornerShape(16.dp),
+        shape = StandardShape,
         color = scheme.surfaceContainerHigh,
         modifier = Modifier.fillMaxWidth(),
     ) {
@@ -925,7 +925,7 @@ internal fun OnboardingCarPage(
         Column(
             Modifier
                 .fillMaxWidth()
-                .clip(RoundedCornerShape(16.dp))
+                .clip(StandardShape)
                 .background(scheme.surfaceContainerHigh)
                 .padding(horizontal = 12.dp, vertical = 4.dp),
         ) {
