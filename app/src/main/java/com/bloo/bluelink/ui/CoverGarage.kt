@@ -84,7 +84,6 @@ import com.bloo.bluelink.data.brand
 import com.bloo.bluelink.data.SettingsStore
 import com.bloo.bluelink.data.Vehicle
 import com.bloo.bluelink.data.isGen5W
-import kotlinx.coroutines.flow.first
 import kotlin.math.abs
 import kotlin.math.max
 
