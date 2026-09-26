@@ -82,7 +82,6 @@ import com.bloo.bluelink.data.brand
 import com.bloo.bluelink.data.Vehicle
 import com.bloo.bluelink.data.supportsHornLights
 import com.bloo.bluelink.data.isPluggedOrCharging
-import kotlinx.coroutines.flow.first
 
 /**
  * Measured, adaptive metrics for the cover-screen content region, provided by
