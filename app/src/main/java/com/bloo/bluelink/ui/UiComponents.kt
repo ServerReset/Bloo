@@ -371,5 +371,7 @@ internal fun Modifier.paddingVertical24() = paddingVertical(24.dp)
 internal fun Modifier.paddingVertical8() = paddingVertical(8.dp)
 
 /** Combined padding patterns that appear across multiple files. */
+@Composable
 internal fun Modifier.paddingHorizontal24Vertical16() = padding(horizontal = 24.dp, vertical = GapSection)
+@Composable
 internal fun Modifier.paddingHorizontal16Vertical12() = padding(horizontal = 16.dp, vertical = GapGroup)

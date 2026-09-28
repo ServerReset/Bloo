@@ -632,7 +632,7 @@ private fun AccountsCardContent(state: UiState, vm: AppViewModel) {
                                 modifier = Modifier.fillMaxWidth(),
                             )
                         }
-                        ExpressiveButtonRow(spacing = 8.dp) {
+                        ExpressiveButtonRow(spacing = GapRow) {
                             if (creds.brand.requiresPin) {
                                 val pinSource = remember { MutableInteractionSource() }
                                 SafeExpansiveButton(
@@ -684,7 +684,7 @@ private fun AccountsCardContent(state: UiState, vm: AppViewModel) {
                 BodySmallText(
                     "If commands fail with a locked PIN, fix the Service PIN above. Too " +
                         "many wrong-PIN attempts lock it for a few minutes server-side.",
-                    modifier = Modifier.padding(top = 8.dp),
+                    modifier = Modifier.padding(top = GapRow),
                 )
             }
 }

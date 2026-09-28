@@ -230,6 +230,7 @@ fun SettingsSegmentedRow(
  * stacking two pebble headers for one car) gets the exact same wrapper by calling this,
  * instead of hand-reproducing it a second time.
  */
+@Composable
 internal fun Modifier.settingsCardSlot(): Modifier =
     fillMaxWidth()
         .padding(bottom = SettingsCardGap)
@@ -308,6 +309,10 @@ internal fun SettingsCard(
             // it the switch sat flush against the end of the label text, mid-row, which is what
             // made the single-setting cards read as broken rather than compact.
             titleTrailingAtEnd = true,
+            // Settings cards space their own rows with explicit Spacers (the gap tokens), so
+            // the shell must not ALSO insert its default row gap -- that double-spaced every
+            // card and is what made the gaps read as uneven.
+            contentGap = 0.dp,
             content = { content() },
         )
     }

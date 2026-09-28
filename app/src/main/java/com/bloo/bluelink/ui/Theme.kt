@@ -479,6 +479,9 @@ fun BlooTheme(
         CompositionLocalProvider(
             LocalDensity provides scaledDensity,
             LocalReduceMotion provides reduceMotion,
+            // The vertical gap scale follows the display scale (damped -- see spaceScaleFor),
+            // so every gap/inset in the app breathes with the font-size setting together.
+            LocalSpaceScale provides spaceScaleFor(uiScale),
             LocalContentColor provides scheme.onBackground,
             content = content,
         )

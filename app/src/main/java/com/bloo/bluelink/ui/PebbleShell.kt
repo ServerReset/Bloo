@@ -301,6 +301,10 @@ internal fun PebbleShell(
      * Null for every other pebble, so nothing else gains a layer.
      */
     background: (@Composable BoxScope.() -> Unit)? = null,
+    /** Vertical gap between [content]'s top-level rows. The default [GapRow] is the standard
+     *  pebble rhythm; a caller whose content spaces ITSELF with explicit [Spacer]s (the
+     *  Settings cards do) passes 0.dp so the two don't stack into doubled gaps. */
+    contentGap: Dp = GapRow,
     content: @Composable ColumnScope.() -> Unit,
 ) {
     val haptics = LocalHaptics.current
@@ -1051,7 +1055,7 @@ internal fun PebbleShell(
                             modifier = Modifier.animateContentSize(
                                 lowPowerAwareSpring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessMediumLow),
                             ).padding(start = 16.dp, end = 16.dp, bottom = 16.dp, top = 4.dp),
-                            verticalGap = 8.dp,
+                            verticalGap = contentGap,
                             content = content,
                         )
                     }

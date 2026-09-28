@@ -742,7 +742,16 @@ fun ExpressiveButtonGroup(
                     // already close, and bounds the size-mismatched case to the smaller member's
                     // own comfortable growth instead of its bigger neighbour's.
                     val seamCapacity = minOf(aHalf, bHalf)
-                    val delta = press[a] * seamCapacity - press[b] * seamCapacity
+                    // A press may only take a neighbour's SLACK above its own content need, never
+                    // the content itself. Without this cap the floor below had to push a squeezed
+                    // member back UP to its content width, which grew the line past its budget and
+                    // pushed the last member off-screen -- worst on the map's two-button row,
+                    // where one label is wider than its equal share. Capping each side's take by
+                    // the other's slack keeps the line total fixed AND every member at or above its
+                    // content width, so the floor never has to fire and nothing overflows.
+                    val bSlack = (base[b] - basis[b]).coerceAtLeast(0.0)
+                    val aSlack = (base[a] - basis[a]).coerceAtLeast(0.0)
+                    val delta = press[a] * minOf(seamCapacity, bSlack) - press[b] * minOf(seamCapacity, aSlack)
                     exact[a] += delta
                     exact[b] -= delta
                 }
@@ -752,6 +761,28 @@ fun ExpressiveButtonGroup(
                 // smaller cost than a truncated label.
                 for (i in memberIdx) {
                     exact[i] = exact[i].coerceAtLeast(basis[i].toDouble())
+                }
+                // FINAL GUARANTEE: the line's placed width never exceeds its budget, whatever the
+                // equal-share or the floor above produced. Claw any excess back from the members
+                // with slack first, then proportionally, so the last member can never be pushed
+                // past the edge of the row and off-screen.
+                val exactSum = memberIdx.sumOf { exact[it] }
+                if (exactSum > total && total > 0) {
+                    var excess = exactSum - total
+                    val slack = memberIdx.map { (exact[it] - basis[it]).coerceAtLeast(0.0) }
+                    val slackTotal = slack.sum()
+                    if (slackTotal > 0.0) {
+                        val take = minOf(excess, slackTotal)
+                        memberIdx.forEachIndexed { k, i -> exact[i] -= take * slack[k] / slackTotal }
+                        excess -= take
+                    }
+                    if (excess > 0.0) {
+                        val sum = memberIdx.sumOf { exact[it] }
+                        if (sum > 0.0) {
+                            val scale = (sum - excess) / sum
+                            for (i in memberIdx) exact[i] *= scale
+                        }
+                    }
                 }
 
                 // Largest-remainder rounding, so the integer widths sum to `total` EXACTLY

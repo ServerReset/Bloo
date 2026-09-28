@@ -144,11 +144,11 @@ internal val HeroOnPhoto = Color(0xFFF2F2F5)
 // ---- Sizing -------------------------------------------------------------------
 
 /** Shared control height: a collapsed pebble matches the lock/unlock button. */
-internal val ControlHeight = 64.dp
+internal val ControlHeight = 76.dp
 
 /** Uniform collapsed-header height so every pebble lines up at the same size. */
 internal val PebbleHeaderHeight = ControlHeight
-internal val PebbleCornerCollapsed = 32.dp
+internal val PebbleCornerCollapsed = 38.dp
 internal val PebbleCornerExpanded = 20.dp
 
 /** The charge bar's height, shared by every surface that draws this bar so the
@@ -185,23 +185,31 @@ internal val HeroReadoutBottomInset = 14.dp
 internal val PebbleContentInset = 16.dp
 
 /**
- * The app's vertical rhythm, as four steps instead of the many raw values that had accumulated
- * (4, 6, 8, 10, 12, 14, 16dp and odder strays, several sitting exactly between two steps).
- * Material 3's spacing system is built on 8 with 4dp sub-steps; ad-hoc gaps are invisible on
- * their own and obvious in aggregate, and 6/10/14 are why a screen read as uneven even when
- * each individual gap looked deliberate.
+ * The app's vertical rhythm: ONE base unit ([SpaceUnit]) that every gap, inset and arrangement
+ * is a multiple of, so the whole layout is tuned from a single place.
  *
- * Use these for every vertical gap, padding and arrangement instead of a raw dp literal. Strays
- * snap to the nearest step, preferring DOWN so screens tighten rather than grow by ~2dp in
- * thirty places.
+ * It scales with the app's own display scale (the "make everything bigger" setting), but only
+ * about half as much, so a bigger font gets more air without the layout ballooning -- see
+ * [spaceScaleFor]. Provided by [BlooTheme]; read through [LocalSpaceScale].
+ *
+ * Material 3's spacing system is built on 8 with 4dp sub-steps; ad-hoc gaps are invisible on
+ * their own and obvious in aggregate, which is why these replaced the many raw values that had
+ * accumulated (4, 6, 8, 10, 12, 14, 16dp and odder strays).
  */
-internal val GapHairline = 4.dp
-internal val GapRow = 8.dp
-internal val GapGroup = 12.dp
-internal val GapSection = 16.dp
+internal val LocalSpaceScale = androidx.compose.runtime.compositionLocalOf { 1f }
 
-/** Gap between settings cards (kept apart from the [GapRow]/[GapGroup] rhythm). */
-internal val SettingsCardGap = 10.dp
+/** Display scale → gap scale: gaps breathe with the app's display scale at half its swing. */
+internal fun spaceScaleFor(uiScale: Float): Float = 1f + (uiScale - 1f) * 0.5f
+
+/** The one spacing unit (4dp at 1.0 scale). Everything below is a multiple of it. */
+internal val SpaceUnit: Dp @Composable get() = 4.dp * LocalSpaceScale.current
+internal val GapHairline: Dp @Composable get() = SpaceUnit
+internal val GapRow: Dp @Composable get() = SpaceUnit * 2
+internal val GapGroup: Dp @Composable get() = SpaceUnit * 3
+internal val GapSection: Dp @Composable get() = SpaceUnit * 4
+
+/** Gap between settings cards: [GapRow] plus a hairline, on the same unit and scale. */
+internal val SettingsCardGap: Dp @Composable get() = SpaceUnit * 2.5f
 
 // ---- Shapes ---------------------------------------------------------------------
 //
