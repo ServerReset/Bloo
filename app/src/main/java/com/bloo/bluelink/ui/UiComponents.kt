@@ -326,6 +326,22 @@ internal fun Modifier.noRippleClickable(onClickLabel: String? = null, onClick: (
     )
 
 /**
+ * The app's standard tappable modifier for controls that are NOT [MorphButton]-shaped (an
+ * inline link, a swatch, a picker row's own body): the same ripple-suppressed click as
+ * [noRippleClickable], plus the shared click haptic every real button already plays. Use this
+ * instead of a bare `Modifier.clickable { ... }` so a custom tappable still feels like the rest
+ * of the app rather than the one silent square on the screen.
+ */
+@Composable
+internal fun Modifier.hapticClickable(
+    onClickLabel: String? = null,
+    onClick: () -> Unit,
+): Modifier {
+    val haptics = LocalHaptics.current
+    return noRippleClickable(onClickLabel) { haptics?.click(); onClick() }
+}
+
+/**
  * Consolidates the most-repeated padding patterns. Used instead of
  * `.padding(horizontal = X, vertical = Y)` across 40+ sites.
  */

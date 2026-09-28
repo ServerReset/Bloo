@@ -3,7 +3,7 @@
 package com.bloo.bluelink.ui
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
+import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -63,7 +63,7 @@ private fun DebugInfoItem(
             .fillMaxWidth()
             .then(
                 if (info.copyable && onCopy != null) {
-                    Modifier.clickable { onCopy(info.value) }
+                    Modifier.clip(RoundedCornerShape(6.dp)).hapticClickable { onCopy(info.value) }
                 } else {
                     Modifier
                 }

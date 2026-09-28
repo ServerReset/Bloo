@@ -7,9 +7,9 @@ import android.content.pm.PackageManager
 import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
@@ -25,6 +25,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
@@ -252,21 +253,20 @@ internal fun AutoLockSettingsGroup(v: Vehicle, vm: AppViewModel) {
                     // short list padded to a fixed height and a long one scrolling inside
                     // a scroller. The paired-device list is a handful of rows, not a feed.
                     devices.forEach { device ->
-                        Column(
-                            Modifier
-                                .fillMaxWidth()
-                                .clip(MaterialTheme.shapes.small)
-                                .clickable {
-                                    update(current.copy(deviceAddress = device.address, deviceName = device.name))
-                                    showDevicePicker = false
-                                }
-                                .padding(horizontal = 12.dp, vertical = GapRow),
+                        MorphButton(
+                            onClick = {
+                                update(current.copy(deviceAddress = device.address, deviceName = device.name))
+                                showDevicePicker = false
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                            contentPadding = PaddingValues(horizontal = GapGroup, vertical = GapRow),
                         ) {
-                            // M3's ListItem drew its own surface fill and its own type scale
-                            // inside the dialog; the name/address pair is the same
-                            // label-over-caption rhythm every settings row in the app uses.
-                            BodyMediumText(device.name)
-                            LabelSmallText(device.address)
+                            // name/address pair, the same label-over-caption rhythm
+                            // every settings row in the app uses.
+                            Column(Modifier.weight(1f), horizontalAlignment = Alignment.Start) {
+                                BodyMediumText(device.name)
+                                LabelSmallText(device.address)
+                            }
                         }
                     }
                 }

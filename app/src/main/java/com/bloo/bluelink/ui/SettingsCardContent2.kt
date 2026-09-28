@@ -20,7 +20,6 @@ import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.animation.core.snap
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
@@ -845,13 +844,8 @@ internal fun ThemeCardContent(appearance: SettingsStore.Appearance, advanced: Bo
                                     )
                                 }
                                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                    Box(
-                                        modifier = Modifier
-                                            .size(48.dp)
-                                            .clip(CircleShape)
-                                            .background(MaterialTheme.colorScheme.surfaceContainerHighest)
-                                            .clickable { editingPalette = null; showPaletteEditor = true },
-                                        contentAlignment = Alignment.Center,
+                                    MorphIconButton(
+                                        onClick = { editingPalette = null; showPaletteEditor = true },
                                     ) {
                                         Icon(Icons.Filled.Add, contentDescription = "New custom palette")
                                     }
@@ -998,7 +992,7 @@ private fun CreditRow(entry: CreditEntry) {
             Row(
                 Modifier
                     .clip(RoundedCornerShape(6.dp))
-                    .clickable { openUrl(context, entry.url) }
+                    .hapticClickable { openUrl(context, entry.url) }
                     .wrapContentWidth(),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(4.dp),
