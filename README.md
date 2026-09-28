@@ -2,39 +2,39 @@
 
 I wanted an app for my Hyundai that felt like Google built it. So I made one.
 
-Bloo is a third-party Android app for controlling **Hyundai**, **Genesis**, and **Kia** vehicles through their US telematics services. Built with Jetpack Compose and Material 3 Expressive for phone, foldable, tablet, and Wear OS. No simulated data -- every screen talks to live servers.
+Bloo is a third-party Android app for controlling **Hyundai**, **Genesis**, and **Kia** vehicles through their connected-car services (US, Canada, and Hyundai Europe). Built with Jetpack Compose and Material 3 Expressive for phones, foldables (including flip-phone cover screens), and tablets. No simulated data -- every screen talks to live servers.
 
 ## Supported brands
 
-| Brand   | Service             | Login       | Gen5W (pre-CCNC) | CCNC (gen 3+, 2023+) |
-|---------|---------------------|-------------|-------------------|----------------------|
-| Hyundai | Blue Link           | Email + PIN | No trips, limited climate | All features |
-| Genesis | Genesis Connected   | Email + PIN | No trips, limited climate | All features |
-| Kia     | Kia Connect         | OTP only    | All features | All features (no gen field) |
+| Region | Brands | Login |
+|--------|--------|-------|
+| US | Hyundai (Blue Link), Genesis (Connected Services), Kia (Connect) | Email + PIN, or one-time code for Kia |
+| Canada | Hyundai, Genesis, Kia | Email + PIN, then a one-time code |
+| Europe | Hyundai (Bluelink) | Email + PIN |
 
-- **Gen5W** (pre-2023, generation code 1-2): The older head unit. Trip history is not available through the API. Climate controls are limited to temperature and defrost only. Seat heat and custom duration values are rejected by the server.
-- **CCNC** (2023+, generation code 3+, Connected Car Navigation Cockpit): The newer head unit. Full API support for all features including trip history, seat heat, and climate duration.
-- **Kia**: Does not expose the head unit generation, so all features work across all model years. One-time code sign-in instead of PIN.
+- **Gen5W** head units (pre-2023) have no trip history through the API, and climate is limited to temperature and defrost; seat heat and custom durations are rejected server-side.
+- **CCNC** head units (2023+) support everything: trips, seat heat, full climate duration.
+- **Kia** does not expose the head-unit generation, so all features work across model years.
 
-Multiple brands can be signed in at the same time. Credentials are stored encrypted on-device.
+Multiple accounts can be signed in at once. Credentials are stored encrypted on-device (AES-256 via the Android Keystore).
 
 ## Features
 
-### Phone app (foldable and tablet supported)
-- Auto-adapting layouts for flip-phone cover screens, foldable open/closed states, and tablets
-- Camera cutout detection on cover screens with content flowing around the camera hole
-- Dual-column expanded view with drag-to-reorder sections
-- **Lock / Unlock, Remote climate, Charging** (start/stop, AC/DC limits), **GPS location** with live map, **Vehicle status** (doors, windows, trunk, hood, tyres, 12V battery, fuel, charge, range), **Trip history** (distance, time, energy), **Weather** at car and home, **On-device AI** (Gemini Nano summaries and search)
-- **Home-screen widget** with 8 auto-adapting size tiers, dynamic button grids, optional car photo background, optional location map, pill shape mode, and info/controls layout preference
-- **Quick Settings tiles** (up to 12 per car), **App shortcuts**, **Biometric auth**, **Custom colour palettes**, **Theme and font choices**
+### Car control
+- **Lock / Unlock**, **Remote climate** (start/stop, temperature, defrost, seat heat, presets), **Charging** (start/stop, AC/DC limits)
+- **Live location** on a map, **full status** (doors, windows, trunk, hood, tyres, 12V battery, fuel, charge, range), **trip history**, **weather** at the car and at home
+- **On-device AI**: Gemini Nano summaries and natural-language car commands
 
-### Wear OS app
-- All phone features mirrored on the watch with crown/bezel navigation
-- 6 poolable Wear OS Tiles (one per car) with live charge arc and action chips
-- Watch-face complications for charge, lock, and climate (tap to toggle)
-- Phone-paired or standalone operation (Wi-Fi/cellular watch)
-- Synced theme, font scale, and settings from the phone
-- Smart climate (reads weather at the car location), climate presets
+### Safety and security
+- **App lock**: biometric unlock with an optional 4-8 digit PIN backup, and a re-lock timing of Off / Screen off / Immediate
+- **AutoLock**: locks the car automatically when your phone disconnects from it and you walk away, with a Bluetooth/activity-recognition trigger and a time-based alarm fallback
+- Commands run through one serialized gate (Blue Link rate-limits overlapping requests), and climate-start is blocked while the car is driving
+
+### Experience
+- Adaptive layouts for flip-phone cover screens (content flows around the camera cutout), foldable open/closed states, dual-column expanded views, and tablets
+- Drag-to-reorder pebbles per car, custom colour palettes, theme and font choices, and an animated Aurora background
+- **Drive sync**: settings, presets, and photos sync across your devices via Google Drive
+- **Self-update**: checks GitHub Releases on launch, on refresh, and periodically in the background, then downloads and hands the APK to the system installer (optionally silently, via Shizuku)
 
 ## Building
 
@@ -42,34 +42,34 @@ Multiple brands can be signed in at the same time. Credentials are stored encryp
 ./gradlew assembleDebug
 ```
 
-APKs are output to `app/build/outputs/apk/` and `wear/build/outputs/apk/`.
+The APK is output to `app/build/outputs/apk/`.
 
-Requires Android Studio Meerkat or newer (AGP 9.1, Kotlin 2.2.20).
+Requires Android Studio Meerkat or newer (AGP 9.1, Kotlin 2.2.20). The build needs JDK 17.
 
 ## Installing
 
-Every push publishes a rolling [GitHub Release](../../releases) tagged `build-<run number>` with the phone (`Bloo.apk`) and watch (`Bloo-Wear.apk`) APKs attached as direct downloads -- plain public files, no GitHub sign-in and no zip/unzip step.
+Every push publishes a rolling [GitHub Release](../../releases) tagged `build-<run number>` with the phone APK (`Bloo.apk`) attached as a direct download -- a plain public file, no GitHub sign-in and no zip step.
 
 To install:
 
-1. Download `Bloo.apk` (and `Bloo-Wear.apk` for the watch) from the [latest release](../../releases)
-2. Open the downloaded file from your notification shade or Downloads app
-3. If Android shows **"Blocked by Play Protect"**, tap **"More details"**, then **"Install anyway"** and confirm with your biometrics or device password
+1. Download `Bloo.apk` from the [latest release](../../releases)
+2. Open the downloaded file from your notification shade or the Downloads app
+3. If Android shows **"Blocked by Play Protect"**, tap **"More details"**, then **"Install anyway"**, and confirm with your biometrics or device password
 
-The warning appears because Bloo is not signed with Google Play Store keys. I cannot publish on the Play Store because it costs money I do not have, and Hyundai would not approve an unofficial app on their platform. The app is safe, open source, and does not collect any data. All credentials are stored encrypted on-device.
+The warning appears because Bloo is not signed with Google Play Store keys. It cannot be published on the Play Store (it costs money I do not have, and Hyundai would not approve an unofficial app), so it ships as a signed APK from GitHub Releases instead. The app is open source and collects no data; credentials never leave the device except to the brand's own servers.
 
-Once installed, updates are entirely automatic and need no configuration: the app checks on cold start and every pull-to-refresh, plus a periodic background check even while it's closed, surfacing a tile that downloads and hands the APK straight to the system installer -- the steps above are only needed for the very first install. The watch checks and installs its own updates the same way, independently of the phone.
+Once installed, updates are automatic: the app checks on cold start and on every pull-to-refresh, plus a periodic background check, and surfaces an in-app tile that downloads the new build and hands it to the installer. The steps above are only needed for the very first install.
 
 ## Architecture
 
 | Module | Purpose |
 |--------|---------|
-| `:shared` | API clients (BlueLinkApi, KiaUsaApi), Models, SessionStore, WearSync protocol |
-| `:app` | Phone UI, widget (Glance), Quick Settings tiles, Wear bridge |
-| `:wear` | Wear OS app, tiles (ProtoLayout), complications, data layer |
-| `:uicommon` | Shared compose components (slider, segmented control, text animations) |
+| `:shared` | API clients (BlueLink US/CA/EU, Kia US), models, repositories, session/credential/snapshot stores, shared formatting |
+| `:app` | Phone, foldable, and tablet UI (Compose + Material 3 Expressive), workers, notifications, AutoLock |
+| `:uicommon` | Foundation-only shared Compose components (morph button, segmented control, slider, text animations) |
+| `:hidden-api-stub` | Compile-only stubs for the reflection used by the Shizuku silent-install path |
 
-Auth tokens are refreshed automatically on 401/403. A second failure returns to the sign-in screen.
+Auth tokens refresh automatically on 401/403; a second failure returns to the sign-in screen. A single process-wide mutex serializes every car request.
 
 ## Disclaimer
 

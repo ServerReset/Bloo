@@ -122,7 +122,7 @@ internal const val COVER_TINY_DP = 300f
  * proportionally more room than the same inset costs a larger cover.
  */
 @Composable
-internal fun coverContentInset(): Dp = if (coverIsTiny()) 10.dp else 12.dp
+internal fun coverContentInset(): Dp = if (coverIsTiny()) GapRow else GapGroup
 
 /** True when the measured cover region is small enough to warrant the tighter of each pair
  *  below. Reads [LocalCoverMetrics], so it is the real region and not a guess from the config. */
@@ -130,42 +130,28 @@ internal fun coverContentInset(): Dp = if (coverIsTiny()) 10.dp else 12.dp
 internal fun coverIsTiny(): Boolean = LocalCoverMetrics.current?.isTiny == true
 
 /**
- * The cover tile's own spacing, as three named steps instead of the literals that had settled in
- * (a 14dp gap above the title, 10dp of vertical padding inside the scrolling body, 10dp between
- * its children and another 14dp below).
- *
- * Those totalled ~48dp of pure padding before a single glyph, on a screen whose usable height is
- * frequently under 300 -- roughly a sixth of the tile spent on air. Phone-sized gaps do not
- * transfer to a one-inch display: the same 14dp that reads as comfortable on a 6" screen is a
- * visible chunk of a cover tile. Each step is tighter here and tighter again when the region is
- * genuinely tiny, which buys back about 20dp of vertical room -- a whole extra line of body text
- * on most tiles -- without any gap collapsing to nothing.
- *
- * Touch targets are deliberately NOT in here and are not shrunk: the cover is operated by a thumb
- * on a small square, which is why the action bar and the grouped buttons are already LARGER here
- * than on the phone. Compactness comes out of padding, never out of what you have to hit.
+ * The cover tile's own spacing, expressed on the app's shared gap scale (see [GapHairline]
+ * ... [GapSection]) rather than the bespoke 6/10/14dp literals that had settled in -- a cover
+ * runs the same vertical rhythm as the phone, just one step tighter when the region is tiny.
  */
 @Composable
-internal fun coverTileEdgeGap(): Dp = if (coverIsTiny()) 8.dp else 10.dp
+internal fun coverTileEdgeGap(): Dp = if (coverIsTiny()) GapRow else GapGroup
 
 /** Vertical padding inside the tile's scrolling body. */
 @Composable
-internal fun coverBodyPad(): Dp = if (coverIsTiny()) 4.dp else 6.dp
+internal fun coverBodyPad(): Dp = if (coverIsTiny()) GapHairline else GapRow
 
 /** Gap between the body's own children. */
 @Composable
-internal fun coverBodyGap(): Dp = if (coverIsTiny()) 6.dp else 8.dp
+internal fun coverBodyGap(): Dp = if (coverIsTiny()) GapHairline else GapRow
 
 /**
- * How far the scroll fade reaches into a cover tile's body.
- *
- * Much shorter than the 28dp the phone uses, and deliberately so: 28dp is a small fraction of a
- * phone pebble and most of a line of text on a cover screen, so the top of the body sat visibly
- * washed out the moment the tile scrolled at all. Here the fade only has to say "there is more
- * above", not dissolve the content saying it.
+ * How far the scroll fade reaches into a cover tile's body. Shorter than the phone's
+ * [HeroPhotoSlideDistance]-class fade, since on a cover the fade only needs to say "there
+ * is more above", not dissolve a whole line of text.
  */
 @Composable
-internal fun coverFadeLength(): Dp = if (coverIsTiny()) 10.dp else 14.dp
+internal fun coverFadeLength(): Dp = if (coverIsTiny()) GapRow else GapGroup
 
 /**
  * The car the current cover page belongs to, provided by CompactCar so a tile deep inside it can
