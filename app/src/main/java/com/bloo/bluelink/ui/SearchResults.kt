@@ -151,7 +151,7 @@ internal fun SettingsSearchResults(
             ToggleRow(spec.label, spec.checked(appearance, notif, state)) { spec.onToggle(vm, it) }
         }
     }
-    // Two of Security's own controls, missing from here entirely -- "fingerprint"
+    // Two of Security's own controls, missing from here entirely -- "biometric"
     // and "lock" are exactly the words someone would type for this. Reproduces
     // the real card's logic verbatim (down to the same confirm-to-disable
     // biometric prompt, not a bare toggle) rather than a simplified stand-in,
@@ -159,14 +159,14 @@ internal fun SettingsSearchResults(
     // step the real row enforces would be a genuine regression, not just a
     // visual inconsistency.
     if (canBio) {
-        add("Require fingerprint to open", "biometric lock security app unlock") {
+        add("Require biometrics to open", "biometric lock security app unlock") {
             // LocalContext.current itself has to stay inside this entry's own @Composable
             // content lambda, not hoisted above -- reading a CompositionLocal is a composable
             // call, and the entries list above is built inside a plain (non-composable)
             // remember calculation now.
             val bioContext = LocalContext.current
             SettingsSegmentedRow(
-                label = "Require fingerprint to open",
+                label = "Require biometrics to open",
                 options = listOf(
                     SegmentOption("off", "Off", null),
                     SegmentOption("on", "On", null),
@@ -177,7 +177,7 @@ internal fun SettingsSearchResults(
                         bioContext.findFragmentActivity()?.let { activity ->
                             showBiometricPrompt(
                                 activity = activity,
-                                title = "Enable fingerprint lock",
+                                title = "Enable biometric lock",
                                 subtitle = "Confirm to require it on launch",
                                 onSuccess = { vm.setBiometricLock(true) },
                                 onError = { },
@@ -190,7 +190,7 @@ internal fun SettingsSearchResults(
                         } else {
                             showBiometricPrompt(
                                 activity = activity,
-                                title = "Disable fingerprint lock",
+                                title = "Disable biometric lock",
                                 subtitle = "Confirm to stop requiring it",
                                 onSuccess = { vm.setBiometricLock(false) },
                                 onError = { },

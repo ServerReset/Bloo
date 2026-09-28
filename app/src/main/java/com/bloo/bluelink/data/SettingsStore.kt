@@ -1069,10 +1069,10 @@ class SettingsStore(private val context: Context) {
     fun syncUri(p: Preferences): String? =
         p[stringPreferencesKey("sync_uri")]?.takeIf { it.isNotBlank() }
 
-    /** A short, stable fingerprint of the ACTUAL Drive file this device is synced
+    /** A short, stable biometric of the ACTUAL Drive file this device is synced
      *  to, derived from the persisted document URI's unique id. Shown in Settings
      *  so two devices can eyeball whether they're on the SAME file: if the two
-     *  fingerprints differ, they picked different files (Google Drive allows two
+     *  biometrics differ, they picked different files (Google Drive allows two
      *  files with the same name), which is the #1 reason settings/devices don't
      *  converge. Null when sync isn't set up. */
     suspend fun syncFileFingerprint(): String? = syncFileFingerprint(context.settingsDataStore.data.first())
@@ -2040,17 +2040,17 @@ class SettingsStore(private val context: Context) {
      *  automatic instead of only firing on a refresh or the periodic worker.
      *  Emits the empty set once the last upload clears it.
      *
-     *  Deduplicated HERE, on the key set *and a fingerprint of those keys' current values*,
+     *  Deduplicated HERE, on the key set *and a biometric of those keys' current values*,
      *  rather than by a plain `distinctUntilChanged()` at the collector. That is the whole
      *  point: the dirty set is a lossy projection of "something changed", so editing the
      *  same key twice leaves it byte-identical. A collector deduplicating on the set alone
      *  therefore saw no second change -- which is fine while the first push is still pending
      *  (it uploads current values anyway), but not when that push FAILED: the set stayed
      *  `{k}`, the re-edit of `k` produced `{k}` again, no emission, and the change sat
-     *  unsynced until a data refresh or the 2-hour worker. The value fingerprint restores
+     *  unsynced until a data refresh or the 2-hour worker. The value biometric restores
      *  the promise the first sentence above makes.
      *
-     *  Fingerprinted by hash, not by retaining the values: `distinctUntilChanged` holds its
+     *  Biometriced by hash, not by retaining the values: `distinctUntilChanged` holds its
      *  last value for comparison, and dirty values include multi-kilobyte JSON blobs
      *  (climate presets, custom palettes). A hash collision would suppress one emission --
      *  a delayed sync, backstopped by the periodic worker -- not a wrong one. */
@@ -2058,12 +2058,12 @@ class SettingsStore(private val context: Context) {
         .map { prefs ->
             val keys = prefs.dirtyKeySet()
             // One name -> value map, not a scan per dirty key. Tombstoned keys are absent
-            // from prefs and fingerprint as null, so a delete and a later restore of the
+            // from prefs and biometric as null, so a delete and a later restore of the
             // same key are correctly distinct.
             val byName = prefs.asMap().entries.associate { it.key.name to it.value }
             // NUL separator below, and written as the ESCAPE rather than the character. A pref
             // value can hold any printable text (names, JSON blobs, file paths), so a space or
-            // comma separator would let two different key/value sets fingerprint alike; NUL
+            // comma separator would let two different key/value sets biometric alike; NUL
             // cannot occur in one. Kotlin also accepts the raw byte, which is the trap: it
             // compiles, and then grep classifies this whole file as binary and prints no
             // matching lines at all. tools/check-control-chars.py now fails on it.

@@ -119,6 +119,7 @@ import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import dev.chrisbanes.haze.HazeState
+import dev.chrisbanes.haze.hazeSource
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -319,8 +320,7 @@ internal fun SettingsScreen(
             modifier = Modifier
                 .widthIn(max = 1100.dp)
                 .fillMaxWidth()
-                // The app root marks itself as the haze source (see BlooApp), so the grid is
-                // not one; a nested source here would overwrite that content layer.
+                .hazeSource(hazeState)
                 // The app runs edge-to-edge (MainActivity's enableEdgeToEdge()), which turns
                 // off the manifest's own adjustResize for every surface -- without this, a
                 // text field low in this list (license plate, a custom weather location) sat
@@ -931,7 +931,7 @@ private fun BackupSyncCardContent(
                     }
                     // Troubleshooting tools, not daily controls: the last-synced
                     // stamp (already summarised in the header above), the file
-                    // fingerprint, and the two repair actions all fold away by
+                    // biometric, and the two repair actions all fold away by
                     // default so the card stops reading as a wall of equal pills.
                     Spacer(Modifier.height(GapRow))
                     var showSyncDiagnostics by rememberSaveable { mutableStateOf(false) }

@@ -328,8 +328,8 @@ data class UiState(
     val thisDeviceId: String? = null,
     /** This device's friendly sync name (editable in Settings). */
     val syncDeviceName: String = "",
-    /** Short fingerprint of the actual Drive file this device syncs to. Two
-     *  devices showing DIFFERENT fingerprints are on different files (the main
+    /** Short biometric of the actual Drive file this device syncs to. Two
+     *  devices showing DIFFERENT biometrics are on different files (the main
      *  reason sync doesn't converge). Null when sync isn't set up. */
     val syncFileFingerprint: String? = null,
     /** Set when the garage fetch came back empty because a request actually

@@ -136,7 +136,7 @@ internal fun LockAlphaOverlay(locked: Boolean, vm: AppViewModel, opaqueBackdrop:
  * well on phones, flip-phone cover screens and tablets alike.
  *
  * Two mechanisms, one overlay:
- *  - **Fingerprint/biometric** when the device has biometrics enrolled AND
+ *  - **Biometric/biometric** when the device has biometrics enrolled AND
  *    the biometric lock is on (the classic prompt, plus a "Use PIN" link);
  *  - **PIN** when a device PIN is installed -- which is always the case on
  *    the device when it has no biometrics at all (the onboarding flow
@@ -346,8 +346,8 @@ internal fun LockOverlay(vm: AppViewModel, opaqueBackdrop: Boolean = false) {
                                     color = MaterialTheme.colorScheme.onSurface,
                                 )
                                 Text(
-                                    if (bioAvailable) "Your fingerprint or your PIN unlocks Bloo."
-                                    else "This device has no fingerprint sensor, so a PIN is required.",
+                                    if (bioAvailable) "Your biometrics or your PIN unlock Bloo."
+                                    else "This device has no biometrics, so a PIN is required.",
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 )
@@ -407,7 +407,7 @@ internal fun LockOverlay(vm: AppViewModel, opaqueBackdrop: Boolean = false) {
                                 enabled = true,
                             ) {
                                 MorphTextButton(
-                                    "Use fingerprint",
+                                    "Use biometrics",
                                     onClick = { haptics?.click(); usePinMode = false; authenticateBiometric() },
                                     interactionSource = bioSource,
                                     modifier = Modifier.fillMaxWidth(),

@@ -440,7 +440,7 @@ fun standardButtonIcon(label: String): ImageVector? = when (label) {
     "Run it", "Working…" -> Icons.Filled.Bolt
     "Remind me" -> Icons.Filled.Refresh
     // Security
-    "Use fingerprint" -> Icons.Filled.Fingerprint
+    "Use biometrics" -> Icons.Filled.Fingerprint
     "Use PIN", "Update PIN", "Change PIN", "Set up PIN" -> Icons.Filled.Pin
     // Places / appearance
     "Set place" -> Icons.Filled.Place

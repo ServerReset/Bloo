@@ -835,7 +835,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    /** Whether the device currently has usable biometrics (fingerprint/face)
+    /** Whether the device currently has usable biometrics (biometric/face)
      *  enrolled -- gates whether [UiState.locked] / [maybeRelock] can ever
      *  apply, since there's nothing to authenticate against otherwise.
      *  BIOMETRIC_WEAK is used (rather than STRONG) so a wider range of
@@ -911,7 +911,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
      * rejected outright (no work spent on it), otherwise a wrong PIN records
      * a failure and every fifth failure opens a window that doubles per
      * batch (30s, 1m, 2m, ...). A correct PIN resets the counter and unlocks
-     * like a fingerprint would.
+     * like a biometric would.
      *
      * Result surfaces through [UiState.pinAttemptRejected] /
      * [UiState.pinLockout]; the overlay acknowledges via
@@ -1551,7 +1551,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             var pushJob: kotlinx.coroutines.Job? = null
             // No .distinctUntilChanged() here: dirtyKeysFlow already dedupes, on the key set
-            // AND a fingerprint of those keys' values. Deduping on the bare set a second time
+            // AND a biometric of those keys' values. Deduping on the bare set a second time
             // would re-introduce exactly what that fixes -- re-editing one key after a failed
             // push yields an identical set, so the retry never got scheduled.
             settingsStore.dirtyKeysFlow

@@ -90,6 +90,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -202,6 +203,21 @@ internal fun OnboardingScreen(vm: AppViewModel) {
     val state by vm.state.collectAsStateWithLifecycle()
     val canBio = remember { vm.canUseBiometrics() }
     val scheme = MaterialTheme.colorScheme
+    val appearance by vm.appearance.collectAsStateWithLifecycle()
+    // Notifications are REQUIRED on the setup step (API 33+), so the grant must be visible to
+    // the Next gate here, not only to the setup card's own button. Re-checked on resume so
+    // returning from the system permission screen updates it without a relaunch.
+    var notifGranted by remember { mutableStateOf(com.bloo.bluelink.data.Notifications.hasPermission(context)) }
+    val notifLifecycle = androidx.lifecycle.compose.LocalLifecycleOwner.current
+    DisposableEffect(notifLifecycle) {
+        val obs = androidx.lifecycle.LifecycleEventObserver { _, event ->
+            if (event == androidx.lifecycle.Lifecycle.Event.ON_RESUME) {
+                notifGranted = com.bloo.bluelink.data.Notifications.hasPermission(context)
+            }
+        }
+        notifLifecycle.lifecycle.addObserver(obs)
+        onDispose { notifLifecycle.lifecycle.removeObserver(obs) }
+    }
 
     // Snapshot of vehicles a restored backup already configured, frozen once
     // the user moves past the SETUP step (always index 1 -- INTRO then SETUP
@@ -234,10 +250,13 @@ internal fun OnboardingScreen(vm: AppViewModel) {
     val lastIndex = steps.lastIndex
     val isLast = pageIndex == lastIndex
 
-    // Devices without biometrics MUST finish the PIN step before leaving it
-    // -- without a PIN there is no lock mechanism for this device at all.
-    // The CTA below is disabled (with a hint) until the PIN lands.
-    val pinRequired = !canBio && steps.getOrNull(pageIndex)?.kind == OnboardingStepKind.SETUP && !state.appPinSet
+    // The setup step is BLOCKING: notifications (API 33+) and a lock (biometrics when the
+    // device has them, else a PIN) are both required before Next unlocks. The lock card swaps
+    // to whichever the device supports, so there is never a second mechanism to skip.
+    val onSetup = steps.getOrNull(pageIndex)?.kind == OnboardingStepKind.SETUP
+    val notifRequired = onSetup && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU && !notifGranted
+    val lockRequired = onSetup && ((canBio && !appearance.biometricLock) || (!canBio && !state.appPinSet))
+    val setupBlocked = notifRequired || lockRequired
 
     fun goNext() {
         if (pageIndex < lastIndex) {
@@ -324,7 +343,7 @@ internal fun OnboardingScreen(vm: AppViewModel) {
                     ) {
                         when (step.kind) {
                             OnboardingStepKind.INTRO -> OnboardingIntroPage()
-                            OnboardingStepKind.SETUP -> OnboardingSetupPage(vm, state, context, canBio)
+                            OnboardingStepKind.SETUP -> OnboardingSetupPage(vm, state, context, canBio, appearance.biometricLock, notifGranted) { notifGranted = it }
                             OnboardingStepKind.CAR -> {
                                 val vehicle = step.vin?.let { vin -> state.vehicles.firstOrNull { it.vin == vin } }
                                 val sc = vehicle?.let { state.seatConfigs[it.vin] } ?: com.bloo.bluelink.data.SeatConfig()
@@ -384,13 +403,13 @@ internal fun OnboardingScreen(vm: AppViewModel) {
                 // over Back that the expression asks for.
                 SafeExpansiveButton(
                     interactionSource = nextSource,
-                    enabled = !pinRequired,
+                    enabled = !setupBlocked,
                     modifier = Modifier.weight(if (pageIndex > 0) 2f else 1f),
                 ) {
                     MorphButton(
                         onClick = ::goNext,
                         active = true,
-                        enabled = !pinRequired,
+                        enabled = !setupBlocked,
                         interactionSource = nextSource,
                         modifier = Modifier.fillMaxWidth(),
                         contentPadding = PaddingValues(vertical = GapSection),
@@ -411,10 +430,11 @@ internal fun OnboardingScreen(vm: AppViewModel) {
                         )
                     }
                 }
-                if (pinRequired) {
+                if (setupBlocked) {
                     Spacer(Modifier.height(GapHairline))
                     BodySmallText(
-                        "Set your PIN above to continue.",
+                        if (notifRequired) "Turn on notifications above to continue."
+                        else "Set up the lock above to continue.",
                     )
                 }
             }
@@ -544,18 +564,28 @@ internal fun OnboardingIntroPage() {
 }
 
 /**
- * Step 2: notifications, biometrics, and Drive/manual sync -- all optional,
- * Next always works regardless. Each gets its own solid card (icon + title +
- * body + action) instead of a bare full-width button floating directly on
- * the animated Aurora background -- a moving, colourful backdrop is a poor
- * contrast surface for plain text, and three thin buttons with nothing else
- * around them read as an empty step. Syncing here (not just notifications +
- * biometrics) also means a restored backup can skip the per-car setup
- * screens later in this same flow for any car it already configured -- see
- * [buildOnboardingSteps]' `preConfiguredVins`.
+ * Step 2: get the app set up to actually work. Two things are REQUIRED before Next unlocks,
+ * because the app is genuinely worse without them and "I'll do it later" reliably means never:
+ *
+ *  - **Notifications**, so charge/alerts/updates can reach the user at all (API 33+).
+ *  - **A lock** -- biometrics when the device has them, otherwise a PIN. Without one of these
+ *    the app can never lock itself, so the lock card SWAPS to whichever the device supports
+ *    instead of showing both and letting the user skip the one that actually matters.
+ *
+ * Drive/manual sync stays optional: a restored backup can still skip the per-car setup screens
+ * later in this flow for any car it already configured (see [buildOnboardingSteps]'
+ * `preConfiguredVins`).
  */
 @Composable
-internal fun OnboardingSetupPage(vm: AppViewModel, state: UiState, context: android.content.Context, canBio: Boolean) {
+internal fun OnboardingSetupPage(
+    vm: AppViewModel,
+    state: UiState,
+    context: android.content.Context,
+    canBio: Boolean,
+    biometricLock: Boolean,
+    notifGranted: Boolean,
+    onNotifResult: (Boolean) -> Unit,
+) {
     val scheme = MaterialTheme.colorScheme
     Text(
         "Quick setup",
@@ -564,26 +594,21 @@ internal fun OnboardingSetupPage(vm: AppViewModel, state: UiState, context: andr
         color = scheme.onSurface,
     )
     BodyMediumText(
-        if (canBio)
-            "All optional -- skip anything here and turn it on later in Settings."
-        else
-            "Everything here is optional -- except one thing: this device has no fingerprint sensor, so a PIN is required to lock the app.",
+        "Two quick things and you're in -- let Bloo reach you, and lock the app.",
         color = scheme.onSurfaceVariant,
     )
     Spacer(Modifier.height(GapHairline))
 
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-        var notifGranted by remember {
-            mutableStateOf(com.bloo.bluelink.data.Notifications.hasPermission(context))
-        }
         val notifLauncher = rememberLauncherForActivityResult(
             ActivityResultContracts.RequestPermission(),
-        ) { granted -> notifGranted = granted }
+        ) { granted -> onNotifResult(granted) }
         OnboardingSetupCard(
             icon = Icons.Filled.Notifications,
             title = "Notifications",
-            body = "Get notified about charge status, alerts, and app updates.",
+            body = "Charge status, car alerts, and app updates need this to reach you.",
             done = notifGranted,
+            required = true,
         ) {
             MorphButton(
                 onClick = { if (!notifGranted) notifLauncher.launch(android.Manifest.permission.POST_NOTIFICATIONS) },
@@ -591,24 +616,24 @@ internal fun OnboardingSetupPage(vm: AppViewModel, state: UiState, context: andr
                 modifier = Modifier.fillMaxWidth(),
                 contentPadding = PaddingValues(vertical = GapGroup),
             ) {
-                val notificationIcon: ImageVector = if (notifGranted) AppIcons.CheckCircle else Icons.Filled.Notifications
-                val notificationText: String = if (notifGranted) "Enabled" else "Enable notifications"
                 MorphButtonLabel(
-                    notificationIcon,
-                    notificationText,
+                    if (notifGranted) AppIcons.CheckCircle else Icons.Filled.Notifications,
+                    if (notifGranted) "Notifications on" else "Turn on notifications",
                     pending = false,
                 )
             }
         }
     }
 
+    // ONE lock card, swapped to whatever this device can actually authenticate with.
     if (canBio) {
-        var bioEnabled by remember { mutableStateOf(false) }
+        val bioEnabled = biometricLock
         OnboardingSetupCard(
             icon = Icons.Filled.Fingerprint,
-            title = "Fingerprint lock",
-            body = "Require your fingerprint to open Bloo.",
+            title = "Biometric lock",
+            body = "Require your biometrics to open Bloo.",
             done = bioEnabled,
+            required = true,
         ) {
             MorphButton(
                 onClick = {
@@ -616,9 +641,9 @@ internal fun OnboardingSetupPage(vm: AppViewModel, state: UiState, context: andr
                         context.findFragmentActivity()?.let { activity ->
                             showBiometricPrompt(
                                 activity = activity,
-                                title = "Enable fingerprint lock",
+                                title = "Enable biometric lock",
                                 subtitle = "Confirm to require it when opening Bloo",
-                                onSuccess = { vm.setBiometricLock(true); bioEnabled = true },
+                                onSuccess = { vm.setBiometricLock(true) },
                                 onError = {},
                             )
                         }
@@ -628,30 +653,20 @@ internal fun OnboardingSetupPage(vm: AppViewModel, state: UiState, context: andr
                 modifier = Modifier.fillMaxWidth(),
                 contentPadding = PaddingValues(vertical = GapGroup),
             ) {
-                val biometricIcon: ImageVector = if (bioEnabled) AppIcons.CheckCircle else Icons.Filled.Fingerprint
-                val biometricText: String = if (bioEnabled) "Enabled" else "Enable fingerprint lock"
                 MorphButtonLabel(
-                    biometricIcon,
-                    biometricText,
+                    if (bioEnabled) AppIcons.CheckCircle else Icons.Filled.Fingerprint,
+                    if (bioEnabled) "Biometric lock on" else "Turn on biometric lock",
                     pending = false,
                 )
             }
         }
-    }
-
-    // --- App PIN ---
-    // Required (this exact card, not a skipped option) on devices with no
-    // biometrics: without either mechanism the app could never lock at all.
-    // On biometric devices it's the optional backup PIN.
-    if (!canBio || !state.appPinSet) {
+    } else {
         OnboardingSetupCard(
             icon = AppIcons.Lock,
-            title = if (canBio) "Backup PIN" else "PIN lock",
-            body = if (canBio)
-                "Add a 4-8 digit PIN as a backup for days fingerprint sensors act up."
-            else
-                "This device can't read fingerprints, so Bloo needs a 4-8 digit PIN to lock itself with.",
+            title = "PIN lock",
+            body = "This device has no biometrics, so a 4-8 digit PIN locks the app.",
             done = state.appPinSet,
+            required = true,
         ) {
             OnboardingPinForm(
                 existing = state.appPinSet,
@@ -689,7 +704,7 @@ internal fun OnboardingSetupPage(vm: AppViewModel, state: UiState, context: andr
         // AnimatedContent, not a bare if/else -- this used to snap straight
         // from the "Set up Drive sync" button to the "enabled" row the instant
         // the dialog finished, the one un-animated content swap left in a step
-        // whose sibling cards (notifications, fingerprint) at least keep the
+        // whose sibling cards (notifications, biometric) at least keep the
         // same MorphButton in place and only recolor it.
         AnimatedContent(
             targetState = syncEnabled,
@@ -814,6 +829,9 @@ internal fun OnboardingSetupCard(
     title: String,
     body: String,
     done: Boolean,
+    /** Required to leave this step: shows a "Required" chip until [done], so the user
+     *  knows why Next is disabled rather than just finding it greyed out. */
+    required: Boolean = false,
     content: @Composable () -> Unit,
 ) {
     val scheme = MaterialTheme.colorScheme
@@ -833,6 +851,20 @@ internal fun OnboardingSetupCard(
                 Column(Modifier.weight(1f)) {
                     TitleSmallText(title, color = scheme.onSurface)
                     MutedText(body)
+                }
+                if (required && !done) {
+                    Surface(
+                        shape = RoundedCornerShape(50),
+                        color = scheme.tertiaryContainer,
+                    ) {
+                        Text(
+                            "Required",
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = scheme.onTertiaryContainer,
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+                        )
+                    }
                 }
             }
             content()

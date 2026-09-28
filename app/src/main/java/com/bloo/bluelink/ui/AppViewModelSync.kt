@@ -264,7 +264,7 @@ fun AppViewModel.testSync() {
  *  makes "enable sync" actually push/pull data right away. */
 internal suspend fun AppViewModel.runDriveSyncNow() {
     val outcome = withContext(Dispatchers.IO) { settingsStore.performMainToMainSync() }
-    // Recompute the file fingerprint each pass so it appears the moment sync is
+    // Recompute the file biometric each pass so it appears the moment sync is
     // set up / the file is changed (it's derived purely from the persisted URI).
     val fingerprint = withContext(Dispatchers.IO) { settingsStore.syncFileFingerprint() }
     if (outcome.ran) {

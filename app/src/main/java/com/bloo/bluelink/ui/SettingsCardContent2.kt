@@ -533,7 +533,7 @@ internal fun SecurityCardContent(
                 val locked = canBio && appearance.biometricLock
                 val securityTint = if (locked) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.onSurfaceVariant
                 val securityStatus = when {
-                    !canBio -> "No fingerprint enrolled"
+                    !canBio -> "No biometrics enrolled"
                     locked -> "Locked · ${appearance.lockTiming.label}"
                     else -> "Not locked"
                 }
@@ -545,7 +545,7 @@ internal fun SecurityCardContent(
                 )
                 Spacer(Modifier.height(GapGroup))
                 if (canBio) {
-                    // One control, three states. This used to be a "require fingerprint"
+                    // One control, three states. This used to be a "require biometric"
                     // on/off toggle plus a separate lock-timing row, which let people save
                     // contradictory combinations (lock ON with "never re-lock", or a lock
                     // timing shown while the lock itself was OFF). A single group keeps the
@@ -628,7 +628,7 @@ internal fun SecurityCardContent(
                                         } else {
                                             showBiometricPrompt(
                                                 activity = activity,
-                                                title = "Enable fingerprint lock",
+                                                title = "Enable biometric lock",
                                                 subtitle = "Confirm to require it on launch",
                                                 onSuccess = {
                                                     vm.setBiometricLock(true)
@@ -644,7 +644,7 @@ internal fun SecurityCardContent(
                     )
                 } else {
                     BodyMediumText(
-                        "No fingerprint/biometric is enrolled on this device.",
+                        "No biometrics are enrolled on this device.",
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
@@ -667,9 +667,9 @@ internal fun SecurityCardContent(
                 Spacer(Modifier.height(GapHairline))
                 BodySmallText(
                     if (canBio)
-                        "A 4-8 digit PIN that works as a backup when fingerprints aren't available."
+                        "A 4-8 digit PIN that works as a backup when biometrics aren't available."
                     else
-                        "This device has no fingerprints, so the app unlocks with this PIN.",
+                        "This device has no biometrics, so the app unlocks with this PIN.",
                 )
                 Spacer(Modifier.height(GapGroup))
                 ExpressiveButtonRow(spacing = 8.dp) {

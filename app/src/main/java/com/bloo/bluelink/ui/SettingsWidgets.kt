@@ -543,9 +543,9 @@ internal fun PinDialogs(
                         else -> {
                             Text(
                                 if (canBio)
-                                    "Removing the PIN leaves fingerprints as the only way to lock the app."
+                                    "Removing the PIN leaves biometrics as the only way to lock the app."
                                 else
-                                    "This device has no fingerprints, so removing the PIN means the app can never lock.",
+                                    "This device has no biometrics, so removing the PIN means the app can never lock.",
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = scheme.onSurfaceVariant,
                             )
