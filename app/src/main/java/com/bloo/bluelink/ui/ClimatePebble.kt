@@ -405,7 +405,7 @@ internal fun ClimatePebble(
                         )
                     }
                     Text(
-                        "It's $ambientLabel where your car is. Smart climate is targeting $targetLabel.",
+                        "It's $ambientLabel by your car. Smart climate targets $targetLabel.",
                         style = MaterialTheme.typography.bodySmall,
                         color = LocalContentColor.current.copy(alpha = MutedContentAlpha),
                     )

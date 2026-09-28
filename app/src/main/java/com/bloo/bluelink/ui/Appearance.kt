@@ -365,7 +365,7 @@ internal fun ColorPickerCanvas(
                 .height(34.dp)
                 .clip(CircleShape)
                 .semantics {
-                    contentDescription = "Hue picker. Use the hex colour field below for exact input."
+                    contentDescription = "Hue picker. Use the hex field below for exact values."
                 }
                 .pointerInput(Unit) {
                     awaitEachGesture {

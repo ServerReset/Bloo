@@ -551,7 +551,7 @@ internal fun SyncChoiceScreen(vm: AppViewModel) {
             OnboardingSetupCard(
                 icon = Icons.Filled.CloudSync,
                 title = "Restore from sync",
-                body = "Pick the sync file another device already uses -- theme, layout, alerts, presets and car setup come with it.",
+                body = "Pick the sync file another device uses -- theme, layout, alerts, presets and car setup come with it.",
                 done = false,
             ) {
                 MorphButton(
@@ -592,7 +592,7 @@ internal fun OnboardingIntroPage() {
         emoji = "👋",
         title = "Welcome to Bloo",
         titleStyle = MaterialTheme.typography.displaySmall,
-        subtitle = "Lock, climate, charge status and more -- for your Hyundai, Genesis, or Kia. Let's set up your car.",
+        subtitle = "Lock, climate, charge and more for your Hyundai, Genesis, or Kia. Let's set up your car.",
         tips = listOf(
             Triple(AppIcons.Bolt, "Live status", "Battery, fuel, and lock state at a glance"),
             Triple(Icons.Filled.Thermostat, "Remote climate", "Warm it up or cool it down before you get in"),
@@ -644,7 +644,7 @@ internal fun OnboardingSetupPage(
         OnboardingSetupCard(
             icon = Icons.Filled.Notifications,
             title = "Notifications",
-            body = "Charge status, car alerts, and app updates need this to reach you.",
+            body = "Charge status, car alerts and app updates need this.",
             done = notifGranted,
             required = true,
         ) {
@@ -1097,7 +1097,7 @@ internal fun OnboardingCrashCoursePage() {
 internal fun OnboardingFeaturesPage(state: UiState) {
     val tips = buildList<Triple<ImageVector, String, String>> {
         add(Triple(AppIcons.Lock, "AutoLock", "Locks your car when you walk away -- enable it per car in Settings"))
-        add(Triple(AppIcons.Bolt, "Live charging updates", "Watch an EV's charge progress right from your lock screen while it's plugged in"))
+        add(Triple(AppIcons.Bolt, "Live charging updates", "Watch an EV's charge progress from your lock screen while plugged in"))
         add(Triple(AppIcons.Search, "Just ask", "Search \"lock my car\" or \"start climate at 70\" to run it from the bar"))
         if (state.aiSupported) {
             add(Triple(AppIcons.AutoAwesome, "On-device AI summaries", "Plain-language status summaries, generated on your phone"))

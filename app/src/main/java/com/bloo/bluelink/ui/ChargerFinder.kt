@@ -105,7 +105,7 @@ internal fun ChargerFilterBar(
                     overflow = TextOverflow.Ellipsis,
                 )
                 Spacer(Modifier.height(GapHairline))
-                MutedText("Open Charge Map needs a free API key per app -- paste one below.")
+                MutedText("Open Charge Map needs a free API key -- paste one below.")
                 Spacer(Modifier.height(GapRow))
                 // Inline, not a bounce to Settings: a missing/invalid key is the single most
                 // likely cause of this exact error, and the whole point of surfacing it here

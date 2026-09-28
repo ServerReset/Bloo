@@ -2396,7 +2396,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     fun downloadUpdateInBackground() {
         val url = _state.value.updateAvailable?.run?.phoneApkUrl
         if (url == null) {
-            _state.update { it.copy(message = "No direct download for this build. Use the browser link instead.") }
+            _state.update { it.copy(message = "No direct download for this build. Use the browser link.") }
             return
         }
         if (_state.value.updateDownloading || _state.value.updateApkReady) return
@@ -2445,7 +2445,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         if (_state.value.updateInstalling) return
         val dest = apkCacheFile()
         if (!dest.exists()) {
-            _state.update { it.copy(updateApkReady = false, message = "The downloaded update is gone. Tap Update to fetch it again.") }
+            _state.update { it.copy(updateApkReady = false, message = "Update file missing. Tap Update to fetch it again.") }
             return
         }
         val installer = com.bloo.bluelink.update.ShizukuInstaller
@@ -2509,7 +2509,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
      *  path). Reports only if even this can't be launched. */
     private fun fallbackInstall(dest: java.io.File) {
         if (!com.bloo.bluelink.data.installDownloadedApk(getApplication<Application>(), dest)) {
-            _state.update { it.copy(message = "Couldn't open the installer. Find Bloo.apk in your downloads.") }
+            _state.update { it.copy(message = "Couldn't open the installer. Find Bloo.apk in Downloads.") }
         }
     }
 

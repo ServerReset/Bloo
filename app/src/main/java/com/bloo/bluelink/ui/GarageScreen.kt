@@ -154,7 +154,7 @@ internal fun GarageScreen(
     // Gentle one-time nudge after onboarding, encouraging a Settings visit.
     LaunchedEffect(showSettingsHint) {
         if (showSettingsHint) {
-            vm.reportInfo("Tip: fine-tune each car's seats, photo and pebble order in Settings")
+            vm.reportInfo("Tip: tune each car's seats, photo and pebble order in Settings")
             vm.dismissSettingsHint()
         }
     }

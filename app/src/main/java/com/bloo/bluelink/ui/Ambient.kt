@@ -534,7 +534,7 @@ internal fun KiaOtpDialog(otp: KiaOtpUi, loading: Boolean, vm: AppViewModel) {
         title = if (otp.sentTo == null) "Verify it's you" else "Enter your code",
         text = {
             if (otp.sentTo == null) {
-                Text("Kia needs to verify this sign-in with a one-time code. Where should it go?")
+                Text("Kia needs a one-time code. Where should it go?")
                 if (otp.challenge.hasEmail) {
                     val emailSource = remember { MutableInteractionSource() }
                     SafeExpansiveButton(

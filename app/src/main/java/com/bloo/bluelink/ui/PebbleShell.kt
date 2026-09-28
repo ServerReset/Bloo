@@ -1026,15 +1026,20 @@ internal fun PebbleShell(
                         }
                         }
                     }
-                    // Normal pebbles: animate the body sliding open/closed. fade = false on
-                    // the exit -- StaggeredRevealColumn's rows own their own fade now (see
-                    // collapseExit's own doc for why running a SECOND, block-level fade at the
-                    // same time buried that per-row one and made closing look like it had no
-                    // content animation at all).
+                    // Normal pebbles: animate the body sliding open/closed. The EXIT is a
+                    // real fade now (it used to be fade = false) -- reported directly that
+                    // closing "just clips behind the bottom of the closed pebble area instead
+                    // of properly going away": with no block fade, the body's own content was
+                    // sliced by the card's shrinking bottom edge for the whole collapse, and
+                    // the per-row cascade alone was not enough to hide it. Fading the block as
+                    // the height shrinks lets the content dissolve ON the way down instead of
+                    // being cut off by the edge, so it reads as the body going away rather than
+                    // as a clip. The rows still cascade underneath it; the fade just masks the
+                    // column edge that the shrink exposes.
                     AnimatedVisibility(
                         visible = expanded,
                         enter = expandEnterSized(),
-                        exit = expandExitSized(fade = false),
+                        exit = expandExitSized(fade = true),
                     ) {
                         // StaggeredRevealColumn, not a plain Column: every row pops in/out on
                         // its own as this cascades open/closed, instead of every row appearing

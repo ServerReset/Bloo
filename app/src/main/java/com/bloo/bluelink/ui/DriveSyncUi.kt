@@ -202,7 +202,7 @@ internal fun SyncDevicesSection(state: UiState, vm: AppViewModel) {
             )
             Spacer(Modifier.width(8.dp))
             Text(
-                "A device hasn't synced recently -- it may be on a different Drive file. Reconnect it via Change Drive file → Open from Drive.",
+                "A device hasn't synced recently -- it may be on a different Drive file. Reconnect via Change Drive file → Open from Drive.",
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -446,7 +446,7 @@ internal fun DriveSyncSetupDialog(
         title = "Google Drive sync",
         text = {
             BodyMediumText(
-                "Keep your settings in sync across devices with one file in Google Drive.",
+                "Keep settings in sync across devices with one Drive file.",
                 color = scheme.onSurfaceVariant,
             )
             // Join first — it's the correct choice when another device already set
@@ -455,7 +455,7 @@ internal fun DriveSyncSetupDialog(
             DriveSyncChoiceRow(
                 icon = Icons.Filled.FileOpen,
                 title = "Open from Drive",
-                subtitle = "Join the file another device already set up, they'll share settings.",
+                subtitle = "Join the file another device set up to share settings.",
                 emphasized = hasExistingSync,
                 onClick = onOpenFromDrive,
             )
@@ -470,7 +470,7 @@ internal fun DriveSyncSetupDialog(
                     verticalArrangement = Arrangement.spacedBy(GapRow),
                 ) {
                     Text(
-                        "This starts a NEW, separate Drive file -- your devices will stop sharing settings.",
+                        "Starts a new Drive file -- your devices stop sharing settings.",
                         style = MaterialTheme.typography.bodySmall,
                         color = scheme.onErrorContainer,
                     )
@@ -484,7 +484,7 @@ internal fun DriveSyncSetupDialog(
                 DriveSyncChoiceRow(
                     icon = Icons.Filled.CreateNewFolder,
                     title = "Save to Drive",
-                    subtitle = "Start fresh: create a new file with this device's settings.",
+                    subtitle = "Start fresh with this device's settings.",
                     onClick = { if (hasExistingSync) warnNewFile = true else onSaveToDrive() },
                 )
             }

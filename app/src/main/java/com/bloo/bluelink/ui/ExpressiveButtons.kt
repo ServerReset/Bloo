@@ -389,6 +389,8 @@ fun ExpressiveButtonRow(
     lineSpacing: Dp = spacing,
     /** See [ExpressiveButtonGroup]'s own `wrap`. */
     wrap: Boolean = true,
+    /** See [ExpressiveButtonGroup]'s own `stretchCompact`. */
+    stretchCompact: Boolean = false,
     content: @Composable () -> Unit,
 ) {
     ExpressiveButtonGroup(
@@ -399,6 +401,7 @@ fun ExpressiveButtonRow(
         horizontalAlignment = horizontalAlignment,
         lineSpacing = lineSpacing,
         wrap = wrap,
+        stretchCompact = stretchCompact,
     ) {
         content()
     }
@@ -458,6 +461,14 @@ fun ExpressiveButtonGroup(
      * at all. They compact to their glyphs instead, which is what the fit rule is for.
      */
     wrap: Boolean = true,
+    /**
+     * For an equal-width row that has been compacted to icon-only (see `wrap`): keep the true
+     * equal share rather than capping each member at its own glyph width, so the compacted
+     * row still spans its full width with the icons spread evenly. The map's bottom toolbar
+     * uses this -- it wants one full-width icon-only strip, and without this a compacted row
+     * shrank to a small cluster instead.
+     */
+    stretchCompact: Boolean = false,
     content: @Composable ExpressiveButtonGroupScope.() -> Unit,
 ) {
     // Natural (unpressed) child widths, cached from the last resting measure pass. A plain
@@ -664,8 +675,10 @@ fun ExpressiveButtonGroup(
                 if (equalWidths && constraints.hasBoundedWidth && memberIdx.size > 1) {
                     val each = room.toDouble() / memberIdx.size
                     val isCompact = basis !== full
-                    for (i in memberIdx) base[i] = if (isCompact) minOf(each, natLine[i].toDouble()) else each
-                    total = if (isCompact) memberIdx.sumOf { base[it] }.roundToInt() else room
+                    for (i in memberIdx) {
+                        base[i] = if (isCompact && !stretchCompact) minOf(each, natLine[i].toDouble()) else each
+                    }
+                    total = if (isCompact && !stretchCompact) memberIdx.sumOf { base[it] }.roundToInt() else room
                 } else {
                     // Members that declare a weight stretch to fill whatever the line leaves
                     // over. This is what lets a split pill span its row AND still redistribute

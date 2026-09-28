@@ -180,7 +180,7 @@ internal fun InfoPebble(v: Vehicle, status: VehicleStatus?, state: UiState, vm: 
             }
             if (lastSvc == null || interval == null) {
                 Text(
-                    "Set last-service mileage and a service interval in Settings to track service.",
+                    "Set last-service mileage and interval in Settings to track service.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )

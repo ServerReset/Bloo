@@ -331,7 +331,7 @@ internal fun LogsCardContent(logs: List<String>, vm: AppViewModel, clipboardScop
                         Spacer(Modifier.height(GapHairline))
                         if (lineCount > 0) {
                             LabelSmallText(
-                                "Earliest entries at the top. The newest $lineCount lines are shown.",
+                                "Newest $lineCount lines.",
                                 color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
                             )
                         }
@@ -410,7 +410,7 @@ internal fun NotificationsCardContent(notif: SettingsStore.NotificationPrefs, vm
                 ToggleRow(
                     "Live charging updates",
                     notif.charging,
-                    description = "A progress bar in the shade (status bar on Android 16+) while charging, with the limit marked and a Stop button.",
+                    description = "A charging bar in the shade (status bar on Android 16+) with the limit and a Stop button.",
                 ) { vm.setNotifyCharging(it) }
                 // Whether it actually promotes to the status-bar chip is a
                 // system decision this app cannot force -- Android 16+ has a
@@ -500,7 +500,7 @@ internal fun NotificationsCardContent(notif: SettingsStore.NotificationPrefs, vm
                 ToggleRow("Car started notifications", notif.carStarted) { vm.setNotifyCarStarted(it) }
                 ToggleRow("Charge complete notifications", notif.chargeComplete) { vm.setNotifyChargeComplete(it) }
                 Text(
-                    "Checks run about every 30 minutes, so alerts may lag your set time. Door/running alerts include a one-tap action.",
+                    "Checks run about every 30 minutes. Door/running alerts include a one-tap action.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )

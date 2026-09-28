@@ -496,12 +496,12 @@ internal fun GarageStatusCard(state: State<UiState>, vm: AppViewModel, hazeState
         accounts.isEmpty() -> Triple(
             Icons.Filled.CloudOff,
             "Not signed in",
-            "Sign in to your Hyundai, Kia, or Genesis account -- swipe right for Settings.",
+            "Sign in to your Hyundai, Kia, or Genesis account. Swipe right for Settings.",
         )
         offline -> Triple(
             Icons.Filled.WifiOff,
             "No connection",
-            "No internet. You're still signed in -- check your connection and pull down to retry.",
+            "No internet. You're still signed in -- check your connection and pull to retry.",
         )
         loadFailed -> Triple(
             Icons.Filled.WifiOff,
@@ -511,7 +511,7 @@ internal fun GarageStatusCard(state: State<UiState>, vm: AppViewModel, hazeState
         else -> Triple(
             Icons.Filled.DirectionsCar,
             "No vehicles found",
-            "No enrolled vehicles were found on this account.\n\nMake sure your car is registered in the BlueLink / UVO app, then pull down to reload.",
+            "No vehicles found on this account.\n\nRegister your car in the BlueLink / UVO app, then pull to reload.",
         )
     }
 

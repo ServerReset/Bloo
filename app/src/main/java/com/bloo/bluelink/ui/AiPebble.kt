@@ -219,7 +219,7 @@ internal fun AiPebble(v: Vehicle, state: UiState, vm: AppViewModel, dragHandle: 
             }
         } else {
             Text(
-                "Summarize this car's last-refreshed status, generated privately on your device.",
+                "Summarizes this car's latest status, on your device.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = LocalContentColor.current.copy(alpha = MutedContentAlpha),
             )

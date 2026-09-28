@@ -378,7 +378,7 @@ internal fun WizardPlatformPage(
     WizardPageHeader(
         "Head-unit generation",
         "Which generation is the ${vehicle.name}?",
-        "Confirm these -- the API can't always tell. Features like Trips only show when supported.",
+        "Confirm these -- the API can't always tell. Some features only show when supported.",
     )
     val current = state.platformOf(vehicle)
     Column(verticalArrangement = Arrangement.spacedBy(GapRow)) {
@@ -453,7 +453,7 @@ internal fun WizardSeatsPage(
         }
     }
     BodySmallText(
-                "You can change these any time in Settings under your car card.",
+                "Change these any time in Settings under your car.",
         color = scheme.onSurfaceVariant,
     )
 }

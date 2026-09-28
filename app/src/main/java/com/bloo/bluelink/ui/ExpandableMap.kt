@@ -129,23 +129,23 @@ internal data class MapFeature(
 internal fun MapFeatureRow(
     features: List<MapFeature>,
     modifier: Modifier = Modifier,
-    /** See [ExpressiveButtonRow]'s own `wrap`. Standard rows wrap; kept as a param only for a
-     *  caller that genuinely needs one fixed line. */
-    wrap: Boolean = true,
+    /** False by default: the map toolbar stays ONE line, compacting to icon-only buttons
+     *  when the labels no longer fit, rather than wrapping to a second line -- see
+     *  [ExpressiveButtonRow]'s own `wrap`. */
+    wrap: Boolean = false,
     horizontalAlignment: Alignment.Horizontal = Alignment.Start,
 ) {
-    // A plain standard row now, exactly like every other multi-button row in the app: the
-    // app's own [MorphActionButton] (icon + label), equal shares (`equalWidths`), and the
-    // standard wrap-when-it-does-not-fit behaviour. The bespoke "compact to icon-only and
-    // stretch to the edges" treatment the map row used to carry (a `wrap = false` + a
-    // since-removed `stretchCompact`) read as a different kind of control from the buttons
-    // everywhere else and was reported as needing to just be standard.
+    // One full-width icon-only strip. `wrap = false` compacts the row to its glyphs once
+    // the labels stop fitting (a map toolbar has no room for two lines), and `stretchCompact`
+    // keeps those glyphs spread across the full width rather than shrinking to a small
+    // cluster in the middle -- requested directly, twice: compact to icons, and full width.
     ExpressiveButtonRow(
         modifier = modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = GapRow),
         spacing = 10.dp,
         equalWidths = true,
         wrap = wrap,
         horizontalAlignment = horizontalAlignment,
+        stretchCompact = true,
     ) {
         features.forEach { feature ->
             val source = remember { MutableInteractionSource() }
