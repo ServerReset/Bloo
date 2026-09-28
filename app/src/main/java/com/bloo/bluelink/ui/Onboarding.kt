@@ -153,6 +153,40 @@ internal enum class OnboardingStepKind { INTRO, SETUP, CAR, CRASH_COURSE, FEATUR
 internal data class OnboardingStep(val kind: OnboardingStepKind, val vin: String? = null)
 
 /**
+ * Whether notifications block leaving the [OnboardingStepKind.SETUP] step: required on API 33+
+ * (POST_NOTIFICATIONS exists) until the permission is granted. Pure so the gate can be pinned
+ * by a plain JVM test without a running Activity or a permission dialog.
+ */
+internal fun notifRequiredOnSetup(
+    onSetup: Boolean,
+    notificationsSupported: Boolean,
+    notifGranted: Boolean,
+): Boolean = onSetup && notificationsSupported && !notifGranted
+
+/**
+ * Whether a lock blocks leaving the SETUP step. Exactly ONE mechanism is required: biometrics
+ * when the device has them enrolled, otherwise a PIN. Pure, so the truth table is testable.
+ */
+internal fun lockRequiredOnSetup(
+    onSetup: Boolean,
+    canBio: Boolean,
+    biometricLock: Boolean,
+    appPinSet: Boolean,
+): Boolean = onSetup && (if (canBio) !biometricLock else !appPinSet)
+
+/** The SETUP step blocks Next while [notifRequiredOnSetup] or [lockRequiredOnSetup] is true. */
+internal fun setupIsBlocked(
+    onSetup: Boolean,
+    notificationsSupported: Boolean,
+    notifGranted: Boolean,
+    canBio: Boolean,
+    biometricLock: Boolean,
+    appPinSet: Boolean,
+): Boolean =
+    notifRequiredOnSetup(onSetup, notificationsSupported, notifGranted) ||
+        lockRequiredOnSetup(onSetup, canBio, biometricLock, appPinSet)
+
+/**
  * Flattens first-run onboarding into one linear list of steps: a welcome
  * intro, a combined notifications+biometrics+sync setup step, one CAR step
  * per vehicle that isn't already configured (each vehicle gets its own
@@ -254,9 +288,16 @@ internal fun OnboardingScreen(vm: AppViewModel) {
     // device has them, else a PIN) are both required before Next unlocks. The lock card swaps
     // to whichever the device supports, so there is never a second mechanism to skip.
     val onSetup = steps.getOrNull(pageIndex)?.kind == OnboardingStepKind.SETUP
-    val notifRequired = onSetup && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU && !notifGranted
-    val lockRequired = onSetup && ((canBio && !appearance.biometricLock) || (!canBio && !state.appPinSet))
-    val setupBlocked = notifRequired || lockRequired
+    val notificationsSupported = Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU
+    val notifRequired = notifRequiredOnSetup(onSetup, notificationsSupported, notifGranted)
+    val setupBlocked = setupIsBlocked(
+        onSetup = onSetup,
+        notificationsSupported = notificationsSupported,
+        notifGranted = notifGranted,
+        canBio = canBio,
+        biometricLock = appearance.biometricLock,
+        appPinSet = state.appPinSet,
+    )
 
     fun goNext() {
         if (pageIndex < lastIndex) {
