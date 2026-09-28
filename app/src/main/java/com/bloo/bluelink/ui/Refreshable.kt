@@ -36,6 +36,7 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -173,7 +174,14 @@ internal fun Refreshable(
             PullToRefreshDefaults.LoadingIndicator(
                 state = ptrState,
                 isRefreshing = refreshing,
-                modifier = Modifier.align(Alignment.TopCenter),
+                // A floating chip that drops in from the top-centre, BELOW the status bar: the
+                // default pins it to the very top edge, where it clips the clock/battery icons
+                // while held over the screen. statusBarsPadding clears them, and the extra gap
+                // makes it read as its own element rather than attached to the edge.
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .statusBarsPadding()
+                    .padding(top = GapGroup),
             )
         },
     ) {

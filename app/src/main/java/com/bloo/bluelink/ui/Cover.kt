@@ -271,7 +271,7 @@ internal fun CoverTile(
         val identityText = listOfNotNull(
             (headline?.takeIf { it.isNotBlank() } ?: title).takeIf { it.isNotBlank() },
             trailingLabel?.takeIf { it.isNotBlank() },
-        ).joinToString("  \u00b7  ")
+        ).joinToString("  \u00b7  ").let { if (it.length > 22) it.take(21).trimEnd() + "\u2026" else it }
         // The identity pill + action buttons are anchored to the tile's own bottom edge and
         // NEVER move, no matter how much or little body content there is -- the scrolling
         // content (below) runs the tile's FULL height behind them, the same "chrome floats,
@@ -784,7 +784,12 @@ private fun CoverIdentityPill(
     iconTint: Color,
 ) {
     val idle = remember { MutableInteractionSource() }
-    SafeExpansiveButton(interactionSource = idle, enabled = false) {
+    // enabled = true, NOT false: this is an INFO pill, not a disabled button. Wrapping it in
+    // SafeExpansiveButton(enabled = false) faded the whole thing to 50%, which is why the cover's
+    // identity read as greyed-out/broken. It still joins the row as a group member (the group
+    // flag lives on the wrapper) and never takes any press width, so the buttons beside it keep
+    // their own sizing -- it just draws at full strength now.
+    SafeExpansiveButton(interactionSource = idle, enabled = true) {
         Box(
             Modifier
                 .heightIn(min = ButtonTargetHeight)

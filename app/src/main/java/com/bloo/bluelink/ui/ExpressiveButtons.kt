@@ -785,6 +785,19 @@ fun ExpressiveButtonGroup(
                     }
                 }
 
+                // A LONE button on a line has no neighbour to take press width from, so the seam
+                // redistribution above left it unchanged and its press would be a corner-only
+                // change with NO growth. Instead it EXPANDS to fill the line's budget: laid out
+                // left-aligned at rest, full-width while pressed. Done AFTER the budget clamp --
+                // filling the row is the whole point, so the clamp must not claw it straight back.
+                if (memberIdx.size == 1) {
+                    val i = memberIdx[0]
+                    if (press[i] > 0f) {
+                        val fill = room.coerceAtLeast(basis[i])
+                        exact[i] = base[i] + (fill - base[i]) * press[i]
+                    }
+                }
+
                 // Largest-remainder rounding, so the integer widths sum to `total` EXACTLY
                 // rather than approximately. Without this the group breathes by a pixel or two
                 // as the spring runs, which on a connected pill is a seam that will not sit

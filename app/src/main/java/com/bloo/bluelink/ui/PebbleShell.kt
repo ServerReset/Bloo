@@ -460,7 +460,10 @@ internal fun PebbleShell(
             // already carries the depth.
             elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
             colors = CardDefaults.cardColors(
-                containerColor = containerColor,
+                // Slightly translucent so the aurora/gradient reads faintly through the card,
+                // giving the pebbles a glassy weight instead of a flat opaque slab. Kept high
+                // enough (0.9) that text contrast is unchanged.
+                containerColor = containerColor.copy(alpha = 0.9f),
                 contentColor = contentColorFor(containerColor),
             ),
         ) {
