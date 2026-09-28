@@ -245,16 +245,6 @@ internal fun PebbleShell(
      */
     titleColor: Color = Color.Unspecified,
     /**
-     * Extra modifier appended to the title [Text] itself, AFTER its own scale
-     * transform -- so a caller reading its position (e.g. via
-     * `onGloballyPositioned`) gets the real, final on-screen bounds, not the
-     * pre-scale layout size. Unused by every current caller (the hero used to
-     * supply one for the now fully-removed floating name pill system); kept
-     * as a hook rather than deleted, since a caller needing to read the
-     * title's own live position is a real, cheap-to-need thing to want again.
-     */
-    titleModifier: Modifier = Modifier,
-    /**
      * Extra content in the header, under the title and [summary].
      *
      * A string is all `summary` can be, and the hero wants a graphical readout there when
@@ -884,7 +874,7 @@ internal fun PebbleShell(
                                                     scaleY = s
                                                     transformOrigin = TransformOrigin(0f, 0.5f)
                                                 }
-                                        }.then(titleModifier),
+                                        },
                                         style = if (atRest) MaterialTheme.typography.titleMedium else titleStyle,
                                         color = titleColor,
                                         fontWeight = FontWeight.Bold,
@@ -898,7 +888,7 @@ internal fun PebbleShell(
                                 // Crossfade wrapper either -- always native titleMedium.
                                 Text(
                                     title,
-                                    modifier = titleBaseModifier.then(titleModifier),
+                                    modifier = titleBaseModifier,
                                     style = MaterialTheme.typography.titleMedium,
                                     color = titleColor,
                                     fontWeight = FontWeight.Bold,

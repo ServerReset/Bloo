@@ -31,6 +31,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -150,7 +151,7 @@ class CrashActivity : ComponentActivity() {
         var checking by remember { mutableStateOf(false) }
         var checkResult by remember { mutableStateOf<UpdateCheckResult?>(null) }
         var downloading by remember { mutableStateOf(false) }
-        var downloadProgress by remember { mutableStateOf(0f) }
+        var downloadProgress by remember { mutableFloatStateOf(0f) }
         var installing by remember { mutableStateOf(false) }
         // Starts false regardless of whether apkFile already exists on disk: a leftover
         // Bloo.apk from a PRIOR session (crashed mid-download, or just never installed) isn't

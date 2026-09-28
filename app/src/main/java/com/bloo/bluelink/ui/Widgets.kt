@@ -485,7 +485,7 @@ internal val LocalCoverScrubbing = staticCompositionLocalOf<MutableState<Boolean
  * can track the pull in real time instead of only animating once refresh starts.
  */
 internal val LocalPullFraction =
-    staticCompositionLocalOf<androidx.compose.runtime.MutableState<Float>> { mutableStateOf(0f) }
+    staticCompositionLocalOf<androidx.compose.runtime.MutableState<Float>> { mutableFloatStateOf(0f) }
 
 /**
  * A headline number that rolls when it changes: it slides up when the value

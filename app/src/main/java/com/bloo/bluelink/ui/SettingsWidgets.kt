@@ -61,6 +61,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -210,10 +211,8 @@ fun SettingsSegmentedRow(
  * same as every pebble in the garage, instead of Settings being the one screen where
  * every section stayed permanently open whether you cared about it or not.
  *
- * [vm] is threaded through purely because [PebbleShell] requires it in its own
- * signature (unused in that function's body today, kept for signature parity with
- * [Pebble]) -- every call site already has it in scope, since every one of them runs
- * inside `SettingsScreen(vm: AppViewModel)`.
+ * [vm] is used for the card's own expand/collapse state (the shared `collapsedSections`
+ * store, via [AppViewModel.togglePebble]) -- it is not just threading.
  *
  * [icon] stays nullable at the call-site API (unchanged from before) but PebbleShell's
  * own `icon` parameter is not, so a null here falls back to a generic settings glyph --
@@ -459,7 +458,7 @@ internal fun PinDialogs(
     // composition must not treat a stale flag (left by an earlier lock
     // screen session, say) as a fresh event.
     var seenRejected by remember(mode) { mutableStateOf(state.pinAttemptRejected) }
-    var seenTick by remember(mode) { mutableStateOf(state.pinAcceptedTick) }
+    var seenTick by remember(mode) { mutableIntStateOf(state.pinAcceptedTick) }
     // Watch the verify outcome: a wrong PIN flags pinAttemptRejected (shown
     // as an inline error here, then acknowledged), a right one advances.
     LaunchedEffect(state.pinAttemptRejected) {

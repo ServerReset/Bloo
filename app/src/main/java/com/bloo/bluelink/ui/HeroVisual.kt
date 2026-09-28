@@ -57,6 +57,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.MutableState
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -300,7 +301,7 @@ internal fun HeroVisual(
         // could only ever report the FIRST of a multi-car account's photos (StartupTrace.once
         // dedupes by key, and every car used the same one), leaving every later photo's own
         // timing invisible in every report so far.
-        var loadStartedAtMs by remember(model) { mutableStateOf(0L) }
+        var loadStartedAtMs by remember(model) { mutableLongStateOf(0L) }
         LaunchedEffect(model) {
             val delayMs = HeroLoadStagger.claimDelayMs()
             if (delayMs > 0) delay(delayMs)

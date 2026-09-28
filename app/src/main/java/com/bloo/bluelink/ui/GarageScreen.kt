@@ -38,6 +38,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.State
@@ -168,7 +169,7 @@ internal fun GarageScreen(
     }
     // Live pull distance reported by Refreshable, so the overlays react the moment
     // the user starts pulling - not only once a refresh is in flight.
-    val pullFractionState = remember { mutableStateOf(0f) }
+    val pullFractionState = remember { mutableFloatStateOf(0f) }
     // Drives the expanded pager's programmatic car-switch (the hero card's own swipe --
     // see ExpandedCar's onSwipeCar).
     val garageScope = rememberCoroutineScope()
@@ -184,7 +185,7 @@ internal fun GarageScreen(
     // composition-scope read of it here would recompose GarageScreen (the car
     // pager's parent) on every one of those pixels, which is expensive. Use boolean
     // derivedStateOf instead for a stable result that only changes at threshold.
-    val pulling by remember { derivedStateOf { pullFractionState.value > 0.01f } }
+    val pulling by remember { derivedStateOf { pullFractionState.floatValue > 0.01f } }
     // Published to the floating registry instead of animated here. The fade and the pull shift
     // are behaviours of floating CHROME, not of the dots or the corner buttons individually --
     // holding them per-site is what let them disagree (dots faded but never shifted; the corner
@@ -258,7 +259,7 @@ internal fun GarageScreen(
     // of the gesture, so the garage, its pager and all three live car pages recomposed on every
     // drag frame to move some chrome. The modifier reads it in its offset lambda instead.
     SideEffect {
-        floatingRegistry.chromePull = { pullFractionState.value }
+        floatingRegistry.chromePull = { pullFractionState.floatValue }
         // Two separate flags on purpose -- see chromeHolding's own doc. The HOLD is only while
         // a refresh is in flight; the FADE covers the pull as well.
         floatingRegistry.chromeHolding = refreshing

@@ -59,6 +59,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.State
@@ -163,11 +164,11 @@ internal fun LockOverlay(vm: AppViewModel, opaqueBackdrop: Boolean = false) {
     // A wall-clock ticker that only runs while a rejection window is open --
     // the countdown line needs a fresh "seconds left" each second, and
     // nothing else here wants a 1s recomposition loop.
-    var nowTick by remember { mutableStateOf(System.currentTimeMillis()) }
+    var nowTick by remember { mutableLongStateOf(System.currentTimeMillis()) }
     // The monotonic reading is ticked alongside the wall clock, so the countdown this screen
     // SHOWS agrees with the one verifyAppPin enforces. Reading only the wall clock here would
     // have the UI cheerfully offer a keypad while the attempt was still being rejected.
-    var elapsedTick by remember { mutableStateOf(android.os.SystemClock.elapsedRealtime()) }
+    var elapsedTick by remember { mutableLongStateOf(android.os.SystemClock.elapsedRealtime()) }
     val lockout = appState.pinLockout
     val rejected = lockout.isLocked(nowTick, elapsedTick)
     val remainingMs = lockout.remainingMs(nowTick, elapsedTick)
