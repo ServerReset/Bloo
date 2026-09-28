@@ -179,7 +179,7 @@ fun SettingsSegmentedRow(
 ) {
     Column(Modifier.fillMaxWidth()) {
         LabelText(label)
-        Spacer(Modifier.height(SettingsGapRow))
+        Spacer(Modifier.height(GapRow))
         MorphSegmented(options = options, selectedKey = selectedKey, onSelect = onSelect)
         if (description != null) SettingsCaption(description)
     }
@@ -377,7 +377,7 @@ internal fun ChoiceRow(label: String, selected: Boolean, onSelect: () -> Unit) {
             // shared idle look.
             activeContainerColor = MaterialTheme.colorScheme.primaryContainer,
             activeContentColor = MaterialTheme.colorScheme.onPrimaryContainer,
-            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
+            contentPadding = PaddingValues(horizontal = 16.dp, vertical = GapGroup),
             // The standard target height and the standard button label, like everything else
             // tappable. A choice row IS a button; it was the last one still setting its own
             // height (none) and its own type (bodyLarge, a body style rather than the button
@@ -485,7 +485,7 @@ internal fun PinDialogs(
                         style = MaterialTheme.typography.bodyMedium,
                         color = scheme.onSurfaceVariant,
                     )
-                    Spacer(Modifier.height(SettingsGapGroup))
+                    Spacer(Modifier.height(GapGroup))
                     OutlinedTextField(
                         value = currentPin,
                         onValueChange = { currentPin = sanitize(it); rejected = false },
@@ -529,7 +529,7 @@ internal fun PinDialogs(
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = scheme.onSurfaceVariant,
                             )
-                            Spacer(Modifier.height(SettingsGapGroup))
+                            Spacer(Modifier.height(GapGroup))
                             OnboardingPinForm(
                                 existing = state.appPinSet,
                                 onSet = { pin -> vm.setAppPin(pin) },
@@ -544,7 +544,7 @@ internal fun PinDialogs(
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = scheme.onSurfaceVariant,
                             )
-                            Spacer(Modifier.height(SettingsGapSection))
+                            Spacer(Modifier.height(GapSection))
                         }
                     }
                 }
@@ -595,7 +595,7 @@ internal fun PinDialogs(
                             )
                         }
                     }
-                    Spacer(Modifier.height(SettingsGapRow))
+                    Spacer(Modifier.height(GapRow))
                     MorphTextButton(
                         "Done",
                         onClick = { haptics?.click(); onDismiss() },

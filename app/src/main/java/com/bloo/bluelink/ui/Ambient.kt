@@ -297,7 +297,7 @@ internal fun LoginScreen(
                         .widthIn(max = 480.dp)
                         .padding(horizontal = 24.dp)
                         .padding(top = 8.dp, bottom = 24.dp),
-                    verticalArrangement = Arrangement.spacedBy(14.dp),
+                    verticalArrangement = Arrangement.spacedBy(GapGroup),
                 ) {
                     val fieldColors = borderlessFieldColors()
 
@@ -393,7 +393,7 @@ internal fun LoginScreen(
                         enter = expandEnterSized(Alignment.Bottom),
                         exit = expandExitSized(Alignment.Bottom),
                     ) {
-                        Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                        Column(verticalArrangement = Arrangement.spacedBy(GapGroup)) {
                             MutedText("Service PIN")
                             OutlinedTextField(
                                 value = pin,

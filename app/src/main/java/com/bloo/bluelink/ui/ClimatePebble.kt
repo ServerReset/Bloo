@@ -381,7 +381,7 @@ internal fun ClimatePebble(
                 val targetLabel = degLabel(smartTarget.toString(), fahrenheit)
                 val ambientLabel = degLabel(ambientF.toString(), fahrenheit)
                 val smartLabel = if (smartClimateIsCooling(ambientF)) "Cool to $targetLabel" else "Heat to $targetLabel"
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Column(verticalArrangement = Arrangement.spacedBy(GapRow)) {
                     SectionLabel("Smart climate")
                     val smartSource = remember { MutableInteractionSource() }
                     SafeExpansiveButton(

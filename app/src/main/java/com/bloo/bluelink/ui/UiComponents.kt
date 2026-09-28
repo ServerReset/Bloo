@@ -335,7 +335,7 @@ internal fun Modifier.paddingAll(all: Dp) = padding(all)
 
 /**
  * Spacing-token based padding helpers use the Settings gap scale directly.
- * `.padding16` is `.padding(horizontal = SettingsGapSection)` -- replaces
+ * `.padding16` is `.padding(horizontal = GapSection)` -- replaces
  * the ad-hoc `padding(horizontal = 16.dp)` pattern across the app.
  */
 internal fun Modifier.padding24() = padding(24.dp)
@@ -355,8 +355,8 @@ internal fun Modifier.paddingVertical24() = paddingVertical(24.dp)
 internal fun Modifier.paddingVertical8() = paddingVertical(8.dp)
 
 /** Combined padding patterns that appear across multiple files. */
-internal fun Modifier.paddingHorizontal24Vertical16() = padding(horizontal = 24.dp, vertical = 16.dp)
-internal fun Modifier.paddingHorizontal16Vertical12() = padding(horizontal = 16.dp, vertical = 12.dp)
+internal fun Modifier.paddingHorizontal24Vertical16() = padding(horizontal = 24.dp, vertical = GapSection)
+internal fun Modifier.paddingHorizontal16Vertical12() = padding(horizontal = 16.dp, vertical = GapGroup)
 
 // StandardRow() and StandardColumn() were deleted here. Both claimed to "consolidate" the
 // Row/Column + fillMaxWidth() + spacedBy pattern, but neither ever gained a single call site

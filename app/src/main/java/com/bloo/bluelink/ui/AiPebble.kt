@@ -199,7 +199,7 @@ internal fun AiPebble(v: Vehicle, state: UiState, vm: AppViewModel, dragHandle: 
             // that IS a bullet gets a real one; anything else (a stray lead-in sentence, if
             // the model ever writes one) prints as plain text, so this degrades safely rather
             // than assuming every summary is bulleted.
-            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Column(verticalArrangement = Arrangement.spacedBy(GapHairline)) {
                 summary.lineSequence().map { it.trim() }.filter { it.isNotEmpty() }.forEach { line ->
                     val bulleted = line.startsWith("* ") || line.startsWith("- ")
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {

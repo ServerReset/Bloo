@@ -151,7 +151,7 @@ internal fun SyncDevicesSection(state: UiState, vm: AppViewModel) {
         )
     }
 
-    Spacer(Modifier.height(SettingsGapGroup))
+    Spacer(Modifier.height(GapGroup))
     Row(verticalAlignment = Alignment.CenterVertically) {
         Icon(
             Icons.Filled.Devices,
@@ -166,7 +166,7 @@ internal fun SyncDevicesSection(state: UiState, vm: AppViewModel) {
     BodySmallText(
         "Drag to reorder. The top device is primary, the source of truth the others follow.",
     )
-    Spacer(Modifier.height(10.dp))
+    Spacer(Modifier.height(GapRow))
 
     ReorderColumn(
         items = ordered,
@@ -193,7 +193,7 @@ internal fun SyncDevicesSection(state: UiState, vm: AppViewModel) {
     val now = System.currentTimeMillis()
     val stalePeer = devices.any { it.id != state.thisDeviceId && it.lastSeenMs > 0 && now - it.lastSeenMs > STALE_DEVICE_MS }
     if (stalePeer) {
-        Spacer(Modifier.height(SettingsGapRow))
+        Spacer(Modifier.height(GapRow))
         Row(verticalAlignment = Alignment.Top) {
             Icon(
                 Icons.Filled.ErrorOutline,
@@ -330,7 +330,7 @@ internal fun SyncDeviceRow(
                     Modifier
                 },
             )
-            .padding(horizontal = 10.dp, vertical = 10.dp),
+            .padding(horizontal = 10.dp, vertical = GapRow),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         // Drag handle — the grab affordance, same idiom as the car-order list.
@@ -468,7 +468,7 @@ internal fun DriveSyncSetupDialog(
                         .clip(StandardShape)
                         .background(scheme.errorContainer.copy(alpha = 0.5f))
                         .padding(14.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                    verticalArrangement = Arrangement.spacedBy(GapRow),
                 ) {
                     Text(
                         "This creates a NEW, separate file: your devices would end up on different files and stop sharing settings. Only do this to start over.",

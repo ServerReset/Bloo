@@ -95,7 +95,7 @@ internal fun ChargerFilterBar(
         hazeState = mapHazeState,
         modifier = modifier.fillMaxWidth().widthIn(max = 520.dp),
     ) {
-        Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp)) {
+        Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = GapGroup)) {
             if (error != null) {
                 Text(
                     error,
@@ -104,9 +104,9 @@ internal fun ChargerFilterBar(
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
-                Spacer(Modifier.height(SettingsGapHairline))
+                Spacer(Modifier.height(GapHairline))
                 MutedText("Open Charge Map needs a free API key per app -- paste one below.")
-                Spacer(Modifier.height(SettingsGapRow))
+                Spacer(Modifier.height(GapRow))
                 // Inline, not a bounce to Settings: a missing/invalid key is the single most
                 // likely cause of this exact error, and the whole point of surfacing it here
                 // (rather than just the error string) is to let it be fixed without losing the
@@ -136,7 +136,7 @@ internal fun ChargerFilterBar(
                         showIcon = false,
                     )
                 }
-                Spacer(Modifier.height(SettingsGapRow))
+                Spacer(Modifier.height(GapRow))
                 MorphTextButton("Retry", onClick = onRetry, showIcon = false, modifier = Modifier.fillMaxWidth())
             } else {
                 Text(
@@ -150,7 +150,7 @@ internal fun ChargerFilterBar(
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
-                Spacer(Modifier.height(SettingsGapRow))
+                Spacer(Modifier.height(GapRow))
                 MorphSegmented(
                     options = listOf(
                         SegmentOption("0", "Any speed", null),
@@ -161,7 +161,7 @@ internal fun ChargerFilterBar(
                     onSelect = { key -> onSetMinKw(key.toIntOrNull() ?: 0) },
                 )
                 if (networks.isNotEmpty()) {
-                    Spacer(Modifier.height(SettingsGapRow))
+                    Spacer(Modifier.height(GapRow))
                     Row(
                         Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
                         horizontalArrangement = Arrangement.spacedBy(8.dp),

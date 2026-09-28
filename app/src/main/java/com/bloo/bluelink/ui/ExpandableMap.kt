@@ -144,7 +144,7 @@ internal fun MapFeatureRow(
     horizontalAlignment: Alignment.Horizontal = Alignment.Start,
 ) {
     ExpressiveButtonRow(
-        modifier = modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp),
+        modifier = modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = GapRow),
         spacing = 10.dp,
         equalWidths = true,
         wrap = wrap,
@@ -774,7 +774,7 @@ internal fun ExpandableMapLayer(
                                 charger = charger,
                                 mapHazeState = mapHazeState,
                                 onDismiss = { selectedCharger = null },
-                                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                                modifier = Modifier.padding(horizontal = 16.dp, vertical = GapRow),
                             )
                         }
                     }
@@ -793,7 +793,7 @@ internal fun ExpandableMapLayer(
                             onToggleNetwork = onToggleChargerNetwork,
                             onRetry = onRetryChargers,
                             onSetApiKey = onSetChargerApiKey,
-                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = GapRow),
                         )
                     }
                     MapFeatureRow(

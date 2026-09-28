@@ -225,7 +225,7 @@ internal fun OwnerLinks(v: Vehicle, state: UiState, context: Context) {
 
     val isSamsung = remember { Build.MANUFACTURER.lowercase() == "samsung" }
 
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    Column(verticalArrangement = Arrangement.spacedBy(GapRow)) {
         group("App & account") {
             MorphActionButton(
                 label = "${links.appName} app",

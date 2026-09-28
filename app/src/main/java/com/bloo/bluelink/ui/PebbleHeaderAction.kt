@@ -352,7 +352,7 @@ internal fun SplitExpandButton(
                 contentColor = leftFg,
                 activeContainerColor = action.activeContainer ?: MaterialTheme.colorScheme.primary,
                 activeContentColor = action.activeContent ?: MaterialTheme.colorScheme.onPrimary,
-                contentPadding = PaddingValues(horizontal = 14.dp, vertical = 10.dp),
+                contentPadding = PaddingValues(horizontal = 14.dp, vertical = GapRow),
                 shapeForCorner = leftShapeForCorner,
                 morphedCornerPercent = morphedPercent,
                 pillCornerPercent = 50f,

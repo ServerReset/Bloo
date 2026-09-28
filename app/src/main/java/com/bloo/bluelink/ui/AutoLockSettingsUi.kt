@@ -103,7 +103,7 @@ internal fun AutoLockSettingsGroup(v: Vehicle, vm: AppViewModel) {
         ToggleRow("Enabled", current.enabled, onChange = ::onEnabledChanged)
 
         if (current.enabled && !LiveCharge.isBackgroundUnrestricted(context)) {
-            SettingsCaption("Won't reliably trigger with the app closed?", bottomGap = SettingsGapHairline)
+            SettingsCaption("Won't reliably trigger with the app closed?", bottomGap = GapHairline)
             MorphTextButton(
                 text = "Allow background activity",
                 onClick = { LiveCharge.requestBackgroundUnrestricted(context) },
@@ -118,7 +118,7 @@ internal fun AutoLockSettingsGroup(v: Vehicle, vm: AppViewModel) {
         if (current.enabled && Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q &&
             !granted(Manifest.permission.ACTIVITY_RECOGNITION)
         ) {
-            SettingsCaption("Won't lock without motion access", bottomGap = SettingsGapHairline)
+            SettingsCaption("Won't lock without motion access", bottomGap = GapHairline)
             MorphTextButton(
                 text = "Grant Physical activity permission",
                 onClick = { corePermissionLauncher.launch(arrayOf(Manifest.permission.ACTIVITY_RECOGNITION)) },
@@ -134,7 +134,7 @@ internal fun AutoLockSettingsGroup(v: Vehicle, vm: AppViewModel) {
         val exactAlarmsOk = Build.VERSION.SDK_INT < Build.VERSION_CODES.S ||
             (context.getSystemService(android.app.AlarmManager::class.java))?.canScheduleExactAlarms() == true
         if (current.enabled && !exactAlarmsOk) {
-            SettingsCaption("Locking may be delayed", bottomGap = SettingsGapHairline)
+            SettingsCaption("Locking may be delayed", bottomGap = GapHairline)
             MorphTextButton(
                 text = "Allow Alarms & reminders",
                 onClick = {
@@ -260,7 +260,7 @@ internal fun AutoLockSettingsGroup(v: Vehicle, vm: AppViewModel) {
                                     update(current.copy(deviceAddress = device.address, deviceName = device.name))
                                     showDevicePicker = false
                                 }
-                                .padding(horizontal = 12.dp, vertical = 10.dp),
+                                .padding(horizontal = 12.dp, vertical = GapRow),
                         ) {
                             // M3's ListItem drew its own surface fill and its own type scale
                             // inside the dialog; the name/address pair is the same

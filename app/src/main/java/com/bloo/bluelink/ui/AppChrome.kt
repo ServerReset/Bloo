@@ -209,7 +209,7 @@ internal fun GlassAlertDialog(
                     ) {
                         Icon(icon, contentDescription = null, tint = scheme.onPrimaryContainer, modifier = Modifier.size(24.dp))
                     }
-                    Spacer(Modifier.height(16.dp))
+                    Spacer(Modifier.height(GapSection))
                 }
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                     Text(
@@ -223,14 +223,14 @@ internal fun GlassAlertDialog(
                         titleTrailing()
                     }
                 }
-                Spacer(Modifier.height(SettingsGapRow))
+                Spacer(Modifier.height(GapRow))
                 Column(
                     Modifier.heightIn(max = 360.dp).verticalScroll(rememberScrollState()),
-                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                    verticalArrangement = Arrangement.spacedBy(GapGroup),
                     content = text,
                 )
-                Spacer(Modifier.height(20.dp))
-                Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(6.dp), content = buttons)
+                Spacer(Modifier.height(GapSection))
+                Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(GapHairline), content = buttons)
             }
         }
     }

@@ -528,7 +528,7 @@ internal fun SettingsScreen(
           // one). Based on the GitHub Actions run number baked in at CI build time;
           // "dev build" for a local build. buildLabel is the canonical formatter shared
           // with the update tile's delta.
-          Spacer(Modifier.height(SettingsGapRow))
+          Spacer(Modifier.height(GapRow))
           Text(
               "Bloo · " + com.bloo.bluelink.data.buildLabel(vm.currentBuildNumber, com.bloo.bluelink.BuildConfig.BUILD_BRANCH),
               style = MaterialTheme.typography.labelSmall,
@@ -593,7 +593,7 @@ private fun AccountsCardContent(state: UiState, vm: AppViewModel) {
                     title = "Signed in",
                     status = if (state.accounts.isEmpty()) "No accounts" else "${state.accounts.size} account${if (state.accounts.size == 1) "" else "s"}",
                 )
-                Spacer(Modifier.height(SettingsGapGroup))
+                Spacer(Modifier.height(GapGroup))
                 if (state.accounts.isEmpty()) {
                     BodyMediumText(
                         "Not signed in",
@@ -601,7 +601,7 @@ private fun AccountsCardContent(state: UiState, vm: AppViewModel) {
                     )
                 }
                 state.accounts.forEachIndexed { i, creds ->
-                    if (i > 0) Spacer(Modifier.height(SettingsGapSection))
+                    if (i > 0) Spacer(Modifier.height(GapSection))
                     var pin by remember(creds.brand, creds.pin) { mutableStateOf(creds.pin) }
                     // Was a single un-confirmed tap that signed the account out
                     // immediately -- same "tap again to confirm" + 4s
@@ -616,7 +616,7 @@ private fun AccountsCardContent(state: UiState, vm: AppViewModel) {
                             confirmSignOut = false
                         }
                     }
-                    Column(verticalArrangement = Arrangement.spacedBy(SettingsGapRow)) {
+                    Column(verticalArrangement = Arrangement.spacedBy(GapRow)) {
                         TitleSmallText(creds.brand.label)
                         StatusRow("Email", creds.email)
                         SecretRow("Password", creds.password)
@@ -667,7 +667,7 @@ private fun AccountsCardContent(state: UiState, vm: AppViewModel) {
                         }
                     }
                 }
-                Spacer(Modifier.height(SettingsGapGroup))
+                Spacer(Modifier.height(GapGroup))
                 val addAccountSource = remember { MutableInteractionSource() }
                 SafeExpansiveButton(
                     interactionSource = addAccountSource,
@@ -720,7 +720,7 @@ private fun AiCardContent(state: UiState, advanced: Boolean, vm: AppViewModel) {
                         title = "On-device AI",
                         status = if (state.aiEnabled) "On" else "Off",
                     )
-                    Spacer(Modifier.height(SettingsGapGroup))
+                    Spacer(Modifier.height(GapGroup))
                     // Names the ENGINE. The card is titled "AI" and the header right above
                     // says "On-device AI" with its own on/off status, so a third "On-device
                     // AI" here said the same thing a third time and told you nothing new.
@@ -749,9 +749,9 @@ private fun AppShortcutsCardContent(state: UiState, vm: AppViewModel) {
                     BodySmallText(
                         "Quick-access shortcuts from the launcher icon",
                     )
-                    Spacer(Modifier.height(SettingsGapRow))
+                    Spacer(Modifier.height(GapRow))
                     state.vehicles.forEach { v ->
-                        Spacer(Modifier.height(SettingsGapHairline))
+                        Spacer(Modifier.height(GapHairline))
                         TitleSmallText(v.name)
                         com.bloo.bluelink.Shortcuts.ACTIONS.forEach { cmd ->
                             ToggleRow(
@@ -813,7 +813,7 @@ private fun BackupSyncCardContent(
                         else -> com.bloo.bluelink.data.relativeLabel(state.lastSyncMs).takeIf { it.isNotBlank() }?.let { "Synced $it" } ?: "Active"
                     },
                 )
-                Spacer(Modifier.height(SettingsGapGroup))
+                Spacer(Modifier.height(GapGroup))
                 if (showDriveDialog) {
                     DriveSyncSetupDialog(
                         onDismissRequest = { showDriveDialog = false },
@@ -866,13 +866,13 @@ private fun BackupSyncCardContent(
                     // A live failure is the one fact that never hides behind the
                     // diagnostics disclosure below — if sync is broken, say so here.
                     state.syncError?.let { err ->
-                        Spacer(Modifier.height(SettingsGapRow))
+                        Spacer(Modifier.height(GapRow))
                         Row(
                             Modifier
                                 .fillMaxWidth()
                                 .clip(RoundedCornerShape(14.dp))
                                 .background(MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.5f))
-                                .padding(horizontal = 12.dp, vertical = 10.dp),
+                                .padding(horizontal = 12.dp, vertical = GapRow),
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
                             Icon(
@@ -892,7 +892,7 @@ private fun BackupSyncCardContent(
                     // The synced-devices registry: a drag-to-reorder list where the
                     // TOP device is primary (source of truth). See SyncDevicesSection.
                     SyncDevicesSection(state = state, vm = vm)
-                    Spacer(Modifier.height(SettingsGapGroup))
+                    Spacer(Modifier.height(GapGroup))
                     MorphSegmented(
                         options = listOf(
                             SegmentOption("wifi", "Wi-Fi only", null),
@@ -901,7 +901,7 @@ private fun BackupSyncCardContent(
                         selectedKey = if (state.syncWifiOnly) "wifi" else "any",
                         onSelect = { vm.setSyncWifiOnly(it == "wifi") },
                     )
-                    Spacer(Modifier.height(SettingsGapRow))
+                    Spacer(Modifier.height(GapRow))
                     // equalWidths: this row sits directly under the Wi-Fi only/Any network
                     // segmented control, which splits its full width evenly -- left otherwise,
                     // the two buttons packed to their own content width and read as a mismatched
@@ -934,7 +934,7 @@ private fun BackupSyncCardContent(
                     // stamp (already summarised in the header above), the file
                     // fingerprint, and the two repair actions all fold away by
                     // default so the card stops reading as a wall of equal pills.
-                    Spacer(Modifier.height(SettingsGapRow))
+                    Spacer(Modifier.height(GapRow))
                     var showSyncDiagnostics by rememberSaveable { mutableStateOf(false) }
                     val diagnosticsSource = remember { MutableInteractionSource() }
                     SafeExpansiveButton(
@@ -955,7 +955,7 @@ private fun BackupSyncCardContent(
                         exit = expandExitSized(Alignment.Bottom),
                     ) {
                         Column {
-                            Spacer(Modifier.height(SettingsGapRow))
+                            Spacer(Modifier.height(GapRow))
                             Column(
                                 Modifier
                                     .fillMaxWidth()
@@ -964,8 +964,8 @@ private fun BackupSyncCardContent(
                                     // the same shared neutral fill every other glass surface in the
                                     // app uses, not a fourth slightly-different copy of the same idea.
                                     .background(glassTint(blurred = false))
-                                    .padding(horizontal = 14.dp, vertical = 12.dp),
-                                verticalArrangement = Arrangement.spacedBy(8.dp),
+                                    .padding(horizontal = 14.dp, vertical = GapGroup),
+                                verticalArrangement = Arrangement.spacedBy(GapRow),
                             ) {
                                 val lastSyncLabel = com.bloo.bluelink.data.relativeLabel(state.lastSyncMs)
                                 StatusRow("Last synced", if (lastSyncLabel.isNotBlank()) lastSyncLabel else "—")
@@ -977,7 +977,7 @@ private fun BackupSyncCardContent(
                                     StatusRow("File ID", fp, valueMono = true)
                                 }
                             }
-                            Spacer(Modifier.height(SettingsGapRow))
+                            Spacer(Modifier.height(GapRow))
                             ExpressiveButtonRow(modifier = Modifier.fillMaxWidth(), spacing = 8.dp) {
                                 // Non-destructive real-provider round-trip so the user can confirm
                                 // sync actually works.
@@ -1020,19 +1020,19 @@ private fun BackupSyncCardContent(
                 // what most people actually want and shouldn't be buried.
                 AnimatedVisibility(visible = staggeredAdvancedVisible(advanced, 1), enter = expandEnterSized(), exit = expandExitSized()) {
                   Column {
-                    Spacer(Modifier.height(SettingsGapGroup))
+                    Spacer(Modifier.height(GapGroup))
                     SectionDivider()
-                    Spacer(Modifier.height(SettingsGapGroup))
+                    Spacer(Modifier.height(GapGroup))
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         ThemedIcon(Icons.Filled.Description, tint = MaterialTheme.colorScheme.onSurfaceVariant, size = 20.dp)
                         Spacer(Modifier.width(8.dp))
                         Text("Manual backup", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
                     }
-                    Spacer(Modifier.height(SettingsGapRow))
+                    Spacer(Modifier.height(GapRow))
                     BodySmallText(
                         "A one-time snapshot file. Credentials are never included.",
                     )
-                    Spacer(Modifier.height(SettingsGapRow))
+                    Spacer(Modifier.height(GapRow))
                     ExpressiveButtonRow(modifier = Modifier.fillMaxWidth(), spacing = 8.dp) {
                         val exportSource = remember { MutableInteractionSource() }
                         SafeExpansiveButton(
@@ -1146,7 +1146,7 @@ private fun DisplayCardContent(appearance: SettingsStore.Appearance, advanced: B
                 PopVisible(visible = advanced) {
                   Column {
                     UiScaleSlider(appearance, vm)
-                    Spacer(Modifier.height(SettingsGapGroup))
+                    Spacer(Modifier.height(GapGroup))
                   }
                 }
                 // SIMPLE, not advanced: this changes what is on the car screen
@@ -1194,7 +1194,7 @@ private fun FontCardContent(appearance: SettingsStore.Appearance, vm: AppViewMod
                     FontChoice.ATKINSON to "Atkinson Hyperlegible",
                     FontChoice.GOOGLE_SANS to "Google Sans",
                 )
-                Column(verticalArrangement = Arrangement.spacedBy(SettingsGapRow)) {
+                Column(verticalArrangement = Arrangement.spacedBy(GapRow)) {
                     FontChoice.entries.forEach { choice ->
                         ChoiceRow(labels.getValue(choice), appearance.fontChoice == choice) { vm.setFontChoice(choice) }
                     }

@@ -272,7 +272,7 @@ internal fun OnboardingScreen(vm: AppViewModel) {
                 .statusBarsPadding()
                 .navigationBarsPadding(),
         ) {
-            Spacer(Modifier.height(SettingsGapRow))
+            Spacer(Modifier.height(GapRow))
 
             // --- Progress: an animated bar plus a small step counter ---
             val progress = if (steps.size > 1) pageIndex.toFloat() / lastIndex.toFloat() else 1f
@@ -320,7 +320,7 @@ internal fun OnboardingScreen(vm: AppViewModel) {
                 ) {
                     Column(
                         Modifier.fillMaxWidth().padding(top = 20.dp, bottom = 110.dp),
-                        verticalArrangement = Arrangement.spacedBy(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(GapSection),
                     ) {
                         when (step.kind) {
                             OnboardingStepKind.INTRO -> OnboardingIntroPage()
@@ -369,7 +369,7 @@ internal fun OnboardingScreen(vm: AppViewModel) {
                             onClick = ::goBack,
                             interactionSource = backSource,
                             modifier = Modifier.fillMaxWidth(),
-                            contentPadding = PaddingValues(vertical = 16.dp),
+                            contentPadding = PaddingValues(vertical = GapSection),
                             border = BorderStroke(1.dp, scheme.outlineVariant),
                         ) {
                             Text("Back", style = ButtonLabelStyle)
@@ -393,7 +393,7 @@ internal fun OnboardingScreen(vm: AppViewModel) {
                         enabled = !pinRequired,
                         interactionSource = nextSource,
                         modifier = Modifier.fillMaxWidth(),
-                        contentPadding = PaddingValues(vertical = 16.dp),
+                        contentPadding = PaddingValues(vertical = GapSection),
                     ) {
                         // MorphButtonLabel, not a hand-rolled Icon+Spacer+Text -- that Text used
                         // FontWeight.Bold, where every other button label in the app (including
@@ -412,7 +412,7 @@ internal fun OnboardingScreen(vm: AppViewModel) {
                     }
                 }
                 if (pinRequired) {
-                    Spacer(Modifier.height(6.dp))
+                    Spacer(Modifier.height(GapHairline))
                     BodySmallText(
                         "Set your PIN above to continue.",
                     )
@@ -473,14 +473,14 @@ internal fun SyncChoiceScreen(vm: AppViewModel) {
             verticalArrangement = Arrangement.Center,
         ) {
             Text("🔄", style = MaterialTheme.typography.displaySmall)
-            Spacer(Modifier.height(SettingsGapGroup))
+            Spacer(Modifier.height(GapGroup))
             Text(
                 "Set up this device",
                 style = MaterialTheme.typography.headlineMedium,
                 fontWeight = FontWeight.Black,
                 color = scheme.onSurface,
             )
-            Spacer(Modifier.height(SettingsGapHairline))
+            Spacer(Modifier.height(GapHairline))
             BodyMediumText(
                 "Already use Bloo somewhere else with sync turned on? Bring that " +
                     "setup in here instead of answering everything again.",
@@ -499,13 +499,13 @@ internal fun SyncChoiceScreen(vm: AppViewModel) {
                     onClick = { restoreLauncher.launch(arrayOf("application/json")) },
                     enabled = !restoring,
                     modifier = Modifier.fillMaxWidth(),
-                    contentPadding = PaddingValues(vertical = 12.dp),
+                    contentPadding = PaddingValues(vertical = GapGroup),
                 ) {
                     if (restoring) LoadingIndicator() else MorphButtonLabel(Icons.Filled.Cloud, "Choose sync file", pending = false)
                 }
             }
 
-            Spacer(Modifier.height(16.dp))
+            Spacer(Modifier.height(GapSection))
 
             MorphButton(
                 onClick = vm::declineSyncRestore,
@@ -570,7 +570,7 @@ internal fun OnboardingSetupPage(vm: AppViewModel, state: UiState, context: andr
             "Everything here is optional -- except one thing: this device has no fingerprint sensor, so a PIN is required to lock the app.",
         color = scheme.onSurfaceVariant,
     )
-    Spacer(Modifier.height(SettingsGapHairline))
+    Spacer(Modifier.height(GapHairline))
 
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
         var notifGranted by remember {
@@ -589,7 +589,7 @@ internal fun OnboardingSetupPage(vm: AppViewModel, state: UiState, context: andr
                 onClick = { if (!notifGranted) notifLauncher.launch(android.Manifest.permission.POST_NOTIFICATIONS) },
                 active = notifGranted,
                 modifier = Modifier.fillMaxWidth(),
-                contentPadding = PaddingValues(vertical = 12.dp),
+                contentPadding = PaddingValues(vertical = GapGroup),
             ) {
                 val notificationIcon: ImageVector = if (notifGranted) AppIcons.CheckCircle else Icons.Filled.Notifications
                 val notificationText: String = if (notifGranted) "Enabled" else "Enable notifications"
@@ -626,7 +626,7 @@ internal fun OnboardingSetupPage(vm: AppViewModel, state: UiState, context: andr
                 },
                 active = bioEnabled,
                 modifier = Modifier.fillMaxWidth(),
-                contentPadding = PaddingValues(vertical = 12.dp),
+                contentPadding = PaddingValues(vertical = GapGroup),
             ) {
                 val biometricIcon: ImageVector = if (bioEnabled) AppIcons.CheckCircle else Icons.Filled.Fingerprint
                 val biometricText: String = if (bioEnabled) "Enabled" else "Enable fingerprint lock"
@@ -716,7 +716,7 @@ internal fun OnboardingSetupPage(vm: AppViewModel, state: UiState, context: andr
                 MorphButton(
                     onClick = { showDriveDialog = true },
                     modifier = Modifier.fillMaxWidth(),
-                    contentPadding = PaddingValues(vertical = 12.dp),
+                    contentPadding = PaddingValues(vertical = GapGroup),
                 ) {
                     MorphButtonLabel(Icons.Filled.Cloud, "Set up Drive sync", pending = false)
                 }
@@ -754,7 +754,7 @@ internal fun OnboardingPinForm(
     val valid = pin.length in PinCrypto.PIN_MIN_DIGITS..PinCrypto.PIN_MAX_DIGITS &&
         pin == confirm
     val sanitize: (String) -> String = { it.take(PinCrypto.PIN_MAX_DIGITS).filter { ch -> ch.isDigit() } }
-    Column(modifier, verticalArrangement = Arrangement.spacedBy(10.dp)) {
+    Column(modifier, verticalArrangement = Arrangement.spacedBy(GapRow)) {
         OutlinedTextField(
             value = pin,
             onValueChange = { pin = sanitize(it); attempted = false },
@@ -799,7 +799,7 @@ internal fun OnboardingPinForm(
                 }
             },
             modifier = Modifier.fillMaxWidth(),
-            contentPadding = PaddingValues(vertical = 12.dp),
+            contentPadding = PaddingValues(vertical = GapGroup),
             enabled = pin.isNotEmpty() && confirm.isNotEmpty(),
         ) {
             val pinLabel: String = if (existing) "Replace PIN" else "Save PIN"
@@ -822,7 +822,7 @@ internal fun OnboardingSetupCard(
         color = scheme.surfaceContainerHigh,
         modifier = Modifier.fillMaxWidth(),
     ) {
-        Column(Modifier.padding16(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Column(Modifier.padding16(), verticalArrangement = Arrangement.spacedBy(GapGroup)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 IconBadge(
                     if (done) AppIcons.CheckCircle else icon,
@@ -905,7 +905,7 @@ internal fun OnboardingCarPage(
         "Bloo cannot read powertrain or feature info from the API. Set them once here so the right controls appear.",
     )
 
-    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+    Column(verticalArrangement = Arrangement.spacedBy(GapRow)) {
         Text("Powertrain", style = MaterialTheme.typography.labelMedium, color = scheme.primary, fontWeight = FontWeight.SemiBold)
         val currentPt = state.powertrainOf(vehicle)
         PowertrainPicker(current = currentPt) { pt -> vm.setPowertrain(vehicle, pt) }
@@ -914,20 +914,20 @@ internal fun OnboardingCarPage(
     // Only Hyundai/Genesis US vehicles have a real head-unit generation to
     // confirm -- see platformOverridable's own doc.
     if (vehicle.platformOverridable) {
-        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Column(verticalArrangement = Arrangement.spacedBy(GapRow)) {
             Text("Head-unit generation", style = MaterialTheme.typography.labelMedium, color = scheme.primary, fontWeight = FontWeight.SemiBold)
             PlatformPicker(current = state.platformOf(vehicle)) { pt -> vm.setPlatform(vehicle, pt) }
         }
     }
 
-    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+    Column(verticalArrangement = Arrangement.spacedBy(GapRow)) {
         Text("Seats", style = MaterialTheme.typography.labelMedium, color = scheme.primary, fontWeight = FontWeight.SemiBold)
         Column(
             Modifier
                 .fillMaxWidth()
                 .clip(StandardShape)
                 .background(scheme.surfaceContainerHigh)
-                .padding(horizontal = 12.dp, vertical = 4.dp),
+                .padding(horizontal = 12.dp, vertical = GapHairline),
         ) {
             SeatPositions.forEachIndexed { i: Int, pos: SeatPosition ->
                 if (i > 0) SectionDivider(alpha = 0.35f)
@@ -947,7 +947,7 @@ internal fun OnboardingCarPage(
         }
     }
 
-    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+    Column(verticalArrangement = Arrangement.spacedBy(GapRow)) {
         Text("Extras", style = MaterialTheme.typography.labelMedium, color = scheme.primary, fontWeight = FontWeight.SemiBold)
         // ToggleRow -- the app's one boolean-setting control, and the same row the
         // per-car Settings card shows this exact flag on ("Heated steering wheel").
@@ -986,10 +986,10 @@ internal fun OnboardingTipListPage(
 ) {
     val scheme = MaterialTheme.colorScheme
     Text(emoji, style = MaterialTheme.typography.displayMedium)
-    Spacer(Modifier.height(SettingsGapHairline))
+    Spacer(Modifier.height(GapHairline))
     Text(title, style = titleStyle, fontWeight = FontWeight.Black, color = scheme.onSurface)
     Text(subtitle, style = MaterialTheme.typography.bodyLarge, color = scheme.onSurfaceVariant)
-    Spacer(Modifier.height(SettingsGapHairline))
+    Spacer(Modifier.height(GapHairline))
     tips.forEach { (icon, cardTitle, body) ->
         OnboardingTipCard(icon, cardTitle, body)
     }

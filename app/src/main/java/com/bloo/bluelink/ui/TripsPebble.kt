@@ -91,7 +91,7 @@ internal fun TripsPebble(v: Vehicle, state: UiState, vm: AppViewModel, dragHandl
         when {
             trips == null -> Text(if (loading) "Fetching trip history…" else "No trip data yet.")
             trips.isEmpty() -> Text("No recent trips reported by this car.")
-            else -> Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            else -> Column(verticalArrangement = Arrangement.spacedBy(GapRow)) {
                 val tMetric = LocalAppearance.current.unitSystem == "metric"
                 // COVER SCREEN: a small "Recent trips" header + only the 3 most recent,
                 // so the tile fits the small square without scrolling and you land at

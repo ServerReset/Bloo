@@ -444,7 +444,7 @@ internal fun SearchSuggestions(state: UiState, compact: Boolean = false, onPick:
         // onSurface instead.
         color = MaterialTheme.colorScheme.onSurface,
     )
-    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(GapRow)) {
         // Same staggered pop as the search RESULT cards (staggeredResultVisible), reused
         // as-is: this list is just as much a "search UI" element as the results below it,
         // and giving one a cascade while the other snaps in flat is exactly the kind of
@@ -464,7 +464,7 @@ internal fun SearchSuggestions(state: UiState, compact: Boolean = false, onPick:
                         interactionSource = exampleSource,
                         containerColor = MaterialTheme.colorScheme.secondaryContainer,
                         contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
-                        contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp),
+                        contentPadding = PaddingValues(horizontal = 14.dp, vertical = GapRow),
                         minHeight = 0.dp,
                         // Theme-weighted, not a bare dropShadow(). These chips float
                         // over the aurora with nothing opaque behind them (see the

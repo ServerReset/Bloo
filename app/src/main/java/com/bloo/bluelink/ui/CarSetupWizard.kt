@@ -223,7 +223,7 @@ internal fun CarFeatureWizard(
                 Box(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding24()) {
                     Column(
                         Modifier.fillMaxWidth().padding(bottom = 100.dp),
-                        verticalArrangement = Arrangement.spacedBy(20.dp),
+                        verticalArrangement = Arrangement.spacedBy(GapSection),
                     ) {
                         when (pg.kind) {
                             WizardStepKind.POWERTRAIN -> WizardPowertrainPage(veh, state, vm)
@@ -266,7 +266,7 @@ internal fun CarFeatureWizard(
                             onClick = ::goBack,
                             interactionSource = backSource,
                             modifier = Modifier.fillMaxWidth(),
-                            contentPadding = PaddingValues(vertical = 14.dp),
+                            contentPadding = PaddingValues(vertical = GapGroup),
                             border = BorderStroke(1.dp, scheme.outlineVariant),
                         ) {
                             Text("Back", style = ButtonLabelStyle)
@@ -284,7 +284,7 @@ internal fun CarFeatureWizard(
                         active = true,
                         interactionSource = nextSource,
                         modifier = Modifier.fillMaxWidth(),
-                        contentPadding = PaddingValues(vertical = 14.dp),
+                        contentPadding = PaddingValues(vertical = GapGroup),
                     ) {
                         val isLast = pageIndex == pages.lastIndex
                         // MorphButtonLabel, not a hand-rolled Icon+Spacer+Text.
@@ -325,7 +325,7 @@ internal fun WizardPowertrainPage(
             "fuel level for gas, or both for plug-in hybrids.",
     )
     val current = state.powertrainOf(vehicle)
-    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+    Column(verticalArrangement = Arrangement.spacedBy(GapRow)) {
         com.bloo.bluelink.data.Powertrain.entries.forEach { pt ->
             val selected = current == pt
             val (icon, label, desc) = when (pt) {
@@ -383,7 +383,7 @@ internal fun WizardPlatformPage(
             "so features like Trips only show up when they're actually available.",
     )
     val current = state.platformOf(vehicle)
-    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+    Column(verticalArrangement = Arrangement.spacedBy(GapRow)) {
         VehiclePlatform.entries.forEach { pt ->
             val selected = current == pt
             val (label, desc) = when (pt) {
@@ -439,7 +439,7 @@ internal fun WizardSeatsPage(
             .clip(StandardShape)
             .background(scheme.surfaceContainerHigh)
             .padding16(),
-        verticalArrangement = Arrangement.spacedBy(4.dp),
+        verticalArrangement = Arrangement.spacedBy(GapHairline),
     ) {
         SeatPositions.forEachIndexed { i: Int, pos: SeatPosition ->
             if (i > 0) SectionDivider(alpha = 0.5f)

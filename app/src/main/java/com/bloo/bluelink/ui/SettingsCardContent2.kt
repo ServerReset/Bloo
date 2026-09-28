@@ -170,7 +170,7 @@ internal fun LocationCardContent(appearance: SettingsStore.Appearance, vm: AppVi
                     "Where \"my location\" points for weather -- and, once set that way, the " +
                         "same live position the map's own device dot and \"distance to car\" use.",
                 )
-                Spacer(Modifier.height(SettingsGapRow))
+                Spacer(Modifier.height(GapRow))
                 var weatherQuery by remember { mutableStateOf("") }
                 val locationPermission = rememberLauncherForActivityResult(
                     ActivityResultContracts.RequestPermission(),
@@ -211,7 +211,7 @@ internal fun LocationCardContent(appearance: SettingsStore.Appearance, vm: AppVi
                             )
                         }
                     }
-                    Spacer(Modifier.height(SettingsGapRow))
+                    Spacer(Modifier.height(GapRow))
                   }
                 }
                 OutlinedTextField(
@@ -223,7 +223,7 @@ internal fun LocationCardContent(appearance: SettingsStore.Appearance, vm: AppVi
                     modifier = Modifier.fillMaxWidth(),
                     keyboardOptions = KeyboardOptions(imeAction = androidx.compose.ui.text.input.ImeAction.Search),
                 )
-                Spacer(Modifier.height(SettingsGapRow))
+                Spacer(Modifier.height(GapRow))
                 // FlowRow, not a fixed 50/50 Row: at a large display/font size each
                 // half was too narrow for "Set place" / "My location", clipping them
                 // to "Set a…". FlowRow keeps them side-by-side when they fit and wraps
@@ -232,7 +232,7 @@ internal fun LocationCardContent(appearance: SettingsStore.Appearance, vm: AppVi
                 FlowRow(
                     Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(GapRow),
                 ) {
                     val setPlaceSource = remember { MutableInteractionSource() }
                     // weight on the WRAPPER: it is the FlowRow's child, and the button inside
@@ -328,9 +328,9 @@ internal fun LogsCardContent(logs: List<String>, vm: AppViewModel, clipboardScop
                     }
                 }
                 Column {
-                    Spacer(Modifier.height(SettingsGapHairline))
+                    Spacer(Modifier.height(GapHairline))
                         SectionDivider()
-                        Spacer(Modifier.height(SettingsGapHairline))
+                        Spacer(Modifier.height(GapHairline))
                         val logScroll = rememberScrollState()
                         SelectionContainer {
                             Text(
@@ -344,7 +344,7 @@ internal fun LogsCardContent(logs: List<String>, vm: AppViewModel, clipboardScop
                                     .verticalScroll(logScroll),
                             )
                         }
-                        Spacer(Modifier.height(SettingsGapHairline))
+                        Spacer(Modifier.height(GapHairline))
                         if (lineCount > 0) {
                             LabelSmallText(
                                 "Earliest entries at the top. The newest $lineCount lines are shown.",
@@ -363,7 +363,7 @@ internal fun MapNavigationCardContent(appearance: SettingsStore.Appearance, vm: 
                 BodySmallText(
                     "Required to show nearby EV chargers on the expanded map. Get a free key at openchargemap.org (My Profile → My Apps).",
                 )
-                Spacer(Modifier.height(SettingsGapRow))
+                Spacer(Modifier.height(GapRow))
                 var keyInput by remember { mutableStateOf(appearance.chargerApiKey ?: "") }
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                     OutlinedTextField(
@@ -410,7 +410,7 @@ internal fun NotificationsCardContent(notif: SettingsStore.NotificationPrefs, vm
                     title = "Alerts",
                     status = if (alertsOn == 0) "All off" else "$alertsOn of ${alertToggles.size} on",
                 )
-                Spacer(Modifier.height(SettingsGapGroup))
+                Spacer(Modifier.height(GapGroup))
                 // First, not last: every other switch in this card is an
                 // ALERT the user hopes never fires. This is a live surface
                 // they watch on purpose while the car charges.
@@ -447,27 +447,27 @@ internal fun NotificationsCardContent(notif: SettingsStore.NotificationPrefs, vm
                             // is one line that never wraps (see MorphButtonLabel), and "Not
                             // starting when charging begins? Tap to fix" does not fit one
                             // inside a Settings card.
-                            SettingsCaption("Not starting when charging begins?", bottomGap = SettingsGapHairline)
+                            SettingsCaption("Not starting when charging begins?", bottomGap = GapHairline)
                             MorphTextButton(
                                 text = "Allow background",
                                 onClick = { LiveCharge.requestBackgroundUnrestricted(ctx) },
                                 contentColor = MaterialTheme.colorScheme.primary,
                                 icon = AppIcons.Warning,
                             )
-                            Spacer(Modifier.height(SettingsGapRow))
+                            Spacer(Modifier.height(GapRow))
                         }
                     }
                     if (Build.VERSION.SDK_INT >= 36) {
                         val ctx = LocalContext.current
                         if (!LiveCharge.isPromotable(ctx)) {
-                            SettingsCaption("Not showing in the status bar?", bottomGap = SettingsGapHairline)
+                            SettingsCaption("Not showing in the status bar?", bottomGap = GapHairline)
                             MorphTextButton(
                                 text = "Open system settings",
                                 onClick = { LiveCharge.openLiveUpdateSettings(ctx) },
                                 contentColor = MaterialTheme.colorScheme.primary,
                                 icon = AppIcons.Warning,
                             )
-                            Spacer(Modifier.height(SettingsGapRow))
+                            Spacer(Modifier.height(GapRow))
                         }
                     }
                     // Still shown even when isPromotable is already true: that check only
@@ -480,14 +480,14 @@ internal fun NotificationsCardContent(notif: SettingsStore.NotificationPrefs, vm
                         onClick = { showTroubleshoot = true },
                         icon = AppIcons.Info,
                     )
-                    Spacer(Modifier.height(SettingsGapRow))
+                    Spacer(Modifier.height(GapRow))
                     if (showTroubleshoot) {
                         LiveUpdateTroubleshootDialog(onDismiss = { showTroubleshoot = false })
                     }
                     }
                 }
                 SectionDivider(alpha = 0.5f)
-                Spacer(Modifier.height(SettingsGapRow))
+                Spacer(Modifier.height(GapRow))
 
                 ToggleRow("Service due alerts", notif.service) { vm.setNotifyService(it) }
                 ToggleRow("Door-left-open alerts", notif.doorOpen) { vm.setNotifyDoor(it) }
@@ -544,7 +544,7 @@ internal fun SecurityCardContent(
                     title = "App lock",
                     status = securityStatus,
                 )
-                Spacer(Modifier.height(SettingsGapGroup))
+                Spacer(Modifier.height(GapGroup))
                 if (canBio) {
                     // One control, three states. This used to be a "require fingerprint"
                     // on/off toggle plus a separate lock-timing row, which let people save
@@ -654,9 +654,9 @@ internal fun SecurityCardContent(
                 // no biometrics, an optional backup on those that have them.
                 // Separate from the biometric rows above because it is a second,
                 // independent mechanism, not a mode of the first one.
-                Spacer(Modifier.height(SettingsGapGroup))
+                Spacer(Modifier.height(GapGroup))
                 SectionDivider(alpha = 0.4f)
-                Spacer(Modifier.height(SettingsGapHairline))
+                Spacer(Modifier.height(GapHairline))
                 var pinDialog by remember { mutableStateOf<String?>(null) }
                 val pinSet = state.appPinSet
                 StatusHeaderRow(
@@ -665,14 +665,14 @@ internal fun SecurityCardContent(
                     title = "App PIN",
                     status = if (pinSet) "On · 4-8 digits" else "Off",
                 )
-                Spacer(Modifier.height(SettingsGapHairline))
+                Spacer(Modifier.height(GapHairline))
                 BodySmallText(
                     if (canBio)
                         "A 4-8 digit PIN that works as a backup when fingerprints aren't available."
                     else
                         "This device has no fingerprints, so the app unlocks with this PIN.",
                 )
-                Spacer(Modifier.height(SettingsGapGroup))
+                Spacer(Modifier.height(GapGroup))
                 ExpressiveButtonRow(spacing = 8.dp) {
                     val pinSource = remember { MutableInteractionSource() }
                     SafeExpansiveButton(
@@ -743,7 +743,7 @@ internal fun ThemeCardContent(appearance: SettingsStore.Appearance, advanced: Bo
                     title = "Display mode",
                     status = if (appearance.auroraBackground) "$themeLabel · Aurora" else themeLabel,
                 )
-                Spacer(Modifier.height(SettingsGapGroup))
+                Spacer(Modifier.height(GapGroup))
                 // Dark is always true black (OLED-friendly) now -- see blooColorScheme's
                 // own doc. This used to also offer separate "AMOLED"/"+AMOLED" options
                 // alongside plain Dark/System; there was no reason to make dark mode
@@ -765,7 +765,7 @@ internal fun ThemeCardContent(appearance: SettingsStore.Appearance, advanced: Bo
                 // background covers everyone else).
                 AnimatedVisibility(visible = staggeredAdvancedVisible(advanced, 5), enter = expandEnterSized(), exit = expandExitSized()) {
                   Column {
-                    Spacer(Modifier.height(SettingsGapRow))
+                    Spacer(Modifier.height(GapRow))
                     ToggleRow("Aurora background", appearance.auroraBackground) { vm.setAuroraBackground(it) }
                     BodySmallText(
                         "Show a gradient aurora behind the content instead of a solid surface.",
@@ -780,9 +780,9 @@ internal fun ThemeCardContent(appearance: SettingsStore.Appearance, advanced: Bo
                         exit = expandExitSized(),
                     ) {
                         Column {
-                            Spacer(Modifier.height(SettingsGapRow))
+                            Spacer(Modifier.height(GapRow))
                             Text("Motion", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.primary)
-                            Spacer(Modifier.height(SettingsGapHairline))
+                            Spacer(Modifier.height(GapHairline))
                             MorphSegmented(
                                 options = listOf(
                                     SegmentOption("static", "Static", null),
@@ -801,9 +801,9 @@ internal fun ThemeCardContent(appearance: SettingsStore.Appearance, advanced: Bo
                   // wrapper the Spacer/Divider/Toggle/Slider siblings below would
                   // all stack on top of each other instead of flowing vertically.
                   Column {
-                    Spacer(Modifier.height(SettingsGapGroup))
+                    Spacer(Modifier.height(GapGroup))
                     SectionDivider()
-                    Spacer(Modifier.height(SettingsGapRow))
+                    Spacer(Modifier.height(GapRow))
                     ToggleRow("Dynamic color (Material You)", appearance.dynamicColor) { vm.setDynamicColor(it) }
                     BodySmallText(
                         "Uses your wallpaper palette on Android 12+. Turn off to choose a built-in palette below.",
@@ -814,10 +814,10 @@ internal fun ThemeCardContent(appearance: SettingsStore.Appearance, advanced: Bo
                         exit = expandExitSized(),
                     ) {
                         Column {
-                            Spacer(Modifier.height(SettingsGapRow))
+                            Spacer(Modifier.height(GapRow))
                             LabelText("Built-in palettes")
-                            Spacer(Modifier.height(SettingsGapHairline))
-                            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Spacer(Modifier.height(GapHairline))
+                            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(GapRow)) {
                                 ColorPalette.entries.forEach { palette ->
                                     PaletteSwatch(
                                         palette = palette,
@@ -830,12 +830,12 @@ internal fun ThemeCardContent(appearance: SettingsStore.Appearance, advanced: Bo
                             // selection existed (SettingsStore + AppViewModel) but had
                             // no entry point anywhere in the UI after the old Color
                             // card was merged into this Theme card -- restore it here.
-                            Spacer(Modifier.height(SettingsGapRow))
+                            Spacer(Modifier.height(GapRow))
                             LabelText("Custom palettes")
-                            Spacer(Modifier.height(SettingsGapHairline))
+                            Spacer(Modifier.height(GapHairline))
                             var editingPalette by remember { mutableStateOf<CustomPaletteData?>(null) }
                             var showPaletteEditor by remember { mutableStateOf(false) }
-                            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(GapRow)) {
                                 appearance.customPalettes.forEach { palette ->
                                     CustomPaletteSwatch(
                                         palette = palette,
@@ -855,7 +855,7 @@ internal fun ThemeCardContent(appearance: SettingsStore.Appearance, advanced: Bo
                                     ) {
                                         Icon(Icons.Filled.Add, contentDescription = "New custom palette")
                                     }
-                                    Spacer(Modifier.height(SettingsGapHairline))
+                                    Spacer(Modifier.height(GapHairline))
                                     LabelSmallText("New")
                                 }
                             }
@@ -869,9 +869,9 @@ internal fun ThemeCardContent(appearance: SettingsStore.Appearance, advanced: Bo
                             }
                         }
                     }
-                    Spacer(Modifier.height(SettingsGapRow))
+                    Spacer(Modifier.height(GapRow))
                     VibrancySlider(appearance, vm)
-                    Spacer(Modifier.height(SettingsGapRow))
+                    Spacer(Modifier.height(GapRow))
                     ToggleRow("Pebble outline", appearance.pebbleOutline) { vm.setPebbleOutline(it) }
                   }
                 }
@@ -945,7 +945,7 @@ internal fun CreditsCardContent(vm: AppViewModel) {
                             CreditRow(entry)
                             if (index != credits.lastIndex) {
                                 HorizontalDivider(
-                                    modifier = Modifier.padding(vertical = 10.dp),
+                                    modifier = Modifier.padding(vertical = GapRow),
                                     color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f),
                                 )
                             }
@@ -989,7 +989,7 @@ private fun CreditRow(entry: CreditEntry) {
             BodySmallText(
                 entry.description,
             )
-            Spacer(Modifier.height(6.dp))
+            Spacer(Modifier.height(GapHairline))
             // The actual link, styled and tappable -- not a caption-coloured, inert
             // copy of the URL. clip+clickable (not the whole Row, which would make
             // the icon/name/description look tappable too when only the link is)

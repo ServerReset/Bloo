@@ -68,7 +68,7 @@ private fun DebugInfoItem(
                     Modifier
                 }
             )
-            .padding(horizontal = 12.dp, vertical = 8.dp),
+            .padding(horizontal = 12.dp, vertical = GapRow),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -209,7 +209,7 @@ fun DebugSettingsPanel(
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-        Spacer(Modifier.height(SettingsGapRow))
+        Spacer(Modifier.height(GapRow))
 
         // heightIn is NOT optional here. This panel is rendered inside the Settings screen's
         // LazyColumn item{}, which measures its content with an UNBOUNDED max
@@ -226,7 +226,7 @@ fun DebugSettingsPanel(
             }
 
             item {
-                Spacer(Modifier.height(SettingsGapRow))
+                Spacer(Modifier.height(GapRow))
                 Row(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     verticalAlignment = Alignment.Top,

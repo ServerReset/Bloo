@@ -677,7 +677,7 @@ internal fun CoverActionButton(
             disabledContentColor = contentFor,
             pillCornerPercent = squarePct,
             morphedCornerPercent = squarePct,
-            contentPadding = PaddingValues(horizontal = 2.dp, vertical = 4.dp),
+            contentPadding = PaddingValues(horizontal = 2.dp, vertical = GapHairline),
             minHeight = 0.dp,
             // The actions carry the row's weight, so they split whatever the identity pill
             // leaves rather than every member claiming an equal share. See the bottom band.

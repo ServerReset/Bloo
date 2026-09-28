@@ -136,7 +136,7 @@ internal fun PaletteSwatch(
                 )
             }
         }
-        Spacer(Modifier.height(SettingsGapHairline))
+        Spacer(Modifier.height(GapHairline))
         Text(
             palette.label,
             style = MaterialTheme.typography.labelSmall,
@@ -322,7 +322,7 @@ internal fun ColorPickerCanvas(
         update()
     }
 
-    Column(modifier, verticalArrangement = Arrangement.spacedBy(10.dp)) {
+    Column(modifier, verticalArrangement = Arrangement.spacedBy(GapRow)) {
         // Saturation × Value square
         Canvas(
             Modifier
@@ -489,7 +489,7 @@ internal fun PaletteEditorDialog(
                 // semantics that every other boolean setting in the app has.
                 ToggleRow("Custom secondary", useSecondary) { useSecondary = it }
                 AnimatedVisibility(useSecondary, enter = expandEnterSized(), exit = expandExitSized()) {
-                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Column(verticalArrangement = Arrangement.spacedBy(GapRow)) {
                         LabelLargeText(
                             "Secondary colour",
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -505,7 +505,7 @@ internal fun PaletteEditorDialog(
                 // semantics that every other boolean setting in the app has.
                 ToggleRow("Custom tertiary", useTertiary) { useTertiary = it }
                 AnimatedVisibility(useTertiary, enter = expandEnterSized(), exit = expandExitSized()) {
-                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Column(verticalArrangement = Arrangement.spacedBy(GapRow)) {
                         LabelLargeText(
                             "Tertiary colour",
                             color = MaterialTheme.colorScheme.onSurfaceVariant,

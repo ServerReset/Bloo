@@ -168,7 +168,7 @@ internal fun CropScreen(vin: String, uriString: String, onCancel: () -> Unit, on
     }
 
     Surface(Modifier.fillMaxSize(), color = Color.Black) {
-        Column(Modifier.fillMaxSize().padding16(), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        Column(Modifier.fillMaxSize().padding16(), verticalArrangement = Arrangement.spacedBy(GapSection)) {
             Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
                 val image = bmp
                 when {
@@ -266,7 +266,7 @@ internal fun CropScreen(vin: String, uriString: String, onCancel: () -> Unit, on
                     },
                     enabled = bmp != null,
                     interactionSource = confirmSource,
-                    contentPadding = PaddingValues(horizontal = 18.dp, vertical = 10.dp),
+                    contentPadding = PaddingValues(horizontal = 18.dp, vertical = GapRow),
                 ) { Text("Use photo", style = ButtonLabelStyle, fontWeight = FontWeight.SemiBold) }
                 }
             }
@@ -452,7 +452,7 @@ internal fun SettingsCaption(
      * control it explains and what matters is the distance to the NEXT one. Pass a smaller one
      * where the caption instead LEADS its own control, so the two read as a pair.
      */
-    bottomGap: Dp = SettingsGapGroup,
+    bottomGap: Dp = GapGroup,
 ) {
     Text(
         text,
@@ -509,7 +509,7 @@ private fun ToggleRowControl(label: String, checked: Boolean, onChange: (Boolean
             // activate" for the row, then the real on/off announcement for the
             // track a swipe later).
             .hapticToggleable(checked, onChange)
-            .padding(vertical = 4.dp),
+            .padding(vertical = GapHairline),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(

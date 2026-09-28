@@ -307,7 +307,7 @@ fun MorphTextButton(
         interactionSource = interactionSource,
         containerColor = containerColor,
         contentColor = contentColor,
-        contentPadding = PaddingValues(horizontal = 18.dp, vertical = 10.dp),
+        contentPadding = PaddingValues(horizontal = 18.dp, vertical = GapRow),
         minHeight = ButtonTargetHeight,
     ) {
         val glyph = (icon ?: standardButtonIcon(text)).takeIf { showIcon }
@@ -365,7 +365,7 @@ fun MorphActionButton(
         enabled = enabled,
         interactionSource = interactionSource,
         groupWeight = groupWeight,
-        contentPadding = PaddingValues(horizontal = 18.dp, vertical = 8.dp),
+        contentPadding = PaddingValues(horizontal = 18.dp, vertical = GapRow),
     ) {
         // The shared label, so the glyph gets the standard gap and -- the part a
         // hand-assembled Icon+Spacer+Text cannot do -- the button can tell a cramped
@@ -720,7 +720,7 @@ fun MorphChip(
         onClickHaptic = { haptics?.tick() },
         interactionSource = chipSource,
         active = selected,
-        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 10.dp),
+        contentPadding = PaddingValues(horizontal = 16.dp, vertical = GapRow),
         // Same target height as every other button. A chip was 0-min and so ended up shorter
         // than the buttons beside it, which is most of why the seat-heat row read as a
         // different family from the rest of a card.

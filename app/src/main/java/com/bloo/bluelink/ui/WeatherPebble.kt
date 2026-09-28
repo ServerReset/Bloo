@@ -193,7 +193,7 @@ internal fun LocationPebble(v: Vehicle, state: UiState, vm: AppViewModel, dragHa
                 // now runs for the whole time the app is open, started once from
                 // loadGarageInner -- not tied to this pebble's own visibility any more.
                 Column(
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                    verticalArrangement = Arrangement.spacedBy(GapGroup)
                 ) {
                 // COVER SCREEN: lead with the place-name hero (the cover drops the header
                 // where the place summary otherwise shows), and shrink the map so hero +
@@ -345,7 +345,7 @@ internal fun WeatherStripe(weather: Weather, fahrenheit: Boolean, caption: Strin
             .fillMaxWidth()
             .clip(StandardShape)
             .background(MaterialTheme.colorScheme.surfaceContainerHigh)
-            .padding(horizontal = 14.dp, vertical = 10.dp),
+            .padding(horizontal = 14.dp, vertical = GapRow),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
@@ -383,7 +383,7 @@ internal fun WeatherDetail(weather: Weather, fahrenheit: Boolean, metric: Boolea
     // is the reported "overlap on tons of the text" in the weather stats. A Column gives the
     // slot the single child it expects, and spaces the rows by the same 12dp the location
     // pebble's own Column was providing before this AnimatedVisibility sat between them.
-    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+    Column(verticalArrangement = Arrangement.spacedBy(GapGroup)) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(16.dp),

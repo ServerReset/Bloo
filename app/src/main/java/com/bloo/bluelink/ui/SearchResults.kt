@@ -239,7 +239,7 @@ internal fun SettingsSearchResults(
             FontChoice.ATKINSON to "Atkinson Hyperlegible",
             FontChoice.GOOGLE_SANS to "Google Sans",
         )
-        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Column(verticalArrangement = Arrangement.spacedBy(GapRow)) {
             FontChoice.entries.forEach { choice ->
                 ChoiceRow(labels.getValue(choice), appearance.fontChoice == choice) { vm.setFontChoice(choice) }
             }
@@ -434,7 +434,7 @@ internal fun SettingsSearchResults(
                             iconSize = 15.dp,
                         )
                         Spacer(Modifier.width(12.dp))
-                        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(GapRow)) {
                             TitleSmallText(e.title)
                             e.content()
                         }
@@ -459,7 +459,7 @@ internal fun SettingsSearchResults(
                         iconSize = 15.dp,
                     )
                     Spacer(Modifier.width(12.dp))
-                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(GapHairline)) {
                         TitleSmallText(cmd.title)
                         Text(cmd.description, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
@@ -565,7 +565,7 @@ internal fun SettingsSearchResults(
             modifier = Modifier.fillMaxWidth(),
             hazeState = hazeState,
         ) {
-            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(GapRow)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(Icons.Filled.Bolt, contentDescription = null, modifier = Modifier.size(18.dp))
                     Spacer(Modifier.width(8.dp))
@@ -619,7 +619,7 @@ internal fun SettingsSearchResults(
                 modifier = Modifier.fillMaxWidth(),
                 hazeState = hazeState,
             ) {
-                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(GapRow)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Icon(Icons.Filled.Bolt, contentDescription = null, modifier = Modifier.size(18.dp))
                         Spacer(Modifier.width(8.dp))
@@ -701,7 +701,7 @@ internal fun SettingsSearchResults(
                 modifier = Modifier.fillMaxWidth(),
                 hazeState = hazeState,
             ) {
-                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(GapRow)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Icon(Icons.Filled.AutoAwesome, contentDescription = null, modifier = Modifier.size(18.dp))
                         Spacer(Modifier.width(8.dp))

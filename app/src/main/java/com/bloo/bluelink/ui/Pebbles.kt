@@ -190,7 +190,7 @@ internal fun HotspotSlot(
     // controls pebble looks unlike every other pebble there. The INNER column below keeps its
     // own 2dp: that gap is between the secondary slot's small pin/Remove label and the pebble
     // that label belongs to, where tight is the point.
-    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(GapGroup)) {
         // PRIMARY SLOT (Top) - Always "controls" (lights/horn), permanently pinned
         // No removal option - this slot is hardcoded and locked
         CompositionLocalProvider(LocalForceExpanded provides true) {
@@ -1063,7 +1063,7 @@ internal fun StateControl(
                     active = highlighted,
                     activeContainerColor = highlightColor,
                     activeContentColor = highlightContentColor,
-                    contentPadding = PaddingValues(horizontal = 14.dp, vertical = 10.dp),
+                    contentPadding = PaddingValues(horizontal = 14.dp, vertical = GapRow),
                     modifier = Modifier.heightIn(min = groupBtnSize),
                 ) {
                     lockContent()
@@ -1107,7 +1107,7 @@ internal fun StateControl(
                         activeContainerColor = highlightColor,
                         activeContentColor = highlightContentColor,
                         shapeForCorner = { morph, cp -> connectedGroupShape(segmentCount - 1, segmentCount, cp, morph) },
-                        contentPadding = PaddingValues(horizontal = 14.dp, vertical = 10.dp),
+                        contentPadding = PaddingValues(horizontal = 14.dp, vertical = GapRow),
                         modifier = Modifier.heightIn(min = groupBtnSize),
                     ) {
                         lockContent()

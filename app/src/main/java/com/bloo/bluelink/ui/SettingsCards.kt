@@ -109,7 +109,7 @@ internal fun LiveUpdateTroubleshootDialog(onDismiss: () -> Unit) {
         title = "Live update not showing?",
         text = {
             Text("A few things to check, in order:", style = MaterialTheme.typography.bodyMedium)
-            Spacer(Modifier.height(SettingsGapGroup))
+            Spacer(Modifier.height(GapGroup))
             TroubleshootStep(
                 1,
                 "Not appearing or updating reliably at all -- especially if it takes a while after charging starts? Use the \"Tap to fix\" link above if it's showing: that's Android's battery-optimization exemption, needed for the background check that posts and updates the bar to run on schedule while the app isn't open." +
@@ -175,7 +175,7 @@ internal fun LiveUpdateTroubleshootDialog(onDismiss: () -> Unit) {
 
 @Composable
 internal fun TroubleshootStep(number: Int, text: String) {
-    Row(modifier = Modifier.padding(bottom = SettingsGapGroup)) {
+    Row(modifier = Modifier.padding(bottom = GapGroup)) {
         Text(
             "$number.",
             style = MaterialTheme.typography.bodyMedium,
@@ -248,7 +248,7 @@ internal fun CarSettingsCard(
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-                Spacer(Modifier.height(SettingsGapHairline))
+                Spacer(Modifier.height(GapHairline))
                 PlatformPicker(current = state.platformOf(v)) { pt -> vm.setPlatform(v, pt) }
             }
         }
@@ -278,7 +278,7 @@ internal fun CarSettingsCard(
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-            Spacer(Modifier.height(SettingsGapHairline))
+            Spacer(Modifier.height(GapHairline))
             MorphSegmented(
                 options = buildList {
                     add(SegmentOption("smart", "Smart", null))
@@ -367,7 +367,7 @@ internal fun MinutesField(initial: Int, label: String, onSet: (Int) -> Unit) {
         singleLine = true,
         shape = FieldShape,
         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-        modifier = Modifier.fillMaxWidth().padding(top = SettingsGapRow),
+        modifier = Modifier.fillMaxWidth().padding(top = GapRow),
     )
 }
 
@@ -400,7 +400,7 @@ internal fun SettingsGroup(title: String, content: @Composable ColumnScope.() ->
             .clip(StandardShape)
             .background(MaterialTheme.colorScheme.surfaceColorAtElevation(6.dp))
             .padding(12.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(GapRow),
     ) {
         Text(
             title,

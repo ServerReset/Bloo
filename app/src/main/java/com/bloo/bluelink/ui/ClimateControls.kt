@@ -218,7 +218,7 @@ internal fun ClimatePresetSection(
             // screen spent announcing an empty section. It also means the label animates away
             // with the last preset instead of being left behind.
             SectionLabel("Presets")
-            Spacer(Modifier.height(SettingsGapHairline))
+            Spacer(Modifier.height(GapHairline))
             // Full-width reorderable rows: drag handle to re-rank, tap to apply.
             ReorderColumn(
                 items = presets,
@@ -252,7 +252,7 @@ internal fun ClimatePresetSection(
                     )
                 }
             }
-            Spacer(Modifier.height(SettingsGapHairline))
+            Spacer(Modifier.height(GapHairline))
         }
     }
 }
@@ -507,13 +507,13 @@ internal fun ChargeLimitPill(
                 }
             }
         }
-        Spacer(Modifier.height(10.dp))
+        Spacer(Modifier.height(GapRow))
         AnimatedSlider(
             value = limit.toFloat(),
             onValueChange = { onValueChange((it / 10f).roundToInt() * 10) },
             valueRange = CHARGE_LIMIT_RANGE.first.toFloat()..CHARGE_LIMIT_RANGE.last.toFloat(),
             steps = 4,
         )
-        Spacer(Modifier.height(6.dp))
+        Spacer(Modifier.height(GapHairline))
     }
 }

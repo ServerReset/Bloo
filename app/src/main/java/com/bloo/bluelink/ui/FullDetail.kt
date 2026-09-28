@@ -117,7 +117,7 @@ internal fun VehicleDetailContent(
                 .fillMaxSize()
                 .verticalScroll(scroll)
                 .padding(horizontal = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+            verticalArrangement = Arrangement.spacedBy(GapGroup),
         ) {
             // Inset spacer (not padding) so content scrolls *behind* the bars --
             // topInset alone, no extra breathing room, so the name sits right at
@@ -283,7 +283,7 @@ internal fun ExpandedCar(
                 ) {
                     Column(
                         Modifier.weight(1f).fillMaxHeight().verticalScroll(leftScroll),
-                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                        verticalArrangement = Arrangement.spacedBy(GapGroup),
                     ) {
                         Spacer(Modifier.height(topSpacerHeight))
                         leftCol()
@@ -291,7 +291,7 @@ internal fun ExpandedCar(
                     }
                     Column(
                         Modifier.weight(1f).fillMaxHeight().verticalScroll(rightScroll),
-                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                        verticalArrangement = Arrangement.spacedBy(GapGroup),
                     ) {
                         Spacer(Modifier.height(topSpacerHeight))
                         rightCol()
@@ -342,7 +342,7 @@ internal fun CarHeaderRow(
         Column(Modifier.weight(1f)) {
             FlowRow(
                 horizontalArrangement = Arrangement.spacedBy(6.dp),
-                verticalArrangement = Arrangement.spacedBy(6.dp),
+                verticalArrangement = Arrangement.spacedBy(GapHairline),
             ) {
                 MetaChip(meta, hazeState = hazeState)
                 LastUpdatedLabel(fetchedAt, hazeState = hazeState)

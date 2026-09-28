@@ -145,11 +145,11 @@ internal val HeroOnPhoto = Color(0xFFF2F2F5)
 // ---- Sizing -------------------------------------------------------------------
 
 /** Shared control height: a collapsed pebble matches the lock/unlock button. */
-internal val ControlHeight = 76.dp
+internal val ControlHeight = 64.dp
 
 /** Uniform collapsed-header height so every pebble lines up at the same size. */
 internal val PebbleHeaderHeight = ControlHeight
-internal val PebbleCornerCollapsed = 38.dp
+internal val PebbleCornerCollapsed = 32.dp
 internal val PebbleCornerExpanded = 20.dp
 
 /** The charge bar's height, shared by every surface that draws this bar so the
@@ -186,21 +186,22 @@ internal val HeroReadoutBottomInset = 14.dp
 internal val PebbleContentInset = 16.dp
 
 /**
- * The Settings screen's vertical rhythm, as four steps instead of the seven raw values that had
- * accumulated (4, 6, 8, 10, 12, 14 and 16dp, with 6/10/14 sitting exactly between the steps
- * around them). Material 3's spacing system is built on 8 with 4dp sub-steps, and a screen of
- * seventeen cards is precisely where an ad-hoc gap is invisible on its own and obvious in
- * aggregate -- the stray values are why the spacing read as uneven from card to card even when
+ * The app's vertical rhythm, as four steps instead of the many raw values that had accumulated
+ * (4, 6, 8, 10, 12, 14, 16dp and odder strays, several sitting exactly between two steps).
+ * Material 3's spacing system is built on 8 with 4dp sub-steps; ad-hoc gaps are invisible on
+ * their own and obvious in aggregate, and 6/10/14 are why a screen read as uneven even when
  * each individual gap looked deliberate.
  *
- * The strays snap DOWN rather than up, so the screen tightens slightly instead of growing by
- * ~2dp in thirty places.
+ * Use these for every vertical gap, padding and arrangement instead of a raw dp literal. Strays
+ * snap to the nearest step, preferring DOWN so screens tighten rather than grow by ~2dp in
+ * thirty places.
  */
-internal val SettingsGapHairline = 4.dp
-internal val SettingsGapRow = 8.dp
-internal val SettingsGapGroup = 12.dp
-internal val SettingsGapSection = 16.dp
+internal val GapHairline = 4.dp
+internal val GapRow = 8.dp
+internal val GapGroup = 12.dp
+internal val GapSection = 16.dp
 
+/** Gap between settings cards (kept apart from the [GapRow]/[GapGroup] rhythm). */
 internal val SettingsCardGap = 10.dp
 
 // ---- Shapes ---------------------------------------------------------------------

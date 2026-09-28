@@ -68,7 +68,7 @@ private fun RemoteActionItem(action: RemoteAction, use24Hour: Boolean) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 5.dp),
+            .padding(vertical = GapHairline),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Box(
@@ -170,7 +170,7 @@ internal fun RemoteActionsInline(actions: List<RemoteAction>, max: Int = 6) {
                 text = "No remote actions yet",
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(vertical = 4.dp),
+                modifier = Modifier.padding(vertical = GapHairline),
             )
             return@Column
         }

@@ -10,7 +10,7 @@
 internal fun AddTilePill(label: String, onClick: () -> Unit) {
     MorphButton(
         onClick = onClick,
-        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+        modifier = Modifier.fillMaxWidth().padding(vertical = GapHairline),
         containerColor = MaterialTheme.colorScheme.surface,
     ) {
         Icon(Icons.Filled.Add, contentDescription = null)
@@ -30,7 +30,7 @@ internal fun AddTilePill(label: String, onClick: () -> Unit) {
         MorphButton(
             onClick = onClick,
             interactionSource = interactionSource,
-            modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+            modifier = Modifier.fillMaxWidth().padding(vertical = GapHairline),
             containerColor = MaterialTheme.colorScheme.surface,
         ) {
             Icon(Icons.Filled.Add, contentDescription = null)

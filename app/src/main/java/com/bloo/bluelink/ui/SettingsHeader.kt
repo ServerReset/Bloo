@@ -310,7 +310,7 @@ internal fun SettingsHeroCard(state: UiState, vm: AppViewModel, compact: Boolean
                 exit = expandExitSized(fade = false),
             ) {
                 Column {
-                    Spacer(Modifier.height(SettingsGapGroup))
+                    Spacer(Modifier.height(GapGroup))
                     // Both update sources share one row instead of two stacked full-width
                     // pills: the in-app checker (primary) and the GitHub Releases page (a
                     // second source that still works when the checker says up-to-date or
@@ -362,7 +362,7 @@ internal fun SettingsHeroCard(state: UiState, vm: AppViewModel, compact: Boolean
                     // Shizuku silent-install: the ROW is gated on Shizuku being present, but
                     // the card is not -- so the update controls above always show.
                     if (state.shizukuAvailable) {
-                        Spacer(Modifier.height(SettingsGapHairline))
+                        Spacer(Modifier.height(GapHairline))
                         ToggleRow("Install seamlessly (Shizuku)", appearance.seamlessInstallShizuku) {
                             vm.setSeamlessInstallShizuku(it)
                         }
@@ -387,7 +387,7 @@ internal fun SettingsHeroCard(state: UiState, vm: AppViewModel, compact: Boolean
                     PopVisible(visible = updateInfo != null && !state.updateTileDismissed, sizeAnimated = true) {
                     if (updateInfo != null) {
                     Column {
-                        Spacer(Modifier.height(SettingsGapGroup))
+                        Spacer(Modifier.height(GapGroup))
                         // Its own outlined container, separate from the check/GitHub/Shizuku
                         // controls above -- marks where "current state" ends and "here's
                         // what's new" begins. Outlined, not filled: UpdateReleaseNotes below
@@ -412,7 +412,7 @@ internal fun SettingsHeroCard(state: UiState, vm: AppViewModel, compact: Boolean
                             "${com.bloo.bluelink.data.buildLabel(vm.currentBuildNumber)} → $newLabel"
                         } else newLabel
                         val seamless = appearance.seamlessInstallShizuku && state.shizukuAvailable
-                        Spacer(Modifier.height(SettingsGapHairline))
+                        Spacer(Modifier.height(GapHairline))
                         // Same tonal Surface the update PEBBLE wraps this exact shared
                         // composable in (UpdateTile.kt) -- same shared composable, same
                         // chrome around it, in both places.
@@ -432,7 +432,7 @@ internal fun SettingsHeroCard(state: UiState, vm: AppViewModel, compact: Boolean
                                 )
                             }
                         }
-                        Spacer(Modifier.height(SettingsGapGroup))
+                        Spacer(Modifier.height(GapGroup))
                         // Label, glyph and branch all come from the shared updateAction /
                         // runUpdateAction, so this button and the pebble's header action
                         // cannot disagree about what the update flow is currently offering.
@@ -456,9 +456,9 @@ internal fun SettingsHeroCard(state: UiState, vm: AppViewModel, compact: Boolean
                         // Shared with the update pebble -- see UpdateReleaseNotes. The two
                         // used to keep a copy each, identical but for the excerpt length and
                         // one of them forgetting FLAG_ACTIVITY_NEW_TASK on the intent.
-                        Spacer(Modifier.height(SettingsGapRow))
+                        Spacer(Modifier.height(GapRow))
                         UpdateReleaseNotes(updateInfo, maxLines = 3)
-                        Spacer(Modifier.height(SettingsGapRow))
+                        Spacer(Modifier.height(GapRow))
                         Row(Modifier.fillMaxWidth()) {
                             Spacer(Modifier.weight(1f))
                             val notNowSource = remember { MutableInteractionSource() }

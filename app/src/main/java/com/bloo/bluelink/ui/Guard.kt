@@ -275,7 +275,7 @@ internal fun LockOverlay(vm: AppViewModel, opaqueBackdrop: Boolean = false) {
                     fontWeight = FontWeight.Bold,
                     color = Color.White,
                 )
-                Spacer(Modifier.height(SettingsGapHairline))
+                Spacer(Modifier.height(GapHairline))
                 Text(
                     if (appState.appPinSet) "Confirm it's you, or use your PIN." else "Confirm it's you to reach your vehicles.",
                     style = MaterialTheme.typography.bodyMedium,
@@ -303,7 +303,7 @@ internal fun LockOverlay(vm: AppViewModel, opaqueBackdrop: Boolean = false) {
                     }
                 }
                 if (appState.appPinSet) {
-                    Spacer(Modifier.height(SettingsGapGroup))
+                    Spacer(Modifier.height(GapGroup))
                     val pinSource = remember { MutableInteractionSource() }
                     SafeExpansiveButton(
                         interactionSource = pinSource,
@@ -354,7 +354,7 @@ internal fun LockOverlay(vm: AppViewModel, opaqueBackdrop: Boolean = false) {
                                 )
                             }
                         }
-                        Spacer(Modifier.height(16.dp))
+                        Spacer(Modifier.height(GapSection))
                         OutlinedTextField(
                             value = pin,
                             onValueChange = { pin = it.take(PinCrypto.PIN_MAX_DIGITS).filter { ch -> ch.isDigit() } },
@@ -385,7 +385,7 @@ internal fun LockOverlay(vm: AppViewModel, opaqueBackdrop: Boolean = false) {
                             },
                             modifier = Modifier.fillMaxWidth(),
                         )
-                        Spacer(Modifier.height(14.dp))
+                        Spacer(Modifier.height(GapGroup))
                         val pinUnlockSource = remember { MutableInteractionSource() }
                         SafeExpansiveButton(
                             interactionSource = pinUnlockSource,
@@ -401,7 +401,7 @@ internal fun LockOverlay(vm: AppViewModel, opaqueBackdrop: Boolean = false) {
                             }
                         }
                         if (bioAvailable) {
-                            Spacer(Modifier.height(SettingsGapRow))
+                            Spacer(Modifier.height(GapRow))
                             val bioSource = remember { MutableInteractionSource() }
                             SafeExpansiveButton(
                                 interactionSource = bioSource,
@@ -427,14 +427,14 @@ internal fun LockOverlay(vm: AppViewModel, opaqueBackdrop: Boolean = false) {
                     modifier = Modifier.size(if (compact) 44.dp else 72.dp),
                     tint = Color.White,
                 )
-                Spacer(Modifier.height(18.dp))
+                Spacer(Modifier.height(GapSection))
                 Text(
                     "Bloo is locked",
                     style = MaterialTheme.typography.headlineSmall,
                     fontWeight = FontWeight.Bold,
                     color = Color.White,
                 )
-                Spacer(Modifier.height(SettingsGapHairline))
+                Spacer(Modifier.height(GapHairline))
                 Text(
                     "Please try opening Bloo again.",
                     style = MaterialTheme.typography.bodyMedium,
@@ -558,7 +558,7 @@ internal fun GarageStatusCard(state: State<UiState>, vm: AppViewModel, hazeState
             ) {
                 Column(
                     horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(GapSection),
                     modifier = Modifier.padding(horizontal = 28.dp, vertical = 32.dp),
                 ) {
                     // Same tonal icon-badge every SettingsCard header uses (StatusHeaderRow,
