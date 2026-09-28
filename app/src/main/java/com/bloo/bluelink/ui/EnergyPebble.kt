@@ -123,21 +123,30 @@ internal fun ChargePebble(v: Vehicle, status: VehicleStatus?, enabled: Boolean, 
             activeContent = Color.White,
         ),
     ) {
-        // COVER SCREEN only: lead with the big charge %/range/charging-state hero
-        // (the same ChargeFuelBar the cover "main" tile uses), so the charge tile
-        // opens on the number that matters instead of just two limit sliders. On the
-        // phone this pebble sits directly under the car's HeroHeader (which already
-        // shows ChargeFuelBar), so we DON'T duplicate it there — gated on forceExpanded.
+        // COVER SCREEN. This tile used to lead with ChargeFuelBar -- the exact charge
+        // %/range/charging bar the cover's own main (hero) tile already draws -- so opening
+        // it just showed the hero again with nothing of its own. Reported directly: "the
+        // flip phone tile is weird for charge limits, it just shows the same stuff as the
+        // hero tile." The one thing the hero does NOT carry is the charge LIMITS, so on the
+        // cover this tile leads with those instead. Read-only and compact, deliberately: the
+        // full slider+Set pills were tried here before and clipped the tile's own Start
+        // action off the bottom of a one-inch panel (editing limits stays a phone control),
+        // but the current AC/DC targets fit as two rows and make this tile genuinely about
+        // limits rather than a second copy of the hero. Brands that cannot report limits (and
+        // cars that have not reported them yet) keep the shared bar as the fallback.
         if (LocalForceExpanded.current) {
-            ChargeFuelBar(
-                status,
-                state.hasBattery(v),
-                state.hasFuel(v),
-                state.drivingLabel(v),
-                metric = LocalAppearance.current.unitSystem == "metric",
-            )
-            // No trailing Spacer — the cover shell's spacedBy(10.dp) owns the gap, so
-            // the hero-to-content rhythm matches every CoverHero tile (was 26dp here).
+            if (v.brand.supportsChargeLimits && (acReported != null || dcReported != null)) {
+                acReported?.let { StatusRow("AC limit", "$it%") }
+                dcReported?.let { StatusRow("DC limit", "$it%") }
+            } else {
+                ChargeFuelBar(
+                    status,
+                    state.hasBattery(v),
+                    state.hasFuel(v),
+                    state.drivingLabel(v),
+                    metric = LocalAppearance.current.unitSystem == "metric",
+                )
+            }
         }
         // Its own PopVisible: this row arrives/leaves live while the pebble is open --
         // plugging or unplugging the car doesn't require re-expanding to see it change.
@@ -153,8 +162,10 @@ internal fun ChargePebble(v: Vehicle, status: VehicleStatus?, enabled: Boolean, 
         // configuration -- you set a charge limit once and then never think about it -- and on a
         // one-inch panel they pushed the readout and the Start button off the bottom of the tile
         // entirely (reported from a real cover screenshot: the DC row and the action clipped).
-        // The cover's job is the glance and the one command; the limits stay a phone control,
-        // where there is room to see what you are dragging.
+        // The cover's job is the glance and the one command; EDITING limits stays a phone
+        // control, where there is room to see what you are dragging. (The cover still SHOWS the
+        // current limits -- as the read-only AC/DC rows in the cover branch above -- it just
+        // does not let you drag them there.)
         if (v.brand.supportsChargeLimits && !LocalForceExpanded.current) {
             ChargeLimitPill(
                 label = "AC (home) limit",
