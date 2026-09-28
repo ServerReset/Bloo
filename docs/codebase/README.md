@@ -4,6 +4,8 @@ A durable reference for the Bloo codebase. Start with **[ARCHITECTURE.md](ARCHIT
 
 Each per-file doc follows a consistent structure: Purpose · Public surface · Internal structure · Data & types · State & concurrency · Collaborators & data flow · Invariants & assumptions · Gotchas & sharp edges.
 
+> **Note:** the per-file deep-dives were written when the app still had a Wear OS companion, a home-screen widget, and Quick Settings tiles. Those subsystems were removed; where a deep-dive still describes them (`WearSync`, `WearBridge`, `TileCommandRunner`, `BlooTile*`, `BlooWidget`), treat it as historical. The top-level map in [ARCHITECTURE.md](ARCHITECTURE.md) and the entries above reflect the current app.
+
 > Two load-bearing invariants underpin everything (see ARCHITECTURE §4): **(1)** every car request runs inside `BlueLinkGate.statusMutex`; **(2)** climate-start is gated on `isDriving` on every path. Watch the encoding traps: `plugType` 0=DC/1=AC vs `batteryPlugin` 0=unplugged/1=DC/2=AC; `hasBattery` (user override) not raw `isEv` drives percent/range.
 
 ---

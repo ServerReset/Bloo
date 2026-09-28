@@ -183,7 +183,7 @@ Because instances are immutable, they are freely shareable across threads. This 
 
 **Consumers (data out):**
 - UI/AppViewModel: `percentFor`, `rangeMiFor`, `isDriving`, `openLabels`, `SeatLevel.rangeFor`, `pluggedInLabel`, `Battery12V.health`, `targetForCurrentPlug`, `coordString`.
-- `WearCommandRunner.kt` uses `snap.toVehicle()` and the driving gate (WearCommandRunner.kt:29, 161) — the watch's standalone command path referenced in the `isDriving` comment.
+- `CarCommandRunner.kt` uses `snap.toVehicle()` and the driving gate (CarCommandRunner.kt:29, 161) — the watch's standalone command path referenced in the `isDriving` comment.
 - `ClimateRequest`/`ClimatePreset`/`SeatLevel` are serialized across the **WearSync wire** (`climate`/`presets` DataItem paths, `command` message path) — `SeatLevel.apiValue`/`fromApi` are the int (de)serializers for that hop, matching the domain fact that seat levels cross the wear wire as ints.
 
 **Channels:** function-call decoding (kotlinx.serialization from HTTP bodies), then plain in-memory object passing. Nothing here touches DataStore, intents, or WorkManager directly; those layers consume/persist these types.

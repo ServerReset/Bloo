@@ -21,7 +21,7 @@ Bloo's phone process holds the authoritative live vehicle state in
 - **Home-screen widgets** (`BlooWidget`), **Quick Settings tiles**
   (`tiles/BlooTileService`), and their command workers run in *separate
   processes* / short-lived contexts and never see the ViewModel.
-- The **watch's standalone / relay command path** (`WearCommandRunner`) may run
+- The **watch's standalone / relay command path** (`CarCommandRunner`) may run
   without the phone UI ever having been opened.
 - On a **cold start**, the UI needs something to show before the first network
   call returns.
@@ -323,7 +323,7 @@ defaults).
   holds mutable in-memory state; each is a thin stateless wrapper over a
   `Context`-scoped DataStore extension property. `SnapshotStore` and
   `StatusCache` instances can be created ad-hoc anywhere (e.g. `SnapshotStore` is
-  constructed fresh inside `WearCommandRunner` at `WearCommandRunner.kt:26` and
+  constructed fresh inside `CarCommandRunner` at `CarCommandRunner.kt:26` and
   `:148`).
 - **One key, one blob each.** `SnapshotStore` stores everything under
   `stringPreferencesKey("payload")` in file `bloo_snapshots`; `StatusCache` under
@@ -354,7 +354,7 @@ defaults).
 **Writers (data in):**
 - `AppViewModel` (phone UI) — populates snapshots after account/status refreshes
   (`saveVehicles`, `updateVehicle`, selection changes).
-- `WearCommandRunner` — `WearCommandRunner.kt:86` `store.updateVehicle(updated)`
+- `CarCommandRunner` — `CarCommandRunner.kt:86` `store.updateVehicle(updated)`
   after a command; `:166`
   `repo.status(v, refresh=force)?.let { store.updateVehicle(snap.merged(it)) }`
   during standalone/command-triggered refreshes. This is the exact path
@@ -426,7 +426,7 @@ in-memory state at startup.
   `SnapshotStore.kt:84-89` documents a real prior bug: `merged()` originally
   reimplemented `percentFor`/`rangeMiFor` logic but with `isEv` instead of the
   user's manual `hasBattery` override. On a PHEV the API misreports as gas, every
-  refresh through `WearCommandRunner.refresh` would clobber `percent`/`rangeMi`
+  refresh through `CarCommandRunner.refresh` would clobber `percent`/`rangeMi`
   with **fuel** data instead of **battery** data. The fix routes through
   `status.percentFor(hasBattery)` / `rangeMiFor(hasBattery)`. Any new code that
   computes headline %/range must use `hasBattery`.

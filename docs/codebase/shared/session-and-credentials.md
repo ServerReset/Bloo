@@ -262,7 +262,7 @@ on:
   `clear`, `migrateLegacy`) rely on this single-transaction atomicity.
 - **Dispatcher/scope:** none of its own — all methods are `suspend` and run on the
   caller's coroutine context; DataStore does its IO on its own internal
-  dispatcher. Callers (`AppViewModel`, `WearCommandRunner`, `TileCommandRunner`,
+  dispatcher. Callers (`AppViewModel`, `CarCommandRunner`, `TileCommandRunner`,
   `AlertWorker`, `WearBridge`) invoke from their own coroutine scopes.
 - **No StateFlow / no `remember`** — this is not a Compose or reactive component;
   it exposes point-in-time `suspend` reads, not observable flows.
@@ -294,7 +294,7 @@ them.
   (AppViewModel.kt:279) hands both stores to the per-brand repository. AppViewModel
   drives `credentialStore.loadAll()` into UI state (`accounts`), `save`, `clear`,
   `updatePin`.
-- `shared/.../data/WearCommandRunner.kt` — the watch-side command executor builds
+- `shared/.../data/CarCommandRunner.kt` — the watch-side command executor builds
   its own stores.
 - `app/.../data/TileCommandRunner.kt` — QS-tile command executor.
 - `app/.../work/AlertWorker.kt` — WorkManager background polling.

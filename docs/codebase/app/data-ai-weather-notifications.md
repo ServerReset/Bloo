@@ -26,7 +26,7 @@ Files covered:
 | `AlertActionReceiver.kt` | The `BroadcastReceiver` that handles an **action-button tap** on a Bloo alert (e.g. "Lock", "Turn off"), runs the remote command, and posts a follow-up. |
 
 None of these is on the vehicle-command hot path except `AlertActionReceiver`, which
-delegates to `WearCommandRunner` (and thus the process-wide `BlueLinkGate` lock).
+delegates to `CarCommandRunner` (and thus the process-wide `BlueLinkGate` lock).
 
 ---
 
@@ -244,7 +244,7 @@ per (kind, VIN) so the three alert types never overwrite each other for one car.
    — a fresh receiver-scoped scope (a `BroadcastReceiver` has no lifecycle scope):
    a. If `notifId != -1`, `runCatching { NotificationManagerCompat.from(ctx).cancel(notifId) }`
       immediately, so the tap feels responsive (before the network call).
-   b. `result = runCatching { WearCommandRunner.execute(ctx, WearCommand(vin, action)) }.getOrNull()`.
+   b. `result = runCatching { CarCommandRunner.execute(ctx, WearCommand(vin, action)) }.getOrNull()`.
    c. `ok = result?.ok == true`; title `"$label sent"` / `"$label failed"`; text is a
       generic success line, or on failure prefers `result?.message` then falls back to
       `"Couldn't reach the car. Try again from the app."`.
@@ -310,7 +310,7 @@ Field fallbacks at construction (`WeatherApi.kt:197-206`): `feelsLikeC = c.appar
 `Action(label: String, vin: String, wearAction: String)` — button text, target VIN,
 and a `WearAction.*` string constant (e.g. `WearAction.LOCK = "lock"`,
 `WearAction.CLIMATE_OFF = "climate_off"`) that flows across the alert intent into
-`AlertActionReceiver` and on to `WearCommandRunner`.
+`AlertActionReceiver` and on to `CarCommandRunner`.
 
 ### 4.5 `CarAlerts.Alert` (`Notifications.kt:140`)
 
@@ -350,7 +350,7 @@ and a `WearAction.*` string constant (e.g. `WearAction.LOCK = "lock"`,
   `edit {}` (DataStore's serialized single-writer). No manual locks.
 - **`AlertActionReceiver`** — Creates a `CoroutineScope(Dispatchers.IO)` per receive
   (no lifecycle scope exists for a receiver). `goAsync()`/`pending.finish()` bound the
-  process's aliveness window. The actual command runs through `WearCommandRunner`, which
+  process's aliveness window. The actual command runs through `CarCommandRunner`, which
   serializes vehicle calls under the process-wide `BlueLinkGate.statusMutex`.
 
 ---
@@ -365,7 +365,7 @@ SettingsStore (DataStore) <──> CarAlerts.evaluate ──> List<Alert> ──
                                                                           ▼
 watch DataItem "climate" ──> WearPhoneService.onDataChanged ──> ClimateSyncStore.save(raw)
 ClimateSyncStore.flow ──> AppViewModel (UI)
-notification action tap ──> AlertActionReceiver.onReceive ──> WearCommandRunner.execute (BlueLinkGate) ──> Notifications.post (follow-up)
+notification action tap ──> AlertActionReceiver.onReceive ──> CarCommandRunner.execute (BlueLinkGate) ──> Notifications.post (follow-up)
 ```
 
 - **`Ai`** is called by the phone's AI-summary path (produces the `WearExtras.ai`
@@ -380,7 +380,7 @@ notification action tap ──> AlertActionReceiver.onReceive ──> WearComman
   intent contract is the four `EXTRA_*` constants + the unique `bloo://alert/$id/$action` URI.
 - **`ClimateSyncStore`** — `WearPhoneService.onDataChanged` calls `save(raw)` when the
   watch publishes a climate DataItem; `AppViewModel` observes `flow`.
-- **`AlertActionReceiver`** — delegates to `WearCommandRunner.execute(ctx, WearCommand(vin, action))`
+- **`AlertActionReceiver`** — delegates to `CarCommandRunner.execute(ctx, WearCommand(vin, action))`
   (in `:shared`), then re-posts via `Notifications.post`.
 
 Data leaving the device: HTTPS GET to `api.open-meteo.com` (lat/lon only, no key);
@@ -417,7 +417,7 @@ text sent to on-device ML Kit (stays on device). Nothing else leaves here.
   (`i` in `0..15`) to avoid request-code overlap with the next id. In practice ≤ 2.
 - **`AlertActionReceiver`** assumes `goAsync()` + `pending.finish()` in `finally` always
   runs; the coroutine must not out-live the process reclaim window (network I/O within
-  the OS broadcast time budget). It assumes `WearCommandRunner.execute` never throws out
+  the OS broadcast time budget). It assumes `CarCommandRunner.execute` never throws out
   of the `runCatching` (it returns a failed result instead).
 - **`ClimateSyncStore`** assumes `WearSync.decodeClimate(null)` returns a sensible empty
   `WearClimateState` (it does) so the first emission before any `save` is valid.
