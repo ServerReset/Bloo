@@ -112,12 +112,12 @@ internal fun LiveUpdateTroubleshootDialog(onDismiss: () -> Unit) {
             Spacer(Modifier.height(GapGroup))
             TroubleshootStep(
                 1,
-                "Not appearing or updating reliably at all -- especially if it takes a while after charging starts? Use the \"Tap to fix\" link above if it's showing: that's Android's battery-optimization exemption, needed for the background check that posts and updates the bar to run on schedule while the app isn't open." +
-                    if (isSamsung) " Samsung also has its OWN separate \"sleeping apps\" restriction, not covered by that fix -- check Settings → Battery → Background usage limits → Sleeping apps / Deep sleeping apps and make sure Bloo isn't listed there." else "",
+                "Not reliable, especially after charging starts? Tap the \"Tap to fix\" link above -- that's Android's battery-optimization exemption, which lets the bar update while the app is closed." +
+                    if (isSamsung) " Samsung also has its own \"sleeping apps\" list -- make sure Bloo isn't under Settings → Battery → Background usage limits." else "",
             )
-            TroubleshootStep(2, "Make sure \"Live charging updates\" is on above, and the car is actually charging -- the bar only exists while charging is true.")
-            TroubleshootStep(3, "Below Android 16, the chip can never appear anywhere -- only the plain progress bar in the shade. That's expected, not a bug.")
-            TroubleshootStep(4, "On Android 16+, use the \"Tap to fix\" link above if it's showing for the status bar -- that's the OS's own per-app Live Updates permission.")
+            TroubleshootStep(2, "Check \"Live charging updates\" is on and the car is charging.")
+            TroubleshootStep(3, "Below Android 16 the chip can't appear -- only the shade progress bar. Expected, not a bug.")
+            TroubleshootStep(4, "On Android 16+, tap \"Tap to fix\" above for the status bar -- the OS's Live Updates permission.")
             if (isSamsung) {
                 TroubleshootStep(
                     5,
@@ -242,9 +242,7 @@ internal fun CarSettingsCard(
         if (v.platformOverridable) {
             SettingsGroup("Head-unit generation") {
                 Text(
-                    "Bloo can't always tell Gen5W and ccNC head units apart from the " +
-                        "API alone. Confirm which one this car has so features like " +
-                        "Trips only show up when they're actually available.",
+                    "Confirm this car's head unit -- the API can't always tell. Features like Trips only show when supported.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -255,8 +253,7 @@ internal fun CarSettingsCard(
 
         SettingsGroup("Climate features") {
             Text(
-                "The remote climate command controls four seat positions. Enable " +
-                    "heating and/or cooling for the seats your car actually has.",
+                "Pick which of the four seats your car has, and heat or cool each.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -273,8 +270,7 @@ internal fun CarSettingsCard(
             val carPresets = state.climatePresets[v.vin].orEmpty()
             val currentDefault = state.defaultClimatePresets[v.vin] ?: "smart"
             Text(
-                "When the climate Start button is tapped (collapsed view), " +
-                    "the app runs your chosen preset or smart climate.",
+                "Tapping Start runs your preset or smart climate.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )

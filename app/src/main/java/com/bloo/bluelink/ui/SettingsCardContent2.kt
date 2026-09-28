@@ -166,8 +166,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 internal fun LocationCardContent(appearance: SettingsStore.Appearance, vm: AppViewModel) {
             SettingsCard("Location", Icons.Filled.LocationOn, vm) {
                 BodySmallText(
-                    "Where \"my location\" points for weather -- and, once set that way, the " +
-                        "same live position the map's own device dot and \"distance to car\" use.",
+                    "Where \"my location\" points for weather, and the device dot on the map.",
                 )
                 Spacer(Modifier.height(GapRow))
                 var weatherQuery by remember { mutableStateOf("") }
@@ -360,7 +359,7 @@ internal fun MapNavigationCardContent(appearance: SettingsStore.Appearance, vm: 
             SettingsCard("Map & Navigation", Icons.Filled.Map, vm) {
                 TitleSmallText("Open Charge Map API Key")
                 BodySmallText(
-                    "Required to show nearby EV chargers on the expanded map. Get a free key at openchargemap.org (My Profile → My Apps).",
+                    "Needed for nearby EV chargers. Free key at openchargemap.org.",
                 )
                 Spacer(Modifier.height(GapRow))
                 var keyInput by remember { mutableStateOf(appearance.chargerApiKey ?: "") }
@@ -416,9 +415,7 @@ internal fun NotificationsCardContent(notif: SettingsStore.NotificationPrefs, vm
                 ToggleRow(
                     "Live charging updates",
                     notif.charging,
-                    description = "A progress bar in the shade and, on Android 16+, in the status bar and " +
-                        "lock screen while the car charges -- with the charge limit marked and " +
-                        "a Stop button.",
+                    description = "A progress bar in the shade (status bar on Android 16+) while charging, with the limit marked and a Stop button.",
                 ) { vm.setNotifyCharging(it) }
                 // Whether it actually promotes to the status-bar chip is a
                 // system decision this app cannot force -- Android 16+ has a
@@ -508,9 +505,7 @@ internal fun NotificationsCardContent(notif: SettingsStore.NotificationPrefs, vm
                 ToggleRow("Car started notifications", notif.carStarted) { vm.setNotifyCarStarted(it) }
                 ToggleRow("Charge complete notifications", notif.chargeComplete) { vm.setNotifyChargeComplete(it) }
                 Text(
-                    "Background checks run roughly every 30 minutes, so alerts may " +
-                        "arrive a little after your set time. Door and running alerts " +
-                        "include a one-tap action to lock or turn the car off.",
+                    "Checks run about every 30 minutes, so alerts may lag your set time. Door/running alerts include a one-tap action.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -805,7 +800,7 @@ internal fun ThemeCardContent(appearance: SettingsStore.Appearance, advanced: Bo
                     Spacer(Modifier.height(GapRow))
                     ToggleRow("Dynamic color (Material You)", appearance.dynamicColor) { vm.setDynamicColor(it) }
                     BodySmallText(
-                        "Uses your wallpaper palette on Android 12+. Turn off to choose a built-in palette below.",
+                        "Use your wallpaper palette (Android 12+) instead of a built-in one.",
                     )
                     AnimatedVisibility(
                         visible = !appearance.dynamicColor,
@@ -899,7 +894,7 @@ internal fun CreditsCardContent(vm: AppViewModel) {
                                 ),
                                 CreditEntry(
                                     "Jetpack Compose",
-                                    "The UI toolkit this entire app -- every screen, every pebble, every animation -- is built with.",
+                                    "The Compose toolkit the whole app is built with.",
                                     "https://developer.android.com/jetpack/compose",
                                     Icons.Filled.Widgets,
                                 ),
@@ -923,7 +918,7 @@ internal fun CreditsCardContent(vm: AppViewModel) {
                                 ),
                                 CreditEntry(
                                     "OpenStreetMap",
-                                    "Map tiles for the car's and device's location, on the phone and the flip cover. © OpenStreetMap contributors.",
+                                    "Map tiles: © OpenStreetMap contributors.",
                                     "https://www.openstreetmap.org/copyright",
                                     Icons.Filled.Map,
                                 ),

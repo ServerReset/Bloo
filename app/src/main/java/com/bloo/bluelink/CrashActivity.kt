@@ -269,8 +269,7 @@ class CrashActivity : ComponentActivity() {
         val clipboardScope = rememberCoroutineScope()
         SettingsGroup("Crash report") {
             Text(
-                "Copy this and send it back -- device, build, the exact reason the app " +
-                    "stopped, and what it was doing right before that.",
+                "Copy this and send it back -- the crash, your device, and what the app was doing.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )

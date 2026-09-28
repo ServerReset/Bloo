@@ -209,7 +209,7 @@ internal fun ClimatePebble(
     // Helper to warn if the car engine is on before changing AC/climate settings
     val startClimateWithEngineCheck: (ClimateRequest) -> Unit = { req ->
         if (status?.engine == true) {
-            vm.reportInfo("AC changes might be rejected because the car is already running and remote climate control takes priority")
+            vm.reportInfo("Climate changes may be rejected while the car is running")
         }
         vm.startClimate(v, req)
     }
@@ -320,7 +320,7 @@ internal fun ClimatePebble(
         if (driving) {
             if (climateOn) {
                 Text(
-                    "Climate is on at the car. It ignores app commands while you're driving, so this is read-only.",
+                    "On at the car. Read-only while driving.",
                     style = MaterialTheme.typography.bodySmall,
                     color = LocalContentColor.current.copy(alpha = MutedContentAlpha),
                 )

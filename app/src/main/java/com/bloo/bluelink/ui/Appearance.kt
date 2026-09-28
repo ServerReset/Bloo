@@ -329,7 +329,7 @@ internal fun ColorPickerCanvas(
                 .height(180.dp)
                 .clip(SmallShape)
                 .semantics {
-                    contentDescription = "Saturation and brightness picker. Use the hex colour field below for exact input."
+                    contentDescription = "Saturation and brightness. Or type a hex below."
                 }
                 .pointerInput(Unit) {
                     awaitEachGesture {

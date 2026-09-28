@@ -501,7 +501,7 @@ internal fun GarageStatusCard(state: State<UiState>, vm: AppViewModel, hazeState
         offline -> Triple(
             Icons.Filled.WifiOff,
             "No connection",
-            "Bloo can't reach the internet right now. You're still signed in -- check your connection and pull down to retry.",
+            "No internet. You're still signed in -- check your connection and pull down to retry.",
         )
         loadFailed -> Triple(
             Icons.Filled.WifiOff,

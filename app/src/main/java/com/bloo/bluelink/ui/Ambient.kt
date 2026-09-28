@@ -502,8 +502,7 @@ internal fun LoginScreen(
                         label = "privacyNote",
                     ) { label ->
                         Text(
-                            "Credentials are sent directly to $label's telematics servers and " +
-                                "stored encrypted on this device.",
+                            "Sent only to $label's servers; stored encrypted on this device.",
                             style = MaterialTheme.typography.bodySmall,
                             color = scheme.onSurfaceVariant,
                         )

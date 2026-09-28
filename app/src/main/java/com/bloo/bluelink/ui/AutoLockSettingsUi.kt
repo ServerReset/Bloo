@@ -96,10 +96,7 @@ internal fun AutoLockSettingsGroup(v: Vehicle, vm: AppViewModel) {
 
     SettingsGroup("AutoLock") {
         MutedText(
-            "Automatically locks ${v.name} once your phone disconnects from its paired " +
-                "Bluetooth and Activity Recognition confirms you're walking away. Starts " +
-                "disabled and in dry-run mode -- it decides what it would do but never sends " +
-                "a real lock command until you turn that off.",
+            "Locks ${v.name} when you walk away (Bluetooth disconnect + motion). Starts in dry run -- decides and logs, never a real lock, until you turn that off.",
         )
         ToggleRow("Enabled", current.enabled, onChange = ::onEnabledChanged)
 
@@ -185,7 +182,7 @@ internal fun AutoLockSettingsGroup(v: Vehicle, vm: AppViewModel) {
             ToggleRow(
                 "Dry run (testing mode)",
                 current.dryRun,
-                description = "Runs the full flow and logs what it would do, but never sends the real lock command. Defaults on; turn off once you trust it.",
+                description = "Runs the full flow but never locks the car. Turn off once you trust it.",
             ) { update(current.copy(dryRun = it)) }
         }
     }
@@ -242,8 +239,7 @@ internal fun AutoLockSettingsGroup(v: Vehicle, vm: AppViewModel) {
             text = {
                 if (devices.isEmpty()) {
                     Text(
-                        "No paired Bluetooth devices found. Pair with your car's head unit " +
-                            "first from Android's Bluetooth settings, then come back here.",
+                        "No paired Bluetooth devices. Pair your car's head unit in Android's Bluetooth settings first.",
                         style = MaterialTheme.typography.bodyMedium,
                     )
                 } else {

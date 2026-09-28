@@ -321,8 +321,7 @@ internal fun WizardPowertrainPage(
     WizardPageHeader(
         "Powertrain",
         "What powers the ${vehicle.name}?",
-        "Bloo uses this to show the right status tiles: battery percentage for EVs, " +
-            "fuel level for gas, or both for plug-in hybrids.",
+        "Sets the right status tiles: battery for EV, fuel for gas, both for plug-in hybrid.",
     )
     val current = state.powertrainOf(vehicle)
     Column(verticalArrangement = Arrangement.spacedBy(GapRow)) {
@@ -379,8 +378,7 @@ internal fun WizardPlatformPage(
     WizardPageHeader(
         "Head-unit generation",
         "Which generation is the ${vehicle.name}?",
-        "Bloo can't always tell these apart from the API alone. Confirm it here " +
-            "so features like Trips only show up when they're actually available.",
+        "Confirm these -- the API can't always tell. Features like Trips only show when supported.",
     )
     val current = state.platformOf(vehicle)
     Column(verticalArrangement = Arrangement.spacedBy(GapRow)) {
@@ -388,7 +386,7 @@ internal fun WizardPlatformPage(
             val selected = current == pt
             val (label, desc) = when (pt) {
                 VehiclePlatform.GEN5W -> "Gen5W" to "Older head unit -- no Trips, no connected-car store"
-                VehiclePlatform.CCNC -> "ccNC" to "Newer head unit -- Trips and the connected-car store, where the backend supports them"
+                VehiclePlatform.CCNC -> "ccNC" to "Newer head unit -- full features"
             }
             // Same MorphButton as the powertrain page: pill at rest, fills
             // primaryContainer as a rounded square once chosen.
@@ -431,7 +429,7 @@ internal fun WizardSeatsPage(
     WizardPageHeader(
         "Seat comfort",
         "What does the ${vehicle.name} have?",
-        "Bloo shows only the controls your car actually supports. Skip any seats you don't have.",
+        "Only your car's real controls. Skip seats you don't have.",
     )
     Column(
         Modifier
@@ -491,7 +489,7 @@ internal fun WizardSteeringPage(
     WizardPageHeader(
         "Climate features",
         "Any extras on the ${vehicle.name}?",
-        "Enable what the car actually has. These control which options appear in the climate command.",
+        "Enable what your car has -- these shape the climate options.",
     )
     Column(
         Modifier

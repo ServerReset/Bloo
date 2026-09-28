@@ -682,8 +682,7 @@ private fun AccountsCardContent(state: UiState, vm: AppViewModel) {
                     )
                 }
                 BodySmallText(
-                    "If commands fail with a locked PIN, fix the Service PIN above. Too " +
-                        "many wrong-PIN attempts lock it for a few minutes server-side.",
+                    "Wrong-PIN attempts lock the Service PIN for a few minutes -- fix it above if commands fail.",
                     modifier = Modifier.padding(top = GapRow),
                 )
             }
@@ -725,10 +724,7 @@ private fun AiCardContent(state: UiState, advanced: Boolean, vm: AppViewModel) {
                     // AI" here said the same thing a third time and told you nothing new.
                     ToggleRow("Gemini Nano", state.aiEnabled) { vm.setAiEnabled(it) }
                     BodySmallText(
-                        "Adds an AI summary pebble to each car and lets you ask the search " +
-                            "box plain questions like \"what's the odometer\". Summaries refresh " +
-                            "on their own when you open a car, refresh its status, or send a " +
-                            "command -- everything runs privately on your device.",
+                        "Adds an AI summary pebble and lets you ask the search box plain questions. Everything runs privately on your device.",
                     )
                 }
 }
@@ -1155,9 +1151,7 @@ private fun DisplayCardContent(appearance: SettingsStore.Appearance, advanced: B
                 ToggleRow(
                     "Search on the car screen",
                     appearance.showSearch,
-                    description = "A search bubble at the bottom of the car screen and the cover screen. " +
-                        "Ask about the car (\"battery level\"), run a command (\"lock my car\"), " +
-                        "or jump to a setting. Settings always has it.",
+                    description = "The search bubble on the car and cover screens. Ask about the car, run a command, or jump to a setting.",
                 ) { vm.setShowSearch(it) }
                 // Unit system: controls temperature, distance, and speed display.
                 SettingsSegmentedRow(

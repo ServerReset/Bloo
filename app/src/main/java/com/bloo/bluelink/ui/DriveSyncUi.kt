@@ -163,7 +163,7 @@ internal fun SyncDevicesSection(state: UiState, vm: AppViewModel) {
     }
     Spacer(Modifier.height(2.dp))
     BodySmallText(
-        "Drag to reorder. The top device is primary, the source of truth the others follow.",
+        "Drag to reorder. The top device is primary.",
     )
     Spacer(Modifier.height(GapRow))
 
@@ -202,7 +202,7 @@ internal fun SyncDevicesSection(state: UiState, vm: AppViewModel) {
             )
             Spacer(Modifier.width(8.dp))
             Text(
-                "A device hasn't synced in a while. If it's still in use, check its File ID matches the one under Diagnostics. Otherwise it's on a different file. Reconnect it via Change Drive file → Open from Drive.",
+                "A device hasn't synced recently -- it may be on a different Drive file. Reconnect it via Change Drive file → Open from Drive.",
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -470,7 +470,7 @@ internal fun DriveSyncSetupDialog(
                     verticalArrangement = Arrangement.spacedBy(GapRow),
                 ) {
                     Text(
-                        "This creates a NEW, separate file: your devices would end up on different files and stop sharing settings. Only do this to start over.",
+                        "This starts a NEW, separate Drive file -- your devices will stop sharing settings.",
                         style = MaterialTheme.typography.bodySmall,
                         color = scheme.onErrorContainer,
                     )

@@ -300,7 +300,7 @@ object AutoLockController {
     private fun notifyLockFailed(context: Context, vin: String, carName: String, reason: String?) {
         val limited = reason?.contains("limit", ignoreCase = true) == true
         val text = if (limited) {
-            "$carName may be over today's remote-command limit. Lock it manually when you can."
+            "$carName may be over today's command limit. Lock it manually."
         } else {
             "AutoLock couldn't lock $carName" + (reason?.let { " ($it)" } ?: "") + ". Lock it manually if needed."
         }

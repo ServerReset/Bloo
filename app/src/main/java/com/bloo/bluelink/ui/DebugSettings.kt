@@ -238,7 +238,7 @@ fun DebugSettingsPanel(
                         modifier = Modifier.padding(top = 2.dp).size(16.dp),
                     )
                     Text(
-                        text = "This debug information should not be shared unless requested for support purposes.",
+                        text = "Share only when support asks.",
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.error,
                     )

@@ -543,8 +543,7 @@ internal fun SyncChoiceScreen(vm: AppViewModel) {
             )
             Spacer(Modifier.height(GapHairline))
             BodyMediumText(
-                "Already use Bloo somewhere else with sync turned on? Bring that " +
-                    "setup in here instead of answering everything again.",
+                "Already use Bloo elsewhere with sync? Bring that setup in.",
                 color = scheme.onSurfaceVariant,
             )
             Spacer(Modifier.height(28.dp))
@@ -552,8 +551,7 @@ internal fun SyncChoiceScreen(vm: AppViewModel) {
             OnboardingSetupCard(
                 icon = Icons.Filled.CloudSync,
                 title = "Restore from sync",
-                body = "Pick the sync file another device is already using -- theme, " +
-                    "layout, alert thresholds, climate presets, and car setup all come with it.",
+                body = "Pick the sync file another device already uses -- theme, layout, alerts, presets and car setup come with it.",
                 done = false,
             ) {
                 MorphButton(
@@ -594,8 +592,7 @@ internal fun OnboardingIntroPage() {
         emoji = "👋",
         title = "Welcome to Bloo",
         titleStyle = MaterialTheme.typography.displaySmall,
-        subtitle = "Control your Hyundai, Genesis, or Kia from your phone -- lock, climate, " +
-            "charge status, and more. Let's get your car set up.",
+        subtitle = "Lock, climate, charge status and more -- for your Hyundai, Genesis, or Kia. Let's set up your car.",
         tips = listOf(
             Triple(AppIcons.Bolt, "Live status", "Battery, fuel, and lock state at a glance"),
             Triple(Icons.Filled.Thermostat, "Remote climate", "Warm it up or cool it down before you get in"),
@@ -738,7 +735,7 @@ internal fun OnboardingSetupPage(
         body = if (syncEnabled) {
             "Your settings and car photos back up to Google Drive automatically."
         } else {
-            "Join an existing backup to bring in your car photos and setup automatically, or start a fresh one."
+            "Join an existing backup to restore your car photos and setup, or start fresh."
         },
         done = syncEnabled,
     ) {
@@ -975,7 +972,7 @@ internal fun OnboardingCarPage(
     WizardPageHeader(
         "Set up",
         vehicle.name,
-        "Bloo cannot read powertrain or feature info from the API. Set them once here so the right controls appear.",
+        "Set powertrain and features once so the right controls appear.",
     )
 
     Column(verticalArrangement = Arrangement.spacedBy(GapRow)) {
@@ -1099,11 +1096,11 @@ internal fun OnboardingCrashCoursePage() {
 @Composable
 internal fun OnboardingFeaturesPage(state: UiState) {
     val tips = buildList<Triple<ImageVector, String, String>> {
-        add(Triple(AppIcons.Lock, "AutoLock", "Locks your car on its own soon after you walk away, confirmed by a Bluetooth disconnect -- turn it on anytime in each car's Settings"))
+        add(Triple(AppIcons.Lock, "AutoLock", "Locks your car when you walk away -- enable it per car in Settings"))
         add(Triple(AppIcons.Bolt, "Live charging updates", "Watch an EV's charge progress right from your lock screen while it's plugged in"))
-        add(Triple(AppIcons.Search, "Just ask", "Search for things like \"lock my car\" or \"start climate at 70\" and it runs right from the search bar"))
+        add(Triple(AppIcons.Search, "Just ask", "Search \"lock my car\" or \"start climate at 70\" to run it from the bar"))
         if (state.aiSupported) {
-            add(Triple(AppIcons.AutoAwesome, "On-device AI summaries", "Get a plain-language summary of your car's status, generated right on your phone -- nothing leaves the device"))
+            add(Triple(AppIcons.AutoAwesome, "On-device AI summaries", "Plain-language status summaries, generated on your phone"))
         }
     }
     OnboardingTipListPage(

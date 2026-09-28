@@ -140,11 +140,10 @@ fun AppViewModel.locate(v: Vehicle) = runCommand(v.vin, "locate", "Location upda
             persistSnapshots()
         }
         hadCached -> _state.update {
-            it.copy(message = "Showing last-known location. A live locate is over today's limit. Try again later.", messageType = "info")
+            it.copy(message = "Showing last-known location -- today's live-locate limit is used up.", messageType = "info")
         }
         else -> throw BlueLinkException(
-            "Couldn't get the car's location. It may be asleep, out of coverage, or over " +
-                "the daily location-lookup limit. Try again later.",
+            "Couldn't get the car's location -- asleep, out of coverage, or over today's limit.",
         )
     }
 }

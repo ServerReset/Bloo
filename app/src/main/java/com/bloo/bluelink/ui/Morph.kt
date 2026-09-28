@@ -646,21 +646,24 @@ fun MorphButtonLabel(
                     val gapPx = gap.roundToPx()
                     val free = constraints.copy(minWidth = 0, maxWidth = Constraints.Infinity, minHeight = 0)
                     val glyph = measurables[0].measure(free)
-                    val labelWidth = measurables[1].maxIntrinsicWidth(constraints.maxHeight)
+                    // Measure the label at its OWN natural size (unbounded), NOT
+                    // maxIntrinsicWidth(). The button GROUP drives a member's width on every
+                    // frame of a press, and each width change re-runs this measure; measuring the
+                    // label under the SAME `free` constraints every time lets Compose cache the
+                    // text layout, where maxIntrinsicWidth() re-laid-out the label on every single
+                    // frame of the press -- the actual source of the "button group press is janky"
+                    // report on the map toolbar and the accounts card.
+                    val text = measurables[1].measure(free)
                     // Whole label or no label. Anything in between is a truncated word.
-                    if (constraints.maxWidth < glyph.width + gapPx + labelWidth) {
+                    if (constraints.maxWidth < glyph.width + gapPx + text.width) {
                         val w = glyph.width.coerceAtMost(constraints.maxWidth)
-                        // Height still accounts for the label that is NOT being drawn. A line
-                        // of text is taller than an 18dp glyph, so reporting the glyph alone
-                        // would make every button lose height at the moment it compacts, and
-                        // the row jump with them. The label's intrinsic height is asked for
-                        // rather than measured, because it is not being placed.
-                        val h = maxOf(glyph.height, measurables[1].minIntrinsicHeight(w))
+                        // Height still accounts for the label that is NOT being drawn (its own
+                        // natural height, already measured above).
+                        val h = maxOf(glyph.height, text.height)
                         return layout(w, h) {
                             glyph.place((w - glyph.width) / 2, (h - glyph.height) / 2)
                         }
                     }
-                    val text = measurables[1].measure(free)
                     val w = glyph.width + gapPx + text.width
                     val h = maxOf(glyph.height, text.height)
                     return layout(w, h) {

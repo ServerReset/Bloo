@@ -119,7 +119,7 @@ internal fun rememberLocateAction(vm: AppViewModel, v: Vehicle): () -> Unit {
             // points there instead of re-asking.
             android.widget.Toast.makeText(
                 context,
-                "Location permission denied. Enable it in system Settings > Apps > Bloo > Permissions to see your position on the map.",
+                "Location permission denied -- enable it in Settings > Apps > Bloo to see your position.",
                 android.widget.Toast.LENGTH_LONG,
             ).show()
         }
