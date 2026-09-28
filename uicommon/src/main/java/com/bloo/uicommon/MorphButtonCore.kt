@@ -101,6 +101,9 @@ fun MorphButtonCore(
      *  instead of washing out -- matching the app's "only the label fades"
      *  disabled treatment everywhere. */
     disabledContainerColor: Color? = null,
+    /** Border used while disabled (overrides [border]); lets a caller give the
+     *  disabled state its own frosted rim instead of the idle hairline. */
+    disabledBorder: BorderStroke? = null,
     interactionSource: MutableInteractionSource = remember { MutableInteractionSource() },
     /** Hold-to-act variety: the chevron easter egg, the cover screen's
      *  flash-lights. Null means plain click-only, exactly like M3 `Button`. */
@@ -173,6 +176,7 @@ fun MorphButtonCore(
             activeContainerColor = activeContainerColor,
             containerColor = containerColor,
             disabledContainerColor = disabledContainerColor,
+            disabledBorder = disabledBorder,
             border = border,
             morphSpring = morphSpring,
             colorSpring = colorSpring,
@@ -208,6 +212,7 @@ private fun BoxScope.MorphChrome(
     activeContainerColor: Color,
     containerColor: Color,
     disabledContainerColor: Color?,
+    disabledBorder: BorderStroke?,
     border: BorderStroke?,
     morphSpring: SpringSpec<Float>,
     colorSpring: FiniteAnimationSpec<Color>,
@@ -250,7 +255,8 @@ private fun BoxScope.MorphChrome(
         animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessHigh),
         label = "morphPressScale",
     )
-    val fill = disabledContainerColor ?: bg
+    val fill = if (!enabled && disabledContainerColor != null) disabledContainerColor else bg
+    val resolvedBorder = if (!enabled) (disabledBorder ?: border) else border
     // The BorderStroke passed in by the caller is the same mutable object in
     // the parent scope; Modifier.border reads it here on every morph frame --
     // cheap, and it keeps the reference semantics identical to before.
@@ -288,8 +294,8 @@ private fun BoxScope.MorphChrome(
             .graphicsLayer { scaleX = scale; scaleY = scale }
             .clip(shape)
             .then(
-                if (border != null) {
-                    Modifier.background(color = fill, shape = shape).border(border, shape)
+                if (resolvedBorder != null) {
+                    Modifier.background(color = fill, shape = shape).border(resolvedBorder, shape)
                 } else {
                     Modifier.background(color = fill, shape = shape)
                 },

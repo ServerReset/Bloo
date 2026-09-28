@@ -22,7 +22,6 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Canvas
 import dev.chrisbanes.haze.HazeState
-import dev.chrisbanes.haze.hazeSource
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.layout.Arrangement
@@ -224,7 +223,7 @@ internal fun CompactGarage(state: State<UiState>, vm: AppViewModel, appearance: 
         val band = coverCutoutBand()
         HorizontalPager(
             state = pager,
-            modifier = Modifier.fillMaxSize().hazeSource(hazeState),
+            modifier = Modifier.fillMaxSize(),
             userScrollEnabled = !scrubbing.value,
             // NOT a flat 1 -- see GarageScreen's own matching fix for the full
             // reasoning (a real, reported crash: ArrayIndexOutOfBoundsException

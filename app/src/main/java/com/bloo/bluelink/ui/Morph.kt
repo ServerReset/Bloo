@@ -247,6 +247,12 @@ fun MorphButton(
                 activeContainerColor = activeContainerColor,
                 contentPadding = contentPadding,
                 border = if (active) null else border,
+                // Disabled = the app's standard frosted glass, not a washed-out tonal
+                // pill: the shared glass tint (translucent, blur-aware) with a matching
+                // frosted rim, so a dimmed button reads as an inert pane of glass sitting
+                // in the layout rather than a broken button.
+                disabledContainerColor = glassTint(canBlurBackdrops()),
+                disabledBorder = BorderStroke(1.dp, MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f)),
                 interactionSource = interactionSource,
                 onLongClick = onLongClick,
                 pillCornerPercent = pillCornerPercent,

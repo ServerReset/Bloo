@@ -206,6 +206,7 @@ internal fun LoginScreen(
     var password by remember { mutableStateOf("") }
     var pin by remember { mutableStateOf("") }
     var showPassword by remember { mutableStateOf(false) }
+    var showPin by remember { mutableStateOf(false) }
     // Region gates which 3 brands the segmented picker below offers, rather
     // than cramming all 6 US+Canada entries into one row -- Hyundai/Genesis/
     // Kia Canada run on a completely different backend (see CanadaApi) with
@@ -402,7 +403,16 @@ internal fun LoginScreen(
                                 singleLine = true,
                                 shape = FieldShape,
                                 colors = fieldColors,
-                                visualTransformation = PasswordVisualTransformation(),
+                                trailingIcon = {
+                                    MorphIconButton(onClick = { showPin = !showPin }) {
+                                        Icon(
+                                            if (showPin) Icons.Filled.VisibilityOff else Icons.Filled.Visibility,
+                                            contentDescription = if (showPin) "Hide service PIN" else "Show service PIN",
+                                            modifier = Modifier.size(20.dp),
+                                        )
+                                    }
+                                },
+                                visualTransformation = if (showPin) VisualTransformation.None else PasswordVisualTransformation(),
                                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
                                 modifier = Modifier.fillMaxWidth(),
                             )

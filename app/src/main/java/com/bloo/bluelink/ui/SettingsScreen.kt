@@ -119,7 +119,6 @@ import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import dev.chrisbanes.haze.HazeState
-import dev.chrisbanes.haze.hazeSource
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -320,7 +319,8 @@ internal fun SettingsScreen(
             modifier = Modifier
                 .widthIn(max = 1100.dp)
                 .fillMaxWidth()
-                .hazeSource(hazeState)
+                // The app root marks itself as the haze source (see BlooApp), so the grid is
+                // not one; a nested source here would overwrite that content layer.
                 // The app runs edge-to-edge (MainActivity's enableEdgeToEdge()), which turns
                 // off the manifest's own adjustResize for every surface -- without this, a
                 // text field low in this list (license plate, a custom weather location) sat

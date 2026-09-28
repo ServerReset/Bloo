@@ -9,7 +9,6 @@ package com.bloo.bluelink.ui
 
 import android.os.Build
 import dev.chrisbanes.haze.HazeState
-import dev.chrisbanes.haze.hazeSource
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.fadeIn
@@ -347,7 +346,7 @@ internal fun GarageScreen(
                 Box(Modifier.fillMaxSize()) {
                     HorizontalPager(
                         state = exPager,
-                        modifier = Modifier.fillMaxSize().hazeSource(hazeState),
+                        modifier = Modifier.fillMaxSize(),
                         // Finger swipe between cars is disabled per user request (the
                         // page-to-page swipe felt bad). To view a different car
                         // full-screen the user collapses back to the grid (the "Back to
@@ -592,7 +591,7 @@ internal fun GarageScreen(
                     val pageWidth = with(density) { ((boxWidthPx + perPage - 1) / perPage).coerceAtLeast(1).toDp() }
                     HorizontalPager(
                         state = pager,
-                        modifier = Modifier.fillMaxSize().hazeSource(hazeState)
+                        modifier = Modifier.fillMaxSize()
                             .onSizeChanged { boxWidthPx = it.width },
                         userScrollEnabled = true,
                         // ONE real item (a car, or Settings) per page, at a FIXED

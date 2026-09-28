@@ -41,6 +41,8 @@ import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.LocalGasStation
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.onClick
 import androidx.compose.ui.semantics.heading
@@ -342,15 +344,13 @@ internal fun SecretRow(label: String, value: String) {
             modifier = Modifier.widthIn(max = 168.dp),
         )
         Spacer(Modifier.width(10.dp))
-        val toggleSource = remember { MutableInteractionSource() }
-        SafeExpansiveButton(
-            interactionSource = toggleSource,
-            enabled = true,
-        ) {
-            MorphTextButton(
-                if (show) "Hide" else "Show",
-                onClick = { show = !show },
-                interactionSource = toggleSource,
+        // The eye icon, matching the login screen's password field -- an icon reads as
+        // "reveal this" at a glance where the old Show/Hide text button needed reading.
+        MorphIconButton(onClick = { show = !show }) {
+            Icon(
+                if (show) Icons.Filled.VisibilityOff else Icons.Filled.Visibility,
+                contentDescription = if (show) "Hide $label" else "Show $label",
+                modifier = Modifier.size(20.dp),
             )
         }
     }

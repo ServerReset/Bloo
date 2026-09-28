@@ -76,6 +76,7 @@ import androidx.compose.runtime.State
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.SideEffect
 import dev.chrisbanes.haze.HazeState
+import dev.chrisbanes.haze.hazeSource
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -284,6 +285,12 @@ fun BlooApp(vm: AppViewModel) {
     Box(
         Modifier
             .fillMaxSize()
+            // The ONE haze source for searchHazeState: the whole app's background + content.
+            // Glass overlays (snackbar, search bar, floating chrome) sit above this in the same
+            // subtree, so every hazeEffect blurs whatever is ACTUALLY behind it -- the current
+            // screen, the gradient, whatever -- instead of only the garage pager as before,
+            // which is why glass over login/settings/onboarding blurred nothing.
+            .hazeSource(searchHazeState)
             .background(
                 Brush.verticalGradient(
                     listOf(
