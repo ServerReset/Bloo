@@ -687,7 +687,7 @@ private fun AccountsCardContent(state: UiState, vm: AppViewModel) {
                     )
                 }
                 BodySmallText(
-                    "Wrong-PIN attempts lock the Service PIN for a few minutes -- fix it above if commands fail.",
+                    "Wrong-PIN attempts lock the Service PIN for a few minutes. Fix it above if commands fail.",
                     modifier = Modifier.padding(top = GapRow),
                 )
             }
@@ -970,7 +970,7 @@ private fun BackupSyncCardContent(
                                 verticalArrangement = Arrangement.spacedBy(GapRow),
                             ) {
                                 val lastSyncLabel = com.bloo.bluelink.data.relativeLabel(state.lastSyncMs)
-                                StatusRow("Last synced", if (lastSyncLabel.isNotBlank()) lastSyncLabel else "—")
+                                StatusRow("Last synced", if (lastSyncLabel.isNotBlank()) lastSyncLabel else "Never")
                                 // File-identity fingerprint: two phones truly on the SAME Drive
                                 // file show the SAME code. If they differ, they picked different
                                 // files (Drive allows duplicate names) — the #1 reason sync

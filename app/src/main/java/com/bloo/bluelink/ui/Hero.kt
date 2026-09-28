@@ -474,26 +474,27 @@ internal fun HeroHeader(
                         )
                     }
                 }
-                // THE numbers. One instance, travelling between the two anchors --
-                // and the travel is a plain lerp because both anchors are points in
-                // this same Box's space.
-                //
-                // A two-phase easing (height drops first, width/x held then released on
-                // a curve that overshoots past its target) was tried here and reverted:
-                // width is what HeroNumbers uses to size its Row, but the ROW's own text
-                // size scales with heroT directly, not with width's easing. Holding width
-                // at the narrow collapsed value while heroT (and so the type size) kept
-                // advancing meant the range text grew past what its still-small width
-                // could fit for part of the transition -- "mi" briefly shrank to "m..."
-                // before width caught up and it reflowed back. A plain lerp keeps width
-                // and type size moving together in lockstep, which is what avoids that.
-                // Each anchor falls back to the other. Requiring BOTH meant that on a card
-                // which has never been expanded -- the normal state of every card in the garage
-                // -- the expanded anchor had never composed, so `to` was null, this whole block
-                // was skipped, and the in-card copy is alpha 0 while hoisted. The percentage and
-                // range simply were not drawn anywhere. With one anchor known the lerp is
-                // between a point and itself, which is exactly right: hold at the collapsed
-                // position until the expanded one reports.
+            },
+            // THE numbers. One instance, travelling between the two anchors -- and the travel
+            // is a plain lerp because both anchors are points in this same Box's space.
+            //
+            // Rendered as `foreground` (ON TOP of the header and body), NOT inside `background`:
+            // the numbers cross the header row on the way between the two anchors, and drawn
+            // behind it they passed UNDER the header's own buttons and read as a clipped glitch.
+            // Reported directly: the range text "glitches when it goes below the buttons during
+            // the collapse". Same card coordinate space either way, so the lerp is unchanged;
+            // only the z-order moved.
+            //
+            // A two-phase easing was tried here and reverted: width is what HeroNumbers uses to
+            // size its Row, but the type size scales with heroT directly, so holding width at the
+            // collapsed value while heroT advanced made the range outgrow its own width mid-morph
+            // ("mi" -> "m..."). Plain lerp keeps width and type in lockstep.
+            //
+            // NOT alpha = statusAlpha: that is the STATUS LINE's own delayed fade, wrong for the
+            // percentage/range, which this Box is the only thing that still paints once a card has
+            // been expanded (both anchors stop painting the moment `hoisted` turns true). Wrapping
+            // it in statusAlpha made the numbers vanish whenever heroT sat near 0.
+            foreground = {
                 val from = collapsedNumbers.value ?: expandedNumbers.value
                 val to = expandedNumbers.value ?: collapsedNumbers.value
                 if (hoisted && from != null && to != null) {
@@ -501,18 +502,6 @@ internal fun HeroHeader(
                     val y = androidx.compose.ui.util.lerp(from.top, to.top, heroT)
                     val w = androidx.compose.ui.util.lerp(from.width, to.width, heroT)
                     Box(
-                        // NOT alpha = statusAlpha. That is the STATUS LINE's own delayed fade
-                        // (0 until heroT passes 0.15, ramping in over the following 0.5) --
-                        // right for the "Charging..." text HeroNumbers gates internally with
-                        // this same value, wrong for the percentage/range themselves, which
-                        // this Box is the ONLY thing that still paints once a card has been
-                        // expanded even once (both anchors go permanently invisible the moment
-                        // `hoisted` turns true -- see their own alpha`s doc). Wrapping the whole
-                        // overlay in statusAlpha meant the numbers vanished for the entire time
-                        // heroT sat at or near 0 -- i.e. whenever that card was COLLAPSED. That
-                        // is the reported "the collapsed hero pebble doesn't have the charge
-                        // percent any more" -- it did, right up until the card was expanded
-                        // once, and then never again while collapsed.
                         Modifier.offset { IntOffset(x.roundToInt(), y.roundToInt()) },
                     ) {
                         CompositionLocalProvider(

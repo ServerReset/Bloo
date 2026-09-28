@@ -370,13 +370,13 @@ internal fun LockOverlay(vm: AppViewModel, opaqueBackdrop: Boolean = false) {
                             supportingText = {
                                 when {
                                     rejected -> Text(
-                                        "Too many attempts — try again in ${formatLockoutSeconds(remainingMs)}",
+                                        "Too many attempts. Try again in ${formatLockoutSeconds(remainingMs)}",
                                         color = MaterialTheme.colorScheme.error,
                                     )
                                     else -> Text(
                                         lockout.attemptsRemainingInBatch(nowTick, elapsedTick)?.let { left ->
-                                            if (left <= 2) "Careful — $left ${if (left == 1) "attempt" else "attempts"} before a lockout"
-                                            else "${PinLockout.STRIKES_PER_BATCH} wrong attempts lock the app for 30 seconds — the wait doubles each time"
+                                            if (left <= 2) "Careful. $left ${if (left == 1) "attempt" else "attempts"} before a lockout"
+                                            else "${PinLockout.STRIKES_PER_BATCH} wrong attempts lock the app for 30 seconds. The wait doubles each time."
                                         } ?: "",
                                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                                     )
@@ -501,7 +501,7 @@ internal fun GarageStatusCard(state: State<UiState>, vm: AppViewModel, hazeState
         offline -> Triple(
             Icons.Filled.WifiOff,
             "No connection",
-            "No internet. You're still signed in -- check your connection and pull to retry.",
+            "No internet. You're still signed in. Check your connection and pull to retry.",
         )
         loadFailed -> Triple(
             Icons.Filled.WifiOff,

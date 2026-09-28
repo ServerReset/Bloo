@@ -112,12 +112,12 @@ internal fun LiveUpdateTroubleshootDialog(onDismiss: () -> Unit) {
             Spacer(Modifier.height(GapGroup))
             TroubleshootStep(
                 1,
-                "Not reliable, especially after charging starts? Tap the \"Tap to fix\" link above -- that's Android's battery-optimization exemption, which lets the bar update while the app is closed." +
-                    if (isSamsung) " Samsung also has its own \"sleeping apps\" list -- make sure Bloo isn't under Settings → Battery → Background usage limits." else "",
+                "Not reliable, especially after charging starts? Tap \"Tap to fix\" above to allow background updates." +
+                    if (isSamsung) " On Samsung, also allow Bloo under Settings → Battery → Background usage limits." else "",
             )
             TroubleshootStep(2, "Check \"Live charging updates\" is on and the car is charging.")
-            TroubleshootStep(3, "Below Android 16 the chip can't appear -- only the shade progress bar. Expected, not a bug.")
-            TroubleshootStep(4, "On Android 16+, tap \"Tap to fix\" above for the status bar -- the OS's Live Updates permission.")
+            TroubleshootStep(3, "Below Android 16 only the shade progress bar shows.")
+            TroubleshootStep(4, "On Android 16+, tap \"Tap to fix\" above to allow Live Updates.")
             if (isSamsung) {
                 TroubleshootStep(
                     5,
@@ -242,7 +242,7 @@ internal fun CarSettingsCard(
         if (v.platformOverridable) {
             SettingsGroup("Head-unit generation") {
                 Text(
-                    "Confirm this car's head unit -- the API can't always tell. Features like Trips only show when supported.",
+                    "Confirm this car's head unit. The API can't always tell. Some features only show when supported.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )

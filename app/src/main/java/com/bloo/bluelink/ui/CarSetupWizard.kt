@@ -378,15 +378,15 @@ internal fun WizardPlatformPage(
     WizardPageHeader(
         "Head-unit generation",
         "Which generation is the ${vehicle.name}?",
-        "Confirm these -- the API can't always tell. Some features only show when supported.",
+        "Confirm these. The API can't always tell. Some features only show when supported.",
     )
     val current = state.platformOf(vehicle)
     Column(verticalArrangement = Arrangement.spacedBy(GapRow)) {
         VehiclePlatform.entries.forEach { pt ->
             val selected = current == pt
             val (label, desc) = when (pt) {
-                VehiclePlatform.GEN5W -> "Gen5W" to "Older head unit -- no Trips, no connected-car store"
-                VehiclePlatform.CCNC -> "ccNC" to "Newer head unit -- full features"
+                VehiclePlatform.GEN5W -> "Gen5W" to "Older head unit: no Trips, no connected-car store"
+                VehiclePlatform.CCNC -> "ccNC" to "Newer head unit: full features"
             }
             // Same MorphButton as the powertrain page: pill at rest, fills
             // primaryContainer as a rounded square once chosen.
@@ -489,7 +489,7 @@ internal fun WizardSteeringPage(
     WizardPageHeader(
         "Climate features",
         "Any extras on the ${vehicle.name}?",
-        "Enable what your car has -- these shape the climate options.",
+        "Enable what your car has. These shape the climate options.",
     )
     Column(
         Modifier

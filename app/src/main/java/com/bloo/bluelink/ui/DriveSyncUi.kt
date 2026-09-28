@@ -202,7 +202,7 @@ internal fun SyncDevicesSection(state: UiState, vm: AppViewModel) {
             )
             Spacer(Modifier.width(8.dp))
             Text(
-                "A device hasn't synced recently -- it may be on a different Drive file. Reconnect via Change Drive file → Open from Drive.",
+                "A device hasn't synced recently. It may be on a different Drive file. Reconnect via Change Drive file → Open from Drive.",
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -470,7 +470,7 @@ internal fun DriveSyncSetupDialog(
                     verticalArrangement = Arrangement.spacedBy(GapRow),
                 ) {
                     Text(
-                        "Starts a new Drive file -- your devices stop sharing settings.",
+                        "Starts a new Drive file. Your devices stop sharing settings.",
                         style = MaterialTheme.typography.bodySmall,
                         color = scheme.onErrorContainer,
                     )

@@ -96,7 +96,7 @@ internal fun AutoLockSettingsGroup(v: Vehicle, vm: AppViewModel) {
 
     SettingsGroup("AutoLock") {
         MutedText(
-            "Locks ${v.name} when you walk away (Bluetooth disconnect + motion). Runs in dry run -- it decides and logs, but never locks until you turn that off.",
+            "Locks ${v.name} when you walk away (Bluetooth disconnect + motion). Runs in dry run: it decides and logs, but never locks until you turn that off.",
         )
         ToggleRow("Enabled", current.enabled, onChange = ::onEnabledChanged)
 
@@ -176,7 +176,7 @@ internal fun AutoLockSettingsGroup(v: Vehicle, vm: AppViewModel) {
                 steps = 22,
             )
             LabelSmallText(
-                "Wait this long before locking — taps \"Lock now\" to skip the countdown.",
+                "Wait this long before locking. Taps \"Lock now\" to skip the countdown.",
             )
 
             ToggleRow(

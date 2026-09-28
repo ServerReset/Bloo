@@ -633,11 +633,13 @@ internal fun CoverActionButton(
 ) {
     val scheme = MaterialTheme.colorScheme
     val haptics = LocalHaptics.current
-    // Same MorphButton as everywhere: active commands wear the primary
-    // highlight, the "worth changing" state wears the error container, and
-    // idle is the standard button fill. It simply pins both corner percents
-    // to the same square 16dp value so a cover bar button never morphs.
-    val squarePct = 100f * 16.dp.value / 56.dp.value
+    // Same MorphButton as everywhere: active commands wear the primary highlight, the "worth
+    // changing" state wears the error container, and idle is the standard button fill. It used
+    // to PIN both corner percents to the same square 16dp value so a cover bar button "never
+    // morphs" -- reported directly as wanting the cover buttons to use the standard framework
+    // and change shape on press like every other group button, so that override is gone and it
+    // now morphs (pill at rest -> rounded square while pressed) exactly like MorphActionButton.
+
     // The content tone for every state the core reaches: active->onPrimary,
     // attention->onErrorContainer, else onSurface. Passed as BOTH the idle
     // content and the disabled content (full alpha, so the cover button's own
@@ -650,6 +652,12 @@ internal fun CoverActionButton(
     SafeExpansiveButton(
         interactionSource = coverSource,
         enabled = enabled && !pending,
+        // The weight belongs HERE, on the node the group actually measures -- it used to be
+        // passed to the MorphButton nested inside this slot, which the group never reads, so
+        // the actions were treated as weightless and pressing one had no width to redistribute.
+        // With the weight on the slot, the actions split whatever the identity pill leaves and
+        // each press shoves its neighbours, exactly like every other group button.
+        groupWeight = 1f,
     ) {
         MorphButton(
             onClick = { onClick() },
@@ -661,13 +669,8 @@ internal fun CoverActionButton(
             containerColor = if (attention) scheme.errorContainer else buttonContainer(),
             contentColor = contentFor,
             disabledContentColor = contentFor,
-            pillCornerPercent = squarePct,
-            morphedCornerPercent = squarePct,
             contentPadding = PaddingValues(horizontal = 2.dp, vertical = GapHairline),
             minHeight = 0.dp,
-            // The actions carry the row's weight, so they split whatever the identity pill
-            // leaves rather than every member claiming an equal share. See the bottom band.
-            groupWeight = 1f,
             // No weight(1f): its parent here is SafeExpansiveButton's own layout, not the row,
             // so it was silently doing nothing. The equal share now comes from the group.
             //

@@ -592,7 +592,7 @@ internal fun SecurityCardContent(
                                             activity = activity,
                                             title = "Turn off app lock",
                                             subtitle = if (pinAlsoSet) {
-                                                "Confirm to stop requiring it -- this also removes your PIN"
+                                                "Confirm to stop requiring it. This also removes your PIN."
                                             } else {
                                                 "Confirm to stop requiring it"
                                             },
@@ -876,7 +876,7 @@ internal fun CreditsCardContent(vm: AppViewModel) {
                             listOf(
                                 CreditEntry(
                                     "Coil",
-                                    "Image loading throughout the app -- car photos, map tiles, everything.",
+                                    "Image loading throughout the app: car photos, map tiles, everything.",
                                     "https://github.com/coil-kt/coil",
                                     Icons.Filled.Image,
                                 ),

@@ -301,6 +301,19 @@ internal fun PebbleShell(
      * Null for every other pebble, so nothing else gains a layer.
      */
     background: (@Composable BoxScope.() -> Unit)? = null,
+    /**
+     * Drawn ON TOP of the header and body, at the same layer [background] sits under.
+     *
+     * The hero's travelling charge numbers use this: they are positioned in the card's own
+     * coordinate space and cross the header row on the way between the collapsed and expanded
+     * anchors, so drawn in [background] they passed UNDERNEATH the header's buttons and read as
+     * a clipped glitch -- reported directly as the range text "glitching when it goes below the
+     * buttons during the collapse". Same coordinate space as [background] (both are the card's
+     * own Box), so nothing about the anchor arithmetic changes; only the z-order does.
+     *
+     * Null for every other pebble.
+     */
+    foreground: (@Composable BoxScope.() -> Unit)? = null,
     /** Vertical gap between [content]'s top-level rows. The default [GapRow] is the standard
      *  pebble rhythm; a caller whose content spaces ITSELF with explicit [Spacer]s (the
      *  Settings cards do) passes 0.dp so the two don't stack into doubled gaps. */
@@ -1068,6 +1081,8 @@ internal fun PebbleShell(
                         )
                     }
                 }
+                // Drawn last, ON TOP of the header and body -- see foreground's own doc.
+                foreground?.invoke(this)
             }
         }
     }
