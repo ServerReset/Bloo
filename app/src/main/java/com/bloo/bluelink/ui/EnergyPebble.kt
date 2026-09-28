@@ -123,50 +123,36 @@ internal fun ChargePebble(v: Vehicle, status: VehicleStatus?, enabled: Boolean, 
             activeContent = Color.White,
         ),
     ) {
-        // COVER SCREEN. This tile used to lead with ChargeFuelBar -- the exact charge
-        // %/range/charging bar the cover's own main (hero) tile already draws -- so opening
-        // it just showed the hero again with nothing of its own. Reported directly: "the
-        // flip phone tile is weird for charge limits, it just shows the same stuff as the
-        // hero tile." The one thing the hero does NOT carry is the charge LIMITS, so on the
-        // cover this tile leads with those instead. Read-only and compact, deliberately: the
-        // full slider+Set pills were tried here before and clipped the tile's own Start
-        // action off the bottom of a one-inch panel (editing limits stays a phone control),
-        // but the current AC/DC targets fit as two rows and make this tile genuinely about
-        // limits rather than a second copy of the hero. Brands that cannot report limits (and
-        // cars that have not reported them yet) keep the shared bar as the fallback.
-        if (LocalForceExpanded.current) {
-            if (v.brand.supportsChargeLimits && (acReported != null || dcReported != null)) {
-                acReported?.let { StatusRow("AC limit", "$it%") }
-                dcReported?.let { StatusRow("DC limit", "$it%") }
-            } else {
-                ChargeFuelBar(
-                    status,
-                    state.hasBattery(v),
-                    state.hasFuel(v),
-                    state.drivingLabel(v),
-                    metric = LocalAppearance.current.unitSystem == "metric",
-                )
-            }
+        // Charge limits are EDITABLE on every surface now, the flip cover included. The
+        // cover pebble used to show them read-only (after an earlier pass replaced the
+        // ChargeFuelBar -- the same bar the cover's own hero tile draws -- with plain AC/DC
+        // rows), which meant the cover could not actually set a limit the way the phone can.
+        // Reported directly: "the flip phone charge pebble doesn't let you set limits just
+        // view them, the flip phone should be the same as the normal pebbles in function."
+        // The two pills ARE the phone's own control, unchanged; the cover tile scrolls
+        // internally (LocalCoverScrollState), so there is no clipping to worry about.
+        // No ChargeFuelBar on the cover: the hero tile already shows the charge %, and
+        // repeating it was the duplication this replaced -- EXCEPT for a brand that cannot
+        // report limits at all (Canada), where there would otherwise be nothing here.
+        if (LocalForceExpanded.current && !v.brand.supportsChargeLimits) {
+            ChargeFuelBar(
+                status,
+                state.hasBattery(v),
+                state.hasFuel(v),
+                state.drivingLabel(v),
+                metric = LocalAppearance.current.unitSystem == "metric",
+            )
         }
         // Its own PopVisible: this row arrives/leaves live while the pebble is open --
         // plugging or unplugging the car doesn't require re-expanding to see it change.
         PopVisible(visible = plugged) {
             chargerLabel(ev?.batteryPlugin)?.let { StatusRow("Charger", it) }
         }
-        // Charge-limit editing is shown only for brands that can actually report the
-        // targets. Canada can't (reservChargeInfos is always null), so the sliders would
-        // sit on the 80/90 display defaults and "Set" would push a value the user never
-        // chose to the car -- so we hide them entirely there. Start/Stop and the charging
-        // hero above stay; only the editable limits go. See Brand.supportsChargeLimits.
-        // Not on the cover. Two labelled pills, each with its own slider and Set button, are
-        // configuration -- you set a charge limit once and then never think about it -- and on a
-        // one-inch panel they pushed the readout and the Start button off the bottom of the tile
-        // entirely (reported from a real cover screenshot: the DC row and the action clipped).
-        // The cover's job is the glance and the one command; EDITING limits stays a phone
-        // control, where there is room to see what you are dragging. (The cover still SHOWS the
-        // current limits -- as the read-only AC/DC rows in the cover branch above -- it just
-        // does not let you drag them there.)
-        if (v.brand.supportsChargeLimits && !LocalForceExpanded.current) {
+        // Shown only for brands that can actually report the targets. Canada can't
+        // (reservChargeInfos is always null), so the sliders would sit on the 80/90 display
+        // defaults and "Set" would push a value the user never chose to the car -- so we hide
+        // them entirely there. See Brand.supportsChargeLimits.
+        if (v.brand.supportsChargeLimits) {
             ChargeLimitPill(
                 label = "AC (home) limit",
                 icon = Icons.Filled.Power,

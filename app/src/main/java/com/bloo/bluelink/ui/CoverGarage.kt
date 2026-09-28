@@ -447,7 +447,11 @@ internal fun CompactCar(
     // (state.sectionsFor). "summary" maps to the always-present "main" tile;
     // "controls" has no cover tile so it falls away. If summary was somehow
     // dropped, "main" is prepended so the cover screen always has a home tile.
-    val hasBattery by remember(v.vin) { derivedStateOf { state.value.hasBattery(v) } }
+    // NOTE: "charge" is deliberately NOT gated on the car having a battery any more. A gas
+    // car renders the fuel pebble under that same "charge" section (SinglePebble routes
+    // "charge" to FuelPebble when hasBattery is false), so gating it on hasBattery left a gas
+    // car's flip cover with NO energy tile at all -- no fuel level or range -- while the phone
+    // showed one. Reported as the kind of odd cover/phone divergence this pass is for.
     // A derived computation, not remember(keys): the keys used to be exactly the state slices
     // this predicate reads, but reading them in the composition body to form the key still
     // subscribed CompactCar to every emission. As a derived state it only invalidates when the
@@ -458,15 +462,7 @@ internal fun CompactCar(
             sel.sectionsFor(v).mapNotNull { section ->
                 when (section) {
                     "summary" -> "main"
-                    else -> section.takeIf {
-                        it in CompactKnownTiles &&
-                            // Cover-screen-only gate, and the reason isSectionAvailable
-                            // does not carry it: everywhere else SinglePebble falls back to
-                            // a FuelPebble for a car with no battery, so "charge" still has
-                            // something to render. The cover has no such fallback tile.
-                            (it != "charge" || hasBattery) &&
-                            sel.isSectionAvailable(v, it)
-                    }
+                    else -> section.takeIf { it in CompactKnownTiles && sel.isSectionAvailable(v, it) }
                 }
             }.let { ordered -> if ("main" in ordered) ordered else listOf("main") + ordered }
         }
