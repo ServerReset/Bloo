@@ -439,7 +439,13 @@ internal fun HeroHeader(
                             // The name-clearing offset belongs to the numbers Row alone; it is
                             // passed to HeroMorphReadout as `numbersStart` below.
                             start = lerp(46.dp, 16.dp, heroT),
-                            end = lerp(76.dp, 16.dp, heroT),
+                            // The readout clears whatever sits at the END of the header row. On a
+                            // plain page that is just the collapse chevron (76dp); in the
+                            // dual-column/expanded view the header ALSO carries the expandAction
+                            // ("Back to all cars"), so the readout (and the charge bar under it)
+                            // stops a full button short of that second control instead of running
+                            // underneath it.
+                            end = lerp(if (expandAction != null) 76.dp + HeaderButtonSize else 76.dp, 16.dp, heroT),
                             bottom = lerp(HeroReadoutBottomInset, 16.dp, heroT),
                         ),
                 ) {
