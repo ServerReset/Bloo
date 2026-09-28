@@ -164,121 +164,107 @@ import androidx.compose.runtime.rememberCoroutineScope
 /** "Location" card content -- see the call site in [SettingsScreen] for context. */
 @Composable
 internal fun LocationCardContent(appearance: SettingsStore.Appearance, vm: AppViewModel) {
-            SettingsCard("Location", Icons.Filled.LocationOn, vm) {
-                BodySmallText(
-                    "Where \"my location\" points for weather, and the device dot on the map.",
+    val place = appearance.weatherLabel
+    SettingsCard(
+        "Location",
+        Icons.Filled.LocationOn,
+        vm,
+        // The collapsed row now names the current place on the right instead of showing
+        // nothing -- the same "tell you what it knows while shut" treatment the rest of
+        // Settings' cards get. Redone body: ONE clear statement of where "my location"
+        // points, then the controls, rather than a description + a place row + a field +
+        // two buttons all at the same visual weight.
+        status = place ?: "Device location",
+    ) {
+        var weatherQuery by remember { mutableStateOf("") }
+        val locationPermission = rememberLauncherForActivityResult(
+            ActivityResultContracts.RequestPermission(),
+        ) { granted ->
+            if (granted) vm.useDeviceLocationForWeather()
+            else vm.reportError("Location permission denied. Type a place instead")
+        }
+        // The current place, as the card's own leading statement. When nothing is set, say
+        // what "my location" falls back to rather than leaving the top of the card blank.
+        if (place == null) {
+            BodySmallText("\"My location\" follows your device until you set a place below.")
+            Spacer(Modifier.height(GapGroup))
+        } else {
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                ThemedIcon(Icons.Filled.LocationOn, tint = MaterialTheme.colorScheme.primary, size = 18.dp)
+                Spacer(Modifier.width(8.dp))
+                Text(
+                    place,
+                    Modifier.weight(1f),
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
                 )
-                Spacer(Modifier.height(GapRow))
-                var weatherQuery by remember { mutableStateOf("") }
-                val locationPermission = rememberLauncherForActivityResult(
-                    ActivityResultContracts.RequestPermission(),
-                ) { granted ->
-                    if (granted) vm.useDeviceLocationForWeather()
-                    else vm.reportError("Location permission denied. Type a place instead")
-                }
-                // PopVisible, not a bare `?.let` -- was snapping in/out with zero
-                // animation whenever a place got set or cleared.
-                PopVisible(visible = appearance.weatherLabel != null) {
-                  Column(Modifier.fillMaxWidth()) {
-                    // fillMaxWidth() on the Row, not just the Column: a weighted child
-                    // needs its immediate parent to actually claim the available width,
-                    // not just an ancestor further up -- without it here, the place-name
-                    // Text (weight(1f)) had no real width to size against and wrapped
-                    // character-by-character ("S/u/n/n/y/v/a/l/e" one letter per line),
-                    // ballooning the whole card's height. Same class of bug StatusRow's
-                    // own doc warns about; maxLines/ellipsis added as the same guard.
-                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                        ThemedIcon(Icons.Filled.LocationOn, tint = MaterialTheme.colorScheme.primary, size = 18.dp)
-                        Spacer(Modifier.width(6.dp))
-                        Text(
-                            appearance.weatherLabel.orEmpty(),
-                            Modifier.weight(1f),
-                            fontWeight = FontWeight.SemiBold,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                        val weatherClearSource = remember { MutableInteractionSource() }
-                        SafeExpansiveButton(
-                            interactionSource = weatherClearSource,
-                            enabled = true,
-                        ) {
-                            MorphTextButton(
-                                "Clear",
-                                onClick = { vm.clearWeatherLocation() },
-                                interactionSource = weatherClearSource,
-                            )
-                        }
-                    }
-                    Spacer(Modifier.height(GapRow))
-                  }
-                }
-                OutlinedTextField(
-                    value = weatherQuery,
-                    onValueChange = { weatherQuery = it },
-                    label = { Text("City or place") },
-                    singleLine = true,
-                    shape = FieldShape,
-                    modifier = Modifier.fillMaxWidth(),
-                    keyboardOptions = KeyboardOptions(imeAction = androidx.compose.ui.text.input.ImeAction.Search),
-                )
-                Spacer(Modifier.height(GapRow))
-                // FlowRow, not a fixed 50/50 Row: at a large display/font size each
-                // half was too narrow for "Set place" / "My location", clipping them
-                // to "Set a…". FlowRow keeps them side-by-side when they fit and wraps
-                // the second button onto its own full-width line when they don't, so
-                // the labels stay whole at any font scale.
-                FlowRow(
-                    Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalArrangement = Arrangement.spacedBy(GapRow),
+                val weatherClearSource = remember { MutableInteractionSource() }
+                SafeExpansiveButton(
+                    interactionSource = weatherClearSource,
+                    enabled = true,
                 ) {
-                    val setPlaceSource = remember { MutableInteractionSource() }
-                    // weight on the WRAPPER: it is the FlowRow's child, and the button inside
-                    // it is not, so the weight there was read by nobody and these two never
-                    // split the line evenly the way the FlowRow note above assumes.
-                    SafeExpansiveButton(
-                        interactionSource = setPlaceSource,
-                        enabled = weatherQuery.isNotBlank(),
-                        modifier = Modifier.weight(1f),
-                    ) {
-                        // Both halves of this pair are the shared MorphActionButton now. They
-                        // sit in one row doing the same kind of thing, and were a text button
-                        // beside a default-filled one -- the mismatch reads as two different
-                        // controls when it is one choice with two answers.
-                        MorphActionButton(
-                            label = "Set place",
-                            icon = Icons.Filled.Place,
-                            modifier = Modifier.fillMaxWidth(),
-                            interactionSource = setPlaceSource,
-                            enabled = weatherQuery.isNotBlank(),
-                            onClick = { vm.setWeatherPlace(weatherQuery); weatherQuery = "" },
-                        )
-                    }
-                    val myLocationSource = remember { MutableInteractionSource() }
-                    SafeExpansiveButton(
-                        interactionSource = myLocationSource,
-                        enabled = true,
-                        modifier = Modifier.weight(1f),
-                    ) {
-                        MorphActionButton(
-                            label = "My location",
-                            icon = Icons.Filled.MyLocation,
-                            onClick = { locationPermission.launch(android.Manifest.permission.ACCESS_COARSE_LOCATION) },
-                            modifier = Modifier.fillMaxWidth(),
-                            interactionSource = myLocationSource,
-                        )
-                    }
+                    MorphTextButton(
+                        "Clear",
+                        onClick = { vm.clearWeatherLocation() },
+                        interactionSource = weatherClearSource,
+                    )
                 }
             }
+            Spacer(Modifier.height(GapGroup))
+        }
+        // One standard button row: the field on its own full-width line, then the app's
+        // standard action buttons beneath it -- the same shape every other Settings card's
+        // controls use, instead of a FlowRow of two half-width buttons.
+        OutlinedTextField(
+            value = weatherQuery,
+            onValueChange = { weatherQuery = it },
+            label = { Text("City or place") },
+            singleLine = true,
+            shape = FieldShape,
+            modifier = Modifier.fillMaxWidth(),
+            keyboardOptions = KeyboardOptions(imeAction = androidx.compose.ui.text.input.ImeAction.Search),
+        )
+        Spacer(Modifier.height(GapRow))
+        ExpressiveButtonRow(modifier = Modifier.fillMaxWidth(), spacing = 8.dp) {
+            val setPlaceSource = remember { MutableInteractionSource() }
+            SafeExpansiveButton(
+                interactionSource = setPlaceSource,
+                enabled = weatherQuery.isNotBlank(),
+            ) {
+                MorphActionButton(
+                    label = "Set place",
+                    icon = Icons.Filled.Place,
+                    modifier = Modifier.fillMaxWidth(),
+                    interactionSource = setPlaceSource,
+                    enabled = weatherQuery.isNotBlank(),
+                    onClick = { vm.setWeatherPlace(weatherQuery); weatherQuery = "" },
+                )
+            }
+            val myLocationSource = remember { MutableInteractionSource() }
+            SafeExpansiveButton(
+                interactionSource = myLocationSource,
+                enabled = true,
+            ) {
+                MorphActionButton(
+                    label = "My location",
+                    icon = Icons.Filled.MyLocation,
+                    onClick = { locationPermission.launch(android.Manifest.permission.ACCESS_COARSE_LOCATION) },
+                    modifier = Modifier.fillMaxWidth(),
+                    interactionSource = myLocationSource,
+                )
+            }
+        }
+    }
 }
 
 /** "Logs" card content -- see the call site in [SettingsScreen] for context. */
 @Composable
 internal fun LogsCardContent(logs: List<String>, vm: AppViewModel, clipboardScope: CoroutineScope, clipboard: Clipboard) {
-            SettingsCard("Logs", AppIcons.Info, vm) {
+            SettingsCard("Logs", AppIcons.Info, vm, status = "${logs.size} lines") {
                 // No local expand state any more. The card's OWN chevron (PebbleShell's, via
-                // SettingsCard) already governs this body -- nothing inside a collapsed card is
-                // composed at all -- so the "Show"/"Hide" button that used to live on this row
+                // SettingsCard) already governs this body -- nothing inside a collapsed card
+                // is composed at all -- so the "Show"/"Hide" button that used to live on this row
                 // was a second disclosure for the same content: open the card, then open the log
                 // again. One control, the outer one.
                 val lineCount = logs.size
@@ -356,7 +342,13 @@ internal fun LogsCardContent(logs: List<String>, vm: AppViewModel, clipboardScop
 /** "Map & Navigation" card content -- see the call site in [SettingsScreen] for context. */
 @Composable
 internal fun MapNavigationCardContent(appearance: SettingsStore.Appearance, vm: AppViewModel) {
-            SettingsCard("Map & Navigation", Icons.Filled.Map, vm) {
+            SettingsCard(
+                "Map & Navigation",
+                Icons.Filled.Map,
+                vm,
+                // Collapsed right-side read of whether nearby chargers can load at all.
+                status = if (appearance.chargerApiKey.isNullOrBlank()) "No API key" else "Key set",
+            ) {
                 TitleSmallText("Open Charge Map API Key")
                 BodySmallText(
                     "Needed for nearby EV chargers. Free key at openchargemap.org.",
@@ -391,12 +383,15 @@ internal fun MapNavigationCardContent(appearance: SettingsStore.Appearance, vm: 
 /** "Notifications" card content -- see the call site in [SettingsScreen] for context. */
 @Composable
 internal fun NotificationsCardContent(notif: SettingsStore.NotificationPrefs, vm: AppViewModel) {
-            SettingsCard("Notifications", Icons.Filled.Notifications, vm) {
+            // Hoisted so the collapsed row's right side shows the same count the in-card
+            // header does (see SettingsCard's `status`).
+            val alertToggles = listOf(notif.charging, notif.service, notif.doorOpen, notif.running, notif.unlocked, notif.carStarted, notif.chargeComplete)
+            val alertsOn = alertToggles.count { it }
+            val notifStatus = if (alertsOn == 0) "All off" else "$alertsOn of ${alertToggles.size} on"
+            SettingsCard("Notifications", Icons.Filled.Notifications, vm, status = notifStatus) {
                 // Icon-badge + status-line header, matching Backup & sync/Updates --
                 // this card used to open straight into a wall of toggles with no
                 // at-a-glance read of how many alerts were actually live.
-                val alertToggles = listOf(notif.charging, notif.service, notif.doorOpen, notif.running, notif.unlocked, notif.carStarted, notif.chargeComplete)
-                val alertsOn = alertToggles.count { it }
                 val notifTint = if (alertsOn > 0) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.onSurfaceVariant
                 // Icons.Filled.Notifications only -- NotificationsActive/Off aren't in
                 // this project's icon set (confirmed by CI), so the on/off read comes
@@ -406,7 +401,7 @@ internal fun NotificationsCardContent(notif: SettingsStore.NotificationPrefs, vm
                     icon = Icons.Filled.Notifications,
                     tint = notifTint,
                     title = "Alerts",
-                    status = if (alertsOn == 0) "All off" else "$alertsOn of ${alertToggles.size} on",
+                    status = notifStatus,
                 )
                 Spacer(Modifier.height(GapGroup))
                 // First, not last: every other switch in this card is an
@@ -521,17 +516,19 @@ internal fun SecurityCardContent(
     context: Context,
     appearance: SettingsStore.Appearance,
 ) {
-            SettingsCard("Security", AppIcons.Lock, vm) {
+            // Hoisted so the collapsed row's right side shows the lock state (see
+            // SettingsCard's `status`).
+            val locked = canBio && appearance.biometricLock
+            val securityTint = if (locked) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.onSurfaceVariant
+            val securityStatus = when {
+                !canBio -> "No biometrics enrolled"
+                locked -> "Locked · ${appearance.lockTiming.label}"
+                else -> "Not locked"
+            }
+            SettingsCard("Security", AppIcons.Lock, vm, status = securityStatus) {
                 // Same icon-badge + status-line header Notifications/Backup & sync use --
                 // this card used to open straight into a segmented row with no glanceable
                 // read of whether the app lock is actually on.
-                val locked = canBio && appearance.biometricLock
-                val securityTint = if (locked) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.onSurfaceVariant
-                val securityStatus = when {
-                    !canBio -> "No biometrics enrolled"
-                    locked -> "Locked · ${appearance.lockTiming.label}"
-                    else -> "Not locked"
-                }
                 StatusHeaderRow(
                     icon = if (locked) AppIcons.Lock else AppIcons.LockOpen,
                     tint = securityTint,
@@ -723,19 +720,22 @@ internal fun SoundsVibrationCardContent(appearance: SettingsStore.Appearance, vm
 /** "Theme" card content -- see the call site in [SettingsScreen] for context. */
 @Composable
 internal fun ThemeCardContent(appearance: SettingsStore.Appearance, advanced: Boolean, vm: AppViewModel) {
-            SettingsCard("Theme", Icons.Filled.Palette, vm) {
+            // Hoisted so the collapsed row's right side shows the display mode (see
+            // SettingsCard's `status`).
+            val themeLabel = when (appearance.themeMode) {
+                ThemeMode.SYSTEM -> "System"
+                ThemeMode.LIGHT -> "Light"
+                ThemeMode.DARK -> "Dark"
+            }
+            val themeStatus = if (appearance.auroraBackground) "$themeLabel · Aurora" else themeLabel
+            SettingsCard("Theme", Icons.Filled.Palette, vm, status = themeStatus) {
                 // Same icon-badge + status-line header as the rest of this pass.
                 val themeTint = MaterialTheme.colorScheme.tertiary
-                val themeLabel = when (appearance.themeMode) {
-                    ThemeMode.SYSTEM -> "System"
-                    ThemeMode.LIGHT -> "Light"
-                    ThemeMode.DARK -> "Dark"
-                }
                 StatusHeaderRow(
                     icon = Icons.Filled.Palette,
                     tint = themeTint,
                     title = "Display mode",
-                    status = if (appearance.auroraBackground) "$themeLabel · Aurora" else themeLabel,
+                    status = themeStatus,
                 )
                 Spacer(Modifier.height(GapGroup))
                 // Dark is always true black (OLED-friendly) now -- see blooColorScheme's

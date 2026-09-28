@@ -129,34 +129,23 @@ internal data class MapFeature(
 internal fun MapFeatureRow(
     features: List<MapFeature>,
     modifier: Modifier = Modifier,
-    /** False for three-plus features: rather than wrapping a lone last button onto
-     *  its own full-width second line (reported directly from a screenshot, once
-     *  "Chargers" became a third feature here), the whole row compacts to icon-only
-     *  buttons instead -- see [ExpressiveButtonRow]'s own `wrap` doc. Still true (the
-     *  default) for the two-feature rows this always fit fine. */
+    /** See [ExpressiveButtonRow]'s own `wrap`. Standard rows wrap; kept as a param only for a
+     *  caller that genuinely needs one fixed line. */
     wrap: Boolean = true,
-    /** [Alignment.CenterHorizontally] when the row can compact to icon-only glyphs (three
-     *  or more features): once those glyphs are capped at their own small size (see
-     *  [ExpressiveButtonGroup]'s equalWidths doc) rather than stretched to fill the row, a
-     *  left-packed cluster reads as broken/half-empty -- centering it in the full row width
-     *  reads as one intentional, compact strip instead. Two-feature rows never compact, so
-     *  their default `Start` never differs from Center in practice; left as `Start` (the
-     *  group's own default) rather than changed for every existing caller. */
     horizontalAlignment: Alignment.Horizontal = Alignment.Start,
 ) {
+    // A plain standard row now, exactly like every other multi-button row in the app: the
+    // app's own [MorphActionButton] (icon + label), equal shares (`equalWidths`), and the
+    // standard wrap-when-it-does-not-fit behaviour. The bespoke "compact to icon-only and
+    // stretch to the edges" treatment the map row used to carry (a `wrap = false` + a
+    // since-removed `stretchCompact`) read as a different kind of control from the buttons
+    // everywhere else and was reported as needing to just be standard.
     ExpressiveButtonRow(
         modifier = modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = GapRow),
         spacing = 10.dp,
         equalWidths = true,
         wrap = wrap,
         horizontalAlignment = horizontalAlignment,
-        // The three-feature full-screen row compacts to glyphs on a phone, and without this
-        // it also SHRANK to the sum of those glyphs -- a small centred cluster, not the
-        // full-width bar the same row already draws on a wide/inner screen where the labels
-        // fit. Reported directly as "not full width on the phone, full width on the inner
-        // screen". Stretching keeps the row spanning its full width in BOTH cases, icon-only
-        // or labelled.
-        stretchCompact = true,
     ) {
         features.forEach { feature ->
             val source = remember { MutableInteractionSource() }
@@ -816,8 +805,6 @@ internal fun ExpandableMapLayer(
                             },
                         ),
                         modifier = Modifier.fillMaxWidth(),
-                        wrap = false,
-                        horizontalAlignment = Alignment.CenterHorizontally,
                     )
                 }
             }

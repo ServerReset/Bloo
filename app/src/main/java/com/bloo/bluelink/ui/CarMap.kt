@@ -675,23 +675,28 @@ internal fun CarMap(
                     .size(40.dp)
                     .offset(y = (-20).dp),
             )
-            // The device's own position, if it fetched one -- offset from the box's centre
-            // the same way the tiles/pin are, but derived from ITS OWN tile coordinate
-            // rather than riding along with panX/panY: the pin's offset (panX, panY) is a
-            // shortcut that only works because the pin IS what the view is centred on.
-            // Anything else on the map has to go through the full conversion: its tile
-            // position minus the car's, in pixels, plus however far the user has panned.
-            devTileOffsetPx?.let { (dx, dy) ->
-                Box(
-                    Modifier
-                        .align(Alignment.Center)
-                        .offset { IntOffset((state.panX + dx).roundToInt(), (state.panY + dy).roundToInt()) }
-                        .size(16.dp)
-                        .background(Color.White, CircleShape)
-                        .padding(3.dp)
-                        .background(deviceLocationColor, CircleShape),
-                )
-            }
+        }
+        // The device's own position, drawn ALWAYS when a fix exists -- deliberately OUTSIDE
+        // the merged/not-merged branch above. It used to be drawn only in the not-merged
+        // case, so whenever the phone was close enough to the car for the two to collide
+        // (i.e. standing next to it, the common case) the "you are here" dot silently
+        // vanished into the combined pin and the map looked like it had no device location
+        // at all. Reported directly: "make the user's location show on the expanded map".
+        // Offset from the box's centre the same way the tiles/pin are, but derived from ITS
+        // OWN tile coordinate rather than riding along with panX/panY: the pin's offset
+        // (panX, panY) is a shortcut that only works because the pin IS what the view is
+        // centred on. Everything else goes through the full conversion: its tile position
+        // minus the car's, in pixels, plus however far the user has panned.
+        devTileOffsetPx?.let { (dx, dy) ->
+            Box(
+                Modifier
+                    .align(Alignment.Center)
+                    .offset { IntOffset((state.panX + dx).roundToInt(), (state.panY + dy).roundToInt()) }
+                    .size(16.dp)
+                    .background(Color.White, CircleShape)
+                    .padding(3.dp)
+                    .background(deviceLocationColor, CircleShape),
+            )
         }
         // Nearby chargers, each going through the SAME full tile-coordinate
         // conversion the device dot above does (its own tile position minus the

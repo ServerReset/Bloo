@@ -581,7 +581,12 @@ internal fun SettingsScreen(
 /** "Accounts" card content -- see the call site in [SettingsScreen] for context. */
 @Composable
 private fun AccountsCardContent(state: UiState, vm: AppViewModel) {
-            SettingsCard("Accounts", Icons.Filled.Person, vm) {
+            // Same summary the in-card header shows, now ALSO on the collapsed row's right
+            // (see SettingsCard's `status`) so the card tells you how many accounts are
+            // connected without having to be opened.
+            val accountsStatus = if (state.accounts.isEmpty()) "No accounts"
+                else "${state.accounts.size} account${if (state.accounts.size == 1) "" else "s"}"
+            SettingsCard("Accounts", Icons.Filled.Person, vm, status = accountsStatus) {
                 // Same icon-badge + status-line header as every other card that's had
                 // this pass applied -- was straight into "Not signed in" or a wall of
                 // per-account blocks with nothing summarizing how many were connected.
@@ -590,7 +595,7 @@ private fun AccountsCardContent(state: UiState, vm: AppViewModel) {
                     icon = Icons.Filled.Person,
                     tint = acctTint,
                     title = "Signed in",
-                    status = if (state.accounts.isEmpty()) "No accounts" else "${state.accounts.size} account${if (state.accounts.size == 1) "" else "s"}",
+                    status = accountsStatus,
                 )
                 Spacer(Modifier.height(GapGroup))
                 if (state.accounts.isEmpty()) {
@@ -695,6 +700,9 @@ private fun AiCardContent(state: UiState, advanced: Boolean, vm: AppViewModel) {
                     "AI",
                     AppIcons.AutoAwesome,
                     vm,
+                    // Collapsed right-side read; ignored in simple mode where the toggle
+                    // itself is already on the row (inlineSetting below).
+                    status = if (state.aiEnabled) "On" else "Off",
                     // The card is inline whenever the CURRENT mode leaves it holding one
                     // setting. In simple mode the auto-summarize toggle below is hidden, so
                     // everything this card can do is the one switch -- and a chevron that opens
@@ -766,7 +774,25 @@ private fun BackupSyncCardContent(
     context: Context,
     advanced: Boolean,
 ) {
-            SettingsCard("Backup & sync", Icons.Filled.CloudSync, vm) {
+            // Hoisted so the collapsed row's right side can show the same at-a-glance state
+            // the in-card header does (see SettingsCard's `status`).
+            val driveConfigured = state.syncUri != null
+            val driveIcon = when {
+                driveConfigured && state.syncError != null -> Icons.Filled.CloudOff
+                driveConfigured -> Icons.Filled.CloudDone
+                else -> Icons.Filled.CloudSync
+            }
+            val driveTint = when {
+                driveConfigured && state.syncError != null -> MaterialTheme.colorScheme.error
+                driveConfigured -> MaterialTheme.colorScheme.tertiary
+                else -> MaterialTheme.colorScheme.onSurfaceVariant
+            }
+            val driveStatus = when {
+                !driveConfigured -> "Not set up"
+                state.syncError != null -> "Sync failed"
+                else -> com.bloo.bluelink.data.relativeLabel(state.lastSyncMs).takeIf { it.isNotBlank() }?.let { "Synced $it" } ?: "Active"
+            }
+            SettingsCard("Backup & sync", Icons.Filled.CloudSync, vm, status = driveStatus) {
                 var showDriveDialog by remember { mutableStateOf(false) }
                 val settingsImportLauncher = rememberLauncherForActivityResult(
                     ActivityResultContracts.GetContent(),
@@ -778,21 +804,6 @@ private fun BackupSyncCardContent(
                     ActivityResultContracts.OpenDocument(),
                 ) { uri -> uri?.let { vm.importSettingsAndSync(context, it) } }
 
-                // Icon + status caption up front, matching the icon-led header
-                // every other multi-row card in Settings uses (AI) -- this card
-                // was the one still opening on two stacked lines of plain text
-                // with no at-a-glance state.
-                val driveConfigured = state.syncUri != null
-                val driveIcon = when {
-                    driveConfigured && state.syncError != null -> Icons.Filled.CloudOff
-                    driveConfigured -> Icons.Filled.CloudDone
-                    else -> Icons.Filled.CloudSync
-                }
-                val driveTint = when {
-                    driveConfigured && state.syncError != null -> MaterialTheme.colorScheme.error
-                    driveConfigured -> MaterialTheme.colorScheme.tertiary
-                    else -> MaterialTheme.colorScheme.onSurfaceVariant
-                }
                 // At-a-glance status header: the state icon in a tonal circle
                 // (matching the app's card-header language) + a bold title and a
                 // colour-coded one-line state. Icon included: driveIcon itself
@@ -802,11 +813,7 @@ private fun BackupSyncCardContent(
                     icon = driveIcon,
                     tint = driveTint,
                     title = "Automatic Drive sync",
-                    status = when {
-                        !driveConfigured -> "Not set up"
-                        state.syncError != null -> "Sync failed"
-                        else -> com.bloo.bluelink.data.relativeLabel(state.lastSyncMs).takeIf { it.isNotBlank() }?.let { "Synced $it" } ?: "Active"
-                    },
+                    status = driveStatus,
                 )
                 Spacer(Modifier.height(GapGroup))
                 if (showDriveDialog) {
