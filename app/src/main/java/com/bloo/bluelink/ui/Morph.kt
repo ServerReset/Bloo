@@ -36,11 +36,13 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Logout
 import androidx.compose.material.icons.automirrored.filled.OpenInNew
 import androidx.compose.material.icons.filled.Bolt
+import androidx.compose.material.icons.filled.Bluetooth
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.CloudDone
 import androidx.compose.material.icons.filled.CloudSync
 import androidx.compose.material.icons.filled.ContentCopy
+import androidx.compose.material.icons.filled.DirectionsCar
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.FileOpen
 import androidx.compose.material.icons.filled.Fingerprint
@@ -425,9 +427,11 @@ fun standardButtonIcon(label: String): ImageVector? = when (label) {
     // matters more now than it did: a button with no glyph cannot fall back to one, so it is the
     // one thing that can stop a whole row from compacting.
     "Choose photo" -> Icons.Filled.FileOpen
+    "Choose device" -> Icons.Filled.Bluetooth
     "Copy" -> Icons.Filled.ContentCopy
     "Export" -> Icons.Filled.Download
     "Restore" -> Icons.Filled.CloudDone
+    "Save" -> Icons.Filled.Check
     "Save as preset" -> Icons.Filled.Star
     // Disclosure. KeyboardArrowDown for both directions: the chevron this app already uses for
     // every expand control, rather than a second pair of glyphs meaning the same thing.
@@ -435,8 +439,9 @@ fun standardButtonIcon(label: String): ImageVector? = when (label) {
     "Hide", "Hide install help", "Hide diagnostics" -> Icons.Filled.KeyboardArrowDown
     // Navigation / external
     "GitHub", "Open release page" -> Icons.AutoMirrored.Filled.OpenInNew
+    "Simulate leaving" -> Icons.Filled.DirectionsCar
     // Sync / run
-    "Test sync", "Pull from primary" -> Icons.Filled.CloudSync
+    "Test sync", "Pull from primary", "Change Drive file" -> Icons.Filled.CloudSync
     "Run it", "Working…" -> Icons.Filled.Bolt
     "Remind me" -> Icons.Filled.Refresh
     // Security

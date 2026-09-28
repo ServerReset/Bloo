@@ -373,8 +373,12 @@ internal fun MapNavigationCardContent(appearance: SettingsStore.Appearance, vm: 
                     MorphTextButton(
                         "Save",
                         onClick = { vm.setChargerApiKey(if (keyInput.isBlank()) null else keyInput, null) },
-                        enabled = keyInput.isNotBlank() && keyInput != (appearance.chargerApiKey ?: ""),
-                        showIcon = false,
+                        // Enabled whenever the field differs from what is saved, INCLUDING when it
+                        // is blank -- blank is how you clear a saved key, and requiring a
+                        // non-blank value here made clearing impossible from this button (the
+                        // handler already turns a blank into null). Standard Save glyph, not
+                        // suppressed: every other action button in Settings leads with one.
+                        enabled = keyInput != (appearance.chargerApiKey ?: ""),
                     )
                 }
             }
