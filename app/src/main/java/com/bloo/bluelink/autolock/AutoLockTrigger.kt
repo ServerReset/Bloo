@@ -1,22 +1,22 @@
 package com.bloo.bluelink.autolock
 
 import android.content.Context
-import android.content.Intent
-import androidx.core.app.NotificationManagerCompat
 import com.bloo.bluelink.data.AppLog
-import com.bloo.bluelink.data.SnapshotStore
 
 /**
  * What happens when a car's Bluetooth link goes away (and when it comes back), shared by the
- * manifest [AutoLockBluetoothReceiver] and the debug-only
- * [com.bloo.bluelink.autolock.AutoLockDebugReceiver].
+ * manifest [AutoLockBluetoothReceiver] and the debug-only [AutoLockDebugReceiver].
  *
- * This is a separate object, not the receiver's own private helper, for a specific reason:
- * the debug trigger used to re-implement this sequence by hand, and it hard-coded the alarm
- * deadline it THOUGHT the real path used (the grace period) while the real path armed the
- * fallback at 0ms and never locked at all. The two drifted, and the only test path anyone
- * could run was the one that worked. One implementation, called by both, removes the
- * possibility.
+ * Rebased onto the i5-AutoLock reference (github.com/Vel-San/i5-AutoLock), which simply runs
+ * its evaluation in-process: the controller owns its own coroutine scope, so the Bluetooth
+ * broadcast that just fired the receiver is all it needs to start. This app had grown a whole
+ * second "alarm + persisted pending record" fallback for the case where the OS refuses a
+ * background foreground-service start -- and that fallback (not the evaluation itself) is what
+ * broke. The reference never needed it, so it is gone: the trigger just starts the controller.
+ *
+ * The foreground service is still started BEST-EFFORT, purely so the progress notification can
+ * show. A blocked background start (the norm on Android 12+) is expected and harmless now that
+ * nothing depends on it -- the evaluation is already running in this process.
  */
 internal object AutoLockTrigger {
 
@@ -26,94 +26,25 @@ internal object AutoLockTrigger {
      * [settings] is passed in rather than read here so the debug trigger can supply its own
      * dry-run/short-grace config while still exercising exactly this code.
      */
-    suspend fun onCarDisconnected(
+    fun onCarDisconnected(
         context: Context,
         vin: String,
         settings: AutoLockConfig,
         log: Boolean = true,
-        forceFallback: Boolean = false,
     ) {
         val ctx = context.applicationContext
-        val graceSeconds = settings.graceSeconds
-        val started = !forceFallback && AutoLockService.start(ctx, vin)
-        // The persisted record is written on BOTH paths, not just the fallback. On the
-        // fallback it is the mechanism; on the service path it is what makes the safety-net
-        // alarm below able to do anything at all -- without it, a process killed mid-evaluation
-        // left the deadline alarm firing into an empty record store and locking nothing. The
-        // alarm receiver's own controller-state guard (see there) is what stops the two paths
-        // from both acting on it.
-        val carName = SnapshotStore(ctx).current().vehicles.firstOrNull { it.vin == vin }?.name
-        AutoLockPending.begin(
-            ctx,
-            AutoLockPending.Record(
-                vin = vin,
-                carName = carName,
-                deadlineMs = System.currentTimeMillis() +
-                    if (started) AutoLockAlarm.servicePathDeadlineMs(graceSeconds)
-                    else AutoLockAlarm.alarmPathDeadlineMs(graceSeconds),
-                dryRun = settings.dryRun,
-            ),
-        )
-        if (!started) {
-            // No service, so this receiver owns the whole countdown. Same mandatory
-            // walk-away confirmation the service path waits for; the transition is delivered
-            // to AutoLockActivityReceiver, which forwards it to the alarm receiver for an
-            // immediate lock.
-            ActivityRecognitionManager.start(ctx)
-            // The countdown the user can actually see and cancel. Its Cancel / Lock now
-            // actions are user interaction, which DOES permit the service start, so they keep
-            // working here.
-            runCatching {
-                NotificationManagerCompat.from(ctx).notify(
-                    AutoLockNotification.notificationId(vin),
-                    AutoLockNotification.build(
-                        ctx, vin, carName ?: "your car",
-                        DetectionState.GRACE, graceSeconds,
-                    ),
-                )
-            }
-        }
+        // Best-effort notification wrapper -- see this object's own doc for why nothing depends
+        // on it succeeding.
+        AutoLockService.start(ctx, vin)
+        // The evaluation itself, in-process and independent of the service.
+        AutoLockController.onTriggerFired(ctx, vin)
         if (log) {
-            AppLog.log(
-                "AutoLock: car Bluetooth disconnected for $vin — " +
-                    if (started) "evaluating." else "using the alarm fallback.",
-            )
+            AppLog.log("AutoLock: car Bluetooth disconnected for $vin — evaluating.")
         }
-        // Always arm the deadline alarm, whichever path runs: with the service it is a safety
-        // net (the controller cancels it on any outcome, so it only ever fires if the process
-        // died mid-way); without it, the alarm IS the mechanism.
-        //
-        // ARMED AFTER the record write above, and at a real deadline -- never zero. It used to
-        // run first and use 0ms for the fallback: the deadline fired instantly, found no
-        // walk-away confirmation yet and took the "may still be in the car" skip branch,
-        // clearing the record before the confirmation could arrive, so the alarm path never
-        // locked at all.
-        AutoLockAlarm.schedule(
-            ctx,
-            vin,
-            if (started) AutoLockAlarm.servicePathDeadlineMs(graceSeconds)
-            else AutoLockAlarm.alarmPathDeadlineMs(graceSeconds),
-        )
     }
 
     /** The car reconnected (the user got back in): abort whatever is pending for it. */
     fun onCarConnected(context: Context, vin: String) {
         AutoLockController.cancel(context.applicationContext, vin)
-    }
-
-    /**
-     * The walk-away confirmation arrived for [vin]: mark its persisted record and hand the
-     * confirmation to the deadline receiver, which locks now instead of waiting for the
-     * deadline. Shared with [AutoLockActivityReceiver] and the debug trigger for the same
-     * "one implementation" reason as [onCarDisconnected].
-     */
-    fun onWalkConfirmed(context: Context, vin: String) {
-        val ctx = context.applicationContext
-        AutoLockPending.markWalkConfirmed(ctx, vin)
-        ctx.sendBroadcast(
-            Intent(ctx, AutoLockAlarmReceiver::class.java)
-                .putExtra(AutoLockAlarmReceiver.EXTRA_VIN, vin)
-                .putExtra(AutoLockAlarmReceiver.EXTRA_WALK_CONFIRMED, true),
-        )
     }
 }

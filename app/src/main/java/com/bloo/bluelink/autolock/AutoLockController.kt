@@ -103,11 +103,6 @@ object AutoLockController {
      * never mid-evaluation, and doesn't push a spurious ABORTED entry into `state` (and
      * therefore into the Settings screen's live status line) for no reason. */
     fun cancel(context: Context, vin: String) {
-        // The alarm-path fallback (see AutoLockAlarm) has no job in this process, so it is
-        // torn down here too: a reconnect or a "Cancel" tap must clear BOTH paths, not just
-        // whichever one this process happens to be running.
-        AutoLockAlarm.cancel(context.applicationContext, vin)
-        AutoLockPending.clear(context.applicationContext, vin)
         val job = jobs[vin] ?: return
         if (!job.isActive) return
         job.cancel()
@@ -122,19 +117,12 @@ object AutoLockController {
      *  (see [com.bloo.bluelink.data.SettingsStore.clearAllAutoLockConfigs]). */
     fun forgetAll(context: Context, vins: Collection<String>) {
         if (vins.isEmpty()) return
-        val ctx = context.applicationContext
         vins.forEach { vin ->
             jobs.remove(vin)?.cancel()
             locks.remove(vin)
             machines.remove(vin)
             skipGrace.remove(vin)
             walkAwayConfirmed.remove(vin)
-            // The persisted fallback record and its armed deadline alarm are NOT part of the
-            // in-memory state above. A sign-out has to clear them too: otherwise a deadline
-            // scheduled for a car whose account is gone stays armed, and its alarm would fire
-            // later and try to lock a car the app can no longer even find.
-            AutoLockPending.clear(ctx, vin)
-            AutoLockAlarm.cancel(ctx, vin)
         }
         _state.update { it - vins.toSet() }
     }
@@ -254,7 +242,6 @@ object AutoLockController {
             _state.update {
                 it + (vin to AutoLockEvalState(detection = DetectionState.LOCKED, lastLockAtEpochMs = System.currentTimeMillis()))
             }
-            finishFallback(context, vin)
             return
         }
         val result = runCatching { runCarCommand(context, CarCommand(vin, CarAction.LOCK)) }.getOrNull()
@@ -264,18 +251,10 @@ object AutoLockController {
             _state.update {
                 it + (vin to AutoLockEvalState(detection = DetectionState.LOCKED, lastLockAtEpochMs = System.currentTimeMillis()))
             }
-            finishFallback(context, vin)
         } else {
             fail(vin, "AutoLock: lock command failed${result?.message?.let { " — $it" } ?: ""}.")
             notifyLockFailed(context, vin, carName, result?.message)
         }
-    }
-
-    /** The service path reached an outcome: drop the fallback's alarm and pending record so
-     *  the deadline can't fire a second evaluation (and a second notification) later. */
-    private fun finishFallback(context: Context, vin: String) {
-        AutoLockAlarm.cancel(context.applicationContext, vin)
-        AutoLockPending.clear(context.applicationContext, vin)
     }
 
     private fun fail(vin: String, message: String) {
@@ -322,7 +301,6 @@ object AutoLockController {
         _state.update { it + (vin to it[vin].let { s -> (s ?: AutoLockEvalState()).copy(detection = next) }) }
     }
 
-    /** How long the walk-away confirmation window stays open before the evaluation gives
-     *  up (shared with [AutoLockAlarm]'s deadline maths). */
+    /** How long the walk-away confirmation window stays open before the evaluation gives up. */
     internal const val CONFIRM_TIMEOUT_MS = 20_000L
 }

@@ -18,13 +18,9 @@ class AutoLockActivityReceiver : BroadcastReceiver() {
                 (it.activityType == DetectedActivity.WALKING || it.activityType == DetectedActivity.ON_FOOT)
         }
         if (!walkedAway) return
-        // In-process evaluations (the service path) get the state-machine nudge...
+        // Every in-process evaluation currently waiting on a walk-away confirmation gets the
+        // state-machine nudge. Walking transitions are app-wide (one registration), so this
+        // confirms all of them at once.
         AutoLockController.onWalkingConfirmedAny()
-        // ...and any evaluation owned by the alarm fallback (no service running, so the
-        // controller has no job for it) is driven directly: mark the persisted record and
-        // hand the confirmation to the deadline receiver, which locks now instead of at the
-        // deadline. Without this the fallback would always wait out the full grace period.
-        val ctx = context.applicationContext
-        AutoLockPending.all(ctx).forEach { record -> AutoLockTrigger.onWalkConfirmed(ctx, record.vin) }
     }
 }

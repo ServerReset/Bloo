@@ -56,27 +56,12 @@ class AutoLockService : Service() {
                 return START_NOT_STICKY
             }
             ACTION_LOCK_NOW -> {
-                if (AutoLockPending.get(this, vin) != null) {
-                    // The fallback owns this car: its evaluation lives in a persisted record,
-                    // not in a controller job. Start a controller job here as well and the two
-                    // race to the same command -- worse, the controller's own flow waits out
-                    // the walk-away confirmation window and then SKIPS, so "Lock now" would
-                    // end up not locking at all. Forward the tap (which IS the walk-away
-                    // confirmation -- it comes from the user) straight to the deadline
-                    // receiver, and promote this service to foreground for the moment it
-                    // takes, so a startForegroundService() caller still gets its
-                    // startForeground() promptly.
-                    startForegroundCompat(vin, DetectionState.LOCKING, 0)
-                    sendBroadcast(
-                        Intent(this, AutoLockAlarmReceiver::class.java)
-                            .putExtra(AutoLockAlarmReceiver.EXTRA_VIN, vin)
-                            .putExtra(AutoLockAlarmReceiver.EXTRA_WALK_CONFIRMED, true),
-                    )
-                    scope.launch { delay(3000); finishTracking(vin) }
-                } else {
-                    AutoLockController.lockNow(this, vin)
-                    observe(vin)
-                }
+                // "Lock now" from the notification: skip the rest of the grace countdown. The
+                // evaluation lives in the controller (started by the trigger), so this only
+                // nudges it -- no separate fallback path to reconcile any more (see
+                // AutoLockTrigger's own doc).
+                AutoLockController.lockNow(this, vin)
+                observe(vin)
                 return START_NOT_STICKY
             }
         }
@@ -91,13 +76,10 @@ class AutoLockService : Service() {
         // soon as that fast local read completes, which is normally well before the
         // CONFIRMING phase's own 20s window is even half over.
         if (!startForegroundCompat(vin, DetectionState.CONFIRMING, 0)) {
-            // The process could not become a foreground service. Run the evaluation anyway --
-            // AutoLockController's scope is independent of this service -- and let the
-            // receiver's already-armed deadline alarm be the backstop if this process is
-            // killed before the evaluation finishes. Just stopping here would silently drop
-            // the lock, which is worse than running it unfrontgrounded (the only thing the
-            // foreground standing buys is not being killed mid-countdown).
-            AutoLockController.onTriggerFired(this, vin)
+            // The process could not become a foreground service. The evaluation is already
+            // running in AutoLockController's own scope (the trigger started it before this
+            // service was even asked for), so there is nothing to start here -- this service
+            // is only the notification wrapper. Just stand down; the lock still happens.
             stopSelf()
             return START_NOT_STICKY
         }
@@ -107,7 +89,9 @@ class AutoLockService : Service() {
             }
             startForegroundCompat(vin, DetectionState.CONFIRMING, 0)
         }
-        AutoLockController.onTriggerFired(this, vin)
+        // No onTriggerFired here any more: AutoLockTrigger already started the controller's
+        // evaluation, and calling it again would cancel and restart that very job (see
+        // onTriggerFired). This service just observes.
         observe(vin)
         return START_NOT_STICKY
     }

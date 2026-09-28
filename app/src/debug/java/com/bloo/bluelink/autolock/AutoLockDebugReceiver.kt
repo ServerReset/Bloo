@@ -26,16 +26,11 @@ import kotlinx.coroutines.launch
  * broken when it isn't:
  *   adb shell am broadcast -n com.bloo.bluelink/com.bloo.bluelink.autolock.AutoLockDebugReceiver --es cmd trigger
  *   adb shell am broadcast -n com.bloo.bluelink/com.bloo.bluelink.autolock.AutoLockDebugReceiver --es cmd walk
- *   adb shell am broadcast -n com.bloo.bluelink/com.bloo.bluelink.autolock.AutoLockDebugReceiver --es cmd deadline
  *
  * `trigger` enables AutoLock for the first car in the snapshot with DRY RUN ON (so no real
  * command is ever sent) and a 5-second grace, then runs [AutoLockTrigger.onCarDisconnected] --
- * the SAME code the manifest Bluetooth receiver runs -- forced onto its fallback branch. It
- * used to re-implement that sequence by hand, and hard-coded the deadline it believed the real
- * path used while the real path armed the fallback at 0ms; the two drifted and the fallback
- * never locked at all. `walk` runs [AutoLockTrigger.onWalkConfirmed] (what the
- * activity-recognition receiver does), which locks immediately. `deadline` fires the deadline
- * directly.
+ * the SAME code the manifest Bluetooth receiver runs. `walk` confirms walking to every
+ * in-flight evaluation, exactly as the activity-recognition receiver does.
  */
 class AutoLockDebugReceiver : BroadcastReceiver() {
 
@@ -67,19 +62,16 @@ class AutoLockDebugReceiver : BroadcastReceiver() {
                                 dryRun = true,
                             ),
                         )
-                        AppLog.log("AutoLock debug: triggering the fallback path for $vin (dry run).")
-                        Log.i("AutoLockDebug", "trigger: running the REAL fallback sequence for $vin")
-                        // The real path, forced onto the fallback branch (the debug broadcast
-                        // usually arrives while the app is foregrounded, where a real
-                        // disconnect would be allowed to start the service). Calling the same
-                        // AutoLockTrigger the manifest receiver calls is the point: the debug
-                        // trigger used to re-implement this by hand and drifted from the real
-                        // deadline arithmetic, hiding a bug that made the fallback never lock.
+                        AppLog.log("AutoLock debug: triggering an evaluation for $vin (dry run).")
+                        Log.i("AutoLockDebug", "trigger: running the REAL trigger sequence for $vin")
+                        // The real path, unchanged: the same AutoLockTrigger the manifest
+                        // receiver calls, so the debug run exercises exactly what a real
+                        // Bluetooth disconnect does.
                         AutoLockTrigger.onCarDisconnected(
-                            ctx, vin, SettingsStore(ctx).autoLockConfig(vin), log = false, forceFallback = true,
+                            ctx, vin, SettingsStore(ctx).autoLockConfig(vin), log = false,
                         )
                     }
-                    "walk" -> AutoLockTrigger.onWalkConfirmed(ctx, vin)
+                    "walk" -> AutoLockController.onWalkingConfirmedAny()
                     // Posts the outcome notification directly, so the notification's channel,
                     // sound and wording can be verified without a car that happens to be
                     // unlocked (the emulator's test car reports "already locked", which the
@@ -96,10 +88,6 @@ class AutoLockDebugReceiver : BroadcastReceiver() {
                         Log.i("AutoLockDebug", "posting the locked notification for $carName")
                         AutoLockEventNotifier.notifyLocked(ctx, vin, carName, dryRun = false)
                     }
-                    "deadline" -> ctx.sendBroadcast(
-                        Intent(ctx, AutoLockAlarmReceiver::class.java)
-                            .putExtra(AutoLockAlarmReceiver.EXTRA_VIN, vin),
-                    )
                     else -> AppLog.log("AutoLock debug: unknown cmd '$cmd'")
                 }
             } finally {
