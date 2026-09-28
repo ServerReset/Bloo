@@ -1075,7 +1075,16 @@ internal fun PebbleShell(
                             // animates those in place too.
                             modifier = Modifier.animateContentSize(
                                 lowPowerAwareSpring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessMediumLow),
-                            ).padding(start = 16.dp, end = 16.dp, bottom = 16.dp, top = 4.dp),
+                            ).padding(start = 16.dp, end = 16.dp, bottom = 16.dp, top = 4.dp)
+                                // The expanded BODY swallows horizontal drags on the phone's car
+                                // pages, so a sideways drag inside an open pebble does not flip to
+                                // the next car. Only the body: the header row above is never
+                                // blocked, so the top of every pebble still changes cars whether it
+                                // is open or not. See LocalBlockBodyPageSwipe.
+                                .then(
+                                    if (LocalBlockBodyPageSwipe.current) Modifier.consumeHorizontalDrags()
+                                    else Modifier,
+                                ),
                             verticalGap = contentGap,
                             content = content,
                         )

@@ -432,6 +432,18 @@ internal val LocalAppearance = staticCompositionLocalOf { SettingsStore.Appearan
 internal val LocalForceExpanded = staticCompositionLocalOf { false }
 
 /**
+ * True on the phone's car pages: a pebble's EXPANDED BODY swallows horizontal drags, so a
+ * sideways drag inside an open pebble (a slider, an empty area) does not flip to the next car.
+ *
+ * The pebble's HEADER ROW -- its collapsed part, which stays on top whether the pebble is open
+ * or shut -- is never blocked, so you can always change cars by swiping across the top of any
+ * pebble. The hero card opts out of the body block entirely, so a swipe anywhere on it changes
+ * cars (see HeroHeader). False everywhere else (the dual-column view has its own column pager,
+ * and Settings' cards are not car pebbles), so this whole rule is scoped to the car pages.
+ */
+internal val LocalBlockBodyPageSwipe = staticCompositionLocalOf { false }
+
+/**
  * When true (cover-screen tiles), a pebble stretches to fill the available height
  * and scrolls internally if its content is taller - so each tile fills the screen.
  */

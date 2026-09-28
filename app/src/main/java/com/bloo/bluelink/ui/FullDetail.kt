@@ -160,7 +160,13 @@ internal fun VehicleDetailContent(
             // ExpandedCar -- which did put "controls" back on screen, but ALSO
             // surfaced the wide-layout-only "Add a pebble" drag target above the hero
             // card, on every phone, reported directly as the layout looking wrong.
-            PebbleList(v, state, vm, pinHotspot = false, onExpand = onExpand, blockHorizontalDrags = true)
+            // Scoped to the pebble list: on the phone's car pages, an OPEN pebble's body
+            // swallows horizontal drags, so a sideways drag inside it does not flip to the next
+            // car. Every pebble's header row still changes cars, expanded or not, and the hero's
+            // photo is unblocked too -- see LocalBlockBodyPageSwipe.
+            CompositionLocalProvider(LocalBlockBodyPageSwipe provides true) {
+                PebbleList(v, state, vm, pinHotspot = false, onExpand = onExpand)
+            }
             // Reserves exactly as much room as the floating search bubble (SearchLayer, mounted
             // globally for Screen.Garage -- see Screens.kt's `searchable` gate) actually needs,
             // read live off its own reported bounds -- not a flat guessed height. A guess here

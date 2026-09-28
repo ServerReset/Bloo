@@ -498,12 +498,6 @@ internal fun PebbleList(
     pinHotspot: Boolean = true,
     /** Forwarded to the "summary" hero pebble only -- see [HeroHeader]'s `expandAction`. */
     onExpand: (() -> Unit)? = null,
-    /** True on the phone's car pages: each pebble (except the hero) swallows horizontal drags
-     *  so a sideways drag on a pebble does not flip to the next car -- only the gaps between
-     *  pebbles and the hero card (which does not carry the blocker) switch cars. See
-     *  [consumeHorizontalDrags]. False for the dual-column view, where the columns themselves
-     *  are the horizontal pager and must receive those drags. */
-    blockHorizontalDrags: Boolean = false,
 ) {
     // ONE derived computation, not `val sel = state.value` plus a remember over its fields.
     //
@@ -608,17 +602,7 @@ internal fun PebbleList(
             derivedStateOf { section in eager || section in filledSections }
         }
         if (ready) {
-            // Swallow horizontal drags on the pebble card (not on the hero -- "summary" is
-            // exempt so a sideways drag on it still switches cars, per the phone's own
-            // swipe rules). See blockHorizontalDrags' own doc.
-            val itemBlocker = if (blockHorizontalDrags && section != "summary") {
-                Modifier.consumeHorizontalDrags()
-            } else {
-                Modifier
-            }
-            Box(itemBlocker) {
-                SinglePebble(section, v, state, vm, dragHandle, onExpand = onExpand)
-            }
+            SinglePebble(section, v, state, vm, dragHandle, onExpand = onExpand)
         } else {
             // Off-screen placeholder, up to a few frames now rather than always exactly
             // one: reserves ~collapsed pebble height so the list doesn't visibly jump
