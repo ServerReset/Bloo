@@ -320,11 +320,8 @@ class SettingsStore(private val context: Context) {
     // eagerly near app launch, so a decode failure here must never crash startup.
     val appearance: Flow<Appearance> = context.settingsDataStore.data.map { prefs ->
         Appearance(
-            // AMOLED/SYSTEM_AMOLED were removed as separate modes once Dark itself became
-            // always-true-black (see ThemeMode's own doc) -- remapped explicitly rather than
-            // falling through to the generic ThemeMode.valueOf()-failure default (SYSTEM), so
-            // a device that had AMOLED selected keeps a dark theme instead of silently
-            // reverting to System.
+            // "AMOLED"/"SYSTEM_AMOLED" are legacy values remapped to the nearest modern mode, so
+            // an install that had AMOLED selected keeps a dark theme instead of reverting to System.
             themeMode = when (val raw = prefs[Keys.THEME]) {
                 "AMOLED" -> ThemeMode.DARK
                 "SYSTEM_AMOLED" -> ThemeMode.SYSTEM
@@ -1792,10 +1789,6 @@ class SettingsStore(private val context: Context) {
         block()
     }
 
-    // widgetLocationAddress/setWidgetLocationAddress removed here -- the last two of
-    // the dead widget accessors, sitting apart from the rest of the block. See the
-    // tombstone at the old "Home-screen widgets" section for why all of them went.
-
     // --- Dual-column "hot spot" (pebbles pinned under the car-info column) -----
 
     /** The single pebble pinned to the hotspot's secondary slot for [vin], or null if none
@@ -1963,13 +1956,6 @@ class SettingsStore(private val context: Context) {
             else it[Keys.ACTIVE_CUSTOM_PALETTE_ID] = id
         }
     }
-
-    // exportPalettesJson() / importPalettesJson() were deleted here: no callers. Custom palettes
-    // travel through the full settings backup and Drive sync like every other pref (they live
-    // under Keys.CUSTOM_PALETTES, which the backup already carries), so a standalone
-    // palette-only import/export was never wired to any UI. The helpers they used
-    // (readCustomPalettes, paletteJson, paletteListSerializer) remain live for the per-palette
-    // save/delete paths above.
 
     // --- Full settings backup --------------------------------------------
 

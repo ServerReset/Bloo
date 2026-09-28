@@ -44,14 +44,3 @@ internal fun isSettingAvailableInMode(
         settingTitle == prefix || settingTitle.startsWith(prefix)
     }
 }
-
-// PER_CAR_DATA_SETTINGS and ADVANCED_FEATURES were deleted here, both with zero references
-// anywhere in the repo.
-//
-// [ADVANCED_ONLY_SETTINGS] above, read by [isSettingAvailableInMode], is the one list this
-// file's gate actually consults. ADVANCED_FEATURES was a strict SUBSET of it ("Default climate
-// start", "Custom palette") declared a second time under a second name -- the exact duplicate
-// that turns a one-line policy change into a hunt for which of two lists is live.
-// PER_CAR_DATA_SETTINGS described an "always searchable regardless of mode" allowlist that
-// isSettingAvailableInMode never had: per-car rows are already mode-gated by the four
-// "<field> · " PREFIXES in ADVANCED_ONLY_SETTINGS, which is why nothing ever needed it.

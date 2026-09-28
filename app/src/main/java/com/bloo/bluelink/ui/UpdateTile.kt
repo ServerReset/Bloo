@@ -617,10 +617,6 @@ internal fun UpdateStatusLine(
         // screenshot (text wrapped one character per line).
         Column(Modifier.fillMaxWidth()) {
             Spacer(Modifier.height(GapRow))
-            // No trailing percentage beside the bar -- this doc's own note above already
-            // says that copy was removed as a redundant third place the same number showed
-            // (with the header pill and the "Downloading" line), but the Text survived here.
-            // The header pill (PebbleHeaderAction, above) is the one place it's shown.
             val p = downloadProgress
             Surface(
                 modifier = Modifier.fillMaxWidth().height(8.dp),

@@ -155,43 +155,9 @@ internal fun chargeReadoutOf(
             charging -> ChargeGreen
             drivingLabel == "Driving" || drivingLabel == "Running" -> MaterialTheme.colorScheme.primary
             else -> {
-                // The inherited content colour, muted -- and NOTHING else. This is the
-                // "Parked"/"Battery"/"Fuel" line, and it was reported (many times) as the
-                // one bit of the hero that ignores the app's theme.
-                //
-                // Two separate faults, both removed here:
-                //
-                // 1. It branched on a raw `isSystemInDarkTheme()`, which is the PHONE's
-                //    setting and not the app's own ThemeMode override -- the exact bug
-                //    already fixed in pebbleCardEdge/glassTint (GlassChrome.kt) and CarMap
-                //    (WeatherPebble.kt). An app forced to Light on a dark phone took the
-                //    `dark` branch and vice versa, so the one thing this branch was meant
-                //    to decide was decided backwards whenever the two disagreed.
-                //
-                // 2. The light branch returned `colorScheme.onSurfaceVariant` -- a SURFACE
-                //    role -- for text that is not on a surface. Every other element of this
-                //    readout (the percentage, the range) and the car's name beside it are
-                //    painted from LocalContentColor, which the hero provides as
-                //    lerp(onSurface, HeroOnPhoto, heroT) so they travel from the card's
-                //    themed content colour onto the scrimmed photo as the card opens (see
-                //    Hero.kt's two CompositionLocalProvider blocks and HeroOnPhoto's own
-                //    doc in UiTokens.kt). This line opted out of that provider, so on a
-                //    light-themed app the expanded hero drew "Parked" in near-black over a
-                //    dark photo scrim -- invisible -- while the percentage directly above
-                //    it was near-white. With a custom palette active it was
-                //    worse: onSurfaceVariant carries a slice of that car's seed colour, so
-                //    it came out as a tinted grey belonging to no backdrop at all.
-                //
-                // Reading LocalContentColor means this now tracks the ACTIVE
-                // MaterialTheme.colorScheme -- including a custom palette, since
-                // the hero's provider derives from colorScheme.onSurface inside that scope
-                // -- in every theme mode, with no dark-mode test of its own to get wrong.
-                // Nothing here needs to know whether it is dark: the provider upstream
-                // already resolved that, once, the way BlooTheme did.
-                //
-                // The alpha split stays: the flip cover (LocalForceExpanded) shows this at
-                // a glance from across a room and wants it nearly solid; the phone hero
-                // wants it subordinate to the percentage above it.
+                // The inherited content colour, muted -- NOT a surface role or a raw
+                // isSystemInDarkTheme() test. Reading LocalContentColor tracks the active
+                // scheme (incl. custom palettes) and the hero's on-photo scrim as the card opens.
                 LocalContentColor.current.copy(
                     alpha = if (LocalForceExpanded.current) 0.92f else MutedContentAlpha,
                 )
@@ -223,34 +189,6 @@ internal fun animatedChargeFrac(target: Float): Float {
     )
     return frac  // Extracted as a reusable composable to avoid hand-copied animations
 }
-
-// ChargeStatsBlock was deleted here. It was the expanded-density readout, and it had become
-// a near-duplicate of HeroMorphReadout's t = 1 end: the same Row, the same weighted spacer,
-// the same two RollingNumbers at the same two type steps. ChargeFuelBar now calls
-// HeroMorphReadout directly, so there is exactly ONE readout implementation serving the
-// phone hero, the flip cover's tile and the EV Charge pebble.
-
-// ChargeStatsLine was deleted here. It drew the collapsed one-line copy of the
-// percentage and range for the hero's title row, and there is no collapsed copy any
-// more -- HeroMorphReadout below is one set of components that morphs between both
-// densities, so the second implementation has nothing left to render.
-
-// heroReadoutReserve() was deleted here. It measured the height the collapsed header had to
-// leave for an absolutely-positioned readout. The collapsed card is now two ordinary rows --
-// the numbers beside the name in the header's own row, the bar under them in headerContent --
-// so the header reserves the right space by CONTAINING the content instead of by computing a
-// height that has to match it. That removes the class of bug this constant kept producing.
-
-// HeroCollapsedStats() was deleted here. It rendered a SECOND copy of the percentage and range
-// beside the car name, crossfading against HeroMorphReadout's copy on heroT. Two renderings of
-// the same digits at similar weight, both half-visible mid-morph, is what actually read as
-// rough -- and no amount of tuning the two alphas fixes a duplicate. There is now one readout,
-// visible in both states, that moves and changes shape; see HeroMorphReadout.
-//
-// Its scale-not-lerp argument was still correct for what it was doing, and is preserved where
-// it now applies: nothing depended on ITS size, whereas the surviving readout's Column height
-// must grow, which is why that one lerps real type steps.
-
 
 /**
  * The hero's readout as ONE set of components that morphs between the collapsed and expanded

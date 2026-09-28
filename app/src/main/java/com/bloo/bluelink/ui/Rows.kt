@@ -277,7 +277,6 @@ internal fun CropScreen(vin: String, uriString: String, onCancel: () -> Unit, on
 // (The settings screen is owned by SettingsScreen.kt's family: SettingsScreen,
 // SettingsCards, SettingsIndex, SettingsSearch, SettingsWidgets.)
 
-
 // --- Small reusable pieces ------------------------------------------------
 
 @Composable
@@ -609,11 +608,4 @@ internal fun SeatConfigRow(
     }
 }
 
-// CommandButton() was deleted here. It was the app's LARGE (64dp) command-button variant, and
-// its own doc named its callers: "Open in maps" and the pebble command rows. Both of those
-// stopped being full-width stacked buttons in e0194e2, which replaced them with the shared
-// MapFeature/MapFeatureRow pills the full-screen map's toolbar already used -- leaving this
-// function with zero call sites and a comment describing a layout the app no longer has.
-// Nothing needs a 64dp button now; if something does, MorphButton + MorphButtonLabel is the
-// two-line body this was.
 

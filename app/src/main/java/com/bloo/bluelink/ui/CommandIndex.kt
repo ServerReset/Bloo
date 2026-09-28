@@ -313,18 +313,3 @@ internal fun Vehicle.canCharge(): Boolean {
     // For now, assume all vehicles can charge (the actual command will fail appropriately)
     return true
 }
-
-// commandCategoryIcon() and CommandCategory.displayName() were deleted here, both with zero
-// call sites anywhere in the repo.
-//
-// commandCategoryIcon was a second, parallel icon mapping for something the data already
-// carries: every [CommandMetadata] declares its OWN `icon`, which is what the one place that
-// draws a command suggestion (SearchResults' `cmd.icon`) reads -- and a per-CATEGORY icon is
-// necessarily coarser than the per-command one, so it could only ever have disagreed with it
-// (LOCK and TRUNK both resolving to a padlock, HORN to a speaker). displayName was a set of
-// category headings for a grouped command palette that was never built; commands render as a
-// flat ranked list, the same as settings results.
-//
-// [CommandCategory] itself and [CommandMetadata.category] stay: the enum is the catalog's own
-// declared taxonomy and every entry sets it, so it is real (if currently unread) data, not a
-// leftover. It is only these two never-wired PRESENTATION mappings that go.

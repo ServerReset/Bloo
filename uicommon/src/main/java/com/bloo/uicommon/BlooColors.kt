@@ -30,10 +30,4 @@ object BlooColors {
         else lerp(surface, onSurface, 0.20f)
     }
 
-    // onAccent() and accentMuted() (plus a private Color.toArgbInt() only accentMuted used) were
-    // deleted here: nothing on either surface ever called them. The object's old doc claimed all
-    // three were "shared utilities between phone and watch", but only buttonContainer ever was.
-    // The widget used to derive its own on-accent tone inline (CarWidget WidgetTheme.build) with a
-    // different dark value, so routing it through a shared onAccent would have changed its colour,
-    // not just its call site -- another reason this was dead rather than merely uncalled.
 }

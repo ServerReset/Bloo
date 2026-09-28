@@ -55,26 +55,3 @@ fun rememberConfirmArm(resetMillis: Long = 4000L): ConfirmArm {
     }
     return ConfirmArm(armed = armed, arm = { armed = true })
 }
-
-// LabelValueRow was removed. It had zero call sites -- not one, in any module, ever
-// -- while sitting in the shared module presenting itself as the obvious base for
-// the phone's and the watch's StatusRow. It would have been a bad one, and that is
-// the actual reason for deleting it rather than wiring it up:
-//
-//  - It called AnimatedValue without reduceMotion, back when that had a default. So
-//    adopting it would have spread the accessibility bug that default caused (see
-//    AnimatedValue's KDoc) to both surfaces at once, including the watch, which was
-//    getting it right.
-//  - Arrangement.SpaceBetween with no weight, maxLines or ellipsis on either cell
-//    is precisely the layout both real StatusRows were rewritten to STOP using; the
-//    comments at Screens.kt's and Components.kt's StatusRow record what overflowed.
-//
-// Sharing these two is still worth doing, but it is a behaviour decision and not a
-// mechanical lift: they currently disagree about the value cell (the phone
-// deliberately fills with weight(1f) + CenterEnd, having documented
-// weight(1f, fill = false) -- what the watch does -- as a bug it fixed), about
-// vertical alignment (Top vs CenterVertically), and about where the label colour
-// comes from (an alpha on inherited content colour vs an onSurfaceVariant role).
-// Any shared core has to take all of that as parameters, in the theme-neutral style
-// this module already uses for AnimatedValue and AnimatedSlider, since :uicommon
-// has no Material dependency at all and cannot see either MaterialTheme.

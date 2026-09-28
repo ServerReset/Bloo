@@ -72,7 +72,6 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import androidx.core.net.toUri
 
-
 /**
  * A pending Kia one-time-code challenge shown over the login form. [sentTo] is
  * the destination the code went to ("EMAIL"/"SMS"), null while still choosing.
@@ -89,7 +88,6 @@ data class CanadaOtpUi(
     val challenge: CanadaAuth.OtpRequired,
     val brand: Brand,
 )
-
 
 /**
  * @Stable, and this is the parameter that would otherwise undo the work done
@@ -812,17 +810,9 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     /**
      * Re-engage the lock when returning to the foreground, honouring the user's
-     * [LockTiming] setting. [backgroundedAtMs] is when the app was last stopped.
-     *
-     * This used to take a second `screenOff` parameter -- whether the screen turned
-     * off while the app was away -- and never read it. MainActivity computed it with
-     * a registered ACTION_SCREEN_OFF BroadcastReceiver, which is now gone too.
-     *
-     * Deleted rather than wired up, deliberately. Using it would mean re-locking on
-     * screen-off regardless of elapsed time, which contradicts the setting the user
-     * actually chose. Nothing is weakened by removing it, since it was providing no
-     * protection at all -- if screen-off-locks-immediately is wanted, it is a new
-     * LockTiming option, not a hidden override of the existing ones.
+     * [LockTiming] setting. [backgroundedAtMs] is when the app was last stopped;
+     * [screenTurnedOff] is whether the screen turned off while the app was away, which
+     * [LockTiming.SCREEN_OFF] keys off.
      */
     fun maybeRelock(backgroundedAtMs: Long, screenTurnedOff: Boolean = false) {
         if (_state.value.locked) return
@@ -1582,12 +1572,6 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                     }
                 }
         }
-        // NOTE: no explicit launch-time sync is needed here. The refreshing-transition
-        // collector above collects a StateFlow-derived flow, which emits its CURRENT
-        // value to a new collector immediately; `refreshing` is false at bootstrap, so
-        // that collector already fires runDriveSyncNow() once on launch (distinctUntil-
-        // Changed passes the first emission through). An earlier explicit initial-pull
-        // block here was removed as a redundant second pass on the same mainToMainSyncMutex.
 
         // Sweep car photos no pref points at any more, once per launch. The crop screen
         // writes a fresh timestamped file each time and only overwrites the img_$vin pref,
@@ -2132,7 +2116,6 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         if (anyCharging) com.bloo.bluelink.work.LiveChargePollWorker.kick(getApplication())
     }
 
-
     /** Re-sort a freshly-fetched vehicle list to match the user's saved
      *  drag-and-drop [order] (a list of VINs). Any VIN in [order] that no
      *  longer matches a fetched vehicle is simply skipped (mapNotNull), and
@@ -2651,7 +2634,6 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     ): ParsedVehicleCommand? =
         enhanceCommandWithAi(query, initialCommand, ai)
 
-
     /**
      * Maps a free-form command to a structured one the app can actually run,
      * or null if it cannot be mapped SAFELY.
@@ -3051,4 +3033,3 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 }
-

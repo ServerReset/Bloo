@@ -59,13 +59,6 @@ class MainActivity : FragmentActivity() {
 
     // App-lock bookkeeping: when we last left the foreground, and whether this is the
     // very first foreground (cold start, where the ViewModel already decides the lock).
-    //
-    // There used to be a third piece here -- a screenOffWhileAway flag fed by a
-    // BroadcastReceiver registered for ACTION_SCREEN_OFF, passed to maybeRelock, and
-    // read by nothing. See maybeRelock's own comment for why it was deleted rather
-    // than wired up. Worth removing rather than leaving inert: it was a real
-    // registered system receiver, woken on every screen-off for the whole life of
-    // this Activity, plus the register/unregister lifecycle around it.
     private var backgroundedAt = 0L
     private var firstStart = true
 

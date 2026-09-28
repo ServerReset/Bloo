@@ -254,10 +254,6 @@ internal fun PebbleShell(
      * title's own live position is a real, cheap-to-need thing to want again.
      */
     titleModifier: Modifier = Modifier,
-    // onTitleWidth was deleted here. It reported the title's measured width so the hero could
-    // offset its collapsed readout past the car name. That whole approach is gone: the numbers are
-    // now trailing content ON this Row (see HeroCollapsedNumbers), so the Row positions them and
-    // nothing needs to know how wide the name is.
     /**
      * Extra content in the header, under the title and [summary].
      *

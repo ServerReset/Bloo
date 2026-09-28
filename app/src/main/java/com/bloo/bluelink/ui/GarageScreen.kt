@@ -402,10 +402,6 @@ internal fun GarageScreen(
                                 state,
                                 vm,
                                 flipped = appearance.columnsFlipped,
-                                // Wired unconditionally per page. Pager dots (which previously
-                                // needed per-page notification) were removed, but the structure
-                                // remains for consistency. Only one page is ever actually
-                                // composed here (beyondViewportPageCount = 0) anyway.
                                 onCollapse = { vm.collapse() },
                                 hazeState = hazeState,
                             )

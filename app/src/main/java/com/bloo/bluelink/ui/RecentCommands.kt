@@ -53,18 +53,3 @@ internal class RecentCommandsTracker(private val context: Context) {
         prefs.edit { clear() }
     }
 }
-
-// List<CommandMetadata>.sortByRecency() and suggestCommandsWithRecency() were deleted here,
-// both with zero call sites anywhere in the repo.
-//
-// They were the READ half of this file, and it was never wired up: the only thing that has
-// ever touched [RecentCommandsTracker] is SearchResults' recordUsage() call after a command
-// actually runs, i.e. the WRITE half. Command suggestions there come straight off
-// searchCommands' own relevance ranking, with no recency pass over them at all -- so these two
-// re-ranked a list nobody handed them, against a history nobody read.
-//
-// The tracker itself stays: it is live, it is what records the history, and reading that
-// history back is a feature someone may still want. That is a handful of lines against
-// `recentCommands()` when it happens, not these two speculative rankers -- one of which
-// (sortByRecency) is a stable-sort ordering the other (suggestCommandsWithRecency) reimplements
-// by partition, which is itself the sign that neither had a real caller to agree with.

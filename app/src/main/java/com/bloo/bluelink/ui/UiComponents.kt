@@ -357,11 +357,3 @@ internal fun Modifier.paddingVertical8() = paddingVertical(8.dp)
 /** Combined padding patterns that appear across multiple files. */
 internal fun Modifier.paddingHorizontal24Vertical16() = padding(horizontal = 24.dp, vertical = GapSection)
 internal fun Modifier.paddingHorizontal16Vertical12() = padding(horizontal = 16.dp, vertical = GapGroup)
-
-// StandardRow() and StandardColumn() were deleted here. Both claimed to "consolidate" the
-// Row/Column + fillMaxWidth() + spacedBy pattern, but neither ever gained a single call site
-// anywhere in the app -- unlike LabelText and ThemedIcon above them, which did and stay. They
-// also could not have been used as written: the whole point of the pattern they wrapped is
-// that each site picks its OWN spacing from the layout tokens, and a wrapper whose only
-// contribution is a DEFAULT spacing saves nothing at a site that has to pass its spacing
-// anyway. A helper nothing calls is not a token, it is a guess at one.

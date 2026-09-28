@@ -36,71 +36,12 @@ import androidx.compose.ui.unit.dp
 import kotlin.math.floor
 import kotlin.math.abs
 
-// Was 1000, "big enough that a user could never swipe to the edge in one
-// sitting" -- which meant every DISTINCT virtual page a user ever swiped onto
-// became its own permanent composition (a whole SettingsScreen, a whole
-// VehicleDetailContent) with no explicit `key` to let Compose reuse one across
-// wraps, retained for the life of the process. Reported directly as a real
-// OOM (heap exhausted shortly after unlock, a trivial 32-byte allocation the
-// one that finally failed). A first fix (`key = { page -> wrap.real(page) }`,
-// letting every virtual copy of the same real item share one identity) was
-// tried and reverted -- it collided ("Key \"1\" was already used") because
-// TWO simultaneously-composed virtual pages can map to the SAME real index
-// whenever `realCount` is small relative to how many pages a pager holds
-// alive at once (beyondViewportPageCount, and perPage on the multi-column
-// pager) -- not a HorizontalPager internals mystery, just this fix skipping
-// that collision check the first time around. A follow-up mitigation just
-// shrunk this constant to 30, capping the leak's ceiling instead of removing
-// it -- still real growth, just bounded, and a real (if very unlikely) dead
-// end once a user actually swiped that far. Real-index keying, collision
-// check and all, was tried a second time (gated on the exact inequality that
-// makes it collision-free) and STILL crashed a different way ("Key 1 was
-// already used") on a real device; it was abandoned for good after that and
-// every call site now keys by the raw virtual page index instead (see
-// [WrapPagerState] below) -- unconditionally safe, at the cost of a recenter
-// jump no longer reusing a composition the way real-index keying would have.
-//
-// This is the actual fix: recenter ([WrapPagerState.recenterIfNearEdge],
-// called after every settle) silently jumps back toward the middle once the
-// pager drifts within [RECENTER_MARGIN_CYCLES] real-item-widths of either
-// edge -- the destination page has the IDENTICAL real index, so the content
-// shown doesn't change, and the pager keeps having room to go. This is what
-// actually bounds the leak (the old huge-range trick just hoped nobody
-// swiped far enough to need bounding at all). A recenter jump IS a fresh
-// composition of that destination page now (raw-index keying, immediately
-// above, is what makes that safe rather than a repeat of the "Key already
-// used" crash) -- a real if minor cost, paid rarely enough (see
-// [RECENTER_MARGIN_CYCLES]'s own doc) that it isn't worth trading back for.
-//
-// First shipped with this constant at 10, "so recentering can only ever
-// retain a small number of compositions" -- but that shrank the SAFE ZONE
-// (the number of one-directional swipes before recentering triggers) down
-// with it, especially for the common case of a small `realCount` (one or two
-// cars): with realCount=2 and this at 10, recentering could trigger after
-// as few as 3-4 swipes in one direction, which is exactly the "swipe the
-// same way repeatedly to see if it loops" motion anyone testing this feature
-// would make -- reported directly as "very obvious when it doesn't infinite
-// scroll and goes around."
-//
-// Raising it all the way to 1000 traded that bug for a real OutOfMemoryError
-// (a heap-exhaustion crash on a live device, not a hypothetical): with
-// realCount=2 that let the pager retain up to 1000x2 = 2000 distinct virtual
-// pages before recentering ever became reachable, and each one is a whole
-// VehicleDetailContent/SettingsScreen subtree, not a lightweight row --
-// nowhere near the "bounded and self-correcting" ceiling that number was
-// asserted to be when 1000 was chosen; it was never actually measured
-// against a device heap. 80 is the compromise: still a wide safe zone
-// (realCount x (40 - RECENTER_MARGIN_CYCLES) one-directional swipes before a
-// recenter is reachable -- 60 for two cars, comfortably past any "does this
-// loop" test), while capping the worst case at 80x[realCount] retained
-// pages instead of 1000x -- an order of magnitude smaller ceiling for
-// whatever in a page's subtree scales with distinct-pages-ever-visited.
-// This is a bound on the ceiling, not a fix for a confirmed root cause: this
-// sandbox can't run the app or take a heap dump, so the exact mechanism
-// retaining those pages (composition-slot retention, an image cache, a
-// per-page coroutine that's never cancelled) hasn't been isolated. If the
-// OOM recurs, that measurement -- not another guess at this constant -- is
-// the next step.
+// The virtual page range is realCount * WRAP_MULTIPLIER, seeded at its midpoint, so the pager
+// opens with room to wrap both ways. [recenterIfNearEdge] jumps back toward the middle when it
+// drifts near either edge, keeping the range effectively infinite. 80 balances two past bugs:
+// a huge range (1000) let distinct pages accumulate until an OOM; a tiny one (10) recentered
+// every few swipes and visibly broke the "does it loop" feel. Pages are keyed by raw virtual
+// index (see [WrapPagerState]) because real-index keying crashed ("Key already used") twice.
 private const val WRAP_MULTIPLIER = 80
 /** Recenter once the pager drifts within this many real-item-widths of
  *  either edge of the virtual range -- see [WRAP_MULTIPLIER]'s own doc. This
@@ -112,16 +53,6 @@ private const val RECENTER_MARGIN_CYCLES = 10
 /** Max per-page scale shrink at full off-screen offset (floor 0.94). */
 private const val PAGER_SHRINK = 0.06f
 
-/**
- * Wraps a [PagerState] whose page space is a small, FIXED virtual range,
- * exposing the real (modulo) index, a delta-jump that moves to a real index
- * without an animated fly-through across it, and [recenterIfNearEdge] --
- * called after every settle -- which is what actually makes the wrap feel
- * infinite (see [WRAP_MULTIPLIER]'s own doc for why this replaced a much
- * bigger fake range). [realCount] is the number of real items the pages
- * cycle through (cars, car-blocks, or tiles depending on the site); when it
- * is <= 1 there is no wrap and [real] is always 0.
- */
 /**
  * Pure wrap arithmetic: the real item index a virtual page maps to.
  *
@@ -160,17 +91,9 @@ internal fun wrapPageToward(currentPage: Int, pageCount: Int, realCount: Int, ta
 internal class WrapPagerState(val pager: PagerState, val realCount: Int) {
     fun real(page: Int): Int = wrapRealIndex(page, realCount)
 
-    // Pages are keyed by their RAW virtual index (`key = { page }`) at every pager call
-    // site, never by `real(page)`. Keying by the real item let two virtual copies of the
-    // same item share one composition slot and crashed ("Key already used"); the raw
-    // index is unique by construction. [recenterIfNearEdge] composes a fresh page when it
-    // jumps, which is rare and uncrashable -- see [WRAP_MULTIPLIER]'s own doc.
-    // settledReal was removed: zero readers. Both places that care about a SETTLE go through
-    // `snapshotFlow { pager.settledPage }.collect { real(it) }` instead (GarageScreen's and
-    // CompactGarage's pager-settle effects), because they need the settle as an EVENT, not as
-    // a value to read during composition -- and reading a settled page in composition scope is
-    // the exact subscription those pagers are built to avoid, so a convenience accessor for it
-    // was never going to be the right shape.
+    // Pager pages are keyed by raw virtual index (`key = { page }`), never by real(page):
+    // real-index keying made two virtual copies of one item share a composition slot and crashed.
+
     /** Jump so the currently-shown page maps to [target], picking the nearest
      *  virtual page in the current direction (no long fly-through). */
     suspend fun snapToReal(target: Int) {
@@ -227,41 +150,14 @@ internal fun rememberWrapPager(realCount: Int, initialRealIndex: Int = 0): WrapP
 }
 
 /**
- * The shared per-page depth transform for the horizontal car pagers: a subtle
- * shrink proportional to how far this [page] is from the settled one, read ONLY
- * in the draw phase (via [graphicsLayer]) so a drag never triggers recomposition
- * of the page content. NOT applied to the vertical tile pager, which stays flat
- * by design.
- *
- * Scale only — no alpha, no translation. The matching fade this used to apply
- * was removed for a real
- * frame-rate reason, not a taste one. A graphicsLayer with alpha < 1 over content
- * that overlaps (a full car page: cards, their drop shadows, the aurora behind
- * them) makes Compose's default compositing strategy allocate a FULL-SCREEN
- * offscreen buffer and composite through it every frame. During a drag two pages
- * are live, so that's two full-screen buffers per frame purely to tint pages 20%
- * darker in transit. Transforms need no such buffer: scale is applied by the
- * RenderNode directly. Dropping the fade keeps the depth read and removes the
- * per-frame allocation entirely. (CompositingStrategy.ModulateAlpha would also
- * avoid the buffer, but it applies alpha per drawing op, so each pebble's own
- * drop shadow would show THROUGH the semi-transparent card above it — a grey
- * wash under every card mid-swipe. Not worth it for a 0.2 fade.)
+ * Per-page depth transform for the horizontal car pagers: a subtle scale shrink proportional to
+ * how far [page] is from the settled one, read only in the draw phase (graphicsLayer) so a drag
+ * never recomposes page content. Scale only -- no alpha (alpha < 1 over overlapping pages makes
+ * Compose allocate a full-screen offscreen buffer per frame) and no translation (which would pull
+ * a neighbour's card into the screen edge at rest).
  */
 internal fun Modifier.pagerDepth(pager: PagerState, page: Int): Modifier = graphicsLayer {
-    // NO translationX. A parallax drift was tried here and reverted from a
-    // device screenshot: a pager page is full-bleed and its neighbours are
-    // composed (beyondViewportPageCount = 1), so ANY translation toward the
-    // viewport pulls the next car's card into the edge of the screen and
-    // leaves it there AT REST -- a sliver of another car down both sides,
-    // which is also live to touch. Depth on a full-bleed pager can only come
-    // from transforms that shrink or push AWAY, never pull in.
-    //
-    // Offset formula matches the Compose Pager docs' own sample --
-    // (currentPage - page) + currentPageOffsetFraction. This file previously
-    // had (page - currentPage) + offset, which negates the fraction's
-    // contribution and made the shrink slightly asymmetric mid-drag: one
-    // neighbour shrank a touch more than the other for the same finger
-    // position.
+    // Offset formula matches the Compose Pager docs' sample: (currentPage - page) + offsetFraction.
     val off = abs((pager.currentPage - page).toFloat() + pager.currentPageOffsetFraction)
         .coerceIn(0f, 1f)
     scaleX = 1f - off * PAGER_SHRINK

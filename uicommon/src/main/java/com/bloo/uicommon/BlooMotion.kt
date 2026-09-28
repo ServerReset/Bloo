@@ -10,11 +10,6 @@ package com.bloo.uicommon
  */
 const val SoftDamping = 0.82f
 
-// ExpressiveDamping (= 0.5f) was deleted here: no callers. Every "press punch" spring in the app
-// hard-codes Spring.DampingRatioMediumBouncy or a literal 0.5f directly, so this named constant
-// only implied a centralisation that did not exist. If bounce damping is ever genuinely unified,
-// reintroduce it AND route the call sites through it in the same change.
-
 /**
  * The morph button's two corner states, as a percentage of the shorter side:
  * a true pill at rest, a rounded rectangle while active or pressed.

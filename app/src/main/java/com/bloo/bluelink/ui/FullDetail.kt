@@ -72,7 +72,6 @@ import kotlin.math.max
 
 // --- Full detail ----------------------------------------------------------
 
-
 /**
  * Single-column car view (phones, and each column of the grid). Everything
  * scrolls together in one [Column] inside [Refreshable] (header row, then
@@ -95,12 +94,6 @@ internal fun VehicleDetailContent(
     state: State<UiState>,
     vm: AppViewModel,
     onExpand: (() -> Unit)? = null,
-    // reserveTopForDots and reserveHeaderEnd were removed the same way: each reserved room for
-    // a floating button that no longer exists (the pager dots, then CarHeaderRow's own
-    // Fullscreen icon -- see its doc), each reduced to "no longer used but kept for API
-    // compatibility. Always false/[value]" once its button went, and there is no API to be
-    // compatible with -- this is an `internal` composable with exactly one caller in the same
-    // module, which passed the literal constant either time.
     /** See [CarHeaderRow]'s own doc -- forwarded through so its chips can blur. */
     hazeState: HazeState? = null,
 ) {
@@ -303,7 +296,6 @@ internal fun ExpandedCar(
     }
     }
 }
-
 
 /**
  * A row of small fact chips (model/powertrain, "updated x ago"). The car's name

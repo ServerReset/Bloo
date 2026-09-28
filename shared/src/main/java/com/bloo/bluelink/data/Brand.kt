@@ -185,7 +185,6 @@ enum class Brand(
      */
     val supportsTrips: Boolean get() = this == HYUNDAI || this == GENESIS
 
-
     companion object {
         /** The sign-in regions, as the keys the login pickers select by. */
         const val REGION_US = "US"
@@ -249,10 +248,6 @@ enum class Brand(
         }
     }
 }
-
-// Brand.Companion.fromNameOrNull was deleted here: no callers anywhere. It was a strict
-// null-returning counterpart to fromName (which defaults to HYUNDAI); nothing needed the strict
-// variant. Re-add from git history if a caller ever wants "unknown brand -> caller handles it".
 
 /** The telematics brand a vehicle belongs to. */
 val Vehicle.brand: Brand get() = Brand.fromIndicator(brandIndicator)

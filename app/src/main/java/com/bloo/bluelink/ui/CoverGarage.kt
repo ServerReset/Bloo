@@ -515,13 +515,6 @@ internal fun CompactCar(
     // cover-screen-only interaction (the normal phone layout doesn't use it).
     val edgeTraceProgress = remember { androidx.compose.animation.core.Animatable(0f) }
     var edgeTraceHolding by remember { mutableStateOf(false) }
-    // `dotsBounds` was removed along with its guard in the gesture handler below. It carved the
-    // tile-scrubber dots' hit area out of the edge-trace hold, so holding the dots to scrub did
-    // not also start the refresh ring underneath them -- but the dots were removed (see the
-    // bottom of this function) and nothing has written to it since, so it was permanently null
-    // and the guard it fed could never fire. A write-only-shaped `var` with no writer is worse
-    // than nothing here: it reads as an active exclusion protecting a gesture that no longer
-    // has anything to collide with.
     LaunchedEffect(edgeTraceHolding) {
         if (edgeTraceHolding) {
             edgeTraceProgress.snapTo(0f)

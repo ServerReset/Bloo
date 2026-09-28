@@ -127,20 +127,6 @@ object CarCommandRunner {
         else -> action
     }
 
-    // inverse() was removed. It returned the verb whose optimistic() write undid
-    // another's, and both revert sites used it as `optimistic(snap, inverse(action))`
-    // to roll back a failed command's flip. That is only an undo when the flip
-    // actually changed something. optimistic() writes an absolute value, so when the
-    // field had been null -- the car has never reported it -- the "undo" invented a
-    // definite false out of nothing, and the widget or tile went on to state plainly
-    // that a car whose doors it knows nothing about is Unlocked. Nothing about the
-    // post-flip snapshot could have told it otherwise; the information was gone
-    // before the revert ran.
-    //
-    // Deleted rather than kept alongside the fix because leaving it would leave two
-    // ways to revert, one of which is wrong in a case the other exists to handle.
-    // Use [stateFor] before the flip and [withState] after the failure.
-
     /**
      * The snapshot field [action]'s [optimistic] prediction will overwrite, read
      * BEFORE that prediction is stored so a failed command can put back exactly what
