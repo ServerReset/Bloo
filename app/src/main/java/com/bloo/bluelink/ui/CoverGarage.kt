@@ -286,15 +286,11 @@ internal fun CompactGarage(state: State<UiState>, vm: AppViewModel, appearance: 
             Box(Modifier.fillMaxSize().pagerDepth(pager, page)) {
                 CompositionLocalProvider(
                     LocalCoverScrubbing provides scrubbing,
-                    // So each section tile can put the car's name on its own title row --
-                    // see CoverTile.trailingLabel. Provided here, where the page's vehicle
-                    // is known, rather than threaded through every tile composable.
-                    // Null when the camera band is already showing the name. The band is
-                    // free real estate beside the island; the tile's trailing label costs a
-                    // share of its header row. So where a band exists it owns the name and
-                    // the tiles get their full width back -- and the name is never drawn
-                    // twice, which it was.
-                    LocalCoverCarName provides v.name.takeIf { band == null },
+                    // The car's name is deliberately NOT put on the tile any more: a cover
+                    // tile is one line tall, and the name ate a chunk of its header row. The
+                    // name still shows on the camera band where one exists; the tiles get
+                    // their full width back either way.
+                    LocalCoverCarName provides null,
                 ) {
                     CompactCar(v, state, vm, hazeState = hazeState)
                 }

@@ -73,7 +73,8 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.pulltorefresh.pullToRefresh
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
+import androidx.compose.material3.pulltorefresh.PullToRefreshDefaults
 import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -159,14 +160,22 @@ internal fun Refreshable(
         snapshotFlow { ptrState.distanceFraction }.collect { pullFractionState.value = it }
     }
 
-    Box(
-        Modifier
-            .fillMaxSize()
-            .pullToRefresh(
-                isRefreshing = refreshing,
+    // Material 3 EXPRESSIVE pull-to-refresh: [PullToRefreshDefaults.LoadingIndicator] is the
+    // expressive loading shape, which pops in from the top edge as the user pulls and then spins
+    // while the refresh runs -- replacing the plain circular indicator the bare pullToRefresh
+    // modifier drew before.
+    PullToRefreshBox(
+        isRefreshing = refreshing,
+        onRefresh = { haptics?.diceRoll(); onRefresh() },
+        state = ptrState,
+        modifier = Modifier.fillMaxSize(),
+        indicator = {
+            PullToRefreshDefaults.LoadingIndicator(
                 state = ptrState,
-                onRefresh = { haptics?.diceRoll(); onRefresh() },
-            ),
+                isRefreshing = refreshing,
+                modifier = Modifier.align(Alignment.TopCenter),
+            )
+        },
     ) {
         // Content stays full-size and edge-to-edge; never shifted down.
         content()
