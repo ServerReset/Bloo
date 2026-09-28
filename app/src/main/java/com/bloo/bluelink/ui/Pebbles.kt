@@ -65,8 +65,6 @@ import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.material3.contentColorFor
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
@@ -250,29 +248,39 @@ internal fun HotspotSlot(
                 }
             }
         } else {
-            // Secondary slot is empty - show "Add a pebble" button if pebbles are available
+            // Secondary slot is empty. Dragging a pebble here -- from the reorderable list in
+            // the other column -- is what pins it (see PebbleList's onDragRelease); this
+            // surface is just that drop target's resting/hover affordance. It used to ALSO
+            // open a DropdownMenu listing every unpinned pebble on tap; that pop-up is gone at
+            // the user's request, so a pebble now reaches this slot only by drag-and-drop.
             if (unpinned.isNotEmpty()) {
-                var menu by remember { mutableStateOf(false) }
                 Box(
                     Modifier.onGloballyPositioned {
                         hotDrag?.let { d -> d.slotTopLeft = it.localToWindow(Offset.Zero); d.slotSize = it.size }
                     },
                 ) {
-                    MorphButton(
-                        onClick = { menu = true },
+                    Surface(
                         modifier = Modifier.fillMaxWidth(),
-                        active = hovered,
-                        activeContainerColor = MaterialTheme.colorScheme.primaryContainer,
-                        activeContentColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                        contentPadding = PaddingValues(12.dp),
+                        shape = RoundedCornerShape(PebbleCornerCollapsed),
+                        color = if (hovered) {
+                            MaterialTheme.colorScheme.primaryContainer
+                        } else {
+                            MaterialTheme.colorScheme.surfaceVariant
+                        },
+                        contentColor = if (hovered) {
+                            MaterialTheme.colorScheme.onPrimaryContainer
+                        } else {
+                            MaterialTheme.colorScheme.onSurfaceVariant
+                        },
                     ) {
-                        MorphButtonLabel(Icons.Filled.PushPin, if (hovered) "Release to pin" else "Add a pebble", pending = false)
-                    }
-                    DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
-                        unpinned.forEach { sec ->
-                            DropdownMenuItem(
-                                text = { Text(sectionLabel(sec)) },
-                                onClick = { vm.setHotspot(v, sec); menu = false },
+                        Box(
+                            Modifier.fillMaxWidth().padding(vertical = 20.dp, horizontal = 12.dp),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            MorphButtonLabel(
+                                Icons.Filled.PushPin,
+                                if (hovered) "Release to pin" else "Drag a pebble here",
+                                pending = false,
                             )
                         }
                     }
@@ -284,7 +292,16 @@ internal fun HotspotSlot(
 
 /** Hero image + gauge (expanded view). */
 @Composable
-internal fun CriticalContent(v: Vehicle, stateSource: State<UiState>, vm: AppViewModel, onCollapse: (() -> Unit)? = null) {
+internal fun CriticalContent(
+    v: Vehicle,
+    stateSource: State<UiState>,
+    vm: AppViewModel,
+    onCollapse: (() -> Unit)? = null,
+    /** Rides the hero card's own drag-handle slot. In the dual-column view this is the
+     *  "swipe the hero card to switch cars" gesture (see [ExpandedCar]'s `onSwipeCar`); on
+     *  the phone's single-column view it stays [Modifier] and the whole page swipes instead. */
+    swipeModifier: Modifier = Modifier,
+) {
     // Narrow, DERIVED reads -- one per thing the hero actually draws.
     //
     // This used to start with `val state = stateSource.value`, which put this composable --
@@ -309,8 +326,21 @@ internal fun CriticalContent(v: Vehicle, stateSource: State<UiState>, vm: AppVie
     HeroHeader(
         v, status, imageUrl, hasBattery, hasFuel, vm,
         drivingLabel, metric = metric, photoExpanded = photoExpanded,
+        dragHandle = swipeModifier,
         expandAction = onCollapse?.let {
-            PebbleHeaderAction(label = "Back to all cars", icon = Icons.AutoMirrored.Filled.ArrowBack, onClick = it)
+            // Icon-only, deliberately: this is the dual-column view, where the header is
+            // already narrower (one column) AND carries the same collapse chevron every
+            // pebble has. A labeled "Back to all cars" split pill ate over 130dp of that
+            // header, which is what pushed the car's own name into "truncating early"
+            // territory once the column got narrow. The glyph alone (with its TalkBack
+            // label) gives the name its room back; system back and the chevron still cover
+            // the discoverability the label used to add.
+            PebbleHeaderAction(
+                label = "",
+                icon = Icons.AutoMirrored.Filled.ArrowBack,
+                contentDescription = "Back to all cars",
+                onClick = it,
+            )
         },
     )
 }
@@ -350,24 +380,24 @@ internal fun ControlsPebble(v: Vehicle, state: UiState, vm: AppViewModel, dragHa
     // was last revealed.
     var showHistory by remember(v.vin) { mutableStateOf(false) }
     val history = state.remoteActionHistory[v.vin].orEmpty()
-    // This pebble is "expanded" in exactly the two senses PebbleShell means it: a body is
-    // actually showing under the control (the revealed history), or it is in a context that
-    // force-expands every pebble in it (the wide layout's HotspotSlot, which wraps both its
-    // slots in LocalForceExpanded = true).
+    // This pebble's corner follows ONLY its own revealed history, never the surrounding
+    // context's force-expand.
     //
-    // The corner has to follow that, because it was the reported "the controls pebble looks
-    // different from every other pebble" in the multi-column layout: this was a FIXED
-    // PebbleCornerCollapsed (38dp) capsule, so in the hot-spot column it sat directly above a
-    // force-expanded pebble drawn at PebbleCornerExpanded (20dp) -- two cards, one column, two
-    // different silhouettes. Same two targets and the same two springs PebbleShell's own
-    // `corner` uses, so the two cards are the same shape at the same time, in the same motion.
+    // It used to follow `LocalForceExpanded` too, on the theory that a pinned pebble in the
+    // wide layout's HotspotSlot (which force-expands both slots) should share the squarer
+    // expanded silhouette of whatever sits beside it. That was reported as the bug it is once
+    // the dual-column view actually shipped: this lock pebble has NO body to disclose -- its
+    // one control is always visible and its history is a press-to-reveal, not an expand -- so
+    // it was drawing the expanded (20dp) corner while genuinely being collapsed, which read as
+    // "the locked pebble has expanded corners even though it isn't expanded." The primary
+    // hotspot slot still force-expands for every OTHER pebble's sake; this one simply stops
+    // listening, so it is a true capsule at rest and only squares off when its history opens.
     //
-    // 38dp stays a plain constant rather than PebbleShell's measured headerRowHeightPx / 2: the
-    // reason that had to be measured is that a header row's height varies with its content, and
-    // this pebble's resting content is hard-pinned to ControlHeight below, so half of it is
-    // knowable up front and is exactly PebbleCornerCollapsed.
-    val forceExpanded = LocalForceExpanded.current
-    val expanded = forceExpanded || showHistory
+    // PebbleCornerCollapsed (38dp = ControlHeight/2) stays a plain constant rather than
+    // PebbleShell's measured headerRowHeightPx / 2: this pebble's resting content is
+    // hard-pinned to ControlHeight below, so half of it is knowable up front and is exactly
+    // PebbleCornerCollapsed.
+    val expanded = showHistory
     val corner by animateDpAsState(
         targetValue = if (expanded) PebbleCornerExpanded else PebbleCornerCollapsed,
         animationSpec = if (expanded) {

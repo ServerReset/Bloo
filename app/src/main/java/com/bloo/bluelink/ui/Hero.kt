@@ -444,8 +444,9 @@ internal fun HeroHeader(
                             // dual-column/expanded view the header ALSO carries the expandAction
                             // ("Back to all cars"), so the readout (and the charge bar under it)
                             // stops a full button short of that second control instead of running
-                            // underneath it.
-                            end = lerp(if (expandAction != null) 76.dp + HeaderButtonSize else 76.dp, 16.dp, heroT),
+                            // underneath it -- plus one more gap, at the user's request that the
+                            // bar read narrower in the dual-column view specifically.
+                            end = lerp(if (expandAction != null) 76.dp + HeaderButtonSize + GapRow else 76.dp, 16.dp, heroT),
                             bottom = lerp(HeroReadoutBottomInset, 16.dp, heroT),
                         ),
                 ) {

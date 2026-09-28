@@ -430,6 +430,25 @@ internal fun openInExternalMaps(context: Context, location: GeoLocation, label: 
     }
 }
 
+/**
+ * Shares the car's location through the system share sheet -- a Google-Maps link, so any
+ * receiving app can resolve it. The second real [MapFeature] the expanded map's bottom row
+ * gained (see [MapFeatureRow]); the share chooser is deliberately the OS's own, not a
+ * hand-rolled contact picker.
+ */
+internal fun shareLocation(context: Context, location: GeoLocation, label: String) {
+    val text = "$label: https://maps.google.com/?q=${location.latitude},${location.longitude}"
+    runCatching {
+        val send = Intent(Intent.ACTION_SEND).apply {
+            type = "text/plain"
+            putExtra(Intent.EXTRA_TEXT, text)
+        }
+        context.startActivity(
+            Intent.createChooser(send, "Share location").apply { addFlags(Intent.FLAG_ACTIVITY_NEW_TASK) },
+        )
+    }
+}
+
 internal fun openUrl(context: Context, url: String) {
     val uri = url.toUri()
     runCatching { CustomTabsIntent.Builder().build().launchUrl(context, uri) }

@@ -39,6 +39,7 @@ import androidx.compose.material.icons.filled.EvStation
 import androidx.compose.material.icons.filled.Map
 import androidx.compose.material.icons.filled.MyLocation
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.onClick
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -357,6 +358,9 @@ internal fun CarMapSheetBody(
             MapFeatureRow(
                 features = listOf(
                     MapFeature(Icons.Filled.MyLocation, "Recentre") { mapState.recenter() },
+                    MapFeature(Icons.Filled.Share, "Share") {
+                        shareLocation(context, location, vehicleName)
+                    },
                     MapFeature(Icons.Filled.Map, "Open in Maps") {
                         openInExternalMaps(context, location, vehicleName)
                     },

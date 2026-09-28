@@ -14,17 +14,8 @@ package com.bloo.bluelink.ui
  * they keep their original `internal` visibility.
  */
 
-import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInHorizontally
-import androidx.compose.animation.slideOutHorizontally
-import androidx.compose.animation.togetherWith
-import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.spring
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -45,6 +36,8 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.ScrollState
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.PageSize
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -55,20 +48,46 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.State
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import com.bloo.bluelink.data.Vehicle
 import dev.chrisbanes.haze.HazeState
 import kotlinx.coroutines.flow.first
-import kotlin.math.max
+import kotlin.math.abs
+
+/**
+ * Horizontal-swipe-to-switch-cars: once the drag passes a sixth of the node's own width it
+ * fires [onSwipeCar] (+1 for a left drag = next car, -1 for a right drag = previous) and
+ * re-arms. [ExpandedCar] hangs this on the two non-column surfaces of its page -- the hero
+ * card and the header chips row -- so a swipe on the card or on the background changes car,
+ * exactly as asked, while every other horizontal drag still belongs to the column pager.
+ */
+internal fun Modifier.carSwipe(onSwipeCar: (Int) -> Unit): Modifier = pointerInput(onSwipeCar) {
+    var accum = 0f
+    detectHorizontalDragGestures(
+        onDragEnd = { accum = 0f },
+        onDragCancel = { accum = 0f },
+    ) { change, dragAmount ->
+        change.consume()
+        accum += dragAmount
+        if (abs(accum) > size.width / 6f) {
+            onSwipeCar(if (accum < 0f) 1 else -1)
+            accum = 0f
+        }
+    }
+}
 
 // --- Full detail ----------------------------------------------------------
 
@@ -175,6 +194,12 @@ internal fun ExpandedCar(
      *  action (see [HeroHeader]'s `expandAction`) instead of a separate floating back
      *  button, now that this view has one already for the opposite direction. */
     onCollapse: () -> Unit,
+    /** Switch to the neighbouring car, -1 = previous / +1 = next -- two-finger-free car
+     *  swapping driven by a horizontal swipe on the hero card itself (see
+     *  [CriticalContent]'s own `onSwipeCar`). The column pager owns every other horizontal
+     *  drag on this screen, so the hero is the deliberate, discoverable seam where a swipe
+     *  means "different car" instead of "different column". */
+    onSwipeCar: (Int) -> Unit = {},
     /** See [CarHeaderRow]'s own doc -- forwarded through so its chips can blur. */
     hazeState: HazeState? = null,
 ) {
@@ -208,8 +233,13 @@ internal fun ExpandedCar(
     // everywhere else in the app. hideName = true here, matching
     // VehicleDetailContent's own CarHeaderRow call exactly.
     val controls: @Composable ColumnScope.() -> Unit = {
-        CarHeaderRow(v, state, hazeState = hazeState)
-        CriticalContent(v, state, vm, onCollapse = onCollapse)
+        // The header chips row is chrome, not a column card, so it reads as "background" --
+        // swiping it switches cars (same modifier the hero card itself carries), rather than
+        // scrolling the column pager like any card below it would.
+        Box(Modifier.carSwipe(onSwipeCar)) {
+            CarHeaderRow(v, state, hazeState = hazeState)
+        }
+        CriticalContent(v, state, vm, onCollapse = onCollapse, swipeModifier = Modifier.carSwipe(onSwipeCar))
         HotspotSlot(v, hotspots, state, vm)
     }
     val pebbles: @Composable ColumnScope.() -> Unit = {
@@ -218,23 +248,41 @@ internal fun ExpandedCar(
     }
     CompositionLocalProvider(LocalHotSeatDrag provides hotDrag) {
     Refreshable(refreshing, onRefresh = { vm.refreshStatus(v) }, hazeState = hazeState) {
-        // Animate the swap when the columns are flipped. Same spring the
-        // expand/collapse transition (GarageScreen) and the collapsed
-        // pager's own settle both use -- this was the one transition left
-        // running on AnimatedContent's plain default spec instead of the
-        // app's own spring language, and read noticeably flatter/more
-        // mechanical next to those two right beside it.
-        AnimatedContent(
-            targetState = flipped,
-            transitionSpec = {
-                val dir = if (targetState) 1 else -1
-                val floatSpec = spring<Float>(dampingRatio = SoftDamping, stiffness = Spring.StiffnessMediumLow)
-                val offsetSpec = spring<IntOffset>(dampingRatio = SoftDamping, stiffness = Spring.StiffnessMediumLow)
-                (slideInHorizontally(offsetSpec) { w -> dir * w / 4 } + fadeIn(floatSpec)) togetherWith
-                    (slideOutHorizontally(offsetSpec) { w -> -dir * w / 4 } + fadeOut(floatSpec))
-            },
-            label = "flipColumns",
-        ) { isFlipped ->
+        // The two columns live in a genuinely infinite horizontal pager now: real page 0 is
+        // [controls | pebbles], real page 1 is [pebbles | controls], and the wrap pager loops
+        // them without end -- dragging left/right slides the pair around forever instead of the
+        // old discrete flip (AnimatedContent's one-shot swap), which is what "scroll between the
+        // two columns, infinitely, moving them left and right" asked for. At rest the two
+        // visible pages are exactly the same pair the old Row drew, so the LAYOUT is unchanged;
+        // only the gesture became a real, continuous, unbounded scroll. Each column keeps its
+        // own hoisted scroll state, so a scroll sticks with its CONTENT across a swap rather
+        // than with whichever physical side it currently renders on.
+        //
+        // `flipped` (the persisted setting) stays the single source of truth: the pager drives
+        // it on settle, and an external change snaps the pager back -- the same two-way sync
+        // the collapsed car pager in GarageScreen uses.
+        val flipWrap = rememberWrapPager(2, if (flipped) 1 else 0)
+        val flipPager = flipWrap.pager
+        LaunchedEffect(flipPager) {
+            snapshotFlow { flipPager.settledPage }.collect { page ->
+                flipWrap.recenterIfNearEdge()
+                val nowFlipped = flipWrap.real(page) == 1
+                if (nowFlipped != flipped) vm.setColumnsFlipped(nowFlipped)
+            }
+        }
+        val skipFirstFlipSnap = remember { mutableStateOf(true) }
+        LaunchedEffect(flipped) {
+            if (skipFirstFlipSnap.value) { skipFirstFlipSnap.value = false; return@LaunchedEffect }
+            flipWrap.snapToReal(if (flipped) 1 else 0)
+        }
+        HorizontalPager(
+            state = flipPager,
+            modifier = Modifier.fillMaxSize(),
+            pageSize = PageSize.Fill,
+            beyondViewportPageCount = 0,
+            key = { page -> page },
+        ) { page ->
+            val isFlipped = flipWrap.real(page) == 1
             val leftCol = if (isFlipped) pebbles else controls
             val rightCol = if (isFlipped) controls else pebbles
             val leftScroll = if (isFlipped) pebblesScroll else controlsScroll
@@ -242,28 +290,7 @@ internal fun ExpandedCar(
             val topSpacerHeight = topInset + HeaderCornerGap + HeaderButtonSize + HeaderContentClearance
             val bottomSpacerHeight = searchBarClearance(fallback = bottomInset + 132.dp)
             Box(
-                Modifier
-                    .fillMaxSize()
-                    // Swipe left/right to flip which column ("controls" vs "pebbles") renders on
-                    // which side -- replaces the screen-level "Flip columns" floating icon that
-                    // used to be the only way to do this. Keyed on `flipped` so a drag that
-                    // crosses the threshold and flips doesn't immediately re-trigger off the
-                    // rest of the SAME continuous gesture (isFlipped's own AnimatedContent swap
-                    // restarts pointerInput's coroutine, zeroing the accumulator).
-                    .pointerInput(isFlipped) {
-                        var dragTotal = 0f
-                        detectHorizontalDragGestures(
-                            onDragEnd = { dragTotal = 0f },
-                            onDragCancel = { dragTotal = 0f },
-                        ) { change, dragAmount ->
-                            change.consume()
-                            dragTotal += dragAmount
-                            if (kotlin.math.abs(dragTotal) > size.width / 4f) {
-                                vm.setColumnsFlipped(!isFlipped)
-                                dragTotal = 0f
-                            }
-                        }
-                    },
+                Modifier.fillMaxSize(),
                 contentAlignment = Alignment.Center,
             ) {
                 Row(

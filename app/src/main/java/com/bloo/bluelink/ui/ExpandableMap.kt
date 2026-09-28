@@ -39,6 +39,7 @@ import androidx.compose.material.icons.filled.EvStation
 import androidx.compose.material.icons.filled.Map
 import androidx.compose.material.icons.filled.MyLocation
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.onClick
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -149,6 +150,13 @@ internal fun MapFeatureRow(
         equalWidths = true,
         wrap = wrap,
         horizontalAlignment = horizontalAlignment,
+        // The three-feature full-screen row compacts to glyphs on a phone, and without this
+        // it also SHRANK to the sum of those glyphs -- a small centred cluster, not the
+        // full-width bar the same row already draws on a wide/inner screen where the labels
+        // fit. Reported directly as "not full width on the phone, full width on the inner
+        // screen". Stretching keeps the row spanning its full width in BOTH cases, icon-only
+        // or labelled.
+        stretchCompact = true,
     ) {
         features.forEach { feature ->
             val source = remember { MutableInteractionSource() }
@@ -800,6 +808,9 @@ internal fun ExpandableMapLayer(
                         features = listOf(
                             MapFeature(Icons.Filled.MyLocation, "Recentre") { mapState.recenter() },
                             MapFeature(Icons.Filled.EvStation, "Chargers") { onToggleChargersVisible() },
+                            MapFeature(Icons.Filled.Share, "Share") {
+                                shareLocation(context, location, vehicleName)
+                            },
                             MapFeature(Icons.Filled.Map, "Open in Maps") {
                                 openInExternalMaps(context, location, vehicleName)
                             },

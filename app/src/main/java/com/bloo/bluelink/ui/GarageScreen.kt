@@ -43,6 +43,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.State
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
@@ -55,6 +56,7 @@ import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.unit.dp
 import com.bloo.bluelink.data.STALE_STATUS_MS
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 /**
  * Top-level garage screen: picks between three fundamentally different
@@ -167,6 +169,9 @@ internal fun GarageScreen(
     // Live pull distance reported by Refreshable, so the overlays react the moment
     // the user starts pulling - not only once a refresh is in flight.
     val pullFractionState = remember { mutableStateOf(0f) }
+    // Drives the expanded pager's programmatic car-switch (the hero card's own swipe --
+    // see ExpandedCar's onSwipeCar).
+    val garageScope = rememberCoroutineScope()
     // Hide the floating chrome as soon as the pull begins (and through the refresh),
     // so the squiggly indicator has the stage to itself; fade it back in when done.
     // NOT read via `by` here: this is GarageScreen scope, the car pager's parent.
@@ -404,6 +409,17 @@ internal fun GarageScreen(
                                 flipped = appearance.columnsFlipped,
                                 onCollapse = { vm.collapse() },
                                 hazeState = hazeState,
+                                // A horizontal swipe on the hero card moves to the neighbouring
+                                // car. The expanded pager itself has no finger swipe
+                                // (userScrollEnabled = false below), so this programmatic page
+                                // step is the one car-switch gesture the expanded view offers.
+                                onSwipeCar = { dir ->
+                                    garageScope.launch {
+                                        exPager.animateScrollToPage(
+                                            (exPager.currentPage + dir).coerceIn(0, exPager.pageCount - 1),
+                                        )
+                                    }
+                                },
                             )
                         }
                     }
