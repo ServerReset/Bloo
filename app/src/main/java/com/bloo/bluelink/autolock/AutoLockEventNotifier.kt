@@ -49,7 +49,7 @@ object AutoLockEventNotifier {
             id = CHANNEL_ID,
             name = "AutoLock events",
             importance = NotificationManager.IMPORTANCE_DEFAULT,
-            description = "Your car was locked automatically (or would have been, in dry run)",
+            description = "Your car was locked automatically (or, in testing mode, would have been)",
             showBadge = true,
             sound = carLockSound(context),
         )
@@ -74,10 +74,14 @@ object AutoLockEventNotifier {
         ensureChannel(context)
 
         val title = if (dryRun) "Would have locked $carName" else "Locked $carName"
+        // Both wordings name the COMMAND explicitly: a real lock says the lock command was
+        // sent, and testing mode says it WOULD have been sent (and that nothing was). Reported
+        // directly -- the outcome notification should say what AutoLock actually did with the
+        // car, not just the resulting state.
         val text = if (dryRun) {
-            "Dry run: no command was sent. Turn dry run off to let AutoLock lock it for you."
+            "Testing mode: AutoLock would have sent the lock command, but nothing was sent."
         } else {
-            "AutoLock locked it for you after you walked away."
+            "AutoLock sent the lock command after you walked away."
         }
 
         val launch = context.packageManager.getLaunchIntentForPackage(context.packageName)

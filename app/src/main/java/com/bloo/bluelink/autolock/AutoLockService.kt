@@ -179,22 +179,18 @@ class AutoLockService : Service() {
         const val ACTION_LOCK_NOW = "com.bloo.bluelink.AUTOLOCK_LOCK_NOW"
         const val EXTRA_VIN = "vin"
 
-        /** Fires a one-off evaluation for [vin] (Bluetooth disconnect / a manual
-         *  "Simulate leaving" test from Settings). */
+        /** Starts the notification wrapper for [vin] (Bluetooth disconnect / a manual
+         *  "Simulate leaving" test from Settings). Best-effort: returns false when the OS
+         *  refuses a background foreground-service start (the norm on Android 12+), which is
+         *  fine now -- the evaluation itself runs in AutoLockController's own scope, started by
+         *  the trigger, and does not depend on this. */
         fun start(context: Context, vin: String): Boolean {
             val intent = Intent(context, AutoLockService::class.java).putExtra(EXTRA_VIN, vin)
             return try {
                 context.startForegroundService(intent)
                 true
             } catch (t: Throwable) {
-                // THE COMMON CASE ON ANDROID 12+, not an edge case: a Bluetooth ACL broadcast
-                // is not one of the exemptions from the background foreground-service start
-                // restriction, so this throws ForegroundServiceStartNotAllowedException
-                // whenever the app isn't in the foreground. Returning false is what lets the
-                // caller fall back to the alarm path instead of AutoLock silently doing
-                // nothing (which is exactly what it used to do -- the exception was swallowed
-                // here and AutoLock never ran in a pocket).
-                AppLog.log("AutoLock: background service start blocked (${t.javaClass.simpleName}) — using the alarm fallback.")
+                AppLog.log("AutoLock: progress notification service not allowed in the background (${t.javaClass.simpleName}); the lock still runs.")
                 false
             }
         }
