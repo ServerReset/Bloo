@@ -123,7 +123,7 @@ composeCompiler {
 }
 
 dependencies {
-    val composeUi = "1.12.0-alpha03"
+    val composeUi = "1.12.1"
 
     // Shared networking / auth / model layer.
     implementation(project(":shared"))
@@ -132,7 +132,7 @@ dependencies {
     // AutoLock's optional confirmation signals: geofencing (left the car's parking spot)
     // and Activity Recognition (driving -> walking), plus the fused location read used to
     // register/confirm a geofence. See app/.../autolock/.
-    implementation("com.google.android.gms:play-services-location:21.3.0")
+    implementation("com.google.android.gms:play-services-location:21.4.0")
 
     // Installs the baseline profile packaged at assets/dexopt/baseline.prof so ART can
     // partially AOT-compile ahead of first use, instead of interpreting everything until
@@ -158,18 +158,18 @@ dependencies {
     // the profile's rules to match the shrunk code.
     implementation("androidx.profileinstaller:profileinstaller:1.4.1")
 
-    implementation("androidx.core:core-ktx:1.19.0")
-    implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.8.7")
-    implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.7")
+    implementation("androidx.core:core-ktx:1.19.1")
+    implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.11.0")
+    implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.11.0")
     // collectAsStateWithLifecycle() -- same 2.8.7 line as the two lifecycle artifacts above,
     // which ship together and are meant to be pinned in lockstep. Lets every StateFlow
     // collector in the UI pause while the app is backgrounded (below STARTED) instead of
     // collecting -- and preparing a recomposition for -- state nobody can see.
-    implementation("androidx.lifecycle:lifecycle-runtime-compose:2.8.7")
-    implementation("androidx.activity:activity-compose:1.9.3")
+    implementation("androidx.lifecycle:lifecycle-runtime-compose:2.11.0")
+    implementation("androidx.activity:activity-compose:1.13.0")
     // Only FragmentActivity is used (MainActivity / BiometricAuth); no fragment-ktx
     // extensions are called, so the plain `fragment` artifact is the honest dependency.
-    implementation("androidx.fragment:fragment:1.8.5")
+    implementation("androidx.fragment:fragment:1.9.1")
 
     implementation("androidx.compose.ui:ui:$composeUi")
     implementation("androidx.compose.ui:ui-graphics:$composeUi")
@@ -177,17 +177,17 @@ dependencies {
 
     // Material 3 Expressive — the Expressive components (ButtonGroup,
     // SplitButtonLayout, FloatingToolbar, LoadingIndicator) live in 1.5.0-alpha.
-    implementation("androidx.compose.material3:material3:1.5.0-alpha21")
+    implementation("androidx.compose.material3:material3:1.5.0-alpha29")
     implementation("androidx.compose.material:material-icons-extended:1.7.8")
 
-    implementation("androidx.datastore:datastore-preferences:1.1.7")
+    implementation("androidx.datastore:datastore-preferences:1.2.1")
     implementation("androidx.biometric:biometric:1.1.0")
-    implementation("androidx.exifinterface:exifinterface:1.3.7")
+    implementation("androidx.exifinterface:exifinterface:1.4.2")
     // Chrome Custom Tabs for opening Hyundai/Genesis links in-app
-    implementation("androidx.browser:browser:1.8.0")
+    implementation("androidx.browser:browser:1.10.0")
     // Background service/door alerts
-    implementation("androidx.work:work-runtime-ktx:2.9.1")
-    implementation("androidx.security:security-crypto:1.1.0-alpha06")
+    implementation("androidx.work:work-runtime-ktx:2.12.0")
+    implementation("androidx.security:security-crypto:1.1.0")
 
     // Real car photos (URL or the system photo picker)
     implementation("io.coil-kt:coil-compose:2.7.0")
@@ -208,10 +208,10 @@ dependencies {
     // runtime by feature availability so unsupported devices simply hide it.
     implementation("com.google.mlkit:genai-summarization:1.0.0-beta1")
 
-    implementation("com.squareup.okhttp3:okhttp:4.12.0")
-    implementation("com.squareup.okhttp3:logging-interceptor:4.12.0")
-    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")
+    implementation("com.squareup.okhttp3:okhttp:5.5.0")
+    implementation("com.squareup.okhttp3:logging-interceptor:5.5.0")
+    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.11.0")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.11.0")
 
     // Shizuku (optional): silent APK install for the self-update flow via local ADB.
     // `api`/`provider` ship; `:hidden-api-stub` is compileOnly (framework PackageInstaller

@@ -130,7 +130,19 @@ object SyncMerge {
         val model: String = "",
         val appVersion: String = "",
         val lastSeenMs: Long = 0L,
-    )
+        /** "watch" for a Wear OS companion, "phone" for everything else. Lets
+         *  Settings show a watch as a dependent companion rather than a peer
+         *  primary candidate -- a watch cannot be the source of truth. Serialized,
+         *  so it round-trips through the Drive registry like every other field;
+         *  absent (null) on entries written before this existed reads as "phone". */
+        val kind: String = KIND_PHONE,
+    ) {
+        val isWatch: Boolean get() = kind == KIND_WATCH
+    }
+
+    const val KIND_PHONE = "phone"
+    const val KIND_WATCH = "watch"
+
 
     /** Registry entries not seen for this long are pruned on merge, so a
      *  factory-reset/retired device doesn't linger in the list forever. 90 days

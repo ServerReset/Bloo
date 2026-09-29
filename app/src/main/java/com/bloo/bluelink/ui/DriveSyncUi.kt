@@ -54,6 +54,8 @@ import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Smartphone
+import androidx.compose.material.icons.filled.SubdirectoryArrowRight
+import androidx.compose.material.icons.filled.Watch
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
@@ -163,12 +165,23 @@ internal fun SyncDevicesSection(state: UiState, vm: AppViewModel) {
     }
     Spacer(Modifier.height(2.dp))
     BodySmallText(
-        "Drag to reorder. The top device is primary.",
+        "Drag to reorder. The top device is primary. A paired watch rides under its phone.",
     )
     Spacer(Modifier.height(GapRow))
 
+    // A watch is a COMPANION, not a peer: split the registry so watches never appear as
+    // reorderable, primary-eligible rows, then render each watch directly under the phone
+    // it syncs to (by the same account/file), indented and marked as a companion.
+    val phones = ordered.filter { !it.isWatch }
+    val watches = ordered.filter { it.isWatch }
+    // Which phone a watch belongs to: the registry carries no explicit pairing, so a
+    // watch rides under the primary phone (the source of truth it syncs from). When the
+    // primary itself is unknown, the first phone stands in. All watches share the one
+    // phone anchor, which is the honest read for a single-account fleet.
+    val watchHost = phones.firstOrNull { it.id == state.syncPrimaryId } ?: phones.firstOrNull()
+
     ReorderColumn(
-        items = ordered,
+        items = phones,
         keyOf = { it.id },
         // Dropped in a new order → the new TOP device becomes primary. setPrimaryDevice
         // persists it + triggers a sync so every device converges on the choice.
@@ -184,6 +197,19 @@ internal fun SyncDevicesSection(state: UiState, vm: AppViewModel) {
             onRename = { renaming = true },
             onRemove = { vm.removeSyncedDevice(device.id) },
         )
+        // The companions for THIS phone, nested right under it. Not in the ReorderColumn's
+        // items -- a watch isn't reorderable and can't be primary -- just drawn in the same
+        // item slot, after the phone row.
+        if (watchHost != null && device.id == watchHost.id) {
+            watches.forEach { watch ->
+                Spacer(Modifier.height(6.dp))
+                WearCompanionRow(
+                    device = watch,
+                    modifier = Modifier.padding(start = 22.dp),
+                    onRemove = { vm.removeSyncedDevice(watch.id) },
+                )
+            }
+        }
     }
 
     // Advisory: if a peer hasn't checked in for a while but this device just
@@ -410,6 +436,93 @@ internal fun SyncDeviceRow(
                     modifier = Modifier.size(18.dp),
                 )
             }
+        }
+    }
+}
+
+/**
+ * A Wear OS companion shown UNDER the phone it syncs to, not as a peer row.
+ *
+ * Deliberately not a [SyncDeviceRow]: a watch is not a reorderable, primary-eligible
+ * device -- it depends on its phone -- so it has no drag handle and no star. The
+ * "Companion" tag and the leading [Icons.Filled.Watch] make that relationship explicit,
+ * which is the whole point of nesting it here rather than listing it flat.
+ */
+@Composable
+private fun WearCompanionRow(
+    device: com.bloo.bluelink.data.SyncMerge.SyncDevice,
+    modifier: Modifier = Modifier,
+    onRemove: () -> Unit,
+) {
+    val shape = RoundedCornerShape(18.dp)
+    Row(
+        modifier
+            .fillMaxWidth()
+            .clip(shape)
+            .background(glassTint(blurred = false))
+            .padding(horizontal = 10.dp, vertical = GapRow),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        // The connecting "rides under" elbow, in place of a drag handle -- it reads as
+        // attached to the phone row above rather than a peer of it.
+        Icon(
+            Icons.Filled.SubdirectoryArrowRight,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.size(18.dp),
+        )
+        Spacer(Modifier.width(8.dp))
+        Icon(
+            Icons.Filled.Watch,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.size(20.dp),
+        )
+        Spacer(Modifier.width(10.dp))
+        Column(Modifier.weight(1f)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    device.name.ifBlank { "Watch" },
+                    style = MaterialTheme.typography.bodyLarge,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f, fill = false),
+                )
+                Spacer(Modifier.width(6.dp))
+                Text(
+                    "Companion",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+            }
+            val seen = com.bloo.bluelink.data.relativeLabel(device.lastSeenMs)
+            val sub = buildString {
+                val model = device.model.takeIf { it.isNotBlank() }
+                if (model != null) append(model)
+                if (seen.isNotBlank()) { if (isNotEmpty()) append(" · "); append(seen) }
+            }
+            if (sub.isNotBlank()) {
+                Text(
+                    sub,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+        }
+        val confirmRemove = rememberConfirmArm()
+        MorphIconButton(onClick = { if (confirmRemove.armed) onRemove() else confirmRemove.arm() }) {
+            Icon(
+                AppIcons.Close,
+                contentDescription = if (confirmRemove.armed) {
+                    "Tap again to remove ${device.name.ifBlank { "this watch" }}"
+                } else {
+                    "Remove ${device.name.ifBlank { "this watch" }} from synced devices"
+                },
+                tint = if (confirmRemove.armed) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(18.dp),
+            )
         }
     }
 }

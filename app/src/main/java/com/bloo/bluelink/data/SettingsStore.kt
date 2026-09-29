@@ -1352,6 +1352,14 @@ class SettingsStore(private val context: Context) {
             model = Build.MODEL ?: "",
             appVersion = appVersion,
             lastSeenMs = nowMs,
+            // A Wear OS companion registers through the SAME Drive sync as a phone, so it
+            // lands in this registry like any peer -- but it must never read as a peer
+            // PRIMARY candidate. Settings uses this to show it as a dependent companion
+            // under its phone instead. FEATURE_WATCH is how a watch announces itself.
+            kind = if (context.packageManager.hasSystemFeature(
+                    android.content.pm.PackageManager.FEATURE_WATCH,
+                )
+            ) SyncMerge.KIND_WATCH else SyncMerge.KIND_PHONE,
         )
     }
 

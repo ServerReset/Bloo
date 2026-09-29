@@ -16,6 +16,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -37,11 +38,11 @@ fun WearPebble(
 ) {
     Surface(
         modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(20.dp),
+        shape = RoundedCornerShape(22.dp),
         color = MaterialTheme.colorScheme.surfaceContainer,
     ) {
         Column(
-            Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 12.dp),
+            Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -56,10 +57,11 @@ fun WearPebble(
 
 /**
  * A single full-width action inside a [WearPebble] -- the shared phone
- * [MorphButtonCore] from :uicommon, so the watch's one tap target morphs and presses
- * exactly like every other Bloo button instead of a watch-only look. The foundation
- * core takes its colours as parameters (it cannot reach Material's LocalContentColor),
- * so the watch theme supplies them here.
+ * [MorphButtonCore] from :uicommon, so the watch's tap target morphs and presses exactly
+ * like every other Bloo button instead of a watch-only look. The foundation core takes
+ * its colours as parameters (it cannot reach Material's LocalContentColor), so the watch
+ * theme supplies them here. [onClickHaptic] fires the click feel the phone buttons all
+ * have.
  */
 @Composable
 fun WearActionRow(
@@ -67,18 +69,26 @@ fun WearActionRow(
     icon: ImageVector,
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
+    active: Boolean = false,
     onClick: () -> Unit,
 ) {
+    val scheme = MaterialTheme.colorScheme
     MorphButtonCore(
         onClick = onClick,
         modifier = modifier.fillMaxWidth(),
         enabled = enabled,
-        containerColor = MaterialTheme.colorScheme.secondaryContainer,
-        activeContainerColor = MaterialTheme.colorScheme.primary,
+        active = active,
+        containerColor = scheme.secondaryContainer,
+        activeContainerColor = scheme.primary,
         contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 14.dp, vertical = 10.dp),
     ) {
         Icon(icon, contentDescription = null, modifier = Modifier.size(18.dp))
         Spacer(Modifier.width(8.dp))
-        Text(label, fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.labelLarge)
+        Text(
+            label,
+            fontWeight = FontWeight.SemiBold,
+            style = MaterialTheme.typography.labelLarge,
+            color = if (active) scheme.onPrimary else scheme.onSecondaryContainer,
+        )
     }
 }

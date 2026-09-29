@@ -12,14 +12,17 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 
 /**
- * The watch's only Activity. A plain ComponentActivity (not a Wear
- * [androidx.wear.activity.AmbientModeSupport] host yet) so the first pass stays
- * minimal: it hosts [WearGarageScreen] and nothing else.
+ * The watch's only Activity. Hosts [WearGarageScreen]; everything else lives in the
+ * repository + shared modules.
  */
 class WearMainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         val repo = WearSnapshotRepository(this)
+        // Begin mirroring the phone's pushed snapshot, once the Data Layer bridge exists
+        // (today: both sides already read the same on-disk SnapshotStore -- see
+        // WearDataLayerSync's own doc).
+        WearDataLayerSync.start(this)
         setContent {
             WearTheme {
                 Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
@@ -31,9 +34,9 @@ class WearMainActivity : ComponentActivity() {
 }
 
 /**
- * The watch theme -- a dark, high-contrast scheme for a small AMOLED watch face,
- * rather than the phone's dynamic-colour machinery (which does not exist on a watch).
- * Deliberately tiny: two surface tones and a primary, enough for the one screen.
+ * The watch theme: a dark, high-contrast scheme for a small AMOLED watch face. The
+ * phone's dynamic-colour machinery does not exist on a watch the same way, so this is a
+ * fixed palette -- deliberately tiny, just enough for the one screen.
  */
 @Composable
 private fun WearTheme(content: @Composable () -> Unit) {

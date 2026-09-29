@@ -58,9 +58,9 @@ dependencies {
     implementation("androidx.compose.animation:animation-core")
     implementation("androidx.compose.material:material-icons-extended")
     implementation("androidx.compose.material3:material3")
-    implementation("androidx.activity:activity-compose:1.9.3")
-    implementation("androidx.core:core-ktx:1.19.0")
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")
+    implementation("androidx.activity:activity-compose:1.13.0")
+    implementation("androidx.core:core-ktx:1.19.1")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.11.0")
 
     // Wear Compose (Material 3) for the watch shell, plus the Pager/Foundation
     // scrolling every watch UI leans on for its swipe-between-cars gesture.

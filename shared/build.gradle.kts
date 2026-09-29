@@ -28,14 +28,14 @@ kotlin {
 dependencies {
     // Exposed with api(...) so :app picks up the model/networking types
     // transitively — these classes appear in its public signatures.
-    api("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
-    api("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")
+    api("org.jetbrains.kotlinx:kotlinx-serialization-json:1.11.0")
+    api("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.11.0")
 
-    implementation("androidx.core:core-ktx:1.19.0")
-    implementation("androidx.datastore:datastore-preferences:1.1.7")
-    implementation("androidx.security:security-crypto:1.1.0-alpha06")
-    implementation("com.squareup.okhttp3:okhttp:4.12.0")
-    implementation("com.squareup.okhttp3:logging-interceptor:4.12.0")
+    implementation("androidx.core:core-ktx:1.19.1")
+    implementation("androidx.datastore:datastore-preferences:1.2.1")
+    implementation("androidx.security:security-crypto:1.1.0")
+    implementation("com.squareup.okhttp3:okhttp:5.5.0")
+    implementation("com.squareup.okhttp3:logging-interceptor:5.5.0")
 
     // Pure-JVM unit tests (CI: testDebugUnitTest). kotlin-test-junit maps
     // kotlin.test's @Test/assert* onto JUnit 4 AND pulls JUnit transitively, so
