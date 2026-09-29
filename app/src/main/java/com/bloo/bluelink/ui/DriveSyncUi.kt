@@ -7,6 +7,7 @@
 
 package com.bloo.bluelink.ui
 
+import android.content.Intent
 import android.graphics.Bitmap
 import android.os.Build
 import android.graphics.BitmapFactory
@@ -54,6 +55,7 @@ import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Smartphone
+import androidx.compose.material.icons.filled.Shop
 import androidx.compose.material.icons.filled.SubdirectoryArrowRight
 import androidx.compose.material.icons.filled.Watch
 import androidx.compose.material.icons.filled.Star
@@ -86,6 +88,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -230,6 +233,20 @@ internal fun SyncDevicesSection(state: UiState, vm: AppViewModel) {
                 }
             }
         }
+    }
+
+    if (watches.isEmpty()) {
+        Spacer(Modifier.height(GapRow))
+        var showAddWatch by remember { mutableStateOf(false) }
+        val addWatchSource = remember { MutableInteractionSource() }
+        SafeExpansiveButton(interactionSource = addWatchSource, enabled = true) {
+            MorphTextButton(
+                "Add a watch",
+                interactionSource = addWatchSource,
+                onClick = { showAddWatch = true },
+            )
+        }
+        if (showAddWatch) AddWatchDialog(onDismiss = { showAddWatch = false })
     }
 
     // Advisory: if a peer hasn't checked in for a while but this device just
@@ -545,6 +562,66 @@ private fun WearCompanionRow(
             )
         }
     }
+}
+
+/**
+ * "Add a watch" setup. First install remains a platform constraint: Android/Wear OS does not
+ * let a phone silently install an APK onto a watch unless the app is published through Play.
+ * Once Bloo for Wear is installed and paired, this flow pushes updates directly over the Data
+ * Layer, with no Drive, browser, APK download, or ADB step for normal updates.
+ */
+@Composable
+private fun AddWatchDialog(onDismiss: () -> Unit) {
+    val context = LocalContext.current
+    val hasWatch by com.bloo.bluelink.wear.WatchPresence.hasWatch.collectAsStateWithLifecycle()
+    var update by remember { mutableStateOf<com.bloo.bluelink.data.WorkflowRun?>(null) }
+    LaunchedEffect(Unit) {
+        update = com.bloo.bluelink.data.UpdateApi.fetchLatestSuccessfulRun(
+            com.bloo.bluelink.data.UpdateApi.DEFAULT_BRANCH,
+        )
+    }
+    GlassAlertDialog(
+        onDismissRequest = onDismiss,
+        icon = Icons.Filled.Watch,
+        title = "Add a watch",
+        text = {
+            if (hasWatch) {
+                Text("Watch connected. Bloo can push the watch app and future updates directly.")
+                update?.watchApkUrl?.let { Text("Tap Send to watch to install the latest build.") }
+            } else {
+                Text("Install Bloo for Wear from Google Play on your watch, then open it once.")
+                Text("After pairing, updates install from your phone without Drive, APK downloads, or ADB.")
+            }
+        },
+        buttons = {
+            if (hasWatch && update?.watchApkUrl != null) {
+                MorphActionButton(
+                    label = "Send to watch",
+                    icon = Icons.Filled.Watch,
+                    onClick = {
+                        com.bloo.bluelink.wear.PhoneWatchSyncService.pushWatchApk(context, update!!.watchApkUrl!!)
+                        onDismiss()
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            } else if (!hasWatch) {
+                MorphActionButton(
+                    label = "Open Play Store",
+                    icon = Icons.Filled.Shop,
+                    onClick = {
+                        runCatching {
+                            context.startActivity(
+                                Intent(Intent.ACTION_VIEW, "market://details?id=com.bloo.bluelink.wear".toUri())
+                                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+                            )
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
+            MorphTextButton("Close", onClick = onDismiss, modifier = Modifier.fillMaxWidth())
+        },
+    )
 }
 
 /**

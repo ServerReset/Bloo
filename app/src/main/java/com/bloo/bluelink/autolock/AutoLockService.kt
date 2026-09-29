@@ -9,7 +9,6 @@ import android.content.IntentFilter
 import android.content.pm.ServiceInfo
 import android.os.Build
 import android.os.IBinder
-import androidx.core.content.ContextCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.app.ServiceCompat
 import com.bloo.bluelink.data.AppLog
@@ -53,11 +52,11 @@ class AutoLockService : Service() {
             override fun onReceive(context: Context, intent: Intent) {
                 val device = intent.getParcelableExtra<BluetoothDevice>(BluetoothDevice.EXTRA_DEVICE)
                     ?: return
-                val mac = runCatching { device.address }.getOrNull() ?: return
+                val address = runCatching { device.address }.getOrNull() ?: return
                 scope.launch {
                     SettingsStore(applicationContext).allAutoLockConfigs().forEach { (vin, config) ->
-                        if (!config.enabled || !mac.equals(config.deviceAddress, ignoreCase = true)) return@forEach
-                        AppLog.log("AutoLock: watcher received ${intent.action} for configured car $vin")
+                        if (!config.enabled || !address.equals(config.deviceAddress, ignoreCase = true)) return@forEach
+                        AppLog.log("AutoLock: watcher received ${intent.action} for $vin")
                         if (intent.action == BluetoothDevice.ACTION_ACL_DISCONNECTED) {
                             AutoLockTrigger.onCarDisconnected(applicationContext, vin, config)
                         } else if (intent.action == BluetoothDevice.ACTION_ACL_CONNECTED) {
@@ -67,20 +66,20 @@ class AutoLockService : Service() {
                 }
             }
         }
-        // RECEIVER_EXPORTED is required for system Bluetooth broadcasts on Android 13+;
-        // NOT_EXPORTED receivers do not receive broadcasts sent from the Bluetooth system UID.
-        // The handler still requires an exact configured device address before doing anything.
-        ContextCompat.registerReceiver(
+        // System Bluetooth broadcasts require an exported dynamic receiver on modern Android.
+        // The exact configured address is checked before any action is taken.
+        androidx.core.content.ContextCompat.registerReceiver(
             this,
             receiver,
             IntentFilter().apply {
                 addAction(BluetoothDevice.ACTION_ACL_CONNECTED)
                 addAction(BluetoothDevice.ACTION_ACL_DISCONNECTED)
             },
-            ContextCompat.RECEIVER_EXPORTED,
+            androidx.core.content.ContextCompat.RECEIVER_EXPORTED,
         )
         watcher = receiver
     }
+
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         if (intent?.action == ACTION_START_WATCH) {

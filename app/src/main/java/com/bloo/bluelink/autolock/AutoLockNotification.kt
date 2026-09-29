@@ -14,7 +14,9 @@ import com.bloo.bluelink.data.ensureNotificationChannel
  *  flight -- countdown, a "Lock now" shortcut, and a Cancel that aborts (the car reconnect
  *  path cancels the same way). Ported/condensed from i5-AutoLock's `AutoLockNotification`. */
 object AutoLockNotification {
-    private const val CHANNEL_ID = "bloo_autolock"
+    /** The low-importance watcher/evaluation channel. Settings can open this channel so the
+     *  user can hide its shade entry while keeping AutoLock's background watcher alive. */
+    internal const val CHANNEL_ID = "bloo_autolock"
 
     // build() is called on every state transition of a live evaluation -- once a second for
     // however long the grace countdown runs, up to the configured max of 120. Without this

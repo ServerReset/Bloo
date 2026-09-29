@@ -44,10 +44,6 @@ object WatchPresence {
             nodeClient.connectedNodes.addOnSuccessListener { nodes ->
                 _hasWatch.value = nodes.isNotEmpty()
             }
-            Wearable.getNodeClient(app)
-        }
-        runCatching {
-            Wearable.getDataClient(app).addListener { }
         }
         // Observe the snapshot store and push on every change.
         scope.launch {

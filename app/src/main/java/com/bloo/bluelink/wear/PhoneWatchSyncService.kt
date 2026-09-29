@@ -90,33 +90,6 @@ class PhoneWatchSyncService : WearableListenerService() {
         runCatching { Wearable.getDataClient(applicationContext).putDataItem(req) }
     }
 
-    /**
-     * Download the watch APK at [url] on the PHONE (the watch has no network) and push its bytes
-     * to the watch as an asset on [WatchSyncProtocol.PATH_WATCH_APK]. The watch then installs it
-     * locally, so the user never opens a browser or leaves the watch. Best-effort: any failure is
-     * logged and the watch simply keeps offering the URL fallback.
-     */
-    fun pushWatchApk(context: Context, url: String) {
-        val app = context.applicationContext
-        CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
-            runCatching {
-                val bytes = okhttp3.OkHttpClient().newCall(
-                    okhttp3.Request.Builder().url(url).get().build(),
-                ).execute().use { resp ->
-                    if (!resp.isSuccessful) error("HTTP ${resp.code}")
-                    resp.body?.bytes() ?: error("empty body")
-                }
-                val asset = com.google.android.gms.wearable.Asset.createFromBytes(bytes)
-                val req = PutDataMapRequest.create(WatchSyncProtocol.PATH_WATCH_APK).apply {
-                    dataMap.putAsset("apk", asset)
-                    dataMap.putLong("_ts", System.currentTimeMillis())
-                }.asPutDataRequest().setUrgent()
-                Wearable.getDataClient(app).putDataItem(req).await()
-                AppLog.log("WatchSync: pushed watch APK (${bytes.size} bytes)")
-            }.onFailure { AppLog.log("WatchSync: watch APK push failed (${it.javaClass.simpleName})") }
-        }
-    }
-
     companion object {
         private const val KEY_PAYLOAD = "payload"
 
@@ -140,6 +113,27 @@ class PhoneWatchSyncService : WearableListenerService() {
          * [com.bloo.bluelink.data.WorkflowRun]; its watch asset URL is what the watch offers to
          * download.
          */
+        fun pushWatchApk(context: Context, url: String) {
+            val app = context.applicationContext
+            CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
+                runCatching {
+                    val bytes = okhttp3.OkHttpClient().newCall(
+                        okhttp3.Request.Builder().url(url).get().build(),
+                    ).execute().use { resp ->
+                        if (!resp.isSuccessful) error("HTTP ${resp.code}")
+                        resp.body?.bytes() ?: error("empty body")
+                    }
+                    val asset = com.google.android.gms.wearable.Asset.createFromBytes(bytes)
+                    val req = PutDataMapRequest.create(WatchSyncProtocol.PATH_WATCH_APK).apply {
+                        dataMap.putAsset("apk", asset)
+                        dataMap.putLong("_ts", System.currentTimeMillis())
+                    }.asPutDataRequest().setUrgent()
+                    Wearable.getDataClient(app).putDataItem(req).await()
+                    AppLog.log("WatchSync: pushed watch APK (${bytes.size} bytes)")
+                }.onFailure { AppLog.log("WatchSync: watch APK push failed (${it.javaClass.simpleName})") }
+            }
+        }
+
         fun pushNow(
             context: Context,
             watchUpdateRunNumber: Int? = null,

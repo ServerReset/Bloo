@@ -2225,11 +2225,18 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 com.bloo.bluelink.autolock.AutoLockService.ACTION_STOP_WATCH
             }
             runCatching {
-                val intent = android.content.Intent(getApplication(), com.bloo.bluelink.autolock.AutoLockService::class.java)
-                    .setAction(action)
-                    .putExtra(com.bloo.bluelink.autolock.AutoLockService.EXTRA_VIN, vin)
-                getApplication<android.app.Application>().startForegroundService(intent)
-            }.onFailure { com.bloo.bluelink.data.AppLog.log("AutoLock watcher start failed: ${it.javaClass.simpleName}") }
+                getApplication<android.app.Application>().startForegroundService(
+                    android.content.Intent(
+                        getApplication(),
+                        com.bloo.bluelink.autolock.AutoLockService::class.java,
+                    ).setAction(action).putExtra(
+                        com.bloo.bluelink.autolock.AutoLockService.EXTRA_VIN,
+                        vin,
+                    ),
+                )
+            }.onFailure {
+                com.bloo.bluelink.data.AppLog.log("AutoLock watcher start failed: ${it.javaClass.simpleName}")
+            }
         }
     }
 

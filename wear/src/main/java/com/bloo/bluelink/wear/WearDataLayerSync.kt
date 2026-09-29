@@ -102,6 +102,11 @@ object WearDataLayerSync {
     /** Apply a snapshot payload: mirror into SnapshotStore + WatchPinStore. */
     suspend fun mirrorSnapshot(context: Context, bytes: ByteArray?) {
         if (bytes == null) return
+        // The listener service can receive the first push before the Activity has ever opened.
+        // Initialise the PIN store here too, otherwise that first payload updates vehicles but
+        // silently drops the phone's lock timing/PIN and the watch opens unguarded until the
+        // user launches it once.
+        if (!started) start(context)
         val payload = runCatching {
             json.decodeFromString(WatchSyncPayload.serializer(), bytes.decodeToString())
         }.getOrNull() ?: return
@@ -170,8 +175,12 @@ object WearDataLayerSync {
         val app = context.applicationContext
         scope.launch {
             runCatching {
-                com.google.android.gms.wearable.Wearable.getMessageClient(app)
-                    .sendMessage("*", WatchSyncProtocol.PATH_REQUEST_APK, ByteArray(0)).await()
+                val nodes = com.google.android.gms.wearable.Wearable.getNodeClient(app)
+                    .connectedNodes.await()
+                nodes.forEach { node ->
+                    com.google.android.gms.wearable.Wearable.getMessageClient(app)
+                        .sendMessage(node.id, WatchSyncProtocol.PATH_REQUEST_APK, ByteArray(0)).await()
+                }
             }
         }
     }

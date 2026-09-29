@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Bluetooth
+import androidx.compose.material.icons.filled.NotificationsOff
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
@@ -32,6 +33,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import com.bloo.bluelink.autolock.AutoLockConfig
+import com.bloo.bluelink.autolock.AutoLockNotification
 import com.bloo.bluelink.autolock.DetectionState
 import com.bloo.bluelink.data.LiveCharge
 import com.bloo.bluelink.data.Vehicle
@@ -99,6 +101,28 @@ internal fun AutoLockSettingsGroup(v: Vehicle, vm: AppViewModel) {
             "Locks ${v.name} when you walk away (Bluetooth disconnect + motion). Runs in dry run: it decides and logs, but never locks until you turn that off.",
         )
         ToggleRow("Enabled", current.enabled, onChange = ::onEnabledChanged)
+
+        if (current.enabled) {
+            SettingsCaption(
+                "AutoLock needs a quiet background watcher. Hide its notification from Android settings if you do not want it in the shade.",
+                bottomGap = GapHairline,
+            )
+            MorphTextButton(
+                text = "Hide watcher notification",
+                onClick = {
+                    runCatching {
+                        context.startActivity(
+                            android.content.Intent(android.provider.Settings.ACTION_CHANNEL_NOTIFICATION_SETTINGS).apply {
+                                putExtra(android.provider.Settings.EXTRA_APP_PACKAGE, context.packageName)
+                                putExtra(android.provider.Settings.EXTRA_CHANNEL_ID, AutoLockNotification.CHANNEL_ID)
+                            },
+                        )
+                    }
+                },
+                contentColor = MaterialTheme.colorScheme.primary,
+                icon = Icons.Filled.NotificationsOff,
+            )
+        }
 
         if (current.enabled && !LiveCharge.isBackgroundUnrestricted(context)) {
             SettingsCaption("Won't reliably trigger with the app closed?", bottomGap = GapHairline)
