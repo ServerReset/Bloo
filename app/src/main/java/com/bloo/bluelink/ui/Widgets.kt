@@ -199,10 +199,6 @@ internal fun StatusBarScrim(
                     // background -- not this Box's own gradient. That gradient (below,
                     // applied identically either way) still does the same legibility
                     // tinting job it always did, now over a genuinely blurred backdrop.
-                    // No explicit HazeStyle override here -- `style` and `state` together
-                    // hit an "overload resolution ambiguity" at compile time against this
-                    // pinned 1.7.0 (caught by CI); "a bit less strong" is carried entirely
-                    // by the gradient's own reduced alpha below instead.
                     //
                     // appHazeEffect: the one shared Haze configuration (see its own doc)
                     // every blurred surface in the app now goes through. progressive = true

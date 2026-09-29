@@ -22,8 +22,10 @@ import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.unit.dp
 import com.bloo.uicommon.dropShadow
+import dev.chrisbanes.haze.HazeInput
 import dev.chrisbanes.haze.HazeState
-import dev.chrisbanes.haze.hazeEffect
+import dev.chrisbanes.haze.blur.HazeBlurStyle
+import dev.chrisbanes.haze.blur.hazeBlur
 import com.bloo.uicommon.frostedRim as sharedFrostedRim
 import com.bloo.uicommon.ambientRing as sharedAmbientRing
 
@@ -338,12 +340,19 @@ internal fun Modifier.glassEffect(
         .background(tint)
 }
 
-internal fun Modifier.appHazeEffect(state: HazeState, progressive: Boolean = false): Modifier =
-    this.hazeEffect(state = state) {
-        if (progressive) {
-            this.progressive = StandardBlurProgressive
-        }
-    }
+ internal fun Modifier.appHazeEffect(state: HazeState, progressive: Boolean = false): Modifier =
+    this.hazeBlur(
+        input = HazeInput.Sources(state),
+        style = HazeBlurStyle {
+            blurRadius(StandardBlurRadius)
+            if (progressive) this.progressive(StandardBlurProgressive)
+        },
+    )
+
+/** The radius every glass surface blurs its backdrop by. One value, so a chip and the status
+ *  bar scrim soften by the same amount. Haze 2.0 defaults blurRadius to 20dp; this matches the
+ *  1.7 look the app was tuned against. */
+private val StandardBlurRadius = 20.dp
 
 /**
  * The app's one floating-glass surface: a real Haze backdrop blur of [hazeState]

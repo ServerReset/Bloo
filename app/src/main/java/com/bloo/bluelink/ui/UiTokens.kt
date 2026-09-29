@@ -380,4 +380,3 @@ internal val StandardBlurProgressive
         startIntensity = 1f,
         endIntensity = 0f
     )
-

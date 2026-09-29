@@ -10,6 +10,8 @@ import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.launch
 
 /**
  * The watch's only Activity. Hosts [WearGarageScreen]; everything else lives in the
@@ -21,8 +23,10 @@ class WearMainActivity : ComponentActivity() {
         val repo = WearSnapshotRepository(this)
         val pinStore = WatchPinStore(this)
         // Begin listening for the phone's pushes (real-time sync; the watch never hits the
-        // network or Drive -- see WearDataLayerSync).
+        // network for CAR data -- see WearDataLayerSync).
         WearDataLayerSync.start(this)
+        // The watch checks for its OWN updates over its own internet, independent of the phone.
+        lifecycleScope.launch { WearUpdateChecker.check() }
         setContent {
             WearTheme {
                 Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {

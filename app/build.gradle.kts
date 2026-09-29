@@ -216,7 +216,9 @@ dependencies {
     // and blurs THAT, the actual "frosted glass" effect this needed. Pinned to the
     // last 1.x release, before the 2.0 pluggable-effects rewrite changed hazeEffect's
     // own configuration shape.
-    implementation("dev.chrisbanes.haze:haze:1.7.0")
+    implementation("dev.chrisbanes.haze:haze:2.0.0")
+    // The built-in Blur effect (HazeBlurStyle/hazeBlur), split out of the core artifact in 2.0.
+    implementation("dev.chrisbanes.haze:haze-blur:2.0.0")
 
 
 
