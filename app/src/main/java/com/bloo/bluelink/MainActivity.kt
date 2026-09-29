@@ -232,6 +232,11 @@ class MainActivity : FragmentActivity() {
     override fun onStart() {
         StartupTrace.mark("MainActivity.onStart")
         super.onStart()
+        // Reattach AutoLock's dynamic Bluetooth watcher for existing installs whose config was
+        // already enabled before the watcher existed. This is idempotent: starting the service
+        // again only refreshes its foreground notification and receiver, it does not start a
+        // car evaluation.
+        viewModel.ensureAutoLockWatcher()
         // Cold start is handled by the ViewModel; only re-evaluate on warm resumes.
         if (!firstStart) {
             viewModel.maybeRelock(backgroundedAt, screenOffAt > backgroundedAt)

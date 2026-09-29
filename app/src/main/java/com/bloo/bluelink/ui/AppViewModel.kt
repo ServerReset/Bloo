@@ -2240,6 +2240,28 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    /** Re-attaches the low-power Bluetooth watcher when the app returns to the foreground.
+     *  This repairs installs upgraded from a build that had AutoLock enabled before the
+     *  watcher was introduced: their persisted config is already ON, so they never visit the
+     *  setting toggle again and would otherwise remain unwatched until the next reboot. */
+    fun ensureAutoLockWatcher() {
+        viewModelScope.launch {
+            val entry = settingsStore.allAutoLockConfigs().entries.firstOrNull { it.value.enabled }
+                ?: return@launch
+            runCatching {
+                getApplication<android.app.Application>().startForegroundService(
+                    android.content.Intent(
+                        getApplication(),
+                        com.bloo.bluelink.autolock.AutoLockService::class.java,
+                    ).setAction(com.bloo.bluelink.autolock.AutoLockService.ACTION_START_WATCH)
+                        .putExtra(com.bloo.bluelink.autolock.AutoLockService.EXTRA_VIN, entry.key),
+                )
+            }.onFailure {
+                com.bloo.bluelink.data.AppLog.log("AutoLock watcher recovery failed: ${it.javaClass.simpleName}")
+            }
+        }
+    }
+
     /** Bonded (paired) Bluetooth devices, for the "which one is your car" picker. Empty
      *  without BLUETOOTH_CONNECT granted -- the Settings section prompts for it first. */
     fun pairedBluetoothDevices(): List<com.bloo.bluelink.autolock.PairedDevice> =

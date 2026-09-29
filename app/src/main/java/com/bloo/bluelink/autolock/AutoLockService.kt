@@ -84,6 +84,7 @@ class AutoLockService : Service() {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         if (intent?.action == ACTION_START_WATCH) {
             val vin = intent.getStringExtra(EXTRA_VIN)
+            AppLog.log("AutoLock: background Bluetooth watcher started")
             if (vin != null) startForegroundCompat(vin, DetectionState.IDLE, 0)
             return START_STICKY
         }
