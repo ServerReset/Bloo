@@ -50,7 +50,7 @@ import kotlinx.coroutines.flow.first
  * set the charge limit and see charging info. Long-press to drag-reorder.
  */
 @Composable
-internal fun ChargePebble(v: Vehicle, status: VehicleStatus?, enabled: Boolean, state: UiState, vm: AppViewModel, dragHandle: Modifier) {
+internal fun ChargePebble(v: Vehicle, status: VehicleStatus?, enabled: Boolean, state: UiState, vm: AppViewModel, modifier: Modifier) {
     val ev = status?.evStatus
     val charging = ev?.batteryCharge == true
     val plugged = ev.isPluggedOrCharging
@@ -110,7 +110,7 @@ internal fun ChargePebble(v: Vehicle, status: VehicleStatus?, enabled: Boolean, 
     }
 
     Pebble(
-        v, "charge", "Charge", Icons.Filled.Bolt, state, vm, dragHandle,
+        v, "charge", "Charge", Icons.Filled.Bolt, state, vm, modifier,
         summary = summary,
         headerAction = PebbleHeaderAction(
             label = if (charging) "Stop" else "Start",
@@ -180,7 +180,7 @@ internal fun ChargePebble(v: Vehicle, status: VehicleStatus?, enabled: Boolean, 
  * all. Occupies the same "charge" slot so order/collapse state carry over.
  */
 @Composable
-internal fun FuelPebble(v: Vehicle, status: VehicleStatus?, state: UiState, vm: AppViewModel, dragHandle: Modifier) {
+internal fun FuelPebble(v: Vehicle, status: VehicleStatus?, state: UiState, vm: AppViewModel, modifier: Modifier) {
     val metric = LocalAppearance.current.unitSystem == "metric"
     val fuelPct = status?.fuelLevel
     val range = status?.dte?.value?.toInt()
@@ -195,7 +195,7 @@ internal fun FuelPebble(v: Vehicle, status: VehicleStatus?, state: UiState, vm: 
     // This one renders both a fuel-level row and a range row, so forcing it always
     // open in simple mode just removed the ability to collapse it.
     Pebble(
-        v, "fuel", "Fuel", Icons.Filled.LocalGasStation, state, vm, dragHandle,
+        v, "fuel", "Fuel", Icons.Filled.LocalGasStation, state, vm, modifier,
         summary = summary,
     ) {
         // COVER SCREEN only: lead with a big fuel-% hero so the gas tile gets the same

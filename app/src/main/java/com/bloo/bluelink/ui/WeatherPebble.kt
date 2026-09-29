@@ -133,7 +133,7 @@ internal fun rememberLocateAction(vm: AppViewModel, v: Vehicle): () -> Unit {
 }
 
 @Composable
-internal fun LocationPebble(v: Vehicle, state: UiState, vm: AppViewModel, dragHandle: Modifier) {
+internal fun LocationPebble(v: Vehicle, state: UiState, vm: AppViewModel, modifier: Modifier) {
     val context = LocalContext.current
     val appearance = LocalAppearance.current
     val fahrenheit = appearance.useFahrenheit
@@ -156,7 +156,7 @@ internal fun LocationPebble(v: Vehicle, state: UiState, vm: AppViewModel, dragHa
     // Show the place name (or a hint) in the header so it's visible even collapsed.
     val summary = place ?: if (location != null) "Located" else "Not located yet"
     Pebble(
-        v, "location", "Location", Icons.Filled.LocationOn, state, vm, dragHandle, summary = summary,
+        v, "location", "Location", Icons.Filled.LocationOn, state, vm, modifier, summary = summary,
         headerAction = PebbleHeaderAction(
             label = "Locate",
             icon = Icons.Filled.LocationOn,

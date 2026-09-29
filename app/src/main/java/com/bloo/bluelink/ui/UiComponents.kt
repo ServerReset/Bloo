@@ -205,8 +205,8 @@ internal fun TitleSmallText(
 @Composable
 internal fun ThemedIcon(
     imageVector: androidx.compose.ui.graphics.vector.ImageVector,
-    contentDescription: String? = null,
     modifier: Modifier = Modifier,
+    contentDescription: String? = null,
     tint: Color = MaterialTheme.colorScheme.onSurface,
     size: Dp = 24.dp,
 ) {

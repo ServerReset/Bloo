@@ -99,7 +99,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -215,8 +217,13 @@ internal fun LoginScreen(
     var region by remember { mutableStateOf("US") }
     var brand by remember { mutableStateOf(Brand.HYUNDAI) }
     val scheme = MaterialTheme.colorScheme
-    val cfg = LocalConfiguration.current
-    val shortScreen = cfg.screenHeightDp < 520
+    // LocalWindowInfo, not LocalConfiguration: the latter reports the whole SCREEN, which is
+    // wrong in split-screen/multi-window (the app is shorter than the screen then, so the
+    // "short screen" branch fired for a tall window and vice versa). containerSize is the
+    // window the app is actually drawing into.
+    val shortScreen = with(LocalDensity.current) {
+        LocalWindowInfo.current.containerSize.height.toDp() < 520.dp
+    }
     val heroHeight = if (shortScreen) 96.dp else 160.dp
     val context = LocalContext.current
 

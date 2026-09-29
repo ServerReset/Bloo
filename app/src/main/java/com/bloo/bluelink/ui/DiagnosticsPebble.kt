@@ -58,7 +58,7 @@ import com.bloo.bluelink.data.formatDistance
 internal data class DiagRow(val label: String, val value: String, val indent: Boolean = false)
 
 @Composable
-internal fun DiagnosticsPebble(v: Vehicle, status: VehicleStatus?, state: UiState, vm: AppViewModel, dragHandle: Modifier) {
+internal fun DiagnosticsPebble(v: Vehicle, status: VehicleStatus?, state: UiState, vm: AppViewModel, modifier: Modifier) {
     val a = LocalAppearance.current
     val fahrenheit = a.useFahrenheit
     val metric = a.unitSystem == "metric"
@@ -141,7 +141,7 @@ internal fun DiagnosticsPebble(v: Vehicle, status: VehicleStatus?, state: UiStat
         }
     }
     Pebble(
-        v, "diagnostics", "Diagnostics", Icons.Filled.ErrorOutline, state, vm, dragHandle,
+        v, "diagnostics", "Diagnostics", Icons.Filled.ErrorOutline, state, vm, modifier,
         summary = diagSummary,
         containerColor = MaterialTheme.colorScheme.surfaceVariant,
         headerAction = if (hasWarning) PebbleHeaderAction(

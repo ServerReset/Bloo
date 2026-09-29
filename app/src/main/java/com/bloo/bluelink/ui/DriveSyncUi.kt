@@ -174,13 +174,13 @@ internal fun SyncDevicesSection(state: UiState, vm: AppViewModel) {
         // persists it + triggers a sync so every device converges on the choice.
         onReorder = { reordered -> reordered.firstOrNull()?.let { vm.setPrimaryDevice(it.id) } },
         spacing = 8.dp,
-    ) { device, dragHandle, dragging ->
+    ) { device, itemDragHandle, dragging ->
         SyncDeviceRow(
             device = device,
             isSelf = device.id == state.thisDeviceId,
             isPrimary = device.id == state.syncPrimaryId,
             dragging = dragging,
-            dragHandle = dragHandle,
+            modifier = itemDragHandle,
             onRename = { renaming = true },
             onRemove = { vm.removeSyncedDevice(device.id) },
         )
@@ -290,7 +290,7 @@ internal fun SyncDeviceRow(
     isSelf: Boolean,
     isPrimary: Boolean,
     dragging: Boolean,
-    dragHandle: Modifier,
+    modifier: Modifier,
     onRename: () -> Unit,
     /** Kick this device out of the registry -- never offered for [isSelf] (see
      *  SettingsStore.removeSyncedDevice's own doc for why this can't remove
@@ -337,7 +337,7 @@ internal fun SyncDeviceRow(
             Icons.Filled.DragHandle,
             contentDescription = "Drag to reorder",
             tint = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = dragHandle.size(20.dp),
+            modifier = modifier.size(20.dp),
         )
         Spacer(Modifier.width(10.dp))
         Icon(

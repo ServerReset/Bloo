@@ -57,7 +57,7 @@ import kotlin.math.max
  * cars whose head unit doesn't report trips simply show an empty state.
  */
 @Composable
-internal fun TripsPebble(v: Vehicle, state: UiState, vm: AppViewModel, dragHandle: Modifier) {
+internal fun TripsPebble(v: Vehicle, state: UiState, vm: AppViewModel, modifier: Modifier) {
     // The evTripDetails feed isn't served by Gen5W (generation 2) head units -
     // they report nothing, EV or not - so the pebble is hidden for them rather
     // than sitting permanently empty. Kia US doesn't report a generation, so it's
@@ -87,7 +87,7 @@ internal fun TripsPebble(v: Vehicle, state: UiState, vm: AppViewModel, dragHandl
     // that reads better inline without an expand/collapse control (see its own doc).
     // This one renders a list of up to 8 trips, so forcing it always open in simple
     // mode just removed the ability to collapse it.
-    Pebble(v, "trips", "Trips", Icons.Filled.Route, state, vm, dragHandle, summary = summary) {
+    Pebble(v, "trips", "Trips", Icons.Filled.Route, state, vm, modifier, summary = summary) {
         when {
             trips == null -> Text(if (loading) "Fetching trip history…" else "No trip data yet.")
             trips.isEmpty() -> Text("No recent trips reported by this car.")

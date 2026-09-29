@@ -1,15 +1,19 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- Debug-only additions. This manifest is merged into debug builds only, so nothing here
      ships in a release APK. -->
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
     <application>
         <!-- Developer trigger for AutoLock: lets an adb command exercise the whole
-             background flow (fallback record -> countdown notification -> walk-away
-             confirmation -> deadline -> dry-run outcome notification) without physically
-             leaving a car. See its own doc. -->
+             background flow (countdown notification -> walk-away confirmation -> dry-run
+             outcome notification) without physically leaving a car. See its own doc.
+             exported + no permission on purpose: an adb `am broadcast` cannot hold a
+             declared permission, so one here would make the trigger unreachable. Debug
+             build only, so it never ships. -->
         <receiver
             android:name=".autolock.AutoLockDebugReceiver"
-            android:exported="true">
+            android:exported="true"
+            tools:ignore="ExportedReceiver">
             <intent-filter>
                 <action android:name="com.bloo.bluelink.DEBUG_AUTOLOCK" />
             </intent-filter>

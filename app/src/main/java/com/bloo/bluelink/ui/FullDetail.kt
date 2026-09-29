@@ -257,7 +257,7 @@ internal fun ExpandedCar(
         Box(Modifier.carSwipe(onSwipeCar)) {
             CarHeaderRow(v, state, hazeState = hazeState)
         }
-        CriticalContent(v, state, vm, onCollapse = onCollapse, swipeModifier = Modifier.carSwipe(onSwipeCar))
+        CriticalContent(v, state, vm, onCollapse = onCollapse, modifier = Modifier.carSwipe(onSwipeCar))
         HotspotSlot(v, hotspots, state, vm)
     }
     val pebbles: @Composable ColumnScope.() -> Unit = {

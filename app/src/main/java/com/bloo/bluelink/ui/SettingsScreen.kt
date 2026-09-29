@@ -1095,7 +1095,7 @@ private fun CarsCardContent(state: UiState, vm: AppViewModel, pick: (String) -> 
                     Box(Modifier.settingsCardSlot()) {
                         CarSettingsCard(
                             v = v, state = state, vm = vm,
-                            expanded = true, dragging = false, dragHandle = Modifier,
+                            expanded = true, dragging = false, modifier = Modifier,
                             collapsible = false,
                             onToggle = {}, onPickPhoto = { pick(v.vin) },
                         )
@@ -1107,10 +1107,10 @@ private fun CarsCardContent(state: UiState, vm: AppViewModel, pick: (String) -> 
                             keyOf = { it.vin },
                             onReorder = { vm.reorderVehicles(it) },
                             spacing = 8.dp,
-                        ) { v, dragHandle, dragging ->
+                        ) { v, itemDragHandle, dragging ->
                             CarSettingsCard(
                                 v = v, state = state, vm = vm,
-                                expanded = expandedCar == v.vin, dragging = dragging, dragHandle = dragHandle,
+                                expanded = expandedCar == v.vin, dragging = dragging, modifier = itemDragHandle,
                                 onToggle = { expandedCar = if (expandedCar == v.vin) null else v.vin },
                                 onPickPhoto = { pick(v.vin) },
                             )

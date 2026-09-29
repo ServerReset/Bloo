@@ -118,8 +118,8 @@ internal fun HeroHeader(
     hasBattery: Boolean,
     hasFuel: Boolean,
     vm: AppViewModel,
+    modifier: Modifier = Modifier,
     drivingLabel: String? = null,
-    dragHandle: Modifier = Modifier,
     height: Dp = 150.dp,
     metric: Boolean = false,
     /** Whether the photo box is showing. Passed IN rather than collected from the
@@ -286,7 +286,7 @@ internal fun HeroHeader(
             onToggle = { vm.togglePebble(v, com.bloo.bluelink.data.HERO_PHOTO_SECTION) },
             icon = Icons.Filled.DirectionsCar,
             title = v.name,
-            dragHandle = dragHandle,
+            modifier = modifier,
             titleColor = heroTitleColorNow,
             headerAction = expandAction,
             // The ONLY pebble that grows its title. Here the title is the car's NAME and the

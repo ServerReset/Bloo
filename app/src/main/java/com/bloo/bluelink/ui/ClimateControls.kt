@@ -226,7 +226,7 @@ internal fun ClimatePresetSection(
                 onReorder = onReorder,
                 spacing = 8.dp,
                 modifier = Modifier.fillMaxWidth(),
-            ) { preset, dragHandle, _ ->
+            ) { preset, itemDragHandle, _ ->
                 AnimatedVisibility(
                     visible = preset.id !in deletingIds,
                     enter = scaleIn(tween(240, easing = LinearOutSlowInEasing), initialScale = 0.88f) +
@@ -248,7 +248,7 @@ internal fun ClimatePresetSection(
                                 deletingIds = deletingIds - id
                             }
                         },
-                        dragHandle = dragHandle,
+                        modifier = itemDragHandle,
                     )
                 }
             }
@@ -293,7 +293,7 @@ internal fun PresetPill(
     active: Boolean,
     onStart: () -> Unit,
     onDelete: () -> Unit,
-    dragHandle: Modifier = Modifier,
+    modifier: Modifier = Modifier,
 ) {
     val haptics = LocalHaptics.current
     // Delete was a single un-confirmable tap right beside the much larger,
@@ -327,7 +327,7 @@ internal fun PresetPill(
     // being members is what lets pressing either half take width from the other instead of
     // shoving it.
     ExpressiveButtonRow(
-        modifier = dragHandle.fillMaxWidth().height(IntrinsicSize.Min),
+        modifier = modifier.fillMaxWidth().height(IntrinsicSize.Min),
         spacing = 3.dp,
         verticalAlignment = Alignment.CenterVertically,
         // One split pill, not two buttons that happen to be adjacent -- see `wrap`.

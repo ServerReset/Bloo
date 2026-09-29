@@ -138,7 +138,7 @@ internal fun Pebble(
     icon: ImageVector,
     state: UiState,
     vm: AppViewModel,
-    dragHandle: Modifier = Modifier,
+    modifier: Modifier = Modifier,
     summary: String? = null,
     containerColor: Color = MaterialTheme.colorScheme.surfaceVariant,
     headerAction: PebbleHeaderAction? = null,
@@ -182,7 +182,7 @@ internal fun Pebble(
         onToggle = if (canToggle) { { vm.togglePebble(v, section) } } else { {} },
         icon = icon,
         title = title,
-        dragHandle = dragHandle,
+        modifier = modifier,
         summary = summary,
         containerColor = containerColor,
         headerAction = headerAction,
@@ -208,7 +208,7 @@ internal fun PebbleShell(
     onToggle: () -> Unit,
     icon: ImageVector,
     title: String,
-    dragHandle: Modifier = Modifier,
+    modifier: Modifier = Modifier,
     summary: String? = null,
     /**
      * Trailing content on the TITLE row -- a headline stat that would otherwise need a
@@ -547,7 +547,7 @@ internal fun PebbleShell(
                                     onToggle()
                                 },
                             )
-                            .then(dragHandle)
+                            .then(modifier)
                             .heightIn(min = PebbleHeaderHeight)
                             // Asymmetric padding: 16dp left, 12dp right (was 16dp),
                             // pushing buttons slightly right while keeping symmetry.

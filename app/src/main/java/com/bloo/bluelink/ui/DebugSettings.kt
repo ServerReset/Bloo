@@ -191,8 +191,8 @@ fun getDebugInfo(): List<DebugInfo> {
  */
 @Composable
 fun DebugSettingsPanel(
-    onCopyToClipboard: ((String) -> Unit)? = null,
     modifier: Modifier = Modifier,
+    onCopyToClipboard: ((String) -> Unit)? = null,
 ) {
     val debugInfo = getDebugInfo()
 

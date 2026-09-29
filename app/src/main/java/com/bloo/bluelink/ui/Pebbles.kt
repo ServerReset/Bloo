@@ -300,11 +300,11 @@ internal fun CriticalContent(
     v: Vehicle,
     stateSource: State<UiState>,
     vm: AppViewModel,
-    onCollapse: (() -> Unit)? = null,
     /** Rides the hero card's own drag-handle slot. In the dual-column view this is the
      *  "swipe the hero card to switch cars" gesture (see [ExpandedCar]'s `onSwipeCar`); on
      *  the phone's single-column view it stays [Modifier] and the whole page swipes instead. */
-    swipeModifier: Modifier = Modifier,
+    modifier: Modifier = Modifier,
+    onCollapse: (() -> Unit)? = null,
 ) {
     // Narrow, DERIVED reads -- one per thing the hero actually draws.
     //
@@ -329,8 +329,8 @@ internal fun CriticalContent(
     val metric = LocalAppearance.current.unitSystem == "metric"
     HeroHeader(
         v, status, imageUrl, hasBattery, hasFuel, vm,
-        drivingLabel, metric = metric, photoExpanded = photoExpanded,
-        dragHandle = swipeModifier,
+        modifier = modifier,
+        drivingLabel = drivingLabel, metric = metric, photoExpanded = photoExpanded,
         expandAction = onCollapse?.let {
             // Icon-only, deliberately: this is the dual-column view, where the header is
             // already narrower (one column) AND carries the same collapse chevron every
@@ -369,7 +369,7 @@ internal fun CriticalContent(
  * It can still be long-pressed and dragged to reorder, like any pebble.
  */
 @Composable
-internal fun ControlsPebble(v: Vehicle, state: UiState, vm: AppViewModel, dragHandle: Modifier) {
+internal fun ControlsPebble(v: Vehicle, state: UiState, vm: AppViewModel, modifier: Modifier) {
     // Was frostedRim unconditionally -- every other pebble instead gates a
     // bolder dedicated border on the pebbleOutline setting (see Pebble()),
     // frostedRim's alpha being tuned for chrome over a car photo and nearly
@@ -415,7 +415,7 @@ internal fun ControlsPebble(v: Vehicle, state: UiState, vm: AppViewModel, dragHa
     Surface(
         modifier = Modifier
             .fillMaxWidth()
-            .then(dragHandle)
+            .then(modifier)
             .pointerInput(v.vin) { detectTapGestures { showHistory = !showHistory } }
             .semantics {
                 customActions = listOf(
@@ -596,20 +596,20 @@ internal fun PebbleList(
         },
         staggerInOnColdStart = true,
         introKey = v.vin,
-    ) { section, dragHandle, _ ->
+    ) { section, itemDragHandle, _ ->
         // Each item watches ONLY its own readiness, so filling one pebble composes one pebble.
         val ready by remember(section) {
             derivedStateOf { section in eager || section in filledSections }
         }
         if (ready) {
-            SinglePebble(section, v, state, vm, dragHandle, onExpand = onExpand)
+            SinglePebble(section, v, state, vm, itemDragHandle, onExpand = onExpand)
         } else {
             // Off-screen placeholder, up to a few frames now rather than always exactly
             // one: reserves ~collapsed pebble height so the list doesn't visibly jump
-            // when the real body fills in, and carries the dragHandle so ReorderColumn's
+            // when the real body fills in, and carries the drag handle so ReorderColumn's
             // item is fully formed. Below the fold, so this transient state is never
             // seen or interacted with.
-            Box(Modifier.fillMaxWidth().height(PebbleHeaderHeight).then(dragHandle))
+            Box(Modifier.fillMaxWidth().height(PebbleHeaderHeight).then(itemDragHandle))
         }
     }
 }
@@ -674,7 +674,7 @@ internal fun stateSlice(state: State<UiState>, contextKey: Any?, keys: (UiState)
 }
 
 @Composable
-internal fun SinglePebble(section: String, v: Vehicle, state: State<UiState>, vm: AppViewModel, dragHandle: Modifier, onExpand: (() -> Unit)? = null) {
+internal fun SinglePebble(section: String, v: Vehicle, state: State<UiState>, vm: AppViewModel, modifier: Modifier, onExpand: (() -> Unit)? = null) {
     // Narrow, derived read: this pebble only cares about ITS car's status. Reading
     // `state.value` here (as this line did) subscribed every pebble to EVERY UiState emission,
     // so a status poll for another car, a device-location tick or a weather refresh
@@ -692,7 +692,8 @@ internal fun SinglePebble(section: String, v: Vehicle, state: State<UiState>, vm
             }
             HeroHeader(
                 v, status, heroState.imageUrls[v.vin], heroState.hasBattery(v), heroState.hasFuel(v), vm,
-                heroState.drivingLabel(v), dragHandle = dragHandle, metric = metric,
+                modifier = modifier,
+                drivingLabel = heroState.drivingLabel(v), metric = metric,
                 photoExpanded = heroState.isPebbleExpanded(v.vin, com.bloo.bluelink.data.HERO_PHOTO_SECTION),
                 expandAction = onExpand?.let {
                     PebbleHeaderAction(label = "Expand to full screen", icon = Icons.Filled.Fullscreen, onClick = it)
@@ -707,13 +708,13 @@ internal fun SinglePebble(section: String, v: Vehicle, state: State<UiState>, vm
                     s.updatePendingDismiss,
                 )
             }
-            UpdateAvailableTile(updateState, vm, dragHandle)
+            UpdateAvailableTile(updateState, vm, modifier)
         }
         "controls" -> {
             val controlsState = stateSlice(state, v) { s ->
                 listOf(s.statuses[v.vin], s.isPending(v.vin, "doors"), s.isPending(v.vin, "hornLights"))
             }
-            ControlsPebble(v, controlsState, vm, dragHandle)
+            ControlsPebble(v, controlsState, vm, modifier)
         }
         "climate" -> {
             val seats by remember(v.vin) { derivedStateOf { state.value.seatConfigFor(v) } }
@@ -725,7 +726,7 @@ internal fun SinglePebble(section: String, v: Vehicle, state: State<UiState>, vm
                     s.defaultClimatePresets[v.vin],
                 )
             }
-            ClimatePebble(v, status, seats, climateState, vm, dragHandle)
+            ClimatePebble(v, status, seats, climateState, vm, modifier)
         }
         "charge" -> {
             val hasBattery by remember(v.vin) { derivedStateOf { state.value.hasBattery(v) } }
@@ -738,12 +739,12 @@ internal fun SinglePebble(section: String, v: Vehicle, state: State<UiState>, vm
                         s.isPebbleExpanded(v.vin, "charge"),
                     )
                 }
-                ChargePebble(v, status, enabled, chargeState, vm, dragHandle)
+                ChargePebble(v, status, enabled, chargeState, vm, modifier)
             } else {
                 val fuelState = stateSlice(state, v) { s ->
                     listOf(s.statuses[v.vin], s.refreshing, s.isPebbleExpanded(v.vin, "charge"))
                 }
-                FuelPebble(v, status, fuelState, vm, dragHandle)
+                FuelPebble(v, status, fuelState, vm, modifier)
             }
         }
         "location" -> {
@@ -753,14 +754,14 @@ internal fun SinglePebble(section: String, v: Vehicle, state: State<UiState>, vm
                     s.carWeather[v.vin], s.deviceLocation, s.isPebbleExpanded(v.vin, "location"),
                 )
             }
-            LocationPebble(v, locationState, vm, dragHandle)
+            LocationPebble(v, locationState, vm, modifier)
         }
         // Trip history rides on the EV trip-details endpoint, so EVs only.
         "trips" -> {
             val tripsState = stateSlice(state, v) { s ->
                 listOf(s.trips[v.vin], s.isPending(v.vin, "trips"), s.isPebbleExpanded(v.vin, "trips"))
             }
-            TripsPebble(v, tripsState, vm, dragHandle)
+            TripsPebble(v, tripsState, vm, modifier)
         }
         "info" -> {
             val infoState = stateSlice(state, v) { s ->
@@ -770,19 +771,19 @@ internal fun SinglePebble(section: String, v: Vehicle, state: State<UiState>, vm
                     s.placeNames[v.vin], s.fetchedAt(v), s.isPebbleExpanded(v.vin, "info"),
                 )
             }
-            InfoPebble(v, status, infoState, vm, dragHandle)
+            InfoPebble(v, status, infoState, vm, modifier)
         }
         "diagnostics" -> {
             val diagnosticsState = stateSlice(state, v) { s ->
                 listOf(s.statuses[v.vin], s.hasBattery(v), s.isPebbleExpanded(v.vin, "diagnostics"))
             }
-            DiagnosticsPebble(v, status, diagnosticsState, vm, dragHandle)
+            DiagnosticsPebble(v, status, diagnosticsState, vm, modifier)
         }
         "ai" -> {
             val aiState = stateSlice(state, v) { s ->
                 listOf(v.vin in s.aiBusy, s.aiSummaries[v.vin], s.isPebbleExpanded(v.vin, "ai"))
             }
-            AiPebble(v, aiState, vm, dragHandle)
+            AiPebble(v, aiState, vm, modifier)
         }
         else -> Spacer(Modifier.fillMaxWidth())
     }

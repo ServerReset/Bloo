@@ -160,6 +160,7 @@ internal fun SplitExpandButton(
     action: PebbleHeaderAction,
     expanded: Boolean,
     onToggle: () -> Unit,
+    modifier: Modifier = Modifier,
     canToggle: Boolean = true,
     /** Caps how much of the header row this whole control may claim -- see the call
      *  site's own doc (PebbleShell's header Row) for why this exists: without it, this
@@ -167,11 +168,6 @@ internal fun SplitExpandButton(
      *  the row's FULL width, so its own already-existing compact-to-icon fit rule never
      *  had a reason to fire even when the weighted title beside it was starved for room
      *  and had to ellipsize instead. */
-    modifier: Modifier = Modifier,
-    /** Reports the CHEVRON half's own pressed (held-down) state, live -- see
-     *  [MorphExpandButton]'s identical parameter for why. The action half
-     *  (the label button) does not report through this; only the chevron is
-     *  the pebble's own expand/collapse control. */
     onChevronPressChange: ((Boolean) -> Unit)? = null,
 ) {
     val haptics = LocalHaptics.current

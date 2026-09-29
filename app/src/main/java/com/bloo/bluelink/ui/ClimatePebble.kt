@@ -151,7 +151,7 @@ internal fun ClimatePebble(
     seats: SeatConfig,
     state: UiState,
     vm: AppViewModel,
-    dragHandle: Modifier,
+    modifier: Modifier,
 ) {
     val pending = state.isPending(v.vin, "climate")
     val fahrenheit = LocalAppearance.current.useFahrenheit
@@ -266,7 +266,7 @@ internal fun ClimatePebble(
     val expanded = LocalForceExpanded.current || state.isPebbleExpanded(v.vin, "climate")
 
     Pebble(
-        v, "climate", "Climate", Icons.Filled.AcUnit, state, vm, dragHandle,
+        v, "climate", "Climate", Icons.Filled.AcUnit, state, vm, modifier,
         summary = when {
             climateOn && driving -> "On · driving"
             climateOn -> "On"

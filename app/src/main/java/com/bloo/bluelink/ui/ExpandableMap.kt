@@ -82,6 +82,7 @@ import androidx.compose.ui.unit.toSize
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.compose.ui.window.DialogWindowProvider
+import androidx.core.graphics.drawable.toDrawable
 import dev.chrisbanes.haze.HazeState
 import dev.chrisbanes.haze.hazeSource
 import com.bloo.bluelink.data.ChargerFilters
@@ -258,7 +259,7 @@ internal fun CarMapSheet(
         SideEffect {
             val window = (dialogView.parent as? DialogWindowProvider)?.window
             window?.setDimAmount(0f)
-            window?.setBackgroundDrawable(android.graphics.drawable.ColorDrawable(android.graphics.Color.TRANSPARENT))
+            window?.setBackgroundDrawable(android.graphics.Color.TRANSPARENT.toDrawable())
         }
         CarMapSheetBody(
             location, vehicleName, deviceLocation,
@@ -323,8 +324,8 @@ internal fun CarMapSheet(
 internal fun MapTopBar(
     vehicleName: String,
     mapHazeState: HazeState,
-    dragModifier: Modifier,
     modifier: Modifier = Modifier,
+    dragModifier: Modifier,
     onRefreshLocation: (() -> Unit)? = null,
     /** True while a refresh this bar's own [onRefreshLocation] kicked off is
      *  still in flight -- the real command-pending flag from the caller

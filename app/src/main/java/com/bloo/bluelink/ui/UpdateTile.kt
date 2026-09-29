@@ -103,7 +103,7 @@ import kotlin.math.roundToInt
 internal fun UpdateAvailableTile(
     state: UiState,
     vm: AppViewModel,
-    dragHandle: Modifier = Modifier,
+    modifier: Modifier = Modifier,
     hazeState: dev.chrisbanes.haze.HazeState? = null,
 ) {
     val info = state.updateAvailable
@@ -144,7 +144,7 @@ internal fun UpdateAvailableTile(
         PebbleShell(
             expanded = expanded,
             onToggle = { expanded = !expanded },
-            dragHandle = dragHandle,
+            modifier = modifier,
             icon = Icons.Filled.SystemUpdate,
             title = "Update available",
             summary = info.run.displayTitle?.takeIf { it.isNotBlank() } ?: deltaLabel,

@@ -124,11 +124,11 @@ import androidx.compose.runtime.derivedStateOf
 
 /** Optional on-device Gemini Nano summary of the car's last-refreshed status. */
 @Composable
-internal fun AiPebble(v: Vehicle, state: UiState, vm: AppViewModel, dragHandle: Modifier) {
+internal fun AiPebble(v: Vehicle, state: UiState, vm: AppViewModel, modifier: Modifier) {
     val busy = v.vin in state.aiBusy
     val summary = state.aiSummaries[v.vin]
     Pebble(
-        v, "ai", "AI summary", Icons.Filled.AutoAwesome, state, vm, dragHandle,
+        v, "ai", "AI summary", Icons.Filled.AutoAwesome, state, vm, modifier,
         // What the tile can tell you, not what engine it runs on. This was the constant string
         // "On-device Gemini Nano", which as a collapsed summary -- and, on the cover, as the
         // tile's whole headline -- spent the most prominent line saying something that is true

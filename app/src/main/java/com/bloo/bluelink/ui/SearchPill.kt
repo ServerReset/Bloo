@@ -138,10 +138,10 @@ internal fun SearchPill(
     onQueryChange: (String) -> Unit,
     onFocusChange: (Boolean) -> Unit,
     onSubmit: () -> Unit,
+    modifier: Modifier = Modifier,
     onDrag: ((Dp, Dp) -> Unit)?,
     onDragStart: () -> Unit = {},
     onDragEnd: () -> Unit = {},
-    modifier: Modifier = Modifier,
     hazeState: HazeState? = null,
 ) {
     val scheme = MaterialTheme.colorScheme

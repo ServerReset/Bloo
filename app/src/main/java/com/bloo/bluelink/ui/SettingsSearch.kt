@@ -170,7 +170,9 @@ internal fun SearchLayer(
     // for whatever it is handed, and the boxed-Float one is the guaranteed
     // path. This changes twice a gesture, not twice a frame -- the boxing is
     // not worth a runtime "no Saver found" on some Compose version.
+    @Suppress("AutoboxingStateCreation")
     var dragX by rememberSaveable { mutableStateOf(Float.NaN) }
+    @Suppress("AutoboxingStateCreation")
     var dragY by rememberSaveable { mutableStateOf(Float.NaN) }
     // True only between finger-down and finger-up on the bubble. The position
     // animation is BYPASSED while it is true -- see the spec choice below.

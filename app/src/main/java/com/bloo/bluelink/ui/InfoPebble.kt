@@ -68,7 +68,7 @@ import com.bloo.bluelink.data.isPluggedOrCharging
 // --- Car info (status + service + links combined) -------------------------
 
 @Composable
-internal fun InfoPebble(v: Vehicle, status: VehicleStatus?, state: UiState, vm: AppViewModel, dragHandle: Modifier) {
+internal fun InfoPebble(v: Vehicle, status: VehicleStatus?, state: UiState, vm: AppViewModel, modifier: Modifier) {
     val context = LocalContext.current
     val appearance = LocalAppearance.current
     val metric = appearance.unitSystem == "metric"
@@ -93,7 +93,7 @@ internal fun InfoPebble(v: Vehicle, status: VehicleStatus?, state: UiState, vm: 
     // that reads better inline without an expand/collapse control (see its own doc).
     // This one renders ~15 info rows (below), so forcing it always open in simple
     // mode just removed the ability to collapse it.
-    Pebble(v, "info", "Car info", Icons.Filled.Info, state, vm, dragHandle, summary = infoSummary) {
+    Pebble(v, "info", "Car info", Icons.Filled.Info, state, vm, modifier, summary = infoSummary) {
         // COVER SCREEN only: lead with a big lock-state hero. On the cover the info
         // tile drops its header (so the "Locked/Unlocked" summary is otherwise
         // buried as one row among ~15). A large icon + word makes it the glance
