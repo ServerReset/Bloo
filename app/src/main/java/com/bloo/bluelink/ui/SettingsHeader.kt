@@ -459,20 +459,21 @@ internal fun SettingsHeroCard(state: UiState, vm: AppViewModel, compact: Boolean
                         Spacer(Modifier.height(GapRow))
                         UpdateReleaseNotes(updateInfo, maxLines = 3)
                         Spacer(Modifier.height(GapRow))
-                        Row(Modifier.fillMaxWidth()) {
-                            Spacer(Modifier.weight(1f))
-                            val notNowSource = remember { MutableInteractionSource() }
-                            SafeExpansiveButton(
+                        // Left-aligned like every other lone button in the app. It used to
+                        // sit in a Row with a leading weight(1f) Spacer to push it to the
+                        // right edge, which was the one right-aligned button in Settings and
+                        // read as a different kind of control from the action above it.
+                        val notNowSource = remember { MutableInteractionSource() }
+                        SafeExpansiveButton(
+                            interactionSource = notNowSource,
+                            enabled = !state.updateDownloading && !state.updateInstalling,
+                        ) {
+                            MorphTextButton(
+                                "Not now",
                                 interactionSource = notNowSource,
+                                onClick = vm::dismissUpdate,
                                 enabled = !state.updateDownloading && !state.updateInstalling,
-                            ) {
-                                MorphTextButton(
-                                    "Not now",
-                                    interactionSource = notNowSource,
-                                    onClick = vm::dismissUpdate,
-                                    enabled = !state.updateDownloading && !state.updateInstalling,
-                                )
-                            }
+                            )
                         }
                         }
                         }
