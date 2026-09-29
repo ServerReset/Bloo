@@ -223,6 +223,12 @@ class BlooApplication : Application(), Configuration.Provider, coil.ImageLoaderF
             }
         }.apply { priority = Thread.MIN_PRIORITY }.start()
         AppLog.log("▶ App starting -- ${deviceSummary()}")
+        // Watch presence + the live snapshot push (see app/.../wear/). Off the main thread,
+        // guarded internally: a phone with no watch, or no Play Services at all, just reads as
+        // "no watch paired" and the push is a no-op.
+        Thread {
+            runCatching { com.bloo.bluelink.wear.WatchPresence.start(applicationContext) }
+        }.apply { priority = Thread.MIN_PRIORITY }.start()
         StartupTrace.mark("Application.onCreate: end")
         Thread.setDefaultUncaughtExceptionHandler { thread, throwable ->
             val trace = Log.getStackTraceString(throwable)

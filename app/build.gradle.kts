@@ -133,6 +133,8 @@ dependencies {
     // and Activity Recognition (driving -> walking), plus the fused location read used to
     // register/confirm a geofence. See app/.../autolock/.
     implementation("com.google.android.gms:play-services-location:21.4.0")
+    // Phone side of the watch sync (Wearable Data Layer). See app/.../wear/.
+    implementation("com.google.android.gms:play-services-wearable:18.2.0")
 
     // Installs the baseline profile packaged at assets/dexopt/baseline.prof so ART can
     // partially AOT-compile ahead of first use, instead of interpreting everything until

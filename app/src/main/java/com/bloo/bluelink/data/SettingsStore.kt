@@ -1138,6 +1138,21 @@ class SettingsStore(private val context: Context) {
         editTracked { it[stringPreferencesKey("sync_wifi")] = value.toString() }
     }
 
+    /**
+     * When a paired WATCH should ask for the app PIN. Device-local (in DEVICE_LOCAL_KEYS): it
+     * describes this phone's own paired watch, so it must not travel in the portable backup.
+     * Stored via the RAW DataStore (not editTracked) for the same reason the device-registry
+     * keys are -- touching it should not pollute the sync dirty set.
+     */
+    suspend fun watchLockTiming(): com.bloo.bluelink.data.WatchLockTiming =
+        com.bloo.bluelink.data.WatchLockTiming.fromWire(
+            context.settingsDataStore.data.first()[stringPreferencesKey("watch_lock_timing")],
+        )
+
+    suspend fun setWatchLockTiming(value: com.bloo.bluelink.data.WatchLockTiming) {
+        context.settingsDataStore.edit { it[stringPreferencesKey("watch_lock_timing")] = value.wireKey }
+    }
+
     // --- Device sync identity + registry (all device-local: see SyncMerge.DEVICE_LOCAL_KEYS) ---
     //
     // These describe THIS install's participation in the shared Drive file. They

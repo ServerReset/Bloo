@@ -31,6 +31,10 @@ data class WorkflowRun(
      *  (see android.yml's "Publish build" step), shown as this build's patch
      *  notes in the update tile. Null for a release with no body. */
     val releaseNotes: String? = null,
+    /** The same release's WATCH APK asset URL, so a paired watch can be offered its update
+     *  from the phone (the watch has no network of its own). Null when the release carries no
+     *  watch asset -- an older release, or a watch build that failed to upload. */
+    val watchApkUrl: String? = null,
 )
 
 /**
@@ -67,6 +71,7 @@ object UpdateApi {
     private const val OWNER = "ServerReset"
     private const val REPO = "Bloo"
     private const val PHONE_ASSET_NAME = "Bloo.apk"
+    private const val WATCH_ASSET_NAME = "Bloo-watch.apk"
 
     /** The branch new builds land on — see UpdateChecker. */
     const val DEFAULT_BRANCH = "claude/great-faraday-QuX3x"
@@ -143,6 +148,7 @@ object UpdateApi {
                     displayTitle = release.name,
                     phoneApkUrl = release.assets.firstOrNull { it.name == PHONE_ASSET_NAME }?.browserDownloadUrl,
                     releaseNotes = extractChangelog(release.body),
+                    watchApkUrl = release.assets.firstOrNull { it.name == WATCH_ASSET_NAME }?.browserDownloadUrl,
                 )
             }
         }.getOrNull()

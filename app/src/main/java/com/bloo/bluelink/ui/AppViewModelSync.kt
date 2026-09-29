@@ -177,6 +177,16 @@ fun AppViewModel.setSyncWifiOnly(wifiOnly: Boolean) = viewModelScope.launch {
     _state.update { it.copy(syncWifiOnly = wifiOnly) }
 }
 
+/** Set when a paired watch should ask for the app PIN. Pushes the new value to the watch
+ *  immediately so the change takes effect without waiting for the next snapshot write. */
+fun AppViewModel.setWatchLockTiming(timing: com.bloo.bluelink.data.WatchLockTiming) {
+    viewModelScope.launch {
+        settingsStore.setWatchLockTiming(timing)
+        _state.update { it.copy(watchLockTiming = timing) }
+        com.bloo.bluelink.wear.PhoneWatchSyncService.pushNow(getApplication())
+    }
+}
+
 /** Manual "Sync now": force a full Drive push/pull right now. Available
  *  whenever sync is configured (not just after a failure) so the user can
  *  deliberately trigger a sync without waiting for a refresh or the 2h

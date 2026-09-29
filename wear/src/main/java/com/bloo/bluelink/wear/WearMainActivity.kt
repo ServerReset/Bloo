@@ -19,14 +19,14 @@ class WearMainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         val repo = WearSnapshotRepository(this)
-        // Begin mirroring the phone's pushed snapshot, once the Data Layer bridge exists
-        // (today: both sides already read the same on-disk SnapshotStore -- see
-        // WearDataLayerSync's own doc).
+        val pinStore = WatchPinStore(this)
+        // Begin listening for the phone's pushes (real-time sync; the watch never hits the
+        // network or Drive -- see WearDataLayerSync).
         WearDataLayerSync.start(this)
         setContent {
             WearTheme {
                 Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
-                    WearGarageScreen(repo)
+                    WearGarageScreen(repo, pinStore)
                 }
             }
         }

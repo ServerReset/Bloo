@@ -1472,6 +1472,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 }
             }
             val wifiOnly = settingsStore.syncWifiOnly(snap)
+            val watchLockTiming = settingsStore.watchLockTiming()
             val settingsMode = settingsStore.settingsMode(snap)
             // Restore the cached device registry + primary + this-device identity so
             // Settings shows "your devices" immediately on launch, before (and even
@@ -1498,6 +1499,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                     settingsMode = settingsMode,
                     syncDevices = cachedDevices, syncPrimaryId = cachedPrimary,
                     thisDeviceId = myDeviceId, syncDeviceName = myDeviceName,
+                    watchLockTiming = watchLockTiming,
                     syncFileFingerprint = fileFingerprint,
                 )
             }
@@ -1785,6 +1787,11 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                                 updatePendingDismiss = false,
                             )
                         }
+                        // Tell a paired watch about the newer WATCH build (if this release
+                        // carries a watch APK) so it can offer its own update -- the watch has
+                        // no network of its own. Advertised only when a watch is actually
+                        // paired, so an unwatched phone never does the extra Data Layer work.
+                        com.bloo.bluelink.wear.WatchPresence.pushWatchUpdateAdvice(getApplication(), result.info.run)
                         // A manual check found a newer build — the update tile appears on
                         // the garage screen, which isn't visible from Settings, so also
                         // confirm via the snackbar (else the button looks like a no-op).

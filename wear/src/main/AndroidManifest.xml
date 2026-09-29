@@ -33,5 +33,21 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <!-- Receives the phone's snapshot pushes (and command results) over the Wearable Data
+             Layer, even when the watch app is closed, and mirrors them. See
+             WatchDataListenerService / WearDataLayerSync. -->
+        <service
+            android:name=".WatchDataListenerService"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="com.google.android.gms.wearable.DATA_CHANGED" />
+                <action android:name="com.google.android.gms.wearable.MESSAGE_RECEIVED" />
+                <data
+                    android:scheme="wear"
+                    android:host="*"
+                    android:pathPrefix="/bloo" />
+            </intent-filter>
+        </service>
     </application>
 </manifest>

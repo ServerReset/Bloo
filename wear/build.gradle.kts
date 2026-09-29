@@ -18,6 +18,9 @@ android {
         // GitHub releases rather than the Play Store.
         versionCode = 2
         versionName = "0.1"
+        // Same CI run number as the phone, so the watch can tell whether the phone is
+        // advertising a newer watch build than the one it is running.
+        buildConfigField("int", "BUILD_RUN_NUMBER", System.getenv("GITHUB_RUN_NUMBER") ?: "0")
     }
 
     buildTypes {
@@ -32,6 +35,7 @@ android {
     }
     buildFeatures {
         compose = true
+        buildConfig = true
     }
 }
 
@@ -67,6 +71,21 @@ dependencies {
     implementation("androidx.wear.compose:compose-material3:1.5.0")
     implementation("androidx.wear.compose:compose-foundation:1.5.0")
     implementation("androidx.wear.compose:compose-navigation:1.5.0")
+    implementation("com.google.android.gms:play-services-wearable:18.2.0")
+    // .await() for a Play Services Task in a coroutine.
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.11.0")
 
     testImplementation("org.jetbrains.kotlin:kotlin-test-junit:2.2.20")
+}
+
+// The watch APK ships as "Bloo-watch.apk" both in CI and on the GitHub Release, so the
+// phone's update surface can advertise a direct download URL for it (UpdateApi).
+androidComponents {
+    onVariants { variant ->
+        variant.outputs.forEach { output ->
+            if (output is com.android.build.api.variant.impl.VariantOutputImpl) {
+                output.outputFileName = "Bloo-watch.apk"
+            }
+        }
+    }
 }

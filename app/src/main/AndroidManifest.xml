@@ -218,6 +218,28 @@
             android:exported="false"
             android:foregroundServiceType="connectedDevice" />
 
+        <!-- Watch sync (see app/.../wear/). A WearableListenerService so a command the watch
+             sends wakes this even when the phone app is closed; it also pushes the snapshot +
+             lock config back. Only ever active when a watch is paired. -->
+        <service
+            android:name=".wear.PhoneWatchSyncService"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="com.google.android.gms.wearable.DATA_CHANGED" />
+                <data
+                    android:scheme="wear"
+                    android:host="*"
+                    android:pathPrefix="/bloo" />
+            </intent-filter>
+        </service>
+
+        <!-- Declares the Wearable Data Layer (phone side of the watch sync). required=false so
+             this installs fine on a phone with no wearable surface at all. -->
+        <uses-library
+            android:name="com.google.android.wearable"
+            android:required="false" />
+
     </application>
 
 </manifest>
+

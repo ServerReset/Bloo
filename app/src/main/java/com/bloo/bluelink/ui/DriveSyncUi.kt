@@ -209,6 +209,26 @@ internal fun SyncDevicesSection(state: UiState, vm: AppViewModel) {
                     onRemove = { vm.removeSyncedDevice(watch.id) },
                 )
             }
+            // The watch PIN gate, shown ONLY when a watch is present (there is nothing to lock
+            // otherwise): "opening the app", "sending commands", or both. A segmented control,
+            // matching every other choice in this card.
+            if (watches.isNotEmpty()) {
+                Spacer(Modifier.height(GapRow))
+                Box(Modifier.padding(start = 22.dp)) {
+                    SettingsSegmentedRow(
+                        label = "Ask the watch for my PIN",
+                        options = listOf(
+                            SegmentOption(com.bloo.bluelink.data.WatchLockTiming.OFF.wireKey, "Off", null),
+                            SegmentOption(com.bloo.bluelink.data.WatchLockTiming.OPEN.wireKey, "Opening", null),
+                            SegmentOption(com.bloo.bluelink.data.WatchLockTiming.COMMANDS.wireKey, "Commands", null),
+                            SegmentOption(com.bloo.bluelink.data.WatchLockTiming.BOTH.wireKey, "Both", null),
+                        ),
+                        selectedKey = state.watchLockTiming.wireKey,
+                        description = "Uses your app PIN. Only shows when a watch is paired.",
+                        onSelect = { vm.setWatchLockTiming(com.bloo.bluelink.data.WatchLockTiming.fromWire(it)) },
+                    )
+                }
+            }
         }
     }
 

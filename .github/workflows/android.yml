@@ -80,7 +80,7 @@ jobs:
       # app/proguard-rules.pro. Verifying behaviour still needs a human installing
       # the release actually published below.
       - name: Run unit tests and build release APKs (runs R8 -- the only check on proguard-rules.pro)
-        run: ./gradlew testDebugUnitTest assembleRelease --stacktrace
+        run: ./gradlew testDebugUnitTest assembleRelease :wear:assembleRelease --stacktrace
 
       # assembleRelease also runs lintVitalRelease (AGP does this for release variants
       # only), whose FATAL-severity findings abort the build. Those reports are the one
@@ -153,6 +153,7 @@ jobs:
           body_path: release_notes.md
           files: |
             app/build/outputs/apk/release/Bloo.apk
+            wear/build/outputs/apk/release/Bloo-watch.apk
 
   # A separate, manually-tagged Release ("vN") for anyone who wants a stable
   # build instead of the rolling "build-<run number>" pre-release the build
@@ -196,11 +197,12 @@ jobs:
       # not an unsigned one — same key as every debug build, so it installs
       # over an existing debug install without an uninstall first.
       - name: Build release APKs
-        run: ./gradlew assembleRelease --stacktrace
+        run: ./gradlew assembleRelease :wear:assembleRelease --stacktrace
 
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           files: |
             app/build/outputs/apk/release/Bloo.apk
+            wear/build/outputs/apk/release/Bloo-watch.apk
           generate_release_notes: true
