@@ -74,6 +74,19 @@ android {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
         }
     }
+    lint {
+        // Two deliberate, non-actionable warnings, silenced by id (not a blanket baseline) so
+        // any NEW finding still fails/prints:
+        //  - NewerVersionAvailable/GradleDependency: haze is pinned to 1.7.0 on purpose (2.0's
+        //    factory/input/style renderer rewrite needs a visual re-tune of the status-bar and
+        //    glass chrome this environment cannot verify), and a "newer Gradle/AGP" notice is a
+        //    toolchain decision, not a code bug.
+        //  - OldTargetApi: targetSdk 36 is the newest the toolchain here ships; bumped as
+        //    tooling allows, not on a lint nudge.
+        disable += setOf("NewerVersionAvailable", "GradleDependency", "OldTargetApi")
+        // Current targetSdk is intentional; see above.
+        checkOnly += listOf()
+    }
 }
 
 androidComponents {
@@ -134,7 +147,8 @@ dependencies {
     // register/confirm a geofence. See app/.../autolock/.
     implementation("com.google.android.gms:play-services-location:21.4.0")
     // Phone side of the watch sync (Wearable Data Layer). See app/.../wear/.
-    implementation("com.google.android.gms:play-services-wearable:18.2.0")
+    implementation("com.google.android.gms:play-services-wearable:20.0.1")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.11.0")
 
     // Installs the baseline profile packaged at assets/dexopt/baseline.prof so ART can
     // partially AOT-compile ahead of first use, instead of interpreting everything until

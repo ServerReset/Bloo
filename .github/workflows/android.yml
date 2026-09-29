@@ -124,12 +124,25 @@ jobs:
           git fetch --tags --quiet
           prev_tag=$(git tag -l 'build-*' | sed 's/^build-//' | sort -n | tail -1)
           {
-            echo "### How to install"
-            echo "1. Download \`Bloo.apk\` below."
-            echo "2. Open the downloaded file from your notification shade or Downloads app."
-            echo "3. If Android shows **\"Blocked by Play Protect\"**, tap **\"More details\"**, then **\"Install anyway\"** and confirm with your biometrics or device password."
+            echo "## Bloo — build #${{ github.run_number }}"
             echo
-            echo "Already have Bloo installed? Just open the app and pull to refresh — it'll offer to download and install this build for you."
+            echo "Two apps in this release:"
+            echo
+            echo "| File | What it is |"
+            echo "| --- | --- |"
+            echo "| \`Bloo.apk\` | The phone app. **Install this first.** |"
+            echo "| \`Bloo-watch.apk\` | The Wear OS companion. Only if you have a paired watch. |"
+            echo
+            echo "### Install — phone"
+            echo "1. Download **\`Bloo.apk\`** from the Assets below."
+            echo "2. Open it from your notification shade or the Downloads app."
+            echo "3. If Android shows **\\\"Blocked by Play Protect\\\"**, tap **\\\"More details\\\"**, then **\\\"Install anyway\\\"**, and confirm with biometrics or your device password."
+            echo
+            echo "Already have Bloo? Just open it and pull to refresh — it offers to download and install this build for you."
+            echo
+            echo "### Install — watch (optional)"
+            echo "Pair your watch to the phone first. Bloo then pushes the watch update to it for you: on the watch, open Bloo and tap **Update now**."
+            echo "Or sideload \`Bloo-watch.apk\` manually the same way as the phone (see above)."
             echo
             echo "### What's changed"
             if [ -n "$prev_tag" ]; then
@@ -137,6 +150,7 @@ jobs:
             else
               git log --pretty=format:'- %s' -n 20
             fi
+            echo
           } > release_notes.md
 
       # See the comment above "No actions/upload-artifact for the APKs" for why
@@ -205,4 +219,26 @@ jobs:
           files: |
             app/build/outputs/apk/release/Bloo.apk
             wear/build/outputs/apk/release/Bloo-watch.apk
-          generate_release_notes: true
+          # A clear, stable body rather than generate_release_notes (which lists merged PRs --
+          # this repo pushes straight to its branch, so it produced an empty "What's Changed").
+          # Both artifacts are named so it is obvious which is for the phone and which for the
+          # watch, and how to install each.
+          body: |
+            ## Bloo ${{ github.ref_name }}
+
+            Two apps in this release:
+
+            | File | What it is |
+            | --- | --- |
+            | `Bloo.apk` | The phone app. **Install this first.** |
+            | `Bloo-watch.apk` | The Wear OS companion. Only if you have a paired watch. |
+
+            ### Install — phone
+            1. Download **`Bloo.apk`** from the Assets below.
+            2. Open it from your notification shade or the Downloads app.
+            3. If Android shows **"Blocked by Play Protect"**, tap **"More details"**, then **"Install anyway"**, and confirm with biometrics or your device password.
+
+            ### Install — watch (optional)
+            Pair your watch to the phone first. Bloo then pushes the watch update to it for you: on the watch, open Bloo and tap **Update now**.
+
+            Or sideload `Bloo-watch.apk` manually the same way as the phone (see above).

@@ -41,7 +41,15 @@ data class WatchSyncPayload(
 object WatchSyncProtocol {
     /** Phone → watch: the snapshot + lock config. Written by the phone, read by the watch. */
     const val PATH_SNAPSHOT = "/bloo/snapshot"
-    /** Watch → phone: a command the watch wants run (see [WatchCommandRequest]). */
+    /** Phone → watch: the full WATCH APK bytes for a seamless in-watch update. The phone
+     *  downloads the watch APK (it has the network; the watch does not) and streams it here as
+     *  an asset; the watch writes it to a cache file and hands it to the system package
+     *  installer, so the user never leaves the watch or opens a browser. */
+    const val PATH_WATCH_APK = "/bloo/watch_apk"
+    /** Watch → phone: "please push me the watch APK". The phone then downloads it and pushes
+     *  [PATH_WATCH_APK]. A no-op if nothing is newer. */
+    const val PATH_REQUEST_APK = "/bloo/request_apk"
+    /** Phone → watch: a command the watch wants run (see [WatchCommandRequest]). */
     const val PATH_COMMAND = "/bloo/command"
     /** Phone → watch: the result of a command the watch asked for, so the watch can clear its
      *  pending state and surface failures. */

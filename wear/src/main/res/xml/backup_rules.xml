@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Pre-Android-12 counterpart to data_extraction_rules.xml: the watch backs up nothing (all
+     of its state is re-pushed from the phone). -->
+<full-backup-content>
+    <exclude domain="sharedpref" path="." />
+    <exclude domain="root" path="." />
+</full-backup-content>

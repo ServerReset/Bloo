@@ -225,6 +225,9 @@ object ShizukuInstaller {
 
     /** OR [extra] into the SessionParams' hidden installFlags field, resolving the
      *  reflected Field once for the read-modify-write. */
+    @Suppress("DiscouragedPrivateApi") // installFlags is the documented-by-observation hidden
+    // field Shizuku silent install needs; there is no public API for it, and this whole path
+    // is optional and runtime-gated behind Shizuku being present.
     private fun orInstallFlags(params: PackageInstaller.SessionParams, extra: Int) {
         val field = PackageInstaller.SessionParams::class.java.getDeclaredField("installFlags")
         field.setInt(params, field.getInt(params) or extra)

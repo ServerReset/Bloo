@@ -37,6 +37,12 @@ android {
         compose = true
         buildConfig = true
     }
+    lint {
+        // Same deliberate toolchain-noise ids silenced in :app (see app/build.gradle.kts for the
+        // reasoning). Wear-compose is pinned to the Compose-BOM-compatible 1.5.0 line; a newer
+        // minor is a deliberate toolchain decision, not a code finding.
+        disable += setOf("NewerVersionAvailable", "GradleDependency", "OldTargetApi")
+    }
 }
 
 kotlin {
@@ -71,7 +77,7 @@ dependencies {
     implementation("androidx.wear.compose:compose-material3:1.5.0")
     implementation("androidx.wear.compose:compose-foundation:1.5.0")
     implementation("androidx.wear.compose:compose-navigation:1.5.0")
-    implementation("com.google.android.gms:play-services-wearable:18.2.0")
+    implementation("com.google.android.gms:play-services-wearable:20.0.1")
     // .await() for a Play Services Task in a coroutine.
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.11.0")
 

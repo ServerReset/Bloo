@@ -14,6 +14,7 @@ import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.LockOpen
 import androidx.compose.material.icons.filled.SystemUpdate
 import androidx.compose.material.icons.filled.Download
+import androidx.compose.material.icons.filled.Link
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -26,6 +27,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.core.net.toUri
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.wear.compose.foundation.lazy.ScalingLazyColumn
 import androidx.wear.compose.foundation.lazy.rememberScalingLazyListState
@@ -52,6 +54,7 @@ fun WearGarageScreen(
     modifier: Modifier = Modifier,
 ) {
     val vehicles by repo.vehicles.collectAsStateWithLifecycle(initialValue = emptyList())
+    val connected by repo.connected.collectAsStateWithLifecycle(initialValue = false)
     val timing = pinStore.timing
     // Session unlock: true once the user has proven the PIN since this screen opened. Only ever
     // consulted for the OPEN gate (and the BOTH command gate) -- see WatchPinPolicy.
@@ -92,7 +95,10 @@ fun WearGarageScreen(
         }
         if (vehicles.isEmpty()) {
             ScreenScaffold(timeText = { TimeText() }) {
-                WearMessage("Open Bloo on your phone to add a car.")
+                WearMessage(
+                    if (connected) "No cars on your phone yet."
+                    else "Waiting for your phone…",
+                )
             }
             return@AppScaffold
         }
@@ -138,21 +144,42 @@ private fun WearCarPage(
         ScalingLazyColumn(state = listState, modifier = Modifier.fillMaxSize()) {
             updateAdvice?.let { advice ->
                 item {
+                    // If the watch cannot install unknown apps yet, the FIRST tap sends the user
+                    // to grant it (Android requires this once per source); afterwards "Update
+                    // now" asks the phone to push the APK and the system installer takes over.
+                    val canInstall = remember { mutableStateOf(context.canRequestPackageInstalls()) }
                     WearPebble(title = "Update available", icon = Icons.Filled.SystemUpdate) {
-                        WearActionRow(label = "Update Bloo", icon = Icons.Filled.Download) {
-                            runCatching {
-                                context.startActivity(
-                                    android.content.Intent(
-                                        android.content.Intent.ACTION_VIEW,
-                                        android.net.Uri.parse(advice.apkUrl),
-                                    ).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK),
-                                )
+                        if (!canInstall.value) {
+                            WearActionRow(label = "Allow installs", icon = Icons.Filled.LockOpen) {
+                                openInstallPermission(context)
+                                canInstall.value = context.canRequestPackageInstalls()
+                            }
+                        } else {
+                            // Primary: ask the phone to push the APK and install it right here (the
+                            // phone does the download; the watch never leaves the screen). Fallback:
+                            // open the URL, for when the Data Layer push is unavailable.
+                            WearActionRow(label = "Update now", icon = Icons.Filled.Download) {
+                                WearDataLayerSync.requestWatchApk(context)
+                            }
+                            WearActionRow(label = "Open link", icon = Icons.Filled.Link) {
+                                openUpdate(context, advice.apkUrl)
                             }
                         }
                     }
                 }
             }
             item { WearMessage(v.name) }
+            // The car's state at a glance -- the whole reason to look at a watch. One compact
+            // line: lock state, charge/fuel %, and charging, whichever the phone has reported.
+            val glimpse = buildList {
+                v.locked?.let { add(if (it) "Locked" else "Unlocked") }
+                v.percent?.let { add("$it%") }
+                if (v.charging == true) add("Charging")
+                if (v.climateOn == true) add("Climate on")
+            }.joinToString("  ·  ")
+            if (glimpse.isNotBlank()) {
+                item { WearMessage(glimpse) }
+            }
             item {
                 WearPebble(title = "Controls", icon = Icons.Filled.DirectionsCar) {
                     val locked = v.locked == true
@@ -189,6 +216,41 @@ private fun WearMessage(text: String, modifier: Modifier = Modifier) {
             textAlign = TextAlign.Center,
             maxLines = 3,
             style = MaterialTheme.typography.titleMedium,
+        )
+    }
+}
+
+/**
+ * Hands the phone-advertised watch APK URL to the platform (browser / package installer). The
+ * watch never downloads anything itself. FLAG_ACTIVITY_NEW_TASK is required and correct for
+ * starting an Activity from a non-Activity context; the WearRecents lint concerns launching the
+ * app's OWN recents entry, which this is not.
+ */
+@Suppress("WearRecents")
+private fun openUpdate(context: android.content.Context, url: String) {
+    runCatching {
+        context.startActivity(
+            android.content.Intent(android.content.Intent.ACTION_VIEW, url.toUri())
+                .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK),
+        )
+    }
+}
+
+/** True when this app may hand an APK to the system installer (Android 8+ per-source grant,
+ *  always required at this app's minSdk 30). */
+private fun android.content.Context.canRequestPackageInstalls(): Boolean =
+    packageManager.canRequestPackageInstalls()
+
+/** Send the user to grant "install unknown apps" for this app, the one-time step the seamless
+ *  in-watch update needs before the installer will accept the pushed APK. */
+@Suppress("WearRecents") // starting a Settings Activity from a non-Activity context
+private fun openInstallPermission(context: android.content.Context) {
+    runCatching {
+        context.startActivity(
+            android.content.Intent(
+                android.provider.Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,
+                "package:${context.packageName}".toUri(),
+            ).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK),
         )
     }
 }

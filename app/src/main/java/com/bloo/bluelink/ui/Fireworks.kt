@@ -16,6 +16,10 @@ object Fireworks {
     fun playSound(context: Context) {
         val ctx = context.applicationContext
         runCatching {
+            // getIdentifier by name, deliberately: the `celebrate` clip is an OPTIONAL drop-in
+            // resource (see this object's own doc) -- a compile-time R.raw.celebrate reference
+            // would fail the build for every checkout that has not added one.
+            @Suppress("DiscouragedApi")
             val resId = ctx.resources.getIdentifier("celebrate", "raw", ctx.packageName)
             if (resId != 0) {
                 MediaPlayer.create(ctx, resId)?.apply {

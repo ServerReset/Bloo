@@ -1,48 +1,50 @@
 # Bloo for Wear OS
 
-A minimal companion watch app. It reuses the phone's own shared modules so it can never
-drift from what the phone shows or does:
+A small, lean companion watch app. It is a pure **auxiliary** surface: it never talks to the
+network or Google Drive, and never runs car commands itself. Everything it shows is pushed from
+the phone over the Wearable Data Layer, and every command it wants is forwarded to the phone,
+which runs it through its normal command path (`CarCommandRunner`) and reports back.
 
-- **`:shared`** — reads the same on-disk `SnapshotStore` the phone's background workers
-  mirror into, and sends commands through the phone's own `CarCommandRunner`
-  (`CarCommand` / `CarAction`), the exact path the phone's notification buttons and
-  AutoLock already use.
-- **`:uicommon`** — the foundation-only `MorphButtonCore`, so the watch's one tap target
-  morphs and presses like every other Bloo button rather than a watch-only look.
+It reuses the phone's own shared modules so the two can never drift:
 
-## What it does today
+- **`:shared`** — `SnapshotStore`/`VehicleSnapshot` for state, `CarCommand`/`CarAction` for the
+  command vocabulary, `PinRecord`/`PinCrypto`/`PinLockout` for the PIN, and the pure
+  `WatchPinPolicy` + `WatchSyncProtocol`/`WatchSyncPayload` that define the sync contract.
+- **`:uicommon`** — the foundation-only `MorphButtonCore`, so the watch's tap targets morph and
+  press like every other Bloo button.
 
-- **Swipe left/right** between cars (a `HorizontalPager` over the snapshot's vehicle list).
-- Per car, one scrolling page ([`ScalingLazyColumn`](https://developer.android.com/training/wearables/compose) so pebbles shrink toward the round edges and scroll with the crown) of **two
-  pebbles**: **Controls** (lock/unlock) and **Climate** (on/off). Adding a pebble is one more
-  `WearPebble` in `WearCarPage`, not a new screen.
-- Wrapped in Wear's own `AppScaffold` + `ScreenScaffold` + `TimeText`, so it honours the
-  round face and shows the time like a watch app should.
+## What it does
 
-Everything is scaffolded, not finished: the UI is intentionally tiny so the shape is
-reviewable before more is built.
+- **Swipe left/right** between cars; each car is a scrolling `ScalingLazyColumn` of pebbles.
+- **Pebbles:** Controls (lock/unlock) and Climate (on/off). The car's state line (locked, %, charging) rides above them. Adding a pebble is one more `WearPebble`, not a new screen.
+- Wrapped in Wear's own `AppScaffold` + `ScreenScaffold` + `TimeText`, so it honours the round
+  face and shows the time.
 
-## How the phone shows it
+## Real-time sync (phone → watch)
 
-The watch registers through the SAME Google Drive sync as a phone (its `SettingsStore`
-`selfSyncDevice` stamps `kind = "watch"` from `PackageManager.FEATURE_WATCH`), so it lands
-in the phone's "Synced devices" registry. Settings renders it as a **companion nested under
-its phone**, not a reorderable peer — see `WearCompanionRow` in `DriveSyncUi.kt`. A watch
-can never be the primary (source of truth) device.
+See `WearDataLayerSync` (watch) and `PhoneWatchSyncService`/`WatchPresence` (phone). The phone
+pushes a `WatchSyncPayload` on every snapshot write; the watch mirrors it. Commands go the other
+way and are run on the phone.
 
-## Live sync
+## PIN gate
 
-Both processes read the same `SnapshotStore`, which is what makes the watch "live sync"
-in the same-device/emulator case. For a real paired watch, `WearDataLayerSync` is the
-seam where the Wearable Data Layer bridge (`com.google.android.gms:play-services-wearable`,
-`DataClient.putDataItem` on the phone → `OnDataChangedListener` on the watch) drops in;
-`WearSnapshotRepository` and the UI do not need to change.
+`WatchPinStore` verifies against the phone-sent `PinRecord` (PBKDF2; the watch never holds the
+PIN). When it asks is decided by the phone's Settings → **Ask the watch for my PIN** (Off /
+Opening / Commands / Both), which only appears when a watch is paired. The rules are pure and
+exhaustively unit-tested in `WatchPinPolicyTest`.
+
+## Updates
+
+The phone (which has the network) downloads the watch APK and pushes its bytes to the watch; the
+watch writes it and hands it to the system installer, so the user stays on the watch. A URL
+fallback exists if the Data Layer push is unavailable, and a one-time "allow installs" grant is
+surfaced in-app. `Bloo-watch.apk` is published on every GitHub Release.
 
 ## Build
 
 ```
-./gradlew :wear:assembleDebug
+./gradlew :wear:assembleDebug     # -> wear/build/outputs/apk/debug/Bloo-watch.apk
 ```
 
-`minSdk 30` (Wear OS 3.0, the first with a real Compose runtime); `:shared`/`:uicommon`
-stay at 26 so they remain usable by both the phone and the watch.
+`minSdk 30` (Wear OS 3.0, the first with a real Compose runtime); `:shared`/`:uicommon` stay at 26
+so both the phone and the watch can use them.

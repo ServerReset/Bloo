@@ -64,7 +64,11 @@ object WearDataLayerSync {
     data class UpdateAdvice(val runNumber: Int, val apkUrl: String, val notes: String?)
 
     private var started = false
-    private var pendingStore: WatchPinStore? = null
+    // The Application context only -- never an Activity or Service context. WatchPinStore holds
+    // this context.applicationContext, so the static reference cannot leak a component.
+    // (Lint's StaticFieldLeak cannot see through the applicationContext call.)
+    @Suppress("StaticFieldLeak")
+    @Volatile private var pendingStore: WatchPinStore? = null
 
     /**
      * Begin listening. Registers a Data Layer listener (via a [WearableListenerService]
@@ -129,6 +133,20 @@ object WearDataLayerSync {
     }
 
     /**
+     * The phone pushed the watch APK bytes: write them to a cache file and return it so the
+     * caller can hand it to the system package installer. Returns null on any failure.
+     */
+    fun writePushedApk(context: Context, bytes: ByteArray?): java.io.File? {
+        if (bytes == null || bytes.isEmpty()) return null
+        return runCatching {
+            val dir = java.io.File(context.cacheDir, "updates").apply { mkdirs() }
+            val file = java.io.File(dir, "bloo-watch.apk")
+            file.writeBytes(bytes)
+            file
+        }.getOrNull()
+    }
+
+    /**
      * Send a command to the phone to run. Returns a request id the caller can watch for in
      * [lastCommandResult]. The watch does NOT run commands itself.
      */
@@ -144,6 +162,17 @@ object WearDataLayerSync {
                 dataMap.putLong("_ts", System.currentTimeMillis())
             }.asPutDataRequest().setUrgent()
             runCatching { Wearable.getDataClient(app).putDataItem(req) }
+        }
+    }
+
+    /** Ask the phone to push this watch the latest watch APK (see [WatchSyncProtocol.PATH_REQUEST_APK]). */
+    fun requestWatchApk(context: Context) {
+        val app = context.applicationContext
+        scope.launch {
+            runCatching {
+                com.google.android.gms.wearable.Wearable.getMessageClient(app)
+                    .sendMessage("*", WatchSyncProtocol.PATH_REQUEST_APK, ByteArray(0)).await()
+            }
         }
     }
 

@@ -2,6 +2,7 @@ package com.bloo.bluelink.wear
 
 import android.content.Context
 import android.os.SystemClock
+import androidx.core.content.edit
 import com.bloo.bluelink.data.PinLockout
 import com.bloo.bluelink.data.PinRecord
 import com.bloo.bluelink.data.WatchLockTiming
@@ -29,15 +30,13 @@ class WatchPinStore(private val context: Context) {
     /** When the phone says the watch should lock. Pushed over the Data Layer; OFF until then. */
     var timing: WatchLockTiming
         get() = WatchLockTiming.fromWire(prefs.getString(KEY_TIMING, null))
-        set(value) = prefs.edit().putString(KEY_TIMING, value.wireKey).apply()
+        set(value) = prefs.edit { putString(KEY_TIMING, value.wireKey) }
 
     /** The mirrored PIN record, or null when the phone has no PIN set. */
     var record: PinRecord?
         get() = PinRecord.decode(prefs.getString(KEY_RECORD, null))
-        set(value) {
-            prefs.edit().apply {
-                if (value == null) remove(KEY_RECORD) else putString(KEY_RECORD, value.encode())
-            }.apply()
+        set(value) = prefs.edit {
+            if (value == null) remove(KEY_RECORD) else putString(KEY_RECORD, value.encode())
         }
 
     /** Whether the phone has pushed a PIN to gate with. */
@@ -49,11 +48,11 @@ class WatchPinStore(private val context: Context) {
         lockedUntilElapsedMs = prefs.getLong(KEY_LOCKED_UNTIL_ELAPSED, 0L),
     )
 
-    private fun save(l: PinLockout) = prefs.edit()
-        .putInt(KEY_FAILURES, l.failures)
-        .putLong(KEY_LOCKED_UNTIL_WALL, l.lockedUntilEpochMs)
-        .putLong(KEY_LOCKED_UNTIL_ELAPSED, l.lockedUntilElapsedMs)
-        .apply()
+    private fun save(l: PinLockout) = prefs.edit {
+        putInt(KEY_FAILURES, l.failures)
+        putLong(KEY_LOCKED_UNTIL_WALL, l.lockedUntilEpochMs)
+        putLong(KEY_LOCKED_UNTIL_ELAPSED, l.lockedUntilElapsedMs)
+    }
 
     /**
      * Verify [pin], updating the lockout policy through [PinLockout]'s own onFailure/onSuccess.

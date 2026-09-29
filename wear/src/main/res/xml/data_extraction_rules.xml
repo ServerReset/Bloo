@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The watch carries no user data worth backing up or transferring: everything it shows is
+     pushed live from the phone, and the only local state is the mirrored PIN hash + lockout,
+     which the phone re-pushes anyway. So nothing is extracted on either path. -->
+<data-extraction-rules>
+    <cloud-backup>
+        <exclude domain="sharedpref" path="." />
+        <exclude domain="root" path="." />
+    </cloud-backup>
+    <device-transfer>
+        <exclude domain="sharedpref" path="." />
+        <exclude domain="root" path="." />
+    </device-transfer>
+</data-extraction-rules>

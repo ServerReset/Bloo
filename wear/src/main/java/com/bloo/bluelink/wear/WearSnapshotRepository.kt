@@ -27,4 +27,7 @@ class WearSnapshotRepository(private val context: Context) {
 
     /** The phone's last command result, so the UI can clear pending + show a failure. */
     val lastCommandResult = WearDataLayerSync.lastCommandResult
+
+    /** Whether a snapshot has been received from the phone at least once this session. */
+    val connected = WearDataLayerSync.connected
 }

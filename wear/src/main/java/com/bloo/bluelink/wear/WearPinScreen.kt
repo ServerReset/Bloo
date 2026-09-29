@@ -45,7 +45,6 @@ fun WearPinScreen(
 ) {
     var entered by remember { mutableStateOf("") }
     var message by remember { mutableStateOf<String?>(null) }
-    var lockedOutSeconds by remember { mutableStateOf(store.lockoutRemainingSeconds()) }
 
     fun submit(pin: String) {
         when (val result = store.verify(pin)) {
@@ -60,7 +59,6 @@ fun WearPinScreen(
             }
             is PinVerifyResult.LockedOut -> {
                 entered = ""
-                lockedOutSeconds = (result.remainingMs / 1000L).coerceAtLeast(0L)
                 message = "Locked. Try again in ${com.bloo.bluelink.data.formatLockoutSeconds(result.remainingMs)}"
             }
         }

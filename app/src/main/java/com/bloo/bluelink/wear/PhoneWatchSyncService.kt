@@ -21,6 +21,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.tasks.await
 import kotlinx.serialization.json.Json
 
 /**
@@ -55,6 +56,17 @@ class PhoneWatchSyncService : WearableListenerService() {
         }
     }
 
+    override fun onMessageReceived(messageEvent: com.google.android.gms.wearable.MessageEvent) {
+        super.onMessageReceived(messageEvent)
+        if (messageEvent.path == WatchSyncProtocol.PATH_REQUEST_APK) {
+            val url = lastWatchApkUrl
+            if (url != null) {
+                AppLog.log("WatchSync: watch requested the APK; pushing.")
+                pushWatchApk(applicationContext, url)
+            }
+        }
+    }
+
     private suspend fun runCommand(request: WatchCommandRequest) {
         val result = runCatching { CarCommandRunner.execute(applicationContext, request.command) }
             .getOrElse {
@@ -78,8 +90,39 @@ class PhoneWatchSyncService : WearableListenerService() {
         runCatching { Wearable.getDataClient(applicationContext).putDataItem(req) }
     }
 
+    /**
+     * Download the watch APK at [url] on the PHONE (the watch has no network) and push its bytes
+     * to the watch as an asset on [WatchSyncProtocol.PATH_WATCH_APK]. The watch then installs it
+     * locally, so the user never opens a browser or leaves the watch. Best-effort: any failure is
+     * logged and the watch simply keeps offering the URL fallback.
+     */
+    fun pushWatchApk(context: Context, url: String) {
+        val app = context.applicationContext
+        CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
+            runCatching {
+                val bytes = okhttp3.OkHttpClient().newCall(
+                    okhttp3.Request.Builder().url(url).get().build(),
+                ).execute().use { resp ->
+                    if (!resp.isSuccessful) error("HTTP ${resp.code}")
+                    resp.body?.bytes() ?: error("empty body")
+                }
+                val asset = com.google.android.gms.wearable.Asset.createFromBytes(bytes)
+                val req = PutDataMapRequest.create(WatchSyncProtocol.PATH_WATCH_APK).apply {
+                    dataMap.putAsset("apk", asset)
+                    dataMap.putLong("_ts", System.currentTimeMillis())
+                }.asPutDataRequest().setUrgent()
+                Wearable.getDataClient(app).putDataItem(req).await()
+                AppLog.log("WatchSync: pushed watch APK (${bytes.size} bytes)")
+            }.onFailure { AppLog.log("WatchSync: watch APK push failed (${it.javaClass.simpleName})") }
+        }
+    }
+
     companion object {
         private const val KEY_PAYLOAD = "payload"
+
+        /** The most recent watch APK URL the phone advertised, so a "push me the APK" request
+         *  from the watch can be served without a fresh update check. */
+        @Volatile private var lastWatchApkUrl: String? = null
 
         /**
          * Push the current snapshot + lock config to every paired watch, now. Called from the
@@ -91,12 +134,20 @@ class PhoneWatchSyncService : WearableListenerService() {
          * build for the watch to offer installing; null (the default) means "nothing to
          * advertise" and the watch shows no update affordance.
          */
+        /**
+         * Advertise a newer WATCH build to any paired watch. A no-op when no watch is paired, so
+         * the update check never pays for a push nobody will read. [run] is the phone's newest
+         * [com.bloo.bluelink.data.WorkflowRun]; its watch asset URL is what the watch offers to
+         * download.
+         */
         fun pushNow(
             context: Context,
             watchUpdateRunNumber: Int? = null,
             watchUpdateApkUrl: String? = null,
             watchUpdateNotes: String? = null,
         ) {
+            // Remember the URL so a "push me the APK" request from the watch can be served.
+            lastWatchApkUrl = watchUpdateApkUrl
             val app = context.applicationContext
             val job = CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
                 val snapshot = SnapshotStore(app).current()
