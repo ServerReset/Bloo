@@ -415,9 +415,10 @@ fun standardButtonIcon(label: String): ImageVector? = when (label) {
     "Cancel", "Not now", "Dismiss" -> Icons.Filled.Close
     // Destructive. Close, not a bin: this app's vocabulary has no delete glyph, and every icon
     // here is one the codebase already uses -- see the note above on why that constraint exists.
-    "Clear", "Remove", "Delete" -> Icons.Filled.Close
+    "Clear", "Remove", "Delete", "Remove PIN" -> Icons.Filled.Close
     "Sign out" -> Icons.AutoMirrored.Filled.Logout
     "Unpin" -> Icons.Filled.PushPin
+    "Done" -> Icons.Filled.Check
     // Confirmation -- the second tap of a two-step action, so it takes the affirmative glyph
     // rather than the destructive one it is confirming.
     "Tap again to confirm", "Tap again to reset", "Keep it", "Keep PIN" -> Icons.Filled.Check
@@ -443,7 +444,7 @@ fun standardButtonIcon(label: String): ImageVector? = when (label) {
     // Sync / run
     "Test sync", "Pull from primary", "Change Drive file" -> Icons.Filled.CloudSync
     "Run it", "Working…" -> Icons.Filled.Bolt
-    "Remind me" -> Icons.Filled.Refresh
+    "Remind me", "Retry" -> Icons.Filled.Refresh
     // Security
     "Use biometrics" -> Icons.Filled.Fingerprint
     "Use PIN", "Update PIN", "Change PIN", "Set up PIN" -> Icons.Filled.Pin

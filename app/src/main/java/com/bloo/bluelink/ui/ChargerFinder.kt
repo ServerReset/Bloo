@@ -133,11 +133,13 @@ internal fun ChargerFilterBar(
                         "Save",
                         onClick = { onSetApiKey(apiKeyInput) },
                         enabled = apiKeyInput.isNotBlank(),
-                        showIcon = false,
                     )
                 }
                 Spacer(Modifier.height(GapRow))
-                MorphTextButton("Retry", onClick = onRetry, showIcon = false, modifier = Modifier.fillMaxWidth())
+                // Content-width, like the Save beside it and every other button in the app --
+                // this one alone was stretched edge-to-edge, and both were text-only while
+                // every other action button leads with a glyph.
+                MorphTextButton("Retry", onClick = onRetry)
             } else {
                 Text(
                     when {
