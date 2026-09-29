@@ -2216,7 +2216,21 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         settingsStore.autoLockConfig(vin)
 
     fun setAutoLockConfig(vin: String, config: com.bloo.bluelink.autolock.AutoLockConfig) {
-        viewModelScope.launch { settingsStore.setAutoLockConfig(vin, config) }
+        viewModelScope.launch {
+            settingsStore.setAutoLockConfig(vin, config)
+            val anyEnabled = settingsStore.allAutoLockConfigs().values.any { it.enabled }
+            val action = if (anyEnabled) {
+                com.bloo.bluelink.autolock.AutoLockService.ACTION_START_WATCH
+            } else {
+                com.bloo.bluelink.autolock.AutoLockService.ACTION_STOP_WATCH
+            }
+            runCatching {
+                val intent = android.content.Intent(getApplication(), com.bloo.bluelink.autolock.AutoLockService::class.java)
+                    .setAction(action)
+                    .putExtra(com.bloo.bluelink.autolock.AutoLockService.EXTRA_VIN, vin)
+                getApplication<android.app.Application>().startForegroundService(intent)
+            }.onFailure { com.bloo.bluelink.data.AppLog.log("AutoLock watcher start failed: ${it.javaClass.simpleName}") }
+        }
     }
 
     /** Bonded (paired) Bluetooth devices, for the "which one is your car" picker. Empty

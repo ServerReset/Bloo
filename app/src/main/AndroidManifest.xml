@@ -34,6 +34,7 @@
          section, only once the feature is actually turned on. -->
     <!-- Bluetooth disconnect trigger + the paired-device picker in Settings. -->
     <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <!-- Activity Recognition confirmation (driving -> walking). -->
     <uses-permission android:name="android.permission.ACTIVITY_RECOGNITION" />
     <!-- The short-lived foreground service that runs while an evaluation (grace countdown,
@@ -211,6 +212,7 @@
         <receiver android:name=".autolock.AutoLockBootReceiver" android:exported="false">
             <intent-filter>
                 <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
             </intent-filter>
         </receiver>
         <service
@@ -242,4 +244,3 @@
     </application>
 
 </manifest>
-

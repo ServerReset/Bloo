@@ -1,15 +1,20 @@
 package com.bloo.bluelink.autolock
 
 import android.app.Service
+import android.bluetooth.BluetoothDevice
+import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.content.pm.ServiceInfo
 import android.os.Build
 import android.os.IBinder
+import androidx.core.content.ContextCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.app.ServiceCompat
 import com.bloo.bluelink.data.AppLog
 import com.bloo.bluelink.data.SnapshotStore
+import com.bloo.bluelink.data.SettingsStore
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -38,13 +43,57 @@ class AutoLockService : Service() {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private val observeJobs = java.util.concurrent.ConcurrentHashMap<String, Job>()
     private val carNames = java.util.concurrent.ConcurrentHashMap<String, String>()
+    private var watcher: BroadcastReceiver? = null
 
     override fun onBind(intent: Intent?): IBinder? = null
 
+    override fun onCreate() {
+        super.onCreate()
+        val receiver = object : BroadcastReceiver() {
+            override fun onReceive(context: Context, intent: Intent) {
+                val device = intent.getParcelableExtra<BluetoothDevice>(BluetoothDevice.EXTRA_DEVICE)
+                    ?: return
+                val mac = runCatching { device.address }.getOrNull() ?: return
+                scope.launch {
+                    SettingsStore(applicationContext).allAutoLockConfigs().forEach { (vin, config) ->
+                        if (!config.enabled || !mac.equals(config.deviceAddress, ignoreCase = true)) return@forEach
+                        AppLog.log("AutoLock: watcher received ${intent.action} for configured car $vin")
+                        if (intent.action == BluetoothDevice.ACTION_ACL_DISCONNECTED) {
+                            AutoLockTrigger.onCarDisconnected(applicationContext, vin, config)
+                        } else if (intent.action == BluetoothDevice.ACTION_ACL_CONNECTED) {
+                            AutoLockTrigger.onCarConnected(applicationContext, vin)
+                        }
+                    }
+                }
+            }
+        }
+        // RECEIVER_EXPORTED is required for system Bluetooth broadcasts on Android 13+;
+        // NOT_EXPORTED receivers do not receive broadcasts sent from the Bluetooth system UID.
+        // The handler still requires an exact configured device address before doing anything.
+        ContextCompat.registerReceiver(
+            this,
+            receiver,
+            IntentFilter().apply {
+                addAction(BluetoothDevice.ACTION_ACL_CONNECTED)
+                addAction(BluetoothDevice.ACTION_ACL_DISCONNECTED)
+            },
+            ContextCompat.RECEIVER_EXPORTED,
+        )
+        watcher = receiver
+    }
+
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        if (intent?.action == ACTION_START_WATCH) {
+            val vin = intent.getStringExtra(EXTRA_VIN)
+            if (vin != null) startForegroundCompat(vin, DetectionState.IDLE, 0)
+            return START_STICKY
+        }
+        if (intent?.action == ACTION_STOP_WATCH) {
+            stopSelf()
+            return START_NOT_STICKY
+        }
         val vin = intent?.getStringExtra(EXTRA_VIN)
         if (vin == null) {
-            if (observeJobs.isEmpty()) stopSelf()
             return START_NOT_STICKY
         }
 
@@ -170,6 +219,8 @@ class AutoLockService : Service() {
     }
 
     override fun onDestroy() {
+        watcher?.let { runCatching { unregisterReceiver(it) } }
+        watcher = null
         scope.cancel()
         super.onDestroy()
     }
@@ -177,6 +228,8 @@ class AutoLockService : Service() {
     companion object {
         const val ACTION_CANCEL = "com.bloo.bluelink.AUTOLOCK_CANCEL"
         const val ACTION_LOCK_NOW = "com.bloo.bluelink.AUTOLOCK_LOCK_NOW"
+        const val ACTION_START_WATCH = "com.bloo.bluelink.AUTOLOCK_START_WATCH"
+        const val ACTION_STOP_WATCH = "com.bloo.bluelink.AUTOLOCK_STOP_WATCH"
         const val EXTRA_VIN = "vin"
 
         /** Starts the notification wrapper for [vin] (Bluetooth disconnect / a manual
