@@ -136,17 +136,22 @@ internal fun MapFeatureRow(
     wrap: Boolean = false,
     horizontalAlignment: Alignment.Horizontal = Alignment.Start,
 ) {
-    // One full-width icon-only strip. `wrap = false` compacts the row to its glyphs once
-    // the labels stop fitting (a map toolbar has no room for two lines), and `stretchCompact`
-    // keeps those glyphs spread across the full width rather than shrinking to a small
-    // cluster in the middle -- requested directly, twice: compact to icons, and full width.
+    // When the labels stop fitting, this row compacts to icon-only buttons -- and must STAY
+    // icon-only. `stretchCompact` was the bug: it kept the full equal share for each compacted
+    // button, so a glyph-only button was still ~1/4 of the width wide, which is wide enough for
+    // its own label to fit again inside that share -- and MorphButtonLabel draws the label
+    // whenever it fits. Reported directly: the Share button "expands then shows the damn label."
+    // With equalWidths and NO stretch, a compacted row instead sits as a centred cluster of
+    // icon-sized buttons (the branch below), which reads as one compact strip and, crucially,
+    // never re-grows the label.
+    val compacted = features.size > 3
     ExpressiveButtonRow(
         modifier = modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = GapRow),
         spacing = 10.dp,
         equalWidths = true,
         wrap = wrap,
-        horizontalAlignment = horizontalAlignment,
-        stretchCompact = true,
+        // A compacted cluster is centred rather than left-packed -- see MapFeatureRow's own doc.
+        horizontalAlignment = if (compacted) Alignment.CenterHorizontally else horizontalAlignment,
     ) {
         features.forEach { feature ->
             val source = remember { MutableInteractionSource() }
