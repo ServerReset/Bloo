@@ -17,18 +17,7 @@ import android.content.Intent
 import android.os.Build
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.scaleIn
-import androidx.compose.animation.scaleOut
-import androidx.compose.animation.slideInVertically
-import androidx.compose.animation.slideOutVertically
-import androidx.compose.animation.togetherWith
-import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.background
-import androidx.compose.animation.core.snap
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -37,14 +26,10 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.only
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.Build
@@ -53,16 +38,10 @@ import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Settings
-import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.onClick
-import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
-import androidx.compose.material3.Icon
-import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -73,16 +52,12 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.core.net.toUri
 import com.bloo.bluelink.update.UpdateInfo
-import com.bloo.bluelink.data.Weather
 import kotlin.math.roundToInt
 
 /**
@@ -361,74 +336,6 @@ internal fun UpdateAvailableTile(
 }
 
 /**
- * The release notes block: "What's new", an excerpt, and a link to the full notes.
- *
- * Shared by the update pebble and [SettingsHeroCard]'s expanded body, which had a copy each --
- * same Surface, same header row, same "Full notes" button, differing only in how many lines of
- * the excerpt they showed and in one of them forgetting FLAG_ACTIVITY_NEW_TASK on the intent.
- * That is the shape of drift this exists to stop: two blocks that are the same idea, kept in
- * step by hand until one of them quietly is not.
- *
- * fillMaxWidth() is load-bearing, not decoration: this can sit inside a PopVisible, and with a
- * weight()-bearing Text in the header row and no explicit width anywhere in the chain, that Text
- * collapses to near-zero and wraps one character per line.
- */
-@Composable
-internal fun UpdateReleaseNotes(
-    info: UpdateInfo,
-    /** 5 in the pebble, which has the room; 3 in the Settings card, which does not. */
-    maxLines: Int = 5,
-    hazeState: dev.chrisbanes.haze.HazeState? = null,
-) {
-    val notes = info.run.releaseNotes?.trim().orEmpty()
-    if (notes.isBlank()) return
-    val context = LocalContext.current
-    // Glass surface with unified blur styling. shadow = false -- shared by the
-    // pebble body AND SettingsHeroCard's expanded body (this composable's own doc),
-    // both of which already nest this inside another elevated card/group; see
-    // glassEdge's own doc for why a nested panel skips the second shadow.
-    GlassSurface(
-        modifier = Modifier.fillMaxWidth(),
-        shape = SmallShape,
-        hazeState = hazeState,
-        shadow = false,
-    ) {
-        Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(GapRow)) {
-            // "Full notes" rides in the section header rather than taking a whole row of its
-            // own below the excerpt -- one less stacked block in a tile that already carries
-            // status, notes and two dismissals.
-            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    "What's new",
-                    style = MaterialTheme.typography.labelSmall,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.weight(1f),
-                )
-                SafeMorphTextButton(
-                    "Full notes",
-                    onClick = {
-                        runCatching {
-                            context.startActivity(
-                                Intent(Intent.ACTION_VIEW, info.run.htmlUrl.toUri())
-                                    .apply { addFlags(Intent.FLAG_ACTIVITY_NEW_TASK) },
-                            )
-                        }
-                    },
-                )
-            }
-            Text(
-                notes,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = maxLines,
-                overflow = TextOverflow.Ellipsis,
-            )
-        }
-    }
-}
-
-/**
  * What the update's primary action says and does, in one place.
  *
  * The pebble surfaces it as its header action and the Settings card as a full-width button, so
@@ -472,138 +379,6 @@ internal fun runUpdateAction(
                 )
             }.isSuccess
             if (opened) vm.dismissUpdate() else vm.reportError("Couldn't open the release page.")
-        }
-    }
-}
-
-/**
- * The live status half of the update flow: the tonal icon badge, the
- * animated one-line status ("Downloading", "Downloaded · tap Install",
- * "Installing silently via Shizuku…") and the download progress bar. The live
- * percentage itself shows only on the header action pill above this (this
- * file's own PebbleHeaderAction) -- it used to also repeat here AND next to
- * the bar below, reported directly as the same number appearing three times.
- *
- * Shared by the update pebble's body and [SettingsHeroCard]'s expanded body, so the
- * two can never drift apart -- this is the same state machine rendered the
- * same way in both places, exactly the "one implementation" rule the
- * Settings card's remake is about.
- *
- * [deltaLabel] ("build 812 → 828") is what the idle state says; [seamless]
- * selects the Shizuku phrasing and the "installs silently" hint.
- */
-@Composable
-internal fun UpdateStatusLine(
-    deltaLabel: String,
-    seamless: Boolean,
-    state: UiState,
-    vm: AppViewModel,
-    /**
-     * False when the tile's own summary is already [deltaLabel], which happens whenever the
-     * release has no display title -- the summary is `displayTitle ?: deltaLabel`. The idle
-     * branch below then said the same "build 812 → build 828" a second time, directly under the
-     * first, which on the cover is the tile's headline and on the phone is the collapsed summary
-     * of the very pebble you just expanded. The other branches all report live progress the
-     * summary cannot know, so they are unaffected.
-     */
-    showDelta: Boolean = true,
-) {
-    val scheme = MaterialTheme.colorScheme
-    val downloadProgress by vm.updateDownloadProgress.collectAsStateWithLifecycle()
-    // ONE state-driven status line -- see the tile's own long comment (git
-    // history) on why statusKind, not the rendered string, drives the
-    // AnimatedContent: the static word must stay put while the percent moves.
-    val (statusIcon, statusKind, statusTint) = when {
-        state.updateInstalling -> Triple(Icons.Filled.SystemUpdate, "installing", scheme.onSurfaceVariant)
-        state.updateDownloading -> Triple(Icons.Filled.Download, "downloading", scheme.onSurfaceVariant)
-        state.updateApkReady && seamless -> Triple(Icons.Filled.CheckCircle, "ready_seamless", ChargeGreen)
-        state.updateApkReady -> Triple(Icons.Filled.CheckCircle, "ready", ChargeGreen)
-        seamless -> Triple(AppIcons.Bolt, "seamless", scheme.onSurfaceVariant)
-        else -> Triple(Icons.Filled.SystemUpdate, "update", scheme.primary)
-    }
-    // Sprung, not a snap -- the tint is what carries "this got a step further along"
-    // (neutral -> ChargeGreen once the APK is ready), so it gets the same treatment
-    // the charge bar's own fill-colour spring does rather than cutting on one frame.
-    val animatedStatusTint by androidx.compose.animation.animateColorAsState(
-        targetValue = statusTint,
-        animationSpec = lowPowerAwareSpring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessLow),
-        label = "updateStatusTint",
-    )
-    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-        // A tonal badge behind the icon, not a bare glyph -- the same "icon gets its
-        // own coloured circle" weight CoverHero gives every stat it leads with.
-        IconBadgeContainer(containerColor = animatedStatusTint.copy(alpha = 0.15f), size = 36.dp) {
-            // AnimatedContent, not a bare Icon swap -- installing -> downloading ->
-            // ready is a real sequence of distinct states, and a plain `when` cut
-            // between their icons on one frame while everything else on this card is
-            // now springing and cascading into place.
-            AnimatedContent(
-                targetState = statusIcon,
-                transitionSpec = { (fadeIn() + scaleIn(initialScale = 0.6f)) togetherWith (fadeOut() + scaleOut(targetScale = 0.6f)) },
-                label = "updateStatusIcon",
-            ) { icon ->
-                Icon(icon, contentDescription = null, tint = animatedStatusTint, modifier = Modifier.size(20.dp))
-            }
-        }
-        AnimatedContent(
-            targetState = statusKind,
-            transitionSpec = { expandContentTransform() },
-            label = "updateStatusText",
-            modifier = Modifier.weight(1f),
-        ) { kind ->
-            val textStyle = MaterialTheme.typography.titleMedium.copy(
-                fontWeight = FontWeight.Bold,
-                color = LocalContentColor.current,
-            )
-            when (kind) {
-                "installing" -> Text("Installing silently via Shizuku…", style = textStyle)
-                // Plain "Downloading", no trailing percentage -- this line and the
-                // number beside the progress bar below used to EACH carry their own
-                // copy of the same value the header action pill above already shows
-                // (PebbleHeaderAction's own label, up in this file), reported directly
-                // from a screenshot as the same percentage appearing twice on screen at
-                // once. That header pill is now the one place it's shown.
-                "downloading" -> Text("Downloading", style = textStyle)
-                "ready_seamless" -> Text("Downloaded · installs silently via Shizuku", style = textStyle)
-                "ready" -> Text("Downloaded · tap Install", style = textStyle)
-                "seamless" -> Text("Installs silently via Shizuku, no prompts", style = textStyle)
-                // Never blank: when showDelta is false the caller's own summary line already
-                // says the delta, but leaving this Unit left the icon badge floating in the row
-                // with nothing beside it -- a real empty gap, not just an unused word.
-                else -> Text(if (showDelta) deltaLabel else "Ready to download", style = textStyle)
-            }
-        }
-    }
-    // Live download progress bar. Own PopVisible rather than a bare `if` --
-    // this bar arrives and leaves while the card is already open (download
-    // starts, download finishes). sizeAnimated: this pebble sits in the
-    // reorderable stack, and the pebble below it repositions itself with its
-    // own ~300ms spring (ReorderColumn's animatePlacement) whenever this one's
-    // height changes -- without this, the bar popped in at full height on one
-    // layout pass while the sibling below was still catching up, so the two
-    // visibly overlapped for that whole window. See PopVisible's own doc.
-    PopVisible(visible = state.updateDownloading, sizeAnimated = true) {
-        // fillMaxWidth() is required here, not optional: a Row that's a DIRECT child of
-        // PopVisible (AnimatedVisibility) and relies on weight() to size a child (the
-        // progress bar below) collapses to a near-zero width without it -- AnimatedVisibility
-        // measures its content's "natural" size before it has anything but the weighted
-        // child to size against, unlike a Row inside an already-bounded parent. See
-        // SettingsScreen.kt's Weather-card place-name Row for the same bug, confirmed by
-        // screenshot (text wrapped one character per line).
-        Column(Modifier.fillMaxWidth()) {
-            Spacer(Modifier.height(GapRow))
-            val p = downloadProgress
-            Surface(
-                modifier = Modifier.fillMaxWidth().height(8.dp),
-                shape = CircleShape,
-                color = scheme.onSurface.copy(alpha = 0.12f),
-            ) {
-                if (p != null) {
-                    LinearProgressIndicator(progress = { p }, modifier = Modifier.fillMaxSize(), trackColor = Color.Transparent)
-                } else {
-                    LinearProgressIndicator(modifier = Modifier.fillMaxSize(), trackColor = Color.Transparent)
-                }
-            }
         }
     }
 }
