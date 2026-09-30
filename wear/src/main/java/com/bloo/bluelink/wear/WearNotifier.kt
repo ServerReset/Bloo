@@ -76,6 +76,8 @@ object WearNotifier {
     /** Compare [old] with [new] and raise/clear whatever changed. [old] empty means first sight: no alerts. */
     fun onVehicles(context: Context, old: List<VehicleSnapshot>, new: List<VehicleSnapshot>) {
         val app = context.applicationContext
+        // The Tile shows the same cars, so it refreshes whenever they change.
+        if (old != new) runCatching { androidx.wear.tiles.TileService.getUpdater(app).requestUpdate(BlooTileService::class.java) }
         if (!canPost(app)) return
         val prefs = WearNotificationPrefs(app)
         ensureChannels(app)
