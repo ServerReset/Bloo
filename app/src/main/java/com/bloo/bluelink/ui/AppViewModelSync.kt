@@ -6,6 +6,11 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import com.bloo.bluelink.data.resetSyncStateForNewFile
+import com.bloo.bluelink.data.performMainToMainSync
+import com.bloo.bluelink.data.testSyncRoundTrip
+import com.bloo.bluelink.data.exportSettingsJson
+import com.bloo.bluelink.data.importSettingsJson
 
 // --- Settings export/import and Drive auto-sync (extracted from AppViewModel) --
 

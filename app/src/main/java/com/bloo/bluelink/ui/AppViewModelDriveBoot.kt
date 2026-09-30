@@ -11,6 +11,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import com.bloo.bluelink.data.pruneOrphanPhotos
 
 // --- Cold-start Drive sync bootstrap (extracted from AppViewModel) --
 
