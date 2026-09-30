@@ -314,7 +314,7 @@ internal fun GarageScreen(
     // foldable, unfolded) rendered ONE frame as a single column before reflowing into its
     // real column count the instant boxWidthPx caught up -- a visible hitch on every single
     // launch, reported directly. widthDp being correct from frame one is what avoids it.
-    val perPage = (widthDp / MIN_CARD_DP.dp).toInt().coerceIn(1, slots)
+    val perPage = carColumnsFor(widthDp.value).coerceIn(1, slots)
     // Expanding to the dual-column view only makes sense on a wide screen.
     val canExpand = large && count > 1
     // Expanded means exactly one thing now: the user tapped the fullscreen icon

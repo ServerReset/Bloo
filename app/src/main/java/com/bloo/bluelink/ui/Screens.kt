@@ -610,8 +610,19 @@ internal val FieldShape: androidx.compose.foundation.shape.RoundedCornerShape
 
 // --- Garage (main) --------------------------------------------------------
 
-/** Minimum comfortable width for one car column before we add another. */
-internal const val MIN_CARD_DP = 320
+/** Window width from which the garage shows two car columns side by side. */
+internal const val TWO_COLUMN_MIN_DP = 600
+
+/** Window width from which it shows three -- tablets, desktop windows; never more than this. */
+internal const val THREE_COLUMN_MIN_DP = 900
+
+/** How many car columns a window [widthDp] wide gets: 1 on a phone, 2 on a foldable or small
+ *  tablet, 3 on a wide tablet or desktop. The caller still caps it at the number of cars. */
+internal fun carColumnsFor(widthDp: Float): Int = when {
+    widthDp >= THREE_COLUMN_MIN_DP -> 3
+    widthDp >= TWO_COLUMN_MIN_DP -> 2
+    else -> 1
+}
 
 /**
  * Snackbar payload that carries its own severity, so the host colours each

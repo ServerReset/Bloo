@@ -215,7 +215,11 @@ internal fun CarMap(
             .onSizeChanged { boxSizePx = it }
             .pointerInput(state) {
                 detectTransformGestures { _, gesturePan, gestureZoom, _ ->
-                    state.pan(gesturePan.x, gesturePan.y)
+                    // The tiles sit in a layer scaled by state.scale (0.5..2 inside one zoom
+                    // level), so a drag of d px moves them d * scale on screen. Dividing by the
+                    // scale first makes the map track the finger 1:1 at every zoom.
+                    val s = state.scale
+                    state.pan(gesturePan.x / s, gesturePan.y / s)
                     state.pinch(gestureZoom)
                 }
             },
