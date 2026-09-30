@@ -139,8 +139,7 @@ internal fun AccountsCardContent(state: UiState, vm: AppViewModel) {
                                     if (confirmSignOut) { vm.logout(creds.brand); confirmSignOut = false }
                                     else confirmSignOut = true
                                 },
-                                containerColor = MaterialTheme.colorScheme.errorContainer,
-                                contentColor = MaterialTheme.colorScheme.onErrorContainer,
+                                emphasis = ButtonEmphasis.Destructive,
                             )
                         }
                     }

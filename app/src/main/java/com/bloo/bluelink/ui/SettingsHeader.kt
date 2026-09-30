@@ -319,26 +319,14 @@ internal fun SettingsHeroCard(state: UiState, vm: AppViewModel, compact: Boolean
                     // second source that still works when the checker says up-to-date or
                     // GitHub's API is flaky).
                     ExpressiveButtonRow(modifier = Modifier.fillMaxWidth(), spacing = 8.dp) {
-                        val checkSource = remember { MutableInteractionSource() }
-                        MorphButton(
+                        SafeMorphTextButton(
+                            "Check",
                             onClick = { vm.checkForUpdateManually() },
-                            interactionSource = checkSource,
                             enabled = !state.updateChecking,
-                            // Explicit primary colours, not active=true -- see the
-                            // original Updates card's own history for why: active
-                            // pins the button's morphed square corner permanently,
-                            // which is wrong for "Check" (it never has an "on" state
-                            // to stay morphed for).
-                            containerColor = MaterialTheme.colorScheme.primary,
-                            contentColor = MaterialTheme.colorScheme.onPrimary,
-                            expressive = true,
-                        ) {
-                            MorphButtonLabel(
-                                icon = Icons.Filled.Refresh,
-                                label = "Check",
-                                pending = state.updateChecking,
-                            )
-                        }
+                            icon = Icons.Filled.Refresh,
+                            pending = state.updateChecking,
+                            emphasis = ButtonEmphasis.Primary,
+                        )
                         SafeMorphTextButton(
                             "GitHub",
                             onClick = {

@@ -595,8 +595,7 @@ internal fun ClimatePebble(
                             },
                             enabled = presetName.isNotBlank(),
                             interactionSource = saveSource,
-                            containerColor = MaterialTheme.colorScheme.primary,
-                            contentColor = MaterialTheme.colorScheme.onPrimary,
+                            emphasis = ButtonEmphasis.Primary,
                             modifier = Modifier.fillMaxWidth(),
                         )
                     }

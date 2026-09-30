@@ -203,64 +203,68 @@ internal fun SyncDevicesSection(state: UiState, vm: AppViewModel) {
         onReorder = { reordered -> reordered.firstOrNull()?.let { vm.setPrimaryDevice(it.id) } },
         spacing = 8.dp,
     ) { device, itemDragHandle, dragging ->
-        val isSelf = device.id == state.thisDeviceId
-        SyncDeviceRow(
-            device = device,
-            isSelf = isSelf,
-            isPrimary = device.id == state.syncPrimaryId,
-            dragging = dragging,
-            modifier = itemDragHandle,
-            onRename = { renaming = true },
-            onRemove = { vm.removeSyncedDevice(device.id) },
-        )
-        // Drawn in the same item slot, after the phone row -- not reorderable items themselves.
-        val live = liveWatch.takeIf { isSelf }
-        val registered = registryWatches.takeIf { device.id == watchHost?.id && live == null }.orEmpty()
-        live?.let { watch ->
-            Spacer(Modifier.height(6.dp))
-            WearCompanionRow(
-                name = watch.name,
-                detail = "Connected to this phone",
-                modifier = Modifier.padding(start = CompanionIndent),
-                onRemove = null,
+        // A Column, not loose children: a ReorderColumn item slot stacks its children on top of
+        // each other, which drew the watch row and "Set up watch" straight over the phone row.
+        Column(Modifier.fillMaxWidth()) {
+            val isSelf = device.id == state.thisDeviceId
+            SyncDeviceRow(
+                device = device,
+                isSelf = isSelf,
+                isPrimary = device.id == state.syncPrimaryId,
+                dragging = dragging,
+                modifier = itemDragHandle,
+                onRename = { renaming = true },
+                onRemove = { vm.removeSyncedDevice(device.id) },
             )
-        }
-        registered.forEach { watch ->
-            Spacer(Modifier.height(6.dp))
-            WearCompanionRow(
-                name = watch.name,
-                detail = listOf(watch.model, com.bloo.bluelink.data.relativeLabel(watch.lastSeenMs))
-                    .filter { it.isNotBlank() }.joinToString(" · "),
-                modifier = Modifier.padding(start = CompanionIndent),
-                onRemove = { vm.removeSyncedDevice(watch.id) },
-            )
-        }
-        if (isSelf && live == null && registered.isEmpty()) {
-            // Under THIS phone on purpose: setting a watch up connects it to the device you
-            // are holding, and the placement says so.
-            Spacer(Modifier.height(6.dp))
-            SetupWatchRow(
-                phoneName = device.name.ifBlank { "this phone" },
-                modifier = Modifier.padding(start = CompanionIndent),
-                onClick = { showSetupWatch = true },
-            )
-        }
-        // The watch PIN gate: nothing to lock unless a watch is present.
-        if (isSelf && (live != null || registered.isNotEmpty())) {
-            Spacer(Modifier.height(GapRow))
-            Box(Modifier.padding(start = CompanionIndent)) {
-                SettingsSegmentedRow(
-                    label = "Ask the watch for my PIN",
-                    options = listOf(
-                        SegmentOption(com.bloo.bluelink.data.WatchLockTiming.OFF.wireKey, "Off", null),
-                        SegmentOption(com.bloo.bluelink.data.WatchLockTiming.OPEN.wireKey, "Opening", null),
-                        SegmentOption(com.bloo.bluelink.data.WatchLockTiming.COMMANDS.wireKey, "Commands", null),
-                        SegmentOption(com.bloo.bluelink.data.WatchLockTiming.BOTH.wireKey, "Both", null),
-                    ),
-                    selectedKey = state.watchLockTiming.wireKey,
-                    description = "Uses your app PIN.",
-                    onSelect = { vm.setWatchLockTiming(com.bloo.bluelink.data.WatchLockTiming.fromWire(it)) },
+            // Drawn in the same item slot, after the phone row -- not reorderable items themselves.
+            val live = liveWatch.takeIf { isSelf }
+            val registered = registryWatches.takeIf { device.id == watchHost?.id && live == null }.orEmpty()
+            live?.let { watch ->
+                Spacer(Modifier.height(6.dp))
+                WearCompanionRow(
+                    name = watch.name,
+                    detail = "Connected to this phone",
+                    modifier = Modifier.padding(start = CompanionIndent),
+                    onRemove = null,
                 )
+            }
+            registered.forEach { watch ->
+                Spacer(Modifier.height(6.dp))
+                WearCompanionRow(
+                    name = watch.name,
+                    detail = listOf(watch.model, com.bloo.bluelink.data.relativeLabel(watch.lastSeenMs))
+                        .filter { it.isNotBlank() }.joinToString(" · "),
+                    modifier = Modifier.padding(start = CompanionIndent),
+                    onRemove = { vm.removeSyncedDevice(watch.id) },
+                )
+            }
+            if (isSelf && live == null && registered.isEmpty()) {
+                // Under THIS phone on purpose: setting a watch up connects it to the device you
+                // are holding, and the placement says so.
+                Spacer(Modifier.height(6.dp))
+                SetupWatchRow(
+                    phoneName = device.name.ifBlank { "this phone" },
+                    modifier = Modifier.padding(start = CompanionIndent),
+                    onClick = { showSetupWatch = true },
+                )
+            }
+            // The watch PIN gate: nothing to lock unless a watch is present.
+            if (isSelf && (live != null || registered.isNotEmpty())) {
+                Spacer(Modifier.height(GapRow))
+                Box(Modifier.padding(start = CompanionIndent)) {
+                    SettingsSegmentedRow(
+                        label = "Ask the watch for my PIN",
+                        options = listOf(
+                            SegmentOption(com.bloo.bluelink.data.WatchLockTiming.OFF.wireKey, "Off", null),
+                            SegmentOption(com.bloo.bluelink.data.WatchLockTiming.OPEN.wireKey, "Opening", null),
+                            SegmentOption(com.bloo.bluelink.data.WatchLockTiming.COMMANDS.wireKey, "Commands", null),
+                            SegmentOption(com.bloo.bluelink.data.WatchLockTiming.BOTH.wireKey, "Both", null),
+                        ),
+                        selectedKey = state.watchLockTiming.wireKey,
+                        description = "Uses your app PIN.",
+                        onSelect = { vm.setWatchLockTiming(com.bloo.bluelink.data.WatchLockTiming.fromWire(it)) },
+                    )
+                }
             }
         }
     }
@@ -343,8 +347,7 @@ internal fun SyncDevicesSection(state: UiState, vm: AppViewModel) {
                         },
                         interactionSource = saveRenameSource,
                         enabled = draft.isNotBlank(),
-                        containerColor = MaterialTheme.colorScheme.primary,
-                        contentColor = MaterialTheme.colorScheme.onPrimary,
+                        emphasis = ButtonEmphasis.Primary,
                         modifier = Modifier.fillMaxWidth(),
                     )
                 }

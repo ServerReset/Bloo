@@ -257,7 +257,7 @@ internal fun MapNavigationCardContent(appearance: SettingsStore.Appearance, vm: 
             ) {
                 TitleSmallText("Open Charge Map API Key")
                 BodySmallText(
-                    "Needed for nearby EV chargers. Free key at openchargemap.org.",
+                    "Needed for nearby EV chargers. Get a free key at openchargemap.org/site/develop/api.",
                 )
                 Spacer(Modifier.height(GapRow))
                 var keyInput by remember { mutableStateOf(appearance.chargerApiKey ?: "") }

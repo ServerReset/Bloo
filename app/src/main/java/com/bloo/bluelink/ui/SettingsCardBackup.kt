@@ -130,30 +130,22 @@ internal fun BackupSyncCardContent(
                     // it as the primary action (same colour language "Stop" and "Install"
                     // use); fillMaxWidth on TOP of that was the oversized, one-off treatment
                     // reported from a real screenshot, not a second thing this control needs.
-                    val setupSource = remember { MutableInteractionSource() }
-                    MorphButton(
+                    SafeMorphTextButton(
+                        "Set up auto-sync",
                         onClick = { showDriveDialog = true },
-                        interactionSource = setupSource,
-                        active = true,
-                        expressive = true,
-                    ) { MorphButtonLabel(icon = Icons.Filled.CloudSync, label = "Set up auto-sync", pending = false) }
+                        icon = Icons.Filled.CloudSync,
+                        emphasis = ButtonEmphasis.Primary,
+                    )
                 } else {
                     // Configured: "Sync now" is THE daily control, so it leads —
                     // ahead of the device registry and the setup/teardown pair,
                     // which are both occasional by comparison.
-                    val syncSource = remember { MutableInteractionSource() }
-                    SafeExpansiveButton(
-                        interactionSource = syncSource,
-                        enabled = true,
-                    ) {
-                        // Same fix as "Set up auto-sync" a few lines up: content width, not
-                        // stretched to the card.
-                        MorphButton(
-                            onClick = { vm.syncNow() },
-                            interactionSource = syncSource,
-                            active = true,
-                        ) { MorphButtonLabel(icon = Icons.Filled.CloudSync, label = "Sync now", pending = false) }
-                    }
+                    SafeMorphTextButton(
+                        "Sync now",
+                        onClick = { vm.syncNow() },
+                        icon = Icons.Filled.CloudSync,
+                        emphasis = ButtonEmphasis.Primary,
+                    )
                     // A live failure is the one fact that never hides behind the
                     // diagnostics disclosure below — if sync is broken, say so here.
                     state.syncError?.let { err ->

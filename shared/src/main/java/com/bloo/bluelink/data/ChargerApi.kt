@@ -2,6 +2,7 @@ package com.bloo.bluelink.data
 
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.json.Json
@@ -55,105 +56,138 @@ fun ChargerStation.matches(filters: ChargerFilters): Boolean {
     return true
 }
 
+/** Outcome of a charger search. Kept distinct on purpose: "no key", "key rejected" and "couldn't
+ *  reach the service" each need a different message and a different fix, and none of them is the
+ *  same thing as "the search worked and nothing is nearby" ([Found] with an empty list). */
+sealed interface ChargerFetch {
+    data class Found(val stations: List<ChargerStation>) : ChargerFetch
+    /** No API key configured; nothing was sent. */
+    data object MissingKey : ChargerFetch
+    /** Open Charge Map answered 401/403: the key is wrong, revoked or not yet active. */
+    data object InvalidKey : ChargerFetch
+    /** Network failure, a non-2xx response, or a body that would not parse. */
+    data class Failed(val detail: String) : ChargerFetch
+}
+
 /**
- * Nearby EV charging stations from ChargingNear.me (https://chargingnear.me), a
- * free charger database with excellent US coverage and clear API key management.
- * The API is simple, responsive, and well-documented.
+ * Nearby EV charging stations from Open Charge Map (https://openchargemap.org), the open,
+ * community-maintained charger database. Endpoint and fields per its API reference at
+ * https://openchargemap.org/site/develop/api .
  *
- * Requires an API key (Bearer token in Authorization header). Users can get one
- * instantly at https://chargingnear.me/developers by creating a free account.
- * Free tier: 100 requests/day. Paid tier: $99/month for 5,000 requests/day.
+ * A free API key is required for every request; it is sent in the `X-API-Key` header (the
+ * documented alternative to a `key=` query parameter, which would leak into logs and URLs).
+ * The user pastes their own key in Settings -> Map & Navigation.
  *
- * This is deliberately NOT something this app curates itself -- a charger database
- * is exactly the kind of specialized dataset a dedicated third party does well
- * (keeping current as stations open, close or change networks). Callers pass
- * the user's API key from Settings (null/blank = error message directing to
- * settings, since the API requires authentication).
+ * This is deliberately NOT something this app curates itself -- a charger database is exactly
+ * the dataset a dedicated third party keeps current as stations open, close or change networks.
  */
 object ChargerApi {
 
-    // ignoreUnknownKeys so OCM adding response fields later doesn't break parsing;
-    // isLenient for the same minor-JSON-quirk tolerance WeatherApi's own client uses.
+    // ignoreUnknownKeys: OCM responses carry dozens of fields we never read, and it adds more.
     private val json = Json { ignoreUnknownKeys = true; isLenient = true }
 
-    // A dedicated client, generous-but-bounded timeouts -- same reasoning as
-    // WeatherApi's own: nearby chargers are a nice-to-have layer on the map, so a
-    // flaky connection gets a real chance rather than failing fast, but a hung
-    // request still can't block the caller indefinitely.
+    // Generous-but-bounded timeouts: nearby chargers are a nice-to-have layer on the map, so a
+    // flaky connection gets a real chance, but a hung request still cannot block the caller.
     private val client: OkHttpClient = OkHttpClient.Builder()
         .connectTimeout(15, TimeUnit.SECONDS)
         .readTimeout(20, TimeUnit.SECONDS)
         .build()
 
+    private const val ENDPOINT = "https://api.openchargemap.io/v3/poi/"
+
+    // OCM's placeholder operator (ID 44) -- not a network worth offering as a filter chip.
+    private const val UNKNOWN_OPERATOR = "(Unknown Operator)"
+
     @Serializable
-    private data class Station(
-        val id: Int = 0,
-        val name: String? = null,
-        val latitude: Double? = null,
-        val longitude: Double? = null,
-        val network: String? = null,
-        val connectorTypes: List<String>? = null,
-        val maxPower: Double? = null,
-        val isOperational: Boolean? = null,
+    private data class Poi(
+        @SerialName("ID") val id: Int = 0,
+        @SerialName("AddressInfo") val address: Address? = null,
+        @SerialName("OperatorInfo") val operator: Operator? = null,
+        @SerialName("StatusType") val status: Status? = null,
+        @SerialName("Connections") val connections: List<Connection>? = null,
     )
 
     @Serializable
-    private data class StationsResponse(
-        val data: List<Station>? = null,
+    private data class Address(
+        @SerialName("Title") val title: String? = null,
+        @SerialName("Latitude") val latitude: Double? = null,
+        @SerialName("Longitude") val longitude: Double? = null,
     )
 
-    private fun Station.toChargerStation(): ChargerStation? {
-        val lat = latitude ?: return null
-        val lon = longitude ?: return null
+    @Serializable
+    private data class Operator(@SerialName("Title") val title: String? = null)
+
+    @Serializable
+    private data class Status(@SerialName("IsOperational") val isOperational: Boolean? = null)
+
+    @Serializable
+    private data class Connection(
+        @SerialName("ConnectionType") val type: ConnectionType? = null,
+        @SerialName("PowerKW") val powerKw: Double? = null,
+    )
+
+    @Serializable
+    private data class ConnectionType(@SerialName("Title") val title: String? = null)
+
+    private fun Poi.toChargerStation(): ChargerStation? {
+        val addr = address ?: return null
+        val lat = addr.latitude ?: return null
+        val lon = addr.longitude ?: return null
+        val conns = connections.orEmpty()
         return ChargerStation(
             id = id,
-            name = name?.takeIf { it.isNotBlank() } ?: "Charging station",
+            name = addr.title?.takeIf { it.isNotBlank() } ?: "Charging station",
             latitude = lat,
             longitude = lon,
-            network = network?.takeIf { it.isNotBlank() },
-            maxKw = maxPower,
-            connectorTypes = connectorTypes?.filter { it.isNotBlank() }?.distinct() ?: emptyList(),
-            operational = isOperational ?: true,
+            network = operator?.title?.takeIf { it.isNotBlank() && it != UNKNOWN_OPERATOR },
+            maxKw = conns.mapNotNull { it.powerKw?.takeIf { kw -> kw > 0 } }.maxOrNull(),
+            connectorTypes = conns.mapNotNull { it.type?.title?.takeIf { t -> t.isNotBlank() } }.distinct(),
+            // Only an explicit "not operational" hides a station; most POIs carry no status.
+            operational = status?.isOperational != false,
         )
     }
 
+    /** Parses an Open Charge Map `/v3/poi/` response body. Pure, so it is unit-tested. */
+    internal fun parseStations(body: String): List<ChargerStation> =
+        json.decodeFromString(ListSerializer(Poi.serializer()), body).mapNotNull { it.toChargerStation() }
+
+    /** The request URL for a search; the key is deliberately not part of it. */
+    internal fun searchUrl(lat: Double, lon: Double, radiusMiles: Double, maxResults: Int): String =
+        "$ENDPOINT?output=json&latitude=$lat&longitude=$lon" +
+            "&distance=$radiusMiles&distanceunit=Miles&maxresults=$maxResults&verbose=false"
+
     /**
-     * Fetch stations within ~25 miles of [lat]/[lon] via ChargingNear.me API.
-     * Returns null on any actual failure (network/IO exception, a non-2xx response
-     * including 401 for invalid/missing [apiKey], or malformed JSON), and only
-     * an empty list for a genuine "search worked, nothing nearby" result.
-     *
-     * This distinction matters: a bare auth failure should show "add API key in
-     * Settings", not "0 chargers nearby". Earlier versions collapsed both to empty
-     * and hid the real problem.
-     *
-     * [apiKey] is required; ChargingNear.me's API requires Bearer auth. Free tier:
-     * 100 requests/day (sufficient for typical usage). Get a key at
-     * https://chargingnear.me/developers
+     * Stations within [radiusMiles] of [lat]/[lon], nearest first. See [ChargerFetch] for why the
+     * failure modes are separate from an empty result.
      */
-    suspend fun nearby(
+    suspend fun search(
         lat: Double,
         lon: Double,
         apiKey: String?,
         radiusMiles: Double = 25.0,
         maxResults: Int = 150,
-    ): List<ChargerStation>? =
-        withContext(Dispatchers.IO) {
+    ): ChargerFetch {
+        val key = apiKey?.trim().orEmpty()
+        if (key.isEmpty()) return ChargerFetch.MissingKey
+        return withContext(Dispatchers.IO) {
             runCatching {
-                val url = "https://api.chargingnear.me/v1/stations/nearest" +
-                    "?latitude=$lat&longitude=$lon&limit=$maxResults"
-                val builder = Request.Builder()
-                    .url(url)
+                val request = Request.Builder()
+                    .url(searchUrl(lat, lon, radiusMiles, maxResults))
+                    .header("X-API-Key", key)
                     .header("User-Agent", MapTiles.userAgent("Android"))
-                if (!apiKey.isNullOrBlank()) {
-                    builder.header("Authorization", "Bearer $apiKey")
+                    .get()
+                    .build()
+                client.newCall(request).execute().use { resp ->
+                    when {
+                        resp.code == 401 || resp.code == 403 -> ChargerFetch.InvalidKey
+                        !resp.isSuccessful -> ChargerFetch.Failed("HTTP ${resp.code}")
+                        else -> {
+                            val body = resp.body?.string() ?: return@use ChargerFetch.Failed("empty response")
+                            ChargerFetch.Found(parseStations(body))
+                        }
+                    }
                 }
-                client.newCall(builder.get().build()).execute().use { resp ->
-                    if (!resp.isSuccessful) return@use null
-                    val body = resp.body?.string() ?: return@use null
-                    val response = json.decodeFromString(StationsResponse.serializer(), body)
-                    response.data?.mapNotNull { it.toChargerStation() } ?: emptyList()
-                }
-            }.getOrNull()
+            }.getOrElse { ChargerFetch.Failed(it.javaClass.simpleName) }
         }
+    }
 }

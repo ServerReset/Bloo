@@ -1,6 +1,7 @@
 package com.bloo.bluelink.ui
 
 import androidx.lifecycle.viewModelScope
+import com.bloo.bluelink.data.ChargerFetch
 import com.bloo.bluelink.data.GeoLocation
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -27,8 +28,8 @@ internal fun AppViewModel.toggleChargersVisible(around: GeoLocation, force: Bool
 }
 
 /** Fetches Open Charge Map stations around [around] and replaces [UiState.chargers]
- *  wholesale. A genuine failure (see [com.bloo.bluelink.data.ChargerApi.nearby]'s
- *  own doc -- null, not an empty list) surfaces as [UiState.chargersError] instead
+ *  wholesale. Every failure (no key, rejected key, unreachable -- see
+ *  [com.bloo.bluelink.data.ChargerFetch]) surfaces as [UiState.chargersError] instead
  *  of silently looking like "zero chargers nearby": that exact confusion is a real
  *  report, from a search that actually failed for lack of an API key. */
 internal fun AppViewModel.loadNearbyChargers(around: GeoLocation) {
@@ -40,16 +41,17 @@ internal fun AppViewModel.loadNearbyChargers(around: GeoLocation) {
     chargerJob?.cancel()
     _state.update { it.copy(chargersLoading = true, chargersError = null) }
     chargerJob = viewModelScope.launch {
-        val stations = com.bloo.bluelink.data.ChargerApi.nearby(
+        val result = com.bloo.bluelink.data.ChargerApi.search(
             around.latitude,
             around.longitude,
             apiKey = appearance.value.chargerApiKey,
         )
         _state.update {
-            if (stations != null) {
-                it.copy(chargers = stations, chargersLoading = false, chargersError = null)
-            } else {
-                it.copy(chargersLoading = false, chargersError = "Couldn't reach the charger directory")
+            when (result) {
+                is ChargerFetch.Found -> it.copy(chargers = result.stations, chargersLoading = false, chargersError = null)
+                ChargerFetch.MissingKey -> it.copy(chargersLoading = false, chargersError = "Add your Open Charge Map key")
+                ChargerFetch.InvalidKey -> it.copy(chargersLoading = false, chargersError = "Open Charge Map rejected that key")
+                is ChargerFetch.Failed -> it.copy(chargersLoading = false, chargersError = "Couldn't reach Open Charge Map")
             }
         }
     }

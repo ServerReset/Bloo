@@ -302,8 +302,7 @@ internal fun UpdateAvailableTile(
                             onClick = { vm.undoDismissUpdate() },
                             enabled = !state.updateDownloading,
                             interactionSource = undoSource,
-                            containerColor = MaterialTheme.colorScheme.primary,
-                            contentColor = MaterialTheme.colorScheme.onPrimary,
+                            emphasis = ButtonEmphasis.Primary,
                         )
                     }
                 }

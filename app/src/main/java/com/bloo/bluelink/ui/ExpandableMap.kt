@@ -101,7 +101,7 @@ internal fun ExpandableMapLayer(
     chargersVisible: Boolean = false,
     chargersLoading: Boolean = false,
     /** Set only on a genuine fetch failure (network/auth/parse) -- see
-     *  [com.bloo.bluelink.data.ChargerApi.nearby]'s own doc for why that's kept
+     *  [com.bloo.bluelink.data.ChargerApi.search]'s own doc for why that's kept
      *  distinct from [chargers] simply being empty. */
     chargersError: String? = null,
     chargers: List<ChargerStation> = emptyList(),

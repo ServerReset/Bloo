@@ -81,6 +81,7 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.takeOrElse
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.TextStyle
@@ -278,6 +279,30 @@ fun MorphButton(
 }
 
 /**
+ * How loudly a button speaks. One choice, resolved to colours in one place, so the same kind of
+ * action looks the same on every screen instead of each call site hand-picking a container.
+ *
+ *  - [Tonal]: the standard button -- everything that is not the one thing you came to do.
+ *  - [Primary]: the screen's or card's main action (Save, Sync now, Sign in).
+ *  - [Destructive]: removes or signs out; red is information, not decoration.
+ */
+enum class ButtonEmphasis { Tonal, Primary, Destructive }
+
+@Composable
+internal fun ButtonEmphasis.container(): Color = when (this) {
+    ButtonEmphasis.Tonal -> buttonContainer()
+    ButtonEmphasis.Primary -> MaterialTheme.colorScheme.primary
+    ButtonEmphasis.Destructive -> MaterialTheme.colorScheme.errorContainer
+}
+
+@Composable
+internal fun ButtonEmphasis.content(): Color = when (this) {
+    ButtonEmphasis.Tonal -> MaterialTheme.colorScheme.onSurface
+    ButtonEmphasis.Primary -> MaterialTheme.colorScheme.onPrimary
+    ButtonEmphasis.Destructive -> MaterialTheme.colorScheme.onErrorContainer
+}
+
+/**
  * A text-only [MorphButton] - the app's one button framework, used everywhere a
  * plain labelled button is needed (dialogs, settings, etc.) so they all share
  * the pill-morphs-to-rounded-square press feel.
@@ -288,8 +313,10 @@ fun MorphTextButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
-    containerColor: Color = buttonContainer(),
-    contentColor: Color = MaterialTheme.colorScheme.onSurface,
+    /** The button's weight in the hierarchy; sets the colours unless one is passed explicitly. */
+    emphasis: ButtonEmphasis = ButtonEmphasis.Tonal,
+    containerColor: Color = Color.Unspecified,
+    contentColor: Color = Color.Unspecified,
     interactionSource: MutableInteractionSource = remember { MutableInteractionSource() },
     /**
      * The glyph to lead with. Null asks [standardButtonIcon] for the standard one for [text],
@@ -298,6 +325,8 @@ fun MorphTextButton(
      */
     icon: ImageVector? = null,
     showIcon: Boolean = true,
+    /** Swaps the glyph for the shared in-flight spinner; pass a real flag, not `true`. */
+    pending: Boolean = false,
     /** See [MorphButton]'s own `groupWeight`. */
     groupWeight: Float = 0f,
 ) {
@@ -307,14 +336,14 @@ fun MorphTextButton(
         enabled = enabled,
         groupWeight = groupWeight,
         interactionSource = interactionSource,
-        containerColor = containerColor,
-        contentColor = contentColor,
+        containerColor = containerColor.takeOrElse { emphasis.container() },
+        contentColor = contentColor.takeOrElse { emphasis.content() },
         contentPadding = PaddingValues(horizontal = 18.dp, vertical = GapRow),
         minHeight = ButtonTargetHeight,
     ) {
         val glyph = (icon ?: standardButtonIcon(text)).takeIf { showIcon }
         if (glyph != null) {
-            MorphButtonLabel(glyph, text, pending = false)
+            MorphButtonLabel(glyph, text, pending = pending)
         } else {
             Text(
                 text,
@@ -339,10 +368,12 @@ fun SafeMorphTextButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
-    containerColor: Color = buttonContainer(),
-    contentColor: Color = MaterialTheme.colorScheme.onSurface,
+    emphasis: ButtonEmphasis = ButtonEmphasis.Tonal,
+    containerColor: Color = Color.Unspecified,
+    contentColor: Color = Color.Unspecified,
     icon: ImageVector? = null,
     showIcon: Boolean = true,
+    pending: Boolean = false,
     groupWeight: Float = 0f,
 ) {
     val source = remember { MutableInteractionSource() }
@@ -352,11 +383,13 @@ fun SafeMorphTextButton(
             onClick = onClick,
             modifier = modifier,
             enabled = enabled,
+            emphasis = emphasis,
             containerColor = containerColor,
             contentColor = contentColor,
             interactionSource = source,
             icon = icon,
             showIcon = showIcon,
+            pending = pending,
             groupWeight = groupWeight,
         )
     }

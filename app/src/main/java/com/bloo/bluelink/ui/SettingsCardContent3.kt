@@ -387,8 +387,7 @@ internal fun SecurityCardContent(
                         SafeMorphTextButton(
                             "Remove",
                             onClick = { pinDialog = "remove" },
-                            containerColor = MaterialTheme.colorScheme.errorContainer,
-                            contentColor = MaterialTheme.colorScheme.onErrorContainer,
+                            emphasis = ButtonEmphasis.Destructive,
                         )
                     }
                 }

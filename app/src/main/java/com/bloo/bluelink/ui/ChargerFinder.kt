@@ -71,7 +71,7 @@ internal fun ChargerFilterBar(
     chargers: List<ChargerStation>,
     filters: ChargerFilters,
     loading: Boolean,
-    /** Set only on a genuine fetch failure -- see [com.bloo.bluelink.data.ChargerApi.nearby]'s
+    /** Set only on a genuine fetch failure -- see [com.bloo.bluelink.data.ChargerFetch]'s
      *  own doc. Switches this whole bar to a compact error state (message + retry + an inline
      *  API key field, since a missing/invalid key is the single most likely cause) instead of
      *  the normal speed/network controls. */
@@ -105,7 +105,7 @@ internal fun ChargerFilterBar(
                     overflow = TextOverflow.Ellipsis,
                 )
                 Spacer(Modifier.height(GapHairline))
-                MutedText("Open Charge Map needs a free API key. Paste one below.")
+                MutedText("Needs a free Open Charge Map key (openchargemap.org/site/develop/api). Paste it below.")
                 Spacer(Modifier.height(GapRow))
                 // Inline, not a bounce to Settings: a missing/invalid key is the single most
                 // likely cause of this exact error, and the whole point of surfacing it here

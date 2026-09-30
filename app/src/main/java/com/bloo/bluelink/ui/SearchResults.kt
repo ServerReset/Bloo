@@ -675,8 +675,7 @@ internal fun SettingsSearchResults(
                                 }
                             },
                             enabled = !running,
-                            containerColor = MaterialTheme.colorScheme.primary,
-                            contentColor = MaterialTheme.colorScheme.onPrimary,
+                            emphasis = ButtonEmphasis.Primary,
                         )
                     }
                 }
