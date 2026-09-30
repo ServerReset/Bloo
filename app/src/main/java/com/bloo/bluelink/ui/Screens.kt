@@ -213,7 +213,7 @@ fun BlooApp(vm: AppViewModel) {
     // the refresh indicator) publishes its bounds here and asks here who else is in the way,
     // instead of screens hand-threading each other's positions around. See FloatingSystem.kt.
     val floatingRegistry = remember { FloatingRegistry() }
-    val dialogExits = remember { DialogExitHost() }
+    val dialogHost = remember { DialogHost(searchHazeState) }
     CompositionLocalProvider(
         // Kills Android's default ripple app-wide -- see NoTapHighlight for why this app
         // answers a press with its own motion instead of a borrowed grey fill.
@@ -228,7 +228,7 @@ fun BlooApp(vm: AppViewModel) {
         LocalIndication provides NoTapHighlight,
         LocalRippleConfiguration provides null,
         LocalFloatingRegistry provides floatingRegistry,
-        LocalDialogExitHost provides dialogExits,
+        LocalDialogHost provides dialogHost,
         LocalHaptics provides haptics,
         // Provided once here (the app root already collects `appearance` above) so
         // every pebble/tile reads LocalAppearance.current instead of opening its own
@@ -438,8 +438,8 @@ fun BlooApp(vm: AppViewModel) {
         // Biometric lock overlay, drawn over the blurred app; fades out on unlock.
         LockAlphaOverlay(locked = locked, vm = vm, opaqueBackdrop = !contentSettled)
     
-    // Dialogs that have just been dismissed finish their exit here, above everything else.
-    DialogExitOverlay(dialogExits)
+    // Every open dialog, above everything else.
+    DialogLayer(dialogHost)
     }
     }
 

@@ -351,7 +351,8 @@ fun SafeExpansiveButton(
             // beside it), and measuring only the first would make the rest silently vanish.
             val w = placeables.maxOf { it.width }.coerceIn(constraints.minWidth, constraints.maxWidth)
             val h = placeables.maxOf { it.height }.coerceIn(constraints.minHeight, constraints.maxHeight)
-            layout(w, h) { placeables.forEach { it.place(0, 0) } }
+            // placeRelative: alone on a row the button rests on the start edge -- left in LTR, right in RTL.
+            layout(w, h) { placeables.forEach { it.placeRelative(0, 0) } }
         },
     )
 }

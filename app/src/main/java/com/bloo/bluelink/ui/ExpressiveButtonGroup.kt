@@ -550,7 +550,9 @@ fun ExpressiveButtonGroup(
             layout(width, height) {
                 var y = 0
                 for ((li, idx) in lines.withIndex()) {
-                    var x = horizontalAlignment.align(lineWidth[li], width, layoutDirection)
+                    // Aligned as if LTR: placeRelative below already mirrors for RTL, so passing the real
+                    // direction here flipped it twice and a lone button rested on the wrong edge.
+                    var x = horizontalAlignment.align(lineWidth[li], width, androidx.compose.ui.unit.LayoutDirection.Ltr)
                     for (i in idx) {
                         val p = out[i]!!
                         p.placeRelative(x, y + verticalAlignment.align(p.height, lineHeight[li]))

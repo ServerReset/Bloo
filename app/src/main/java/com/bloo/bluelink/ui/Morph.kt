@@ -271,12 +271,18 @@ fun MorphButton(
     // is the "it just pushes them and they don't shrink" behaviour, and it could reappear with
     // any new call site, so the button joins itself rather than relying on the call site to
     // remember. Wrapping is idempotent -- see SafeExpansiveButton's group branch.
-    if (LocalExpressiveGroup.current || expressive) {
+    // A labelled button (one that declares a width weight) follows the standard press behaviour
+    // wherever it sits: in a group it shares the line, alone it rests at its natural width on the
+    // start edge and fills the row when pressed. [LocalExpressiveGrowth] is true inside a wrapper
+    // that has already done this (SafeMorphTextButton, an explicit SafeExpansiveButton), so the
+    // standard behaviour is never applied twice.
+    val standalone = groupWeight != 0f && !LocalExpressiveGrowth.current
+    if (LocalExpressiveGroup.current || expressive || standalone) {
         SafeExpansiveButton(
             interactionSource = interactionSource,
             enabled = enabled,
             groupWeight = groupWeight,
-            fillOnPress = fillOnPress,
+            fillOnPress = fillOnPress || standalone,
         ) { body() }
     } else {
         body()

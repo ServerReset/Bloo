@@ -163,140 +163,75 @@ internal fun GlassAlertDialog(
     // button). Sits to the right of the title, vertically centered.
     titleTrailing: (@Composable () -> Unit)? = null,
 ) {
-    val scheme = MaterialTheme.colorScheme
-    val shape = ExtraLargeShape
-    // 1 = resting, 0 = fully below the screen. The card and the scrim both ride it: up with a bounce
-    // on the way in; on the way out the card is handed to DialogExitOverlay (see DialogMotion.kt).
-    val exitHost = LocalDialogExitHost.current
-    val graphicsContext = LocalGraphicsContext.current
-    val cardLayer = remember { graphicsContext.createGraphicsLayer() }
-    val progress = remember { Animatable(0f) }
-    LaunchedEffect(Unit) { progress.animateTo(1f, DialogEnterSpec) }
-    DisposableEffect(Unit) {
-        onDispose {
-            if (exitHost != null && cardLayer.size.width > 0) {
-                exitHost.add(cardLayer, progress.value) { graphicsContext.releaseGraphicsLayer(cardLayer) }
-            } else {
-                graphicsContext.releaseGraphicsLayer(cardLayer)
-            }
+    val host = LocalDialogHost.current
+    val card: @Composable () -> Unit = { DialogCard(icon, title, titleTrailing, text, buttons) }
+    if (host != null) {
+        // Drawn by the app's own dialog layer (see DialogMotion.kt): real glass over the live app,
+        // bouncing up from the bottom and dropping away again when this leaves composition.
+        val entry = remember { DialogEntry() }
+        SideEffect {
+            entry.onDismiss = onDismissRequest
+            entry.content = card
         }
+        DisposableEffect(entry) {
+            host.entries.add(entry)
+            onDispose { entry.leaving = true }
+        }
+        return
     }
-    val screenHeightPx = with(LocalDensity.current) { LocalConfiguration.current.screenHeightDp.dp.toPx() }
+    // No layer to draw into (a preview, a secondary window): an ordinary platform dialog.
     Dialog(
         onDismissRequest = onDismissRequest,
-        // Full-screen window with no platform dim, so the scrim can fade and the card can travel
-        // from beyond the bottom edge; the card itself keeps a sensible width.
-        properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false),
+        properties = DialogProperties(usePlatformDefaultWidth = false),
     ) {
-        // Dialog() opens its own platform Window, which doesn't inherit the
-        // app's forceDarkAllowed=false the way the main Activity window does
-        // -- on API 29+ Android's automatic Force Dark heuristic was
-        // re-inverting already-dark, explicitly-colored text drawn here
-        // (this dialog's title and body rendered near-black on a near-black
-        // card, while the identical text elsewhere in the app -- inside the
-        // Activity's own window -- rendered correctly). Disabling it on this
-        // window specifically stops Android from "helpfully" reprocessing
-        // colors Compose already resolved correctly.
-        val dialogView = LocalView.current
-        SideEffect {
-            (dialogView.parent as? DialogWindowProvider)?.window?.apply {
-                setDimAmount(0f)
-                clearFlags(android.view.WindowManager.LayoutParams.FLAG_DIM_BEHIND)
-            }
-        }
-        SideEffect {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                val decorView = (dialogView.parent as? DialogWindowProvider)?.window?.decorView
-                // Reflection, not a direct call: setForceDarkAllowed isn't
-                // exposed as a resolvable View method against every compileSdk
-                // stub this project has built against, even though it's a
-                // real public API on-device at this API level.
-                runCatching {
-                    android.view.View::class.java
-                        .getMethod("setForceDarkAllowed", Boolean::class.javaPrimitiveType)
-                        .invoke(decorView, false)
-                }
-            }
-        }
-        // GlassSurface (GlassChrome.kt) -- the same edge/shadow every other floating
-        // surface in the app shares, but NOT its default ambient tint. That tint
-        // (GlassTintAlpha, ~0.10) is deliberately low so floating chrome over the
-        // app's own content -- the status bar, search results -- shows background
-        // through it; it was tuned down repeatedly on exactly that reasoning (see
-        // its own doc). A modal dialog is the opposite case: nothing here wires a
-        // hazeState in (a dialog opens its own platform Window, not a layer inside
-        // whatever screen is behind it, so there's no blur to do the legibility
-        // work), and it needs to read clearly regardless of what's behind it --
-        // reported directly as dialog text bleeding into a Settings screen's own
-        // log viewer showing right through the card. Back to a near-opaque,
-        // theme-aware fill for this one call site, restoring the "deliberate
-        // exception for a modal dialog" an earlier pass folded into the ambient
-        // default and lost.
-        Box(Modifier.fillMaxSize().imePadding(), contentAlignment = Alignment.Center) {
-        // The page behind, dimmed in step with the card; tapping it dismisses, as outside-taps did.
-        Box(
-            Modifier
-                .fillMaxSize()
-                .drawBehind { drawRect(Color.Black, alpha = DialogScrimAlpha * progress.value.coerceIn(0f, 1f)) }
-                .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) {
-                    onDismissRequest()
-                },
-        )
         GlassSurface(
-            shape = shape,
-            modifier = Modifier
-                .padding(horizontal = 24.dp)
-                .widthIn(max = 560.dp)
-                .fillMaxWidth()
-                .graphicsLayer { translationY = (1f - progress.value) * screenHeightPx }
-                // Recorded as it draws, so the card can be shown again after this composable is gone.
-                .drawWithContent {
-                    cardLayer.record(
-                        density = this,
-                        layoutDirection = layoutDirection,
-                        size = IntSize(size.width.toInt(), size.height.toInt()),
-                    ) { this@drawWithContent.drawContent() }
-                    drawLayer(cardLayer)
-                }
-                // Swallows taps on the card so they do not fall through to the scrim.
-                .pointerInput(Unit) { detectTapGestures { } },
-            tint = scheme.surfaceContainerHigh.copy(alpha = 0.97f),
-        ) {
-            Column(Modifier.padding(24.dp)) {
-                if (icon != null) {
-                    Box(
-                        Modifier
-                            .size(48.dp)
-                            .background(scheme.primaryContainer, CircleShape),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        Icon(icon, contentDescription = null, tint = scheme.onPrimaryContainer, modifier = Modifier.size(24.dp))
-                    }
-                    Spacer(Modifier.height(GapSection))
-                }
-                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        title,
-                        style = MaterialTheme.typography.headlineSmall,
-                        fontWeight = FontWeight.Bold,
-                        modifier = Modifier.weight(1f),
-                    )
-                    if (titleTrailing != null) {
-                        Spacer(Modifier.width(8.dp))
-                        titleTrailing()
-                    }
-                }
-                Spacer(Modifier.height(GapRow))
-                Column(
-                    Modifier.heightIn(max = 360.dp).verticalScroll(rememberScrollState()),
-                    verticalArrangement = Arrangement.spacedBy(GapGroup),
-                    content = text,
-                )
-                Spacer(Modifier.height(GapSection))
-                Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(GapHairline), content = buttons)
+            shape = ExtraLargeShape,
+            modifier = Modifier.padding(horizontal = 24.dp).widthIn(max = 560.dp).fillMaxWidth(),
+            tint = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.97f),
+        ) { card() }
+    }
+}
+
+/** The inside of every dialog: optional icon badge, title row, scrolling body, then the buttons. */
+@Composable
+private fun DialogCard(
+    icon: ImageVector?,
+    title: String,
+    titleTrailing: (@Composable () -> Unit)?,
+    text: @Composable ColumnScope.() -> Unit,
+    buttons: @Composable ColumnScope.() -> Unit,
+) {
+    val scheme = MaterialTheme.colorScheme
+    Column(Modifier.padding(24.dp)) {
+        if (icon != null) {
+            Box(
+                Modifier.size(48.dp).background(scheme.primaryContainer, CircleShape),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(icon, contentDescription = null, tint = scheme.onPrimaryContainer, modifier = Modifier.size(24.dp))
+            }
+            Spacer(Modifier.height(GapSection))
+        }
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                title,
+                style = MaterialTheme.typography.headlineSmall,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.weight(1f),
+            )
+            if (titleTrailing != null) {
+                Spacer(Modifier.width(8.dp))
+                titleTrailing()
             }
         }
-        }
+        Spacer(Modifier.height(GapRow))
+        Column(
+            Modifier.heightIn(max = 360.dp).verticalScroll(rememberScrollState()),
+            verticalArrangement = Arrangement.spacedBy(GapGroup),
+            content = text,
+        )
+        Spacer(Modifier.height(GapSection))
+        Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(GapHairline), content = buttons)
     }
 }
 
