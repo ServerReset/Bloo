@@ -460,7 +460,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     // Kia sign-in is a two-step dance: password first, then (usually) a
     // one-time code sent to the account's email or phone. The credentials are
     // held here between the steps and only persisted once fully signed in.
-    private var kiaPending: Credentials? = null
+    internal var kiaPending: Credentials? = null
 
 
 
@@ -471,7 +471,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     // Kia US there's no destination choice (email only) and the account's PIN
     // IS required (every command needs it, see CanadaApi.pinAuth) -- so the PIN
     // typed into the login form travels straight through the OTP challenge.
-    private var canadaPending: Credentials? = null
+    internal var canadaPending: Credentials? = null
 
 
 
