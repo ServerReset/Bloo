@@ -67,6 +67,8 @@ import com.bloo.bluelink.data.Weather
 import kotlinx.coroutines.launch
 import kotlin.math.max
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.foundation.ExperimentalFoundationApi
 /**
  * The whole Settings screen.
  *

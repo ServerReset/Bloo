@@ -80,6 +80,10 @@ import com.bloo.bluelink.data.platformOverridable
 import com.bloo.bluelink.data.Vehicle
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
 
 internal enum class WizardStepKind { POWERTRAIN, PLATFORM, SEATS, STEERING }
 

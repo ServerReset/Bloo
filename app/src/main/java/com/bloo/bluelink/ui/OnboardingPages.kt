@@ -77,13 +77,10 @@ import com.bloo.bluelink.data.SeatConfig
 import com.bloo.bluelink.data.platformOverridable
 import com.bloo.bluelink.data.Vehicle
 import kotlinx.coroutines.launch
-
-internal enum class WizardStepKind { POWERTRAIN, PLATFORM, SEATS, STEERING }
-
-internal data class WizardPage(
-    val kind: WizardStepKind,
-    val vin: String? = null,
-)
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
 
 /**
  * Step 1: a short welcome + feature highlights. See [OnboardingTipListPage]'s own doc for why
