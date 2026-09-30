@@ -85,3 +85,10 @@
 -dontwarn org.conscrypt.**
 -dontwarn org.bouncycastle.**
 -dontwarn io.github.muntashirakon.adb.**
+
+# Hidden framework AIDL types used reflectively by ShizukuInstaller (stubs are compile-only, in :shared).
+-dontwarn android.content.IIntentSender**
+-dontwarn android.content.IIntentReceiver**
+-dontwarn android.content.pm.IPackageInstaller**
+-dontwarn android.content.pm.IPackageInstallerSession**
+-dontwarn android.content.pm.IPackageManager**
