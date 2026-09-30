@@ -24,9 +24,10 @@ import kotlinx.serialization.json.Json
 import java.util.UUID
 
 /**
- * The watch's ONLY data source: everything it shows is pushed from the phone over the
- * Wearable Data Layer. The watch never touches the network or Google Drive -- it is a pure
- * auxiliary surface that mirrors the phone in real time.
+ * The watch's window onto the phone: cars, lock timing and the PIN record are pushed from the
+ * phone over the Wearable Data Layer and mirrored here in real time. Once the phone has signed the
+ * watch in ([WearCredentialSync]) the watch also talks to the car's service itself, and uses the
+ * phone only for what the phone owns.
  *
  * Two directions:
  *  - phone → watch: [WatchSyncProtocol.PATH_SNAPSHOT] carries vehicles + the watch lock
@@ -129,6 +130,20 @@ object WearDataLayerSync {
         }
     }
 
+    /**
+     * Re-read the on-watch store after a command or refresh the watch ran ITSELF, so the UI shows
+     * what it just did, and report the command's outcome the same way the phone's reply would.
+     */
+    suspend fun reloadFromStore(context: Context, result: com.bloo.bluelink.data.CarCommandResult?) {
+        val snapshot = SnapshotStore(context.applicationContext).current()
+        if (snapshot.vehicles.isNotEmpty()) _vehicles.value = snapshot.vehicles
+        result?.let {
+            _lastCommandResult.value = com.bloo.bluelink.data.WatchCommandResult(
+                requestId = "local-${System.nanoTime()}", vin = it.vin, action = it.action, ok = it.ok, message = it.message,
+            )
+        }
+    }
+
     fun applyCommandResult(context: Context, bytes: ByteArray?) {
         if (bytes == null) return
         val result = runCatching {
@@ -152,8 +167,8 @@ object WearDataLayerSync {
     }
 
     /**
-     * Send a command to the phone to run. Returns a request id the caller can watch for in
-     * [lastCommandResult]. The watch does NOT run commands itself.
+     * Send a command to the phone to run; its outcome arrives in [lastCommandResult]. Used when
+     * the watch has no session of its own (see [WearCredentialSync.runLocally]).
      */
     fun sendCommand(context: Context, vin: String, action: String) {
         val app = context.applicationContext

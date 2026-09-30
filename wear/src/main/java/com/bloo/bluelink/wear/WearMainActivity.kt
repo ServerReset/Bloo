@@ -27,6 +27,8 @@ class WearMainActivity : ComponentActivity() {
         WearDataLayerSync.start(this)
         // The watch checks for its OWN updates over its own internet, independent of the phone.
         lifecycleScope.launch { WearUpdateChecker.check() }
+        // A watch the phone has signed in fetches its own car status.
+        lifecycleScope.launch { WearCredentialSync.refresh(this@WearMainActivity) }
         setContent {
             WearTheme {
                 Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {

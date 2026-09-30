@@ -55,6 +55,7 @@ fun WearGarageScreen(
     val vehicles by repo.vehicles.collectAsStateWithLifecycle(initialValue = emptyList())
     val connected by repo.connected.collectAsStateWithLifecycle(initialValue = false)
     val timing = pinStore.timing
+    val signInCode by WearCredentialSync.signInCode.collectAsStateWithLifecycle()
     // Session unlock: true once the user has proven the PIN since this screen opened. Only ever
     // consulted for the OPEN gate (and the BOTH command gate) -- see WatchPinPolicy.
     var sessionUnlocked by remember { mutableStateOf(false) }
@@ -89,6 +90,15 @@ fun WearGarageScreen(
                         pendingCommand = null
                     },
                 )
+            }
+            return@AppScaffold
+        }
+        signInCode?.let { code ->
+            ScreenScaffold(timeText = { TimeText() }) {
+                ScalingLazyColumn(state = rememberScalingLazyListState(), modifier = Modifier.fillMaxSize()) {
+                    item { WearCenteredText("Sign in from your phone") }
+                    item { WearHero(value = code, caption = "Confirm this code", tint = MaterialTheme.colorScheme.primary) }
+                }
             }
             return@AppScaffold
         }

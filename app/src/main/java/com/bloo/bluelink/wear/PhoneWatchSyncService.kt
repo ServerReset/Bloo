@@ -59,6 +59,10 @@ class PhoneWatchSyncService : WearableListenerService() {
 
     override fun onMessageReceived(messageEvent: com.google.android.gms.wearable.MessageEvent) {
         super.onMessageReceived(messageEvent)
+        when (messageEvent.path) {
+            WatchSyncProtocol.PATH_CRED_KEY -> WatchSignIn.onKey(messageEvent.sourceNodeId, messageEvent.data)
+            WatchSyncProtocol.PATH_CRED_ACK -> WatchSignIn.onAck()
+        }
         if (messageEvent.path == WatchSyncProtocol.PATH_REQUEST_APK) {
             val url = lastWatchApkUrl
             if (url != null) {

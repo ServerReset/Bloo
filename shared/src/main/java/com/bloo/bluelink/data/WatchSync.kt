@@ -54,6 +54,14 @@ object WatchSyncProtocol {
     /** Phone → watch: the result of a command the watch asked for, so the watch can clear its
      *  pending state and surface failures. */
     const val PATH_COMMAND_RESULT = "/bloo/command_result"
+    /** Phone → watch message: "I'd like to sign you in" -- the watch answers with [PATH_CRED_KEY]. */
+    const val PATH_CRED_OFFER = "/bloo/cred_offer"
+    /** Watch → phone message: the public half of the watch's Keystore transfer key. */
+    const val PATH_CRED_KEY = "/bloo/cred_key"
+    /** Phone → watch message: the sealed [WatchCredentialBundle] (see [WatchCredentialTransfer]). */
+    const val PATH_CRED_PAYLOAD = "/bloo/cred_payload"
+    /** Watch → phone message: the bundle was opened and saved. */
+    const val PATH_CRED_ACK = "/bloo/cred_ack"
 }
 
 /**

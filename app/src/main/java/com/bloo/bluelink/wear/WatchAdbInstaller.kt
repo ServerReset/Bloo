@@ -88,6 +88,7 @@ internal class WatchAdbInstaller : AbsAdbConnectionManager() {
             runCatching {
                 openStream("shell:monkey -p $WATCH_PACKAGE -c android.intent.category.LAUNCHER 1").use { it.openInputStream().readBytes() }
             }
+            Unit
         }
     }
 

@@ -225,6 +225,10 @@ internal fun SyncDevicesSection(state: UiState, vm: AppViewModel) {
                     modifier = Modifier.padding(start = CompanionIndent),
                     onRemove = null,
                 )
+                SignWatchInRow(
+                    modifier = Modifier.padding(start = CompanionIndent),
+                    onClick = { com.bloo.bluelink.wear.WatchSignIn.offer(context) },
+                )
             }
             registered.forEach { watch ->
                 Spacer(Modifier.height(6.dp))
@@ -266,6 +270,7 @@ internal fun SyncDevicesSection(state: UiState, vm: AppViewModel) {
             }
         }
     }
+    WatchSignInDialog()
     if (showSetupWatch) {
         SetupWatchDialog(
             phoneName = phones.firstOrNull { it.id == state.thisDeviceId }?.name?.ifBlank { null } ?: "this phone",
@@ -565,6 +570,15 @@ private fun WearCompanionRow(
                 )
             }
         }
+    }
+}
+
+/** Under a connected watch: hands it the accounts so it can work without the phone. */
+@Composable
+private fun SignWatchInRow(modifier: Modifier = Modifier, onClick: () -> Unit) {
+    Column(modifier.fillMaxWidth().padding(top = 6.dp)) {
+        SafeMorphTextButton("Sign watch in", onClick = onClick, icon = Icons.Filled.Watch)
+        LabelSmallText("Lets it run your car without this phone")
     }
 }
 

@@ -3,29 +3,41 @@ package com.bloo.bluelink.wear
 import android.content.Context
 import com.bloo.bluelink.data.CarAction
 import com.bloo.bluelink.data.VehicleSnapshot
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.launch
 
 /**
  * The watch's one gateway to car state and car commands.
  *
- * It is a pure AUXILIARY surface: it does NOT read Drive, does NOT hit the network, and does
- * NOT execute commands itself. Vehicles come from [WearDataLayerSync] (pushed by the phone in
- * real time); commands are FORWARDED to the phone, which runs them through its normal command
- * path and reports back. The watch only ever renders what the phone sends and asks the phone to
- * act on its behalf.
+ * Commands run ON the watch whenever it has been signed in by the phone
+ * ([WearCredentialSync]), so it works on its own -- no phone nearby, no Bluetooth link. A watch
+ * that hasn't been signed in yet hands the command to the phone instead. Vehicles arrive from
+ * [WearDataLayerSync], pushed by the phone and refreshed by the watch's own commands.
  */
 class WearSnapshotRepository(private val context: Context) {
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     /** Every car the phone has pushed, live. */
     val vehicles: Flow<List<VehicleSnapshot>> = WearDataLayerSync.vehicles
 
-    /** Ask the phone to lock/unlock. */
-    fun lock(vin: String) = WearDataLayerSync.sendCommand(context, vin, CarAction.TOGGLE_LOCK)
+    /** Lock/unlock. */
+    fun lock(vin: String) = run(vin, CarAction.TOGGLE_LOCK)
 
-    /** Ask the phone to toggle climate. */
-    fun climate(vin: String) = WearDataLayerSync.sendCommand(context, vin, CarAction.TOGGLE_CLIMATE)
+    /** Toggle climate. */
+    fun climate(vin: String) = run(vin, CarAction.TOGGLE_CLIMATE)
 
-    /** The phone's last command result, so the UI can clear pending + show a failure. */
+    private fun run(vin: String, action: String) {
+        scope.launch {
+            if (WearCredentialSync.runLocally(context, vin, action) == null) {
+                WearDataLayerSync.sendCommand(context, vin, action)
+            }
+        }
+    }
+
+    /** The last command result, so the UI can clear pending + show a failure. */
     val lastCommandResult = WearDataLayerSync.lastCommandResult
 
     /** Whether a snapshot has been received from the phone at least once this session. */

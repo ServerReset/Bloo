@@ -73,5 +73,11 @@ class WatchDataListenerService : WearableListenerService() {
 
     override fun onMessageReceived(messageEvent: MessageEvent) {
         super.onMessageReceived(messageEvent)
+        val phone = messageEvent.sourceNodeId
+        when (messageEvent.path) {
+            WatchSyncProtocol.PATH_CRED_OFFER -> scope.launch { WearCredentialSync.onOffer(applicationContext, phone) }
+            WatchSyncProtocol.PATH_CRED_PAYLOAD ->
+                scope.launch { WearCredentialSync.onPayload(applicationContext, phone, messageEvent.data) }
+        }
     }
 }
