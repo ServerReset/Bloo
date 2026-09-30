@@ -117,6 +117,16 @@ import androidx.compose.ui.graphics.toArgb
 import androidx.core.net.toUri
 import androidx.compose.runtime.withFrameNanos
 import com.bloo.bluelink.data.platform
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.graphics.layer.drawLayer
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalGraphicsContext
+import androidx.compose.ui.window.DialogProperties
+import androidx.compose.ui.unit.IntSize
 
 /**
  * Shared app-wide visual chrome: the elevated glass dialog shell (GlassAlertDialog)
@@ -156,7 +166,29 @@ internal fun GlassAlertDialog(
 ) {
     val scheme = MaterialTheme.colorScheme
     val shape = ExtraLargeShape
-    Dialog(onDismissRequest = onDismissRequest) {
+    // 1 = resting, 0 = fully below the screen. The card and the scrim both ride it: up with a bounce
+    // on the way in; on the way out the card is handed to DialogExitOverlay (see DialogMotion.kt).
+    val exitHost = LocalDialogExitHost.current
+    val graphicsContext = LocalGraphicsContext.current
+    val cardLayer = remember { graphicsContext.createGraphicsLayer() }
+    val progress = remember { Animatable(0f) }
+    LaunchedEffect(Unit) { progress.animateTo(1f, DialogEnterSpec) }
+    DisposableEffect(Unit) {
+        onDispose {
+            if (exitHost != null && cardLayer.size.width > 0) {
+                exitHost.add(cardLayer, progress.value) { graphicsContext.releaseGraphicsLayer(cardLayer) }
+            } else {
+                graphicsContext.releaseGraphicsLayer(cardLayer)
+            }
+        }
+    }
+    val screenHeightPx = with(LocalDensity.current) { LocalConfiguration.current.screenHeightDp.dp.toPx() }
+    Dialog(
+        onDismissRequest = onDismissRequest,
+        // Full-screen window with no platform dim, so the scrim can fade and the card can travel
+        // from beyond the bottom edge; the card itself keeps a sensible width.
+        properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false),
+    ) {
         // Dialog() opens its own platform Window, which doesn't inherit the
         // app's forceDarkAllowed=false the way the main Activity window does
         // -- on API 29+ Android's automatic Force Dark heuristic was
@@ -167,6 +199,12 @@ internal fun GlassAlertDialog(
         // window specifically stops Android from "helpfully" reprocessing
         // colors Compose already resolved correctly.
         val dialogView = LocalView.current
+        SideEffect {
+            (dialogView.parent as? DialogWindowProvider)?.window?.apply {
+                setDimAmount(0f)
+                clearFlags(android.view.WindowManager.LayoutParams.FLAG_DIM_BEHIND)
+            }
+        }
         SideEffect {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                 val decorView = (dialogView.parent as? DialogWindowProvider)?.window?.decorView
@@ -195,9 +233,34 @@ internal fun GlassAlertDialog(
         // theme-aware fill for this one call site, restoring the "deliberate
         // exception for a modal dialog" an earlier pass folded into the ambient
         // default and lost.
+        Box(Modifier.fillMaxSize().imePadding(), contentAlignment = Alignment.Center) {
+        // The page behind, dimmed in step with the card; tapping it dismisses, as outside-taps did.
+        Box(
+            Modifier
+                .fillMaxSize()
+                .drawBehind { drawRect(Color.Black, alpha = DialogScrimAlpha * progress.value.coerceIn(0f, 1f)) }
+                .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) {
+                    onDismissRequest()
+                },
+        )
         GlassSurface(
             shape = shape,
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier
+                .padding(horizontal = 24.dp)
+                .widthIn(max = 560.dp)
+                .fillMaxWidth()
+                .graphicsLayer { translationY = (1f - progress.value) * screenHeightPx }
+                // Recorded as it draws, so the card can be shown again after this composable is gone.
+                .drawWithContent {
+                    cardLayer.record(
+                        density = this,
+                        layoutDirection = layoutDirection,
+                        size = IntSize(size.width.toInt(), size.height.toInt()),
+                    ) { this@drawWithContent.drawContent() }
+                    drawLayer(cardLayer)
+                }
+                // Swallows taps on the card so they do not fall through to the scrim.
+                .pointerInput(Unit) { detectTapGestures { } },
             tint = scheme.surfaceContainerHigh.copy(alpha = 0.97f),
         ) {
             Column(Modifier.padding(24.dp)) {
@@ -233,6 +296,7 @@ internal fun GlassAlertDialog(
                 Spacer(Modifier.height(GapSection))
                 Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(GapHairline), content = buttons)
             }
+        }
         }
     }
 }
