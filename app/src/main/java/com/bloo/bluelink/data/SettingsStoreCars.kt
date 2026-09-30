@@ -402,6 +402,7 @@ suspend fun SettingsStore.powertrain(vin: String): Powertrain? = powertrain(vin,
 
 fun SettingsStore.powertrain(vin: String, p: Preferences): Powertrain? =
     p[stringPreferencesKey("ptrain_$vin")]
+        ?.let { runCatching { Powertrain.valueOf(it) }.getOrNull() }
 
 suspend fun SettingsStore.setPowertrain(vin: String, value: Powertrain) {
     editTracked { it[stringPreferencesKey("ptrain_$vin")] = value.name }
@@ -411,6 +412,7 @@ suspend fun SettingsStore.platform(vin: String): VehiclePlatform? = platform(vin
 
 fun SettingsStore.platform(vin: String, p: Preferences): VehiclePlatform? =
     p[stringPreferencesKey("platform_$vin")]
+        ?.let { runCatching { VehiclePlatform.valueOf(it) }.getOrNull() }
 
 suspend fun SettingsStore.setPlatform(vin: String, value: VehiclePlatform) {
     editTracked { it[stringPreferencesKey("platform_$vin")] = value.name }

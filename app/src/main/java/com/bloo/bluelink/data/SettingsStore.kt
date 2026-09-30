@@ -467,16 +467,12 @@ class SettingsStore(internal val context: Context) {
 
     // --- Per-car powertrain override -------------------------------------
 
-            ?.let { runCatching { Powertrain.valueOf(it) }.getOrNull() }
-
     // --- Per-car head-unit generation override ----------------------------
     //
     // Same shape as the powertrain override right above -- null means "not
     // confirmed by the user yet", callers fall back to the API-derived guess
     // ([com.bloo.bluelink.data.isGen5W]) when this is null. See VehiclePlatform's
     // own doc for which vehicles this has anything real to confirm.
-
-            ?.let { runCatching { VehiclePlatform.valueOf(it) }.getOrNull() }
 
     // --- Per-car climate settings + presets ------------------------------
 
