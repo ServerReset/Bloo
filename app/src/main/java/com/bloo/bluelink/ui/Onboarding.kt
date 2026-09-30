@@ -60,6 +60,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
@@ -170,10 +171,12 @@ internal fun setupIsBlocked(
 internal fun buildOnboardingSteps(
     vehicles: List<com.bloo.bluelink.data.Vehicle>,
     preConfiguredVins: Set<String> = emptySet(),
+    /** Summoned again from Settings: the same cards, minus the per-car questions already answered. */
+    replay: Boolean = false,
 ): List<OnboardingStep> = buildList {
     add(OnboardingStep(OnboardingStepKind.INTRO))
     add(OnboardingStep(OnboardingStepKind.SETUP))
-    vehicles.forEach { if (it.vin !in preConfiguredVins) add(OnboardingStep(OnboardingStepKind.CAR, it.vin)) }
+    if (!replay) vehicles.forEach { if (it.vin !in preConfiguredVins) add(OnboardingStep(OnboardingStepKind.CAR, it.vin)) }
     add(OnboardingStep(OnboardingStepKind.CRASH_COURSE))
     add(OnboardingStep(OnboardingStepKind.FEATURES))
 }
@@ -193,7 +196,7 @@ internal fun buildOnboardingSteps(
  * entirely before finishing setup.
  */
 @Composable
-internal fun OnboardingScreen(vm: AppViewModel) {
+internal fun OnboardingScreen(vm: AppViewModel, replay: Boolean = false) {
     val context = LocalContext.current
     val haptics = LocalHaptics.current
     val state by vm.state.collectAsStateWithLifecycle()
@@ -221,7 +224,12 @@ internal fun OnboardingScreen(vm: AppViewModel) {
     // page later (which also updates state.powertrains) can't retroactively
     // shrink the step list out from under the page the user is looking at.
     var preConfiguredVins by remember { mutableStateOf<Set<String>>(emptySet()) }
-    var pageIndex by remember { mutableIntStateOf(0) }
+    // The cards are a pager, like the app's own: swipe left and right between them. The count is
+    // held here because the step list below is computed from the page the user is on.
+    var pageCount by remember { mutableIntStateOf(if (replay) 4 else 5) }
+    val pagerState = androidx.compose.foundation.pager.rememberPagerState(pageCount = { pageCount })
+    val pageIndex = pagerState.currentPage
+    val pageScope = androidx.compose.runtime.rememberCoroutineScope()
     // The freeze has to LATCH. Keying the update on `pageIndex <= 1` alone read as
     // "only while still on INTRO/SETUP", but that condition becomes true again
     // every time the user navigates BACK to those pages -- and BackHandler makes
@@ -240,8 +248,8 @@ internal fun OnboardingScreen(vm: AppViewModel) {
         if (pageIndex > 1) pastSetup = true
         if (!pastSetup) preConfiguredVins = state.powertrains.keys.toSet()
     }
-    val steps = remember(state.vehicles, preConfiguredVins) { buildOnboardingSteps(state.vehicles, preConfiguredVins) }
-    LaunchedEffect(steps) { if (pageIndex > steps.lastIndex) pageIndex = steps.lastIndex }
+    val steps = remember(state.vehicles, preConfiguredVins, replay) { buildOnboardingSteps(state.vehicles, preConfiguredVins, replay) }
+    SideEffect { pageCount = steps.size }
 
     val lastIndex = steps.lastIndex
     val isLast = pageIndex == lastIndex
@@ -249,7 +257,7 @@ internal fun OnboardingScreen(vm: AppViewModel) {
     // The setup step is BLOCKING: notifications (API 33+) and a lock (biometrics when the
     // device has them, else a PIN) are both required before Next unlocks. The lock card swaps
     // to whichever the device supports, so there is never a second mechanism to skip.
-    val onSetup = steps.getOrNull(pageIndex)?.kind == OnboardingStepKind.SETUP
+    val onSetup = !replay && steps.getOrNull(pageIndex)?.kind == OnboardingStepKind.SETUP
     val notificationsSupported = Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU
     val notifRequired = notifRequiredOnSetup(onSetup, notificationsSupported, notifGranted)
     val setupBlocked = setupIsBlocked(
@@ -264,7 +272,9 @@ internal fun OnboardingScreen(vm: AppViewModel) {
     fun goNext() {
         if (pageIndex < lastIndex) {
             haptics?.click()
-            pageIndex++
+            pageScope.launch { pagerState.animateScrollToPage(pageIndex + 1) }
+        } else if (replay) {
+            vm.dismissWelcomeCards()
         } else {
             vm.finishOnboarding()
         }
@@ -272,13 +282,23 @@ internal fun OnboardingScreen(vm: AppViewModel) {
     fun goBack() {
         if (pageIndex > 0) {
             haptics?.click()
-            pageIndex--
+            pageScope.launch { pagerState.animateScrollToPage(pageIndex - 1) }
+        } else if (replay) {
+            vm.dismissWelcomeCards()
         }
     }
     BackHandler { goBack() }
 
+    // Swiping is free, but not past the setup card while what it requires is undone: the pager
+    // settles back onto it, the same gate the Next button enforces.
+    val setupIndex = steps.indexOfFirst { it.kind == OnboardingStepKind.SETUP }
+    val setupUnmet = !replay && setupIsBlocked(true, notificationsSupported, notifGranted, canBio, appearance.biometricLock, state.appPinSet)
+    LaunchedEffect(pagerState.settledPage, setupUnmet) {
+        if (setupUnmet && setupIndex >= 0 && pagerState.settledPage > setupIndex) pagerState.animateScrollToPage(setupIndex)
+    }
+
     LaunchedEffect(isLast) {
-        if (isLast) {
+        if (isLast && !replay) {
             Fireworks.playSound(context)
             haptics?.fireworks()
         }
@@ -286,7 +306,7 @@ internal fun OnboardingScreen(vm: AppViewModel) {
 
     Box(Modifier.fillMaxSize()) {
         AuroraBackground(Modifier.matchParentSize())
-        if (isLast) FireworksOverlay(Modifier.fillMaxSize())
+        if (isLast && !replay) FireworksOverlay(Modifier.fillMaxSize())
 
         Column(
             Modifier
@@ -296,59 +316,49 @@ internal fun OnboardingScreen(vm: AppViewModel) {
         ) {
             Spacer(Modifier.height(GapRow))
 
-            // --- Progress: an animated bar plus a small step counter ---
-            val progress = if (steps.size > 1) pageIndex.toFloat() / lastIndex.toFloat() else 1f
-            val animatedProgress by animateFloatAsState(progress, tween(WizardProgressDurationMs), label = "onboardProgress")
+            // --- Where you are: one dot per card, the current one stretched ---
             Row(
                 Modifier.fillMaxWidth().paddingHorizontal24(),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Box(
-                    Modifier
-                        .weight(1f)
-                        .height(4.dp)
-                        .clip(RoundedCornerShape(50))
-                        .background(scheme.surfaceContainerHighest),
-                ) {
-                    Box(
-                        Modifier
-                            .fillMaxWidth(animatedProgress)
-                            .height(4.dp)
-                            .clip(RoundedCornerShape(50))
-                            .background(Brush.horizontalGradient(listOf(scheme.primary, scheme.tertiary))),
-                    )
+                OnboardingDots(count = steps.size, current = pageIndex, modifier = Modifier.weight(1f))
+                if (replay) {
+                    MorphIconButton(onClick = { vm.dismissWelcomeCards() }) {
+                        Icon(AppIcons.Close, contentDescription = "Close welcome cards")
+                    }
                 }
-                Spacer(Modifier.width(10.dp))
-                LabelText("${pageIndex + 1}/${steps.size}")
             }
 
-            // --- Slide/fade animated step content ---
-            AnimatedContent(
-                targetState = pageIndex,
-                transitionSpec = {
-                    val dir = if (targetState > initialState) 1 else -1
-                    (slideInHorizontally { it * dir } + fadeIn(tween(WizardStepFadeInDurationMs))) togetherWith
-                        (slideOutHorizontally { -it * dir } + fadeOut(tween(180)))
-                },
+            // --- The cards: a pager of pebbles, swiped like the ones in the garage ---
+            androidx.compose.foundation.pager.HorizontalPager(
+                state = pagerState,
                 modifier = Modifier.weight(1f),
-                label = "onboardStep",
+                contentPadding = PaddingValues(horizontal = 20.dp),
+                pageSpacing = 14.dp,
+                beyondViewportPageCount = 1,
             ) { idx ->
-                val step = steps.getOrNull(idx) ?: return@AnimatedContent
-                Box(
+                val step = steps.getOrNull(idx) ?: return@HorizontalPager
+                Column(
                     Modifier
                         .fillMaxSize()
                         .verticalScroll(rememberScrollState())
-                        .paddingHorizontal24(),
+                        .padding(top = 16.dp, bottom = 24.dp),
                 ) {
-                    Column(
-                        Modifier.fillMaxWidth().padding(top = 20.dp, bottom = 110.dp),
-                        verticalArrangement = Arrangement.spacedBy(GapSection),
+                    val vehicle = step.vin?.let { vin -> state.vehicles.firstOrNull { it.vin == vin } }
+                    val spec = onboardingCardSpec(step.kind, vehicle?.name)
+                    PebbleShell(
+                        expanded = true,
+                        onToggle = {},
+                        icon = spec.icon,
+                        title = spec.title,
+                        summary = spec.summary,
+                        canToggle = false,
+                        forceExpanded = true,
                     ) {
                         when (step.kind) {
                             OnboardingStepKind.INTRO -> OnboardingIntroPage()
                             OnboardingStepKind.SETUP -> OnboardingSetupPage(vm, state, context, canBio, appearance.biometricLock, notifGranted) { notifGranted = it }
                             OnboardingStepKind.CAR -> {
-                                val vehicle = step.vin?.let { vin -> state.vehicles.firstOrNull { it.vin == vin } }
                                 val sc = vehicle?.let { state.seatConfigs[it.vin] } ?: com.bloo.bluelink.data.SeatConfig()
                                 OnboardingCarPage(vehicle, state, sc, vm)
                             }
@@ -395,6 +405,7 @@ internal fun OnboardingScreen(vm: AppViewModel) {
                 // over Back that the expression asks for.
                 val nextIcon: ImageVector = if (isLast) AppIcons.CheckCircle else AppIcons.Check
                     val nextText: String = when {
+                        isLast && replay -> "Dismiss"
                         isLast -> "Enter Bloo"
                         pageIndex == 0 -> "Get started"
                         else -> "Next"

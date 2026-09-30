@@ -32,6 +32,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Style
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.ui.text.style.TextDecoration
@@ -286,6 +287,20 @@ internal fun MapNavigationCardContent(appearance: SettingsStore.Appearance, vm: 
                     )
                 }
             }
+}
+
+/** "Welcome cards": bring the first-run cards back, to read again or to show someone else. */
+@Composable
+internal fun WelcomeCardsCardContent(vm: AppViewModel) {
+    SettingsCard("Welcome cards", Icons.Filled.Style, vm) {
+        BodySmallText("The cards you swipe through when you first open Bloo: what it does, how to get around, and what's worth knowing. Dismiss them whenever you like.")
+        Spacer(Modifier.height(GapRow))
+        MorphActionButton(
+            label = "Show welcome cards",
+            icon = Icons.Filled.Style,
+            onClick = { vm.showWelcomeCards() },
+        )
+    }
 }
 
 /** "Credits" card content -- see the call site in [SettingsScreen] for context. */

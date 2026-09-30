@@ -438,6 +438,10 @@ fun BlooApp(vm: AppViewModel) {
         // Biometric lock overlay, drawn over the blurred app; fades out on unlock.
         LockAlphaOverlay(locked = locked, vm = vm, opaqueBackdrop = !contentSettled)
     
+    // The welcome cards, when summoned from Settings: over the app, dismissed back to it.
+    if (state.welcomeCardsOpen) {
+        Box(Modifier.fillMaxSize()) { OnboardingScreen(vm, replay = true) }
+    }
     // Every open dialog, above everything else.
     DialogLayer(dialogHost)
     }

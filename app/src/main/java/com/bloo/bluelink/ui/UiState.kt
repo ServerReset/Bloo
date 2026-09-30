@@ -261,6 +261,8 @@ data class UiState(
     /** Gentle hint shown on the garage right after onboarding, nudging the user
      *  toward Settings to fine-tune each car. */
     val showSettingsHint: Boolean = false,
+    /** The welcome cards, summoned again from Settings (see [showWelcomeCards]). */
+    val welcomeCardsOpen: Boolean = false,
     /** All signed-in accounts (one per brand). */
     val accounts: List<Credentials> = emptyList(),
     /** Showing the login form to add another account while already signed in. */

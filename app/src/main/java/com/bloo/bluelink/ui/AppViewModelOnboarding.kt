@@ -66,3 +66,9 @@ fun AppViewModel.finishCarSetup(vins: List<String>) {
 /** Dismiss the post-onboarding "check out Settings" hint on the garage
  *  (in-memory only -- it's a one-time nudge, not worth persisting). */
 fun AppViewModel.dismissSettingsHint() = _state.update { it.copy(showSettingsHint = false) }
+
+/** Summon the welcome cards again from Settings. They sit over whatever screen is showing. */
+fun AppViewModel.showWelcomeCards() = _state.update { it.copy(welcomeCardsOpen = true) }
+
+/** Dismiss the welcome cards; they go away until summoned from Settings again. */
+fun AppViewModel.dismissWelcomeCards() = _state.update { it.copy(welcomeCardsOpen = false) }

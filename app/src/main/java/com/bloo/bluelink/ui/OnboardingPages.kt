@@ -95,10 +95,6 @@ import com.bloo.bluelink.data.syncUri
 @Composable
 internal fun OnboardingIntroPage() {
     OnboardingTipListPage(
-        emoji = "👋",
-        title = "Welcome to Bloo",
-        titleStyle = MaterialTheme.typography.displaySmall,
-        subtitle = "Lock, climate, charge and more for your Hyundai, Genesis, or Kia. Let's set up your car.",
         tips = listOf(
             Triple(AppIcons.Bolt, "Live status", "Battery, fuel, and lock state at a glance"),
             Triple(Icons.Filled.Thermostat, "Remote climate", "Warm it up or cool it down before you get in"),
@@ -131,18 +127,6 @@ internal fun OnboardingSetupPage(
     onNotifResult: (Boolean) -> Unit,
 ) {
     val scheme = MaterialTheme.colorScheme
-    Text(
-        "Quick setup",
-        style = MaterialTheme.typography.headlineMedium,
-        fontWeight = FontWeight.Black,
-        color = scheme.onSurface,
-    )
-    BodyMediumText(
-        "Two quick things and you're in -- let Bloo reach you, and lock the app.",
-        color = scheme.onSurfaceVariant,
-    )
-    Spacer(Modifier.height(GapHairline))
-
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
         val notifLauncher = rememberLauncherForActivityResult(
             ActivityResultContracts.RequestPermission(),
@@ -461,12 +445,6 @@ internal fun OnboardingCarPage(
 ) {
     val scheme = MaterialTheme.colorScheme
     if (vehicle == null) return
-    WizardPageHeader(
-        "Set up",
-        vehicle.name,
-        "Set powertrain and features once so the right controls appear.",
-    )
-
     Column(verticalArrangement = Arrangement.spacedBy(GapRow)) {
         Text("Powertrain", style = MaterialTheme.typography.labelMedium, color = scheme.primary, fontWeight = FontWeight.SemiBold)
         val currentPt = state.powertrainOf(vehicle)
@@ -539,19 +517,7 @@ internal fun OnboardingCarPage(
  * choice per page that happens to agree today.
  */
 @Composable
-internal fun OnboardingTipListPage(
-    emoji: String,
-    title: String,
-    subtitle: String,
-    tips: List<Triple<ImageVector, String, String>>,
-    titleStyle: TextStyle = MaterialTheme.typography.headlineMedium,
-) {
-    val scheme = MaterialTheme.colorScheme
-    Text(emoji, style = MaterialTheme.typography.displayMedium)
-    Spacer(Modifier.height(GapHairline))
-    Text(title, style = titleStyle, fontWeight = FontWeight.Black, color = scheme.onSurface)
-    Text(subtitle, style = MaterialTheme.typography.bodyLarge, color = scheme.onSurfaceVariant)
-    Spacer(Modifier.height(GapHairline))
+internal fun OnboardingTipListPage(tips: List<Triple<ImageVector, String, String>>) {
     tips.forEach { (icon, cardTitle, body) ->
         OnboardingTipCard(icon, cardTitle, body)
     }
@@ -562,9 +528,6 @@ internal fun OnboardingTipListPage(
 @Composable
 internal fun OnboardingCrashCoursePage() {
     OnboardingTipListPage(
-        emoji = "🎉",
-        title = "You're all set",
-        subtitle = "A few things that make Bloo quick to use:",
         tips = listOf(
             Triple(Icons.Filled.SwapHoriz, "Swipe between cars", "Swipe left or right on any pebble's top row, or anywhere on the hero card, to change cars, even when a pebble is open"),
             Triple(Icons.Filled.DragHandle, "Tap to expand, hold to reorder", "Tap any pebble for details, or hold and drag to rearrange them"),
@@ -596,9 +559,6 @@ internal fun OnboardingFeaturesPage(state: UiState) {
         }
     }
     OnboardingTipListPage(
-        emoji = "✨",
-        title = "A few more things Bloo can do",
-        subtitle = "Worth knowing about, whenever you're ready for them:",
         tips = tips,
     )
 }
