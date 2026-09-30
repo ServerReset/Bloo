@@ -147,7 +147,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     // building an ML Kit client) is on the critical path to the first frame.
     private val store = com.bloo.bluelink.data.StartupTrace.trace("SessionStore()") { SessionStore(app) }
     internal val settingsStore = com.bloo.bluelink.data.StartupTrace.trace("SettingsStore()") { SettingsStore(app) }
-    private val credentialStore = com.bloo.bluelink.data.StartupTrace.trace("CredentialStore()") { CredentialStore(app) }
+    internal val credentialStore = com.bloo.bluelink.data.StartupTrace.trace("CredentialStore()") { CredentialStore(app) }
     private val snapshotStore = com.bloo.bluelink.data.StartupTrace.trace("SnapshotStore()") { SnapshotStore(app) }
     private val statusCache = com.bloo.bluelink.data.StartupTrace.trace("StatusCache()") { StatusCache(app) }
     internal val ai = com.bloo.bluelink.data.StartupTrace.trace("Ai()") { com.bloo.bluelink.data.Ai(app) }
@@ -157,9 +157,9 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     internal fun repoFor(brand: Brand): VehicleRepository =
         repos.getOrPut(brand) { com.bloo.bluelink.data.repositoryFor(brand, store, credentialStore) }
 
-    private fun kiaRepo(): KiaRepository = repoFor(Brand.KIA) as KiaRepository
+    internal fun kiaRepo(): KiaRepository = repoFor(Brand.KIA) as KiaRepository
 
-    private fun canadaRepo(brand: Brand): CanadaRepository = repoFor(brand) as CanadaRepository
+    internal fun canadaRepo(brand: Brand): CanadaRepository = repoFor(brand) as CanadaRepository
 
     private fun brandOf(v: Vehicle): Brand =
         Brand.fromIndicator(v.brandIndicator)
@@ -455,130 +455,17 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     // --- Auth ------------------------------------------------------------
 
-    /**
-     * Sign in (or add another account). Multiple brands can be active at once.
-     * Validates the fields locally first (PIN is skipped for brands that use a
-     * one-time-code login instead of a PIN), then branches: Kia always goes
-     * through [loginKia]'s two-step OTP dance, everything else does a normal
-     * synchronous BlueLinkRepository login wrapped in [launchBusy] (so the
-     * "loading" spinner shows and any thrown exception becomes a snackbar).
-     * On success the credentials are persisted (so next cold start auto-logs-in)
-     * and the garage is (re)loaded to pull in the newly-added account's cars.
-     */
-    fun login(username: String, password: String, pin: String, brand: Brand) {
-        if (username.isBlank() || password.isBlank() || (pin.isBlank() && brand.requiresPin)) {
-            _state.update { it.copy(message = "Email, password and PIN are all required", messageType = "error") }
-            return
-        }
-        if (brand == Brand.KIA) {
-            loginKia(username.trim(), password, pin.trim())
-            return
-        }
-        if (brand.isCanada) {
-            loginCanada(username.trim(), password, pin.trim(), brand)
-            return
-        }
-        if (brand.isEurope) {
-            loginEurope(username.trim(), password, pin.trim(), brand)
-            return
-        }
-        launchBusy {
-            (repoFor(brand) as BlueLinkRepository).login(username.trim(), password, pin.trim())
-            credentialStore.save(Credentials(username.trim(), password, pin.trim(), brand))
-            AppLog.log("Signed in as ${maskEmail(username.trim())} (${brand.label})")
-            _state.update { it.copy(accounts = credentialStore.loadAll(), addingAccount = false) }
-            loadGarageInternal()
-        }
-    }
 
-    /**
-     * Europe (Hyundai Bluelink EU) sign-in. Single-step like the Hyundai/Genesis
-     * US branch — no OTP — just against [EuRepository] instead of
-     * [BlueLinkRepository]; same post-login bookkeeping (persist credentials,
-     * reload the garage).
-     */
-    private fun loginEurope(username: String, password: String, pin: String, brand: Brand) {
-        launchBusy {
-            (repoFor(brand) as EuRepository).login(username, password, pin)
-            credentialStore.save(Credentials(username, password, pin, brand))
-            AppLog.log("Signed in as ${maskEmail(username)} (${brand.label})")
-            _state.update { it.copy(accounts = credentialStore.loadAll(), addingAccount = false) }
-            loadGarageInternal()
-        }
-    }
 
     // Kia sign-in is a two-step dance: password first, then (usually) a
     // one-time code sent to the account's email or phone. The credentials are
     // held here between the steps and only persisted once fully signed in.
     private var kiaPending: Credentials? = null
 
-    /**
-     * Step 1 of Kia login: attempt sign-in with just username/password/PIN. Kia's
-     * API either logs straight in ([KiaAuth.LoggedIn]) or demands a one-time code
-     * ([KiaAuth.OtpRequired]) — which branch happens depends on the account and
-     * isn't knowable ahead of time. On the OTP branch the credentials are stashed
-     * in [kiaPending] (NOT yet persisted to [credentialStore]) and the UI is told
-     * to show the OTP challenge; [kiaSendOtp]/[kiaVerifyOtp] complete the flow.
-     */
-    private fun loginKia(username: String, password: String, pin: String) {
-        launchBusy {
-            when (val auth = kiaRepo().startLogin(username, password, pin)) {
-                is KiaAuth.LoggedIn -> {
-                    kiaPending = null
-                    finishKiaLogin(Credentials(username, password, pin, Brand.KIA))
-                }
-                is KiaAuth.OtpRequired -> {
-                    kiaPending = Credentials(username, password, pin, Brand.KIA)
-                    AppLog.log("Kia requires a one-time code (email: ${auth.hasEmail}, sms: ${auth.hasSms})")
-                    _state.update { it.copy(kiaOtp = KiaOtpUi(auth)) }
-                }
-            }
-        }
-    }
 
-    /** Send the Kia one-time code to the chosen destination ("EMAIL"/"SMS"). */
-    fun kiaSendOtp(notifyType: String) {
-        val otp = _state.value.kiaOtp ?: return
-        launchBusy {
-            kiaRepo().sendOtp(otp.challenge, notifyType)
-            AppLog.log("Kia one-time code sent via $notifyType")
-            _state.update { it.copy(kiaOtp = otp.copy(sentTo = notifyType)) }
-        }
-    }
 
-    /** Verify the Kia one-time code and finish signing in. */
-    fun kiaVerifyOtp(code: String) {
-        val otp = _state.value.kiaOtp ?: return
-        val creds = kiaPending ?: return
-        if (code.isBlank()) {
-            _state.update { it.copy(message = "Enter the code you received", messageType = "error") }
-            return
-        }
-        launchBusy {
-            kiaRepo().verifyOtp(creds.email, creds.password, creds.pin, code.trim(), otp.challenge)
-            kiaPending = null
-            _state.update { it.copy(kiaOtp = null) }
-            finishKiaLogin(creds)
-        }
-    }
 
-    /** Back out of the Kia OTP challenge screen: drops the stashed
-     *  credentials (they were never persisted) and clears the challenge UI. */
-    fun kiaCancelOtp() {
-        kiaPending = null
-        _state.update { it.copy(kiaOtp = null) }
-    }
 
-    /** Finish a fully-authenticated Kia login (reached from either the direct
-     *  [KiaAuth.LoggedIn] branch or after [kiaVerifyOtp] succeeds): persist the
-     *  credentials now that they're verified, refresh the account list, close
-     *  the login form, and load the garage. */
-    private suspend fun finishKiaLogin(creds: Credentials) {
-        credentialStore.save(creds)
-        AppLog.log("Signed in as ${maskEmail(creds.email)} (Kia)")
-        _state.update { it.copy(accounts = credentialStore.loadAll(), addingAccount = false) }
-        loadGarageInternal()
-    }
 
     // Canada sign-in (Hyundai/Genesis/Kia) is also a two-step dance, but unlike
     // Kia US there's no destination choice (email only) and the account's PIN
@@ -586,73 +473,10 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     // typed into the login form travels straight through the OTP challenge.
     private var canadaPending: Credentials? = null
 
-    /**
-     * Step 1 of Canada login: attempt sign-in with username/password. Returns
-     * straight in ([CanadaAuth.LoggedIn]) if this device is still within a
-     * prior login's 90-day remembered-device grant, otherwise an email code
-     * challenge ([CanadaAuth.OtpRequired]) -- which is sent immediately (no
-     * destination to pick, unlike Kia), so the UI goes straight to a
-     * code-entry dialog; [canadaVerifyOtp] completes the flow.
-     */
-    private fun loginCanada(username: String, password: String, pin: String, brand: Brand) {
-        launchBusy {
-            when (val auth = canadaRepo(brand).startLogin(username, password, pin)) {
-                is CanadaAuth.LoggedIn -> {
-                    canadaPending = null
-                    finishCanadaLogin(Credentials(username, password, pin, brand))
-                }
-                is CanadaAuth.OtpRequired -> {
-                    canadaPending = Credentials(username, password, pin, brand)
-                    canadaRepo(brand).sendOtp(auth)
-                    AppLog.log("${brand.label} requires a one-time code (email)")
-                    _state.update { it.copy(canadaOtp = CanadaOtpUi(auth, brand)) }
-                }
-            }
-        }
-    }
 
-    /** Verify the Canada one-time code and finish signing in. */
-    fun canadaVerifyOtp(code: String) {
-        val otp = _state.value.canadaOtp ?: return
-        val creds = canadaPending ?: return
-        if (code.isBlank()) {
-            _state.update { it.copy(message = "Enter the code you received", messageType = "error") }
-            return
-        }
-        launchBusy {
-            canadaRepo(otp.brand).verifyOtp(creds.email, creds.pin, code.trim(), otp.challenge)
-            canadaPending = null
-            _state.update { it.copy(canadaOtp = null) }
-            finishCanadaLogin(creds)
-        }
-    }
 
-    /** Back out of the Canada OTP challenge screen: drops the stashed
-     *  credentials (they were never persisted) and clears the challenge UI. */
-    fun canadaCancelOtp() {
-        canadaPending = null
-        _state.update { it.copy(canadaOtp = null) }
-    }
 
-    /** Finish a fully-authenticated Canada login (reached from either the
-     *  direct [CanadaAuth.LoggedIn] branch or after [canadaVerifyOtp]
-     *  succeeds) -- same shape as [finishKiaLogin]. */
-    private suspend fun finishCanadaLogin(creds: Credentials) {
-        credentialStore.save(creds)
-        AppLog.log("Signed in as ${maskEmail(creds.email)} (${creds.brand.label})")
-        _state.update { it.copy(accounts = credentialStore.loadAll(), addingAccount = false) }
-        loadGarageInternal()
-    }
 
-    /** Show the login form again on top of an already-loaded garage, so the
-     *  user can sign into a second (or third) brand without losing the first. */
-    fun beginAddAccount() = _state.update { it.copy(addingAccount = true) }
-    fun cancelAddAccount() = _state.update { s ->
-        // If the user arrived here by backing out of the biometric prompt, "Cancel"
-        // must re-lock the app — not silently return them to the already-loaded garage.
-        if (s.lockedToLogin) s.copy(addingAccount = false, locked = true, lockedToLogin = false)
-        else s.copy(addingAccount = false)
-    }
 
     /**
      * Sign out of one brand. The server-side logout call is best-effort
@@ -954,7 +778,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
      *  the same moment shouldn't run two overlapping fetches of every brand's
      *  vehicle list. `@Volatile` because this can be read/written from
      *  different coroutines dispatched onto different threads. */
-    private suspend fun loadGarageInternal() {
+    internal suspend fun loadGarageInternal() {
         if (loadingGarage) return
         loadingGarage = true
         try {
@@ -2629,7 +2453,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
      * logged, and turned into a snackbar message instead of crashing the
      * ViewModel's coroutine scope.
      */
-    private fun launchBusy(block: suspend () -> Unit) {
+    internal fun launchBusy(block: suspend () -> Unit) {
         viewModelScope.launch {
             _state.update { it.copy(loading = true, message = null) }
             try {
