@@ -25,6 +25,11 @@ dependencyResolutionManagement {
     repositories {
         google()
         mavenCentral()
+        // Only for the ADB client used to sideload the watch app.
+        maven {
+            url = uri("https://jitpack.io")
+            content { includeGroupByRegex("com\\.github\\.MuntashirAkon.*") }
+        }
     }
 }
 

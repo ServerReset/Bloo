@@ -7,7 +7,6 @@
 
 package com.bloo.bluelink.ui
 
-import android.content.Intent
 import android.graphics.Bitmap
 import android.os.Build
 import android.graphics.BitmapFactory
@@ -55,7 +54,6 @@ import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Smartphone
-import androidx.compose.material.icons.filled.Shop
 import androidx.compose.material.icons.filled.SubdirectoryArrowRight
 import androidx.compose.material.icons.filled.Watch
 import androidx.compose.material.icons.filled.Star
@@ -111,7 +109,6 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.core.graphics.createBitmap
-import androidx.core.net.toUri
 import com.bloo.uicommon.dropShadow
 import com.bloo.uicommon.rememberConfirmArm
 import com.bloo.bluelink.data.Weather
@@ -587,64 +584,6 @@ private fun SetupWatchRow(phoneName: String, modifier: Modifier = Modifier, onCl
             LabelSmallText("Connects to $phoneName")
         }
     }
-}
-
-/**
- * "Set up watch". First install remains a platform constraint: Android/Wear OS does not let a
- * phone silently install an APK onto a watch unless the app is published through Play. Once
- * Bloo for Wear is installed and paired, this pushes updates directly over the Data Layer.
- */
-@Composable
-private fun SetupWatchDialog(phoneName: String, onDismiss: () -> Unit) {
-    val context = LocalContext.current
-    val watch by com.bloo.bluelink.wear.WatchPresence.watch.collectAsStateWithLifecycle()
-    var update by remember { mutableStateOf<com.bloo.bluelink.data.WorkflowRun?>(null) }
-    LaunchedEffect(Unit) {
-        update = com.bloo.bluelink.data.UpdateApi.fetchLatestSuccessfulRun(
-            com.bloo.bluelink.data.UpdateApi.DEFAULT_BRANCH,
-        )
-    }
-    val apkUrl = update?.watchApkUrl
-    GlassAlertDialog(
-        onDismissRequest = onDismiss,
-        icon = Icons.Filled.Watch,
-        title = "Set up watch",
-        text = {
-            if (watch != null) {
-                BodyMediumText("${watch?.name?.ifBlank { "Your watch" }} is connected to $phoneName. Bloo can push the watch app and future updates straight to it.")
-            } else {
-                BodyMediumText("Install Bloo for Wear from Google Play on your watch and open it once. It will connect to $phoneName.")
-            }
-        },
-        buttons = {
-            if (watch != null && apkUrl != null) {
-                MorphActionButton(
-                    label = "Send to watch",
-                    icon = Icons.Filled.Watch,
-                    onClick = {
-                        com.bloo.bluelink.wear.PhoneWatchSyncService.pushWatchApk(context, apkUrl)
-                        onDismiss()
-                    },
-                    modifier = Modifier.fillMaxWidth(),
-                )
-            } else if (watch == null) {
-                MorphActionButton(
-                    label = "Open Play Store",
-                    icon = Icons.Filled.Shop,
-                    onClick = {
-                        runCatching {
-                            context.startActivity(
-                                Intent(Intent.ACTION_VIEW, "market://details?id=com.bloo.bluelink.wear".toUri())
-                                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
-                            )
-                        }
-                    },
-                    modifier = Modifier.fillMaxWidth(),
-                )
-            }
-            MorphTextButton("Close", onClick = onDismiss, modifier = Modifier.fillMaxWidth())
-        },
-    )
 }
 
 /**

@@ -78,3 +78,10 @@
 -dontwarn rikka.shizuku.**
 -dontwarn dev.rikka.shizuku.**
 -keep class rikka.shizuku.** { *; }
+
+# Watch sideload over ADB: libadb loads Conscrypt by name and pairs with BouncyCastle.
+-keep class org.conscrypt.** { *; }
+-keep class io.github.muntashirakon.adb.** { *; }
+-dontwarn org.conscrypt.**
+-dontwarn org.bouncycastle.**
+-dontwarn io.github.muntashirakon.adb.**
