@@ -112,6 +112,7 @@ object WearDataLayerSync {
             json.decodeFromString(WatchSyncPayload.serializer(), bytes.decodeToString())
         }.getOrNull() ?: return
         val app = context.applicationContext
+        WearNotificationPrefs(app).apply(payload.notify)
         WearNotifier.onVehicles(app, _vehicles.value, payload.vehicles)
         _vehicles.value = payload.vehicles
         _selectedVin.value = payload.selectedVin

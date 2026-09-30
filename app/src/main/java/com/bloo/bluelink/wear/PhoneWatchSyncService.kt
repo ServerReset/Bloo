@@ -8,7 +8,12 @@ import com.bloo.bluelink.data.SettingsStore
 import com.bloo.bluelink.data.SnapshotStore
 import com.bloo.bluelink.data.WatchCommandRequest
 import com.bloo.bluelink.data.WatchCommandResult
+import com.bloo.bluelink.data.WatchNotifyPrefs
 import com.bloo.bluelink.data.WatchSyncPayload
+import com.bloo.bluelink.data.notificationPrefs
+import com.bloo.bluelink.data.setNotifyChargeComplete
+import com.bloo.bluelink.data.setNotifyCharging
+import com.bloo.bluelink.data.setNotifyWatchLowBattery
 import com.bloo.bluelink.data.WatchSyncProtocol
 import com.bloo.bluelink.data.WatchLockTiming
 import com.google.android.gms.wearable.DataEvent
@@ -62,6 +67,19 @@ class PhoneWatchSyncService : WearableListenerService() {
         when (messageEvent.path) {
             WatchSyncProtocol.PATH_CRED_KEY -> WatchSignIn.onKey(messageEvent.sourceNodeId, messageEvent.data)
             WatchSyncProtocol.PATH_CRED_ACK -> WatchSignIn.onAck()
+            WatchSyncProtocol.PATH_NOTIF_PREFS -> scope.launch {
+                runCatching { json.decodeFromString(WatchNotifyPrefs.serializer(), messageEvent.data.decodeToString()) }
+                    .getOrNull()?.let { p ->
+                        val store = SettingsStore(applicationContext)
+                        store.setNotifyCharging(p.charging)
+                        store.setNotifyChargeComplete(p.chargeComplete)
+                        store.setNotifyWatchLowBattery(p.lowBattery)
+                        if (!p.charging) {
+                            com.bloo.bluelink.data.LiveCharge.cancelAll(applicationContext, SnapshotStore(applicationContext).current().vehicles.map { it.vin })
+                        }
+                        pushNow(applicationContext)
+                    }
+            }
         }
         if (messageEvent.path == WatchSyncProtocol.PATH_REQUEST_APK) {
             val url = lastWatchApkUrl
@@ -161,6 +179,7 @@ class PhoneWatchSyncService : WearableListenerService() {
                     watchUpdateRunNumber = watchUpdateRunNumber,
                     watchUpdateApkUrl = watchUpdateApkUrl,
                     watchUpdateNotes = watchUpdateNotes,
+                    notify = SettingsStore(app).notificationPrefs().let { WatchNotifyPrefs(it.charging, it.chargeComplete, it.watchLowBattery) },
                 )
                 val jsonString = Json.encodeToString(WatchSyncPayload.serializer(), payload)
                 val req = PutDataMapRequest.create(WatchSyncProtocol.PATH_SNAPSHOT).apply {

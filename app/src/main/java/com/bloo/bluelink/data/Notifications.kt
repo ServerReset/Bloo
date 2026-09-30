@@ -167,6 +167,8 @@ object Notifications {
         actions: List<Action> = emptyList(),
         /** Which of the app's channels this belongs on -- see the CHANNEL_* consts. */
         channelId: String = CHANNEL_ALERTS,
+        /** Don't bridge this to a paired watch (it raises its own version). */
+        localOnly: Boolean = false,
     ): Boolean {
         if (!hasPermission(context)) return false
         ensureChannel(context, channelId)
@@ -184,6 +186,7 @@ object Notifications {
             .setContentText(text)
             .setStyle(NotificationCompat.BigTextStyle().bigText(text))
             .setAutoCancel(true)
+            .setLocalOnly(localOnly)
             .setCategory(NotificationCompat.CATEGORY_REMINDER)
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
             .apply { pi?.let { setContentIntent(it) } }

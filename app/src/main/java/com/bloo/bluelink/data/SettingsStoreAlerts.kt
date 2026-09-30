@@ -24,6 +24,7 @@ internal fun SettingsStore.decodeNotificationPrefs(p: Preferences): SettingsStor
         autoLockAlerts = p[booleanPreferencesKey("notify_autolock")] ?: true,
         carStarted = p[booleanPreferencesKey("notify_start")] ?: true,
         chargeComplete = p[booleanPreferencesKey("notify_charge_complete")] ?: true,
+        watchLowBattery = p[booleanPreferencesKey("notify_watch_low")] ?: true,
     )
 
 /** One-shot read of [SettingsStore.NotificationPrefs] (vs. the [notifications] Flow below,
@@ -67,6 +68,9 @@ suspend fun SettingsStore.setNotifyCarStarted(v: Boolean) =
 
 suspend fun SettingsStore.setNotifyChargeComplete(v: Boolean) =
     editTracked { it[booleanPreferencesKey("notify_charge_complete")] = v }.let {}
+
+suspend fun SettingsStore.setNotifyWatchLowBattery(v: Boolean) =
+    editTracked { it[booleanPreferencesKey("notify_watch_low")] = v }.let {}
 
 // Transient alert bookkeeping (per car), used to fire each alert only once.
 // Mechanism: when AlertWorker (see work/AlertWorker.kt) first observes a

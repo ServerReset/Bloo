@@ -398,6 +398,8 @@ class SettingsStore(internal val context: Context) {
         val carStarted: Boolean = true,
         /** Notification when charging is complete. */
         val chargeComplete: Boolean = true,
+        /** The watch's own "battery is low" notification (the phone has no equivalent). */
+        val watchLowBattery: Boolean = true,
     )
 
     /** Reactive equivalent of [notificationPrefs] for UI that needs to update

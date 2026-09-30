@@ -2,6 +2,7 @@ package com.bloo.bluelink.wear
 
 import android.content.Context
 import com.bloo.bluelink.data.SnapshotStore
+import com.bloo.bluelink.data.WatchSyncProtocol
 import com.google.android.gms.wearable.Wearable
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -37,9 +38,31 @@ object WatchPresence {
     /** Live "is a watch paired right now", for the Settings UI. */
     val hasWatch: StateFlow<Boolean> = _hasWatch
 
+    private val _hasApp = MutableStateFlow(false)
+    /** Whether a reachable watch is running the Bloo watch app (not just any paired Wear device). */
+    val hasApp: StateFlow<Boolean> = _hasApp
+
+    /** Last known answer, readable from a fresh process (a worker posting a notification) before
+     *  the first [refresh] has come back. */
+    fun appInstalled(context: Context): Boolean =
+        context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getBoolean(KEY_APP, false)
+
+    private const val PREFS = "bloo_watch_presence"
+    private const val KEY_APP = "app_installed"
+
     /** Re-read the connected-node list. Cheap; the Settings card calls it while it is visible
      *  because the Data Layer offers no node-change callback without a capability name. */
     fun refresh(context: Context) {
+        runCatching {
+            val app = context.applicationContext
+            Wearable.getCapabilityClient(app)
+                .getCapability(WatchSyncProtocol.CAPABILITY_WATCH_APP, com.google.android.gms.wearable.CapabilityClient.FILTER_REACHABLE)
+                .addOnSuccessListener { info ->
+                    val present = info.nodes.isNotEmpty()
+                    _hasApp.value = present
+                    app.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putBoolean(KEY_APP, present).apply()
+                }
+        }
         runCatching {
             Wearable.getNodeClient(context.applicationContext).connectedNodes.addOnSuccessListener { nodes ->
                 val node = nodes.firstOrNull { it.isNearby } ?: nodes.firstOrNull()

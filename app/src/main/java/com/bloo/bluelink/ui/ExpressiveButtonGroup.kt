@@ -212,20 +212,40 @@ fun ExpressiveButtonGroup(
             if (!wrap) {
                 lines.add(IntArray(n) { it })
             } else {
-                var cur = ArrayList<Int>()
-                var used = 0
-                // Content, not content-plus-reserve: a line breaks when what it holds does not
-                // fit, not when its squash allowance does not. The reserve is trimmed below
-                // instead, which is a far smaller change than moving a button to another line.
-                for (i in 0 until n) {
-                    val add = full[i] + if (cur.isEmpty()) 0 else gapPx
-                    if (cur.isNotEmpty() && used + add > maxW) {
-                        lines.add(cur.toIntArray()); cur = ArrayList(); used = 0
+                // Break greedily, exactly as a FlowRow would: as many buttons as fit on each line.
+                fun breakInto(cap: Int): List<IntArray> {
+                    val result = ArrayList<IntArray>()
+                    var cur = ArrayList<Int>()
+                    var used = 0
+                    // Content, not content-plus-reserve: a line breaks when what it holds does not
+                    // fit, not when its squash allowance does not. The reserve is trimmed below
+                    // instead, which is a far smaller change than moving a button to another line.
+                    for (i in 0 until n) {
+                        val add = full[i] + if (cur.isEmpty()) 0 else gapPx
+                        if (cur.isNotEmpty() && used + add > cap) {
+                            result.add(cur.toIntArray()); cur = ArrayList(); used = 0
+                        }
+                        cur.add(i)
+                        used += if (cur.size == 1) full[i] else add
                     }
-                    cur.add(i)
-                    used += if (cur.size == 1) full[i] else add
+                    if (cur.isNotEmpty()) result.add(cur.toIntArray())
+                    return result
                 }
-                if (cur.isNotEmpty()) lines.add(cur.toIntArray())
+                var broken = breakInto(maxW)
+                // Then BALANCE: keep that many lines, but move the break points so they are as even
+                // as they can be (the narrowest cap that still fits in the same number of lines),
+                // rather than a full line over a stray button. Each line then stretches to the full
+                // width, so evenly filled lines make evenly sized buttons.
+                if (broken.size > 1 && maxW != Int.MAX_VALUE) {
+                    var lo = full.max()
+                    var hi = maxW
+                    while (lo < hi) {
+                        val mid = (lo + hi) ushr 1
+                        if (breakInto(mid).size <= broken.size) hi = mid else lo = mid + 1
+                    }
+                    broken = breakInto(lo)
+                }
+                lines.addAll(broken)
             }
 
             val out = arrayOfNulls<Placeable>(n)
@@ -243,6 +263,9 @@ fun ExpressiveButtonGroup(
                     nonMemberWidth += p.width
                 }
                 val memberIdx = idx.filter { member[it] }
+                // A lone button on its line has nobody to share with: it rests at its own width
+                // (aligned to the start) and only fills the line while pressed -- see below.
+                if (memberIdx.size == 1) weight[memberIdx[0]] = 0f
                 if (memberIdx.isEmpty()) {
                     lineWidth[li] = nonMemberWidth + gapsHere
                     lineHeight[li] = idx.maxOf { out[it]?.height ?: 0 }

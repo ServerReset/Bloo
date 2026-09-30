@@ -17,10 +17,32 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.tasks.await
 
 /** Which watch notifications the user wants. Plain prefs: nothing here is secret. */
 class WearNotificationPrefs(context: Context) {
     private val prefs = context.applicationContext.getSharedPreferences("bloo_watch_notifications", Context.MODE_PRIVATE)
+
+    /** Take the phone's choices (it is the source of truth; see [WatchNotifyPrefs]). */
+    fun apply(p: com.bloo.bluelink.data.WatchNotifyPrefs) {
+        prefs.edit { putBoolean("charging", p.charging); putBoolean("charge_complete", p.chargeComplete); putBoolean("low_battery", p.lowBattery) }
+    }
+
+    fun current() = com.bloo.bluelink.data.WatchNotifyPrefs(charging, chargeComplete, lowBattery)
+
+    /** Tell the phone about a change made here, so both sides stay the same. */
+    fun sendToPhone(context: Context) {
+        val bytes = kotlinx.serialization.json.Json.encodeToString(com.bloo.bluelink.data.WatchNotifyPrefs.serializer(), current()).encodeToByteArray()
+        val app = context.applicationContext
+        CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
+            runCatching {
+                com.google.android.gms.wearable.Wearable.getNodeClient(app).connectedNodes.await().forEach {
+                    com.google.android.gms.wearable.Wearable.getMessageClient(app)
+                        .sendMessage(it.id, com.bloo.bluelink.data.WatchSyncProtocol.PATH_NOTIF_PREFS, bytes).await()
+                }
+            }
+        }
+    }
 
     var charging: Boolean
         get() = prefs.getBoolean("charging", true)

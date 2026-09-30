@@ -497,6 +497,8 @@ object LiveCharge {
         )
 
         val builder = NotificationCompat.Builder(context, CHANNEL)
+            // The watch shows its own charging card, so the phone's isn't copied onto it.
+            .setLocalOnly(com.bloo.bluelink.wear.WatchPresence.appInstalled(context))
             .setSmallIcon(R.drawable.ic_stat_bloo)
             .setColor(ACCENT)
             .setContentTitle("$carName is charging")

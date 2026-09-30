@@ -32,6 +32,17 @@ data class WatchSyncPayload(
     val watchUpdateRunNumber: Int? = null,
     val watchUpdateApkUrl: String? = null,
     val watchUpdateNotes: String? = null,
+    /** The phone's choices for the notifications the watch raises itself, so the two always
+     *  agree (the watch edits them too, via [WatchSyncProtocol.PATH_NOTIF_PREFS]). */
+    val notify: WatchNotifyPrefs = WatchNotifyPrefs(),
+)
+
+/** Which watch notifications are on. Shared so the phone's settings and the watch's toggles are one thing. */
+@Serializable
+data class WatchNotifyPrefs(
+    val charging: Boolean = true,
+    val chargeComplete: Boolean = true,
+    val lowBattery: Boolean = true,
 )
 
 /**
@@ -55,6 +66,10 @@ object WatchSyncProtocol {
      *  pending state and surface failures. */
     const val PATH_COMMAND_RESULT = "/bloo/command_result"
     /** Phone → watch message: "I'd like to sign you in" -- the watch answers with [PATH_CRED_KEY]. */
+    /** Watch → phone message: a [WatchNotifyPrefs] (JSON) the user changed on the watch. */
+    const val PATH_NOTIF_PREFS = "/bloo/notif_prefs"
+    /** Capability the watch app advertises, so the phone can tell a Bloo watch from any other Wear device. */
+    const val CAPABILITY_WATCH_APP = "bloo_watch_app"
     const val PATH_CRED_OFFER = "/bloo/cred_offer"
     /** Watch → phone message: the public half of the watch's Keystore transfer key. */
     const val PATH_CRED_KEY = "/bloo/cred_key"

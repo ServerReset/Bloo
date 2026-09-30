@@ -14,6 +14,7 @@ import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.NotificationsOff
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -81,6 +82,14 @@ internal fun NotificationsCardContent(
                 description = "A live notification with progress, the charge limit and a Stop button; on Android 16+ it also shows in the status bar.",
             ) { vm.setNotifyCharging(it) }
             ToggleRow("Charge complete", notif.chargeComplete) { vm.setNotifyChargeComplete(it) }
+            val hasWatchApp by com.bloo.bluelink.wear.WatchPresence.hasApp.collectAsStateWithLifecycle()
+            PopVisible(visible = hasWatchApp) {
+                ToggleRow(
+                    "Low battery on watch",
+                    notif.watchLowBattery,
+                    description = "Charging and charge-complete alerts show on the watch instead of being copied to it. These three switches match the ones on the watch.",
+                ) { vm.setNotifyWatchLowBattery(it) }
+            }
         }
         Spacer(Modifier.height(GapGroup))
 

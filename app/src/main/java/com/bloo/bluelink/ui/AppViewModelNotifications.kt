@@ -15,6 +15,7 @@ import com.bloo.bluelink.data.setNotifyDoor
 import com.bloo.bluelink.data.setNotifyRunning
 import com.bloo.bluelink.data.setNotifyService
 import com.bloo.bluelink.data.setNotifyUnlocked
+import com.bloo.bluelink.data.setNotifyWatchLowBattery
 import com.bloo.bluelink.data.setRunningMinutes
 import com.bloo.bluelink.data.setUnlockedMinutes
 
@@ -44,6 +45,7 @@ fun AppViewModel.setUnlockedMinutes(m: Int) = viewModelScope.launch { settingsSt
  *  until they happen to notice the setting changed. */
 fun AppViewModel.setNotifyCharging(v: Boolean) = viewModelScope.launch {
     settingsStore.setNotifyCharging(v)
+    com.bloo.bluelink.wear.PhoneWatchSyncService.pushNow(getApplication())
     if (!v) {
         LiveCharge.cancelAll(getApplication(), _state.value.vehicles.map { it.vin })
         com.bloo.bluelink.work.LiveChargePollWorker.cancel(getApplication())
@@ -52,7 +54,16 @@ fun AppViewModel.setNotifyCharging(v: Boolean) = viewModelScope.launch {
 
 fun AppViewModel.setNotifyCarStarted(v: Boolean) = viewModelScope.launch { settingsStore.setNotifyCarStarted(v) }
 
-fun AppViewModel.setNotifyChargeComplete(v: Boolean) = viewModelScope.launch { settingsStore.setNotifyChargeComplete(v) }
+fun AppViewModel.setNotifyChargeComplete(v: Boolean) = viewModelScope.launch {
+    settingsStore.setNotifyChargeComplete(v)
+    com.bloo.bluelink.wear.PhoneWatchSyncService.pushNow(getApplication())
+}
 
 /** Whether AutoLock posts its "Locked" / "Would have locked" notification. */
 fun AppViewModel.setNotifyAutoLock(v: Boolean) = viewModelScope.launch { settingsStore.setNotifyAutoLock(v) }
+
+/** The watch's own low-battery notification; pushed to the watch with the next sync. */
+fun AppViewModel.setNotifyWatchLowBattery(v: Boolean) = viewModelScope.launch {
+    settingsStore.setNotifyWatchLowBattery(v)
+    com.bloo.bluelink.wear.PhoneWatchSyncService.pushNow(getApplication())
+}

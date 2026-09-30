@@ -14,6 +14,8 @@ object CarAlerts {
          *  "car started" and "charge complete" transitions pass
          *  [Notifications.CHANNEL_EVENTS]. */
         val channelId: String = Notifications.CHANNEL_ALERTS,
+        /** Keep it off the watch: set when the watch raises its own version of this alert. */
+        val localOnly: Boolean = false,
     )
 
     /**
@@ -321,6 +323,8 @@ object CarAlerts {
                         "${v.name} charging is complete",
                         "Your car has finished charging.",
                         channelId = Notifications.CHANNEL_EVENTS,
+                        // The watch raises its own "charged" alert, so don't also bridge this one.
+                        localOnly = com.bloo.bluelink.wear.WatchPresence.appInstalled(settings.context),
                     )
                 }
                 // Reset the flag so we're ready for the next charge cycle

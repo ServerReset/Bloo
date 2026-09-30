@@ -257,7 +257,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
      */
     internal suspend fun checkAlerts(v: Vehicle, status: VehicleStatus) {
         val alerts = CarAlerts.evaluate(settingsStore, v, status)
-        alerts.forEach { Notifications.post(getApplication(), it.id, it.title, it.text, it.actions, it.channelId) }
+        alerts.forEach { Notifications.post(getApplication(), it.id, it.title, it.text, it.actions, it.channelId, it.localOnly) }
         alerts.firstOrNull()?.let { a -> _state.update { it.copy(message = a.text, messageType = "error") } }
     }
 
