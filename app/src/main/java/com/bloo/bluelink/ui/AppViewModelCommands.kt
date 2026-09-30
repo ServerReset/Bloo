@@ -14,6 +14,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.withLock
 import com.bloo.bluelink.data.unitSystem
+import com.bloo.bluelink.data.saveClimate
 
 // --- Live device location + remote vehicle commands (extracted from AppViewModel) --
 //
@@ -242,7 +243,11 @@ fun AppViewModel.startClimate(v: Vehicle, req: ClimateRequest) =
             // it can't extend climate past what this shorter run intends.
             com.bloo.bluelink.work.ClimateExtendWorker.cancel(ctx, v.vin)
         }
-    }
+    }.also {
+    // What the car was last TOLD to do is what "last used" means now -- not wherever a slider
+    // happened to be left -- so re-opening the pebble can restore the real thing.
+    viewModelScope.launch { settingsStore.saveClimate(v.vin, req) }
+}
 
 // startCharge/stopCharge/setChargeLimits all route the vehicle through
 // electric(v) before calling the repository -- unlike the commands above,

@@ -108,6 +108,16 @@ internal fun ChargePebble(v: Vehicle, status: VehicleStatus?, enabled: Boolean, 
         if (!acSeeded) acReported?.let { acLimit = it; acSeeded = true }
         if (!dcSeeded) dcReported?.let { dcLimit = it; dcSeeded = true }
     }
+    // Collapsing throws away limits that were dragged but never applied: re-opening the pebble shows
+    // the targets the car actually has. (The latches above only ever seed once, so without this a
+    // half-edited slider would survive a close and open and look like the car's real setting.)
+    val expanded = LocalForceExpanded.current || state.isPebbleExpanded(v.vin, "charge")
+    LaunchedEffect(expanded) {
+        if (!expanded) {
+            acReported?.let { acLimit = it }
+            dcReported?.let { dcLimit = it }
+        }
+    }
 
     Pebble(
         v, "charge", "Charge", Icons.Filled.Bolt, state, vm, modifier,

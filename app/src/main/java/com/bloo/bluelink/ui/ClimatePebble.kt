@@ -108,6 +108,7 @@ import com.bloo.bluelink.data.deleteClimatePreset
 import com.bloo.bluelink.data.saveClimatePreset
 import com.bloo.bluelink.data.settingsMode
 import com.bloo.uicommon.blockPageSwipe
+import com.bloo.bluelink.data.TempValue
 
 
 // --- Climate --------------------------------------------------------------
@@ -270,6 +271,25 @@ internal fun ClimatePebble(
     // so this and the header's Start button agree on what "expanded" means.
     val expanded = LocalForceExpanded.current || state.isPebbleExpanded(v.vin, "climate")
 
+    // While climate runs the controls are locked, so they should show what the CAR is doing, not
+    // whatever the sliders last held. Only the fields the car reports back are mirrored.
+    val carTempF = status?.airTemp?.asFahrenheit()
+    val carDefrost = status?.defrost
+    val carWheelHeat = status?.steerWheelHeat
+    val syncFromCar: () -> Unit = {
+        carTempF?.let { tempF = it.coerceIn(CLIMATE_TEMP_RANGE_F.first, CLIMATE_TEMP_RANGE_F.last) }
+        carDefrost?.let { defrost = it }
+        carWheelHeat?.let { steeringHeat = WheelHeatLevel.fromApi(it) }
+    }
+    LaunchedEffect(climateOn, carTempF, carDefrost, carWheelHeat) { if (climateOn) syncFromCar() }
+    // Collapsing throws away edits that were never sent: re-opening shows the car's real settings
+    // while it runs, or the last climate actually started while it doesn't.
+    LaunchedEffect(expanded) {
+        if (!expanded && settingsLoaded) {
+            if (climateOn) syncFromCar() else vm.loadSavedClimate(v)?.let(applyRequest)
+        }
+    }
+
     Pebble(
         v, "climate", "Climate", Icons.Filled.AcUnit, state, vm, modifier,
         summary = when {
@@ -418,147 +438,151 @@ internal fun ClimatePebble(
             }
         }
 
-        SectionLabel("Controls")
+        // Running climate is ended first (the header button) before anything here can change, so
+        // the controls sit behind glass while it is on.
+        LockedControls(locked = climateOn, message = "Stop climate to change settings") {
+            SectionLabel("Controls")
 
-        // Show the set temperature when climate is running, with an animated entrance.
-        AnimatedVisibility(
-            visible = climateOn,
-            enter = expandEnterSized(),
-            exit = expandExitSized(),
-        ) {
-            Row(Modifier.fillMaxWidth().padding(bottom = 6.dp), horizontalArrangement = Arrangement.SpaceBetween) {
-                MutedText("Set temperature")
-                // color resolved explicitly to onSurface -- same fix, same reason as
-                // the update pebble's own AnimatedValue calls: BasicText (which this
-                // renders through) doesn't fall back to LocalContentColor the way a
-                // plain Text() does, so this rendered unreadably dark instead of
-                // standing out against the muted label beside it -- the value, not
-                // the label, is the important half of this row.
-                com.bloo.uicommon.AnimatedValue(
-                    degLabel(tempF.toString(), fahrenheit),
-                    style = MaterialTheme.typography.bodySmall.copy(
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurface,
-                    ),
-                    reduceMotion = LocalReduceMotion.current,
+            // Show the set temperature when climate is running, with an animated entrance.
+            AnimatedVisibility(
+                visible = climateOn,
+                enter = expandEnterSized(),
+                exit = expandExitSized(),
+            ) {
+                Row(Modifier.fillMaxWidth().padding(bottom = 6.dp), horizontalArrangement = Arrangement.SpaceBetween) {
+                    MutedText("Set temperature")
+                    // color resolved explicitly to onSurface -- same fix, same reason as
+                    // the update pebble's own AnimatedValue calls: BasicText (which this
+                    // renders through) doesn't fall back to LocalContentColor the way a
+                    // plain Text() does, so this rendered unreadably dark instead of
+                    // standing out against the muted label beside it -- the value, not
+                    // the label, is the important half of this row.
+                    com.bloo.uicommon.AnimatedValue(
+                        degLabel(tempF.toString(), fahrenheit),
+                        style = MaterialTheme.typography.bodySmall.copy(
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurface,
+                        ),
+                        reduceMotion = LocalReduceMotion.current,
+                    )
+                }
+            }
+
+            // Was a hand-rolled version of the same blue->green->warm mapping
+            // uicommon.tempColor() now centralizes (an earlier copy had drifted to
+            // a different, unanimated palette).
+            val tempRange = CLIMATE_TEMP_RANGE_F.first.toFloat()..CLIMATE_TEMP_RANGE_F.last.toFloat()
+            val tempColor = com.bloo.uicommon.tempColor(tempF, tempRange.start, tempRange.endInclusive)
+            // The label + value readout is the same in either unit -- only degLabel's
+            // suffix (°F/°C) and the slider below differ -- so it's hoisted out of the
+            // branch. RollingNumber (used for the hero's %/range) rather than the plain
+            // AnimatedValue this had: it rolls the DIRECTION the value actually moved (up
+            // when dragged warmer, down when cooler) instead of always sliding one way.
+            Row(Modifier.fillMaxWidth().padding(vertical = 2.dp), horizontalArrangement = Arrangement.SpaceBetween) {
+                MutedText("Temperature")
+                RollingNumber(
+                    text = degLabel(tempF.toString(), fahrenheit),
+                    style = MaterialTheme.typography.bodySmall,
+                    fontWeight = FontWeight.Bold,
+                    color = tempColor,
                 )
             }
-        }
+            if (fahrenheit) {
+                AnimatedSlider(
+                    value = tempF.toFloat(),
+                    onValueChange = { tempF = it.roundToInt() },
+                    valueRange = tempRange,
+                    steps = 19,
+                    accent = tempColor,
+                )
+            } else {
+                // Celsius: drive the slider in whole °C but keep tempF canonical for
+                // the command, converting on each side.
+                val tempC = ((tempF - 32) * 5 / 9f).roundToInt()
+                AnimatedSlider(
+                    value = tempC.toFloat(),
+                    onValueChange = { tempF = (it * 9 / 5f + 32).roundToInt() },
+                    valueRange = 17f..28f,
+                    steps = 10,
+                    accent = tempColor,
+                )
+            }
 
-        // Was a hand-rolled version of the same blue->green->warm mapping
-        // uicommon.tempColor() now centralizes (an earlier copy had drifted to
-        // a different, unanimated palette).
-        val tempRange = CLIMATE_TEMP_RANGE_F.first.toFloat()..CLIMATE_TEMP_RANGE_F.last.toFloat()
-        val tempColor = com.bloo.uicommon.tempColor(tempF, tempRange.start, tempRange.endInclusive)
-        // The label + value readout is the same in either unit -- only degLabel's
-        // suffix (°F/°C) and the slider below differ -- so it's hoisted out of the
-        // branch. RollingNumber (used for the hero's %/range) rather than the plain
-        // AnimatedValue this had: it rolls the DIRECTION the value actually moved (up
-        // when dragged warmer, down when cooler) instead of always sliding one way.
-        Row(Modifier.fillMaxWidth().padding(vertical = 2.dp), horizontalArrangement = Arrangement.SpaceBetween) {
-            MutedText("Temperature")
-            RollingNumber(
-                text = degLabel(tempF.toString(), fahrenheit),
-                style = MaterialTheme.typography.bodySmall,
-                fontWeight = FontWeight.Bold,
-                color = tempColor,
-            )
-        }
-        if (fahrenheit) {
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top) {
+                Text(
+                    "Run time",
+                    Modifier.weight(1f),
+                    style = MaterialTheme.typography.bodyMedium,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Spacer(Modifier.width(8.dp))
+                // RollingNumber, not StepRow's built-in roll: StepRow's AnimatedContent
+                // always slides the same direction regardless of which way the value
+                // moved, which reads oddly on a slider you're actively dragging both
+                // ways. RollingNumber rolls up when the minutes increase, down when
+                // they decrease, matching every other draggable number in the app.
+                RollingNumber(
+                    text = "$duration min",
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.Medium,
+                )
+            }
             AnimatedSlider(
-                value = tempF.toFloat(),
-                onValueChange = { tempF = it.roundToInt() },
-                valueRange = tempRange,
-                steps = 19,
-                accent = tempColor,
+                value = duration.toFloat(),
+                // Extended range: the car itself has no single command past
+                // CLIMATE_DURATION_RANGE's 10-minute cap -- a request beyond that
+                // is auto-chained into follow-up commands instead (see
+                // AppViewModel.startClimate / ClimateExtendWorker), so the slider
+                // can go further than any one command actually could.
+                onValueChange = { duration = it.roundToInt() },
+                valueRange = CLIMATE_EXTENDED_DURATION_RANGE.first.toFloat()..CLIMATE_EXTENDED_DURATION_RANGE.last.toFloat(),
+                steps = CLIMATE_EXTENDED_DURATION_RANGE.last - CLIMATE_EXTENDED_DURATION_RANGE.first - 1,
             )
-        } else {
-            // Celsius: drive the slider in whole °C but keep tempF canonical for
-            // the command, converting on each side.
-            val tempC = ((tempF - 32) * 5 / 9f).roundToInt()
-            AnimatedSlider(
-                value = tempC.toFloat(),
-                onValueChange = { tempF = (it * 9 / 5f + 32).roundToInt() },
-                valueRange = 17f..28f,
-                steps = 10,
-                accent = tempColor,
-            )
-        }
-
-        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top) {
-            Text(
-                "Run time",
-                Modifier.weight(1f),
-                style = MaterialTheme.typography.bodyMedium,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-            )
-            Spacer(Modifier.width(8.dp))
-            // RollingNumber, not StepRow's built-in roll: StepRow's AnimatedContent
-            // always slides the same direction regardless of which way the value
-            // moved, which reads oddly on a slider you're actively dragging both
-            // ways. RollingNumber rolls up when the minutes increase, down when
-            // they decrease, matching every other draggable number in the app.
-            RollingNumber(
-                text = "$duration min",
-                style = MaterialTheme.typography.bodyMedium,
-                fontWeight = FontWeight.Medium,
-            )
-        }
-        AnimatedSlider(
-            value = duration.toFloat(),
-            // Extended range: the car itself has no single command past
-            // CLIMATE_DURATION_RANGE's 10-minute cap -- a request beyond that
-            // is auto-chained into follow-up commands instead (see
-            // AppViewModel.startClimate / ClimateExtendWorker), so the slider
-            // can go further than any one command actually could.
-            onValueChange = { duration = it.roundToInt() },
-            valueRange = CLIMATE_EXTENDED_DURATION_RANGE.first.toFloat()..CLIMATE_EXTENDED_DURATION_RANGE.last.toFloat(),
-            steps = CLIMATE_EXTENDED_DURATION_RANGE.last - CLIMATE_EXTENDED_DURATION_RANGE.first - 1,
-        )
-        AnimatedVisibility(
-            visible = duration > CLIMATE_DURATION_RANGE.last,
-            enter = expandEnterSized(Alignment.Bottom),
-            exit = expandExitSized(Alignment.Bottom),
-        ) {
-            LabelSmallText(
-                "Sent as ${climateChunksLabel(duration)}, continued automatically",
-            )
-        }
-
-        ToggleRow("Defrost", defrost) { defrost = it }
-        if (seats.steeringWheel) {
-            WheelHeatControl(steeringHeat) { steeringHeat = it }
-        }
-
-        val isGen5W = state.isGen5WEffective(v)
-        // state.powertrainOf(v), not the raw v.isEv -- the same "one shared
-        // powertrain rule" every other display decision in the app goes
-        // through (see resolvePowertrain's own doc, SettingsStore.kt), so a
-        // user's own powertrain override (e.g. correcting a PHEV the API
-        // reports as gas) is honoured here too, not just everywhere else.
-        if (seats.any && !(isGen5W && state.powertrainOf(v) == com.bloo.bluelink.data.Powertrain.EV)) {
-            SectionLabel("Seats")
-            if (seats.driverHeat || seats.driverCool) {
-                SeatControl("Driver seat", driver, seats.driverCool, seats.driverHeat) { driver = it }
+            AnimatedVisibility(
+                visible = duration > CLIMATE_DURATION_RANGE.last,
+                enter = expandEnterSized(Alignment.Bottom),
+                exit = expandExitSized(Alignment.Bottom),
+            ) {
+                LabelSmallText(
+                    "Sent as ${climateChunksLabel(duration)}, continued automatically",
+                )
             }
-            if (seats.passHeat || seats.passCool) {
-                SeatControl("Passenger seat", passenger, seats.passCool, seats.passHeat) { passenger = it }
-            }
-            if (seats.rearLeftHeat || seats.rearLeftCool) {
-                SeatControl("Rear left seat", rearLeft, seats.rearLeftCool, seats.rearLeftHeat) { rearLeft = it }
-            }
-            if (seats.rearRightHeat || seats.rearRightCool) {
-                SeatControl("Rear right seat", rearRight, seats.rearRightCool, seats.rearRightHeat) { rearRight = it }
-            }
-        }
 
-        SectionLabel("Save")
-        SafeMorphTextButton(
-            text = "Save as preset",
-            onClick = { presetName = ""; showAddPreset = true },
-            modifier = Modifier.fillMaxWidth(),
-        )
+            ToggleRow("Defrost", defrost) { defrost = it }
+            if (seats.steeringWheel) {
+                WheelHeatControl(steeringHeat) { steeringHeat = it }
+            }
+
+            val isGen5W = state.isGen5WEffective(v)
+            // state.powertrainOf(v), not the raw v.isEv -- the same "one shared
+            // powertrain rule" every other display decision in the app goes
+            // through (see resolvePowertrain's own doc, SettingsStore.kt), so a
+            // user's own powertrain override (e.g. correcting a PHEV the API
+            // reports as gas) is honoured here too, not just everywhere else.
+            if (seats.any && !(isGen5W && state.powertrainOf(v) == com.bloo.bluelink.data.Powertrain.EV)) {
+                SectionLabel("Seats")
+                if (seats.driverHeat || seats.driverCool) {
+                    SeatControl("Driver seat", driver, seats.driverCool, seats.driverHeat) { driver = it }
+                }
+                if (seats.passHeat || seats.passCool) {
+                    SeatControl("Passenger seat", passenger, seats.passCool, seats.passHeat) { passenger = it }
+                }
+                if (seats.rearLeftHeat || seats.rearLeftCool) {
+                    SeatControl("Rear left seat", rearLeft, seats.rearLeftCool, seats.rearLeftHeat) { rearLeft = it }
+                }
+                if (seats.rearRightHeat || seats.rearRightCool) {
+                    SeatControl("Rear right seat", rearRight, seats.rearRightCool, seats.rearRightHeat) { rearRight = it }
+                }
+            }
+
+            SectionLabel("Save")
+            SafeMorphTextButton(
+                text = "Save as preset",
+                onClick = { presetName = ""; showAddPreset = true },
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
 
         if (showAddPreset) {
             // Standardized on the shared GlassAlertDialog shell (stacked buttons).
@@ -611,3 +635,8 @@ internal fun ClimatePebble(
     }
 }
 
+/** A reported setpoint as whole °F: the API's own unit code says whether it is Celsius (0) or °F (1). */
+private fun TempValue.asFahrenheit(): Int? {
+    val n = value?.toDoubleOrNull() ?: return null
+    return (if (unit == 0) n * 9 / 5 + 32 else n).roundToInt()
+}

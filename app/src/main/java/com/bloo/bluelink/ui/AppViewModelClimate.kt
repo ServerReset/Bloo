@@ -20,17 +20,17 @@ import com.bloo.bluelink.data.setClimatePresets
 suspend fun AppViewModel.loadSavedClimate(v: Vehicle): ClimateRequest? = settingsStore.savedClimate(v.vin)
 
 /**
- * Debounced persist + cross-composition mirror of the live climate draft. Lives in
- * viewModelScope on purpose: a LaunchedEffect-side debounce is cancelled when
- * the ClimatePebble leaves composition (cover-screen tile swipe, car switch,
- * collapse), silently dropping any change made in the final 400ms - the
- * sliders then reverted to the stale persisted value on the next open.
+ * Debounced cross-composition mirror of the live climate draft. Lives in viewModelScope on
+ * purpose: a LaunchedEffect-side debounce is cancelled when the ClimatePebble leaves composition
+ * (cover-screen tile swipe, car switch, collapse), dropping a change made in the final 400ms.
+ *
+ * It no longer PERSISTS the draft: only a climate run that is actually started is saved (see
+ * [startClimate]), so "last used" means what the car was told, and a collapsed pebble can reset to it.
  */
 fun AppViewModel.saveClimateDebounced(v: Vehicle, req: ClimateRequest, activePresetId: String?) {
     climateSaveJobs[v.vin]?.cancel()
     climateSaveJobs[v.vin] = viewModelScope.launch {
         kotlinx.coroutines.delay(400)
-        settingsStore.saveClimate(v.vin, req)
         publishClimateState(v.vin, activePresetId, req)
     }
 }
