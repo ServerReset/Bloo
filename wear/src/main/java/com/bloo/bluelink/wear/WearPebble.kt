@@ -91,8 +91,12 @@ fun WearActionRow(
     onClick: () -> Unit,
 ) {
     val scheme = MaterialTheme.colorScheme
+    val haptics = androidx.compose.ui.platform.LocalHapticFeedback.current
     MorphButtonCore(
-        onClick = onClick,
+        onClick = {
+            haptics.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
+            onClick()
+        },
         modifier = modifier.fillMaxWidth(),
         enabled = enabled,
         active = active,

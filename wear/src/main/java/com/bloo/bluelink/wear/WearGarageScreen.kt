@@ -177,6 +177,16 @@ private fun WearCarPage(
                     tint = v.heroTint(),
                 )
             }
+            v.stateLine()?.let { line ->
+                item {
+                    WearCenteredText(
+                        line,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        fontWeight = androidx.compose.ui.text.font.FontWeight.Normal,
+                    )
+                }
+            }
 
             item {
                 WearPebble(title = "Controls", icon = Icons.Filled.DirectionsCar) {
@@ -217,6 +227,13 @@ private fun WearCarPage(
 /** The single value a glance at this car should show: charge/fuel %, else lock state. */
 private fun VehicleSnapshot.heroValue(): String =
     percent?.let { "$it%" } ?: locked?.let { if (it) "Locked" else "Unlocked" } ?: "—"
+
+/** The supporting line under the hero: lock state, charging, and range, whichever the car reports. */
+private fun VehicleSnapshot.stateLine(): String? = listOfNotNull(
+    locked?.let { if (it) "Locked" else "Unlocked" }.takeIf { percent != null },
+    if (charging == true) "Charging" else null,
+    rangeMi?.let { "$it mi" },
+).joinToString(" · ").ifBlank { null }
 
 /** Charge/fuel reads in the brand accent; a lock-only car reads in the plain on-background tone. */
 @Composable

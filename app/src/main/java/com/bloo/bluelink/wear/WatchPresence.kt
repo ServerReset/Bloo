@@ -25,9 +25,29 @@ import kotlinx.coroutines.launch
  */
 object WatchPresence {
 
+    /** The watch currently connected to THIS phone over the Data Layer. */
+    data class ConnectedWatch(val id: String, val name: String)
+
+    private val _watch = MutableStateFlow<ConnectedWatch?>(null)
+    /** The watch connected to this phone right now, or null. The watch never writes to the Drive
+     *  registry, so this -- not the synced-devices list -- is what says which phone owns it. */
+    val watch: StateFlow<ConnectedWatch?> = _watch
+
     private val _hasWatch = MutableStateFlow(false)
     /** Live "is a watch paired right now", for the Settings UI. */
     val hasWatch: StateFlow<Boolean> = _hasWatch
+
+    /** Re-read the connected-node list. Cheap; the Settings card calls it while it is visible
+     *  because the Data Layer offers no node-change callback without a capability name. */
+    fun refresh(context: Context) {
+        runCatching {
+            Wearable.getNodeClient(context.applicationContext).connectedNodes.addOnSuccessListener { nodes ->
+                val node = nodes.firstOrNull { it.isNearby } ?: nodes.firstOrNull()
+                _watch.value = node?.let { ConnectedWatch(it.id, it.displayName) }
+                _hasWatch.value = node != null
+            }
+        }
+    }
 
     private var started = false
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -39,12 +59,7 @@ object WatchPresence {
         // Node presence: LISTEN for changes and seed once. Guarded throughout -- on a device
         // with no Play Services / no wearable surface any of these throws, and a missing watch
         // must never crash or slow the phone.
-        runCatching {
-            val nodeClient = Wearable.getNodeClient(app)
-            nodeClient.connectedNodes.addOnSuccessListener { nodes ->
-                _hasWatch.value = nodes.isNotEmpty()
-            }
-        }
+        refresh(app)
         // Observe the snapshot store and push on every change.
         scope.launch {
             runCatching {

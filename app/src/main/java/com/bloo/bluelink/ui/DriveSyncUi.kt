@@ -172,16 +172,22 @@ internal fun SyncDevicesSection(state: UiState, vm: AppViewModel) {
     )
     Spacer(Modifier.height(GapRow))
 
-    // A watch is a COMPANION, not a peer: split the registry so watches never appear as
-    // reorderable, primary-eligible rows, then render each watch directly under the phone
-    // it syncs to (by the same account/file), indented and marked as a companion.
+    // A watch is a COMPANION, not a peer: it never appears as a reorderable, primary-eligible
+    // row. It rides UNDER the phone that owns it. The watch that is connected over the Data Layer
+    // belongs to THIS phone (the registry can't say -- the watch never writes to Drive); any
+    // watch the registry does carry rides under the primary phone.
     val phones = ordered.filter { !it.isWatch }
-    val watches = ordered.filter { it.isWatch }
-    // Which phone a watch belongs to: the registry carries no explicit pairing, so a
-    // watch rides under the primary phone (the source of truth it syncs from). When the
-    // primary itself is unknown, the first phone stands in. All watches share the one
-    // phone anchor, which is the honest read for a single-account fleet.
+    val registryWatches = ordered.filter { it.isWatch }
     val watchHost = phones.firstOrNull { it.id == state.syncPrimaryId } ?: phones.firstOrNull()
+    val context = LocalContext.current
+    val liveWatch by com.bloo.bluelink.wear.WatchPresence.watch.collectAsStateWithLifecycle()
+    LaunchedEffect(Unit) {
+        while (true) {
+            com.bloo.bluelink.wear.WatchPresence.refresh(context)
+            delay(WATCH_REFRESH_MS)
+        }
+    }
+    var showSetupWatch by remember { mutableStateOf(false) }
 
     ReorderColumn(
         items = phones,
@@ -191,62 +197,72 @@ internal fun SyncDevicesSection(state: UiState, vm: AppViewModel) {
         onReorder = { reordered -> reordered.firstOrNull()?.let { vm.setPrimaryDevice(it.id) } },
         spacing = 8.dp,
     ) { device, itemDragHandle, dragging ->
+        val isSelf = device.id == state.thisDeviceId
         SyncDeviceRow(
             device = device,
-            isSelf = device.id == state.thisDeviceId,
+            isSelf = isSelf,
             isPrimary = device.id == state.syncPrimaryId,
             dragging = dragging,
             modifier = itemDragHandle,
             onRename = { renaming = true },
             onRemove = { vm.removeSyncedDevice(device.id) },
         )
-        // The companions for THIS phone, nested right under it. Not in the ReorderColumn's
-        // items -- a watch isn't reorderable and can't be primary -- just drawn in the same
-        // item slot, after the phone row.
-        if (watchHost != null && device.id == watchHost.id) {
-            watches.forEach { watch ->
-                Spacer(Modifier.height(6.dp))
-                WearCompanionRow(
-                    device = watch,
-                    modifier = Modifier.padding(start = 22.dp),
-                    onRemove = { vm.removeSyncedDevice(watch.id) },
+        // Drawn in the same item slot, after the phone row -- not reorderable items themselves.
+        val live = liveWatch.takeIf { isSelf }
+        val registered = registryWatches.takeIf { device.id == watchHost?.id && live == null }.orEmpty()
+        live?.let { watch ->
+            Spacer(Modifier.height(6.dp))
+            WearCompanionRow(
+                name = watch.name,
+                detail = "Connected to this phone",
+                modifier = Modifier.padding(start = CompanionIndent),
+                onRemove = null,
+            )
+        }
+        registered.forEach { watch ->
+            Spacer(Modifier.height(6.dp))
+            WearCompanionRow(
+                name = watch.name,
+                detail = listOf(watch.model, com.bloo.bluelink.data.relativeLabel(watch.lastSeenMs))
+                    .filter { it.isNotBlank() }.joinToString(" · "),
+                modifier = Modifier.padding(start = CompanionIndent),
+                onRemove = { vm.removeSyncedDevice(watch.id) },
+            )
+        }
+        if (isSelf && live == null && registered.isEmpty()) {
+            // Under THIS phone on purpose: setting a watch up connects it to the device you
+            // are holding, and the placement says so.
+            Spacer(Modifier.height(6.dp))
+            SetupWatchRow(
+                phoneName = device.name.ifBlank { "this phone" },
+                modifier = Modifier.padding(start = CompanionIndent),
+                onClick = { showSetupWatch = true },
+            )
+        }
+        // The watch PIN gate: nothing to lock unless a watch is present.
+        if (isSelf && (live != null || registered.isNotEmpty())) {
+            Spacer(Modifier.height(GapRow))
+            Box(Modifier.padding(start = CompanionIndent)) {
+                SettingsSegmentedRow(
+                    label = "Ask the watch for my PIN",
+                    options = listOf(
+                        SegmentOption(com.bloo.bluelink.data.WatchLockTiming.OFF.wireKey, "Off", null),
+                        SegmentOption(com.bloo.bluelink.data.WatchLockTiming.OPEN.wireKey, "Opening", null),
+                        SegmentOption(com.bloo.bluelink.data.WatchLockTiming.COMMANDS.wireKey, "Commands", null),
+                        SegmentOption(com.bloo.bluelink.data.WatchLockTiming.BOTH.wireKey, "Both", null),
+                    ),
+                    selectedKey = state.watchLockTiming.wireKey,
+                    description = "Uses your app PIN.",
+                    onSelect = { vm.setWatchLockTiming(com.bloo.bluelink.data.WatchLockTiming.fromWire(it)) },
                 )
-            }
-            // The watch PIN gate, shown ONLY when a watch is present (there is nothing to lock
-            // otherwise): "opening the app", "sending commands", or both. A segmented control,
-            // matching every other choice in this card.
-            if (watches.isNotEmpty()) {
-                Spacer(Modifier.height(GapRow))
-                Box(Modifier.padding(start = 22.dp)) {
-                    SettingsSegmentedRow(
-                        label = "Ask the watch for my PIN",
-                        options = listOf(
-                            SegmentOption(com.bloo.bluelink.data.WatchLockTiming.OFF.wireKey, "Off", null),
-                            SegmentOption(com.bloo.bluelink.data.WatchLockTiming.OPEN.wireKey, "Opening", null),
-                            SegmentOption(com.bloo.bluelink.data.WatchLockTiming.COMMANDS.wireKey, "Commands", null),
-                            SegmentOption(com.bloo.bluelink.data.WatchLockTiming.BOTH.wireKey, "Both", null),
-                        ),
-                        selectedKey = state.watchLockTiming.wireKey,
-                        description = "Uses your app PIN. Only shows when a watch is paired.",
-                        onSelect = { vm.setWatchLockTiming(com.bloo.bluelink.data.WatchLockTiming.fromWire(it)) },
-                    )
-                }
             }
         }
     }
-
-    if (watches.isEmpty()) {
-        Spacer(Modifier.height(GapRow))
-        var showAddWatch by remember { mutableStateOf(false) }
-        val addWatchSource = remember { MutableInteractionSource() }
-        SafeExpansiveButton(interactionSource = addWatchSource, enabled = true) {
-            MorphTextButton(
-                "Add a watch",
-                interactionSource = addWatchSource,
-                onClick = { showAddWatch = true },
-            )
-        }
-        if (showAddWatch) AddWatchDialog(onDismiss = { showAddWatch = false })
+    if (showSetupWatch) {
+        SetupWatchDialog(
+            phoneName = phones.firstOrNull { it.id == state.thisDeviceId }?.name?.ifBlank { null } ?: "this phone",
+            onDismiss = { showSetupWatch = false },
+        )
     }
 
     // Advisory: if a peer hasn't checked in for a while but this device just
@@ -477,31 +493,30 @@ internal fun SyncDeviceRow(
     }
 }
 
+/** How far a companion is inset under its phone row. */
+private val CompanionIndent = 22.dp
+private const val WATCH_REFRESH_MS = 6_000L
+
 /**
- * A Wear OS companion shown UNDER the phone it syncs to, not as a peer row.
- *
- * Deliberately not a [SyncDeviceRow]: a watch is not a reorderable, primary-eligible
- * device -- it depends on its phone -- so it has no drag handle and no star. The
- * "Companion" tag and the leading [Icons.Filled.Watch] make that relationship explicit,
- * which is the whole point of nesting it here rather than listing it flat.
+ * A Wear OS companion shown UNDER the phone it belongs to, not as a peer row. Deliberately not a
+ * [SyncDeviceRow]: a watch has no drag handle and no star, because it depends on its phone.
+ * [onRemove] is null for a live Data Layer watch -- pairing is managed by Wear OS, not by Bloo.
  */
 @Composable
 private fun WearCompanionRow(
-    device: com.bloo.bluelink.data.SyncMerge.SyncDevice,
+    name: String,
+    detail: String,
     modifier: Modifier = Modifier,
-    onRemove: () -> Unit,
+    onRemove: (() -> Unit)?,
 ) {
-    val shape = RoundedCornerShape(18.dp)
     Row(
         modifier
             .fillMaxWidth()
-            .clip(shape)
+            .clip(RoundedCornerShape(18.dp))
             .background(glassTint(blurred = false))
             .padding(horizontal = 10.dp, vertical = GapRow),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        // The connecting "rides under" elbow, in place of a drag handle -- it reads as
-        // attached to the phone row above rather than a peer of it.
         Icon(
             Icons.Filled.SubdirectoryArrowRight,
             contentDescription = null,
@@ -519,28 +534,18 @@ private fun WearCompanionRow(
         Column(Modifier.weight(1f)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
-                    device.name.ifBlank { "Watch" },
+                    name.ifBlank { "Watch" },
                     style = MaterialTheme.typography.bodyLarge,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.weight(1f, fill = false),
                 )
                 Spacer(Modifier.width(6.dp))
-                Text(
-                    "Companion",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.primary,
-                )
+                Text("Companion", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
             }
-            val seen = com.bloo.bluelink.data.relativeLabel(device.lastSeenMs)
-            val sub = buildString {
-                val model = device.model.takeIf { it.isNotBlank() }
-                if (model != null) append(model)
-                if (seen.isNotBlank()) { if (isNotEmpty()) append(" · "); append(seen) }
-            }
-            if (sub.isNotBlank()) {
+            if (detail.isNotBlank()) {
                 Text(
-                    sub,
+                    detail,
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1,
@@ -548,63 +553,81 @@ private fun WearCompanionRow(
                 )
             }
         }
-        val confirmRemove = rememberConfirmArm()
-        MorphIconButton(onClick = { if (confirmRemove.armed) onRemove() else confirmRemove.arm() }) {
-            Icon(
-                AppIcons.Close,
-                contentDescription = if (confirmRemove.armed) {
-                    "Tap again to remove ${device.name.ifBlank { "this watch" }}"
-                } else {
-                    "Remove ${device.name.ifBlank { "this watch" }} from synced devices"
-                },
-                tint = if (confirmRemove.armed) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.size(18.dp),
-            )
+        if (onRemove != null) {
+            val confirmRemove = rememberConfirmArm()
+            MorphIconButton(onClick = { if (confirmRemove.armed) onRemove() else confirmRemove.arm() }) {
+                Icon(
+                    AppIcons.Close,
+                    contentDescription = if (confirmRemove.armed) "Tap again to remove ${name.ifBlank { "this watch" }}"
+                    else "Remove ${name.ifBlank { "this watch" }} from synced devices",
+                    tint = if (confirmRemove.armed) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(18.dp),
+                )
+            }
+        }
+    }
+}
+
+/** The empty-companion slot: a "Set up watch" action hanging off this phone's row. */
+@Composable
+private fun SetupWatchRow(phoneName: String, modifier: Modifier = Modifier, onClick: () -> Unit) {
+    val source = remember { MutableInteractionSource() }
+    Row(modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        Icon(
+            Icons.Filled.SubdirectoryArrowRight,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.size(18.dp),
+        )
+        Spacer(Modifier.width(8.dp))
+        Column(Modifier.weight(1f)) {
+            SafeExpansiveButton(interactionSource = source, enabled = true) {
+                MorphTextButton("Set up watch", interactionSource = source, onClick = onClick, icon = Icons.Filled.Watch)
+            }
+            LabelSmallText("Connects to $phoneName")
         }
     }
 }
 
 /**
- * "Add a watch" setup. First install remains a platform constraint: Android/Wear OS does not
- * let a phone silently install an APK onto a watch unless the app is published through Play.
- * Once Bloo for Wear is installed and paired, this flow pushes updates directly over the Data
- * Layer, with no Drive, browser, APK download, or ADB step for normal updates.
+ * "Set up watch". First install remains a platform constraint: Android/Wear OS does not let a
+ * phone silently install an APK onto a watch unless the app is published through Play. Once
+ * Bloo for Wear is installed and paired, this pushes updates directly over the Data Layer.
  */
 @Composable
-private fun AddWatchDialog(onDismiss: () -> Unit) {
+private fun SetupWatchDialog(phoneName: String, onDismiss: () -> Unit) {
     val context = LocalContext.current
-    val hasWatch by com.bloo.bluelink.wear.WatchPresence.hasWatch.collectAsStateWithLifecycle()
+    val watch by com.bloo.bluelink.wear.WatchPresence.watch.collectAsStateWithLifecycle()
     var update by remember { mutableStateOf<com.bloo.bluelink.data.WorkflowRun?>(null) }
     LaunchedEffect(Unit) {
         update = com.bloo.bluelink.data.UpdateApi.fetchLatestSuccessfulRun(
             com.bloo.bluelink.data.UpdateApi.DEFAULT_BRANCH,
         )
     }
+    val apkUrl = update?.watchApkUrl
     GlassAlertDialog(
         onDismissRequest = onDismiss,
         icon = Icons.Filled.Watch,
-        title = "Add a watch",
+        title = "Set up watch",
         text = {
-            if (hasWatch) {
-                Text("Watch connected. Bloo can push the watch app and future updates directly.")
-                update?.watchApkUrl?.let { Text("Tap Send to watch to install the latest build.") }
+            if (watch != null) {
+                BodyMediumText("${watch?.name?.ifBlank { "Your watch" }} is connected to $phoneName. Bloo can push the watch app and future updates straight to it.")
             } else {
-                Text("Install Bloo for Wear from Google Play on your watch, then open it once.")
-                Text("After pairing, updates install from your phone without Drive, APK downloads, or ADB.")
+                BodyMediumText("Install Bloo for Wear from Google Play on your watch and open it once. It will connect to $phoneName.")
             }
         },
         buttons = {
-            if (hasWatch && update?.watchApkUrl != null) {
+            if (watch != null && apkUrl != null) {
                 MorphActionButton(
                     label = "Send to watch",
                     icon = Icons.Filled.Watch,
                     onClick = {
-                        com.bloo.bluelink.wear.PhoneWatchSyncService.pushWatchApk(context, update!!.watchApkUrl!!)
+                        com.bloo.bluelink.wear.PhoneWatchSyncService.pushWatchApk(context, apkUrl)
                         onDismiss()
                     },
                     modifier = Modifier.fillMaxWidth(),
                 )
-            } else if (!hasWatch) {
+            } else if (watch == null) {
                 MorphActionButton(
                     label = "Open Play Store",
                     icon = Icons.Filled.Shop,
