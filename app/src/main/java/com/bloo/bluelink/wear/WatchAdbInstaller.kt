@@ -92,18 +92,6 @@ internal class WatchAdbInstaller : AbsAdbConnectionManager() {
         }
     }
 
-    /**
-     * If the Shizuku app is on the watch, start its service over this same connection, so the
-     * watch can then update Bloo silently. Best effort: false when Shizuku isn't there.
-     */
-    suspend fun startShizukuOnWatch(): Boolean = withContext(Dispatchers.IO) {
-        runCatching {
-            openStream("shell:sh /sdcard/Android/data/moe.shizuku.privileged.api/start.sh").use { stream ->
-                stream.openInputStream().bufferedReader().readText()
-            }.contains("shizuku_starter exit with 0")
-        }.getOrDefault(false)
-    }
-
     companion object {
         const val WATCH_PACKAGE = "com.bloo.bluelink.wear"
     }

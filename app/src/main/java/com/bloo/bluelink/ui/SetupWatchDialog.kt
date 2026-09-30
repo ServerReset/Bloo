@@ -68,7 +68,6 @@ internal fun SetupWatchDialog(phoneName: String, onDismiss: () -> Unit) {
     var busy by remember { mutableStateOf(false) }
     var status by remember { mutableStateOf<String?>(null) }
     var failed by remember { mutableStateOf(false) }
-    var shizukuOnWatch by remember { mutableStateOf(false) }
 
     fun report(result: Result<Unit>, ok: () -> Unit) {
         busy = false
@@ -109,14 +108,7 @@ internal fun SetupWatchDialog(phoneName: String, onDismiss: () -> Unit) {
                     BodyMediumText("Paired. Back on the Wireless debugging screen, enter the port shown under the IP address. It isn't the pairing port.")
                     SetupField(connectPort, { connectPort = it.filter(Char::isDigit) }, "Connection port", KeyboardType.Number)
                 }
-                WatchSetupStep.Done -> BodyMediumText(
-                    "Bloo is installed on the watch. Open it there and it will connect to $phoneName. " +
-                        if (shizukuOnWatch) {
-                            "Shizuku is running on the watch, so allow it when asked and updates will install silently."
-                        } else {
-                            "You can turn Wireless debugging off again."
-                        },
-                )
+                WatchSetupStep.Done -> BodyMediumText("Bloo is installed on the watch. Open it there and it will connect to $phoneName. You can turn Wireless debugging off again.")
             }
             status?.let {
                 Text(
@@ -175,11 +167,7 @@ internal fun SetupWatchDialog(phoneName: String, onDismiss: () -> Unit) {
                             status = "Downloading the watch app…"
                             val apk = held.download(url).getOrElse { return@launch report(Result.failure(it)) {} }
                             status = "Installing on the watch…"
-                            val installed = held.install(apk)
-                            // With the Shizuku app on the watch, start it now over this same
-                            // connection so later updates install without a prompt.
-                            if (installed.isSuccess) shizukuOnWatch = held.startShizukuOnWatch()
-                            report(installed) { step = WatchSetupStep.Done; status = null }
+                            report(held.install(apk)) { step = WatchSetupStep.Done; status = null }
                         }
                     },
                     modifier = Modifier.fillMaxWidth(),

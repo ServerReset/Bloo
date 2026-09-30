@@ -1,5 +1,8 @@
 package com.bloo.bluelink.wear
 
+import android.content.Intent
+import android.net.Uri
+import androidx.core.content.FileProvider
 import com.bloo.bluelink.data.WatchSyncProtocol
 import com.google.android.gms.wearable.DataEvent
 import com.google.android.gms.wearable.DataEventBuffer
@@ -43,16 +46,29 @@ class WatchDataListenerService : WearableListenerService() {
 
     /**
      * Pull the APK asset off the Data Layer, write it, and launch the system installer. This is
-     * the seamless path: the phone did the network work, and with Shizuku on the watch the install
-     * needs no tap at all (otherwise one tap on the system installer).
+     * the seamless path: the phone did the network work, and the user stays on the watch -- a
+     * single tap on the system installer is the only interaction.
      */
+    @android.annotation.SuppressLint("WearRecents") // starting the installer from a Service
     private suspend fun installPushedApk(asset: com.google.android.gms.wearable.Asset) {
         val bytes = runCatching {
             com.google.android.gms.wearable.Wearable.getDataClient(applicationContext)
                 .getFdForAsset(asset).await().inputStream?.use { it.readBytes() }
         }.getOrNull() ?: return
         val file = WearDataLayerSync.writePushedApk(applicationContext, bytes) ?: return
-        com.bloo.bluelink.update.ShizukuInstaller.installSilentlyOrPrompt(applicationContext, file)
+        runCatching {
+            val uri: Uri = FileProvider.getUriForFile(
+                applicationContext,
+                "${packageName}.fileprovider",
+                file,
+            )
+            startActivity(
+                Intent(Intent.ACTION_VIEW).apply {
+                    setDataAndType(uri, "application/vnd.android.package-archive")
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                },
+            )
+        }
     }
 
     override fun onMessageReceived(messageEvent: MessageEvent) {

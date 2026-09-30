@@ -104,7 +104,6 @@ object ShizukuInstaller {
      */
     fun installApk(apk: File, callerPackageName: String): Result<Unit> = runCatching {
         require(apk.exists() && apk.length() > 0) { "APK missing or empty: ${apk.path}" }
-        liftHiddenApiBlock()
 
         // Wrap the framework "package" service so the call runs in the privileged
         // Shizuku server, reach the hidden package installer, and wrap it too.
@@ -198,32 +197,6 @@ object ShizukuInstaller {
             runCatching { session?.close() }
         }
     }
-
-    @Volatile private var hiddenApiLifted = false
-
-    /** The reflected PackageInstaller constructors are non-SDK; lift the block once per process.
-     *  Callers on the phone also do this at start-up; doing it here too lets the watch, which has
-     *  no such start-up hook in its listener service, install without any setup. */
-    private fun liftHiddenApiBlock() {
-        if (hiddenApiLifted) return
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-            runCatching { org.lsposed.hiddenapibypass.HiddenApiBypass.addHiddenApiExemptions("L") }
-        }
-        hiddenApiLifted = true
-    }
-
-    /**
-     * Install [apk] with no prompt when Shizuku is running and this app holds its permission,
-     * otherwise hand it to the system installer. Off the main thread.
-     */
-    suspend fun installSilentlyOrPrompt(context: android.content.Context, apk: File): Boolean =
-        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-            if (isAvailable() && hasPermission() && installApk(apk, context.packageName).isSuccess) {
-                true
-            } else {
-                com.bloo.bluelink.data.installDownloadedApk(context, apk)
-            }
-        }
 
     // --- Reflected @hide constructors (framework types from :hidden-api-stub) --------
 

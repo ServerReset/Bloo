@@ -4,7 +4,7 @@ import android.content.Context
 import com.bloo.bluelink.data.UpdateApi
 import com.bloo.bluelink.data.UpdateGate
 import com.bloo.bluelink.data.WorkflowRun
-import com.bloo.bluelink.update.ShizukuInstaller
+import com.bloo.bluelink.data.installDownloadedApk
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -53,7 +53,7 @@ object WearUpdateChecker {
         }
     }
 
-    /** Download the available watch APK and install it: silently through Shizuku when the watch has it, else via the system installer. */
+    /** Download the available watch APK and hand it to the system installer. */
     suspend fun downloadAndInstall(context: Context) {
         val run = _available.value ?: return
         val url = run.watchApkUrl ?: return
@@ -70,7 +70,7 @@ object WearUpdateChecker {
                 _error.value = "Download failed"
                 return
             }
-            ShizukuInstaller.installSilentlyOrPrompt(context, dest)
+            installDownloadedApk(context, dest)
         } catch (t: Throwable) {
             _error.value = t.message ?: "Update failed"
         } finally {

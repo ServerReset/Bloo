@@ -58,9 +58,6 @@ dependencies {
     // button/chrome composables this app reuses rather than re-implementing.
     implementation(project(":shared"))
     implementation(project(":uicommon"))
-    // Silent self-update through Shizuku running on the watch (see ShizukuInstaller in :shared).
-    implementation("dev.rikka.shizuku:api:13.1.5")
-    implementation("dev.rikka.shizuku:provider:13.1.5")
 
     val composeBom = platform("androidx.compose:compose-bom:2025.04.01")
     implementation(composeBom)
