@@ -59,6 +59,29 @@ import com.bloo.bluelink.data.LiveCharge
 import com.bloo.bluelink.data.LockTiming
 import com.bloo.bluelink.data.SettingsStore
 import kotlinx.coroutines.launch
+import com.bloo.bluelink.data.deleteCustomPalette
+import com.bloo.bluelink.data.platform
+import com.bloo.bluelink.data.saveCustomPalette
+import com.bloo.bluelink.data.setActiveCustomPaletteId
+import com.bloo.bluelink.data.setAuroraBackground
+import com.bloo.bluelink.data.setAuroraMotion
+import com.bloo.bluelink.data.setBiometricLock
+import com.bloo.bluelink.data.setColorPalette
+import com.bloo.bluelink.data.setDoorOpenMinutes
+import com.bloo.bluelink.data.setDynamicColor
+import com.bloo.bluelink.data.setHapticsEnabled
+import com.bloo.bluelink.data.setLockTiming
+import com.bloo.bluelink.data.setNotifyCarStarted
+import com.bloo.bluelink.data.setNotifyChargeComplete
+import com.bloo.bluelink.data.setNotifyCharging
+import com.bloo.bluelink.data.setNotifyDoor
+import com.bloo.bluelink.data.setNotifyRunning
+import com.bloo.bluelink.data.setNotifyService
+import com.bloo.bluelink.data.setNotifyUnlocked
+import com.bloo.bluelink.data.setPebbleOutline
+import com.bloo.bluelink.data.setRunningMinutes
+import com.bloo.bluelink.data.setThemeMode
+import com.bloo.bluelink.data.setUnlockedMinutes
 
 /** "Notifications" card content -- see the call site in [SettingsScreen] for context. */
 @Composable

@@ -120,6 +120,10 @@ import kotlinx.coroutines.launch
 import kotlin.math.sin
 import kotlin.math.cos
 import kotlin.math.max
+import com.bloo.bluelink.data.platform
+import com.bloo.bluelink.data.setPlatform
+import com.bloo.bluelink.data.setPowertrain
+import com.bloo.bluelink.data.setSeatFlag
 
 /**
  * The per-car feature setup wizard (heated seats, powertrain, steering wheel heat,

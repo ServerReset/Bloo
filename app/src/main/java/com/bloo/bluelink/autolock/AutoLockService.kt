@@ -21,6 +21,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import com.bloo.bluelink.data.allAutoLockConfigs
 
 /**
  * Short-lived foreground service that runs while one or more AutoLock evaluations are in

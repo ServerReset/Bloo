@@ -100,6 +100,7 @@ import kotlinx.coroutines.flow.first
 import com.bloo.uicommon.coldStartIntroPlayed
 import com.bloo.uicommon.animatePlacement
 import com.bloo.uicommon.SegmentOption
+import com.bloo.bluelink.data.platform
 
 /**
  * Small status-chip widgets: MetaChip, StatusChip, the update-available chip/dot/

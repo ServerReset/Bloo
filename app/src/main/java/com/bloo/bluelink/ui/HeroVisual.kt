@@ -101,6 +101,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
+import com.bloo.bluelink.data.platform
 
 /**
  * The hero's car-photo rendering: the tonal fallback brush, photo backdrop, and

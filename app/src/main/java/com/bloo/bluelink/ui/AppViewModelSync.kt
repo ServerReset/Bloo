@@ -11,6 +11,16 @@ import com.bloo.bluelink.data.performMainToMainSync
 import com.bloo.bluelink.data.testSyncRoundTrip
 import com.bloo.bluelink.data.exportSettingsJson
 import com.bloo.bluelink.data.importSettingsJson
+import com.bloo.bluelink.data.removeSyncedDevice
+import com.bloo.bluelink.data.requestPullFromPrimary
+import com.bloo.bluelink.data.setLastSyncError
+import com.bloo.bluelink.data.setPrimaryDevice
+import com.bloo.bluelink.data.setSyncDeviceName
+import com.bloo.bluelink.data.setSyncUri
+import com.bloo.bluelink.data.setSyncWifiOnly
+import com.bloo.bluelink.data.setWatchLockTiming
+import com.bloo.bluelink.data.syncFileFingerprint
+import com.bloo.bluelink.data.syncUri
 
 // --- Settings export/import and Drive auto-sync (extracted from AppViewModel) --
 

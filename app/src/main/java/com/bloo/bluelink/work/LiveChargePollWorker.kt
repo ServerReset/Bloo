@@ -20,6 +20,7 @@ import com.bloo.bluelink.data.VehicleStatus
 import com.bloo.bluelink.data.repositoryFor
 import kotlinx.coroutines.sync.withLock
 import java.util.concurrent.TimeUnit
+import com.bloo.bluelink.data.notificationPrefs
 
 /**
  * Keeps [LiveCharge]'s notification moving while a car keeps charging.

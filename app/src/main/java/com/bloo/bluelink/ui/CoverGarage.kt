@@ -86,6 +86,7 @@ import com.bloo.bluelink.data.Vehicle
 import com.bloo.bluelink.data.isGen5W
 import kotlin.math.abs
 import kotlin.math.max
+import com.bloo.bluelink.data.platform
 
 /**
  * Flip-cover Settings: the REAL scrollable SettingsScreen (the settings grid

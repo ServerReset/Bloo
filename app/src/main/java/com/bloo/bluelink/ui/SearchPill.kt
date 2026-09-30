@@ -111,6 +111,7 @@ import dev.chrisbanes.haze.HazeState
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlin.math.max
+import com.bloo.bluelink.data.platform
 
 /**
  * The search bar itself (SearchPill) and its suggestions list (SearchSuggestions).

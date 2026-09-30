@@ -52,6 +52,12 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import com.bloo.bluelink.data.lastSyncMs
+import com.bloo.bluelink.data.setSyncUri
+import com.bloo.bluelink.data.setSyncWifiOnly
+import com.bloo.bluelink.data.syncFileFingerprint
+import com.bloo.bluelink.data.syncUri
+import com.bloo.bluelink.data.syncWifiOnly
 
 /** "Backup & sync" card content -- see the call site in [SettingsScreen] for context. */
 @Composable

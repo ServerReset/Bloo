@@ -11,6 +11,7 @@ import com.bloo.bluelink.data.AppLog
 import com.bloo.bluelink.data.SettingsStore
 import java.util.concurrent.TimeUnit
 import com.bloo.bluelink.data.performMainToMainSync
+import com.bloo.bluelink.data.syncUri
 
 /**
  * Runs the Drive auto-sync periodically in the background, so a settings change

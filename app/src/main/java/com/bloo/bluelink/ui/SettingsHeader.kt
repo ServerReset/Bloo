@@ -71,6 +71,9 @@ import androidx.compose.ui.unit.dp
 import androidx.core.net.toUri
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.delay
+import com.bloo.bluelink.data.collapsedSections
+import com.bloo.bluelink.data.platform
+import com.bloo.bluelink.data.setSeamlessInstallShizuku
 
 /**
  * Delays an advanced-only card's own entrance by `index * STAGGER_STEP_MS` once [advanced]

@@ -99,6 +99,7 @@ import kotlinx.coroutines.flow.first
 import com.bloo.uicommon.coldStartIntroPlayed
 import com.bloo.uicommon.animatePlacement
 import com.bloo.uicommon.SegmentOption
+import com.bloo.bluelink.data.platform
 
 /**
  * True while the Activity is in Android's multi-window/split-screen/freeform

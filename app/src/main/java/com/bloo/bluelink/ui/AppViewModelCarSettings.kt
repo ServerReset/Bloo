@@ -9,6 +9,17 @@ import com.bloo.bluelink.data.VehicleSnapshot
 import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import com.bloo.bluelink.data.lastServiceMiles
+import com.bloo.bluelink.data.serviceIntervalMiles
+import com.bloo.bluelink.data.setHotspots
+import com.bloo.bluelink.data.setImageUrl
+import com.bloo.bluelink.data.setLastServiceMiles
+import com.bloo.bluelink.data.setLicensePlate
+import com.bloo.bluelink.data.setPlatform
+import com.bloo.bluelink.data.setPowertrain
+import com.bloo.bluelink.data.setSeatFlag
+import com.bloo.bluelink.data.setSectionOrder
+import com.bloo.bluelink.data.setServiceIntervalMiles
 
 // --- Per-car identity, service, seats, powertrain and layout settings (extracted from AppViewModel) --
 

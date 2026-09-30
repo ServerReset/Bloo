@@ -21,6 +21,9 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import com.bloo.bluelink.data.setBiometricLock
+import com.bloo.bluelink.data.setCoverSettingsHintDismissed
+import com.bloo.bluelink.data.setLockTiming
 
 // --- App PIN, lock timing, and biometric lock (extracted from AppViewModel) --
 

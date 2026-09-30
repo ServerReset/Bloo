@@ -7,6 +7,14 @@ import com.bloo.bluelink.data.VehicleRepository
 import com.bloo.bluelink.data.brand
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import com.bloo.bluelink.data.aiEnabled
+import com.bloo.bluelink.data.autoLockConfiguredVins
+import com.bloo.bluelink.data.clearAllAutoLockConfigs
+import com.bloo.bluelink.data.lastSyncMs
+import com.bloo.bluelink.data.settingsMode
+import com.bloo.bluelink.data.syncDeviceName
+import com.bloo.bluelink.data.syncUri
+import com.bloo.bluelink.data.syncWifiOnly
 
 // --- Sign-out (extracted from AppViewModel) --
 

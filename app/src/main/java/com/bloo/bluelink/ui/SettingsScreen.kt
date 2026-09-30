@@ -69,6 +69,9 @@ import kotlin.math.max
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.foundation.ExperimentalFoundationApi
+import com.bloo.bluelink.data.platform
+import com.bloo.bluelink.data.setSettingsMode
+import com.bloo.bluelink.data.settingsMode
 /**
  * The whole Settings screen.
  *

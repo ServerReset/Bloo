@@ -3,6 +3,25 @@ package com.bloo.bluelink.ui
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import com.bloo.bluelink.data.deleteCustomPalette
+import com.bloo.bluelink.data.saveCustomPalette
+import com.bloo.bluelink.data.searchBubblePosition
+import com.bloo.bluelink.data.setActiveCustomPaletteId
+import com.bloo.bluelink.data.setAuroraBackground
+import com.bloo.bluelink.data.setAuroraMotion
+import com.bloo.bluelink.data.setColorPalette
+import com.bloo.bluelink.data.setColumnsFlipped
+import com.bloo.bluelink.data.setDynamicColor
+import com.bloo.bluelink.data.setFontChoice
+import com.bloo.bluelink.data.setHapticsEnabled
+import com.bloo.bluelink.data.setPebbleOutline
+import com.bloo.bluelink.data.setSeamlessInstallShizuku
+import com.bloo.bluelink.data.setSearchBubblePosition
+import com.bloo.bluelink.data.setShowSearch
+import com.bloo.bluelink.data.setThemeMode
+import com.bloo.bluelink.data.setUiScale
+import com.bloo.bluelink.data.setUnitSystem
+import com.bloo.bluelink.data.setVibrancy
 
 // --- Appearance / UI preference setters (extracted from AppViewModel) ------
 //

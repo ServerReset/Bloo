@@ -77,6 +77,7 @@ import com.bloo.bluelink.data.brand
 import kotlinx.coroutines.flow.first
 import kotlin.math.max
 import androidx.core.net.toUri
+import com.bloo.bluelink.data.platform
 
 /**
  * Sign-in form supporting every brand (US Hyundai/Genesis/Kia plus the three

@@ -17,6 +17,24 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import com.bloo.bluelink.data.climatePresets
+import com.bloo.bluelink.data.collapsedSections
+import com.bloo.bluelink.data.defaultClimatePreset
+import com.bloo.bluelink.data.enabledShortcuts
+import com.bloo.bluelink.data.hotspots
+import com.bloo.bluelink.data.imageUrl
+import com.bloo.bluelink.data.isCarConfigured
+import com.bloo.bluelink.data.lastServiceMiles
+import com.bloo.bluelink.data.lastVehicleVin
+import com.bloo.bluelink.data.licensePlate
+import com.bloo.bluelink.data.onboardingSeen
+import com.bloo.bluelink.data.platform
+import com.bloo.bluelink.data.powertrain
+import com.bloo.bluelink.data.seatConfig
+import com.bloo.bluelink.data.sectionOrder
+import com.bloo.bluelink.data.serviceIntervalMiles
+import com.bloo.bluelink.data.snapshot
+import com.bloo.bluelink.data.vehicleOrder
 
 // --- Garage loading, cached publish, and per-car config seeding (extracted from AppViewModel) --
 

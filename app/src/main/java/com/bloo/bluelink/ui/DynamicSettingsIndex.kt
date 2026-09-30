@@ -1,5 +1,7 @@
 package com.bloo.bluelink.ui
 
+import com.bloo.bluelink.data.settingsMode
+
 /**
  * Helpers to determine which settings are available in the current mode
  * (simple vs. advanced) and should appear in search results.

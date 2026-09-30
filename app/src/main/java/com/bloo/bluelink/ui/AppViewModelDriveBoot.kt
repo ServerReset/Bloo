@@ -12,6 +12,19 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import com.bloo.bluelink.data.pruneOrphanPhotos
+import com.bloo.bluelink.data.lastSyncError
+import com.bloo.bluelink.data.lastSyncMs
+import com.bloo.bluelink.data.setLastSyncError
+import com.bloo.bluelink.data.settingsMode
+import com.bloo.bluelink.data.snapshot
+import com.bloo.bluelink.data.syncDeviceId
+import com.bloo.bluelink.data.syncDeviceName
+import com.bloo.bluelink.data.syncFileFingerprint
+import com.bloo.bluelink.data.syncPrimaryDeviceId
+import com.bloo.bluelink.data.syncUri
+import com.bloo.bluelink.data.syncWifiOnly
+import com.bloo.bluelink.data.syncedDevices
+import com.bloo.bluelink.data.watchLockTiming
 
 // --- Cold-start Drive sync bootstrap (extracted from AppViewModel) --
 

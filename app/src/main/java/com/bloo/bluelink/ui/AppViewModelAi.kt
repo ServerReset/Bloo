@@ -5,6 +5,8 @@ import com.bloo.bluelink.data.AppLog
 import com.bloo.bluelink.data.Vehicle
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import com.bloo.bluelink.data.aiEnabled
+import com.bloo.bluelink.data.setAiEnabled
 
 // --- On-device AI (Gemini Nano): summaries, free-form questions, command resolution (extracted from AppViewModel) --
 

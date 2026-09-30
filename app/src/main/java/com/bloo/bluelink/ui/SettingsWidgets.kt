@@ -81,6 +81,7 @@ import androidx.compose.ui.unit.dp
 import com.bloo.bluelink.data.Powertrain
 import com.bloo.bluelink.data.platformOverridable
 import kotlin.math.max
+import com.bloo.bluelink.data.collapsedSections
 
 
 

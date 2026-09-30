@@ -36,6 +36,19 @@ import com.bloo.bluelink.data.Weather
 import com.bloo.bluelink.data.links
 import com.bloo.bluelink.data.degLabel
 import kotlin.math.max
+import com.bloo.bluelink.data.aiEnabled
+import com.bloo.bluelink.data.setAiEnabled
+import com.bloo.bluelink.data.setAuroraBackground
+import com.bloo.bluelink.data.setDynamicColor
+import com.bloo.bluelink.data.setHapticsEnabled
+import com.bloo.bluelink.data.setNotifyCharging
+import com.bloo.bluelink.data.setNotifyDoor
+import com.bloo.bluelink.data.setNotifyRunning
+import com.bloo.bluelink.data.setNotifyService
+import com.bloo.bluelink.data.setNotifyUnlocked
+import com.bloo.bluelink.data.setPebbleOutline
+import com.bloo.bluelink.data.setSeamlessInstallShizuku
+import com.bloo.bluelink.data.setSeatFlag
 
 internal val SearchStopwords = setOf(
     "for", "the", "of", "show", "me", "what", "whats", "is", "a", "an", "to",

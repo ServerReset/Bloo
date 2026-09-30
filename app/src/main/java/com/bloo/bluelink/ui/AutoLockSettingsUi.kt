@@ -37,6 +37,9 @@ import com.bloo.bluelink.autolock.DetectionState
 import com.bloo.bluelink.data.LiveCharge
 import com.bloo.bluelink.data.Vehicle
 import kotlin.math.roundToInt
+import com.bloo.bluelink.data.autoLockConfig
+import com.bloo.bluelink.data.platform
+import com.bloo.bluelink.data.setAutoLockConfig
 
 /**
  * AutoLock's per-car Settings section, inside [CarSettingsCard]. Ported feature from the

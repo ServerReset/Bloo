@@ -58,6 +58,8 @@ import androidx.compose.ui.unit.dp
 import com.bloo.bluelink.data.STALE_STATUS_MS
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import com.bloo.bluelink.data.platform
+import com.bloo.bluelink.data.setChargerApiKey
 
 /**
  * Top-level garage screen: picks between three fundamentally different

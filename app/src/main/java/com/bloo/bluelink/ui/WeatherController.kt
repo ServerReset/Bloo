@@ -20,6 +20,8 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.util.Locale
+import com.bloo.bluelink.data.setWeatherFromDeviceLocation
+import com.bloo.bluelink.data.setWeatherLocation
 
 internal class WeatherController(
     private val app: Application,

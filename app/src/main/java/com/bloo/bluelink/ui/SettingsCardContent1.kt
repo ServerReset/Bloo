@@ -58,6 +58,13 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import com.bloo.bluelink.data.aiEnabled
+import com.bloo.bluelink.data.platform
+import com.bloo.bluelink.data.setAiEnabled
+import com.bloo.bluelink.data.setFontChoice
+import com.bloo.bluelink.data.setShowSearch
+import com.bloo.bluelink.data.setUnitSystem
+import com.bloo.bluelink.data.unitSystem
 
 /** "Accounts" card content -- see the call site in [SettingsScreen] for context. */
 @Composable

@@ -73,6 +73,8 @@ import com.bloo.bluelink.data.distanceMilesTo
 import com.bloo.bluelink.data.formatDistance
 import com.bloo.bluelink.data.formatSpeed
 import kotlinx.coroutines.launch
+import com.bloo.bluelink.data.platform
+import com.bloo.bluelink.data.unitSystem
 
 /**
  * A "Locate" action for [v] that requests ACCESS_FINE_LOCATION first if it isn't already

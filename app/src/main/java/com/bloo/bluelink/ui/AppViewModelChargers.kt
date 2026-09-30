@@ -4,6 +4,7 @@ import androidx.lifecycle.viewModelScope
 import com.bloo.bluelink.data.GeoLocation
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import com.bloo.bluelink.data.setChargerApiKey
 
 // --- EV charger map search (extracted from AppViewModel) -------------------
 //

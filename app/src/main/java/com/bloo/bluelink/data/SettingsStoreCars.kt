@@ -1,0 +1,621 @@
+package com.bloo.bluelink.data
+
+import android.content.Context
+import androidx.datastore.preferences.core.Preferences
+import androidx.datastore.preferences.core.booleanPreferencesKey
+import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.stringPreferencesKey
+import com.bloo.bluelink.autolock.AutoLockConfig
+import com.bloo.bluelink.ui.ColorPalette
+import com.bloo.bluelink.ui.CustomPaletteData
+import com.bloo.bluelink.ui.FontChoice
+import com.bloo.bluelink.ui.ThemeMode
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
+import kotlinx.serialization.DeserializationStrategy
+import kotlinx.serialization.builtins.serializer
+import kotlinx.serialization.json.Json
+
+// --- Per-car identity, layout, AutoLock, climate, palettes, chargers and weather (extracted from SettingsStore) --
+
+suspend fun SettingsStore.licensePlate(vin: String): String = licensePlate(vin, context.settingsDataStore.data.first())
+
+fun SettingsStore.licensePlate(vin: String, p: Preferences): String =
+    p[stringPreferencesKey("plate_$vin")] ?: ""
+
+suspend fun SettingsStore.setLicensePlate(vin: String, value: String) {
+    editTracked {
+        val key = stringPreferencesKey("plate_$vin")
+        if (value.isBlank()) it.remove(key) else it[key] = value.trim()
+    }
+}
+
+suspend fun SettingsStore.lastServiceMiles(vin: String): Int? = lastServiceMiles(vin, context.settingsDataStore.data.first())
+
+fun SettingsStore.lastServiceMiles(vin: String, p: Preferences): Int? =
+    p[stringPreferencesKey("svc_last_$vin")]?.toIntOrNull()
+
+suspend fun SettingsStore.setLastServiceMiles(vin: String, value: Int?) {
+    editTracked {
+        val key = stringPreferencesKey("svc_last_$vin")
+        if (value == null) it.remove(key) else it[key] = value.toString()
+    }
+}
+
+suspend fun SettingsStore.serviceIntervalMiles(vin: String): Int? = serviceIntervalMiles(vin, context.settingsDataStore.data.first())
+
+fun SettingsStore.serviceIntervalMiles(vin: String, p: Preferences): Int? =
+    p[stringPreferencesKey("svc_interval_$vin")]?.toIntOrNull()
+
+suspend fun SettingsStore.setServiceIntervalMiles(vin: String, value: Int?) {
+    editTracked {
+        val key = stringPreferencesKey("svc_interval_$vin")
+        if (value == null) it.remove(key) else it[key] = value.toString()
+    }
+}
+
+suspend fun SettingsStore.lastVehicleVin(): String? = lastVehicleVin(context.settingsDataStore.data.first())
+
+fun SettingsStore.lastVehicleVin(p: Preferences): String? = p[SettingsStore.Keys.LAST_VIN]
+
+suspend fun SettingsStore.setLastVehicleVin(vin: String) {
+    editTracked { it[SettingsStore.Keys.LAST_VIN] = vin }
+}
+
+/** User-defined display order of vehicles (by VIN). */
+suspend fun SettingsStore.vehicleOrder(): List<String> = vehicleOrder(context.settingsDataStore.data.first())
+
+fun SettingsStore.vehicleOrder(p: Preferences): List<String> =
+    p[SettingsStore.Keys.ORDER]?.split("\n")?.filter { it.isNotBlank() } ?: emptyList()
+
+suspend fun SettingsStore.setVehicleOrder(order: List<String>) {
+    editTracked { it[SettingsStore.Keys.ORDER] = order.joinToString("\n") }
+}
+
+/** Optional user-set photo URL per vehicle (empty = use the default gradient). */
+/**
+ * ONE Preferences snapshot, for a caller about to read many keys at once.
+ *
+ * Every getter here inlines its own `data.first()`, which after the first read is served
+ * from memory but is still a collect-and-cancel round trip on the DataStore actor, and
+ * they are sequential suspends. `loadGarageInner` made twelve of them PER CAR -- 36 on a
+ * three-car account, on the cold-start critical path, every one returning the identical
+ * object -- and `refreshLocalCarConfig` did it again on every settings import.
+ *
+ * Pair this with the `Preferences`-taking overloads: read once, pass it down. Those
+ * overloads exist so the KEY and the DEFAULT stay written exactly once, in the getter --
+ * a caller that reached for the raw key itself would be the drift this store exists to
+ * prevent.
+ */
+/**
+ * Force the settings DataStore's first load now.
+ *
+ * Its very first read is the expensive one -- opening the file, parsing the preferences
+ * protobuf -- and on the cold-start path the auto-login's own `appearance.first()` was
+ * paying it, measured at 452ms on the API 34 emulator, directly between the credential
+ * load and the garage load. DataStore caches the parsed data in memory after that first
+ * read, so loading it on the startup warm-up thread makes the real read ~free.
+ */
+suspend fun SettingsStore.warmUp() {
+    runCatching { context.settingsDataStore.data.first() }
+}
+
+suspend fun SettingsStore.snapshot(): Preferences {
+    com.bloo.bluelink.data.StartupTrace.markIfStarting("SettingsStore.snapshot(): DataStore data.first() begin")
+    val prefs = context.settingsDataStore.data.first()
+    com.bloo.bluelink.data.StartupTrace.markIfStarting("SettingsStore.snapshot(): DataStore data.first() done")
+    return prefs
+}
+
+suspend fun SettingsStore.imageUrl(vin: String): String? = imageUrl(vin, context.settingsDataStore.data.first())
+
+fun SettingsStore.imageUrl(vin: String, p: Preferences): String? =
+    p[stringPreferencesKey("img_$vin")]?.takeIf { it.isNotBlank() }
+
+suspend fun SettingsStore.setImageUrl(vin: String, url: String) {
+    editTracked {
+        val key = stringPreferencesKey("img_$vin")
+        if (url.isBlank()) it.remove(key) else it[key] = url.trim()
+    }
+}
+
+/**
+ * Reads the per-seat heat/cool capability flags for [vin], each stored under
+ * its own short-suffixed key (e.g. "seat_dh_$vin" for driver-heat).
+ *
+ * Migration mechanism: earlier app versions only tracked one flag per axle
+ * (front heat/cool, rear heat/cool) rather than per-individual-seat. Each new
+ * per-seat key is looked up first; if it's absent (the user's data predates
+ * the per-seat split, or this specific seat was never touched since), the
+ * matching old grouped flag is used as the fallback, and if THAT is also
+ * absent a hardcoded default applies. This means an existing user's old
+ * front-heat=true setting transparently becomes both driver-heat=true and
+ * passenger-heat=true the first time this is read, without any explicit
+ * one-time migration step or version bump.
+ */
+suspend fun SettingsStore.seatConfig(vin: String): SeatConfig =
+    seatConfig(vin, context.settingsDataStore.data.first())
+
+/**
+ * Reads THIRTEEN keys plus an older grouped-flag format, which is exactly why it takes a
+ * Preferences: thirteen reads for one car became thirteen DataStore round trips, and
+ * loadGarage does this per car.
+ */
+fun SettingsStore.seatConfig(vin: String, p: Preferences): SeatConfig {
+    fun b(key: String): Boolean? = p[booleanPreferencesKey(key)]
+    // Migration: older builds stored grouped front/rear flags.
+    val oldFrontHeat = b("seat_fh_$vin")
+    val oldFrontCool = b("seat_fc_$vin")
+    val oldRearHeat = b("seat_rh_$vin")
+    val oldRearCool = b("seat_rc_$vin")
+    return SeatConfig(
+        driverHeat = b("seat_dh_$vin") ?: oldFrontHeat ?: true,
+        driverCool = b("seat_dc_$vin") ?: oldFrontCool ?: false,
+        passHeat = b("seat_ph_$vin") ?: oldFrontHeat ?: true,
+        passCool = b("seat_pc_$vin") ?: oldFrontCool ?: false,
+        rearLeftHeat = b("seat_rlh_$vin") ?: oldRearHeat ?: false,
+        rearLeftCool = b("seat_rlc_$vin") ?: oldRearCool ?: false,
+        rearRightHeat = b("seat_rrh_$vin") ?: oldRearHeat ?: false,
+        rearRightCool = b("seat_rrc_$vin") ?: oldRearCool ?: false,
+        steeringWheel = b("seat_sw_$vin") ?: false,
+    )
+}
+
+/** [field] is one of dh/dc/ph/pc/rlh/rlc/rrh/rrc. */
+suspend fun SettingsStore.setSeatFlag(vin: String, field: String, value: Boolean) {
+    editTracked { it[booleanPreferencesKey("seat_${field}_$vin")] = value }
+}
+
+suspend fun SettingsStore.onboardingSeen(): Boolean = onboardingSeen(context.settingsDataStore.data.first())
+
+fun SettingsStore.onboardingSeen(p: Preferences): Boolean = p[booleanPreferencesKey("onboarding_seen")] ?: false
+
+suspend fun SettingsStore.setOnboardingSeen() {
+    editTracked { it[booleanPreferencesKey("onboarding_seen")] = true }
+}
+
+/** True once a car has been through the feature-setup wizard. */
+suspend fun SettingsStore.isCarConfigured(vin: String): Boolean =
+    isCarConfigured(vin, context.settingsDataStore.data.first())
+
+fun SettingsStore.isCarConfigured(vin: String, p: Preferences): Boolean =
+    p[booleanPreferencesKey("car_configured_$vin")] ?: false
+
+suspend fun SettingsStore.setCarConfigured(vin: String) {
+    editTracked { it[booleanPreferencesKey("car_configured_$vin")] = true }
+}
+
+suspend fun SettingsStore.autoLockConfig(vin: String): AutoLockConfig =
+    autoLockConfig(vin, context.settingsDataStore.data.first())
+
+/**
+ * [Preferences]-taking overload, same reason as [seatConfig]/[isCarConfigured]: the
+ * Bluetooth receiver checks EVERY registered VIN on every single connect/disconnect
+ * event, and each of those used to be its own full `.data.first()` DataStore round trip
+ * -- N reads for N configured cars, on every Bluetooth event this phone ever sees, not
+ * just the car's own. One snapshot, taken once by the caller (see
+ * [autoLockConfiguredVins]'s own overload), serves all of them.
+ */
+fun SettingsStore.autoLockConfig(vin: String, p: Preferences): AutoLockConfig {
+    fun b(key: String, default: Boolean) = p[booleanPreferencesKey(key)] ?: default
+    fun s(key: String) = p[stringPreferencesKey(key)]
+    fun i(key: String, default: Int) = s(key)?.toIntOrNull() ?: default
+    return AutoLockConfig(
+        enabled = b("autolock_enabled_$vin", false),
+        deviceAddress = s("autolock_device_addr_$vin"),
+        deviceName = s("autolock_device_name_$vin"),
+        graceSeconds = i("autolock_grace_$vin", 30),
+        dryRun = b("autolock_dry_run_$vin", true),
+    )
+}
+
+/** Every DataStore key one car's [AutoLockConfig] occupies -- named once so
+ *  [setAutoLockConfig] (which writes them) and [clearAllAutoLockConfigs] (which removes
+ *  them on sign-out) can't drift out of sync with each other the way two hand-written key
+ *  lists eventually would.
+ *
+ *  Includes several keys ("autolock_use_activity_$vin", "autolock_dont_lock_if_open_$vin",
+ *  "autolock_use_bt_$vin", "autolock_use_geofence_$vin", "autolock_geofence_radius_$vin")
+ *  that [autoLockConfig] no longer reads and [setAutoLockConfig] no longer writes -- those
+ *  behaviors are now either hardcoded always-on or removed entirely (geofence). Left in
+ *  this list purely so a sign-out still clears any value an older build wrote for them,
+ *  rather than leaving orphaned keys behind. */
+private fun SettingsStore.autoLockKeys(vin: String) = listOf(
+    booleanPreferencesKey("autolock_enabled_$vin"),
+    stringPreferencesKey("autolock_device_addr_$vin"),
+    stringPreferencesKey("autolock_device_name_$vin"),
+    booleanPreferencesKey("autolock_use_bt_$vin"),
+    stringPreferencesKey("autolock_grace_$vin"),
+    booleanPreferencesKey("autolock_use_activity_$vin"),
+    booleanPreferencesKey("autolock_use_geofence_$vin"),
+    stringPreferencesKey("autolock_geofence_radius_$vin"),
+    booleanPreferencesKey("autolock_dont_lock_if_open_$vin"),
+    booleanPreferencesKey("autolock_dry_run_$vin"),
+)
+
+suspend fun SettingsStore.setAutoLockConfig(vin: String, config: AutoLockConfig) {
+    editTracked {
+        it[booleanPreferencesKey("autolock_enabled_$vin")] = config.enabled
+        val addrKey = stringPreferencesKey("autolock_device_addr_$vin")
+        if (config.deviceAddress == null) it.remove(addrKey) else it[addrKey] = config.deviceAddress
+        val nameKey = stringPreferencesKey("autolock_device_name_$vin")
+        if (config.deviceName == null) it.remove(nameKey) else it[nameKey] = config.deviceName
+        it[stringPreferencesKey("autolock_grace_$vin")] = config.graceSeconds.toString()
+        it[booleanPreferencesKey("autolock_dry_run_$vin")] = config.dryRun
+    }
+    // Maintain the registry of "cars with AutoLock configured" so the Bluetooth
+    // receiver -- which starts from a raw device MAC or a VIN, not a UI selection -- can
+    // enumerate every car to check instead of needing one BroadcastReceiver registration
+    // per car.
+    editTracked {
+        val key = stringPreferencesKey("autolock_vins")
+        val current = (it[key] ?: "").split(',').filter { s -> s.isNotBlank() }.toMutableSet()
+        if (config.enabled) current += vin else current -= vin
+        it[key] = current.joinToString(",")
+    }
+}
+
+/** Every VIN that has ever had AutoLock enabled -- see [setAutoLockConfig]'s registry
+ *  note. Used by [com.bloo.bluelink.autolock.AutoLockBluetoothReceiver] to find which
+ *  car(s), if any, a disconnected Bluetooth device belongs to. */
+suspend fun SettingsStore.autoLockConfiguredVins(): List<String> =
+    autoLockConfiguredVins(context.settingsDataStore.data.first())
+
+fun SettingsStore.autoLockConfiguredVins(p: Preferences): List<String> =
+    (p[stringPreferencesKey("autolock_vins")] ?: "").split(',').filter { it.isNotBlank() }
+
+/** Forgets AutoLock entirely for every currently-registered car -- called on a full
+ *  sign-out (see [com.bloo.bluelink.ui.AppViewModel.logout]) alongside the other
+ *  account-derived stores it already wipes there (statusCache, snapshotStore). Without
+ *  this, a signed-out car's VIN stayed in the registry forever: every Bluetooth
+ *  connect/disconnect this phone ever saw kept checking it, futilely, against a vehicle
+ *  [com.bloo.bluelink.autolock.AutoLockController] can never find again. */
+suspend fun SettingsStore.clearAllAutoLockConfigs() {
+    val vins = autoLockConfiguredVins()
+    if (vins.isEmpty()) return
+    editTracked {
+        it.remove(stringPreferencesKey("autolock_vins"))
+        // MutablePreferences.remove is generic on the key's own value type
+        // (fun <T> remove(key: Preferences.Key<T>): T) and autoLockKeys' mixed
+        // Boolean/String keys collapse to Preferences.Key<*> in the list -- Kotlin can't
+        // infer T from a star projection, so the type parameter is pinned to Any here
+        // instead (an unchecked but safe cast: remove() only ever reads the key's
+        // identity, never the value type, to find and drop the entry).
+        @Suppress("UNCHECKED_CAST")
+        vins.forEach { vin -> autoLockKeys(vin).forEach { key -> it.remove(key as Preferences.Key<Any>) } }
+    }
+}
+
+/** One DataStore read for every registered car's full [AutoLockConfig] -- what the
+ *  Bluetooth receiver actually wants (a device MAC or a VIN comes in, every configured
+ *  car needs checking against it), instead of the registry list plus one [autoLockConfig]
+ *  round trip per car. */
+suspend fun SettingsStore.allAutoLockConfigs(): Map<String, AutoLockConfig> {
+    val p = context.settingsDataStore.data.first()
+    return autoLockConfiguredVins(p).associateWith { autoLockConfig(it, p) }
+}
+
+/**
+ * The order in which detail-pebble sections should render for [vin],
+ * reconciled against [DEFAULT_SECTIONS] so app updates that add a brand-new
+ * section (or a user's stored list that's stale/corrupt) still produce a
+ * complete, valid ordering rather than silently dropping the new section
+ * forever.
+ *
+ * Mechanism: the saved comma-separated order is read and filtered down to
+ * only names still present in DEFAULT_SECTIONS (drops anything renamed or
+ * removed since). If nothing valid is left, the whole default order is used
+ * as-is. Otherwise, any DEFAULT_SECTIONS entries missing from the saved list
+ * (i.e. new since the user last customized their order) are inserted:
+ * "summary"/"controls" are always pinned back to the very front (in
+ * DEFAULT_SECTIONS order) since they're the primary at-a-glance sections;
+ * every other missing section is inserted immediately after the nearest
+ * section that precedes it in DEFAULT_SECTIONS order and IS present in the
+ * user's list, so a newly-added section lands in a sensible relative spot
+ * instead of always being tacked onto the end.
+ */
+suspend fun SettingsStore.sectionOrder(vin: String): List<String> =
+    sectionOrder(vin, context.settingsDataStore.data.first())
+
+fun SettingsStore.sectionOrder(vin: String, p: Preferences): List<String> {
+    val saved = p[stringPreferencesKey("sections_$vin")]
+        ?.split(",")?.filter { it.isNotBlank() }
+    val valid = saved?.filter { it in DEFAULT_SECTIONS } ?: emptyList()
+    if (valid.isEmpty()) return DEFAULT_SECTIONS
+    val result = valid.toMutableList()
+    val missing = DEFAULT_SECTIONS.filter { it !in result }
+    val (lead, trail) = missing.partition { it == "summary" || it == "controls" }
+    // Prepend any missing pinned-lead sections in order.
+    lead.reversed().forEach { s -> result.add(0, s) }
+    // Insert each remaining new section after its nearest preceding sibling in
+    // DEFAULT_SECTIONS order so it lands in a sensible position (e.g. "ai" goes
+    // right after "charge" rather than being appended at the end).
+    for (section in trail) {
+        val defIdx = DEFAULT_SECTIONS.indexOf(section)
+        val predecessor = DEFAULT_SECTIONS.subList(0, defIdx).lastOrNull { it in result }
+        val pos = if (predecessor != null) result.indexOf(predecessor) + 1 else result.size
+        result.add(pos, section)
+    }
+    return result
+}
+
+suspend fun SettingsStore.setSectionOrder(vin: String, order: List<String>) {
+    editTracked { it[stringPreferencesKey("sections_$vin")] = order.joinToString(",") }
+}
+
+/** Shared helper: reads [key] as a comma-separated string and splits it back
+ *  into a Set, dropping empty segments (so a stored empty string decodes to
+ *  an empty set rather than a set containing one blank element). Used for
+ *  every "set of section names" preference (collapsed/hidden sections here)
+ *  since Preferences DataStore has no native Set<String> support for
+ *  primitives written as plain strings elsewhere in this file. */
+private fun SettingsStore.csv(p: androidx.datastore.preferences.core.Preferences, key: String): Set<String> =
+    p[stringPreferencesKey(key)]?.split(",")?.filter { it.isNotBlank() }?.toSet() ?: emptySet()
+
+suspend fun SettingsStore.collapsedSections(vin: String): Set<String> = collapsedSections(vin, context.settingsDataStore.data.first())
+
+fun SettingsStore.collapsedSections(vin: String, p: Preferences): Set<String> =
+    csv(p, "collapsed_$vin")
+
+/** Toggles [section] in or out of [vin]'s collapsed set: reads the current
+ *  CSV-encoded set, adds or removes the section, then re-encodes and writes
+ *  it back — a read-modify-write pair inside one editTracked() transaction
+ *  so a concurrent write to the same key can't be lost between the read and
+ *  the write (DataStore's edit{} block runs with the current prefs snapshot
+ *  passed in, not a stale one captured earlier). */
+suspend fun SettingsStore.setSectionCollapsed(vin: String, section: String, collapsed: Boolean) {
+    editTracked {
+        val set = csv(it, "collapsed_$vin").toMutableSet()
+        if (collapsed) set.add(section) else set.remove(section)
+        it[stringPreferencesKey("collapsed_$vin")] = set.joinToString(",")
+    }
+}
+
+suspend fun SettingsStore.aiEnabled(): Boolean =
+    context.settingsDataStore.data.first()[booleanPreferencesKey("ai_enabled")] ?: false
+
+suspend fun SettingsStore.setAiEnabled(value: Boolean) {
+    editTracked { it[booleanPreferencesKey("ai_enabled")] = value }
+}
+
+/** The single pebble pinned to the hotspot's secondary slot for [vin], or null if none
+ *  selected. The primary slot ("controls") is hardcoded and never persisted here. */
+suspend fun SettingsStore.hotspots(vin: String): String? = hotspots(vin, context.settingsDataStore.data.first())
+
+fun SettingsStore.hotspots(vin: String, p: Preferences): String? {
+    return p[stringPreferencesKey("hotspots_$vin")]?.takeIf { it.isNotBlank() }
+}
+
+suspend fun SettingsStore.setHotspots(vin: String, section: String?) {
+    editTracked {
+        val key = stringPreferencesKey("hotspots_$vin")
+        if (section.isNullOrBlank()) it.remove(key) else it[key] = section
+    }
+}
+
+/** Null means "not confirmed by the user yet" — the US Hyundai/Genesis API
+ *  only distinguishes EV vs. gas, so the app asks the user to disambiguate
+ *  hybrid/PHEV during car setup and stores their answer here; callers fall
+ *  back to whatever the API-derived guess was when this is null. */
+suspend fun SettingsStore.powertrain(vin: String): Powertrain? = powertrain(vin, context.settingsDataStore.data.first())
+
+fun SettingsStore.powertrain(vin: String, p: Preferences): Powertrain? =
+    p[stringPreferencesKey("ptrain_$vin")]
+
+suspend fun SettingsStore.setPowertrain(vin: String, value: Powertrain) {
+    editTracked { it[stringPreferencesKey("ptrain_$vin")] = value.name }
+}
+
+suspend fun SettingsStore.platform(vin: String): VehiclePlatform? = platform(vin, context.settingsDataStore.data.first())
+
+fun SettingsStore.platform(vin: String, p: Preferences): VehiclePlatform? =
+    p[stringPreferencesKey("platform_$vin")]
+
+suspend fun SettingsStore.setPlatform(vin: String, value: VehiclePlatform) {
+    editTracked { it[stringPreferencesKey("platform_$vin")] = value.name }
+}
+
+// Remaining global appearance setters (theme/font/dynamic-color/palette):
+// each stores its enum's name() (or, for dynamicColor, a "true"/"false"
+// string) under its fixed SettingsStore.Keys.* entry; decoding happens once, centrally,
+// in the `appearance` Flow above.
+suspend fun SettingsStore.setThemeMode(mode: ThemeMode) {
+    editTracked { it[SettingsStore.Keys.THEME] = mode.name }
+}
+
+suspend fun SettingsStore.setFontChoice(choice: FontChoice) {
+    editTracked { it[SettingsStore.Keys.FONT] = choice.name }
+}
+
+suspend fun SettingsStore.setDynamicColor(enabled: Boolean) {
+    editTracked { it[SettingsStore.Keys.DYNAMIC] = enabled.toString() }
+}
+
+suspend fun SettingsStore.setColorPalette(palette: ColorPalette) {
+    editTracked { it[SettingsStore.Keys.PALETTE] = palette.name }
+}
+
+/** Shared decode-or-default for the repeated
+ *  `runCatching { json.decodeFromString(serializer, raw) }.getOrElse { default }`
+ *  pattern used to read JSON-encoded prefs — a corrupt/foreign/renamed stored
+ *  value falls back to [default] rather than throwing. The [json] instance is
+ *  passed in (climateJson vs paletteJson, both ignoreUnknownKeys=true but kept
+ *  explicit per section) rather than hardcoded here. */
+internal fun <T> SettingsStore.decodeJsonOr(json: Json, serializer: DeserializationStrategy<T>, raw: String, default: T): T =
+    runCatching { json.decodeFromString(serializer, raw) }.getOrElse { default }
+
+/** Last-used climate settings for a car, restored when the pebble reopens. */
+suspend fun SettingsStore.savedClimate(vin: String): ClimateRequest? {
+    val raw = context.settingsDataStore.data.first()[stringPreferencesKey("climate_$vin")] ?: return null
+    return runCatching { climateJson.decodeFromString(ClimateRequest.serializer(), raw) }.getOrNull()
+}
+
+suspend fun SettingsStore.saveClimate(vin: String, req: ClimateRequest) {
+    editTracked {
+        it[stringPreferencesKey("climate_$vin")] = climateJson.encodeToString(ClimateRequest.serializer(), req)
+    }
+}
+
+/** User-named climate presets for a car. */
+suspend fun SettingsStore.climatePresets(vin: String): List<ClimatePreset> =
+    climatePresets(vin, context.settingsDataStore.data.first())
+
+fun SettingsStore.climatePresets(vin: String, p: Preferences): List<ClimatePreset> {
+    val raw = p[stringPreferencesKey("climate_presets_$vin")] ?: return emptyList()
+    return decodeJsonOr(climateJson, presetListSerializer, raw, emptyList())
+}
+
+/** Insert-or-replace by id: the whole preset list is re-read, decoded, the
+ *  matching entry (by [ClimatePreset.id]) is replaced in place if found or
+ *  appended if not, then the entire list is re-encoded and written back as
+ *  one JSON string — there's no partial-update of a single preset within
+ *  the stored JSON, the whole array is always rewritten. */
+suspend fun SettingsStore.saveClimatePreset(vin: String, preset: ClimatePreset) {
+    val existing = climatePresets(vin).toMutableList()
+    val idx = existing.indexOfFirst { it.id == preset.id }
+    if (idx >= 0) existing[idx] = preset else existing.add(preset)
+    editTracked {
+        it[stringPreferencesKey("climate_presets_$vin")] = climateJson.encodeToString(presetListSerializer, existing)
+    }
+}
+
+suspend fun SettingsStore.deleteClimatePreset(vin: String, id: String) {
+    val updated = climatePresets(vin).filter { it.id != id }
+    editTracked {
+        it[stringPreferencesKey("climate_presets_$vin")] = climateJson.encodeToString(presetListSerializer, updated)
+    }
+}
+
+/** Persist a full, reordered preset list for a car. */
+suspend fun SettingsStore.setClimatePresets(vin: String, presets: List<ClimatePreset>) {
+    editTracked {
+        it[stringPreferencesKey("climate_presets_$vin")] = climateJson.encodeToString(presetListSerializer, presets)
+    }
+}
+
+private suspend fun SettingsStore.readCustomPalettes(): List<CustomPaletteData> {
+    val raw = context.settingsDataStore.data.first()[SettingsStore.Keys.CUSTOM_PALETTES] ?: return emptyList()
+    return decodeJsonOr(paletteJson, paletteListSerializer, raw, emptyList())
+}
+
+/** Insert or replace a custom palette by id. */
+suspend fun SettingsStore.saveCustomPalette(palette: CustomPaletteData) {
+    val updated = readCustomPalettes().filter { it.id != palette.id } + palette
+    editTracked {
+        it[SettingsStore.Keys.CUSTOM_PALETTES] = paletteJson.encodeToString(paletteListSerializer, updated)
+    }
+}
+
+/** Remove a custom palette; clears the active id if it matches. */
+suspend fun SettingsStore.deleteCustomPalette(id: String) {
+    val updated = readCustomPalettes().filter { it.id != id }
+    editTracked { prefs ->
+        prefs[SettingsStore.Keys.CUSTOM_PALETTES] = paletteJson.encodeToString(paletteListSerializer, updated)
+        if (prefs[SettingsStore.Keys.ACTIVE_CUSTOM_PALETTE_ID] == id) prefs.remove(SettingsStore.Keys.ACTIVE_CUSTOM_PALETTE_ID)
+    }
+}
+
+/** Set which custom palette is active (null = use a built-in palette). */
+suspend fun SettingsStore.setActiveCustomPaletteId(id: String?) {
+    editTracked {
+        if (id == null) it.remove(SettingsStore.Keys.ACTIVE_CUSTOM_PALETTE_ID)
+        else it[SettingsStore.Keys.ACTIVE_CUSTOM_PALETTE_ID] = id
+    }
+}
+
+/** Sets or clears (blank/null) the user's own Open Charge Map API key -- see
+ *  [SettingsStore.Appearance.chargerApiKey]'s own doc. */
+suspend fun SettingsStore.setChargerApiKey(key: String?) {
+    editTracked {
+        if (key.isNullOrBlank()) it.remove(SettingsStore.Keys.CHARGER_API_KEY) else it[SettingsStore.Keys.CHARGER_API_KEY] = key.trim()
+    }
+}
+
+/** Set or clear the weather location. Passing null lat/lon clears it. Always
+ *  resets [SettingsStore.Appearance.weatherFollowsDevice] to false -- every caller of this
+ *  EXCEPT [setWeatherFromDeviceLocation] is setting an explicit, static
+ *  location (a typed place, or clearing it entirely), and that one turns the
+ *  flag back on itself, right after calling this. */
+suspend fun SettingsStore.setWeatherLocation(lat: Double?, lon: Double?, label: String?) {
+    editTracked {
+        if (lat == null || lon == null) {
+            it.remove(SettingsStore.Keys.WEATHER_LAT)
+            it.remove(SettingsStore.Keys.WEATHER_LON)
+            it.remove(SettingsStore.Keys.WEATHER_LABEL)
+        } else {
+            it[SettingsStore.Keys.WEATHER_LAT] = lat.toString()
+            it[SettingsStore.Keys.WEATHER_LON] = lon.toString()
+            if (label.isNullOrBlank()) it.remove(SettingsStore.Keys.WEATHER_LABEL) else it[SettingsStore.Keys.WEATHER_LABEL] = label
+        }
+        it.remove(SettingsStore.Keys.WEATHER_FOLLOWS_DEVICE)
+    }
+}
+
+/** Set the home weather location from this device's own last-known GPS
+ *  fix, reverse-geocoded to a place label -- the phone Settings screen's
+ *  "My location" action. Returns false when no location is available
+ *  (e.g. permission never granted on this device) so the caller can
+ *  report that clearly.
+ *
+ *  [preloaded], when given, is used AS-IS instead of this function doing
+ *  its own LocationManager fetch -- specifically so AppViewModel's periodic
+ *  device-location refresh (fused location, the same fix that becomes
+ *  [com.bloo.bluelink.ui.UiState.deviceLocation] and the dot drawn on the
+ *  car map) and the weather-follows-device location are the SAME reading,
+ *  not two independently-fetched ones that can legitimately disagree by
+ *  city blocks. Reported directly: the map's device dot, the home weather
+ *  card and "how far is the car from me" could each show a different spot
+ *  for "here". A caller with no pre-fetched location (the Settings screen's
+ *  manual "My location" button) still gets the original LocationManager-based
+ *  fetch below. */
+suspend fun SettingsStore.setWeatherFromDeviceLocation(preloaded: android.location.Location? = null): Boolean {
+    val loc = preloaded ?: run {
+        // GetLastKnownLocation requires an active location grant; fail fast and
+        // explicitly instead of relying on the SecurityException throw inside
+        // the runCatching below to do the same thing. Keep the runCatching
+        // anyway -- TIME is revoked mid-call by the user sometimes, and a
+        // missed weather label must never crash a settings click.
+        if (androidx.core.app.ActivityCompat.checkSelfPermission(
+                context, android.Manifest.permission.ACCESS_COARSE_LOCATION,
+            ) != android.content.pm.PackageManager.PERMISSION_GRANTED
+        ) {
+            return false
+        }
+        runCatching {
+            val lm = context.getSystemService(android.content.Context.LOCATION_SERVICE) as android.location.LocationManager
+            listOf(
+                android.location.LocationManager.GPS_PROVIDER,
+                android.location.LocationManager.NETWORK_PROVIDER,
+                android.location.LocationManager.PASSIVE_PROVIDER,
+            ).firstNotNullOfOrNull { p -> runCatching { lm.getLastKnownLocation(p) }.getOrNull() }
+        }.getOrNull() ?: return false
+    }
+    // @Suppress("DEPRECATION"): the sync Geocoder is Java-deprecated in favour of
+    // the API-33+ listener overload, but the sync form is the only one that
+    // exists on every supported API level (minSdk 26) without a second,
+    // listener-shaped implementation. The whole read is runCatching-wrapped.
+    @Suppress("DEPRECATION")
+    val label = runCatching {
+        android.location.Geocoder(context, java.util.Locale.getDefault())
+            .getFromLocation(loc.latitude, loc.longitude, 1)?.firstOrNull()?.let { a ->
+                listOfNotNull(a.locality ?: a.subAdminArea, a.adminArea).distinct()
+                    .joinToString(", ")
+                    // .ifBlank, because the `?: "My location"` below only catches a NULL
+                    // geocode. An Address whose locality, subAdminArea AND adminArea are
+                    // all null -- offshore, or a sparse country -- makes joinToString
+                    // return "", which is non-null, so it sailed past the fallback and
+                    // setWeatherLocation stored a label of no label at all. The
+                    // forward-geocode path in AppViewModel already guards this way.
+                    .ifBlank { "My location" }
+            }
+    }.getOrNull() ?: "My location"
+    setWeatherLocation(loc.latitude, loc.longitude, label)
+    // Re-set AFTER setWeatherLocation, which unconditionally clears this flag
+    // (see its own doc) -- this is the one call site that's allowed to turn it
+    // back on, marking the location as "following the device" so a later
+    // refresh (WeatherController.refreshDeviceLocationForWeather) knows to
+    // re-run this same fetch instead of leaving it frozen at this one fix.
+    editTracked { it[SettingsStore.Keys.WEATHER_FOLLOWS_DEVICE] = "true" }
+    return true
+}

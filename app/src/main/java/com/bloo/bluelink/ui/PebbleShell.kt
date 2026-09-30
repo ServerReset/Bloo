@@ -87,6 +87,8 @@ import com.bloo.bluelink.data.Weather
 import kotlinx.coroutines.flow.first
 import kotlin.math.floor
 import kotlin.math.max
+import com.bloo.bluelink.data.platform
+import com.bloo.bluelink.data.settingsMode
 
 /**
  * A collapsible "pebble" - a titled section that springs open/closed with a

@@ -20,6 +20,7 @@ import com.bloo.bluelink.data.SnapshotStore
 import com.bloo.bluelink.data.VehicleStatus
 import kotlinx.coroutines.sync.withLock
 import java.util.concurrent.TimeUnit
+import com.bloo.bluelink.data.notificationPrefs
 
 /**
  * Periodically refreshes each signed-in car's status in the background and posts
