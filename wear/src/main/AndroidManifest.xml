@@ -7,6 +7,7 @@
          the phone-created Android Keystore-protected session (CredentialStore). -->
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <!-- Seamless in-watch update: the phone pushes the watch APK and the watch hands it to the
          system installer (see WatchDataListenerService). -->
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
@@ -55,6 +56,9 @@
                     android:pathPrefix="/bloo" />
             </intent-filter>
         </service>
+
+        <!-- Runs the action buttons on the watch's own notifications (Stop charging). -->
+        <receiver android:name=".WearActionReceiver" android:exported="false" />
 
         <!-- Serves the cached update APK to the system installer (see file_paths.xml). -->
         <provider

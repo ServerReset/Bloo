@@ -7,9 +7,14 @@ import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AcUnit
+import androidx.compose.material.icons.filled.BatteryAlert
+import androidx.compose.material.icons.filled.BatteryFull
 import androidx.compose.material.icons.filled.Bolt
+import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.DirectionsCar
 import androidx.compose.material.icons.filled.Download
+import androidx.compose.material.icons.filled.FlashOn
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.LockOpen
 import androidx.compose.material.icons.filled.SystemUpdate
@@ -32,6 +37,7 @@ import androidx.wear.compose.material3.MaterialTheme
 import androidx.wear.compose.material3.ScreenScaffold
 import androidx.wear.compose.material3.TimeText
 import com.bloo.bluelink.data.VehicleSnapshot
+import com.bloo.bluelink.data.supportsHornLights
 import com.bloo.bluelink.data.WatchPinPolicy
 import kotlinx.coroutines.launch
 
@@ -147,6 +153,7 @@ private fun WearCarPage(
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
     val listState = rememberScalingLazyListState()
+    val signedIn by WearCredentialSync.signedIn.collectAsStateWithLifecycle()
     val lastResult by repo.lastCommandResult.collectAsStateWithLifecycle(initialValue = null)
     val updateAdvice by WearDataLayerSync.updateAdvice.collectAsStateWithLifecycle(initialValue = null)
     val selfUpdate by WearUpdateChecker.available.collectAsStateWithLifecycle(initialValue = null)
@@ -185,6 +192,7 @@ private fun WearCarPage(
                     value = v.heroValue(),
                     caption = v.name,
                     tint = v.heroTint(),
+                    progress = v.percent?.let { it / 100f },
                 )
             }
             v.stateLine()?.let { line ->
@@ -199,24 +207,31 @@ private fun WearCarPage(
             }
 
             item {
-                WearPebble(title = "Controls", icon = Icons.Filled.DirectionsCar) {
+                val actions = buildList {
                     val locked = v.locked == true
-                    WearActionRow(
-                        label = if (locked) "Unlock" else "Lock",
-                        icon = if (locked) Icons.Filled.LockOpen else Icons.Filled.Lock,
-                    ) { requestCommand { repo.lock(v.vin) } }
-                }
-            }
-            item {
-                WearPebble(title = "Climate", icon = Icons.Filled.AcUnit) {
+                    add(WearQuickAction(if (locked) "Unlock" else "Lock", if (locked) Icons.Filled.LockOpen else Icons.Filled.Lock) {
+                        requestCommand { repo.lock(v.vin) }
+                    })
                     val on = v.climateOn == true
-                    WearActionRow(
-                        label = if (on) "Climate off" else "Climate on",
-                        icon = Icons.Filled.AcUnit,
-                        active = on,
-                    ) { requestCommand { repo.climate(v.vin) } }
+                    add(WearQuickAction(if (on) "Climate off" else "Climate", Icons.Filled.AcUnit, active = on) {
+                        requestCommand { repo.climate(v.vin) }
+                    })
+                    if (v.hasBattery) {
+                        val charging = v.charging == true
+                        add(WearQuickAction(if (charging) "Stop charge" else "Charge", Icons.Filled.Bolt, active = charging) {
+                            requestCommand { repo.charge(v.vin) }
+                        })
+                    }
+                    if (v.toVehicle().supportsHornLights) {
+                        add(WearQuickAction("Flash", Icons.Filled.FlashOn) { requestCommand { repo.flashLights(v.vin) } })
+                    }
                 }
+                WearQuickActions(actions)
             }
+            if (signedIn) {
+                item { WearActionRow(label = "Refresh", icon = Icons.Filled.Refresh) { repo.refresh() } }
+            }
+            item { WearAlertsPebble() }
 
             val failure = lastResult?.takeIf { it.vin == v.vin && !it.ok }
             if (failure != null) {
@@ -249,3 +264,18 @@ private fun VehicleSnapshot.stateLine(): String? = listOfNotNull(
 @Composable
 private fun VehicleSnapshot.heroTint(): Color =
     if (percent != null) Color(0xFF2EBD59) else MaterialTheme.colorScheme.onBackground
+
+/** The watch's notification switches: a pebble of three toggles, kept deliberately short. */
+@Composable
+private fun WearAlertsPebble() {
+    val context = LocalContext.current
+    val prefs = remember { WearNotificationPrefs(context) }
+    var charging by remember { mutableStateOf(prefs.charging) }
+    var complete by remember { mutableStateOf(prefs.chargeComplete) }
+    var low by remember { mutableStateOf(prefs.lowBattery) }
+    WearPebble(title = "Watch alerts", icon = Icons.Filled.Notifications) {
+        WearActionRow("Charging card", Icons.Filled.Bolt, active = charging) { charging = !charging; prefs.charging = charging }
+        WearActionRow("Charged", Icons.Filled.BatteryFull, active = complete) { complete = !complete; prefs.chargeComplete = complete }
+        WearActionRow("Low battery", Icons.Filled.BatteryAlert, active = low) { low = !low; prefs.lowBattery = low }
+    }
+}

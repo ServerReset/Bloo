@@ -29,6 +29,17 @@ class WearSnapshotRepository(private val context: Context) {
     /** Toggle climate. */
     fun climate(vin: String) = run(vin, CarAction.TOGGLE_CLIMATE)
 
+    /** Start or stop charging. */
+    fun charge(vin: String) = run(vin, CarAction.TOGGLE_CHARGE)
+
+    /** Flash the hazards (Hyundai/Genesis). */
+    fun flashLights(vin: String) = run(vin, CarAction.FLASH_LIGHTS)
+
+    /** Pull fresh status when the watch has its own session. */
+    fun refresh() {
+        scope.launch { WearCredentialSync.refresh(context) }
+    }
+
     private fun run(vin: String, action: String) {
         scope.launch {
             if (WearCredentialSync.runLocally(context, vin, action) == null) {

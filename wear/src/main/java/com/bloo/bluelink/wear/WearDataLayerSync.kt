@@ -112,6 +112,7 @@ object WearDataLayerSync {
             json.decodeFromString(WatchSyncPayload.serializer(), bytes.decodeToString())
         }.getOrNull() ?: return
         val app = context.applicationContext
+        WearNotifier.onVehicles(app, _vehicles.value, payload.vehicles)
         _vehicles.value = payload.vehicles
         _selectedVin.value = payload.selectedVin
         _connected.value = true
@@ -136,7 +137,10 @@ object WearDataLayerSync {
      */
     suspend fun reloadFromStore(context: Context, result: com.bloo.bluelink.data.CarCommandResult?) {
         val snapshot = SnapshotStore(context.applicationContext).current()
-        if (snapshot.vehicles.isNotEmpty()) _vehicles.value = snapshot.vehicles
+        if (snapshot.vehicles.isNotEmpty()) {
+            WearNotifier.onVehicles(context, _vehicles.value, snapshot.vehicles)
+            _vehicles.value = snapshot.vehicles
+        }
         result?.let {
             _lastCommandResult.value = com.bloo.bluelink.data.WatchCommandResult(
                 requestId = "local-${System.nanoTime()}", vin = it.vin, action = it.action, ok = it.ok, message = it.message,

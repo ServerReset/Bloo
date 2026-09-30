@@ -25,6 +25,11 @@ class WearMainActivity : ComponentActivity() {
         // Begin listening for the phone's pushes (real-time sync; the watch never hits the
         // network for CAR data -- see WearDataLayerSync).
         WearDataLayerSync.start(this)
+        // Notifications need a one-time grant on Android 13+.
+        if (!WearNotifier.canPost(this)) {
+            registerForActivityResult(androidx.activity.result.contract.ActivityResultContracts.RequestPermission()) { }
+                .launch(android.Manifest.permission.POST_NOTIFICATIONS)
+        }
         // The watch checks for its OWN updates over its own internet, independent of the phone.
         lifecycleScope.launch { WearUpdateChecker.check() }
         // A watch the phone has signed in fetches its own car status.
