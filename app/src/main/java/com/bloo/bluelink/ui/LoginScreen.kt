@@ -323,34 +323,14 @@ internal fun LoginScreen(
                     }
 
                     // Sign in CTA — label reflects the chosen brand.
-                    val signInSource = remember { MutableInteractionSource() }
-                    MorphButton(
+                    SafeMorphTextButton(
+                        text = "Sign in to ${brand.label}",
                         onClick = { onLogin(email, password, pin, brand) },
                         modifier = Modifier.fillMaxWidth(),
-                        interactionSource = signInSource,
                         enabled = !loading,
-                        containerColor = scheme.primary,
-                        contentColor = scheme.onPrimary,
-                        expressive = true,
-                        fillOnPress = true,
-                        groupWeight = GroupWeightProportional,
-                    ) {
-                        if (loading) {
-                            LoadingIndicator()
-                        } else {
-                            AnimatedContent(
-                                targetState = brand.label,
-                                // Same duration as the email label's own crossfade just
-                                // above -- both are driven by the same brand-selection
-                                // change, so they should settle together instead of at
-                                // three slightly different paces.
-                                transitionSpec = { fadeIn(tween(220)) togetherWith fadeOut(tween(160)) },
-                                label = "signInLabel",
-                            ) { label ->
-                                Text("Sign in to $label", style = ButtonLabelStyle, fontWeight = FontWeight.SemiBold)
-                            }
-                        }
-                    }
+                        pending = loading,
+                        emphasis = ButtonEmphasis.Primary,
+                    )
 
                     if (onCancel != null) {
                         SafeMorphTextButton(

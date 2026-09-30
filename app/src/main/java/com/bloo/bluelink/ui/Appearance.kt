@@ -511,11 +511,10 @@ internal fun PaletteEditorDialog(
                 }
         },
         buttons = {
-            val saveSource = remember { MutableInteractionSource() }
             MorphActionButton(
-    label = "Save",
-    icon = Icons.Filled.Check,
-    onClick = {
+                label = "Save",
+                icon = Icons.Filled.Check,
+                onClick = {
                     onSave(
                         CustomPaletteData(
                             id = paletteId,
