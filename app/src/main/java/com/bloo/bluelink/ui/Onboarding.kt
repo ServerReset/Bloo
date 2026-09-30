@@ -388,37 +388,25 @@ internal fun OnboardingScreen(vm: AppViewModel) {
                         modifier = Modifier.fillMaxWidth(),
                     )
                 }
-                val nextSource = remember { MutableInteractionSource() }
                 // The weight goes on the SafeExpansiveButton, which is the Row's actual child,
                 // NOT on the MorphButton inside it -- whose parent is that wrapper's own layout
                 // and never reads it. The same dead-weight mistake the cover action bar had:
                 // this button was silently hugging its label instead of taking the 2:1 share
                 // over Back that the expression asks for.
-                MorphButton(
-                    onClick = ::goNext,
-                    active = true,
-                    enabled = !setupBlocked,
-                    interactionSource = nextSource,
-                    modifier = Modifier.fillMaxWidth(),
-                    expressive = true,
-                    fillOnPress = true,
-                    groupWeight = GroupWeightProportional,
-                ) {
-                    // MorphButtonLabel, not a hand-rolled Icon+Spacer+Text -- that Text used
-                    // FontWeight.Bold, where every other button label in the app (including
-                    // this one's own "Back" neighbour) uses SemiBold.
-                    val nextIcon: ImageVector = if (isLast) AppIcons.CheckCircle else AppIcons.Check
+                val nextIcon: ImageVector = if (isLast) AppIcons.CheckCircle else AppIcons.Check
                     val nextText: String = when {
                         isLast -> "Enter Bloo"
                         pageIndex == 0 -> "Get started"
                         else -> "Next"
                     }
-                    MorphButtonLabel(
-                        nextIcon,
-                        nextText,
-                        pending = false,
+                    MorphActionButton(
+                        label = nextText,
+                        icon = nextIcon,
+                        onClick = ::goNext,
+                        modifier = Modifier.fillMaxWidth(),
+                        enabled = !setupBlocked,
+                        active = true,
                     )
-                }
                 if (setupBlocked) {
                     Spacer(Modifier.height(GapHairline))
                     BodySmallText(
@@ -502,13 +490,14 @@ internal fun SyncChoiceScreen(vm: AppViewModel) {
                 body = "Pick the sync file another device uses -- theme, layout, alerts, presets and car setup come with it.",
                 done = false,
             ) {
-                MorphButton(
+                MorphActionButton(
+                    label = "Choose sync file",
+                    icon = Icons.Filled.Cloud,
                     onClick = { restoreLauncher.launch(arrayOf("application/json")) },
-                    enabled = !restoring,
                     modifier = Modifier.fillMaxWidth(),
-                ) {
-                    if (restoring) LoadingIndicator() else MorphButtonLabel(Icons.Filled.Cloud, "Choose sync file", pending = false)
-                }
+                    enabled = !restoring,
+                    pending = restoring,
+                )
             }
 
             Spacer(Modifier.height(GapSection))

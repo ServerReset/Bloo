@@ -453,15 +453,23 @@ fun MorphActionButton(
     expressive: Boolean = false,
     /** See [MorphButton]'s own `fillOnPress`; false when the button shares its row. */
     fillOnPress: Boolean = true,
+    /** The button's weight in the hierarchy, same as [MorphTextButton]'s. */
+    emphasis: ButtonEmphasis = ButtonEmphasis.Tonal,
+    /** A toggle's "on" state: the primary fill, same as [MorphButton]'s own `active`. */
+    active: Boolean = false,
 ) {
     MorphButton(
         onClick = onClick,
         modifier = modifier,
         enabled = enabled,
+        active = active,
         interactionSource = interactionSource,
         groupWeight = groupWeight,
         expressive = expressive,
         fillOnPress = fillOnPress,
+        // Tonal keeps MorphButton's own default fill; the others take their emphasis colours.
+        containerColor = if (emphasis == ButtonEmphasis.Tonal) MaterialTheme.colorScheme.secondaryContainer else emphasis.container(),
+        contentColor = if (emphasis == ButtonEmphasis.Tonal) MaterialTheme.colorScheme.onSecondaryContainer else emphasis.content(),
         contentPadding = PaddingValues(horizontal = 18.dp, vertical = GapRow),
     ) {
         // The shared label, so the glyph gets the standard gap and -- the part a

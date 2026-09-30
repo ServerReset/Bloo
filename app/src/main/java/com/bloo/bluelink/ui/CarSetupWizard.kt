@@ -269,26 +269,17 @@ internal fun CarFeatureWizard(
                         modifier = Modifier.fillMaxWidth(),
                     )
                 }
-                val nextSource = remember { MutableInteractionSource() }
-                MorphButton(
-                    onClick = ::goNext,
-                    active = true,
-                    interactionSource = nextSource,
-                    modifier = Modifier.fillMaxWidth(),
-                    expressive = true,
-                    fillOnPress = true,
-                    groupWeight = GroupWeightProportional,
-                ) {
-                    val isLast = pageIndex == pages.lastIndex
-                    // MorphButtonLabel, not a hand-rolled Icon+Spacer+Text.
+                val isLast = pageIndex == pages.lastIndex
+                    
                     val wizardNextIcon: ImageVector = if (isLast) AppIcons.CheckCircle else AppIcons.Check
                     val wizardNextText: String = if (isLast) "Done" else "Next"
-                    MorphButtonLabel(
-                        wizardNextIcon,
-                        wizardNextText,
-                        pending = false,
+                    MorphActionButton(
+                        label = wizardNextText,
+                        icon = wizardNextIcon,
+                        onClick = ::goNext,
+                        modifier = Modifier.fillMaxWidth(),
+                        active = true,
                     )
-                }
             }
         }
 

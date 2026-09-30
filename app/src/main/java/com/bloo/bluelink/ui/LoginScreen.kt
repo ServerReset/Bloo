@@ -449,18 +449,13 @@ internal fun KiaOtpDialog(otp: KiaOtpUi, loading: Boolean, vm: AppViewModel) {
             // Verify shown only once a code's been sent; Cancel always. Stacked
             // full-width (primary on top) per the shell's convention.
             if (otp.sentTo != null) {
-                val verifySource = remember { MutableInteractionSource() }
-                MorphButton(
+                SafeMorphTextButton(
+                    text = "Verify",
                     onClick = { vm.kiaVerifyOtp(code) },
-                    interactionSource = verifySource,
-                    enabled = !loading && code.isNotBlank(),
                     modifier = Modifier.fillMaxWidth(),
-                    expressive = true,
-                    fillOnPress = true,
-                    groupWeight = GroupWeightProportional,
-                ) {
-                    if (loading) LoadingIndicator() else Text("Verify", style = ButtonLabelStyle, fontWeight = FontWeight.SemiBold)
-                }
+                    enabled = !loading && code.isNotBlank(),
+                    pending = loading,
+                )
             }
             SafeMorphTextButton(
                 "Cancel",
@@ -492,18 +487,13 @@ internal fun CanadaOtpDialog(otp: CanadaOtpUi, loading: Boolean, vm: AppViewMode
             OtpCodeField(code) { code = it }
         },
         buttons = {
-            val canadaVerifySource = remember { MutableInteractionSource() }
-            MorphButton(
+            SafeMorphTextButton(
+                text = "Verify",
                 onClick = { vm.canadaVerifyOtp(code) },
-                interactionSource = canadaVerifySource,
-                enabled = !loading && code.isNotBlank(),
                 modifier = Modifier.fillMaxWidth(),
-                expressive = true,
-                fillOnPress = true,
-                groupWeight = GroupWeightProportional,
-            ) {
-                if (loading) LoadingIndicator() else Text("Verify", style = ButtonLabelStyle, fontWeight = FontWeight.SemiBold)
-            }
+                enabled = !loading && code.isNotBlank(),
+                pending = loading,
+            )
             SafeMorphTextButton(
                 "Cancel",
                 vm::canadaCancelOtp,

@@ -512,8 +512,10 @@ internal fun PaletteEditorDialog(
         },
         buttons = {
             val saveSource = remember { MutableInteractionSource() }
-            MorphButton(
-                onClick = {
+            MorphActionButton(
+    label = "Save",
+    icon = Icons.Filled.Check,
+    onClick = {
                     onSave(
                         CustomPaletteData(
                             id = paletteId,
@@ -525,13 +527,9 @@ internal fun PaletteEditorDialog(
                     )
                     onDismiss()
                 },
-                active = true,
-                interactionSource = saveSource,
-                modifier = Modifier.fillMaxWidth(),
-                expressive = true,
-                fillOnPress = true,
-                groupWeight = GroupWeightProportional,
-            ) { MorphButtonLabel(Icons.Filled.Check, "Save", pending = false) }
+    modifier = Modifier.fillMaxWidth(),
+    active = true,
+)
             SafeMorphTextButton(
                 "Cancel",
                 onDismiss,

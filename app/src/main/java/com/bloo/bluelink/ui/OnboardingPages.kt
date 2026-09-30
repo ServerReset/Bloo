@@ -154,17 +154,13 @@ internal fun OnboardingSetupPage(
             done = notifGranted,
             required = true,
         ) {
-            MorphButton(
+            MorphActionButton(
+                label = if (notifGranted) "Notifications on" else "Turn on notifications",
+                icon = if (notifGranted) AppIcons.CheckCircle else Icons.Filled.Notifications,
                 onClick = { if (!notifGranted) notifLauncher.launch(android.Manifest.permission.POST_NOTIFICATIONS) },
-                active = notifGranted,
                 modifier = Modifier.fillMaxWidth(),
-            ) {
-                MorphButtonLabel(
-                    if (notifGranted) AppIcons.CheckCircle else Icons.Filled.Notifications,
-                    if (notifGranted) "Notifications on" else "Turn on notifications",
-                    pending = false,
-                )
-            }
+                active = notifGranted,
+            )
         }
     }
 
@@ -178,7 +174,9 @@ internal fun OnboardingSetupPage(
             done = bioEnabled,
             required = true,
         ) {
-            MorphButton(
+            MorphActionButton(
+                label = if (bioEnabled) "Biometric lock on" else "Turn on biometric lock",
+                icon = if (bioEnabled) AppIcons.CheckCircle else Icons.Filled.Fingerprint,
                 onClick = {
                     if (!bioEnabled) {
                         context.findFragmentActivity()?.let { activity ->
@@ -192,15 +190,9 @@ internal fun OnboardingSetupPage(
                         }
                     }
                 },
-                active = bioEnabled,
                 modifier = Modifier.fillMaxWidth(),
-            ) {
-                MorphButtonLabel(
-                    if (bioEnabled) AppIcons.CheckCircle else Icons.Filled.Fingerprint,
-                    if (bioEnabled) "Biometric lock on" else "Turn on biometric lock",
-                    pending = false,
-                )
-            }
+                active = bioEnabled,
+            )
         }
     } else {
         OnboardingSetupCard(
@@ -270,12 +262,12 @@ internal fun OnboardingSetupPage(
                     Text("Drive sync enabled", fontWeight = FontWeight.SemiBold, color = scheme.primary)
                 }
             } else {
-                MorphButton(
+                MorphActionButton(
+                    label = "Set up Drive sync",
+                    icon = Icons.Filled.Cloud,
                     onClick = { showDriveDialog = true },
                     modifier = Modifier.fillMaxWidth(),
-                ) {
-                    MorphButtonLabel(Icons.Filled.Cloud, "Set up Drive sync", pending = false)
-                }
+                )
             }
         }
     }
@@ -340,7 +332,10 @@ internal fun OnboardingPinForm(
                 color = scheme.error,
             )
         }
-        MorphButton(
+        val pinLabel: String = if (existing) "Replace PIN" else "Save PIN"
+        MorphActionButton(
+            label = pinLabel,
+            icon = AppIcons.Lock,
             onClick = {
                 if (valid) {
                     haptics?.click()
@@ -354,10 +349,7 @@ internal fun OnboardingPinForm(
             },
             modifier = Modifier.fillMaxWidth(),
             enabled = pin.isNotEmpty() && confirm.isNotEmpty(),
-        ) {
-            val pinLabel: String = if (existing) "Replace PIN" else "Save PIN"
-            MorphButtonLabel(AppIcons.Lock, pinLabel, pending = false)
-        }
+        )
     }
 }
 
