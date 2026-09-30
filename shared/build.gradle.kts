@@ -34,6 +34,11 @@ dependencies {
     implementation("androidx.core:core-ktx:1.19.1")
     implementation("androidx.datastore:datastore-preferences:1.2.1")
     implementation("androidx.security:security-crypto:1.1.0")
+    // Silent APK install through Shizuku, shared by the phone's self-update and the watch's
+    // (see ShizukuInstaller). The framework AIDL stubs are compile-only and never packaged.
+    implementation("dev.rikka.shizuku:api:13.1.5")
+    implementation("org.lsposed.hiddenapibypass:hiddenapibypass:6.1")
+    compileOnly(project(":hidden-api-stub"))
     implementation("com.squareup.okhttp3:okhttp:5.5.0")
     implementation("com.squareup.okhttp3:logging-interceptor:5.5.0")
 

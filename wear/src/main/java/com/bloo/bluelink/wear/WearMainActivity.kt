@@ -11,6 +11,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.lifecycle.lifecycleScope
+import com.bloo.bluelink.update.ShizukuInstaller
 import kotlinx.coroutines.launch
 
 /**
@@ -25,6 +26,9 @@ class WearMainActivity : ComponentActivity() {
         // Begin listening for the phone's pushes (real-time sync; the watch never hits the
         // network for CAR data -- see WearDataLayerSync).
         WearDataLayerSync.start(this)
+        // Shizuku on the watch: ask once for permission so updates can install without a prompt.
+        // A no-op unless Shizuku is running here.
+        if (ShizukuInstaller.isAvailable() && !ShizukuInstaller.hasPermission()) ShizukuInstaller.requestPermission(SHIZUKU_REQUEST)
         // The watch checks for its OWN updates over its own internet, independent of the phone.
         lifecycleScope.launch { WearUpdateChecker.check() }
         // A watch the phone has signed in fetches its own car status.
@@ -36,6 +40,10 @@ class WearMainActivity : ComponentActivity() {
                 }
             }
         }
+    }
+
+    private companion object {
+        const val SHIZUKU_REQUEST = 4127
     }
 }
 

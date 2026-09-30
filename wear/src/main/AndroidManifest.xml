@@ -11,6 +11,10 @@
          system installer (see WatchDataListenerService). -->
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
 
+    <!-- Runtime permission Shizuku grants so the watch can update itself without the installer
+         prompt. Inert unless Shizuku is running on the watch. -->
+    <uses-permission android:name="moe.shizuku.manager.permission.API_V23" />
+
     <uses-feature android:name="android.hardware.type.watch" />
 
     <application
@@ -55,6 +59,16 @@
                     android:pathPrefix="/bloo" />
             </intent-filter>
         </service>
+
+        <!-- Shizuku entry point; must be exported (it throws otherwise) and is guarded by a
+             signature|privileged permission, exactly as on the phone. -->
+        <provider
+            android:name="rikka.shizuku.ShizukuProvider"
+            android:authorities="${applicationId}.shizuku"
+            android:multiprocess="false"
+            android:enabled="true"
+            android:exported="true"
+            android:permission="android.permission.INTERACT_ACROSS_USERS_FULL" />
 
         <!-- Serves the cached update APK to the system installer (see file_paths.xml). -->
         <provider
