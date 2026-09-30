@@ -21,6 +21,7 @@ internal fun SettingsStore.decodeNotificationPrefs(p: Preferences): SettingsStor
         unlocked = p[booleanPreferencesKey("notify_unlocked")] ?: true,
         unlockedMinutes = p[stringPreferencesKey("notify_unlocked_min")]?.toIntOrNull() ?: 10,
         charging = p[booleanPreferencesKey("notify_charging")] ?: true,
+        liveChargeSystemStyle = p[booleanPreferencesKey("notify_charging_system_style")] ?: false,
         carStarted = p[booleanPreferencesKey("notify_start")] ?: true,
         chargeComplete = p[booleanPreferencesKey("notify_charge_complete")] ?: true,
     )
@@ -57,6 +58,9 @@ suspend fun SettingsStore.setUnlockedMinutes(v: Int) =
 
 suspend fun SettingsStore.setNotifyCharging(v: Boolean) =
     editTracked { it[booleanPreferencesKey("notify_charging")] = v }.let {}
+
+suspend fun SettingsStore.setLiveChargeSystemStyle(v: Boolean) =
+    editTracked { it[booleanPreferencesKey("notify_charging_system_style")] = v }.let {}
 
 suspend fun SettingsStore.setNotifyCarStarted(v: Boolean) =
     editTracked { it[booleanPreferencesKey("notify_start")] = v }.let {}

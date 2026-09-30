@@ -533,6 +533,8 @@ internal fun PaletteEditorDialog(
                 interactionSource = saveSource,
                 modifier = Modifier.fillMaxWidth(),
                 expressive = true,
+                fillOnPress = true,
+                groupWeight = GroupWeightProportional,
             ) { MorphButtonLabel(Icons.Filled.Check, "Save", pending = false) }
             SafeMorphTextButton(
                 "Cancel",

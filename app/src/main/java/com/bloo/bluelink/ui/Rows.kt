@@ -258,7 +258,9 @@ internal fun CropScreen(vin: String, uriString: String, onCancel: () -> Unit, on
                 interactionSource = confirmSource,
                 contentPadding = PaddingValues(horizontal = 18.dp, vertical = GapRow),
                     expressive = true,
-                ) { Text("Use photo", style = ButtonLabelStyle, fontWeight = FontWeight.SemiBold) }
+                fillOnPress = true,
+                groupWeight = GroupWeightProportional,
+            ) { Text("Use photo", style = ButtonLabelStyle, fontWeight = FontWeight.SemiBold) }
             }
         }
     }

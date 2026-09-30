@@ -426,6 +426,8 @@ internal fun SettingsHeroCard(state: UiState, vm: AppViewModel, compact: Boolean
                             enabled = !state.updateInstalling && !state.updateDownloading,
                             interactionSource = updateSource,
                             expressive = true,
+                            fillOnPress = true,
+                            groupWeight = GroupWeightProportional,
                         ) {
                             MorphButtonLabel(act.icon, act.label, pending = false)
                         }

@@ -336,6 +336,8 @@ internal fun LoginScreen(
                         containerColor = scheme.primary,
                         contentColor = scheme.onPrimary,
                         expressive = true,
+                        fillOnPress = true,
+                        groupWeight = GroupWeightProportional,
                     ) {
                         if (loading) {
                             LoadingIndicator()
@@ -363,6 +365,8 @@ internal fun LoginScreen(
                             containerColor = scheme.secondaryContainer,
                             contentColor = scheme.onSecondaryContainer,
                             expressive = true,
+                            fillOnPress = true,
+                            groupWeight = GroupWeightProportional,
                         ) { Text("Cancel", style = ButtonLabelStyle, fontWeight = FontWeight.SemiBold) }
                     }
 
@@ -435,6 +439,8 @@ internal fun KiaOtpDialog(otp: KiaOtpUi, loading: Boolean, vm: AppViewModel) {
                         enabled = !loading,
                         modifier = Modifier.fillMaxWidth(),
                         expressive = true,
+                        fillOnPress = true,
+                        groupWeight = GroupWeightProportional,
                     ) { Text("Email" + (otp.challenge.email?.let { " · $it" } ?: ""), style = ButtonLabelStyle, fontWeight = FontWeight.SemiBold) }
                 }
                 if (otp.challenge.hasSms) {
@@ -445,6 +451,8 @@ internal fun KiaOtpDialog(otp: KiaOtpUi, loading: Boolean, vm: AppViewModel) {
                         enabled = !loading,
                         modifier = Modifier.fillMaxWidth(),
                         expressive = true,
+                        fillOnPress = true,
+                        groupWeight = GroupWeightProportional,
                     ) { Text("Text message" + (otp.challenge.sms?.let { " · $it" } ?: ""), style = ButtonLabelStyle, fontWeight = FontWeight.SemiBold) }
                 }
             } else {
@@ -466,6 +474,8 @@ internal fun KiaOtpDialog(otp: KiaOtpUi, loading: Boolean, vm: AppViewModel) {
                     enabled = !loading && code.isNotBlank(),
                     modifier = Modifier.fillMaxWidth(),
                     expressive = true,
+                    fillOnPress = true,
+                    groupWeight = GroupWeightProportional,
                 ) {
                     if (loading) LoadingIndicator() else Text("Verify", style = ButtonLabelStyle, fontWeight = FontWeight.SemiBold)
                 }
@@ -507,6 +517,8 @@ internal fun CanadaOtpDialog(otp: CanadaOtpUi, loading: Boolean, vm: AppViewMode
                 enabled = !loading && code.isNotBlank(),
                 modifier = Modifier.fillMaxWidth(),
                 expressive = true,
+                fillOnPress = true,
+                groupWeight = GroupWeightProportional,
             ) {
                 if (loading) LoadingIndicator() else Text("Verify", style = ButtonLabelStyle, fontWeight = FontWeight.SemiBold)
             }

@@ -388,6 +388,8 @@ internal fun ChoiceRow(label: String, selected: Boolean, onSelect: () -> Unit) {
         minHeight = ButtonTargetHeight,
         modifier = Modifier.fillMaxWidth(),
         expressive = true,
+        fillOnPress = true,
+        groupWeight = GroupWeightProportional,
     ) {
     Text(
         label,

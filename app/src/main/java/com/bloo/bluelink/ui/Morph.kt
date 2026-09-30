@@ -191,6 +191,10 @@ fun MorphButton(
      *  site sets a flag instead of hand-wiring a wrapper around a shared interaction source.
      *  Always on inside an [ExpressiveButtonGroup], where the button joins on its own. */
     expressive: Boolean = false,
+    /** For a labelled button alone on its row: rests at its natural width on the start edge and
+     *  widens to the whole row when pressed. See [SafeExpansiveButton]'s own `fillOnPress`.
+     *  Only takes effect together with [expressive]. */
+    fillOnPress: Boolean = false,
     content: @Composable RowScope.() -> Unit,
 ) {
     val haptics = LocalHaptics.current
@@ -272,6 +276,7 @@ fun MorphButton(
             interactionSource = interactionSource,
             enabled = enabled,
             groupWeight = groupWeight,
+            fillOnPress = fillOnPress,
         ) { body() }
     } else {
         body()
@@ -327,8 +332,8 @@ fun MorphTextButton(
     showIcon: Boolean = true,
     /** Swaps the glyph for the shared in-flight spinner; pass a real flag, not `true`. */
     pending: Boolean = false,
-    /** See [MorphButton]'s own `groupWeight`. */
-    groupWeight: Float = 0f,
+    /** See [MorphButton]'s own `groupWeight`; labelled buttons default to proportional-to-label. */
+    groupWeight: Float = GroupWeightProportional,
 ) {
     MorphButton(
         onClick = onClick,
@@ -374,10 +379,13 @@ fun SafeMorphTextButton(
     icon: ImageVector? = null,
     showIcon: Boolean = true,
     pending: Boolean = false,
-    groupWeight: Float = 0f,
+    groupWeight: Float = GroupWeightProportional,
+    /** False for the rare button that shares its row with other content (a field, a label): it
+     *  keeps the small press push instead of widening over its neighbours. */
+    fillOnPress: Boolean = true,
 ) {
     val source = remember { MutableInteractionSource() }
-    SafeExpansiveButton(interactionSource = source, enabled = enabled) {
+    SafeExpansiveButton(interactionSource = source, enabled = enabled, fillOnPress = fillOnPress) {
         MorphTextButton(
             text = text,
             onClick = onClick,
@@ -425,10 +433,12 @@ fun MorphActionButton(
     /** Swaps the glyph for the shared in-flight spinner; pass a real flag, not `true`. */
     pending: Boolean = false,
     interactionSource: MutableInteractionSource = remember { MutableInteractionSource() },
-    /** See [MorphButton]'s own `groupWeight`. */
-    groupWeight: Float = 0f,
+    /** See [MorphButton]'s own `groupWeight`; labelled buttons default to proportional-to-label. */
+    groupWeight: Float = GroupWeightProportional,
     /** See [MorphButton]'s own `expressive`. */
     expressive: Boolean = false,
+    /** See [MorphButton]'s own `fillOnPress`; false when the button shares its row. */
+    fillOnPress: Boolean = true,
 ) {
     MorphButton(
         onClick = onClick,
@@ -437,6 +447,7 @@ fun MorphActionButton(
         interactionSource = interactionSource,
         groupWeight = groupWeight,
         expressive = expressive,
+        fillOnPress = fillOnPress,
         contentPadding = PaddingValues(horizontal = 18.dp, vertical = GapRow),
     ) {
         // The shared label, so the glyph gets the standard gap and -- the part a

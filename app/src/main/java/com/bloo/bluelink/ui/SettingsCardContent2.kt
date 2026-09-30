@@ -138,6 +138,7 @@ internal fun LocationCardContent(appearance: SettingsStore.Appearance, vm: AppVi
                 SafeMorphTextButton(
                     "Clear",
                     onClick = { vm.clearWeatherLocation() },
+                    fillOnPress = false,
                 )
             }
             Spacer(Modifier.height(GapGroup))

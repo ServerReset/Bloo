@@ -292,6 +292,8 @@ internal fun LockOverlay(vm: AppViewModel, opaqueBackdrop: Boolean = false) {
                     contentColor = Color.Black,
                     contentPadding = PaddingValues(horizontal = 40.dp, vertical = 18.dp),
                     expressive = true,
+                    fillOnPress = true,
+                    groupWeight = GroupWeightProportional,
                 ) {
                     // MorphButtonLabel, not a hand-rolled Icon+Spacer+Text -- the icon stays
                     // larger (24dp) than the standard 18dp, an intentional emphasis for the
@@ -382,6 +384,8 @@ internal fun LockOverlay(vm: AppViewModel, opaqueBackdrop: Boolean = false) {
                             interactionSource = pinUnlockSource,
                             enabled = !rejected && pin.length in PinCrypto.PIN_MIN_DIGITS..PinCrypto.PIN_MAX_DIGITS,
                             expressive = true,
+                            fillOnPress = true,
+                            groupWeight = GroupWeightProportional,
                         ) {
                             MorphButtonLabel(Icons.Filled.LockOpen, "Unlock", pending = false)
                         }

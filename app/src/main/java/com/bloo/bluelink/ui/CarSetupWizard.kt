@@ -272,6 +272,8 @@ internal fun CarFeatureWizard(
                         contentPadding = PaddingValues(vertical = GapGroup),
                         border = BorderStroke(1.dp, scheme.outlineVariant),
                         expressive = true,
+                        fillOnPress = true,
+                        groupWeight = GroupWeightProportional,
                     ) {
                         Text("Back", style = ButtonLabelStyle)
                     }
@@ -284,6 +286,8 @@ internal fun CarFeatureWizard(
                     modifier = Modifier.fillMaxWidth(),
                     contentPadding = PaddingValues(vertical = GapGroup),
                     expressive = true,
+                    fillOnPress = true,
+                    groupWeight = GroupWeightProportional,
                 ) {
                     val isLast = pageIndex == pages.lastIndex
                     // MorphButtonLabel, not a hand-rolled Icon+Spacer+Text.

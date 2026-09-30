@@ -390,6 +390,8 @@ internal fun OnboardingScreen(vm: AppViewModel) {
                         contentPadding = PaddingValues(vertical = GapSection),
                         border = BorderStroke(1.dp, scheme.outlineVariant),
                         expressive = true,
+                        fillOnPress = true,
+                        groupWeight = GroupWeightProportional,
                     ) {
                         Text("Back", style = ButtonLabelStyle)
                     }
@@ -408,6 +410,8 @@ internal fun OnboardingScreen(vm: AppViewModel) {
                     modifier = Modifier.fillMaxWidth(),
                     contentPadding = PaddingValues(vertical = GapSection),
                     expressive = true,
+                    fillOnPress = true,
+                    groupWeight = GroupWeightProportional,
                 ) {
                     // MorphButtonLabel, not a hand-rolled Icon+Spacer+Text -- that Text used
                     // FontWeight.Bold, where every other button label in the app (including

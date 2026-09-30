@@ -186,6 +186,14 @@ fun ExpressiveButtonGroup(
             // What each child's content actually asked for -- the only intrinsic width this
             // group pays for by default.
             val full = naturals.content!!
+            // Proportional-to-label members take spare room in proportion to their own natural
+            // width, so a row of buttons fills edge to edge with the wider label getting the wider
+            // button. A group with a single member is a lone button, which rests at its natural
+            // width instead (see SafeExpansiveButton's fillOnPress) -- so it opts back out here.
+            val memberCount = member.count { it }
+            for (i in 0 until n) {
+                if (weight[i] < 0f) weight[i] = if (memberCount > 1) full[i].toFloat().coerceAtLeast(1f) else 0f
+            }
             // The icon-only fallback is genuinely lazy, not just cached: minIntrinsicWidth asks
             // a full intrinsic pass down each member's own subtree, and querying it for EVERY
             // member on EVERY resting pass -- which the first version of the fit rule did
@@ -568,6 +576,13 @@ internal data class ExpressiveGroupData(
 ) : ParentDataModifier {
     override fun Density.modifyParentData(parentData: Any?): Any = this@ExpressiveGroupData
 }
+
+/**
+ * A [ExpressiveGroupData.weight] meaning "take spare room in proportion to my own label width".
+ * The default for every labelled button ([MorphTextButton], [MorphActionButton]); icon-only buttons
+ * keep 0 and therefore their size.
+ */
+internal const val GroupWeightProportional = -1f
 
 /** Receiver for [ExpressiveButtonGroup]'s children. */
 @Stable

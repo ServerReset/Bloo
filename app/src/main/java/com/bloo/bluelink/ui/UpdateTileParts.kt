@@ -124,6 +124,7 @@ internal fun UpdateReleaseNotes(
                             )
                         }
                     },
+                    fillOnPress = false,
                 )
             }
             Text(

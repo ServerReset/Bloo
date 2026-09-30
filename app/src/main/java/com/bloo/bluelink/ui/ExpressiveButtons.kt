@@ -240,6 +240,14 @@ fun SafeExpansiveButton(
     enabled: Boolean = true,
     /** See [ExpressiveGroupData.weight]. Ignored outside a group. */
     groupWeight: Float = 0f,
+    /**
+     * For a labelled button on a row of its own: rests at its natural width on the row's start
+     * edge (left in LTR, right in RTL) and, pressed, widens to fill the row. False keeps the
+     * small [ExpressivePressGrowth] push, which is what an icon-only button or a button that
+     * shares its row with other content wants -- stretching those would squeeze the neighbours.
+     * Ignored inside a group, where the group's own layout decides.
+     */
+    fillOnPress: Boolean = false,
     content: @Composable () -> Unit,
 ) {
     val press by expressivePressFraction(interactionSource, enabled)
@@ -327,9 +335,15 @@ fun SafeExpansiveButton(
                 measurables.map { it.measure(naturalConstraints) }
                     .also { naturals.widths = intArrayOf(it.maxOf { pl -> pl.width }) }
             } else {
-                val target = (cached * (1f + ExpressivePressGrowth * p)).roundToInt()
-                    .coerceAtMost(if (constraints.hasBoundedWidth) constraints.maxWidth else Int.MAX_VALUE)
-                    .coerceAtLeast(0)
+                val room = if (constraints.hasBoundedWidth) constraints.maxWidth else Int.MAX_VALUE
+                // Filling needs a real edge to fill to; on an unbounded axis (a horizontally
+                // scrolling row) there is none, so it falls back to the small push.
+                val grown = if (fillOnPress && constraints.hasBoundedWidth) {
+                    cached + ((room - cached) * p.coerceIn(0f, 1f)).roundToInt()
+                } else {
+                    (cached * (1f + ExpressivePressGrowth * p)).roundToInt()
+                }
+                val target = grown.coerceAtMost(room).coerceAtLeast(0)
                 measurables.map { it.measure(constraints.copy(minWidth = target, maxWidth = target)) }
             }
             // Stacked at the origin, like the Box this replaced: a handful of call sites emit

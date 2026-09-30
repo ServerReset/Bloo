@@ -391,6 +391,10 @@ class SettingsStore(internal val context: Context) {
          *  [com.bloo.bluelink.data.LiveCharge]'s class doc for what that
          *  means precisely and how to verify it's actually working. */
         val charging: Boolean = true,
+        /** Which look the charging notification takes. False (the default) is the full-width
+         *  bar layout; true hands it to the system's own Live Update style, which is the ONLY
+         *  way to get the Android 16 status-bar chip -- a custom layout cannot be promoted. */
+        val liveChargeSystemStyle: Boolean = false,
         /** Notification when the car's engine is started. */
         val carStarted: Boolean = true,
         /** Notification when charging is complete. */
