@@ -9,7 +9,6 @@ import kotlinx.coroutines.launch
 import com.bloo.bluelink.data.setDoorOpenMinutes
 import com.bloo.bluelink.data.setNotifyCarStarted
 import com.bloo.bluelink.data.setNotifyChargeComplete
-import com.bloo.bluelink.data.setLiveChargeSystemStyle
 import com.bloo.bluelink.data.setNotifyAutoLock
 import com.bloo.bluelink.data.setNotifyCharging
 import com.bloo.bluelink.data.setNotifyDoor
@@ -54,11 +53,6 @@ fun AppViewModel.setNotifyCharging(v: Boolean) = viewModelScope.launch {
 fun AppViewModel.setNotifyCarStarted(v: Boolean) = viewModelScope.launch { settingsStore.setNotifyCarStarted(v) }
 
 fun AppViewModel.setNotifyChargeComplete(v: Boolean) = viewModelScope.launch { settingsStore.setNotifyChargeComplete(v) }
-
-/** Which look the charging notification takes: the full-width bar (false) or the system Live Update
- *  style that can be promoted to the status bar (true). Re-posts nothing itself; the next poll
- *  draws it in the new style. */
-fun AppViewModel.setLiveChargeSystemStyle(v: Boolean) = viewModelScope.launch { settingsStore.setLiveChargeSystemStyle(v) }
 
 /** Whether AutoLock posts its "Locked" / "Would have locked" notification. */
 fun AppViewModel.setNotifyAutoLock(v: Boolean) = viewModelScope.launch { settingsStore.setNotifyAutoLock(v) }

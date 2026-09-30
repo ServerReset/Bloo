@@ -76,24 +76,11 @@ internal fun NotificationsCardContent(
             // First: every other switch here is an alert the user hopes never fires, while this is
             // a live surface they watch on purpose while the car charges.
             ToggleRow(
-                "Live charging bar",
+                "Live charging updates",
                 notif.charging,
-                description = "Progress, the charge limit and a Stop button, updating while the car charges.",
+                description = "A live notification with progress, the charge limit and a Stop button; on Android 16+ it also shows in the status bar.",
             ) { vm.setNotifyCharging(it) }
             ToggleRow("Charge complete", notif.chargeComplete) { vm.setNotifyChargeComplete(it) }
-            PopVisible(visible = notif.charging && advanced) {
-                SettingsSegmentedRow(
-                    label = "Charging bar look",
-                    options = listOf(
-                        SegmentOption("bar", "Full-width bar", null),
-                        SegmentOption("system", "System style", null),
-                    ),
-                    selectedKey = if (notif.liveChargeSystemStyle) "system" else "bar",
-                    description = "System style can show in the status bar on Android 16+, but the system " +
-                        "draws it, so the bar is narrower.",
-                    onSelect = { vm.setLiveChargeSystemStyle(it == "system") },
-                )
-            }
         }
         Spacer(Modifier.height(GapGroup))
 
@@ -168,7 +155,7 @@ internal fun NotificationsCardContent(
             PackageManager.PERMISSION_GRANTED
         val alarmsBlocked = autoLockOn && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
             context.getSystemService(android.app.AlarmManager::class.java)?.canScheduleExactAlarms() != true
-        val chipBlocked = notif.charging && notif.liveChargeSystemStyle && Build.VERSION.SDK_INT >= 36 &&
+        val chipBlocked = notif.charging && Build.VERSION.SDK_INT >= 36 &&
             !LiveCharge.isPromotable(context)
         if (ignored >= 0 && (backgroundBlocked || activityBlocked || alarmsBlocked || chipBlocked)) {
             Spacer(Modifier.height(GapGroup))
