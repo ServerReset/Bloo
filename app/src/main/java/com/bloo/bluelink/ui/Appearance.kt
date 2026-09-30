@@ -53,7 +53,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.ui.window.Dialog
 import androidx.compose.runtime.Composable
@@ -86,7 +85,6 @@ import kotlin.math.roundToInt
 import java.util.UUID
 import androidx.compose.ui.graphics.toArgb
 import androidx.core.graphics.toColorInt
-import com.bloo.uicommon.blockPageSwipe
 
 /**
  * A round colour swatch for the palette picker. Shows the palette's seed colour
@@ -400,7 +398,7 @@ internal fun ColorPickerCanvas(
                 .background(picked)
         )
 
-        OutlinedTextField(
+        BlooTextField(
             value = hexInput,
             onValueChange = { hexInput = it; hexError = false },
             label = { Text("Hex colour") },
@@ -409,12 +407,11 @@ internal fun ColorPickerCanvas(
             // single call site that never passed it, so it drew M3's default 4dp
             // corners directly above the "Name" field of the very dialog it lives in
             // (which does pass FieldShape). Same field, two corner radii, one dialog.
-            shape = FieldShape,
             isError = hexError,
             supportingText = if (hexError) { { Text("Not a valid colour") } } else null,
             keyboardOptions = KeyboardOptions(imeAction = androidx.compose.ui.text.input.ImeAction.Done),
             keyboardActions = KeyboardActions(onDone = { commitHex() }),
-            modifier = Modifier.fillMaxWidth().onFocusChanged { if (!it.isFocused) commitHex() }.blockPageSwipe(),
+            modifier = Modifier.fillMaxWidth().onFocusChanged { if (!it.isFocused) commitHex() },
         )
     }
 }
@@ -466,13 +463,12 @@ internal fun PaletteEditorDialog(
             }
         } else null,
         text = {
-                OutlinedTextField(
+                BlooTextField(
                     value = name,
                     onValueChange = { name = it },
                     label = { Text("Name") },
-                    modifier = Modifier.fillMaxWidth().blockPageSwipe(),
+                    modifier = Modifier.fillMaxWidth(),
                     singleLine = true,
-                    shape = FieldShape,
                 )
 
                 // Primary colour picker

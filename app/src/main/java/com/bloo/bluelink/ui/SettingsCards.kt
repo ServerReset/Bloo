@@ -41,7 +41,6 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.surfaceColorAtElevation
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -79,7 +78,6 @@ import com.bloo.bluelink.data.setPowertrain
 import com.bloo.bluelink.data.setSeatFlag
 import com.bloo.bluelink.data.setServiceIntervalMiles
 import com.bloo.bluelink.data.settingsMode
-import com.bloo.uicommon.blockPageSwipe
 
 /**
  * Ordered troubleshooting steps covering the two different ways this bar can fail to
@@ -301,13 +299,12 @@ internal fun CarSettingsCard(
         if (advanced) {
             SettingsGroup("Identity & service") {
                 SelectionContainer { StatusRow("VIN", v.vin) }
-                OutlinedTextField(
+                BlooTextField(
                     value = state.licensePlates[v.vin] ?: "",
                     onValueChange = { vm.setLicensePlate(v.vin, it) },
                     label = { Text("License plate") },
                     singleLine = true,
-                    shape = FieldShape,
-                    modifier = Modifier.fillMaxWidth().blockPageSwipe(),
+                    modifier = Modifier.fillMaxWidth(),
                 )
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     MilesField(state.lastServiceMiles[v.vin], "Last service (mi)", Modifier.weight(1f)) {
@@ -332,7 +329,7 @@ internal fun CarSettingsCard(
 @Composable
 internal fun MinutesField(initial: Int, label: String, onSet: (Int) -> Unit) {
     var text by remember(initial) { mutableStateOf(initial.toString()) }
-    OutlinedTextField(
+    BlooTextField(
         value = text,
         onValueChange = {
             text = it.filter(Char::isDigit)
@@ -340,9 +337,8 @@ internal fun MinutesField(initial: Int, label: String, onSet: (Int) -> Unit) {
         },
         label = { Text(label) },
         singleLine = true,
-        shape = FieldShape,
         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-        modifier = Modifier.fillMaxWidth().padding(top = GapRow).blockPageSwipe(),
+        modifier = Modifier.fillMaxWidth().padding(top = GapRow),
     )
 }
 
@@ -355,14 +351,13 @@ internal fun MinutesField(initial: Int, label: String, onSet: (Int) -> Unit) {
  */
 @Composable
 internal fun MilesField(value: Int?, label: String, modifier: Modifier, onSet: (Int?) -> Unit) {
-    OutlinedTextField(
+    BlooTextField(
         value = value?.toString() ?: "",
         onValueChange = { onSet(it.filter(Char::isDigit).toIntOrNull()) },
         label = { Text(label) },
         singleLine = true,
-        shape = FieldShape,
         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-        modifier = modifier.blockPageSwipe(),
+        modifier = modifier,
     )
 }
 

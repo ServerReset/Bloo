@@ -74,7 +74,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
@@ -125,7 +124,6 @@ import com.bloo.bluelink.data.setPrimaryDevice
 import com.bloo.bluelink.data.setWatchLockTiming
 import com.bloo.bluelink.data.syncDeviceName
 import com.bloo.bluelink.data.watchLockTiming
-import com.bloo.uicommon.blockPageSwipe
 
 /**
  * Multi-device Drive sync UI: the device list/reorder section, per-device row,
@@ -323,15 +321,14 @@ internal fun SyncDevicesSection(state: UiState, vm: AppViewModel) {
                 // sits on the aurora and needs its own opaque fill. "Name this device"
                 // is an ordinary form field, and it was the only one of those wearing
                 // the credential look.
-                OutlinedTextField(
+                BlooTextField(
                     value = draft,
                     onValueChange = { draft = it },
                     label = { Text("Device name") },
                     placeholder = { Text(Build.MODEL ?: "This device") },
                     singleLine = true,
-                    shape = FieldShape,
                     keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Words),
-                    modifier = Modifier.fillMaxWidth().blockPageSwipe(),
+                    modifier = Modifier.fillMaxWidth(),
                 )
             },
             buttons = {

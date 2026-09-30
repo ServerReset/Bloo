@@ -59,7 +59,6 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -88,7 +87,6 @@ import kotlin.math.max
 import android.content.ClipData
 import com.bloo.bluelink.data.platform
 import com.bloo.bluelink.data.setChargerApiKey
-import com.bloo.uicommon.blockPageSwipe
 
 /**
  * The second half of Settings' per-card content functions (Location through
@@ -146,13 +144,12 @@ internal fun LocationCardContent(appearance: SettingsStore.Appearance, vm: AppVi
         // One standard button row: the field on its own full-width line, then the app's
         // standard action buttons beneath it -- the same shape every other Settings card's
         // controls use, instead of a FlowRow of two half-width buttons.
-        OutlinedTextField(
+        BlooTextField(
             value = weatherQuery,
             onValueChange = { weatherQuery = it },
             label = { Text("City or place") },
             singleLine = true,
-            shape = FieldShape,
-            modifier = Modifier.fillMaxWidth().blockPageSwipe(),
+            modifier = Modifier.fillMaxWidth(),
             keyboardOptions = KeyboardOptions(imeAction = androidx.compose.ui.text.input.ImeAction.Search),
         )
         Spacer(Modifier.height(GapRow))
@@ -264,18 +261,17 @@ internal fun MapNavigationCardContent(appearance: SettingsStore.Appearance, vm: 
                 Spacer(Modifier.height(GapRow))
                 var keyInput by remember { mutableStateOf(appearance.chargerApiKey ?: "") }
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                    OutlinedTextField(
+                    BlooTextField(
                         value = keyInput,
                         onValueChange = { keyInput = it },
                         placeholder = { Text("Paste API key here") },
                         singleLine = true,
-                        shape = FieldShape,
                         colors = borderlessFieldColors(),
                         keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
                         keyboardActions = KeyboardActions(onDone = {
                             vm.setChargerApiKey(if (keyInput.isBlank()) null else keyInput, null)
                         }),
-                        modifier = Modifier.weight(1f).blockPageSwipe(),
+                        modifier = Modifier.weight(1f),
                     )
                     Spacer(Modifier.width(8.dp))
                     MorphTextButton(

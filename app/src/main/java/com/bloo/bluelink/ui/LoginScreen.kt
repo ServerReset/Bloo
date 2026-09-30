@@ -48,7 +48,6 @@ import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -258,12 +257,11 @@ internal fun LoginScreen(
                     ) { label ->
                         MutedText(label)
                     }
-                    OutlinedTextField(
+                    BlooTextField(
                         value = email,
                         onValueChange = { email = it },
                         placeholder = { Text(emailLabel) },
                         singleLine = true,
-                        shape = FieldShape,
                         colors = fieldColors,
                         leadingIcon = { Icon(Icons.Filled.MailOutline, contentDescription = null, modifier = Modifier.size(20.dp)) },
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
@@ -271,12 +269,11 @@ internal fun LoginScreen(
                     )
 
                     MutedText("Password")
-                    OutlinedTextField(
+                    BlooTextField(
                         value = password,
                         onValueChange = { password = it },
                         placeholder = { Text("Password") },
                         singleLine = true,
-                        shape = FieldShape,
                         colors = fieldColors,
                         leadingIcon = { Icon(Icons.Filled.Lock, contentDescription = null, modifier = Modifier.size(20.dp)) },
                         trailingIcon = {
@@ -303,12 +300,11 @@ internal fun LoginScreen(
                     ) {
                         Column(verticalArrangement = Arrangement.spacedBy(GapGroup)) {
                             MutedText("Service PIN")
-                            OutlinedTextField(
+                            BlooTextField(
                                 value = pin,
                                 onValueChange = { pin = it },
                                 placeholder = { Text("Service PIN") },
                                 singleLine = true,
-                                shape = FieldShape,
                                 colors = fieldColors,
                                 trailingIcon = {
                                     MorphIconButton(onClick = { showPin = !showPin }) {
@@ -540,12 +536,11 @@ internal fun CanadaOtpDialog(otp: CanadaOtpUi, loading: Boolean, vm: AppViewMode
  */
 @Composable
 internal fun OtpCodeField(code: String, onCodeChange: (String) -> Unit) {
-    OutlinedTextField(
+    BlooTextField(
         value = code,
         onValueChange = onCodeChange,
         label = { Text("Code") },
         singleLine = true,
-        shape = FieldShape,
         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
         modifier = Modifier.fillMaxWidth(),
     )

@@ -54,7 +54,6 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -82,7 +81,6 @@ import com.bloo.bluelink.data.Powertrain
 import com.bloo.bluelink.data.platformOverridable
 import kotlin.math.max
 import com.bloo.bluelink.data.collapsedSections
-import com.bloo.uicommon.blockPageSwipe
 
 
 
@@ -490,12 +488,11 @@ internal fun PinDialogs(
                         color = scheme.onSurfaceVariant,
                     )
                     Spacer(Modifier.height(GapGroup))
-                    OutlinedTextField(
+                    BlooTextField(
                         value = currentPin,
                         onValueChange = { currentPin = sanitize(it); rejected = false },
                         placeholder = { Text("Current PIN") },
                         singleLine = true,
-                        shape = FieldShape,
                         // borderlessFieldColors(), like every other PIN entry in the app (the
                         // lock screen's field, onboarding's set-a-PIN pair -- and, one stage
                         // later in THIS dialog, OnboardingPinForm itself). It used to pass
@@ -522,7 +519,7 @@ internal fun PinDialogs(
                                 )
                             }
                         } else null,
-                        modifier = Modifier.fillMaxWidth().blockPageSwipe(),
+                        modifier = Modifier.fillMaxWidth(),
                     )
                 }
                 "finish" -> {

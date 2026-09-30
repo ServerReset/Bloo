@@ -33,7 +33,6 @@ import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.material3.Card
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -65,7 +64,6 @@ import com.bloo.bluelink.data.setFontChoice
 import com.bloo.bluelink.data.setShowSearch
 import com.bloo.bluelink.data.setUnitSystem
 import com.bloo.bluelink.data.unitSystem
-import com.bloo.uicommon.blockPageSwipe
 
 /** "Accounts" card content -- see the call site in [SettingsScreen] for context. */
 @Composable
@@ -115,15 +113,14 @@ internal fun AccountsCardContent(state: UiState, vm: AppViewModel) {
                         SecretRow("Password", creds.password)
                         // Kia US has no service PIN; commands are session-keyed.
                         if (creds.brand.requiresPin) {
-                            OutlinedTextField(
+                            BlooTextField(
                                 value = pin,
                                 onValueChange = { pin = it },
                                 label = { Text("Service PIN") },
                                 singleLine = true,
-                                shape = FieldShape,
                                 visualTransformation = PasswordVisualTransformation(),
                                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
-                                modifier = Modifier.fillMaxWidth().blockPageSwipe(),
+                                modifier = Modifier.fillMaxWidth(),
                             )
                         }
                         ExpressiveButtonRow(spacing = GapRow) {

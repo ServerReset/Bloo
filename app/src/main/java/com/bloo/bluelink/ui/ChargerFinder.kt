@@ -25,7 +25,6 @@ import androidx.compose.material.icons.filled.EvStation
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -115,12 +114,11 @@ internal fun ChargerFilterBar(
                 // so a good key clears this error on the very next frame.
                 var apiKeyInput by remember(error) { mutableStateOf("") }
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                    OutlinedTextField(
+                    BlooTextField(
                         value = apiKeyInput,
                         onValueChange = { apiKeyInput = it },
                         placeholder = { Text("Paste API key") },
                         singleLine = true,
-                        shape = FieldShape,
                         colors = borderlessFieldColors(),
                         keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
                         keyboardActions = KeyboardActions(onDone = {

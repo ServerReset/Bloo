@@ -53,7 +53,6 @@ import androidx.compose.ui.semantics.onClick
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -315,24 +314,22 @@ internal fun OnboardingPinForm(
         pin == confirm
     val sanitize: (String) -> String = { it.take(PinCrypto.PIN_MAX_DIGITS).filter { ch -> ch.isDigit() } }
     Column(modifier, verticalArrangement = Arrangement.spacedBy(GapRow)) {
-        OutlinedTextField(
+        BlooTextField(
             value = pin,
             onValueChange = { pin = sanitize(it); attempted = false },
             placeholder = { Text("4–8 digit PIN") },
             singleLine = true,
-            shape = FieldShape,
             colors = borderlessFieldColors(),
             visualTransformation = PasswordVisualTransformation(),
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
             isError = attempted && pin.isNotEmpty() && pin.length < PinCrypto.PIN_MIN_DIGITS,
             modifier = Modifier.fillMaxWidth(),
         )
-        OutlinedTextField(
+        BlooTextField(
             value = confirm,
             onValueChange = { confirm = sanitize(it); attempted = false },
             placeholder = { Text("Confirm PIN") },
             singleLine = true,
-            shape = FieldShape,
             colors = borderlessFieldColors(),
             visualTransformation = PasswordVisualTransformation(),
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),

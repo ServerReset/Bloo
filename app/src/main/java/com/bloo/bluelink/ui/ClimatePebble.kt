@@ -56,7 +56,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -107,7 +106,6 @@ import com.bloo.bluelink.data.climatePresets
 import com.bloo.bluelink.data.deleteClimatePreset
 import com.bloo.bluelink.data.saveClimatePreset
 import com.bloo.bluelink.data.settingsMode
-import com.bloo.uicommon.blockPageSwipe
 import com.bloo.bluelink.data.TempValue
 
 
@@ -591,13 +589,12 @@ internal fun ClimatePebble(
                 icon = Icons.Filled.Thermostat,
                 title = "Save preset",
                 text = {
-                    OutlinedTextField(
+                    BlooTextField(
                         value = presetName,
                         onValueChange = { presetName = it },
                         label = { Text("Name") },
                         singleLine = true,
-                        shape = FieldShape,
-                        modifier = Modifier.fillMaxWidth().blockPageSwipe(),
+                        modifier = Modifier.fillMaxWidth(),
                     )
                 },
                 buttons = {

@@ -43,7 +43,6 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -280,7 +279,7 @@ internal fun SettingsSearchResults(
         val st = state.statusFor(v)
         val plate = state.licensePlates[v.vin] ?: ""
         add("License plate · ${v.name}", "plate licence registration ${v.name} $plate") {
-            OutlinedTextField(
+            BlooTextField(
                 value = plate,
                 onValueChange = { vm.setLicensePlate(v.vin, it) },
                 label = { Text("License plate") },

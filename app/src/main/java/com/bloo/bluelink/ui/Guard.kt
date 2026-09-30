@@ -52,7 +52,6 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -346,12 +345,11 @@ internal fun LockOverlay(vm: AppViewModel, opaqueBackdrop: Boolean = false) {
                             }
                         }
                         Spacer(Modifier.height(GapSection))
-                        OutlinedTextField(
+                        BlooTextField(
                             value = pin,
                             onValueChange = { pin = it.take(PinCrypto.PIN_MAX_DIGITS).filter { ch -> ch.isDigit() } },
                             placeholder = { Text("4–8 digit PIN") },
                             singleLine = true,
-                            shape = FieldShape,
                             colors = borderlessFieldColors(),
                             visualTransformation = PasswordVisualTransformation(),
                             keyboardOptions = KeyboardOptions(
