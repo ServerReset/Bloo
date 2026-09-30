@@ -65,6 +65,7 @@ import com.bloo.bluelink.data.setFontChoice
 import com.bloo.bluelink.data.setShowSearch
 import com.bloo.bluelink.data.setUnitSystem
 import com.bloo.bluelink.data.unitSystem
+import com.bloo.uicommon.blockPageSwipe
 
 /** "Accounts" card content -- see the call site in [SettingsScreen] for context. */
 @Composable
@@ -122,7 +123,7 @@ internal fun AccountsCardContent(state: UiState, vm: AppViewModel) {
                                 shape = FieldShape,
                                 visualTransformation = PasswordVisualTransformation(),
                                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
-                                modifier = Modifier.fillMaxWidth(),
+                                modifier = Modifier.fillMaxWidth().blockPageSwipe(),
                             )
                         }
                         ExpressiveButtonRow(spacing = GapRow) {

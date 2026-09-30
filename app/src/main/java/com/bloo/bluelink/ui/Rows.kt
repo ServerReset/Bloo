@@ -118,6 +118,7 @@ import kotlinx.coroutines.withContext
 import kotlin.math.max
 import com.bloo.uicommon.ReorderColumn
 import com.bloo.bluelink.data.platform
+import com.bloo.uicommon.blockPageSwipe
 
 /**
  * Lightweight, crash-free crop: pinch-zoom + drag the picked image inside a 16:9
@@ -466,7 +467,7 @@ internal fun SettingsCaption(
 @Composable
 private fun Modifier.hapticToggleable(checked: Boolean, onChange: (Boolean) -> Unit): Modifier {
     val haptics = LocalHaptics.current
-    return toggleable(
+    return blockPageSwipe().toggleable(
         value = checked,
         interactionSource = remember { MutableInteractionSource() },
         indication = null,

@@ -88,6 +88,7 @@ import kotlin.math.max
 import android.content.ClipData
 import com.bloo.bluelink.data.platform
 import com.bloo.bluelink.data.setChargerApiKey
+import com.bloo.uicommon.blockPageSwipe
 
 /**
  * The second half of Settings' per-card content functions (Location through
@@ -150,7 +151,7 @@ internal fun LocationCardContent(appearance: SettingsStore.Appearance, vm: AppVi
             label = { Text("City or place") },
             singleLine = true,
             shape = FieldShape,
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier.fillMaxWidth().blockPageSwipe(),
             keyboardOptions = KeyboardOptions(imeAction = androidx.compose.ui.text.input.ImeAction.Search),
         )
         Spacer(Modifier.height(GapRow))
@@ -273,7 +274,7 @@ internal fun MapNavigationCardContent(appearance: SettingsStore.Appearance, vm: 
                         keyboardActions = KeyboardActions(onDone = {
                             vm.setChargerApiKey(if (keyInput.isBlank()) null else keyInput, null)
                         }),
-                        modifier = Modifier.weight(1f),
+                        modifier = Modifier.weight(1f).blockPageSwipe(),
                     )
                     Spacer(Modifier.width(8.dp))
                     MorphTextButton(

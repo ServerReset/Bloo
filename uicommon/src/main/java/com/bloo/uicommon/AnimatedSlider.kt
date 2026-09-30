@@ -175,6 +175,7 @@ fun AnimatedSlider(
 
     Box(
         Modifier
+            .blockPageSwipe()
             .fillMaxWidth()
             .height(thumbH)
             // No motion blur. A BlurEffect over the whole control during the post-release

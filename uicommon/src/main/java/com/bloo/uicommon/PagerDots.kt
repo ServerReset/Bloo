@@ -169,6 +169,7 @@ fun PagerDots(
         }
         Box(
             modifier = Modifier
+                .blockPageSwipe()
                 .then(
                     if (onRefresh != null) {
                         Modifier.pointerInput(Unit) {

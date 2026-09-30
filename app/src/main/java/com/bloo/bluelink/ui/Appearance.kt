@@ -86,6 +86,7 @@ import kotlin.math.roundToInt
 import java.util.UUID
 import androidx.compose.ui.graphics.toArgb
 import androidx.core.graphics.toColorInt
+import com.bloo.uicommon.blockPageSwipe
 
 /**
  * A round colour swatch for the palette picker. Shows the palette's seed colour
@@ -413,7 +414,7 @@ internal fun ColorPickerCanvas(
             supportingText = if (hexError) { { Text("Not a valid colour") } } else null,
             keyboardOptions = KeyboardOptions(imeAction = androidx.compose.ui.text.input.ImeAction.Done),
             keyboardActions = KeyboardActions(onDone = { commitHex() }),
-            modifier = Modifier.fillMaxWidth().onFocusChanged { if (!it.isFocused) commitHex() },
+            modifier = Modifier.fillMaxWidth().onFocusChanged { if (!it.isFocused) commitHex() }.blockPageSwipe(),
         )
     }
 }
@@ -469,7 +470,7 @@ internal fun PaletteEditorDialog(
                     value = name,
                     onValueChange = { name = it },
                     label = { Text("Name") },
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier.fillMaxWidth().blockPageSwipe(),
                     singleLine = true,
                     shape = FieldShape,
                 )

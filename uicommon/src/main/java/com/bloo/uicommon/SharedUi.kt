@@ -6,7 +6,9 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
@@ -54,4 +56,19 @@ fun rememberConfirmArm(resetMillis: Long = 4000L): ConfirmArm {
         }
     }
     return ConfirmArm(armed = armed, arm = { armed = true })
+}
+
+/**
+ * Marks a control as the thing a sideways drag belongs to: the drag is consumed here, so the
+ * pager that holds the page never sees it and does not flip. Everything WITHOUT this modifier
+ * lets a horizontal swipe change pages, which is the point -- the app pages from anywhere, and
+ * only buttons, sliders, toggles, segmented controls, scrubbers and text fields opt out, because
+ * a finger that lands on one of those is aiming at it, not at the page.
+ *
+ * Put it OUTSIDE the control's own gesture handling: pointer events reach inner modifiers first,
+ * so a control that claims the drag itself (a slider) still does, and this only takes what is
+ * left. Vertical drags are untouched, so a scrollable parent still scrolls over the control.
+ */
+fun Modifier.blockPageSwipe(): Modifier = pointerInput(Unit) {
+    detectHorizontalDragGestures { change, _ -> change.consume() }
 }

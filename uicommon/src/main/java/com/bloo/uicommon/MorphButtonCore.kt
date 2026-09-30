@@ -165,7 +165,7 @@ fun MorphButtonCore(
     // measured AFTER, and against, the size this Box got from its real content,
     // so the chrome always exactly covers the button without ever contributing
     // to -- or inflating -- its size.
-    Box(modifier = modifier, contentAlignment = Alignment.Center) {
+    Box(modifier = modifier.blockPageSwipe(), contentAlignment = Alignment.Center) {
         MorphChrome(
             pressed = pressed,
             active = active,

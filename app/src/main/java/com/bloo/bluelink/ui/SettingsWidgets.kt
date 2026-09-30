@@ -82,6 +82,7 @@ import com.bloo.bluelink.data.Powertrain
 import com.bloo.bluelink.data.platformOverridable
 import kotlin.math.max
 import com.bloo.bluelink.data.collapsedSections
+import com.bloo.uicommon.blockPageSwipe
 
 
 
@@ -519,7 +520,7 @@ internal fun PinDialogs(
                                 )
                             }
                         } else null,
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier.fillMaxWidth().blockPageSwipe(),
                     )
                 }
                 "finish" -> {

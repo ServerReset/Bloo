@@ -89,18 +89,6 @@ internal fun Modifier.carSwipe(onSwipeCar: (Int) -> Unit): Modifier = pointerInp
     }
 }
 
-/**
- * Swallows horizontal drags so they never reach an ancestor horizontal pager. Put on each pebble
- * card in a car's page so a sideways drag on a pebble does NOT flip to the next car, while the
- * gaps BETWEEN pebbles and the hero card (neither of which carries this) still do -- requested
- * directly: "you can only change the pages of cars when you're swiping between pebbles or on the
- * hero card." Vertical drags pass through untouched, so the list still scrolls, and a child that
- * owns the gesture (a temperature slider) still consumes it before this sees it.
- */
-internal fun Modifier.consumeHorizontalDrags(): Modifier = pointerInput(Unit) {
-    detectHorizontalDragGestures { change, _ -> change.consume() }
-}
-
 // --- Full detail ----------------------------------------------------------
 
 /**
@@ -160,13 +148,7 @@ internal fun VehicleDetailContent(
             // ExpandedCar -- which did put "controls" back on screen, but ALSO
             // surfaced the wide-layout-only "Add a pebble" drag target above the hero
             // card, on every phone, reported directly as the layout looking wrong.
-            // Scoped to the pebble list: on the phone's car pages, an OPEN pebble's body
-            // swallows horizontal drags, so a sideways drag inside it does not flip to the next
-            // car. Every pebble's header row still changes cars, expanded or not, and the hero's
-            // photo is unblocked too -- see LocalBlockBodyPageSwipe.
-            CompositionLocalProvider(LocalBlockBodyPageSwipe provides true) {
-                PebbleList(v, state, vm, pinHotspot = false, onExpand = onExpand)
-            }
+            PebbleList(v, state, vm, pinHotspot = false, onExpand = onExpand)
             // Reserves exactly as much room as the floating search bubble (SearchLayer, mounted
             // globally for Screen.Garage -- see Screens.kt's `searchable` gate) actually needs,
             // read live off its own reported bounds -- not a flat guessed height. A guess here

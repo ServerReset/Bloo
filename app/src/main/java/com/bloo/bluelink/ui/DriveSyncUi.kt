@@ -128,6 +128,7 @@ import com.bloo.bluelink.data.setPrimaryDevice
 import com.bloo.bluelink.data.setWatchLockTiming
 import com.bloo.bluelink.data.syncDeviceName
 import com.bloo.bluelink.data.watchLockTiming
+import com.bloo.uicommon.blockPageSwipe
 
 /**
  * Multi-device Drive sync UI: the device list/reorder section, per-device row,
@@ -328,7 +329,7 @@ internal fun SyncDevicesSection(state: UiState, vm: AppViewModel) {
                     singleLine = true,
                     shape = FieldShape,
                     keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Words),
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier.fillMaxWidth().blockPageSwipe(),
                 )
             },
             buttons = {

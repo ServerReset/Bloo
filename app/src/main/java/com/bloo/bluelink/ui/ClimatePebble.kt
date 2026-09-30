@@ -107,6 +107,7 @@ import com.bloo.bluelink.data.climatePresets
 import com.bloo.bluelink.data.deleteClimatePreset
 import com.bloo.bluelink.data.saveClimatePreset
 import com.bloo.bluelink.data.settingsMode
+import com.bloo.uicommon.blockPageSwipe
 
 
 // --- Climate --------------------------------------------------------------
@@ -572,7 +573,7 @@ internal fun ClimatePebble(
                         label = { Text("Name") },
                         singleLine = true,
                         shape = FieldShape,
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier.fillMaxWidth().blockPageSwipe(),
                     )
                 },
                 buttons = {

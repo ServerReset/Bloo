@@ -79,6 +79,7 @@ import com.bloo.bluelink.data.setPowertrain
 import com.bloo.bluelink.data.setSeatFlag
 import com.bloo.bluelink.data.setServiceIntervalMiles
 import com.bloo.bluelink.data.settingsMode
+import com.bloo.uicommon.blockPageSwipe
 
 /**
  * Ordered troubleshooting steps covering the two different ways this bar can fail to
@@ -326,7 +327,7 @@ internal fun CarSettingsCard(
                     label = { Text("License plate") },
                     singleLine = true,
                     shape = FieldShape,
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier.fillMaxWidth().blockPageSwipe(),
                 )
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     MilesField(state.lastServiceMiles[v.vin], "Last service (mi)", Modifier.weight(1f)) {
@@ -361,7 +362,7 @@ internal fun MinutesField(initial: Int, label: String, onSet: (Int) -> Unit) {
         singleLine = true,
         shape = FieldShape,
         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-        modifier = Modifier.fillMaxWidth().padding(top = GapRow),
+        modifier = Modifier.fillMaxWidth().padding(top = GapRow).blockPageSwipe(),
     )
 }
 
@@ -381,7 +382,7 @@ internal fun MilesField(value: Int?, label: String, modifier: Modifier, onSet: (
         singleLine = true,
         shape = FieldShape,
         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-        modifier = modifier,
+        modifier = modifier.blockPageSwipe(),
     )
 }
 

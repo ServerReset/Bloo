@@ -133,7 +133,7 @@ fun MorphSegmented(
     // Slightly less rounded than before (was 20.dp) -- a small tune-down per feedback.
     val trackShape = RoundedCornerShape(16.dp)
     Box(
-        modifier = modifier.fillMaxWidth().clip(trackShape).background(containerColor)
+        modifier = modifier.blockPageSwipe().fillMaxWidth().clip(trackShape).background(containerColor)
             .then(if (borderColor != null) Modifier.border(BorderStroke(1.dp, borderColor), trackShape) else Modifier),
     ) {
         // BoxWithConstraints exposes maxWidth (the available width after trackPad is

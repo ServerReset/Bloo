@@ -85,6 +85,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.bloo.bluelink.data.platform
+import com.bloo.uicommon.blockPageSwipe
 
 /**
  * Small shared composables built on UiTokens' design tokens: text styles, icon badges,
@@ -339,7 +340,7 @@ internal fun Modifier.hapticClickable(
     onClick: () -> Unit,
 ): Modifier {
     val haptics = LocalHaptics.current
-    return noRippleClickable(onClickLabel) { haptics?.click(); onClick() }
+    return blockPageSwipe().noRippleClickable(onClickLabel) { haptics?.click(); onClick() }
 }
 
 /**
