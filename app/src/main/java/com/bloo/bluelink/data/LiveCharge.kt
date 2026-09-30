@@ -90,14 +90,6 @@ object LiveCharge {
     // heads-up peek) while still clearing promotion condition 9 above with a
     // full step to spare.
     private const val CHANNEL = "bloo_live_charge"
-    // Two earlier ids for this exact channel, from before it had this name -- each rename
-    // was to change channel properties (importance, mainly), which Android only reads at
-    // creation and never updates on an existing channel id. Neither rename deleted the old
-    // channel, so a device that has had this feature installed since either earlier version
-    // is carrying dead duplicates: the OS-level Notifications screen lists all three under
-    // "Charging" with nothing to tell them apart, and the two orphans can never post again.
-    // Deleted below, once, the first time [ensureChannel] runs after this fix ships.
-    private val LEGACY_CHANNELS = listOf("bloo_charging", "bloo_charging_v2")
     private const val ACCENT = BlooColors.brandAccent
     // The one shared charge green (BlooColors.chargeGreen), used by every charge readout on the
     // phone. This used to be its own 0xFF34C759 -- a brighter,
@@ -130,11 +122,6 @@ object LiveCharge {
             // No launcher badge: a persistent live-progress bar shouldn't dot the app icon.
             showBadge = false,
         )
-        val mgr = context.getSystemService(NotificationManager::class.java)
-        // Cheap once this device's orphans are gone: deleteNotificationChannel is a
-        // no-op (not an error) for an id that doesn't exist, so this never needs its
-        // own "already cleaned up" flag. No SDK guard (channels are O+, minSdk 26).
-        LEGACY_CHANNELS.forEach { legacyId -> runCatching { mgr.deleteNotificationChannel(legacyId) } }
     }
 
     /** Clears every car's live-charge notification at once -- used when the

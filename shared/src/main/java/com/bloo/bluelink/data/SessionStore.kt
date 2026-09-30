@@ -65,15 +65,13 @@ class SessionStore(private val context: Context) {
     }
 
     /**
-     * Reads back one brand's session, running [migrateLegacy] first in case this is
-     * the first access since an upgrade from the old single-session layout. Returns
+     * Reads back one brand's session. Returns
      * null (meaning "not logged in for this brand") if any of the three required
      * fields — access token, username, pin — is missing, rather than returning a
      * half-populated [Session].
      */
     suspend fun load(brand: Brand): Session? {
         StartupTrace.markIfStarting("SessionStore.load(${brand.name}): begin")
-        migrateLegacy()
         val p = context.dataStore.data.first()
         val access = p[key(brand, "access")] ?: return null
         val username = p[key(brand, "username")] ?: return null
@@ -97,7 +95,6 @@ class SessionStore(private val context: Context) {
      * [Brand] constant instead of throwing.
      */
     suspend fun loggedInBrands(): List<Brand> {
-        migrateLegacy()
         return context.dataStore.data.first()[brandsKey]
             ?.split(",")?.mapNotNull { runCatching { Brand.valueOf(it) }.getOrNull() } ?: emptyList()
     }
@@ -131,41 +128,5 @@ class SessionStore(private val context: Context) {
     /** Wipes the entire session DataStore — every brand signed out. */
     suspend fun clearAll() {
         context.dataStore.edit { it.clear() }
-    }
-
-    /** Migrate the old single-session keys into the per-brand layout (one-shot). */
-    private suspend fun migrateLegacy() {
-        // Quick short-circuit so a call with nothing to migrate skips opening a
-        // transaction at all. The actual migration re-reads everything from
-        // the transaction's own state (`e`), not this outer snapshot -- it
-        // used to copy the remaining legacy fields from this stale `p` read
-        // even inside edit{}, so a second migrateLegacy() racing a concurrent
-        // updateAccessToken() (SessionStore is constructed fresh in several
-        // places that can run at once) could re-write a stale legacy-derived
-        // token over one that was just updated.
-        //
-        // Mechanism: first does a cheap outer read to check whether the legacy
-        // unprefixed "access_token" key still exists at all; if not, this device has
-        // already been migrated (or was never on the old scheme) and nothing further
-        // happens. If it does exist, opens one `edit` transaction, re-reads the legacy
-        // fields from that transaction's own snapshot `e` (not the outer `p`, to avoid
-        // the stale-overwrite race described above), copies each present legacy field
-        // to its brand-namespaced key, seeds `brandsKey` with just that one brand
-        // (single-account legacy sessions only ever had one brand), and finally
-        // removes all five legacy keys so `access_token` is gone and this method
-        // becomes a no-op the next time it runs.
-        if (context.dataStore.data.first()[stringPreferencesKey("access_token")] == null) return
-        context.dataStore.edit { e ->
-            val legacyAccess = e[stringPreferencesKey("access_token")] ?: return@edit
-            val brand = Brand.fromName(e[stringPreferencesKey("brand")])
-            e[key(brand, "access")] = legacyAccess
-            e[stringPreferencesKey("refresh_token")]?.let { e[key(brand, "refresh")] = it }
-            e[stringPreferencesKey("username")]?.let { e[key(brand, "username")] = it }
-            e[stringPreferencesKey("pin")]?.let { e[key(brand, "pin")] = it }
-            e[brandsKey] = brand.name
-            listOf("access_token", "refresh_token", "username", "pin", "brand").forEach {
-                e.remove(stringPreferencesKey(it))
-            }
-        }
     }
 }

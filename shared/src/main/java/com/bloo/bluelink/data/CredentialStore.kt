@@ -52,14 +52,11 @@ class CredentialStore(context: Context) {
 
     /**
      * Persists [credentials] under brand-prefixed keys (e.g. "HYUNDAI_email") so
-     * multiple brands' accounts coexist in the same prefs file. Runs [migrateLegacy]
-     * first in case this is the first write since an app upgrade from the old
-     * single-account key scheme. Adds the brand's name to the [KEY_BRANDS] set (used
+     * multiple brands' accounts coexist in the same prefs file. Adds the brand's name to the [KEY_BRANDS] set (used
      * by [loadAll]/[brandSet] to know which brands have stored credentials) and writes
      * everything in one `apply()` batch.
      */
     fun save(credentials: Credentials) {
-        migrateLegacy()
         val b = credentials.brand.name
         val brands = brandSet().toMutableSet().apply { add(b) }
         prefs.edit()
@@ -78,7 +75,6 @@ class CredentialStore(context: Context) {
      * [Credentials] with blank fields.
      */
     fun load(brand: Brand): Credentials? {
-        migrateLegacy()
         val b = brand.name
         val email = prefs.getString("${b}_email", null) ?: return null
         val password = prefs.getString("${b}_password", null) ?: return null
@@ -99,7 +95,6 @@ class CredentialStore(context: Context) {
     fun loadAll(): List<Credentials> = cachedAccounts ?: loadAllUncached().also { cachedAccounts = it }
 
     private fun loadAllUncached(): List<Credentials> {
-        migrateLegacy()
         return brandSet().mapNotNull { name ->
             runCatching { Brand.valueOf(name) }.getOrNull()?.let { load(it) }
         }
@@ -178,28 +173,6 @@ class CredentialStore(context: Context) {
     // loadAll()/save()/clear() bookkeeping. Falls back to emptySet() because
     // getStringSet can return null if the key was never written.
     private fun brandSet(): Set<String> = prefs.getStringSet(KEY_BRANDS, emptySet()) ?: emptySet()
-
-    /**
-     * Migrate the old single-account keys into the per-brand layout (one-shot).
-     * Detects the legacy scheme by checking for a bare "email" key (no brand prefix);
-     * if absent, this is either a fresh install or an already-migrated install, so it
-     * returns immediately. Otherwise it reads the legacy "brand" key (defaulting via
-     * [Brand.fromName] if missing/unrecognized), rewrites the three legacy fields
-     * under the new brand-prefixed keys, seeds [KEY_BRANDS] with that one brand, and
-     * removes the old unprefixed keys so this block becomes a no-op on future calls.
-     */
-    private fun migrateLegacy() {
-        val email = prefs.getString("email", null) ?: return
-        val brand = Brand.fromName(prefs.getString("brand", null)).name
-        prefs.edit()
-            .putString("${brand}_email", email)
-            .putString("${brand}_password", prefs.getString("password", null))
-            .putString("${brand}_pin", prefs.getString("pin", null))
-            .putStringSet(KEY_BRANDS, setOf(brand))
-            .remove("email").remove("password").remove("pin").remove("brand")
-            .apply()
-        cachedAccounts = null
-    }
 
     private companion object {
         // Prefs key holding the Set<String> of brand names ("HYUNDAI", "KIA", ...)
