@@ -1,7 +1,6 @@
 package com.bloo.bluelink.ui
 
 import android.app.Application
-import android.location.Geocoder
 import androidx.compose.runtime.Stable
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
@@ -9,7 +8,6 @@ import com.bloo.bluelink.data.AppLog
 import com.bloo.bluelink.data.Brand
 import com.bloo.bluelink.data.CarAlerts
 import com.bloo.bluelink.data.CredentialStore
-import com.bloo.bluelink.data.LiveCharge
 import com.bloo.bluelink.data.Notifications
 import com.bloo.bluelink.data.PinLockout
 import com.bloo.bluelink.data.Credentials
@@ -19,8 +17,6 @@ import com.bloo.bluelink.data.KiaAuth
 import com.bloo.bluelink.data.KiaRepository
 import com.bloo.bluelink.data.VehicleRepository
 import com.bloo.bluelink.data.StatusCache
-import com.bloo.bluelink.data.toGeoLocation
-import com.bloo.bluelink.data.GeoLocation
 import com.bloo.bluelink.data.brand
 import com.bloo.bluelink.data.SessionStore
 import com.bloo.bluelink.data.SettingsStore
@@ -34,7 +30,6 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
@@ -103,7 +98,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     // WHOLE cold start with nothing in between, so a slow stretch anywhere inside it had no
     // way to show up in a report. Every `logStartup` call below narrows that down to one
     // specific stage instead.
-    private val coldStartAt = System.currentTimeMillis()
+    internal val coldStartAt = System.currentTimeMillis()
 
     /** Logs [message] to [AppLog] with elapsed time since this ViewModel was constructed
      *  ([coldStartAt]) -- see that property's own doc. Startup-only: nothing outside the
@@ -123,11 +118,11 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     internal val store = com.bloo.bluelink.data.StartupTrace.trace("SessionStore()") { SessionStore(app) }
     internal val settingsStore = com.bloo.bluelink.data.StartupTrace.trace("SettingsStore()") { SettingsStore(app) }
     internal val credentialStore = com.bloo.bluelink.data.StartupTrace.trace("CredentialStore()") { CredentialStore(app) }
-    private val snapshotStore = com.bloo.bluelink.data.StartupTrace.trace("SnapshotStore()") { SnapshotStore(app) }
-    private val statusCache = com.bloo.bluelink.data.StartupTrace.trace("StatusCache()") { StatusCache(app) }
+    internal val snapshotStore = com.bloo.bluelink.data.StartupTrace.trace("SnapshotStore()") { SnapshotStore(app) }
+    internal val statusCache = com.bloo.bluelink.data.StartupTrace.trace("StatusCache()") { StatusCache(app) }
     internal val ai = com.bloo.bluelink.data.StartupTrace.trace("Ai()") { com.bloo.bluelink.data.Ai(app) }
     // One repository per signed-in brand (any mix of brands can be active).
-    private val repos = mutableMapOf<Brand, VehicleRepository>()
+    internal val repos = mutableMapOf<Brand, VehicleRepository>()
 
     internal fun repoFor(brand: Brand): VehicleRepository =
         repos.getOrPut(brand) { com.bloo.bluelink.data.repositoryFor(brand, store, credentialStore) }
@@ -151,7 +146,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     /** One-shot: has [refreshLiveChargeBar] forgotten this process's live-charge
      *  dismissals yet? See that function's own comment for why. */
     @Volatile
-    private var liveChargeDismissalsResetThisSession = false
+    internal var liveChargeDismissalsResetThisSession = false
 
     /** Set to true during garage load if the app will show a lock screen, so that
      *  status fetching is deferred until after unlock (avoiding recomposition jank
@@ -208,17 +203,17 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     /** The pending "Not now" undo-window timer (see dismissUpdate). */
     internal var updateDismissJob: kotlinx.coroutines.Job? = null
 
-    private val statusInFlight = mutableSetOf<String>()
+    internal val statusInFlight = mutableSetOf<String>()
 
     /** Subset of [statusInFlight] whose call used surfaceErrors=true (drives the spinner + settle haptic). */
-    private val surfaceInFlight = mutableSetOf<String>()
+    internal val surfaceInFlight = mutableSetOf<String>()
 
     /** VINs fetched from the network this session (cache restore doesn't count). */
-    private val sessionFetched = java.util.Collections.synchronizedSet(mutableSetOf<String>())
+    internal val sessionFetched = java.util.Collections.synchronizedSet(mutableSetOf<String>())
 
     /** Guards [bootstrapDriveSync] so it starts its collector exactly once per
      *  ViewModel, no matter how many times the garage (re)loads. */
-    private val driveSyncBootstrapped = java.util.concurrent.atomic.AtomicBoolean(false)
+    internal val driveSyncBootstrapped = java.util.concurrent.atomic.AtomicBoolean(false)
 
     /** Copy-pasteable activity log shown in Settings. */
     /**
@@ -253,7 +248,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
      * visible even if the app is already in the foreground (where a system
      * notification is easy to miss). Called after every successful status load.
      */
-    private suspend fun checkAlerts(v: Vehicle, status: VehicleStatus) {
+    internal suspend fun checkAlerts(v: Vehicle, status: VehicleStatus) {
         val alerts = CarAlerts.evaluate(settingsStore, v, status)
         alerts.forEach { Notifications.post(getApplication(), it.id, it.title, it.text, it.actions, it.channelId) }
         alerts.firstOrNull()?.let { a -> _state.update { it.copy(message = a.text, messageType = "error") } }
@@ -413,733 +408,9 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     // typed into the login form travels straight through the OTP challenge.
     internal var canadaPending: Credentials? = null
 
-    /**
-     * Sign out of one brand. The server-side logout call is best-effort
-     * (`runCatching` — a failed logout call shouldn't block clearing local
-     * state), but clearing the cached credentials and dropping the brand's
-     * cached [VehicleRepository] from [repos] always happens so the app
-     * forgets that brand for good. If that was the LAST signed-in account, the
-     * whole [UiState] is replaced with a fresh one pointed at the login screen
-     * (wiping any stale per-VIN data for the signed-out cars); otherwise the
-     * garage is reloaded so it no longer shows that brand's vehicles.
-     */
-    fun logout(brand: Brand) {
-        viewModelScope.launch {
-            runCatching { repoFor(brand).logout() }
-            credentialStore.clear(brand)
-            repos.remove(brand)
-            AppLog.log("Signed out of ${brand.label}")
-            val remaining = credentialStore.loadAll()
-            if (remaining.isEmpty()) {
-                // Wipe account-derived telemetry from disk on full sign-out: the
-                // last-known car GPS/lock/charge state and reverse-geocoded place
-                // names persist as plaintext JSON and would otherwise re-load into
-                // the UI on the next cold start. Session tokens + credentials are
-                // already cleared above; this closes the derived-location leak.
-                runCatching { statusCache.clear() }
-                runCatching { snapshotStore.saveVehicles(emptyList()) }
-                // AutoLock config is account-derived too (it's keyed by VIN): a car left
-                // registered here after its account is gone means every future Bluetooth
-                // connect/disconnect this phone sees keeps checking it, forever, against a
-                // vehicle AutoLockController can now never find. See both functions' own docs.
-                runCatching {
-                    val autoLockVins = settingsStore.autoLockConfiguredVins()
-                    com.bloo.bluelink.autolock.AutoLockController.forgetAll(getApplication(), autoLockVins)
-                    settingsStore.clearAllAutoLockConfigs()
-                }
-                // `sessionFetched` is add-only and lives for the ViewModel's life, and
-                // [ensureStatus] returns immediately for any VIN in it. Left uncleared here,
-                // signing out and back in within the same process meant every car's
-                // ensureStatus short-circuited against a set describing a session whose
-                // statusCache and snapshot we had just wiped two lines above -- so the garage
-                // sat showing unknown lock, charge and range for every car, with no spinner
-                // and no error, until the user found pull-to-refresh.
-                //
-                // Belongs exactly here, beside the other two things being cleared because the
-                // account is gone.
-                sessionFetched.clear()
-                // Preserve everything that is NOT account state across the full reset.
-                //
-                // This already preserved the four device-capability probes, with a comment
-                // giving the right rule -- "they're device capabilities, not account state" --
-                // and then applied it to four fields when nine more qualify. Signing out of
-                // a car account says nothing about which Drive file this DEVICE backs up to,
-                // or whether this user picked Advanced settings.
-                //
-                // The Drive fields are the ones that actually broke something. The debounced
-                // settings push gates on `_state.value.syncUri == null` (see the
-                // dirtyKeysFlow collector), so wiping it here silently stops Drive sync for
-                // the rest of the process even though the URI is still on disk -- and
-                // `thisDeviceId`/`syncDeviceName`/`syncPrimaryId` are this device's identity
-                // in the sync registry, which a car sign-out has no business resetting.
-                // It recovers on the next sign-in, because loadGarage re-reads the store,
-                // but "recovers if you sign back in" is not the same as "works".
-                //
-                // `settingsMode` is the visible one: sign out and the Settings screen drops
-                // from Advanced back to Simple.
-                //
-                // Deliberately NOT preserved: defaultClimatePresets, which is keyed per VIN
-                // and therefore genuinely account state.
-                val keep = _state.value
-                _state.value = UiState(
-                    screen = Screen.Login,
-                    aiSupported = keep.aiSupported,
-                    aiEnabled = keep.aiEnabled,
-                    shizukuAvailable = keep.shizukuAvailable,
-                    settingsMode = keep.settingsMode,
-                    syncUri = keep.syncUri,
-                    lastSyncMs = keep.lastSyncMs,
-                    syncWifiOnly = keep.syncWifiOnly,
-                    syncError = keep.syncError,
-                    syncDevices = keep.syncDevices,
-                    syncPrimaryId = keep.syncPrimaryId,
-                    thisDeviceId = keep.thisDeviceId,
-                    syncDeviceName = keep.syncDeviceName,
-                )
-            } else {
-                _state.update { it.copy(accounts = remaining) }
-                loadGarage()
-            }
-        }
-    }
-
     // --- App PIN (device unlock PIN) -------------------------------------
 
     // --- Garage / vehicles ----------------------------------------------
-
-    /** Public entry point for a full garage (re)load, wrapped in [launchBusy]
-     *  so [UiState.loading] shows and any thrown exception becomes a snackbar. */
-    fun loadGarage() = launchBusy { loadGarageInternal() }
-
-    /** Re-entrancy guard around [loadGarageInner]: the [loadingGarage] flag
-     *  (checked/set here, not inside [loadGarageInner] itself so every caller
-     *  goes through this one gate) makes sure only one garage load runs at a
-     *  time -- e.g. a login finishing and a manual pull-to-refresh landing at
-     *  the same moment shouldn't run two overlapping fetches of every brand's
-     *  vehicle list. `@Volatile` because this can be read/written from
-     *  different coroutines dispatched onto different threads. */
-    internal suspend fun loadGarageInternal() {
-        if (loadingGarage) return
-        loadingGarage = true
-        try {
-            loadGarageInner()
-        } finally {
-            loadingGarage = false
-        }
-    }
-
-    /** Whether the device currently has a validated internet-capable network --
-     *  not just "some network interface is up", which is also true mid-captive-
-     *  portal or on a link with no actual internet behind it. Used to tell a real
-     *  API/auth failure (garageLoadError while genuinely online) apart from the
-     *  device simply having no connection at all, so the status card
-     *  GarageScreen folds in for a zero-vehicle account only shows the plain
-     *  "no connection" copy for the latter. */
-    private fun isDeviceOnline(): Boolean {
-        val cm = getApplication<Application>()
-            .getSystemService(android.content.Context.CONNECTIVITY_SERVICE) as? android.net.ConnectivityManager
-            ?: return true
-        val caps = cm.getNetworkCapabilities(cm.activeNetwork) ?: return false
-        return caps.hasCapability(android.net.NetworkCapabilities.NET_CAPABILITY_INTERNET) &&
-            caps.hasCapability(android.net.NetworkCapabilities.NET_CAPABILITY_VALIDATED)
-    }
-
-    /**
-     * Publish the last-known garage from disk, before [loadGarageInner]'s network round trip.
-     *
-     * The vehicle LIST is a network fetch, and it used to gate the garage being shown at all:
-     * a returning user watched Screen.Loading for the whole round trip. [SnapshotStore]
-     * already holds every car's identity from the last session, and [StatusCache]'s own
-     * restore (a separate launch) fills in their statuses, so there is nothing to wait for.
-     * The fetch in [loadGarageInner] replaces this with fresh data a moment later; if it
-     * fails, the cached garage stays (the better failure mode: last-known cars plus the
-     * error banner, not an empty garage).
-     *
-     * Only fires on the cold-start path (screen still Loading) and only when the resolved
-     * screen is Garage, so a first run or a car still needing its powertrain/seats set up
-     * keeps going through SyncChoice/CarSetup exactly as before.
-     */
-    private suspend fun publishCachedGarage() {
-        if (_state.value.screen != Screen.Loading) return
-        val cached = runCatching { snapshotStore.current() }.getOrNull() ?: return
-        if (cached.vehicles.isEmpty()) return
-        val cachedVehicles = cached.vehicles.map { it.toVehicle() }
-        val prefs = settingsStore.snapshot()
-        if (resolveScreen(cachedVehicles, prefs) != Screen.Garage) return
-        val cfg = perCarConfig(cachedVehicles, prefs)
-        val lastVin = settingsStore.lastVehicleVin(prefs)
-        val index = cachedVehicles.indexOfFirst { it.vin == lastVin }.let { if (it < 0) 0 else it }
-        val defaultPresets = cachedVehicles.associate { v ->
-            v.vin to (settingsStore.defaultClimatePreset(v.vin, prefs) ?: "smart")
-        }
-        _state.update {
-            cfg.apply(it).copy(
-                vehicles = cachedVehicles,
-                screen = Screen.Garage,
-                garageLoadError = null,
-                defaultClimatePresets = defaultPresets,
-            )
-        }
-        _currentIndex.value = index
-        AppLog.log("⚡ Cached garage shown before the network: ${cachedVehicles.size} vehicle(s)")
-    }
-
-    private suspend fun loadGarageInner() {
-        logStartup("loadGarageInner: started")
-        // Fire-and-forget, in parallel with the vehicle fetch below (its own
-        // viewModelScope.launch, not awaited here) -- refreshes the DEVICE's own
-        // last-known location on every cold start/app open. See refreshDeviceLocation's
-        // own doc; this is the "whenever the app... opened" half of that, refreshStatus
-        // covers "whenever the app refreshed".
-        refreshDeviceLocation()
-        com.bloo.bluelink.data.StartupTrace.markIfStarting(
-            "loadGarageInner: refreshDeviceLocation() dispatched (repos=${repos.size})",
-        )
-        // "Every minute or two while inside the app" -- reported directly, correcting
-        // the previous every-5-seconds design: started once per app open (this
-        // ViewModel's own lifetime is "inside the app"; there is no explicit stop,
-        // the same way refreshDeviceLocation's own one-shot fires have never needed
-        // one -- Android tears the subscription down with the process). See
-        // beginLiveDeviceLocation's own doc.
-        beginLiveDeviceLocation()
-        com.bloo.bluelink.data.StartupTrace.markIfStarting("loadGarageInner: live device location started")
-        // Show the last-known garage NOW, before the vehicle-list fetch below. That fetch is
-        // a network round trip and it was the gate on the garage being shown at all: the UI
-        // sat on Screen.Loading for its whole duration (measured 2.1s on the API 34
-        // emulator, and that is before the garage's own first composition). The list is
-        // already on disk from the last session -- see publishCachedGarage's own doc.
-        publishCachedGarage()
-        // Merge vehicles from every signed-in brand; one brand failing shouldn't
-        // hide the others. Track failures separately from "this account
-        // genuinely has zero vehicles" -- collapsing both into the same empty
-        // list used to make a network/API failure display as "Not signed in"
-        // or "No vehicles found", which looked like the app had silently
-        // signed the user out rather than telling them what actually happened.
-        var lastError: String? = null
-        // .toList() FIRST, so the iteration below runs over a snapshot rather than
-        // the live map. It suspends inside the loop -- statusMutex.withLock plus a
-        // network round trip per brand -- and every suspension hands the main thread
-        // to another coroutine that may mutate `repos`: logout() calls
-        // repos.remove(brand), and signing into a new brand makes repoFor() insert
-        // one. Confining the map to the main thread is not enough to make iterating
-        // it safe when the loop body suspends; that is exactly how single-threaded
-        // coroutine code still earns a ConcurrentModificationException. Signing out
-        // of one account while the garage was still loading another's cars was
-        // enough to do it.
-        //
-        // A snapshot is also the behaviour this wants: a brand signed out mid-load
-        // should not have its half-fetched vehicles land in the merged list, and a
-        // brand signed in mid-load gets its own reload from logout()/login()'s own
-        // path anyway.
-        val vehiclesFetchStartedAt = System.currentTimeMillis()
-        val fetched = repos.values.toList().flatMap { r ->
-            runCatching {
-                // Cold-start diagnostic: isolates how long THIS call spent merely waiting
-                // for statusMutex (held by some other concurrent account/status call, if
-                // anything) from how long r.vehicles() itself actually took once it had the
-                // lock -- a real device log showed loadGarageInner's own overall vehicle-list
-                // timer running ~1.5s longer than every timed sub-step inside r.vehicles()
-                // (dispatch onto IO, store.load(), the network body read) summed together,
-                // and mutex contention was one of the untimed gaps that could hide in.
-                val lockWaitStartedAt = System.currentTimeMillis()
-                statusMutex.withLock {
-                    val lockWaitMs = System.currentTimeMillis() - lockWaitStartedAt
-                    if (lockWaitMs > 200) {
-                        AppLog.log("loadGarageInner: waited ${lockWaitMs}ms for statusMutex before fetching vehicles")
-                    }
-                    r.vehicles()
-                }
-            }.getOrElse { e ->
-                // A malformed response (see ResponseFraming) would otherwise surface okio's
-                // parser text -- "Expected leading [0-9a-fA-F] character but was 0x7b" -- as the
-                // user-facing reason, which tells a person nothing. It is retried once inside the
-                // API layer; this is the wording for when the retry also fails.
-                val msg = com.bloo.bluelink.data.ResponseFraming.userMessage(e)
-                    ?: e.message
-                    ?: "Couldn't load vehicles"
-                AppLog.log("⚠ $msg")
-                lastError = msg
-                emptyList()
-            }
-        }
-        logStartup(
-            "loadGarageInner: vehicle list fetched in " +
-                "${System.currentTimeMillis() - vehiclesFetchStartedAt}ms: ${fetched.size} vehicle(s)",
-        )
-        if (fetched.isEmpty()) {
-            // Still bootstrap Drive sync on an empty/failed cold start so the
-            // restore + persisted-grant check + auto-sync collector run once this
-            // session -- bootstrapDriveSync is idempotent (AtomicBoolean guard),
-            // so the non-empty path below calling it again is a no-op.
-            bootstrapDriveSync()
-            com.bloo.bluelink.data.StartupTrace.markIfStarting("loadGarageInner: publishing empty garage")
-            _state.update {
-                it.copy(
-                    // Whatever cars are already on screen -- the cached garage published
-                    // above, if any -- rather than blanking them: a failed fetch should
-                    // leave the last-known cars visible with the error banner, not replace
-                    // a perfectly good garage with an empty one. On a genuine first run
-                    // this is still empty, so the status card is unchanged.
-                    vehicles = it.vehicles,
-                    // Garage, not a separate empty screen -- GarageScreen folds
-                    // the "no connection"/"not signed in"/"no vehicles" status
-                    // card in as a page of its own pager instead.
-                    screen = Screen.Garage,
-                    garageLoadError = lastError,
-                    garageLoadOffline = lastError != null && !isDeviceOnline(),
-                )
-            }
-            return
-        }
-        // ONE Preferences read for every per-car setting below (including vehicleOrder,
-        // right after), instead of one read per getter -- vehicleOrder used to be its own
-        // extra data.first() taken separately, one more round trip sitting directly ahead
-        // of the very snapshot meant to eliminate this class of cost on the cold-start
-        // critical path. See SettingsStore.snapshot().
-        //
-        // Taken HERE and not at the top of the function, deliberately: everything above
-        // this is network work that can take seconds, and a snapshot read before it would
-        // be stale by the time it was used if the user changed a setting meanwhile.
-        // Timed like SessionStore.load() elsewhere in this file's own history: that one
-        // turned out to take 850ms-2.9s on this same account for no visible reason, and
-        // this is the same shape of call (a suspend Preferences DataStore read) sitting
-        // directly between "vehicle list fetched" and "fetching status for" with nothing
-        // to explain a multi-second gap between them if this is where it goes too.
-        val snapshotStartedAt = System.currentTimeMillis()
-        val prefs = settingsStore.snapshot()
-        val snapshotMs = System.currentTimeMillis() - snapshotStartedAt
-        if (snapshotMs > 500) {
-            logStartup("loadGarageInner: settingsStore.snapshot() took ${snapshotMs}ms")
-        }
-        val vehicles = applyOrder(fetched, settingsStore.vehicleOrder(prefs))
-        // The 16 per-car/per-tile config fields, shared with refreshLocalCarConfig via
-        // perCarConfig so the two can't drift. firstRun's empty-collapsed rule lives inside it.
-        com.bloo.bluelink.data.StartupTrace.markIfStarting("loadGarageInner: prefs snapshot + order applied, perCarConfig starting")
-        val cfg = perCarConfig(vehicles, prefs)
-        com.bloo.bluelink.data.StartupTrace.markIfStarting("loadGarageInner: perCarConfig done")
-        // All three read the SAME prefs snapshot taken just above (the Preferences-taking
-        // overloads), not their own suspend re-fetch of the DataStore -- isCarConfigured in
-        // particular used to be one full data.first() round trip PER VEHICLE, sequentially, on
-        // the cold-start critical path (every one of them returning fields off the identical
-        // snapshot). See snapshot()'s own doc for why this is the pattern every per-car/global
-        // getter here is meant to be paired with.
-        val lastVin = settingsStore.lastVehicleVin(prefs)
-        val index = vehicles.indexOfFirst { it.vin == lastVin }.let { if (it < 0) 0 else it }
-        val screen = resolveScreen(vehicles, prefs)
-        // Folded into this SAME update rather than seedDefaultClimatePresets()'s own
-        // separate _state.update a few lines down (see that function's remaining call
-        // site inside bootstrapDriveSync for why it still exists there) -- this was one
-        // of three back-to-back UiState emissions landing in the first couple of frames
-        // right as Screen.Loading flips to Screen.Garage, each one a full recomposition
-        // pass over the newly-visible screen (UiState is diffed by its generated
-        // equals(), so any one changed field invalidates every pebble taking the whole
-        // object). vehicles/prefs are already both in scope here, so there's no reason
-        // this needs its own trip through the StateFlow at all on the cold-start path.
-        val defaultPresets = vehicles.associate { v -> v.vin to (settingsStore.defaultClimatePreset(v.vin, prefs) ?: "smart") }
-        _state.update {
-            // Shared config first, then the fields only the full garage load owns.
-            cfg.apply(it).copy(
-                vehicles = vehicles,
-                screen = screen,
-                garageLoadError = null,
-                defaultClimatePresets = defaultPresets,
-            )
-        }
-        // Startup breadcrumb: if a crash follows shortly after, CrashActivity's own report
-        // includes the tail of AppLog, so this (and "App starting" in BlooApplication.onCreate)
-        // is what tells "did this even get as far as showing the garage" apart from "crashed
-        // during the very first frame" -- something the earlier per-brand/per-car error logs
-        // in this function don't cover on their own since they only fire on FAILURE.
-        AppLog.log("✓ Garage loaded: ${vehicles.size} vehicle(s), screen=$screen")
-        val shortcutSet = cfg.shortcutSet
-        // Restores the last-selected car. This used to ride along inside the
-        // copy() above; it lives in its own flow now (see currentIndex), so it
-        // has to be set alongside rather than within.
-        _currentIndex.value = index
-        // The disk write for the whole garage. MOVED to here from just after `applyOrder`
-        // above, and the move IS a fix.
-        //
-        // Why saveVehiclesKeepingStatus and not saveVehicles: snapshotOf(v, null) knows every
-        // car's identity and nothing about its state, and saveVehicles replaces the payload
-        // wholesale -- it used to blank percent, range, lock, charge, climate, engine,
-        // location and fetchedAt for every car on disk on every cold start, login and
-        // pull-to-refresh, and fetchedAt = 0 tripped the stale gate on the way.
-        // persistSnapshots() gets the same result by passing the in-memory status cache;
-        // deliberately NOT copied here, because that cache is restored on its own
-        // viewModelScope.launch and whether it has landed by now is a race. The store carries
-        // the values forward from disk inside its own edit transaction, which has no window.
-        //
-        // Why it had to move DOWN here:
-        //
-        // snapshotOf() reads `_state.value.hasBattery(v)`, which reads the `powertrains` map
-        // that the _state.update just above is what populates. Run BEFORE it -- where this
-        // line used to be -- every car was written to disk with hasBattery = false, and
-        // keepingStatusOf carries the STATUS fields forward but not this one, so the false
-        // stuck.
-        //
-        // Every surface fed from that same file read the wrong powertrain, so an EV got its
-        // gauge labelled "Fuel" and its battery-only actions dropped.
-        // persistSnapshots() later repairs it -- but only when a status fetch actually returns
-        // something, because it sits inside `s?.let`. With cars asleep (null status) or the
-        // network down, the wrong value stood for the whole session.
-        //
-        // Still saveVehiclesKeepingStatus, and still snapshotOf(it, null): the store carries
-        // the status fields forward inside its own edit transaction, which has no race
-        // against the separately-launched cache restore. That reasoning was already right.
-        snapshotStore.saveVehiclesKeepingStatus(vehicles.map { snapshotOf(it, null, _state.value) })
-        // seedDefaultClimatePresets() used to be called here too, on EVERY non-empty garage
-        // load -- folded into the main _state.update above instead (vehicles/prefs were
-        // already in scope there, so it's the identical computation, just written into the
-        // same emission instead of a second one), so this path no longer pays for a second
-        // UiState emission. bootstrapDriveSync's own call to the same function, a few lines
-        // into the coroutine below, is unrelated to this and untouched: it runs once per
-        // PROCESS (guarded), specifically to cover a cold start whose very first garage
-        // load returned nothing at all (the empty-vehicles branch, an early return above
-        // this point) --
-        // this fold does not affect that path since it never reaches this line either.
-        // One-time: start the Drive auto-sync bootstrap + collector.
-        bootstrapDriveSync()
-        // Keep the app-icon long-press shortcuts in sync with the current cars. Dispatched
-        // off the main thread: ShortcutManagerCompat does a synchronous binder round trip per
-        // call, and this lands on the very frame the garage first draws -- it has no ordering
-        // relationship with the shortcut ROUTING below, which reads the intent that launched
-        // this Activity, not the shortcut list.
-        viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
-            runCatching { com.bloo.bluelink.Shortcuts.refresh(getApplication(), vehicles, shortcutSet) }
-        }
-        // Run any shortcut that was tapped before the garage finished loading.
-        tryRunPendingShortcut()
-        // Set the defer flag if the app is locked (or will be locked shortly by maybeRelock).
-        // This gates status fetching below -- if true, status fetches are deferred until
-        // unlocked() is called, avoiding recomposition jank that overlaps the lock-away
-        // blur animation. Check the current lock state from the updated state above.
-        val currentLocked = _state.value.locked
-        if (!currentLocked) {
-            // Unlocked session: fetch status now (no lock animation to worry about).
-            logStartup("loadGarageInner: fetching status for ${vehicles[index].name} (current car)")
-            ensureStatus(vehicles[index], logStartupTiming = true)
-            viewModelScope.launch {
-                vehicles.forEachIndexed { i, v -> if (i != index) ensureStatus(v) }
-            }
-        } else {
-            // Locked session: defer status fetching until after unlock animation completes.
-            logStartup("loadGarageInner: locked, deferring status fetch until unlock")
-            deferredStatusLoad = true
-        }
-    }
-
-    /**
-     * Re-reads this device's local per-car config (seat capability, powertrain,
-     * photo, license plate, service intervals, pebble order) for the currently
-     * loaded vehicles and folds it straight into state -- the same local reads
-     * [loadGarageInner] already does once at startup, no network call. A
-     * restored/imported settings backup only ever writes to [settingsStore]
-     * directly; without this, the already-composed UI (onboarding mid-flow, a
-     * Settings screen already open) kept showing whatever it loaded before the
-     * import, until some unrelated event happened to trigger a full reload.
-     */
-    /**
-     * Decides which screen a signed-in session with [vehicles] already loaded should land
-     * on, from a fresh [prefs] snapshot: [firstRunScreen] for a genuinely first-run device,
-     * then [Screen.CarSetup] for any vehicle that first-run screen doesn't cover (a car
-     * added since, or one a partial restore didn't configure), else straight to the garage.
-     *
-     * Shared by [loadGarageInner] (a fresh vehicle fetch, where "first run" means
-     * [Screen.SyncChoice] -- ask before assuming anything) and
-     * [restoreFromSyncThenContinue] (an import that can flip onboarding_seen/isCarConfigured
-     * without any new vehicle fetch at all -- there [firstRunScreen] is [Screen.Onboarding],
-     * so a restore that didn't actually resolve first-run status falls into the normal
-     * wizard instead of looping back to the choice the user just answered).
-     */
-    internal suspend fun resolveScreen(
-        vehicles: List<Vehicle>,
-        prefs: androidx.datastore.preferences.core.Preferences,
-        firstRunScreen: Screen = Screen.SyncChoice,
-    ): Screen {
-        val firstRun = !settingsStore.onboardingSeen(prefs)
-        val unconfiguredVins = vehicles.filter { !settingsStore.isCarConfigured(it.vin, prefs) }.map { it.vin }
-        return when {
-            firstRun -> firstRunScreen
-            unconfiguredVins.isNotEmpty() -> Screen.CarSetup(unconfiguredVins)
-            else -> Screen.Garage
-        }
-    }
-
-    /**
-     * Reads this device's 17 local per-car / per-tile config values for [vehicles] from one
-     * [prefs] snapshot and returns a UiState transform that folds them into `copy()`, plus the
-     * resolved shortcut set (the one value a caller needs OUTSIDE the copy, to re-push launcher
-     * shortcuts).
-     *
-     * This block was duplicated byte-for-byte between [loadGarageInner] and
-     * [refreshLocalCarConfig] -- all 17 vals with identical right-hand sides. The comment at the
-     * old refreshLocalCarConfig copy recorded the exact bug that duplication caused: fields it
-     * had OMITTED (pebble visibility, collapse, hotspots, tile config, shortcuts) wrote DataStore
-     * on a sync but never reached the running UiState, so "hid a pebble / moved a Quick-tile,
-     * synced, nothing changed". Two copies is how one falls behind the other; there is now one.
-     *
-     * `firstRun` -> empty collapsed set is preserved (all pebbles start expanded on first open),
-     * and callers layer their own distinct fields (loadGarageInner adds vehicles/screen/
-     * garageLoadError; refreshLocalCarConfig adds nothing) on top of the returned transform.
-     */
-    // Dispatchers.Default, same reasoning as SettingsStore.appearance's own .flowOn(Default):
-    // climatePresets(vin, prefs) below JSON-decodes each car's saved preset list, and this whole
-    // function runs right on the Loading -> Garage transition frame (loadGarageInner) or a
-    // settings-import refresh -- exactly the "decode ran on the main thread while the first
-    // frame was trying to draw" cost that fix already called out elsewhere. Everything else here
-    // is a pure, already-in-memory Preferences read (no real suspension), so hopping dispatchers
-    // once for the whole function costs one context switch, not one per getter.
-    private suspend fun perCarConfig(
-        vehicles: List<Vehicle>,
-        prefs: androidx.datastore.preferences.core.Preferences,
-    ): PerCarConfig = withContext(Dispatchers.Default) {
-        val seatConfigs = vehicles.associate { it.vin to settingsStore.seatConfig(it.vin, prefs) }
-        val powertrains = vehicles.mapNotNull { v -> settingsStore.powertrain(v.vin, prefs)?.let { v.vin to it } }.toMap()
-        val platforms = vehicles.mapNotNull { v -> settingsStore.platform(v.vin, prefs)?.let { v.vin to it } }.toMap()
-        val sectionOrders = vehicles.associate { it.vin to settingsStore.sectionOrder(it.vin, prefs) }
-        val images = vehicles.mapNotNull { v -> settingsStore.imageUrl(v.vin, prefs)?.let { v.vin to it } }.toMap()
-        val plates = vehicles.associate { it.vin to settingsStore.licensePlate(it.vin, prefs) }.filterValues { it.isNotBlank() }
-        val lastSvc = vehicles.mapNotNull { v -> settingsStore.lastServiceMiles(v.vin, prefs)?.let { v.vin to it } }.toMap()
-        val svcInterval = vehicles.mapNotNull { v -> settingsStore.serviceIntervalMiles(v.vin, prefs)?.let { v.vin to it } }.toMap()
-        val climatePresets = vehicles.associate { it.vin to settingsStore.climatePresets(it.vin, prefs) }
-        val firstRun = !settingsStore.onboardingSeen(prefs)
-        // On first open all pebbles start expanded regardless of any stored state.
-        val collapsed = if (firstRun) emptySet()
-        else vehicles.flatMap { v -> settingsStore.collapsedSections(v.vin, prefs).map { "${v.vin}:$it" } }.toSet()
-        val hotspots = vehicles.mapNotNull { v -> settingsStore.hotspots(v.vin, prefs)?.let { v.vin to it } }.toMap()
-        val shortcutSet = settingsStore.enabledShortcuts(prefs)
-        PerCarConfig(
-            apply = {
-                it.copy(
-                    seatConfigs = seatConfigs,
-                    powertrains = powertrains,
-                    platforms = platforms,
-                    sectionOrders = sectionOrders,
-                    imageUrls = images,
-                    licensePlates = plates,
-                    lastServiceMiles = lastSvc,
-                    serviceIntervalMiles = svcInterval,
-                    climatePresets = climatePresets,
-                    collapsedPebbles = collapsed,
-                    hotspotSections = hotspots,
-                    shortcutSet = shortcutSet,
-                )
-            },
-            shortcutSet = shortcutSet,
-        )
-    }
-
-    /** Result of [perCarConfig]: a UiState transform folding in the 17 config fields, plus the
-     *  shortcut set the caller needs separately for [com.bloo.bluelink.Shortcuts.refresh]. */
-    private class PerCarConfig(val apply: (UiState) -> UiState, val shortcutSet: Set<String>?)
-
-    internal suspend fun refreshLocalCarConfig() {
-        // ONE Preferences read for every per-car setting below, instead of one per
-        // getter per car. See SettingsStore.snapshot().
-        val prefs = settingsStore.snapshot()
-        val vehicles = _state.value.vehicles
-        if (vehicles.isEmpty()) return
-        com.bloo.bluelink.data.StartupTrace.markIfStarting("loadGarageInner: prefs snapshot + order applied, perCarConfig starting")
-        val cfg = perCarConfig(vehicles, prefs)
-        com.bloo.bluelink.data.StartupTrace.markIfStarting("loadGarageInner: perCarConfig done")
-        _state.update { cfg.apply(it) }
-        // Quick-tile / shortcut changes must also re-push the launcher shortcuts,
-        // exactly as loadGarageInner does, so an imported shortcut-set change is
-        // reflected in the app-icon long-press menu and not just in-app.
-        com.bloo.bluelink.Shortcuts.refresh(getApplication(), vehicles, cfg.shortcutSet)
-    }
-
-    /**
-     * One-time Drive-sync bootstrap: restore the saved sync URI / settings-mode /
-     * last-sync-time / per-car default climate presets, then start the
-     * bidirectional auto-sync collector (download-then-upload whenever a refresh
-     * settles). Guarded by [driveSyncBootstrapped] so calling this more than once
-     * (the garage can reload after a re-login) never starts a second collector.
-     *
-     * This used to be spliced into the middle of [loadStatus] — which runs on
-     * every single vehicle status fetch — so every manual refresh started a
-     * brand-new, permanent `_state.refreshing` collector that itself did a full
-     * Drive download + merge + upload. None of those collectors ever completed,
-     * so a long session accumulated an unbounded pile of them, and each later
-     * refresh fired ALL of them at once: redundant network calls and concurrent
-     * writes to the same Drive file racing each other.
-     */
-    /**
-     * Seeds [UiState.defaultClimatePresets] from the CURRENT vehicle list.
-     *
-     * Lives outside [bootstrapDriveSync] because it is per-GARAGE-LOAD work, and that function
-     * is once-per-PROCESS (an AtomicBoolean). The two were the same block, and the empty/failed
-     * cold-start path calls bootstrapDriveSync BEFORE any vehicle exists -- deliberately, so the
-     * sync collector still starts. That consumed the guard, so this map was computed from an
-     * empty list and the later call on the real load was a documented no-op: every car's default
-     * climate preset silently fell back to "smart" for the whole process, ignoring what the user
-     * had chosen, until an app restart whose first garage load happened to succeed.
-     *
-     * Two different lifetimes had been given one guard. Splitting them is the fix.
-     */
-    private suspend fun seedDefaultClimatePresets() {
-        val vehicles = _state.value.vehicles
-        if (vehicles.isEmpty()) return
-        // ONE Preferences read, not one suspend data.first() per car -- this runs right on
-        // the cold-start critical path (called from loadGarageInner immediately after the
-        // Loading -> Garage flip), the exact "N getters x N cars" shape SettingsStore.snapshot()
-        // exists to eliminate everywhere else in this file.
-        val prefs = settingsStore.snapshot()
-        val presets = vehicles.associate { v ->
-            v.vin to (settingsStore.defaultClimatePreset(v.vin, prefs) ?: "smart")
-        }
-        _state.update { it.copy(defaultClimatePresets = presets) }
-    }
-
-    private fun bootstrapDriveSync() {
-        if (!driveSyncBootstrapped.compareAndSet(false, true)) return
-        com.bloo.bluelink.data.StartupTrace.markIfStarting("bootstrapDriveSync: entered")
-        // Restore auto-sync Drive URI and last sync timestamp from preferences.
-        viewModelScope.launch {
-            // One DataStore round trip for the whole bootstrap instead of ~10
-            // sequential ones -- this runs on every cold start, so each extra
-            // suspend read here was a small, compounding hit to how fast the
-            // garage could show up.
-            val snap = settingsStore.snapshot()
-            com.bloo.bluelink.data.StartupTrace.markIfStarting("bootstrapDriveSync: prefs snapshot read")
-            val uri = settingsStore.syncUri(snap)
-            val lastSync = settingsStore.lastSyncMs(snap)
-            // Restores a failure the background periodic worker hit while the
-            // app was closed, so it's visible in Settings on next launch instead
-            // of only ever surfacing if a foreground sync happens to fail too.
-            var lastError = settingsStore.lastSyncError(snap)
-            // Proactive check: don't wait for the next sync attempt to discover
-            // the persisted grant is gone (revoked in system Settings, or the
-            // picked Drive file/folder was deleted) -- surface it the moment
-            // the app opens instead.
-            if (uri != null) {
-                val stillGranted = runCatching {
-                    getApplication<android.app.Application>().contentResolver.persistedUriPermissions.any {
-                        it.uri.toString() == uri && it.isReadPermission && it.isWritePermission
-                    }
-                }.getOrDefault(true) // Assume fine if the check itself fails; performMainToMainSync will report the real error.
-                if (!stillGranted) {
-                    lastError = "Lost access to the Drive file. Set up sync again"
-                    settingsStore.setLastSyncError(lastError)
-                }
-            }
-            val wifiOnly = settingsStore.syncWifiOnly(snap)
-            val watchLockTiming = settingsStore.watchLockTiming()
-            val settingsMode = settingsStore.settingsMode(snap)
-            // Restore the cached device registry + primary + this-device identity so
-            // Settings shows "your devices" immediately on launch, before (and even
-            // without) the first live sync of the session.
-            val cachedDevices = settingsStore.syncedDevices(snap)
-            val cachedPrimary = settingsStore.syncPrimaryDeviceId(snap)
-            // Falls back to the suspend, id-minting overload only on the rare
-            // snapshot where no device id has ever been written yet.
-            val myDeviceId = settingsStore.syncDeviceId(snap) ?: settingsStore.syncDeviceId()
-            val myDeviceName = settingsStore.syncDeviceName(snap)
-            val fileFingerprint = settingsStore.syncFileFingerprint(snap)
-            // Still seeded from here for the normal cold start (vehicles are already in state by
-            // the time this coroutine runs), and now ALSO from loadGarage so a first load that
-            // returned nothing cannot leave it empty for the process.
-            com.bloo.bluelink.data.StartupTrace.markIfStarting("seedDefaultClimatePresets: starting")
-            seedDefaultClimatePresets()
-            com.bloo.bluelink.data.StartupTrace.markIfStarting("seedDefaultClimatePresets: done")
-            _state.update {
-                it.copy(
-                    syncUri = uri, lastSyncMs = lastSync, syncError = lastError, syncWifiOnly = wifiOnly,
-                    // defaultClimatePresets is NOT set here any more -- see
-                    // seedDefaultClimatePresets. It is per-garage-load, and this block runs once
-                    // per process.
-                    settingsMode = settingsMode,
-                    syncDevices = cachedDevices, syncPrimaryId = cachedPrimary,
-                    thisDeviceId = myDeviceId, syncDeviceName = myDeviceName,
-                    watchLockTiming = watchLockTiming,
-                    syncFileFingerprint = fileFingerprint,
-                )
-            }
-        }
-        // Bidirectional auto-sync on refresh: download newer settings from Drive,
-        // then upload our current settings (merge loop for cross-device sync).
-        // The actual download/compare/import/upload sequence lives in
-        // SettingsStore.performMainToMainSync().
-        viewModelScope.launch {
-            // True only for the very first emission below (the launch-time bootstrap pass,
-            // per this block's own doc a few lines down) -- NOT for a real refresh finishing
-            // later, which should still sync immediately as before.
-            var firstPass = true
-            _state.map { it.refreshing }.distinctUntilChanged().collect { wasRefreshing ->
-                // Route through the single sync path so an imported remote is
-                // actually folded into UiState (refreshLocalCarConfig), not just
-                // lastSyncMs/syncError -- same handling as setSyncUri / syncNow.
-                if (!wasRefreshing) {
-                    if (firstPass) {
-                        firstPass = false
-                        // Give the cold-start critical path (fetching the currently-viewed
-                        // car's own status -- the fetch that gates its first-visible pebbles)
-                        // a head start before this joins the queue. performMainToMainSync
-                        // does real cross-process I/O (a Storage Access Framework round trip
-                        // to the Drive app, possibly network-bound on Drive's end) that isn't
-                        // anything the user is waiting ON at this exact moment the way the
-                        // car's own status is -- reported directly, and confirmed by a real
-                        // timed report: a plain, already-warm SessionStore.load() read (no
-                        // I/O of its own beyond an in-memory DataStore snapshot) measured at
-                        // 850ms-2.7s specifically while "Drive sync: uploaded settings" was
-                        // running concurrently, with nothing else in that window. Delaying
-                        // just this ONE bootstrap pass (not the dirty-key auto-push above, and
-                        // not a REAL refresh finishing later) keeps settings syncing on every
-                        // cold start same as before, just not competing for the first few
-                        // seconds a user is actually staring at a loading screen for.
-                        delay(DRIVE_SYNC_COLD_START_DELAY_MS)
-                    }
-                    runDriveSyncNow()
-                }
-            }
-        }
-        // Auto-push on ANY tracked change: every editTracked() that touches a
-        // portable pref (a settings toggle, a pebble/section reorder, per-car
-        // config…) appends to the dirty set, so observing it here lets sync feel
-        // automatic and seamless instead of only firing on a data refresh or the
-        // 2h worker. Debounced with a cancel-and-restart job so a burst of edits
-        // (dragging pebbles, nudging a slider) coalesces into ONE Drive write
-        // ~2s after the last change rather than hammering Drive per keystroke.
-        // Only runs when sync is configured; the download-then-upload merge in
-        // performMainToMainSync stays the single source of truth.
-        viewModelScope.launch {
-            var pushJob: kotlinx.coroutines.Job? = null
-            // No .distinctUntilChanged() here: dirtyKeysFlow already dedupes, on the key set
-            // AND a biometric of those keys' values. Deduping on the bare set a second time
-            // would re-introduce exactly what that fixes -- re-editing one key after a failed
-            // push yields an identical set, so the retry never got scheduled.
-            settingsStore.dirtyKeysFlow
-                .collect { dirty ->
-                    // Empty = nothing pending (or a sync just cleared it) — cancel any
-                    // scheduled push and wait for the next real change.
-                    if (dirty.isEmpty() || _state.value.syncUri == null) {
-                        pushJob?.cancel()
-                        return@collect
-                    }
-                    pushJob?.cancel()
-                    // viewModelScope.launch (not a bare `launch`): the collect{}
-                    // lambda's receiver is FlowCollector, not a CoroutineScope, so
-                    // the debounce job is launched on the ViewModel's own scope.
-                    pushJob = viewModelScope.launch {
-                        kotlinx.coroutines.delay(AUTO_PUSH_DEBOUNCE_MS)
-                        runDriveSyncNow()
-                    }
-                }
-        }
-
-        // Sweep car photos no pref points at any more, once per launch. The crop screen
-        // writes a fresh timestamped file each time and only overwrites the img_$vin pref,
-        // so every re-crop stranded the previous full-resolution image on disk forever.
-        //
-        // Delayed rather than immediate: this is pure housekeeping with nothing waiting on
-        // it, and launch is the one moment the process is contended (garage load, status
-        // fetches, the first Drive pass, composition). Reading DataStore and stat-ing a
-        // directory is cheap, but not free, and there is no reason for it to compete.
-        viewModelScope.launch {
-            kotlinx.coroutines.delay(PHOTO_SWEEP_DELAY_MS)
-            runCatching { settingsStore.pruneOrphanPhotos() }
-        }
-    }
 
     /**
      * Switch the visible car (swipe). Updates the index, and lazily loads this
@@ -1175,316 +446,6 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     }
     /** Back out of the expanded single-car view to the grid. */
     fun collapse() = _state.update { it.copy(expandedIndex = null) }
-
-    /**
-     * Fetches fresh status once per session. Disk-cached data is shown instantly
-     * (so no UI flash), but we still pull a live update — otherwise a warm cache
-     * would leave the garage permanently stale until a manual refresh.
-     */
-    internal fun ensureStatus(
-        v: Vehicle,
-        /** Startup-only instrumentation: when true, logs how long THIS fetch actually took
-         *  once it succeeds, so [loadGarageInner]'s own cold-start timeline can report when
-         *  the CURRENT car's status (the one gating its first-visible pebbles) was actually
-         *  ready, not just when the fetch was dispatched. Every other caller leaves this
-         *  false -- see [logStartup]'s own doc for why this isn't meaningful outside the
-         *  cold-start path. */
-        logStartupTiming: Boolean = false,
-    ) {
-        if (v.vin in sessionFetched) return
-        val startedAt = System.currentTimeMillis()
-        // Background load: log failures but don't interrupt with a toast (one
-        // flaky car shouldn't spam errors over the others).
-        loadStatus(
-            v, refresh = false, errorMessage = "Couldn't load status", surfaceErrors = false,
-            // onStatusApplied, NOT logSuccess: logSuccess only fires once loadStatus's whole
-            // function body finishes, which includes reverseGeocode -- documented as taking up
-            // to GEOCODE_TIMEOUT_MS (6 SECONDS) -- plus checkAlerts/persistCache/autoSummarize,
-            // none of which the pebbles need. onStatusApplied fires the instant the fetched
-            // status actually lands in _state, which is what "ready" needs to mean here.
-            onStatusApplied = if (logStartupTiming) {
-                {
-                    logStartup(
-                        "loadGarageInner: current car's status applied to state in " +
-                            "${System.currentTimeMillis() - startedAt}ms",
-                    )
-                }
-            } else null,
-            logSuccess = if (logStartupTiming) {
-                {
-                    "loadGarageInner: current car's status fetch FULLY done (incl. geocode/" +
-                        "alerts/persist) in ${System.currentTimeMillis() - startedAt}ms " +
-                        "(+${System.currentTimeMillis() - coldStartAt}ms since app start)"
-                }
-            } else null,
-            logStartupTiming = logStartupTiming,
-        )
-    }
-
-    fun refreshStatus(v: Vehicle) {
-        loadStatus(
-            v, refresh = true, errorMessage = "Refresh failed",
-            logSuccess = { "Status refreshed for ${v.name}" }, surfaceErrors = true,
-        )
-        // A manual pull-to-refresh is exactly the moment someone's actively
-        // looking at the app and wants everything current -- piggyback the
-        // (internally debounced, so this doesn't hammer the network on rapid
-        // refreshes) update check here instead of only ever firing once at
-        // cold start, which could go a whole session without re-checking.
-        checkForUpdate()
-        // Same reasoning: this is also exactly the moment to refresh the DEVICE's own
-        // last-known location (UiState.deviceLocation), not just the car's -- reported
-        // directly as only ever updating on the map's own one-shot fetch, never on an
-        // app refresh/open.
-        refreshDeviceLocation()
-    }
-
-    /** Shared by the cold-start check and every refreshStatus() call. Debounced/
-     *  snoozed internally (see UpdateChecker) -- safe to call as often as this is.
-     *  [force] bypasses the debounce/snooze (for a user-initiated "Check now");
-     *  [surfaceResult] reports UpToDate/Failed to the snackbar (auto checks stay silent). */
-    private fun checkForUpdate(force: Boolean = false, surfaceResult: Boolean = false) {
-        viewModelScope.launch {
-            if (surfaceResult) _state.update { it.copy(updateChecking = true) }
-            try {
-                val result = com.bloo.bluelink.update.UpdateChecker.checkPhone(getApplication(), force = force)
-                when (result) {
-                    is com.bloo.bluelink.update.UpdateCheckResult.Available -> {
-                        // Cancel the undo-window job, not just its flags. Clearing
-                        // updatePendingDismiss below without cancelling left the countdown
-                        // RUNNING, and when it elapsed it set updateTileDismissed = true and hid
-                        // the tile -- the exact opposite of what the comment a few lines down
-                        // promises ("a refresh mid-countdown just keeps the tile"). So a refresh
-                        // during the undo window appeared to keep the tile, then silently lost it
-                        // seconds later.
-                        //
-                        // undoDismissUpdate() has always done both, which is what made the
-                        // asymmetry easy to miss: the same intent expressed correctly in one place
-                        // and half-expressed in another.
-                        updateDismissJob?.cancel()
-                        _state.update {
-                            // A previously-downloaded APK is only still good if it's
-                            // for this same build -- a newer one showing up means the
-                            // cached file is stale.
-                            val sameBuild = it.updateAvailable?.run?.runNumber == result.info.run.runNumber
-                            it.copy(
-                                updateAvailable = result.info,
-                                updateApkReady = it.updateApkReady && sameBuild,
-                                // "Not now" only hides the tile until the NEXT check: any
-                                // Available result (even the same build re-found on a
-                                // refresh) clears the dismissed flag so the tile comes
-                                // back. ("Remind me" is the one that stays hidden longer —
-                                // it sets a snooze so checkPhone short-circuits to UpToDate
-                                // until the reminder worker clears it, so we never reach
-                                // this branch while snoozed.) A pending (undo-window)
-                                // dismiss is also cleared so a refresh mid-countdown just
-                                // keeps the tile.
-                                updateTileDismissed = false,
-                                updatePendingDismiss = false,
-                            )
-                        }
-                        // Tell a paired watch about the newer WATCH build (if this release
-                        // carries a watch APK) so it can offer its own update -- the watch has
-                        // no network of its own. Advertised only when a watch is actually
-                        // paired, so an unwatched phone never does the extra Data Layer work.
-                        com.bloo.bluelink.wear.WatchPresence.pushWatchUpdateAdvice(getApplication(), result.info.run)
-                        // A manual check found a newer build — the update tile appears on
-                        // the garage screen, which isn't visible from Settings, so also
-                        // confirm via the snackbar (else the button looks like a no-op).
-                        if (surfaceResult) _state.update {
-                            it.copy(message = "Update available: ${com.bloo.bluelink.data.buildLabel(result.info.run.runNumber)}", messageType = "info")
-                        }
-                    }
-                    is com.bloo.bluelink.update.UpdateCheckResult.Failed ->
-                        if (surfaceResult) _state.update { it.copy(message = "Couldn't reach GitHub to check for updates.", messageType = "error") }
-                    // else: silent -- next refresh tries again
-                    is com.bloo.bluelink.update.UpdateCheckResult.Skipped -> {
-                        // No network call happened at all (debounce or an active snooze), so
-                        // this says nothing about whether an update exists -- must NOT touch
-                        // updateAvailable. It used to arrive here as UpToDate, indistinguishable
-                        // from a genuine "checked, nothing newer" -- so a pull-to-refresh that
-                        // landed inside the previous check's 1-minute debounce window (the
-                        // common case: cold start finds an update, user immediately pulls to
-                        // refresh to confirm) cleared the tile for an update that was still
-                        // there, never actually re-verified. Reported from a real device.
-                        //
-                        // surfaceResult is effectively never true here in practice --
-                        // checkForUpdateManually always passes force = true, which bypasses the
-                        // debounce/snooze entirely -- but if that ever changes, staying silent
-                        // (like Failed's own "not force" reasoning) beats claiming a checked
-                        // result that didn't happen.
-                    }
-                    is com.bloo.bluelink.update.UpdateCheckResult.UpToDate -> {
-                        _state.update {
-                            // Never yank the tile out from under work already in
-                            // flight. A ready-to-install APK is kept for the same
-                            // reason: the user still has an Install button to press.
-                            // (This branch is now a network-VERIFIED "nothing newer" --
-                            // the debounce/snooze short-circuit moved to Skipped above --
-                            // so clearing the tile here is always a real answer, not a
-                            // guess made from silence.)
-                            if (it.updateDownloading || it.updateInstalling || it.updateApkReady) it
-                            else it.copy(updateAvailable = null, updateApkReady = false, updateTileDismissed = false)
-                        }
-                        if (surfaceResult) _state.update { it.copy(message = "You're on the latest build.", messageType = "info") }
-                    }
-                }
-            } finally {
-                if (surfaceResult) _state.update { it.copy(updateChecking = false) }
-            }
-        }
-    }
-
-    /** User-initiated "Check for updates" from Settings: forces past the debounce/
-     *  snooze and surfaces the result (up-to-date / can't-reach) to the snackbar. If a
-     *  newer build is found it just appears as the usual update tile. */
-    fun checkForUpdateManually() = checkForUpdate(force = true, surfaceResult = true)
-
-    /**
-     * Fetches one car's status. The network call funnels through [statusMutex]
-     * so they run strictly sequentially (Blue Link 502s on overlapping
-     * requests), and a (vin, refresh) already queued/running is skipped so we
-     * never pile up duplicates -- keyed on refresh too so a live pull-to-refresh
-     * isn't dropped behind an in-flight background (refresh=false) fetch.
-     */
-    private fun loadStatus(
-        v: Vehicle,
-        refresh: Boolean,
-        errorMessage: String,
-        // A lazy supplier, not a plain String: a caller timing this fetch (see ensureStatus's
-        // own logSuccess param) needs to measure elapsed time at COMPLETION, and a plain
-        // String argument is evaluated eagerly at the call site -- before the fetch this is
-        // supposedly timing has even started -- which would always read "0ms".
-        logSuccess: (() -> String)? = null,
-        surfaceErrors: Boolean = true,
-        // Fires the instant the fetched status actually lands in `_state` -- i.e. the moment
-        // a car's pebbles have real data to show -- NOT when this whole function finishes.
-        // Those are very different moments: everything after the _state.update below
-        // (persistCache, checkAlerts, autoSummarize, and especially reverseGeocode, whose own
-        // doc says it can legitimately run for GEOCODE_TIMEOUT_MS = 6 SECONDS) is bookkeeping
-        // and a "place name" label, none of which the pebbles need to render. `logSuccess`
-        // firing at the very end of this function was silently timing all of that too --
-        // ensureStatus's own cold-start instrumentation reported "current car's status ready
-        // in 5368ms" for a fetch whose actual network round trip was under 200ms, because the
-        // reported number included a full reverse-geocode lookup that happens to matter for
-        // approximately nothing the user was looking at yet.
-        onStatusApplied: (() -> Unit)? = null,
-        // Startup-only: when true, logs two extra checkpoints inside the viewModelScope.launch
-        // below -- when that coroutine actually starts running, and when it actually acquires
-        // statusMutex -- so a slow "status applied" number (measured from ensureStatus's own
-        // call, further back) can be split into "time waiting for a coroutine dispatch onto a
-        // busy Main thread" vs "time waiting for the mutex" vs "actual network+processing
-        // time", instead of one lump sum that could be any of the three.
-        logStartupTiming: Boolean = false,
-    ) {
-        val calledAt = System.currentTimeMillis()
-        // Key the in-flight set on (vin, refresh) so a user pull-to-refresh
-        // (refresh=true) is never deduped behind an already-queued background
-        // fetch (refresh=false) for the same car -- otherwise the manual call
-        // returned instantly with no spinner and no live poll.
-        val inFlightKey = "${v.vin}:$refresh"
-        synchronized(statusInFlight) {
-            if (!statusInFlight.add(inFlightKey)) return
-            if (surfaceErrors) surfaceInFlight.add(v.vin)
-        }
-        // Only show the spinner/settle-haptic for user-triggered refreshes; silent
-        // background fetches (ensureStatus) run without touching refreshing so the
-        // UI stays still and no settle haptic fires when they complete.
-        if (surfaceErrors) _state.update { it.copy(refreshing = true) }
-        viewModelScope.launch {
-            if (logStartupTiming) {
-                logStartup(
-                    "loadStatus: coroutine dispatched in ${System.currentTimeMillis() - calledAt}ms " +
-                        "(time for Main to schedule it -- a big number here means Main was busy " +
-                        "with something else, not the network)",
-                )
-            }
-            try {
-                // Only the network status() call needs the account-wide mutex
-                // (Blue Link 502s on overlapping requests). Capture the result
-                // and EXIT the lock before running the slow, purely-local
-                // follow-up work (checkAlerts' DataStore read, the blocking
-                // Geocoder) so it doesn't stall every other car's fetch and the
-                // background poller behind it.
-                val beforeLockAt = System.currentTimeMillis()
-                val s = statusMutex.withLock {
-                    if (logStartupTiming) {
-                        logStartup("loadStatus: statusMutex acquired in ${System.currentTimeMillis() - beforeLockAt}ms")
-                    }
-                    repoFor(v).status(v, refresh = refresh)
-                }
-                s?.let { status ->
-                    // The status payload carries last-known GPS for free — use
-                    // it so the map/location works without the rate-limited
-                    // findMyCar call (this is what the official app does).
-                    val statusLoc = status.toGeoLocation()
-                    _state.update { st ->
-                        st.copy(
-                            statuses = st.statuses + (v.vin to status),
-                            lastFetched = st.lastFetched + (v.vin to System.currentTimeMillis()),
-                            locations = if (statusLoc != null) {
-                                st.locations + (v.vin to statusLoc)
-                            } else st.locations,
-                        )
-                    }
-                    onStatusApplied?.invoke()
-                    persistSnapshots()
-                    persistCache()
-                    checkAlerts(v, status)
-                    // Auto-AI: refresh the summary off the new data if enabled.
-                    autoSummarize(v)
-                    statusLoc?.let { loc ->
-                        reverseGeocode(loc)?.let { place ->
-                            _state.update {
-                                it.copy(
-                                    placeNames = it.placeNames + (v.vin to place.full),
-                                    placeZips = it.placeZips + (v.vin to place.compact),
-                                )
-                            }
-                            // Re-persist. The persistCache() above ran BEFORE this geocode, and
-                            // statusCache.save writes placeNames alongside locations -- so the
-                            // cache had just paired the newest coordinates with the PREVIOUS
-                            // fetch's label, and on a car's first ever geocode with no label at
-                            // all. Next cold start then showed the wrong place, or none, beside
-                            // a correct position.
-                            //
-                            // Additive rather than moving the earlier call: that one must stay
-                            // where it is so a status still reaches disk even if the geocode
-                            // never returns (no network, unsupported locale, nothing at those
-                            // coordinates -- all routine). This second write only happens when a
-                            // label actually arrived, so the common no-location path pays nothing.
-                            persistCache()
-                        }
-                    }
-                    // Only mark fetched once a non-null status actually arrived, so
-                    // a car that returned null (e.g. asleep) is retried when viewed.
-                    sessionFetched.add(v.vin)
-                }
-                logSuccess?.let { AppLog.log(it()) }
-            } catch (e: Exception) {
-                val msg = com.bloo.bluelink.data.ResponseFraming.userMessage(e)
-                    ?: e.message
-                    ?: errorMessage
-                AppLog.log("⚠ ${v.name}: $msg")
-                if (surfaceErrors) _state.update { it.copy(message = "${v.name}: $msg", messageType = "error") }
-            } finally {
-                // Clear refreshing only when no more user-visible (surfaceErrors) fetches remain.
-                // Background fetches finishing after a user refresh must not prematurely clear
-                // the spinner or trigger the settle haptic.
-                val noMoreSurface = synchronized(statusInFlight) {
-                    statusInFlight.remove(inFlightKey)
-                    // Only clear this VIN's surface entry if THIS call added it
-                    // (surfaceErrors=true). Otherwise a concurrent background
-                    // (refresh=false) fetch for the same car -- now possible since
-                    // in-flight is keyed on (vin, refresh) -- would clobber a live
-                    // refresh's entry and clear the spinner prematurely.
-                    if (surfaceErrors) surfaceInFlight.remove(v.vin)
-                    surfaceInFlight.isEmpty()
-                }
-                if (noMoreSurface) _state.update { it.copy(refreshing = false) }
-            }
-        }
-    }
 
     /** Persist a new car display order (drag-and-drop in Settings). */
     fun reorderVehicles(order: List<Vehicle>) {
@@ -1553,70 +514,6 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     internal suspend fun persistSnapshots(vehicles: List<Vehicle> = _state.value.vehicles) {
         snapshotStore.saveVehicles(vehicles.map { snapshotOf(it, _state.value.statuses[it.vin], _state.value) })
         refreshLiveChargeBar(vehicles)
-    }
-
-    /**
-     * Brings the live-charge notification (see [LiveCharge]) in step with
-     * whatever the app itself just fetched -- otherwise only the background
-     * workers ever wrote it, and the one moment the user has the freshest
-     * data (having just pulled to refresh, standing in the app) was the one
-     * moment the bar in the shade didn't move. `LiveCharge.update` clears
-     * the bar on its own once a car isn't charging, so this also handles
-     * the instant a refresh shows charging has finished. Also kicks the
-     * 5-minute poll chain the moment the app is first to notice charging
-     * begin, instead of waiting on AlertWorker's 30-minute tick.
-     */
-    private suspend fun refreshLiveChargeBar(vehicles: List<Vehicle>) {
-        if (!settingsStore.notificationPrefs().charging) return
-        // The first time this runs in a fresh process -- cold start, including right
-        // after installing an app update, since that is also a fresh process -- forget
-        // any earlier swipe-dismiss. A dismiss exists to silence the BACKGROUND poll
-        // worker for the rest of an unattended charging session (see LiveCharge.sync's
-        // own doc: reposting behind the user's back every five minutes is exactly the
-        // annoyance it was added to stop) -- it was never meant to survive the user
-        // deliberately opening the app again. Reported from a real device: swiped the
-        // live notification away, updated the app, reopened it, and with the car still
-        // charging the whole time -- so `charging` never went false, the ONLY other
-        // place a dismissal is forgotten (see sync()'s own `!charging` branch) -- it
-        // stayed gone. Guarded per-VIN (liveChargeDismissed check before the write, not
-        // an unconditional setLiveChargeDismissed) for the same reason sync()'s own
-        // !charging branch is: skip the durable write entirely for the common case
-        // where there was nothing to clear.
-        if (!liveChargeDismissalsResetThisSession) {
-            liveChargeDismissalsResetThisSession = true
-            vehicles.forEach { v ->
-                runCatching {
-                    if (settingsStore.liveChargeDismissed(v.vin)) settingsStore.setLiveChargeDismissed(v.vin, false)
-                }
-            }
-        }
-        val statuses = _state.value.statuses
-        var anyCharging = false
-        vehicles.forEach { v ->
-            // Only cars we actually hold a status for. LiveCharge.update CANCELS the
-            // notification when told charging = false, and a missing status produced
-            // exactly that -- so opening the app before its own first fetch landed could
-            // delete a live bar a background worker had correctly posted, purely because
-            // this in-memory map was still empty. Third instance of the same mistake;
-            // AlertWorker and the 5-minute poll worker had it too.
-            //
-            // The "charging just finished" case the doc above describes still works: a
-            // fetched status that reports not-charging is present-and-false, not absent.
-            val status = statuses[v.vin] ?: return@forEach
-            val ev = status.evStatus
-            if (ev?.batteryCharge == true) anyCharging = true
-            runCatching {
-                // Five-field derivation now lives in the LiveCharge.sync(ev=...) overload.
-                LiveCharge.sync(
-                    context = getApplication(),
-                    settings = settingsStore,
-                    vin = v.vin,
-                    carName = v.name,
-                    ev = ev,
-                )
-            }
-        }
-        if (anyCharging) com.bloo.bluelink.work.LiveChargePollWorker.kick(getApplication())
     }
 
     /** Re-sort a freshly-fetched vehicle list to match the user's saved
@@ -1710,42 +607,6 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     /** Per-VIN pending debounced climate save (see saveClimateDebounced). */
     internal val climateSaveJobs = mutableMapOf<String, kotlinx.coroutines.Job>()
 
-    /**
-     * Refreshes [UiState.deviceLocation] -- the PHONE's own last-known position, not any
-     * car's. Best-effort via the same fused-location helper
-     * ([com.bloo.bluelink.autolock.LocationHelper]) used elsewhere; fails soft (leaves whatever value
-     * was already there) with no permission or no fix, the same way [locate] already
-     * treats a failed car GPS fix. Fire-and-forget: callers do not await this, since a
-     * missing/slow device fix should never hold up whatever ELSE they were doing (loading
-     * the garage, refreshing a car's status, locating the car).
-     *
-     * Called on cold start/app open ([loadGarageInner]), on every pull-to-refresh
-     * ([refreshStatus]), and again by [locate] itself -- reported directly: tapping
-     * "Locate" only ever refreshed the CAR's position, leaving this one stale until the
-     * next unrelated refresh happened to touch it.
-     */
-    internal fun refreshDeviceLocation() {
-        viewModelScope.launch {
-            val loc = com.bloo.bluelink.autolock.LocationHelper.currentLocation(getApplication()) ?: return@launch
-            _state.update {
-                it.copy(
-                    deviceLocation = GeoLocation(
-                        loc.latitude,
-                        loc.longitude,
-                        if (loc.hasSpeed()) loc.speed.toDouble() else null,
-                    ),
-                )
-            }
-            // Hands this SAME fused-location fix to the weather-follows-device path
-            // (its own persisted flag, checked inside) rather than letting it do its
-            // own separate LocationManager fetch -- see
-            // WeatherController.refreshDeviceLocationForWeather's own doc for why:
-            // reported directly as the map's device dot, the home weather card and
-            // "distance to car" not agreeing on where "here" is.
-            weather.refreshDeviceLocationForWeather(loc)
-        }
-    }
-
     internal var liveLocationJob: kotlinx.coroutines.Job? = null
 
     /** The in-flight [loadNearbyChargers] fetch, if any -- see its own doc for why a
@@ -1753,25 +614,6 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     internal var chargerJob: kotlinx.coroutines.Job? = null
 
     // beginLiveDeviceLocation / locate moved to AppViewModelCommands.kt.
-
-    /**
-     * Turn a lat/lon into a short human-readable place name (a neighbourhood or city).
-     * Null means "just don't show a place name" -- geocoding fails routinely (no
-     * network, unsupported locale, nothing at those coordinates) and no caller treats
-     * that as an error worth surfacing.
-     *
-     * Delegates to the shared [com.bloo.bluelink.data.reverseGeocode]. This was its own
-     * copy until now, using only the deprecated blocking Geocoder overload on every
-     * device, with no isPresent() check.
-     *
-     * The KDoc this replaces argued for its withTimeoutOrNull on the grounds that "the
-     * async listener API needs API 33+, and this needs to work below that" -- true of
-     * the fallback, but it meant the phone never took the 33+ path at all, and the
-     * timeout it was defending could not fire around a blocking call anyway. Both
-     * points are addressed where the implementation now lives.
-     */
-    internal suspend fun reverseGeocode(loc: GeoLocation): com.bloo.bluelink.data.GeocodedPlace? =
-        com.bloo.bluelink.data.reverseGeocode(getApplication(), loc.latitude, loc.longitude)
 
     // lock / unlock / flashLights / hornAndLights / stopClimate / startClimate /
     // toggleClimate / startCharge / stopCharge / setChargeLimits / runCommand /
@@ -1787,25 +629,6 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
      *  update every time. */
     fun setOnSettingsPageSlot(value: Boolean) {
         if (_state.value.onSettingsPageSlot != value) _state.update { it.copy(onSettingsPageSlot = value) }
-    }
-
-    /** Kept in sync by GarageScreen's own `LaunchedEffect(expandedMap.vin)` -- see
-     *  [UiState.mapExpanded]'s own doc. Guarded the same way [setOnSettingsPageSlot]
-     *  is, so panning/zooming the expanded map (which doesn't change `vin`) never
-     *  re-emits this. */
-    fun setMapExpanded(value: Boolean) {
-        if (_state.value.mapExpanded != value) _state.update { it.copy(mapExpanded = value) }
-        // The map itself just collapsed: drop whatever charger state belonged to
-        // it -- the toggle AND the fetched list/error, not just the toggle -- so
-        // the next car's map (or this same one reopened) starts completely fresh
-        // instead of `toggleChargersVisible`'s own `chargers.isEmpty()` check
-        // seeing a non-empty list left over from a DIFFERENT car's location and
-        // skipping the fetch, silently showing that other car's stations (wrong
-        // pins, wrong distances, wrong count) as though they were near this one.
-        val s = _state.value
-        if (!value && (s.chargersVisible || s.chargers.isNotEmpty() || s.chargersError != null)) {
-            _state.update { it.copy(chargersVisible = false, chargers = emptyList(), chargersError = null) }
-        }
     }
 
     // toggleChargersVisible / loadNearbyChargers / setChargerApiKey / setChargerMinKw /
@@ -1829,8 +652,6 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     internal val weather = WeatherController(getApplication(), settingsStore, _state, viewModelScope)
 
     fun clearWeatherLocation() = weather.clearWeatherLocation()
-    fun setWeatherPlace(query: String) = weather.setWeatherPlace(query)
-    fun useDeviceLocationForWeather() = weather.useDeviceLocationForWeather()
     fun loadHomeWeather(force: Boolean = false) = weather.loadHomeWeather(force)
     fun loadCarWeather(v: Vehicle, force: Boolean = false) = weather.loadCarWeather(v, force)
 
