@@ -382,19 +382,11 @@ internal fun OnboardingScreen(vm: AppViewModel) {
                     // in the app already reaches for the same component rather
                     // than a bespoke look-alike for "the quieter one."
                     // With expansion animation.
-                    val backSource = remember { MutableInteractionSource() }
-                    MorphButton(
+                    SafeMorphTextButton(
+                        text = "Back",
                         onClick = ::goBack,
-                        interactionSource = backSource,
                         modifier = Modifier.fillMaxWidth(),
-                        contentPadding = PaddingValues(vertical = GapSection),
-                        border = BorderStroke(1.dp, scheme.outlineVariant),
-                        expressive = true,
-                        fillOnPress = true,
-                        groupWeight = GroupWeightProportional,
-                    ) {
-                        Text("Back", style = ButtonLabelStyle)
-                    }
+                    )
                 }
                 val nextSource = remember { MutableInteractionSource() }
                 // The weight goes on the SafeExpansiveButton, which is the Row's actual child,
@@ -408,7 +400,6 @@ internal fun OnboardingScreen(vm: AppViewModel) {
                     enabled = !setupBlocked,
                     interactionSource = nextSource,
                     modifier = Modifier.fillMaxWidth(),
-                    contentPadding = PaddingValues(vertical = GapSection),
                     expressive = true,
                     fillOnPress = true,
                     groupWeight = GroupWeightProportional,
@@ -515,7 +506,6 @@ internal fun SyncChoiceScreen(vm: AppViewModel) {
                     onClick = { restoreLauncher.launch(arrayOf("application/json")) },
                     enabled = !restoring,
                     modifier = Modifier.fillMaxWidth(),
-                    contentPadding = PaddingValues(vertical = GapGroup),
                 ) {
                     if (restoring) LoadingIndicator() else MorphButtonLabel(Icons.Filled.Cloud, "Choose sync file", pending = false)
                 }
@@ -523,15 +513,12 @@ internal fun SyncChoiceScreen(vm: AppViewModel) {
 
             Spacer(Modifier.height(GapSection))
 
-            MorphButton(
+            SafeMorphTextButton(
+                text = "Set up fresh",
                 onClick = vm::declineSyncRestore,
-                enabled = !restoring,
                 modifier = Modifier.fillMaxWidth(),
-                containerColor = scheme.secondaryContainer,
-                contentColor = scheme.onSecondaryContainer,
-            ) {
-                Text("Set up fresh", style = ButtonLabelStyle, fontWeight = FontWeight.SemiBold)
-            }
+                enabled = !restoring,
+            )
 
             Spacer(Modifier.height(24.dp))
         }

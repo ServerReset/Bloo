@@ -158,7 +158,6 @@ internal fun OnboardingSetupPage(
                 onClick = { if (!notifGranted) notifLauncher.launch(android.Manifest.permission.POST_NOTIFICATIONS) },
                 active = notifGranted,
                 modifier = Modifier.fillMaxWidth(),
-                contentPadding = PaddingValues(vertical = GapGroup),
             ) {
                 MorphButtonLabel(
                     if (notifGranted) AppIcons.CheckCircle else Icons.Filled.Notifications,
@@ -195,7 +194,6 @@ internal fun OnboardingSetupPage(
                 },
                 active = bioEnabled,
                 modifier = Modifier.fillMaxWidth(),
-                contentPadding = PaddingValues(vertical = GapGroup),
             ) {
                 MorphButtonLabel(
                     if (bioEnabled) AppIcons.CheckCircle else Icons.Filled.Fingerprint,
@@ -275,7 +273,6 @@ internal fun OnboardingSetupPage(
                 MorphButton(
                     onClick = { showDriveDialog = true },
                     modifier = Modifier.fillMaxWidth(),
-                    contentPadding = PaddingValues(vertical = GapGroup),
                 ) {
                     MorphButtonLabel(Icons.Filled.Cloud, "Set up Drive sync", pending = false)
                 }
@@ -356,7 +353,6 @@ internal fun OnboardingPinForm(
                 }
             },
             modifier = Modifier.fillMaxWidth(),
-            contentPadding = PaddingValues(vertical = GapGroup),
             enabled = pin.isNotEmpty() && confirm.isNotEmpty(),
         ) {
             val pinLabel: String = if (existing) "Replace PIN" else "Save PIN"

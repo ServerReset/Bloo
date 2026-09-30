@@ -263,19 +263,11 @@ internal fun CarFeatureWizard(
                     // Wrapped in SafeExpansiveButton, matching goNext beside it and the main
                     // OnboardingScreen's own Back/Next -- it was missing the press-growth
                     // affordance every other button pair in the app gets.
-                    val backSource = remember { MutableInteractionSource() }
-                    MorphButton(
+                    SafeMorphTextButton(
+                        text = "Back",
                         onClick = ::goBack,
-                        interactionSource = backSource,
                         modifier = Modifier.fillMaxWidth(),
-                        contentPadding = PaddingValues(vertical = GapGroup),
-                        border = BorderStroke(1.dp, scheme.outlineVariant),
-                        expressive = true,
-                        fillOnPress = true,
-                        groupWeight = GroupWeightProportional,
-                    ) {
-                        Text("Back", style = ButtonLabelStyle)
-                    }
+                    )
                 }
                 val nextSource = remember { MutableInteractionSource() }
                 MorphButton(
@@ -283,7 +275,6 @@ internal fun CarFeatureWizard(
                     active = true,
                     interactionSource = nextSource,
                     modifier = Modifier.fillMaxWidth(),
-                    contentPadding = PaddingValues(vertical = GapGroup),
                     expressive = true,
                     fillOnPress = true,
                     groupWeight = GroupWeightProportional,

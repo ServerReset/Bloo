@@ -223,7 +223,10 @@ internal fun SyncDevicesSection(state: UiState, vm: AppViewModel) {
                     modifier = Modifier.padding(start = CompanionIndent),
                     onRemove = null,
                 )
-                SignWatchInRow(
+                Spacer(Modifier.height(6.dp))
+                CompanionActionRow(
+                    label = "Sign watch in",
+                    caption = "Lets it run your car without this phone",
                     modifier = Modifier.padding(start = CompanionIndent),
                     onClick = { com.bloo.bluelink.wear.WatchSignIn.offer(context) },
                 )
@@ -242,8 +245,9 @@ internal fun SyncDevicesSection(state: UiState, vm: AppViewModel) {
                 // Under THIS phone on purpose: setting a watch up connects it to the device you
                 // are holding, and the placement says so.
                 Spacer(Modifier.height(6.dp))
-                SetupWatchRow(
-                    phoneName = device.name.ifBlank { "this phone" },
+                CompanionActionRow(
+                    label = "Set up watch",
+                    caption = "Connects to ${device.name.ifBlank { "this phone" }}",
                     modifier = Modifier.padding(start = CompanionIndent),
                     onClick = { showSetupWatch = true },
                 )
@@ -572,18 +576,13 @@ private fun WearCompanionRow(
     }
 }
 
-/** Under a connected watch: hands it the accounts so it can work without the phone. */
+/**
+ * An action hanging off a device row in the sync list: the standard button with a one-line caption
+ * under it, indented to sit under the device it belongs to. "Set up watch" and "Sign watch in" are
+ * both this.
+ */
 @Composable
-private fun SignWatchInRow(modifier: Modifier = Modifier, onClick: () -> Unit) {
-    Column(modifier.fillMaxWidth().padding(top = 6.dp)) {
-        SafeMorphTextButton("Sign watch in", onClick = onClick, icon = Icons.Filled.Watch)
-        LabelSmallText("Lets it run your car without this phone")
-    }
-}
-
-/** The empty-companion slot: a "Set up watch" action hanging off this phone's row. */
-@Composable
-private fun SetupWatchRow(phoneName: String, modifier: Modifier = Modifier, onClick: () -> Unit) {
+private fun CompanionActionRow(label: String, caption: String, modifier: Modifier = Modifier, onClick: () -> Unit) {
     Row(modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
         Icon(
             Icons.Filled.SubdirectoryArrowRight,
@@ -593,8 +592,8 @@ private fun SetupWatchRow(phoneName: String, modifier: Modifier = Modifier, onCl
         )
         Spacer(Modifier.width(8.dp))
         Column(Modifier.weight(1f)) {
-            SafeMorphTextButton("Set up watch", onClick = onClick, icon = Icons.Filled.Watch)
-            LabelSmallText("Connects to $phoneName")
+            SafeMorphTextButton(label, onClick = onClick, icon = Icons.Filled.Watch)
+            LabelSmallText(caption)
         }
     }
 }
@@ -659,11 +658,12 @@ internal fun DriveSyncSetupDialog(
                         style = MaterialTheme.typography.bodySmall,
                         color = scheme.onErrorContainer,
                     )
-                    MorphButton(
+                    SafeMorphTextButton(
+                        text = "Create a new file anyway",
                         onClick = onSaveToDrive,
                         modifier = Modifier.fillMaxWidth(),
-                        contentPadding = PaddingValues(12.dp),
-                    ) { Text("Create a new file anyway", style = ButtonLabelStyle, color = scheme.error) }
+                        emphasis = ButtonEmphasis.Destructive,
+                    )
                 }
             } else {
                 DriveSyncChoiceRow(

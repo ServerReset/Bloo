@@ -326,7 +326,7 @@ internal fun LoginScreen(
                     val signInSource = remember { MutableInteractionSource() }
                     MorphButton(
                         onClick = { onLogin(email, password, pin, brand) },
-                        modifier = Modifier.fillMaxWidth().height(56.dp),
+                        modifier = Modifier.fillMaxWidth(),
                         interactionSource = signInSource,
                         enabled = !loading,
                         containerColor = scheme.primary,
@@ -353,17 +353,11 @@ internal fun LoginScreen(
                     }
 
                     if (onCancel != null) {
-                        val cancelSource = remember { MutableInteractionSource() }
-                        MorphButton(
+                        SafeMorphTextButton(
+                            text = "Cancel",
                             onClick = onCancel,
                             modifier = Modifier.fillMaxWidth(),
-                            interactionSource = cancelSource,
-                            containerColor = scheme.secondaryContainer,
-                            contentColor = scheme.onSecondaryContainer,
-                            expressive = true,
-                            fillOnPress = true,
-                            groupWeight = GroupWeightProportional,
-                        ) { Text("Cancel", style = ButtonLabelStyle, fontWeight = FontWeight.SemiBold) }
+                        )
                     }
 
                     // Forgot password — MorphTextButton that routes to the right brand portal.
@@ -428,28 +422,20 @@ internal fun KiaOtpDialog(otp: KiaOtpUi, loading: Boolean, vm: AppViewModel) {
             if (otp.sentTo == null) {
                 Text("Kia needs a one-time code. Where should it go?")
                 if (otp.challenge.hasEmail) {
-                    val emailSource = remember { MutableInteractionSource() }
-                    MorphButton(
+                    SafeMorphTextButton(
+                        text = "Email" + (otp.challenge.email?.let { " · $it" } ?: ""),
                         onClick = { vm.kiaSendOtp("EMAIL") },
-                        interactionSource = emailSource,
-                        enabled = !loading,
                         modifier = Modifier.fillMaxWidth(),
-                        expressive = true,
-                        fillOnPress = true,
-                        groupWeight = GroupWeightProportional,
-                    ) { Text("Email" + (otp.challenge.email?.let { " · $it" } ?: ""), style = ButtonLabelStyle, fontWeight = FontWeight.SemiBold) }
+                        enabled = !loading,
+                    )
                 }
                 if (otp.challenge.hasSms) {
-                    val smsSource = remember { MutableInteractionSource() }
-                    MorphButton(
+                    SafeMorphTextButton(
+                        text = "Text message" + (otp.challenge.sms?.let { " · $it" } ?: ""),
                         onClick = { vm.kiaSendOtp("SMS") },
-                        interactionSource = smsSource,
-                        enabled = !loading,
                         modifier = Modifier.fillMaxWidth(),
-                        expressive = true,
-                        fillOnPress = true,
-                        groupWeight = GroupWeightProportional,
-                    ) { Text("Text message" + (otp.challenge.sms?.let { " · $it" } ?: ""), style = ButtonLabelStyle, fontWeight = FontWeight.SemiBold) }
+                        enabled = !loading,
+                    )
                 }
             } else {
                 Text(

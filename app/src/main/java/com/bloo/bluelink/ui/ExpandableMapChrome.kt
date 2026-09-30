@@ -69,58 +69,26 @@ import com.bloo.bluelink.data.GeoLocation
 import kotlinx.coroutines.flow.first
 
 /**
- * The map sheet's bottom toolbar: one [MorphButton] pill per [MapFeature], sharing an
- * [ExpressiveButtonRow] -- the same connected-group framework the lock/horn cluster
- * and every other multi-button row in the app uses, so pressing one pill takes width
- * FROM its neighbour (both keep their own independent pill shape; only the WIDTH
- * trades) instead of each growing independently into free space. `equalWidths = true`
- * keeps both pills the same width regardless, matching the even split this row always
- * had. `wrap = true` (not a scrolling Row): a future feature list long enough to
- * overflow one line wraps to a second instead of needing its own horizontal-scroll
- * affordance.
- *
- * Icon AND label, via the shared [MorphActionButton] -- these two buttons (Expand, Open
- * in Maps) used to be icon-only with no visible label or border, reported directly as
- * wanting names and outlines like the app's other buttons. The outlined-tonal treatment
- * they were given here is now THE standard action-button look, so it lives in Morph.kt
- * rather than being re-typed inline here.
+ * The buttons under a map: one standard [MorphActionButton] per [MapFeature] in the app's standard
+ * [ExpressiveButtonRow] -- as many to a line as fit, each line balanced and filled edge to edge,
+ * a press pushing its neighbours, a button alone on its line resting on the start edge and widening
+ * when pressed. Nothing here is special to maps: it is the same row every other group of buttons is.
  */
 @Composable
 internal fun MapFeatureRow(
     features: List<MapFeature>,
     modifier: Modifier = Modifier,
-    /** False by default: the map toolbar stays ONE line, compacting to icon-only buttons
-     *  when the labels no longer fit, rather than wrapping to a second line -- see
-     *  [ExpressiveButtonRow]'s own `wrap`. */
-    wrap: Boolean = false,
-    horizontalAlignment: Alignment.Horizontal = Alignment.Start,
 ) {
-    // When the labels stop fitting, this row compacts to icon-only buttons -- and must STAY
-    // icon-only. `stretchCompact` was the bug: it kept the full equal share for each compacted
-    // button, so a glyph-only button was still ~1/4 of the width wide, which is wide enough for
-    // its own label to fit again inside that share -- and MorphButtonLabel draws the label
-    // whenever it fits. Reported directly: the Share button "expands then shows the damn label."
-    // With equalWidths and NO stretch, a compacted row instead sits as a centred cluster of
-    // icon-sized buttons (the branch below), which reads as one compact strip and, crucially,
-    // never re-grows the label.
-    val compacted = features.size > 3
     ExpressiveButtonRow(
         modifier = modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = GapRow),
-        spacing = 10.dp,
-        equalWidths = true,
-        wrap = wrap,
-        // A compacted cluster is centred rather than left-packed -- see MapFeatureRow's own doc.
-        horizontalAlignment = if (compacted) Alignment.CenterHorizontally else horizontalAlignment,
+        spacing = 8.dp,
     ) {
         features.forEach { feature ->
-            val source = remember { MutableInteractionSource() }
             MorphActionButton(
                 label = feature.label,
                 icon = feature.icon,
                 onClick = feature.onClick,
-                interactionSource = source,
                 enabled = feature.enabled,
-                expressive = true,
             )
         }
     }
