@@ -104,56 +104,10 @@ internal fun AutoLockSettingsGroup(v: Vehicle, vm: AppViewModel) {
         )
         ToggleRow("Enabled", current.enabled, onChange = ::onEnabledChanged)
 
-        if (current.enabled) {
-            SettingsCaption(
-                "AutoLock needs a quiet background watcher. Hide its notification from Android settings if you do not want it in the shade.",
-                bottomGap = GapHairline,
-            )
-            MorphTextButton(
-                text = "Hide watcher notification",
-                onClick = {
-                    runCatching {
-                        context.startActivity(
-                            android.content.Intent(android.provider.Settings.ACTION_CHANNEL_NOTIFICATION_SETTINGS).apply {
-                                putExtra(android.provider.Settings.EXTRA_APP_PACKAGE, context.packageName)
-                                putExtra(android.provider.Settings.EXTRA_CHANNEL_ID, AutoLockNotification.CHANNEL_ID)
-                            },
-                        )
-                    }
-                },
-                contentColor = MaterialTheme.colorScheme.primary,
-                icon = Icons.Filled.NotificationsOff,
-            )
-        }
+        // AutoLock's notification controls (its alerts, the watcher notification, and the
+        // permission and reliability prompts it depends on) are in Settings -> Notifications,
+        // next to every other reason an alert might or might not arrive.
 
-        if (current.enabled && !LiveCharge.isBackgroundUnrestricted(context)) {
-            SettingsCaption("Won't reliably trigger with the app closed?", bottomGap = GapHairline)
-            MorphTextButton(
-                text = "Allow background activity",
-                onClick = { LiveCharge.requestBackgroundUnrestricted(context) },
-                contentColor = MaterialTheme.colorScheme.primary,
-                icon = Icons.Filled.Warning,
-            )
-        }
-
-        // Locking always waits for a walking confirmation, so denying this permission
-        // means every evaluation times out and skips -- surfaced here since it would
-        // otherwise look like AutoLock is simply broken, with no toggle left to point at.
-        if (current.enabled && Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q &&
-            !granted(Manifest.permission.ACTIVITY_RECOGNITION)
-        ) {
-            SettingsCaption("Won't lock without motion access", bottomGap = GapHairline)
-            MorphTextButton(
-                text = "Grant Physical activity permission",
-                onClick = { corePermissionLauncher.launch(arrayOf(Manifest.permission.ACTIVITY_RECOGNITION)) },
-                contentColor = MaterialTheme.colorScheme.primary,
-                icon = Icons.Filled.Warning,
-            )
-        }
-
-        // Exact-alarm access used to be requested here for the (now removed) alarm fallback.
-        // The evaluation runs in-process like the i5-AutoLock reference, so there is no alarm
-        // to make exact any more.
         if (current.enabled) {
             StatusRow("Car Bluetooth device", current.deviceName ?: "Not set")
             SafeMorphTextButton(

@@ -33,6 +33,7 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import com.bloo.bluelink.data.autoLockConfig
 import com.bloo.bluelink.data.clearAllAutoLockConfigs
+import com.bloo.bluelink.data.notificationPrefs
 
 /** Snapshot the UI/notification observe for one car's in-flight (or last) evaluation. */
 data class AutoLockEvalState(
@@ -234,13 +235,16 @@ object AutoLockController {
     }
 
     private suspend fun performLock(context: Context, vin: String, carName: String, settings: AutoLockConfig) {
+        // The outcome notification is the user's to silence (Settings -> Notifications); a failure
+        // notification below is not.
+        val announce = runCatching { SettingsStore(context).notificationPrefs().autoLockAlerts }.getOrDefault(true)
         _state.update { it + (vin to AutoLockEvalState(detection = DetectionState.LOCKING)) }
         if (settings.dryRun) {
             AppLog.log("AutoLock DRY RUN: would have locked $vin now. (No command sent.)")
             // Dry run is otherwise SILENT on the phone (it only ever reached AppLog), so a
             // user evaluating AutoLock had nothing to notice. This is the "it would have
             // locked" notification, on its own channel with the car-lock sound.
-            AutoLockEventNotifier.notifyLocked(context, vin, carName, dryRun = true)
+            if (announce) AutoLockEventNotifier.notifyLocked(context, vin, carName, dryRun = true)
             _state.update {
                 it + (vin to AutoLockEvalState(detection = DetectionState.LOCKED, lastLockAtEpochMs = System.currentTimeMillis()))
             }
@@ -249,7 +253,7 @@ object AutoLockController {
         val result = runCatching { runCarCommand(context, CarCommand(vin, CarAction.LOCK)) }.getOrNull()
         if (result?.ok == true) {
             AppLog.log("AutoLock: car locked automatically ($vin).")
-            AutoLockEventNotifier.notifyLocked(context, vin, carName, dryRun = false)
+            if (announce) AutoLockEventNotifier.notifyLocked(context, vin, carName, dryRun = false)
             _state.update {
                 it + (vin to AutoLockEvalState(detection = DetectionState.LOCKED, lastLockAtEpochMs = System.currentTimeMillis()))
             }

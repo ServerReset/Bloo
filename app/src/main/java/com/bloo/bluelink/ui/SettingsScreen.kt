@@ -401,7 +401,7 @@ internal fun SettingsScreen(
             item {
 
             // Notifications
-            NotificationsCardContent(notif, vm)
+            NotificationsCardContent(notif, state, advanced, vm)
             }
             item {
 

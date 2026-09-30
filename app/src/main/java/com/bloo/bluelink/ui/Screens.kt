@@ -59,10 +59,6 @@ import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SnackbarDuration
-import androidx.compose.material3.SnackbarHost
-import androidx.compose.material3.SnackbarHostState
-import androidx.compose.material3.SnackbarVisuals
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -167,7 +163,7 @@ fun BlooApp(vm: AppViewModel) {
     // instead of each screen's own previously-private, unshared HazeState leaving
     // search with nothing to blur regardless of which one was on screen.
     val searchHazeState = remember { HazeState() }
-    val snackbar = remember { SnackbarHostState() }
+    val toasts = remember { ToastState() }
     val scope = rememberCoroutineScope()
     // LocalClipboard (the non-deprecated spelling): its set API is SUSPEND, so
     // the copy call below hops through this screen's existing `scope` rather
@@ -203,22 +199,12 @@ fun BlooApp(vm: AppViewModel) {
         }
     }
 
-    // The snackbar's colour is driven by the message TYPE, but clearMessage()
-    // (called right after showing) resets messageType back to "error" for the
-    // next message, so the host can't read state.messageType at render time —
-    // it would always paint red.
-    //
-    // A single captured `shownMessageType` variable didn't work either:
-    // showSnackbar serialises on an internal mutex, so a second message queues
-    // behind the first for up to ~4s while a shared variable is overwritten the
-    // moment it's queued — the first snackbar recomposed into the SECOND one's
-    // colour while still on screen (a failed refresh turning blue mid-display as
-    // the update check's info message queued behind it). The type has to travel
-    // WITH its own message, so it rides in custom visuals the host reads back.
+    // Every message the ViewModels raise lands in the toast stack, carrying its own type so a
+    // later message can never repaint an earlier one. clearMessage() right after keeps the single
+    // UiState slot free for the next one, which stacks below instead of queueing behind.
     LaunchedEffect(message) {
         message?.let { msg ->
-            val visuals = BlooSnackbarVisuals(msg, messageType)
-            scope.launch { snackbar.showSnackbar(visuals) }
+            toasts.show(msg, messageType)
             vm.clearMessage()
         }
     }
@@ -298,137 +284,13 @@ fun BlooApp(vm: AppViewModel) {
     Scaffold(
         containerColor = Color.Transparent,
         snackbarHost = {
-            SnackbarHost(snackbar, modifier = Modifier.imePadding()) { data ->
-                // Two-part state, not one Animatable driven by snapTo: a live drag used to
-                // launch a brand-new coroutine PER drag delta (`swipeScope.launch { offsetX.snapTo(...) }`),
-                // each one entering Animatable's MutatorMutex separately -- at a touch-move's
-                // frame rate that's dozens of allocated coroutines a second fighting the same
-                // mutex, which is exactly the kind of stutter "swipe feels jittery" describes.
-                // `dragOffsetPx` is a plain float written directly and synchronously from the
-                // gesture callback -- follows the finger 1:1 with zero coroutine overhead. The
-                // Animatable is reserved for what actually needs animating: springing back to 0
-                // or flying off-screen once the finger lifts, started with exactly one launch per
-                // gesture instead of one per pixel.
-                var isDragging by remember(data) { mutableStateOf(false) }
-                val dragOffsetPx = remember(data) { mutableFloatStateOf(0f) }
-                val settleOffsetX = remember(data) { Animatable(0f) }
-                val swipeScope = rememberCoroutineScope()
-                val dismissPx = with(LocalDensity.current) { 110.dp.toPx() }
-                // Read off THIS snackbar's own visuals, so a message queued behind
-                // it can't repaint it — see the LaunchedEffect that shows them.
-                val snackColors = when ((data.visuals as? BlooSnackbarVisuals)?.type) {
-                    "success" -> MaterialTheme.colorScheme.primaryContainer to MaterialTheme.colorScheme.onPrimaryContainer
-                    "info" -> MaterialTheme.colorScheme.secondaryContainer to MaterialTheme.colorScheme.onSecondaryContainer
-                    else -> MaterialTheme.colorScheme.errorContainer to MaterialTheme.colorScheme.onErrorContainer
-                }
-                val snackShape = RoundedCornerShape(24.dp)
-                // GlassSurface, not a plain solid Surface -- this was the one floating
-                // element in the app still using a flat opaque fill instead of the shared
-                // blur/tint every other piece of chrome (dialogs, the search bar, floating
-                // buttons) uses. searchHazeState is the same HazeState the screen behind
-                // this snackbar already renders into (see this file's own `hazeSource`
-                // wiring), so the blur is real, not a guess at a color. Alpha stays fairly
-                // high even with real blur behind it -- unlike ambient chrome, a toast is
-                // reporting something that just happened and needs to read clearly the
-                // instant it appears, not fade into whatever's behind it.
-                GlassSurface(
-                    shape = snackShape,
-                    hazeState = searchHazeState,
-                    tint = snackColors.first.copy(alpha = if (canBlurBackdrops()) 0.75f else 0.94f),
-                    contentColor = snackColors.second,
-                    modifier = Modifier
-                        .padding(16.dp)
-                        // This is a hand-rolled Surface, not M3's own Snackbar()
-                        // composable (which sets live-region semantics
-                        // internally) -- without this, a command result / sync
-                        // completion / error appears visually but TalkBack
-                        // never proactively announces it; a screen-reader user
-                        // has to blindly swipe around after every action to
-                        // discover whether it worked.
-                        .semantics { liveRegion = LiveRegionMode.Polite }
-                        // Read inside the placement/draw-phase lambdas, not hoisted to a val above
-                        // -- that keeps a live drag to a layout/draw re-run per frame instead of a
-                        // full recomposition of this snackbar (same convention as GarageScreen's
-                        // pull-to-refresh offsets; see its own doc on why the hoisted read is the
-                        // expensive version).
-                        .offset {
-                            val x = if (isDragging) dragOffsetPx.floatValue else settleOffsetX.value
-                            IntOffset(x.roundToInt(), 0)
-                        }
-                        .graphicsLayer {
-                            val x = if (isDragging) dragOffsetPx.floatValue else settleOffsetX.value
-                            alpha = (1f - abs(x) / (dismissPx * 2.2f)).coerceIn(0f, 1f)
-                        }
-                        .pointerInput(data) {
-                            detectHorizontalDragGestures(
-                                onDragStart = {
-                                    isDragging = true
-                                    dragOffsetPx.floatValue = settleOffsetX.value
-                                },
-                                onHorizontalDrag = { change, dragAmount ->
-                                    change.consume()
-                                    dragOffsetPx.floatValue += dragAmount
-                                },
-                                onDragEnd = {
-                                    isDragging = false
-                                    val released = dragOffsetPx.floatValue
-                                    swipeScope.launch {
-                                        settleOffsetX.snapTo(released)
-                                        if (abs(released) > dismissPx) {
-                                            val target = if (released > 0) dismissPx * 4 else -dismissPx * 4
-                                            settleOffsetX.animateTo(target)
-                                            data.dismiss()
-                                        } else {
-                                            settleOffsetX.animateTo(0f)
-                                        }
-                                    }
-                                },
-                                onDragCancel = {
-                                    isDragging = false
-                                    val released = dragOffsetPx.floatValue
-                                    swipeScope.launch {
-                                        settleOffsetX.snapTo(released)
-                                        settleOffsetX.animateTo(0f)
-                                    }
-                                },
-                            )
-                        },
-                ) {
-                    Row(
-                        Modifier.padding(start = 18.dp, end = 6.dp, top = 10.dp, bottom = 10.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Icon(Icons.Filled.ErrorOutline, contentDescription = null)
-                        Spacer(Modifier.width(12.dp))
-                        SelectionContainer(Modifier.weight(1f)) {
-                            Text(data.visuals.message, style = MaterialTheme.typography.bodyMedium)
-                        }
-                        // NOT a group, deliberately. Two icon buttons cannot donate width to
-                        // each other: a donor's floor is its own minIntrinsicWidth, and an
-                        // IconButton's intrinsic width IS its fixed 48dp target, so capacity is
-                        // zero and a group here would add layout nodes for no motion. (Joining
-                        // a group is still right for an icon button sitting among LABELLED
-                        // ones, where it can grow and they can give -- which is why
-                        // MorphIconButton does it automatically.) These two keep the plain Row
-                        // and the press scale MorphButtonCore already draws.
-                        MorphIconButton(onClick = {
-                            scope.launch {
-                                clipboard.setClipEntry(ClipEntry(ClipData.newPlainText("bloo", data.visuals.message)))
-                            }
-                        }) {
-                            Icon(Icons.Filled.ContentCopy, contentDescription = "Copy")
-                        }
-                        // Swipe-to-dismiss is a raw drag gesture with no
-                        // TalkBack equivalent (a single-finger swipe here is
-                        // captured by TalkBack's own navigation instead), so a
-                        // screen-reader user previously had no way to dismiss
-                        // early and had to wait out the auto-hide timeout.
-                        MorphIconButton(onClick = { data.dismiss() }) {
-                            Icon(Icons.Filled.Close, contentDescription = "Dismiss")
-                        }
-                    }
-                }
-            }
+            ToastHost(
+                state = toasts,
+                hazeState = searchHazeState,
+                onCopy = { text ->
+                    scope.launch { clipboard.setClipEntry(ClipEntry(ClipData.newPlainText("bloo", text))) }
+                },
+            )
         },
     ) { padding ->
         // Adding an account shows the login form even while already signed in.
@@ -622,19 +484,4 @@ internal fun carColumnsFor(widthDp: Float): Int = when {
     widthDp >= THREE_COLUMN_MIN_DP -> 3
     widthDp >= TWO_COLUMN_MIN_DP -> 2
     else -> 1
-}
-
-/**
- * Snackbar payload that carries its own severity, so the host colours each
- * message from ITS OWN type rather than from a shared variable that the next
- * queued message may already have overwritten. [type] matches
- * `UiState.messageType`: "success", "info", or anything else (treated as error).
- */
-private class BlooSnackbarVisuals(
-    override val message: String,
-    val type: String,
-) : SnackbarVisuals {
-    override val actionLabel: String? = null
-    override val duration: SnackbarDuration = SnackbarDuration.Short
-    override val withDismissAction: Boolean = false
 }

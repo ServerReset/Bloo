@@ -7,8 +7,15 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
+import android.graphics.Canvas
+import android.graphics.Paint
+import android.graphics.Path
+import android.graphics.PorterDuff
+import android.graphics.PorterDuffXfermode
+import android.graphics.RectF
 import android.os.Build
 import android.provider.Settings
+import android.widget.RemoteViews
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.net.toUri
@@ -109,6 +116,55 @@ object LiveCharge {
     // inter-segment gap to fall back on the way the phone bars do, so the
     // colour step here has to carry the whole distinction on its own.
     private const val TRACK_DIM = 0x14FFFFFF
+
+    /** The custom notification body: title and percent, a bar spanning the full width, detail. */
+    private fun chargeBody(context: Context, carName: String, percent: Int?, limit: Int?, detail: String): RemoteViews =
+        RemoteViews(context.packageName, R.layout.notification_live_charge).apply {
+            setTextViewText(R.id.live_charge_title, "$carName is charging")
+            setTextViewText(R.id.live_charge_percent, percent?.let { "${it.coerceIn(0, 100)}%" }.orEmpty())
+            setImageViewBitmap(R.id.live_charge_bar, renderBar(percent, limit?.takeIf { it in 1..99 }))
+            setTextViewText(R.id.live_charge_detail, detail.ifBlank { "Charging" })
+        }
+
+    /**
+     * The charge bar as a bitmap: neutral track that reads on a light or dark shade, the fill in
+     * charge green (blue once the limit is reached), a dimmer zone past the limit, and a see-through
+     * notch at the limit itself. Drawn at a width close to a phone's so stretching it to the
+     * notification's width barely distorts the rounded ends.
+     */
+    private fun renderBar(percent: Int?, limit: Int?): Bitmap {
+        val w = BAR_W
+        val h = BAR_H
+        val bmp = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
+        val canvas = Canvas(bmp)
+        val r = h / 2f
+        canvas.clipPath(Path().apply { addRoundRect(RectF(0f, 0f, w.toFloat(), h.toFloat()), r, r, Path.Direction.CW) })
+        val paint = Paint(Paint.ANTI_ALIAS_FLAG)
+        paint.color = BAR_TRACK
+        canvas.drawRect(0f, 0f, w.toFloat(), h.toFloat(), paint)
+        if (limit != null) {
+            paint.color = BAR_BEYOND_LIMIT
+            canvas.drawRect(w * limit / 100f, 0f, w.toFloat(), h.toFloat(), paint)
+        }
+        val pct = percent?.coerceIn(0, 100)
+        if (pct != null && pct > 0) {
+            paint.color = if (limit != null && pct >= limit) CHARGE_BLUE else CHARGE_GREEN
+            canvas.drawRect(0f, 0f, w * pct / 100f, h.toFloat(), paint)
+        }
+        if (limit != null) {
+            paint.xfermode = PorterDuffXfermode(PorterDuff.Mode.CLEAR)
+            val x = w * limit / 100f
+            canvas.drawRect(x - BAR_NOTCH / 2f, 0f, x + BAR_NOTCH / 2f, h.toFloat(), paint)
+            paint.xfermode = null
+        }
+        return bmp
+    }
+
+    private const val BAR_W = 1080
+    private const val BAR_H = 28
+    private const val BAR_NOTCH = 5
+    private const val BAR_TRACK = 0x40808080
+    private const val BAR_BEYOND_LIMIT = 0x1A808080
 
     private fun idFor(vin: String) = ("live_charge_$vin").hashCode()
 
@@ -348,6 +404,7 @@ object LiveCharge {
             return
         }
         if (runCatching { settings.liveChargeDismissed(vin) }.getOrDefault(false)) return
+        val systemStyle = runCatching { settings.notificationPrefs().liveChargeSystemStyle }.getOrDefault(false)
         // Large icon removed - widget system deleted
         val carPhoto = null
         update(
@@ -361,6 +418,7 @@ object LiveCharge {
             enabled = true,
             chargeLimit = chargeLimit,
             carPhoto = carPhoto,
+            systemStyle = systemStyle,
         )
     }
 
@@ -391,6 +449,9 @@ object LiveCharge {
          *  large icon so the bar reads as THIS car, the same way the hero card's photo does.
          *  Null falls back to the plain small icon with nothing extra, never an error. */
         carPhoto: Bitmap? = null,
+        /** True hands the notification to the system's Live Update style (the only way to get
+         *  the Android 16 status-bar chip); false is the custom full-width bar. */
+        systemStyle: Boolean = false,
     ) {
         val id = idFor(vin)
         // Check THIS feature's own channel, not the alerts channel: the charging bar posts to
@@ -518,8 +579,19 @@ object LiveCharge {
             .setOngoing(true)
             .setOnlyAlertOnce(true)
             .setPriority(NotificationCompat.PRIORITY_LOW)
-            .setRequestPromotedOngoing(true)
-            .setStyle(style)
+            .apply {
+                if (systemStyle) {
+                    setRequestPromotedOngoing(true).setStyle(style)
+                } else {
+                    // A custom body cannot be promoted to the status bar, which is exactly the
+                    // trade the "system style" setting exists to make. DecoratedCustomViewStyle
+                    // keeps the system's own header, actions and dismiss behaviour around it.
+                    val body = chargeBody(context, carName, percent, limit, detail)
+                    setStyle(NotificationCompat.DecoratedCustomViewStyle())
+                    setCustomContentView(body)
+                    setCustomBigContentView(body)
+                }
+            }
             .addAction(0, "Stop charging", stopPi)
             .setDeleteIntent(dismissPi)
             .apply { contentPi?.let { setContentIntent(it) } }
@@ -540,7 +612,7 @@ object LiveCharge {
             // unverified change to the exact surface that is broken, so it goes until the
             // chip is confirmed back.
             .setShowWhen(false)
-            .apply { percent?.let { setShortCriticalText("${it.coerceIn(0, 100)}%") } }
+            .apply { if (systemStyle) percent?.let { setShortCriticalText("${it.coerceIn(0, 100)}%") } }
 
         // Same TOCTOU reasoning as Notifications.post: permission could be
         // revoked between the hasPermission() check above and this call.

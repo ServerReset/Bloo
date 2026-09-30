@@ -230,67 +230,15 @@ internal fun CarSettingsCard(
         containerColor = cardBg,
         forceExpanded = !collapsible,
     ) {
-        SettingsGroup("Powertrain") {
-            PowertrainPicker(current = state.powertrainOf(v)) { pt -> vm.setPowertrain(v, pt) }
-        }
+        val advanced = state.settingsMode == "advanced"
 
-        // Only Hyundai/Genesis US vehicles have a real head-unit generation to
-        // confirm -- see Vehicle.platformOverridable's own doc. Every other
-        // brand/region always resolves the same way regardless, so showing
-        // this picker there would be a control with no actual effect.
-        if (v.platformOverridable) {
-            SettingsGroup("Head-unit generation") {
-                Text(
-                    "Confirm this car's head unit. The API can't always tell. Some features only show when supported.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                Spacer(Modifier.height(GapHairline))
-                PlatformPicker(current = state.platformOf(v)) { pt -> vm.setPlatform(v, pt) }
-            }
-        }
-
-        SettingsGroup("Climate features") {
-            Text(
-                "Pick which of the four seats your car has, and heat or cool each.",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            SeatPositions.forEach { pos ->
-                SeatConfigRow(pos.label, pos.heat(seats), pos.cool(seats),
-                    { vm.setSeatFlag(v, pos.heatKey, it) }, { vm.setSeatFlag(v, pos.coolKey, it) })
-            }
-            ToggleRow("Heated steering wheel", seats.steeringWheel) { vm.setSeatFlag(v, "sw", it) }
-        }
-
-        AutoLockSettingsGroup(v, vm)
-
-        if (state.settingsMode == "advanced") SettingsGroup("Default climate start") {
-            val carPresets = state.climatePresets[v.vin].orEmpty()
-            val currentDefault = state.defaultClimatePresets[v.vin] ?: "smart"
-            Text(
-                "Tapping Start runs your preset or smart climate.",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            Spacer(Modifier.height(GapHairline))
-            MorphSegmented(
-                options = buildList {
-                    add(SegmentOption("smart", "Smart", null))
-                    carPresets.forEach { p -> add(SegmentOption(p.id, p.name, null)) }
-                },
-                selectedKey = currentDefault,
-                onSelect = { key -> vm.setDefaultClimatePreset(v.vin, key.takeIf { it != "smart" }) },
-            )
-        }
-
+        // Order is the order you would set a car up in: how it looks, what it is, what it can do,
+        // what it does by itself, and -- advanced only -- the paperwork.
         SettingsGroup("Photo") {
             val storedImage = state.imageUrls[v.vin]
-            // A live preview instead of just "Custom photo set" as plain
-            // text -- there was no way to actually see the effect of a
-            // photo change without leaving Settings and finding this car
-            // on the garage screen.
-            if (!storedImage.isNullOrBlank()) {
+            val hasPhoto = !storedImage.isNullOrBlank()
+            // A live preview, so the effect of a change is visible without leaving Settings.
+            if (hasPhoto) {
                 AsyncImage(
                     model = rememberPhotoModel(storedImage),
                     contentDescription = null,
@@ -301,24 +249,56 @@ internal fun CarSettingsCard(
                         .clip(RoundedCornerShape(14.dp)),
                 )
             }
-            // A group, not a plain Row: pressing "Choose photo" should take its extra width
-            // from "Clear" beside it rather than shove it sideways. See ExpressiveButtons.kt.
+            // A group, not a plain Row: the buttons share the row's width and press against each other.
             ExpressiveButtonRow(spacing = 8.dp) {
-                MorphTextButton("Choose photo", onClick = onPickPhoto)
-                if (state.imageUrls[v.vin] != null) {
-                    MorphTextButton("Clear", onClick = { vm.setVehicleImage(v.vin, "") })
+                MorphTextButton(if (hasPhoto) "Change photo" else "Choose photo", onClick = onPickPhoto)
+                if (hasPhoto) MorphTextButton("Clear", onClick = { vm.setVehicleImage(v.vin, "") })
+            }
+        }
+
+        SettingsGroup("Vehicle") {
+            LabelText("Powertrain")
+            PowertrainPicker(current = state.powertrainOf(v)) { pt -> vm.setPowertrain(v, pt) }
+            // Only Hyundai/Genesis US vehicles have a real head-unit generation to confirm -- see
+            // Vehicle.platformOverridable. Everywhere else it resolves the same way regardless, so
+            // a picker there would be a control with no effect.
+            if (v.platformOverridable) {
+                Spacer(Modifier.height(GapRow))
+                LabelText("Head unit")
+                MutedText("Confirm this car's head unit -- the API can't always tell. Some features only show when supported.")
+                PlatformPicker(current = state.platformOf(v)) { pt -> vm.setPlatform(v, pt) }
+            }
+        }
+
+        SettingsGroup("Climate") {
+            MutedText("Which seats your car has, and whether each can heat, cool, or both.")
+            SeatPositions.forEach { pos ->
+                SeatConfigRow(pos.label, pos.heat(seats), pos.cool(seats),
+                    { vm.setSeatFlag(v, pos.heatKey, it) }, { vm.setSeatFlag(v, pos.coolKey, it) })
+            }
+            ToggleRow("Heated steering wheel", seats.steeringWheel) { vm.setSeatFlag(v, "sw", it) }
+            PopVisible(visible = advanced) {
+                Column {
+                    SectionDivider(alpha = 0.5f)
+                    Spacer(Modifier.height(GapRow))
+                    LabelText("Default start")
+                    MutedText("What the Start button runs: smart climate, or one of your presets.")
+                    val carPresets = state.climatePresets[v.vin].orEmpty()
+                    MorphSegmented(
+                        options = buildList {
+                            add(SegmentOption("smart", "Smart", null))
+                            carPresets.forEach { p -> add(SegmentOption(p.id, p.name, null)) }
+                        },
+                        selectedKey = state.defaultClimatePresets[v.vin] ?: "smart",
+                        onSelect = { key -> vm.setDefaultClimatePreset(v.vin, key.takeIf { it != "smart" }) },
+                    )
                 }
             }
         }
 
-        // Identity & service tracking and pebble visibility are both
-        // power-user record-keeping, not something a first-time or
-        // casual user needs to see every time they open a car's
-        // settings -- Simple mode now only shows what actually changes
-        // which controls appear (photo, powertrain, seat/climate
-        // features), matching Default climate start/Palette override
-        // above.
-        if (state.settingsMode == "advanced") {
+        AutoLockSettingsGroup(v, vm)
+
+        if (advanced) {
             SettingsGroup("Identity & service") {
                 SelectionContainer { StatusRow("VIN", v.vin) }
                 OutlinedTextField(
