@@ -211,56 +211,52 @@ internal fun CropScreen(vin: String, uriString: String, onCancel: () -> Unit, on
                     onClick = onCancel,
                 )
                 val confirmSource = remember { MutableInteractionSource() }
-                SafeExpansiveButton(
-                    interactionSource = confirmSource,
-                    enabled = true,
-                ) {
-                    MorphButton(
-                    onClick = {
-                        val image = bmp ?: return@MorphButton
-                        val f = frame
-                        scope.launch {
-                            val path = withContext(Dispatchers.IO) {
-                                runCatching {
-                                    val wpx = f.width.toFloat()
-                                    val hpx = f.height.toFloat()
-                                    val cover = max(wpx / image.width, hpx / image.height)
-                                    val s = cover * scale
-                                    val maxX = ((image.width * s - wpx) / 2f).coerceAtLeast(0f)
-                                    val maxY = ((image.height * s - hpx) / 2f).coerceAtLeast(0f)
-                                    val cx = offset.x.coerceIn(-maxX, maxX)
-                                    val cy = offset.y.coerceIn(-maxY, maxY)
-                                    val outScale = 1080f / wpx
-                                    val out = createBitmap(1080, (hpx * outScale).toInt(), Bitmap.Config.ARGB_8888)
-                                    val canvas = android.graphics.Canvas(out)
-                                    val m = android.graphics.Matrix().apply {
-                                        postTranslate(-image.width / 2f, -image.height / 2f)
-                                        postScale(s, s)
-                                        postTranslate(wpx / 2f + cx, hpx / 2f + cy)
-                                        postScale(outScale, outScale)
-                                    }
-                                    canvas.drawBitmap(image, m, android.graphics.Paint(android.graphics.Paint.FILTER_BITMAP_FLAG))
-                                    val dir = java.io.File(context.filesDir, "cars").apply { mkdirs() }
-                                    // Preserve transparency: alpha sources are saved as PNG (so the
-                                    // background stays see-through and renders seamlessly), others JPEG.
-                                    val alpha = image.hasAlpha()
-                                    val ext = if (alpha) "png" else "jpg"
-                                    val file = java.io.File(dir, "car_${vin}_${System.currentTimeMillis()}.$ext")
-                                    file.outputStream().use {
-                                        if (alpha) out.compress(Bitmap.CompressFormat.PNG, 100, it)
-                                        else out.compress(Bitmap.CompressFormat.JPEG, 90, it)
-                                    }
-                                    file.absolutePath
-                                }.getOrNull()
-                            }
-                            if (path != null) onSave(path) else onCancel()
+                MorphButton(
+                onClick = {
+                    val image = bmp ?: return@MorphButton
+                    val f = frame
+                    scope.launch {
+                        val path = withContext(Dispatchers.IO) {
+                            runCatching {
+                                val wpx = f.width.toFloat()
+                                val hpx = f.height.toFloat()
+                                val cover = max(wpx / image.width, hpx / image.height)
+                                val s = cover * scale
+                                val maxX = ((image.width * s - wpx) / 2f).coerceAtLeast(0f)
+                                val maxY = ((image.height * s - hpx) / 2f).coerceAtLeast(0f)
+                                val cx = offset.x.coerceIn(-maxX, maxX)
+                                val cy = offset.y.coerceIn(-maxY, maxY)
+                                val outScale = 1080f / wpx
+                                val out = createBitmap(1080, (hpx * outScale).toInt(), Bitmap.Config.ARGB_8888)
+                                val canvas = android.graphics.Canvas(out)
+                                val m = android.graphics.Matrix().apply {
+                                    postTranslate(-image.width / 2f, -image.height / 2f)
+                                    postScale(s, s)
+                                    postTranslate(wpx / 2f + cx, hpx / 2f + cy)
+                                    postScale(outScale, outScale)
+                                }
+                                canvas.drawBitmap(image, m, android.graphics.Paint(android.graphics.Paint.FILTER_BITMAP_FLAG))
+                                val dir = java.io.File(context.filesDir, "cars").apply { mkdirs() }
+                                // Preserve transparency: alpha sources are saved as PNG (so the
+                                // background stays see-through and renders seamlessly), others JPEG.
+                                val alpha = image.hasAlpha()
+                                val ext = if (alpha) "png" else "jpg"
+                                val file = java.io.File(dir, "car_${vin}_${System.currentTimeMillis()}.$ext")
+                                file.outputStream().use {
+                                    if (alpha) out.compress(Bitmap.CompressFormat.PNG, 100, it)
+                                    else out.compress(Bitmap.CompressFormat.JPEG, 90, it)
+                                }
+                                file.absolutePath
+                            }.getOrNull()
                         }
-                    },
-                    enabled = bmp != null,
-                    interactionSource = confirmSource,
-                    contentPadding = PaddingValues(horizontal = 18.dp, vertical = GapRow),
+                        if (path != null) onSave(path) else onCancel()
+                    }
+                },
+                enabled = bmp != null,
+                interactionSource = confirmSource,
+                contentPadding = PaddingValues(horizontal = 18.dp, vertical = GapRow),
+                    expressive = true,
                 ) { Text("Use photo", style = ButtonLabelStyle, fontWeight = FontWeight.SemiBold) }
-                }
             }
         }
     }

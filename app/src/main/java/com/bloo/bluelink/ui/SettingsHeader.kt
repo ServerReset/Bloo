@@ -317,28 +317,24 @@ internal fun SettingsHeroCard(state: UiState, vm: AppViewModel, compact: Boolean
                     // GitHub's API is flaky).
                     ExpressiveButtonRow(modifier = Modifier.fillMaxWidth(), spacing = 8.dp) {
                         val checkSource = remember { MutableInteractionSource() }
-                        SafeExpansiveButton(
+                        MorphButton(
+                            onClick = { vm.checkForUpdateManually() },
                             interactionSource = checkSource,
                             enabled = !state.updateChecking,
+                            // Explicit primary colours, not active=true -- see the
+                            // original Updates card's own history for why: active
+                            // pins the button's morphed square corner permanently,
+                            // which is wrong for "Check" (it never has an "on" state
+                            // to stay morphed for).
+                            containerColor = MaterialTheme.colorScheme.primary,
+                            contentColor = MaterialTheme.colorScheme.onPrimary,
+                            expressive = true,
                         ) {
-                            MorphButton(
-                                onClick = { vm.checkForUpdateManually() },
-                                interactionSource = checkSource,
-                                enabled = !state.updateChecking,
-                                // Explicit primary colours, not active=true -- see the
-                                // original Updates card's own history for why: active
-                                // pins the button's morphed square corner permanently,
-                                // which is wrong for "Check" (it never has an "on" state
-                                // to stay morphed for).
-                                containerColor = MaterialTheme.colorScheme.primary,
-                                contentColor = MaterialTheme.colorScheme.onPrimary,
-                            ) {
-                                MorphButtonLabel(
-                                    icon = Icons.Filled.Refresh,
-                                    label = "Check",
-                                    pending = state.updateChecking,
-                                )
-                            }
+                            MorphButtonLabel(
+                                icon = Icons.Filled.Refresh,
+                                label = "Check",
+                                pending = state.updateChecking,
+                            )
                         }
                         SafeMorphTextButton(
                             "GitHub",
@@ -431,20 +427,16 @@ internal fun SettingsHeroCard(state: UiState, vm: AppViewModel, compact: Boolean
                         // cannot disagree about what the update flow is currently offering.
                         val act = updateAction(state, updateInfo, seamless)
                         val updateSource = remember { MutableInteractionSource() }
-                        SafeExpansiveButton(
-                            interactionSource = updateSource,
+                        MorphButton(
+                            onClick = { runUpdateAction(state, vm, updateInfo, context) },
+                            active = act.ready,
+                            activeContainerColor = ChargeGreen,
+                            activeContentColor = Color.White,
                             enabled = !state.updateInstalling && !state.updateDownloading,
+                            interactionSource = updateSource,
+                            expressive = true,
                         ) {
-                            MorphButton(
-                                onClick = { runUpdateAction(state, vm, updateInfo, context) },
-                                active = act.ready,
-                                activeContainerColor = ChargeGreen,
-                                activeContentColor = Color.White,
-                                enabled = !state.updateInstalling && !state.updateDownloading,
-                                interactionSource = updateSource,
-                            ) {
-                                MorphButtonLabel(act.icon, act.label, pending = false)
-                            }
+                            MorphButtonLabel(act.icon, act.label, pending = false)
                         }
                         // Shared with the update pebble -- see UpdateReleaseNotes. The two
                         // used to keep a copy each, identical but for the excerpt length and

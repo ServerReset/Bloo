@@ -261,41 +261,35 @@ internal fun CarFeatureWizard(
                     // OnboardingScreen's own Back/Next -- it was missing the press-growth
                     // affordance every other button pair in the app gets.
                     val backSource = remember { MutableInteractionSource() }
-                    SafeExpansiveButton(interactionSource = backSource, enabled = true) {
-                        MorphButton(
-                            onClick = ::goBack,
-                            interactionSource = backSource,
-                            modifier = Modifier.fillMaxWidth(),
-                            contentPadding = PaddingValues(vertical = GapGroup),
-                            border = BorderStroke(1.dp, scheme.outlineVariant),
-                        ) {
-                            Text("Back", style = ButtonLabelStyle)
-                        }
+                    MorphButton(
+                        onClick = ::goBack,
+                        interactionSource = backSource,
+                        modifier = Modifier.fillMaxWidth(),
+                        contentPadding = PaddingValues(vertical = GapGroup),
+                        border = BorderStroke(1.dp, scheme.outlineVariant),
+                        expressive = true,
+                    ) {
+                        Text("Back", style = ButtonLabelStyle)
                     }
                 }
                 val nextSource = remember { MutableInteractionSource() }
-                SafeExpansiveButton(
+                MorphButton(
+                    onClick = ::goNext,
+                    active = true,
                     interactionSource = nextSource,
-                    enabled = true,
-                    modifier = Modifier.weight(if (pageIndex > 0) 2f else 1f),
+                    modifier = Modifier.fillMaxWidth(),
+                    contentPadding = PaddingValues(vertical = GapGroup),
+                    expressive = true,
                 ) {
-                    MorphButton(
-                        onClick = ::goNext,
-                        active = true,
-                        interactionSource = nextSource,
-                        modifier = Modifier.fillMaxWidth(),
-                        contentPadding = PaddingValues(vertical = GapGroup),
-                    ) {
-                        val isLast = pageIndex == pages.lastIndex
-                        // MorphButtonLabel, not a hand-rolled Icon+Spacer+Text.
-                        val wizardNextIcon: ImageVector = if (isLast) AppIcons.CheckCircle else AppIcons.Check
-                        val wizardNextText: String = if (isLast) "Done" else "Next"
-                        MorphButtonLabel(
-                            wizardNextIcon,
-                            wizardNextText,
-                            pending = false,
-                        )
-                    }
+                    val isLast = pageIndex == pages.lastIndex
+                    // MorphButtonLabel, not a hand-rolled Icon+Spacer+Text.
+                    val wizardNextIcon: ImageVector = if (isLast) AppIcons.CheckCircle else AppIcons.Check
+                    val wizardNextText: String = if (isLast) "Done" else "Next"
+                    MorphButtonLabel(
+                        wizardNextIcon,
+                        wizardNextText,
+                        pending = false,
+                    )
                 }
             }
         }

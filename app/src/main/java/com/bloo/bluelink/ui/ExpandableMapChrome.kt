@@ -114,18 +114,14 @@ internal fun MapFeatureRow(
     ) {
         features.forEach { feature ->
             val source = remember { MutableInteractionSource() }
-            SafeExpansiveButton(
+            MorphActionButton(
+                label = feature.label,
+                icon = feature.icon,
+                onClick = feature.onClick,
                 interactionSource = source,
                 enabled = feature.enabled,
-            ) {
-                MorphActionButton(
-                    label = feature.label,
-                    icon = feature.icon,
-                    onClick = feature.onClick,
-                    interactionSource = source,
-                    enabled = feature.enabled,
-                )
-            }
+                expressive = true,
+            )
         }
     }
 }

@@ -154,32 +154,24 @@ internal fun LocationCardContent(appearance: SettingsStore.Appearance, vm: AppVi
         Spacer(Modifier.height(GapRow))
         ExpressiveButtonRow(modifier = Modifier.fillMaxWidth(), spacing = 8.dp) {
             val setPlaceSource = remember { MutableInteractionSource() }
-            SafeExpansiveButton(
+            MorphActionButton(
+                label = "Set place",
+                icon = Icons.Filled.Place,
+                modifier = Modifier.fillMaxWidth(),
                 interactionSource = setPlaceSource,
                 enabled = weatherQuery.isNotBlank(),
-            ) {
-                MorphActionButton(
-                    label = "Set place",
-                    icon = Icons.Filled.Place,
-                    modifier = Modifier.fillMaxWidth(),
-                    interactionSource = setPlaceSource,
-                    enabled = weatherQuery.isNotBlank(),
-                    onClick = { vm.setWeatherPlace(weatherQuery); weatherQuery = "" },
-                )
-            }
+                onClick = { vm.setWeatherPlace(weatherQuery); weatherQuery = "" },
+                expressive = true,
+            )
             val myLocationSource = remember { MutableInteractionSource() }
-            SafeExpansiveButton(
+            MorphActionButton(
+                label = "My location",
+                icon = Icons.Filled.MyLocation,
+                onClick = { locationPermission.launch(android.Manifest.permission.ACCESS_COARSE_LOCATION) },
+                modifier = Modifier.fillMaxWidth(),
                 interactionSource = myLocationSource,
-                enabled = true,
-            ) {
-                MorphActionButton(
-                    label = "My location",
-                    icon = Icons.Filled.MyLocation,
-                    onClick = { locationPermission.launch(android.Manifest.permission.ACCESS_COARSE_LOCATION) },
-                    modifier = Modifier.fillMaxWidth(),
-                    interactionSource = myLocationSource,
-                )
-            }
+                expressive = true,
+            )
         }
     }
 }

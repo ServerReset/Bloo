@@ -284,23 +284,19 @@ internal fun LockOverlay(vm: AppViewModel, opaqueBackdrop: Boolean = false) {
                 Spacer(Modifier.height(if (compact) 16.dp else 28.dp))
                 // White pill for maximum contrast over the dimmed blur.
                 val unlockSource = remember { MutableInteractionSource() }
-                SafeExpansiveButton(
+                MorphButton(
+                    onClick = { authenticateBiometric() },
+                    modifier = Modifier.height(if (compact) 56.dp else ControlHeight),
                     interactionSource = unlockSource,
-                    enabled = true,
+                    containerColor = Color.White,
+                    contentColor = Color.Black,
+                    contentPadding = PaddingValues(horizontal = 40.dp, vertical = 18.dp),
+                    expressive = true,
                 ) {
-                    MorphButton(
-                        onClick = { authenticateBiometric() },
-                        modifier = Modifier.height(if (compact) 56.dp else ControlHeight),
-                        interactionSource = unlockSource,
-                        containerColor = Color.White,
-                        contentColor = Color.Black,
-                        contentPadding = PaddingValues(horizontal = 40.dp, vertical = 18.dp),
-                    ) {
-                        // MorphButtonLabel, not a hand-rolled Icon+Spacer+Text -- the icon stays
-                        // larger (24dp) than the standard 18dp, an intentional emphasis for the
-                        // screen's one primary CTA.
-                        MorphButtonLabel(Icons.Filled.Fingerprint, "Unlock", pending = false, iconSize = 24.dp)
-                    }
+                    // MorphButtonLabel, not a hand-rolled Icon+Spacer+Text -- the icon stays
+                    // larger (24dp) than the standard 18dp, an intentional emphasis for the
+                    // screen's one primary CTA.
+                    MorphButtonLabel(Icons.Filled.Fingerprint, "Unlock", pending = false, iconSize = 24.dp)
                 }
                 if (appState.appPinSet) {
                     Spacer(Modifier.height(GapGroup))
@@ -380,18 +376,14 @@ internal fun LockOverlay(vm: AppViewModel, opaqueBackdrop: Boolean = false) {
                         )
                         Spacer(Modifier.height(GapGroup))
                         val pinUnlockSource = remember { MutableInteractionSource() }
-                        SafeExpansiveButton(
+                        MorphButton(
+                            onClick = { attemptPin() },
+                            modifier = Modifier.fillMaxWidth().height(52.dp),
                             interactionSource = pinUnlockSource,
                             enabled = !rejected && pin.length in PinCrypto.PIN_MIN_DIGITS..PinCrypto.PIN_MAX_DIGITS,
+                            expressive = true,
                         ) {
-                            MorphButton(
-                                onClick = { attemptPin() },
-                                modifier = Modifier.fillMaxWidth().height(52.dp),
-                                interactionSource = pinUnlockSource,
-                                enabled = !rejected && pin.length in PinCrypto.PIN_MIN_DIGITS..PinCrypto.PIN_MAX_DIGITS,
-                            ) {
-                                MorphButtonLabel(Icons.Filled.LockOpen, "Unlock", pending = false)
-                            }
+                            MorphButtonLabel(Icons.Filled.LockOpen, "Unlock", pending = false)
                         }
                         if (bioAvailable) {
                             Spacer(Modifier.height(GapRow))

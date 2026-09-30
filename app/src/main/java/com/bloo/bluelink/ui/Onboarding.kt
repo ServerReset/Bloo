@@ -383,19 +383,15 @@ internal fun OnboardingScreen(vm: AppViewModel) {
                     // than a bespoke look-alike for "the quieter one."
                     // With expansion animation.
                     val backSource = remember { MutableInteractionSource() }
-                    SafeExpansiveButton(
+                    MorphButton(
+                        onClick = ::goBack,
                         interactionSource = backSource,
-                        enabled = true,
+                        modifier = Modifier.fillMaxWidth(),
+                        contentPadding = PaddingValues(vertical = GapSection),
+                        border = BorderStroke(1.dp, scheme.outlineVariant),
+                        expressive = true,
                     ) {
-                        MorphButton(
-                            onClick = ::goBack,
-                            interactionSource = backSource,
-                            modifier = Modifier.fillMaxWidth(),
-                            contentPadding = PaddingValues(vertical = GapSection),
-                            border = BorderStroke(1.dp, scheme.outlineVariant),
-                        ) {
-                            Text("Back", style = ButtonLabelStyle)
-                        }
+                        Text("Back", style = ButtonLabelStyle)
                     }
                 }
                 val nextSource = remember { MutableInteractionSource() }
@@ -404,34 +400,29 @@ internal fun OnboardingScreen(vm: AppViewModel) {
                 // and never reads it. The same dead-weight mistake the cover action bar had:
                 // this button was silently hugging its label instead of taking the 2:1 share
                 // over Back that the expression asks for.
-                SafeExpansiveButton(
-                    interactionSource = nextSource,
+                MorphButton(
+                    onClick = ::goNext,
+                    active = true,
                     enabled = !setupBlocked,
-                    modifier = Modifier.weight(if (pageIndex > 0) 2f else 1f),
+                    interactionSource = nextSource,
+                    modifier = Modifier.fillMaxWidth(),
+                    contentPadding = PaddingValues(vertical = GapSection),
+                    expressive = true,
                 ) {
-                    MorphButton(
-                        onClick = ::goNext,
-                        active = true,
-                        enabled = !setupBlocked,
-                        interactionSource = nextSource,
-                        modifier = Modifier.fillMaxWidth(),
-                        contentPadding = PaddingValues(vertical = GapSection),
-                    ) {
-                        // MorphButtonLabel, not a hand-rolled Icon+Spacer+Text -- that Text used
-                        // FontWeight.Bold, where every other button label in the app (including
-                        // this one's own "Back" neighbour) uses SemiBold.
-                        val nextIcon: ImageVector = if (isLast) AppIcons.CheckCircle else AppIcons.Check
-                        val nextText: String = when {
-                            isLast -> "Enter Bloo"
-                            pageIndex == 0 -> "Get started"
-                            else -> "Next"
-                        }
-                        MorphButtonLabel(
-                            nextIcon,
-                            nextText,
-                            pending = false,
-                        )
+                    // MorphButtonLabel, not a hand-rolled Icon+Spacer+Text -- that Text used
+                    // FontWeight.Bold, where every other button label in the app (including
+                    // this one's own "Back" neighbour) uses SemiBold.
+                    val nextIcon: ImageVector = if (isLast) AppIcons.CheckCircle else AppIcons.Check
+                    val nextText: String = when {
+                        isLast -> "Enter Bloo"
+                        pageIndex == 0 -> "Get started"
+                        else -> "Next"
                     }
+                    MorphButtonLabel(
+                        nextIcon,
+                        nextText,
+                        pending = false,
+                    )
                 }
                 if (setupBlocked) {
                     Spacer(Modifier.height(GapHairline))

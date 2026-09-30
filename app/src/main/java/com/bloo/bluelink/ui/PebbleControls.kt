@@ -562,26 +562,19 @@ internal fun StateControl(
             // silently applied to the one-segment case too. SafeExpansiveButton's OTHER path
             // (outside a group) grows the button for real, which is exactly the fallback a
             // solitary button wants and every other lone MorphButton in the app already gets.
-            SafeExpansiveButton(
-                interactionSource = mainSource,
+            MorphButton(
+                onClick = { if (isOn == true) onDeactivate() else onActivate() },
+                onClickHaptic = { haptics?.heavy() },
                 enabled = enabled && !pending,
-                // Same cap the group version applies via its own Modifier -- see groupMaxWidth's
-                // doc above for why this can't be worked out from inside the button itself.
-                modifier = Modifier.widthIn(max = groupMaxWidth),
+                interactionSource = mainSource,
+                active = highlighted,
+                activeContainerColor = highlightColor,
+                activeContentColor = highlightContentColor,
+                contentPadding = PaddingValues(horizontal = 14.dp, vertical = GapRow),
+                modifier = Modifier.heightIn(min = groupBtnSize),
+                expressive = true,
             ) {
-                MorphButton(
-                    onClick = { if (isOn == true) onDeactivate() else onActivate() },
-                    onClickHaptic = { haptics?.heavy() },
-                    enabled = enabled && !pending,
-                    interactionSource = mainSource,
-                    active = highlighted,
-                    activeContainerColor = highlightColor,
-                    activeContentColor = highlightContentColor,
-                    contentPadding = PaddingValues(horizontal = 14.dp, vertical = GapRow),
-                    modifier = Modifier.heightIn(min = groupBtnSize),
-                ) {
-                    lockContent()
-                }
+                lockContent()
             }
         } else {
             ExpressiveButtonRow(
@@ -595,37 +588,35 @@ internal fun StateControl(
             ) {
                 groupActions.forEachIndexed { i, action ->
                     val actionSource = remember { MutableInteractionSource() }
-                    SafeExpansiveButton(interactionSource = actionSource, enabled = action.enabled) {
-                        MorphButton(
-                            onClick = action.onClick,
-                            enabled = action.enabled,
-                            interactionSource = actionSource,
-                            contentPadding = PaddingValues(0.dp),
-                            shapeForCorner = { morph, cp -> connectedGroupShape(i, segmentCount, cp, morph) },
-                            modifier = Modifier.size(groupBtnSize),
-                        ) { Icon(action.icon, contentDescription = action.contentDescription, modifier = Modifier.size(actionIconSize)) }
-                    }
+                    MorphButton(
+                        onClick = action.onClick,
+                        enabled = action.enabled,
+                        interactionSource = actionSource,
+                        contentPadding = PaddingValues(0.dp),
+                        shapeForCorner = { morph, cp -> connectedGroupShape(i, segmentCount, cp, morph) },
+                        modifier = Modifier.size(groupBtnSize),
+                        expressive = true,
+                    ) { Icon(action.icon, contentDescription = action.contentDescription, modifier = Modifier.size(actionIconSize)) }
                 }
                 // Pill when off, rounded rectangle + highlight colour when on - same
                 // as the climate/charge controls -- except when it's part of a
                 // group, where the connected shape takes over (see MorphButton's
                 // shape param doc): a connected group's silhouette is static, not
                 // something one segment morphs independently of the others.
-                SafeExpansiveButton(interactionSource = mainSource, enabled = enabled && !pending) {
-                    MorphButton(
-                        onClick = { if (isOn == true) onDeactivate() else onActivate() },
-                        onClickHaptic = { haptics?.heavy() },
-                        enabled = enabled && !pending,
-                        interactionSource = mainSource,
-                        active = highlighted,
-                        activeContainerColor = highlightColor,
-                        activeContentColor = highlightContentColor,
-                        shapeForCorner = { morph, cp -> connectedGroupShape(segmentCount - 1, segmentCount, cp, morph) },
-                        contentPadding = PaddingValues(horizontal = 14.dp, vertical = GapRow),
-                        modifier = Modifier.heightIn(min = groupBtnSize),
-                    ) {
-                        lockContent()
-                    }
+                MorphButton(
+                    onClick = { if (isOn == true) onDeactivate() else onActivate() },
+                    onClickHaptic = { haptics?.heavy() },
+                    enabled = enabled && !pending,
+                    interactionSource = mainSource,
+                    active = highlighted,
+                    activeContainerColor = highlightColor,
+                    activeContentColor = highlightContentColor,
+                    shapeForCorner = { morph, cp -> connectedGroupShape(segmentCount - 1, segmentCount, cp, morph) },
+                    contentPadding = PaddingValues(horizontal = 14.dp, vertical = GapRow),
+                    modifier = Modifier.heightIn(min = groupBtnSize),
+                    expressive = true,
+                ) {
+                    lockContent()
                 }
             }
         }

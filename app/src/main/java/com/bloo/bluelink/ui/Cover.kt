@@ -649,113 +649,103 @@ internal fun CoverActionButton(
         else if (attention) scheme.onErrorContainer
         else scheme.onSurface
     val coverSource = remember { MutableInteractionSource() }
-    SafeExpansiveButton(
-        interactionSource = coverSource,
+    MorphButton(
+        onClick = { onClick() },
+        onClickHaptic = { haptics?.click() },
+        onLongClick = onLongClick?.let { fn -> { haptics?.tick(); fn() } },
         enabled = enabled && !pending,
-        // The weight belongs HERE, on the node the group actually measures -- it used to be
-        // passed to the MorphButton nested inside this slot, which the group never reads, so
-        // the actions were treated as weightless and pressing one had no width to redistribute.
-        // With the weight on the slot, the actions split whatever the identity pill leaves and
-        // each press shoves its neighbours, exactly like every other group button.
-        groupWeight = 1f,
+        active = active,
+        interactionSource = coverSource,
+        containerColor = if (attention) scheme.errorContainer else buttonContainer(),
+        contentColor = contentFor,
+        disabledContentColor = contentFor,
+        contentPadding = PaddingValues(horizontal = 2.dp, vertical = GapHairline),
+        minHeight = 0.dp,
+        // No weight(1f): its parent here is SafeExpansiveButton's own layout, not the row,
+        // so it was silently doing nothing. The equal share now comes from the group.
+        //
+        // `.height(...)`, with NO `.fillMaxHeight()` before it -- an earlier attempt at
+        // this fix kept `.fillMaxHeight().heightIn(min = max = X)`, which does NOT work:
+        // Modifier chains apply outer-to-inner, so `.fillMaxHeight()` (outer) ALREADY
+        // locks the incoming constraint to `minHeight = maxHeight = parent's max` before
+        // `.heightIn` (inner) ever runs -- and `.heightIn`'s own max cannot go below an
+        // incoming min that's already fixed higher, so the "cap" silently had no effect
+        // at all. Confirmed still broken after that first attempt.
+        //
+        // The real problem `.fillMaxHeight()` was chasing: this button's row sits inside
+        // CoverTile's bottom band -- a plain Column, bottom-aligned inside a Box that
+        // fills the WHOLE tile. A Box hands every child (including a bottom-aligned one)
+        // the SAME max-height constraint it was given itself, so `.fillMaxHeight()` filled
+        // all the way up into that full-tile max -- reported from a real screenshot as one
+        // lone action button (a Charge tile's single "Stop", with no identity-pill sibling
+        // narrow enough to visually mask the effect) ballooning to cover most of the tile,
+        // overlapping the readout above it. `.height(X)` measures this button at exactly
+        // X regardless of what the parent offers -- no `fillMaxHeight()` in the chain
+        // means there's nothing left to override.
+        modifier = Modifier
+            .height(if (compact) 44.dp else 56.dp)
+            .alpha(if (enabled) 1f else 0.45f),
+        expressive = true,
     ) {
-        MorphButton(
-            onClick = { onClick() },
-            onClickHaptic = { haptics?.click() },
-            onLongClick = onLongClick?.let { fn -> { haptics?.tick(); fn() } },
-            enabled = enabled && !pending,
-            active = active,
-            interactionSource = coverSource,
-            containerColor = if (attention) scheme.errorContainer else buttonContainer(),
-            contentColor = contentFor,
-            disabledContentColor = contentFor,
-            contentPadding = PaddingValues(horizontal = 2.dp, vertical = GapHairline),
-            minHeight = 0.dp,
-            // No weight(1f): its parent here is SafeExpansiveButton's own layout, not the row,
-            // so it was silently doing nothing. The equal share now comes from the group.
-            //
-            // `.height(...)`, with NO `.fillMaxHeight()` before it -- an earlier attempt at
-            // this fix kept `.fillMaxHeight().heightIn(min = max = X)`, which does NOT work:
-            // Modifier chains apply outer-to-inner, so `.fillMaxHeight()` (outer) ALREADY
-            // locks the incoming constraint to `minHeight = maxHeight = parent's max` before
-            // `.heightIn` (inner) ever runs -- and `.heightIn`'s own max cannot go below an
-            // incoming min that's already fixed higher, so the "cap" silently had no effect
-            // at all. Confirmed still broken after that first attempt.
-            //
-            // The real problem `.fillMaxHeight()` was chasing: this button's row sits inside
-            // CoverTile's bottom band -- a plain Column, bottom-aligned inside a Box that
-            // fills the WHOLE tile. A Box hands every child (including a bottom-aligned one)
-            // the SAME max-height constraint it was given itself, so `.fillMaxHeight()` filled
-            // all the way up into that full-tile max -- reported from a real screenshot as one
-            // lone action button (a Charge tile's single "Stop", with no identity-pill sibling
-            // narrow enough to visually mask the effect) ballooning to cover most of the tile,
-            // overlapping the readout above it. `.height(X)` measures this button at exactly
-            // X regardless of what the parent offers -- no `fillMaxHeight()` in the chain
-            // means there's nothing left to override.
-            modifier = Modifier
-                .height(if (compact) 44.dp else 56.dp)
-                .alpha(if (enabled) 1f else 0.45f),
-        ) {
-        val glyph: @Composable () -> Unit = {
-            if (pending) {
-                CircularProgressIndicator(
-                    modifier = Modifier.size(20.dp),
-                    strokeWidth = 2.dp,
-                    color = LocalContentColor.current,
-                )
-            } else {
-                // iconOnly moves `label` here as the contentDescription instead of null --
-                // with no visible text anywhere on the button, this glyph is the ONLY node
-                // left for a screen reader to describe it by.
-                Icon(icon, contentDescription = if (iconOnly) label else null, modifier = Modifier.size(22.dp))
-            }
-        }
-        val text: @Composable () -> Unit = {
-            com.bloo.uicommon.FittedText(
-                text = label,
-                style = MaterialTheme.typography.labelSmall.copy(
-                    fontWeight = FontWeight.SemiBold,
-                    color = LocalContentColor.current,
-                ),
+    val glyph: @Composable () -> Unit = {
+        if (pending) {
+            CircularProgressIndicator(
+                modifier = Modifier.size(20.dp),
+                strokeWidth = 2.dp,
+                color = LocalContentColor.current,
             )
-        }
-        if (iconOnly) {
-            // Genuinely icon-only -- not icon-plus-hidden-label -- same "skip the layout for
-            // the half that isn't there" rule every other icon-only path in this app follows
-            // (MorphButtonLabel's own, CoverIdentityPill's new one above).
-            Box(Modifier.fillMaxHeight(), contentAlignment = Alignment.Center) {
-                glyph()
-            }
-        } else if (compact) {
-            Row(
-                // fillMaxHEIGHT, not fillMaxSize. MorphButtonCore sizes itself from its content,
-                // and its own doc spells out the consequence of a content child that fills:
-                // "the button had no intrinsic size of its own and simply took whatever the
-                // incoming constraints allowed". In a full-width action row that is the whole
-                // panel -- which is the enormous button, and no amount of guarding equalWidths
-                // above could have helped, because the stretch was coming from inside.
-                Modifier.fillMaxHeight().padding(horizontal = 14.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                glyph()
-                text()
-            }
         } else {
-            Column(
-                // fillMaxHeight for the same reason. The stacked form is only ever used where
-                // the group hands out an exact width anyway, so it never depended on filling.
-                Modifier.fillMaxHeight(),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.Center,
-            ) {
-                glyph()
-                Spacer(Modifier.height(3.dp))
-                text()
-            }
+            // iconOnly moves `label` here as the contentDescription instead of null --
+            // with no visible text anywhere on the button, this glyph is the ONLY node
+            // left for a screen reader to describe it by.
+            Icon(icon, contentDescription = if (iconOnly) label else null, modifier = Modifier.size(22.dp))
         }
     }
+    val text: @Composable () -> Unit = {
+        com.bloo.uicommon.FittedText(
+            text = label,
+            style = MaterialTheme.typography.labelSmall.copy(
+                fontWeight = FontWeight.SemiBold,
+                color = LocalContentColor.current,
+            ),
+        )
     }
+    if (iconOnly) {
+        // Genuinely icon-only -- not icon-plus-hidden-label -- same "skip the layout for
+        // the half that isn't there" rule every other icon-only path in this app follows
+        // (MorphButtonLabel's own, CoverIdentityPill's new one above).
+        Box(Modifier.fillMaxHeight(), contentAlignment = Alignment.Center) {
+            glyph()
+        }
+    } else if (compact) {
+        Row(
+            // fillMaxHEIGHT, not fillMaxSize. MorphButtonCore sizes itself from its content,
+            // and its own doc spells out the consequence of a content child that fills:
+            // "the button had no intrinsic size of its own and simply took whatever the
+            // incoming constraints allowed". In a full-width action row that is the whole
+            // panel -- which is the enormous button, and no amount of guarding equalWidths
+            // above could have helped, because the stretch was coming from inside.
+            Modifier.fillMaxHeight().padding(horizontal = 14.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            glyph()
+            text()
+        }
+    } else {
+        Column(
+            // fillMaxHeight for the same reason. The stacked form is only ever used where
+            // the group hands out an exact width anyway, so it never depended on filling.
+            Modifier.fillMaxHeight(),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center,
+        ) {
+            glyph()
+            Spacer(Modifier.height(3.dp))
+            text()
+        }
+    }
+}
 }
 
 /**

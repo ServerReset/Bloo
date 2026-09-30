@@ -125,16 +125,12 @@ internal fun BackupSyncCardContent(
                     // use); fillMaxWidth on TOP of that was the oversized, one-off treatment
                     // reported from a real screenshot, not a second thing this control needs.
                     val setupSource = remember { MutableInteractionSource() }
-                    SafeExpansiveButton(
+                    MorphButton(
+                        onClick = { showDriveDialog = true },
                         interactionSource = setupSource,
-                        enabled = true,
-                    ) {
-                        MorphButton(
-                            onClick = { showDriveDialog = true },
-                            interactionSource = setupSource,
-                            active = true,
-                        ) { MorphButtonLabel(icon = Icons.Filled.CloudSync, label = "Set up auto-sync", pending = false) }
-                    }
+                        active = true,
+                        expressive = true,
+                    ) { MorphButtonLabel(icon = Icons.Filled.CloudSync, label = "Set up auto-sync", pending = false) }
                 } else {
                     // Configured: "Sync now" is THE daily control, so it leads —
                     // ahead of the device registry and the setup/teardown pair,

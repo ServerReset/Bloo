@@ -455,39 +455,35 @@ internal fun SearchSuggestions(state: UiState, compact: Boolean = false, onPick:
                 // Same MorphButton every selector chip in the app uses, with
                 // the search screen's tonal fill kept as its standard colours.
                 val exampleSource = remember { MutableInteractionSource() }
-                SafeExpansiveButton(
+                MorphButton(
+                    onClick = { onPick(example) },
                     interactionSource = exampleSource,
-                    enabled = true,
+                    containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                    contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                    contentPadding = PaddingValues(horizontal = 14.dp, vertical = GapRow),
+                    minHeight = 0.dp,
+                    // Theme-weighted, not a bare dropShadow(). These chips float
+                    // over the aurora with nothing opaque behind them (see the
+                    // heading's own comment just above), so they do want a real
+                    // shadow -- but dropShadow's default colour is 0.38-alpha
+                    // black, and on a light theme that is the "black halo behind
+                    // a floating pill" this app has now been reported for from
+                    // three different surfaces. Same split, and the same reasoning,
+                    // as glassDropShadow (GlassChrome.kt): unchanged in dark, a
+                    // soft contact shadow in light.
+                    modifier = Modifier.dropShadow(
+                        RoundedCornerShape(50),
+                        color = Color.Black.copy(alpha = if (appIsDarkTheme()) 0.38f else 0.12f),
+                        blurRadius = 8.dp,
+                        offsetY = 3.dp,
+                    ),
+                    expressive = true,
                 ) {
-                    MorphButton(
-                        onClick = { onPick(example) },
-                        interactionSource = exampleSource,
-                        containerColor = MaterialTheme.colorScheme.secondaryContainer,
-                        contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
-                        contentPadding = PaddingValues(horizontal = 14.dp, vertical = GapRow),
-                        minHeight = 0.dp,
-                        // Theme-weighted, not a bare dropShadow(). These chips float
-                        // over the aurora with nothing opaque behind them (see the
-                        // heading's own comment just above), so they do want a real
-                        // shadow -- but dropShadow's default colour is 0.38-alpha
-                        // black, and on a light theme that is the "black halo behind
-                        // a floating pill" this app has now been reported for from
-                        // three different surfaces. Same split, and the same reasoning,
-                        // as glassDropShadow (GlassChrome.kt): unchanged in dark, a
-                        // soft contact shadow in light.
-                        modifier = Modifier.dropShadow(
-                            RoundedCornerShape(50),
-                            color = Color.Black.copy(alpha = if (appIsDarkTheme()) 0.38f else 0.12f),
-                            blurRadius = 8.dp,
-                            offsetY = 3.dp,
-                        ),
-                    ) {
-                        Text(
-                            example,
-                            style = MaterialTheme.typography.labelLarge,
-                            fontWeight = FontWeight.SemiBold,
-                        )
-                    }
+                    Text(
+                        example,
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = FontWeight.SemiBold,
+                    )
                 }
             }
         }

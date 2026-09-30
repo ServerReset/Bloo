@@ -515,28 +515,24 @@ internal fun PaletteEditorDialog(
         },
         buttons = {
             val saveSource = remember { MutableInteractionSource() }
-            SafeExpansiveButton(
-                interactionSource = saveSource,
-                enabled = true,
-            ) {
-                MorphButton(
-                    onClick = {
-                        onSave(
-                            CustomPaletteData(
-                                id = paletteId,
-                                name = name.ifBlank { "Custom" },
-                                primaryArgb = primaryColor.toArgb(),
-                                secondaryArgb = if (useSecondary) secondaryColor.toArgb() else null,
-                                tertiaryArgb = if (useTertiary) tertiaryColor.toArgb() else null,
-                            )
+            MorphButton(
+                onClick = {
+                    onSave(
+                        CustomPaletteData(
+                            id = paletteId,
+                            name = name.ifBlank { "Custom" },
+                            primaryArgb = primaryColor.toArgb(),
+                            secondaryArgb = if (useSecondary) secondaryColor.toArgb() else null,
+                            tertiaryArgb = if (useTertiary) tertiaryColor.toArgb() else null,
                         )
-                        onDismiss()
-                    },
-                    active = true,
-                    interactionSource = saveSource,
-                    modifier = Modifier.fillMaxWidth(),
-                ) { MorphButtonLabel(Icons.Filled.Check, "Save", pending = false) }
-            }
+                    )
+                    onDismiss()
+                },
+                active = true,
+                interactionSource = saveSource,
+                modifier = Modifier.fillMaxWidth(),
+                expressive = true,
+            ) { MorphButtonLabel(Icons.Filled.Check, "Save", pending = false) }
             SafeMorphTextButton(
                 "Cancel",
                 onDismiss,

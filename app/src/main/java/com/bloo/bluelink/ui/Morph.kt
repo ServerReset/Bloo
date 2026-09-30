@@ -196,6 +196,10 @@ fun MorphButton(
      * a group member -- see ExpressiveGroupData.weight.
      */
     groupWeight: Float = 0f,
+    /** Wraps the button in [SafeExpansiveButton] itself -- the press-grow feedback -- so a call
+     *  site sets a flag instead of hand-wiring a wrapper around a shared interaction source.
+     *  Always on inside an [ExpressiveButtonGroup], where the button joins on its own. */
+    expressive: Boolean = false,
     content: @Composable RowScope.() -> Unit,
 ) {
     val haptics = LocalHaptics.current
@@ -272,7 +276,7 @@ fun MorphButton(
     // is the "it just pushes them and they don't shrink" behaviour, and it could reappear with
     // any new call site, so the button joins itself rather than relying on the call site to
     // remember. Wrapping is idempotent -- see SafeExpansiveButton's group branch.
-    if (LocalExpressiveGroup.current) {
+    if (LocalExpressiveGroup.current || expressive) {
         SafeExpansiveButton(
             interactionSource = interactionSource,
             enabled = enabled,
@@ -400,6 +404,8 @@ fun MorphActionButton(
     interactionSource: MutableInteractionSource = remember { MutableInteractionSource() },
     /** See [MorphButton]'s own `groupWeight`. */
     groupWeight: Float = 0f,
+    /** See [MorphButton]'s own `expressive`. */
+    expressive: Boolean = false,
 ) {
     MorphButton(
         onClick = onClick,
@@ -407,6 +413,7 @@ fun MorphActionButton(
         enabled = enabled,
         interactionSource = interactionSource,
         groupWeight = groupWeight,
+        expressive = expressive,
         contentPadding = PaddingValues(horizontal = 18.dp, vertical = GapRow),
     ) {
         // The shared label, so the glyph gets the standard gap and -- the part a

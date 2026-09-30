@@ -366,49 +366,45 @@ internal fun ChoiceRow(label: String, selected: Boolean, onSelect: () -> Unit) {
     // primaryContainer rounded square once chosen, pressed-state included.
     // With expansion animation.
     val choiceSource = remember { MutableInteractionSource() }
-    SafeExpansiveButton(
+    MorphButton(
+        onClick = { onSelect() },
+        active = selected,
         interactionSource = choiceSource,
-        enabled = true,
+        // Idle container/content left at MorphButton's own defaults (the tonal fill
+        // + hairline rim every idle button in the app now shares) instead of the old
+        // bespoke buttonContainer()/onSurface -- only the SELECTED state stays a
+        // distinct explicit colour here, since that's this row's own state, not the
+        // shared idle look.
+        activeContainerColor = MaterialTheme.colorScheme.primaryContainer,
+        activeContentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+        contentPadding = PaddingValues(horizontal = 16.dp, vertical = GapGroup),
+        // The standard target height and the standard button label, like everything else
+        // tappable. A choice row IS a button; it was the last one still setting its own
+        // height (none) and its own type (bodyLarge, a body style rather than the button
+        // one), which is why a list of them sat visibly shorter and lighter than the
+        // buttons directly above them in the same card.
+        minHeight = ButtonTargetHeight,
+        modifier = Modifier.fillMaxWidth(),
+        expressive = true,
     ) {
-        MorphButton(
-            onClick = { onSelect() },
-            active = selected,
-            interactionSource = choiceSource,
-            // Idle container/content left at MorphButton's own defaults (the tonal fill
-            // + hairline rim every idle button in the app now shares) instead of the old
-            // bespoke buttonContainer()/onSurface -- only the SELECTED state stays a
-            // distinct explicit colour here, since that's this row's own state, not the
-            // shared idle look.
-            activeContainerColor = MaterialTheme.colorScheme.primaryContainer,
-            activeContentColor = MaterialTheme.colorScheme.onPrimaryContainer,
-            contentPadding = PaddingValues(horizontal = 16.dp, vertical = GapGroup),
-            // The standard target height and the standard button label, like everything else
-            // tappable. A choice row IS a button; it was the last one still setting its own
-            // height (none) and its own type (bodyLarge, a body style rather than the button
-            // one), which is why a list of them sat visibly shorter and lighter than the
-            // buttons directly above them in the same card.
-            minHeight = ButtonTargetHeight,
-            modifier = Modifier.fillMaxWidth(),
-        ) {
-        Text(
-            label,
-            Modifier.weight(1f),
-            style = ButtonLabelStyle,
-            fontWeight = FontWeight.SemiBold,
+    Text(
+        label,
+        Modifier.weight(1f),
+        style = ButtonLabelStyle,
+        fontWeight = FontWeight.SemiBold,
+    )
+    AnimatedVisibility(
+        visible = selected,
+        enter = scaleIn(spring(dampingRatio = Spring.DampingRatioMediumBouncy)) + fadeIn(),
+        exit = scaleOut() + fadeOut(),
+    ) {
+        Icon(
+            Icons.Filled.Check,
+            contentDescription = null,
+            modifier = Modifier.size(ButtonIconSize),
         )
-        AnimatedVisibility(
-            visible = selected,
-            enter = scaleIn(spring(dampingRatio = Spring.DampingRatioMediumBouncy)) + fadeIn(),
-            exit = scaleOut() + fadeOut(),
-        ) {
-            Icon(
-                Icons.Filled.Check,
-                contentDescription = null,
-                modifier = Modifier.size(ButtonIconSize),
-            )
-        }
     }
-    }
+}
 }
 
 
