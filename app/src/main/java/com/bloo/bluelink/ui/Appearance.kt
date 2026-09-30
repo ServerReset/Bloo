@@ -537,18 +537,11 @@ internal fun PaletteEditorDialog(
                     modifier = Modifier.fillMaxWidth(),
                 ) { MorphButtonLabel(Icons.Filled.Check, "Save", pending = false) }
             }
-            val cancelSource = remember { MutableInteractionSource() }
-            SafeExpansiveButton(
-                interactionSource = cancelSource,
-                enabled = true,
-            ) {
-                MorphTextButton(
-                    "Cancel",
-                    onDismiss,
-                    interactionSource = cancelSource,
-                    modifier = Modifier.fillMaxWidth()
-                )
-            }
+            SafeMorphTextButton(
+                "Cancel",
+                onDismiss,
+                modifier = Modifier.fillMaxWidth()
+            )
         },
     )
 }

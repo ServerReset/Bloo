@@ -206,17 +206,10 @@ internal fun CropScreen(vin: String, uriString: String, onCancel: () -> Unit, on
                 }
             }
             ExpressiveButtonRow(spacing = 12.dp) {
-                val cancelSource = remember { MutableInteractionSource() }
-                SafeExpansiveButton(
-                    interactionSource = cancelSource,
-                    enabled = true,
-                ) {
-                    MorphTextButton(
-                        "Cancel",
-                        onClick = onCancel,
-                        interactionSource = cancelSource,
-                    )
-                }
+                SafeMorphTextButton(
+                    "Cancel",
+                    onClick = onCancel,
+                )
                 val confirmSource = remember { MutableInteractionSource() }
                 SafeExpansiveButton(
                     interactionSource = confirmSource,

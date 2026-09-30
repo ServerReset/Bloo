@@ -199,17 +199,10 @@ internal fun LocationCardContent(appearance: SettingsStore.Appearance, vm: AppVi
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
-                val weatherClearSource = remember { MutableInteractionSource() }
-                SafeExpansiveButton(
-                    interactionSource = weatherClearSource,
-                    enabled = true,
-                ) {
-                    MorphTextButton(
-                        "Clear",
-                        onClick = { vm.clearWeatherLocation() },
-                        interactionSource = weatherClearSource,
-                    )
-                }
+                SafeMorphTextButton(
+                    "Clear",
+                    onClick = { vm.clearWeatherLocation() },
+                )
             }
             Spacer(Modifier.height(GapGroup))
         }
@@ -279,35 +272,21 @@ internal fun LogsCardContent(logs: List<String>, vm: AppViewModel, clipboardScop
                     // was opened, which is exactly the second step that made this card feel
                     // like it opened twice.
                     ExpressiveButtonRow(spacing = 0.dp) {
-                            val copySource = remember { MutableInteractionSource() }
-                            SafeExpansiveButton(
-                                interactionSource = copySource,
-                                enabled = true,
-                            ) {
-                                MorphTextButton(
-                                    "Copy",
-                                    onClick = {
-                                        clipboardScope.launch {
-                                            clipboard.setClipEntry(
-                                                ClipEntry(ClipData.newPlainText("bloo logs", logs.joinToString("\n"))),
-                                            )
-                                        }
-                                    },
-                                    interactionSource = copySource,
-                                )
-                            }
+                            SafeMorphTextButton(
+                                "Copy",
+                                onClick = {
+                                    clipboardScope.launch {
+                                        clipboard.setClipEntry(
+                                            ClipEntry(ClipData.newPlainText("bloo logs", logs.joinToString("\n"))),
+                                        )
+                                    }
+                                },
+                            )
                             Spacer(Modifier.width(8.dp))
-                            val clearSource = remember { MutableInteractionSource() }
-                            SafeExpansiveButton(
-                                interactionSource = clearSource,
-                                enabled = true,
-                            ) {
-                                MorphTextButton(
-                                    "Clear",
-                                    onClick = { vm.clearLogs() },
-                                    interactionSource = clearSource,
-                                )
-                            }
+                            SafeMorphTextButton(
+                                "Clear",
+                                onClick = { vm.clearLogs() },
+                            )
                         Spacer(Modifier.width(4.dp))
                     }
                 }
@@ -685,19 +664,12 @@ internal fun SecurityCardContent(
                         )
                     }
                     if (pinSet) {
-                        val removeSource = remember { MutableInteractionSource() }
-                        SafeExpansiveButton(
-                            interactionSource = removeSource,
-                            enabled = true,
-                        ) {
-                            MorphTextButton(
-                                "Remove",
-                                onClick = { pinDialog = "remove" },
-                                interactionSource = removeSource,
-                                containerColor = MaterialTheme.colorScheme.errorContainer,
-                                contentColor = MaterialTheme.colorScheme.onErrorContainer,
-                            )
-                        }
+                        SafeMorphTextButton(
+                            "Remove",
+                            onClick = { pinDialog = "remove" },
+                            containerColor = MaterialTheme.colorScheme.errorContainer,
+                            contentColor = MaterialTheme.colorScheme.onErrorContainer,
+                        )
                     }
                 }
                 PinDialogs(

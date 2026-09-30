@@ -340,24 +340,17 @@ internal fun SettingsHeroCard(state: UiState, vm: AppViewModel, compact: Boolean
                                 )
                             }
                         }
-                        val githubSource = remember { MutableInteractionSource() }
-                        SafeExpansiveButton(
-                            interactionSource = githubSource,
-                            enabled = true,
-                        ) {
-                            MorphTextButton(
-                                "GitHub",
-                                interactionSource = githubSource,
-                                onClick = {
-                                    runCatching {
-                                        context.startActivity(
-                                            Intent(Intent.ACTION_VIEW, com.bloo.bluelink.data.UpdateApi.RELEASES_URL.toUri())
-                                                .apply { addFlags(Intent.FLAG_ACTIVITY_NEW_TASK) },
-                                        )
-                                    }
-                                },
-                            )
-                        }
+                        SafeMorphTextButton(
+                            "GitHub",
+                            onClick = {
+                                runCatching {
+                                    context.startActivity(
+                                        Intent(Intent.ACTION_VIEW, com.bloo.bluelink.data.UpdateApi.RELEASES_URL.toUri())
+                                            .apply { addFlags(Intent.FLAG_ACTIVITY_NEW_TASK) },
+                                    )
+                                }
+                            },
+                        )
                     }
                     // Shizuku silent-install: the ROW is gated on Shizuku being present, but
                     // the card is not -- so the update controls above always show.
@@ -463,18 +456,11 @@ internal fun SettingsHeroCard(state: UiState, vm: AppViewModel, compact: Boolean
                         // sit in a Row with a leading weight(1f) Spacer to push it to the
                         // right edge, which was the one right-aligned button in Settings and
                         // read as a different kind of control from the action above it.
-                        val notNowSource = remember { MutableInteractionSource() }
-                        SafeExpansiveButton(
-                            interactionSource = notNowSource,
+                        SafeMorphTextButton(
+                            "Not now",
+                            onClick = vm::dismissUpdate,
                             enabled = !state.updateDownloading && !state.updateInstalling,
-                        ) {
-                            MorphTextButton(
-                                "Not now",
-                                interactionSource = notNowSource,
-                                onClick = vm::dismissUpdate,
-                                enabled = !state.updateDownloading && !state.updateInstalling,
-                            )
-                        }
+                        )
                         }
                         }
                     }

@@ -15,7 +15,6 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
-import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -643,30 +642,23 @@ internal fun SettingsSearchResults(
                         // default is the calmer buttonContainer(), and this is the
                         // card's primary action -- the conversion should change the
                         // FEEL, not quietly demote the emphasis.
-                        val runSource = remember { MutableInteractionSource() }
-                        SafeExpansiveButton(
-                            interactionSource = runSource,
+                        SafeMorphTextButton(
+                            text = if (running) "Working…" else "Run it",
+                            onClick = {
+                                running = true
+                                scope.launch {
+                                    val r = runCatching {
+                                        TileCommandRunner.run(ctx, car.vin, p.first, "default")
+                                    }.getOrNull()
+                                    ran = r?.message ?: "Command failed"
+                                    running = false
+                                    vm.refreshStatus(car)
+                                }
+                            },
                             enabled = !running,
-                        ) {
-                            MorphTextButton(
-                                text = if (running) "Working…" else "Run it",
-                                interactionSource = runSource,
-                                onClick = {
-                                    running = true
-                                    scope.launch {
-                                        val r = runCatching {
-                                            TileCommandRunner.run(ctx, car.vin, p.first, "default")
-                                        }.getOrNull()
-                                        ran = r?.message ?: "Command failed"
-                                        running = false
-                                        vm.refreshStatus(car)
-                                    }
-                                },
-                                enabled = !running,
-                                containerColor = MaterialTheme.colorScheme.primary,
-                                contentColor = MaterialTheme.colorScheme.onPrimary,
-                            )
-                        }
+                            containerColor = MaterialTheme.colorScheme.primary,
+                            contentColor = MaterialTheme.colorScheme.onPrimary,
+                        )
                     }
                 }
             }

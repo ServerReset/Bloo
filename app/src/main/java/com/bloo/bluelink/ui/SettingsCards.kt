@@ -144,31 +144,17 @@ internal fun LiveUpdateTroubleshootDialog(onDismiss: () -> Unit) {
                 )
             }
             if (isSamsung) {
-                val devSource = remember { MutableInteractionSource() }
-                SafeExpansiveButton(
-                    interactionSource = devSource,
-                    enabled = true,
-                ) {
-                    MorphTextButton(
-                        "Open Developer options",
-                        onClick = { LiveCharge.openDeveloperOptions(context) },
-                        interactionSource = devSource,
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-                }
-            }
-            val closeSource = remember { MutableInteractionSource() }
-            SafeExpansiveButton(
-                interactionSource = closeSource,
-                enabled = true,
-            ) {
-                MorphTextButton(
-                    "Close",
-                    onDismiss,
-                    interactionSource = closeSource,
+                SafeMorphTextButton(
+                    "Open Developer options",
+                    onClick = { LiveCharge.openDeveloperOptions(context) },
                     modifier = Modifier.fillMaxWidth(),
                 )
             }
+            SafeMorphTextButton(
+                "Close",
+                onDismiss,
+                modifier = Modifier.fillMaxWidth(),
+            )
         },
     )
 }

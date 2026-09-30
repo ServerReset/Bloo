@@ -304,19 +304,12 @@ internal fun LockOverlay(vm: AppViewModel, opaqueBackdrop: Boolean = false) {
                 }
                 if (appState.appPinSet) {
                     Spacer(Modifier.height(GapGroup))
-                    val pinSource = remember { MutableInteractionSource() }
-                    SafeExpansiveButton(
-                        interactionSource = pinSource,
-                        enabled = true,
-                    ) {
-                        MorphTextButton(
-                            "Use PIN",
-                            onClick = { haptics?.click(); usePinMode = true },
-                            interactionSource = pinSource,
-                            containerColor = Color.White.copy(alpha = 0.10f),
-                            contentColor = Color.White,
-                        )
-                    }
+                    SafeMorphTextButton(
+                        "Use PIN",
+                        onClick = { haptics?.click(); usePinMode = true },
+                        containerColor = Color.White.copy(alpha = 0.10f),
+                        contentColor = Color.White,
+                    )
                 }
             } else if (appState.appPinSet) {
                 // --- PIN prompt (device has no biometrics, or user chose PIN) --
@@ -402,18 +395,11 @@ internal fun LockOverlay(vm: AppViewModel, opaqueBackdrop: Boolean = false) {
                         }
                         if (bioAvailable) {
                             Spacer(Modifier.height(GapRow))
-                            val bioSource = remember { MutableInteractionSource() }
-                            SafeExpansiveButton(
-                                interactionSource = bioSource,
-                                enabled = true,
-                            ) {
-                                MorphTextButton(
-                                    "Use biometrics",
-                                    onClick = { haptics?.click(); usePinMode = false; authenticateBiometric() },
-                                    interactionSource = bioSource,
-                                    modifier = Modifier.fillMaxWidth(),
-                                )
-                            }
+                            SafeMorphTextButton(
+                                "Use biometrics",
+                                onClick = { haptics?.click(); usePinMode = false; authenticateBiometric() },
+                                modifier = Modifier.fillMaxWidth(),
+                            )
                         }
                     }
                 }

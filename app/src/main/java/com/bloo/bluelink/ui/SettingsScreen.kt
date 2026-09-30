@@ -639,35 +639,21 @@ private fun AccountsCardContent(state: UiState, vm: AppViewModel) {
                         }
                         ExpressiveButtonRow(spacing = GapRow) {
                             if (creds.brand.requiresPin) {
-                                val pinSource = remember { MutableInteractionSource() }
-                                SafeExpansiveButton(
-                                    interactionSource = pinSource,
+                                SafeMorphTextButton(
+                                    "Update PIN",
+                                    onClick = { vm.updatePin(creds.brand, pin) },
                                     enabled = pin.isNotBlank() && pin != creds.pin,
-                                ) {
-                                    MorphTextButton(
-                                        "Update PIN",
-                                        onClick = { vm.updatePin(creds.brand, pin) },
-                                        enabled = pin.isNotBlank() && pin != creds.pin,
-                                        interactionSource = pinSource,
-                                    )
-                                }
-                            }
-                            val signOutSource = remember { MutableInteractionSource() }
-                            SafeExpansiveButton(
-                                interactionSource = signOutSource,
-                                enabled = true,
-                            ) {
-                                MorphTextButton(
-                                    if (confirmSignOut) "Tap again to confirm" else "Sign out",
-                                    onClick = {
-                                        if (confirmSignOut) { vm.logout(creds.brand); confirmSignOut = false }
-                                        else confirmSignOut = true
-                                    },
-                                    containerColor = MaterialTheme.colorScheme.errorContainer,
-                                    contentColor = MaterialTheme.colorScheme.onErrorContainer,
-                                    interactionSource = signOutSource,
                                 )
                             }
+                            SafeMorphTextButton(
+                                if (confirmSignOut) "Tap again to confirm" else "Sign out",
+                                onClick = {
+                                    if (confirmSignOut) { vm.logout(creds.brand); confirmSignOut = false }
+                                    else confirmSignOut = true
+                                },
+                                containerColor = MaterialTheme.colorScheme.errorContainer,
+                                contentColor = MaterialTheme.colorScheme.onErrorContainer,
+                            )
                         }
                     }
                 }
@@ -909,28 +895,14 @@ private fun BackupSyncCardContent(
                     // the two buttons packed to their own content width and read as a mismatched
                     // pair next to the evenly-split control right above them.
                     ExpressiveButtonRow(modifier = Modifier.fillMaxWidth(), spacing = 8.dp, equalWidths = true) {
-                        val changeFileSource = remember { MutableInteractionSource() }
-                        SafeExpansiveButton(
-                            interactionSource = changeFileSource,
-                            enabled = true,
-                        ) {
-                            MorphTextButton(
-                                "Change Drive file",
-                                interactionSource = changeFileSource,
-                                onClick = { showDriveDialog = true },
-                            )
-                        }
-                        val disableSource = remember { MutableInteractionSource() }
-                        SafeExpansiveButton(
-                            interactionSource = disableSource,
-                            enabled = true,
-                        ) {
-                            MorphTextButton(
-                                "Disable",
-                                interactionSource = disableSource,
-                                onClick = { vm.clearSyncUri() },
-                            )
-                        }
+                        SafeMorphTextButton(
+                            "Change Drive file",
+                            onClick = { showDriveDialog = true },
+                        )
+                        SafeMorphTextButton(
+                            "Disable",
+                            onClick = { vm.clearSyncUri() },
+                        )
                     }
                     // Troubleshooting tools, not daily controls: the last-synced
                     // stamp (already summarised in the header above), the file
@@ -983,33 +955,19 @@ private fun BackupSyncCardContent(
                             ExpressiveButtonRow(modifier = Modifier.fillMaxWidth(), spacing = 8.dp) {
                                 // Non-destructive real-provider round-trip so the user can confirm
                                 // sync actually works.
-                                val testSyncSource = remember { MutableInteractionSource() }
-                                SafeExpansiveButton(
-                                    interactionSource = testSyncSource,
-                                    enabled = true,
-                                ) {
-                                    MorphTextButton(
-                                        "Test sync",
-                                        interactionSource = testSyncSource,
-                                        onClick = { vm.testSync() }
-                                    )
-                                }
+                                SafeMorphTextButton(
+                                    "Test sync",
+                                    onClick = { vm.testSync() }
+                                )
                                 // "Pull from primary now": force this device to adopt the
                                 // primary's full settings — only when a primary exists AND it
                                 // isn't this device (pulling from yourself is a no-op). When not
                                 // shown, Test sync spans the row on its own.
                                 if (state.syncPrimaryId != null && state.syncPrimaryId != state.thisDeviceId) {
-                                    val pullSource = remember { MutableInteractionSource() }
-                                    SafeExpansiveButton(
-                                        interactionSource = pullSource,
-                                        enabled = true,
-                                    ) {
-                                        MorphTextButton(
-                                            "Pull from primary",
-                                            interactionSource = pullSource,
-                                            onClick = { vm.pullFromPrimary() }
-                                        )
-                                    }
+                                    SafeMorphTextButton(
+                                        "Pull from primary",
+                                        onClick = { vm.pullFromPrimary() }
+                                    )
                                 }
                             }
                         }
@@ -1036,28 +994,14 @@ private fun BackupSyncCardContent(
                     )
                     Spacer(Modifier.height(GapRow))
                     ExpressiveButtonRow(modifier = Modifier.fillMaxWidth(), spacing = 8.dp) {
-                        val exportSource = remember { MutableInteractionSource() }
-                        SafeExpansiveButton(
-                            interactionSource = exportSource,
-                            enabled = true,
-                        ) {
-                            MorphTextButton(
-                                "Export",
-                                interactionSource = exportSource,
-                                onClick = { vm.exportSettings(context) },
-                            )
-                        }
-                        val restoreSource = remember { MutableInteractionSource() }
-                        SafeExpansiveButton(
-                            interactionSource = restoreSource,
-                            enabled = true,
-                        ) {
-                            MorphTextButton(
-                                "Restore",
-                                interactionSource = restoreSource,
-                                onClick = { settingsImportLauncher.launch("application/json") },
-                            )
-                        }
+                        SafeMorphTextButton(
+                            "Export",
+                            onClick = { vm.exportSettings(context) },
+                        )
+                        SafeMorphTextButton(
+                            "Restore",
+                            onClick = { settingsImportLauncher.launch("application/json") },
+                        )
                     }
                   }
                 }

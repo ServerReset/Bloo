@@ -335,6 +335,40 @@ fun MorphTextButton(
 }
 
 /**
+ * [MorphTextButton] with its own press-feedback wrapper: owns the interaction source and wraps
+ * itself in [SafeExpansiveButton], so a call site is one call instead of a hand-wired
+ * source + wrapper + button trio.
+ */
+@Composable
+fun SafeMorphTextButton(
+    text: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true,
+    containerColor: Color = buttonContainer(),
+    contentColor: Color = MaterialTheme.colorScheme.onSurface,
+    icon: ImageVector? = null,
+    showIcon: Boolean = true,
+    groupWeight: Float = 0f,
+) {
+    val source = remember { MutableInteractionSource() }
+    SafeExpansiveButton(interactionSource = source, enabled = enabled) {
+        MorphTextButton(
+            text = text,
+            onClick = onClick,
+            modifier = modifier,
+            enabled = enabled,
+            containerColor = containerColor,
+            contentColor = contentColor,
+            interactionSource = source,
+            icon = icon,
+            showIcon = showIcon,
+            groupWeight = groupWeight,
+        )
+    }
+}
+
+/**
  * **The** standard action button: a glyph, a label, a tonal fill and a hairline rim.
  *
  * This is the one look for "tap this and something happens" -- Expand / Open in Maps on

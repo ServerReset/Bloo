@@ -7,7 +7,6 @@ import android.content.pm.PackageManager
 import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -154,20 +153,16 @@ internal fun AutoLockSettingsGroup(v: Vehicle, vm: AppViewModel) {
         // to make exact any more.
         if (current.enabled) {
             StatusRow("Car Bluetooth device", current.deviceName ?: "Not set")
-            val deviceSource = remember { MutableInteractionSource() }
-            SafeExpansiveButton(interactionSource = deviceSource, enabled = true) {
-                MorphTextButton(
-                    "Choose device",
-                    interactionSource = deviceSource,
-                    onClick = {
-                        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S || granted(Manifest.permission.BLUETOOTH_CONNECT)) {
-                            showDevicePicker = true
-                        } else {
-                            bluetoothConnectLauncher.launch(Manifest.permission.BLUETOOTH_CONNECT)
-                        }
-                    },
-                )
-            }
+            SafeMorphTextButton(
+                "Choose device",
+                onClick = {
+                    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S || granted(Manifest.permission.BLUETOOTH_CONNECT)) {
+                        showDevicePicker = true
+                    } else {
+                        bluetoothConnectLauncher.launch(Manifest.permission.BLUETOOTH_CONNECT)
+                    }
+                },
+            )
 
             StepRow("Grace period", "${current.graceSeconds}s")
             AnimatedSlider(
@@ -191,15 +186,11 @@ internal fun AutoLockSettingsGroup(v: Vehicle, vm: AppViewModel) {
 
     if (current.enabled) {
         SettingsGroup("Test") {
-            val simSource = remember { MutableInteractionSource() }
-            SafeExpansiveButton(interactionSource = simSource, enabled = current.isUsable) {
-                MorphTextButton(
-                    "Simulate leaving",
-                    interactionSource = simSource,
-                    enabled = current.isUsable,
-                    onClick = { vm.simulateAutoLockLeaving(v) },
-                )
-            }
+            SafeMorphTextButton(
+                "Simulate leaving",
+                enabled = current.isUsable,
+                onClick = { vm.simulateAutoLockLeaving(v) },
+            )
             if (!current.isUsable) {
                 LabelSmallText(
                     "Choose the car's Bluetooth device above to try this.",

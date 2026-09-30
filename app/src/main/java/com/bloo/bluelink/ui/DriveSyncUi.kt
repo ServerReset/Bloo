@@ -342,18 +342,11 @@ internal fun SyncDevicesSection(state: UiState, vm: AppViewModel) {
                         modifier = Modifier.fillMaxWidth(),
                     )
                 }
-                val cancelRenameSource = remember { MutableInteractionSource() }
-                SafeExpansiveButton(
-                    interactionSource = cancelRenameSource,
-                    enabled = true,
-                ) {
-                    MorphTextButton(
-                        "Cancel",
-                        onClick = { renaming = false },
-                        interactionSource = cancelRenameSource,
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                }
+                SafeMorphTextButton(
+                    "Cancel",
+                    onClick = { renaming = false },
+                    modifier = Modifier.fillMaxWidth()
+                )
             },
         )
     }
@@ -571,7 +564,6 @@ private fun WearCompanionRow(
 /** The empty-companion slot: a "Set up watch" action hanging off this phone's row. */
 @Composable
 private fun SetupWatchRow(phoneName: String, modifier: Modifier = Modifier, onClick: () -> Unit) {
-    val source = remember { MutableInteractionSource() }
     Row(modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
         Icon(
             Icons.Filled.SubdirectoryArrowRight,
@@ -581,9 +573,7 @@ private fun SetupWatchRow(phoneName: String, modifier: Modifier = Modifier, onCl
         )
         Spacer(Modifier.width(8.dp))
         Column(Modifier.weight(1f)) {
-            SafeExpansiveButton(interactionSource = source, enabled = true) {
-                MorphTextButton("Set up watch", interactionSource = source, onClick = onClick, icon = Icons.Filled.Watch)
-            }
+            SafeMorphTextButton("Set up watch", onClick = onClick, icon = Icons.Filled.Watch)
             LabelSmallText("Connects to $phoneName")
         }
     }

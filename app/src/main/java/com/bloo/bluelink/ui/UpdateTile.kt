@@ -252,17 +252,10 @@ internal fun UpdateAvailableTile(
             // something to shout before the user has even tapped Update.
             if (!seamless) {
                 var showHelp by rememberSaveable(info.run.runNumber) { mutableStateOf(false) }
-                val helpSource = remember { MutableInteractionSource() }
-                SafeExpansiveButton(
-                    interactionSource = helpSource,
-                    enabled = true,
-                ) {
-                    MorphTextButton(
-                        if (showHelp) "Hide install help" else "Trouble installing?",
-                        onClick = { showHelp = !showHelp },
-                        interactionSource = helpSource,
-                    )
-                }
+                SafeMorphTextButton(
+                    if (showHelp) "Hide install help" else "Trouble installing?",
+                    onClick = { showHelp = !showHelp },
+                )
                 PopVisible(visible = showHelp) {
                     // Glass surface instead of tonal -- unified styling with glass blur.
                     // fillMaxWidth() to match sibling panels. shadow = false -- see the
@@ -301,17 +294,10 @@ internal fun UpdateAvailableTile(
             // exists purely for the pending-dismiss undo window, so it is the one
             // piece that stays.
             if (state.updatePendingDismiss) {
-                val keepSource = remember { MutableInteractionSource() }
-                SafeExpansiveButton(
-                    interactionSource = keepSource,
-                    enabled = true,
-                ) {
-                    MorphTextButton(
-                        "Keep it",
-                        onClick = vm::undoDismissUpdate,
-                        interactionSource = keepSource,
-                    )
-                }
+                SafeMorphTextButton(
+                    "Keep it",
+                    onClick = vm::undoDismissUpdate,
+                )
                 Spacer(Modifier.height(GapHairline))
             }
             // Dismiss / undo / remind — hierarchy: during the undo window "Keep it" is
@@ -362,18 +348,11 @@ internal fun UpdateAvailableTile(
                             interactionSource = remindSource,
                         )
                     }
-                    val notNowSource = remember { MutableInteractionSource() }
-                    SafeExpansiveButton(
-                        interactionSource = notNowSource,
+                    SafeMorphTextButton(
+                        "Not now",
+                        onClick = vm::dismissUpdate,
                         enabled = !state.updateDownloading,
-                    ) {
-                        MorphTextButton(
-                            "Not now",
-                            onClick = vm::dismissUpdate,
-                            enabled = !state.updateDownloading,
-                            interactionSource = notNowSource,
-                        )
-                    }
+                    )
                 }
             }
         }
@@ -426,21 +405,17 @@ internal fun UpdateReleaseNotes(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.weight(1f),
                 )
-                val notesSource = remember { MutableInteractionSource() }
-                SafeExpansiveButton(interactionSource = notesSource, enabled = true) {
-                    MorphTextButton(
-                        "Full notes",
-                        onClick = {
-                            runCatching {
-                                context.startActivity(
-                                    Intent(Intent.ACTION_VIEW, info.run.htmlUrl.toUri())
-                                        .apply { addFlags(Intent.FLAG_ACTIVITY_NEW_TASK) },
-                                )
-                            }
-                        },
-                        interactionSource = notesSource,
-                    )
-                }
+                SafeMorphTextButton(
+                    "Full notes",
+                    onClick = {
+                        runCatching {
+                            context.startActivity(
+                                Intent(Intent.ACTION_VIEW, info.run.htmlUrl.toUri())
+                                    .apply { addFlags(Intent.FLAG_ACTIVITY_NEW_TASK) },
+                            )
+                        }
+                    },
+                )
             }
             Text(
                 notes,

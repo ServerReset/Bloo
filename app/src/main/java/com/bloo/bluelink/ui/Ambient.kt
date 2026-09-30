@@ -476,14 +476,8 @@ internal fun LoginScreen(
 
                     // Forgot password — MorphTextButton that routes to the right brand portal.
                     Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-                        val forgotSource = remember { MutableInteractionSource() }
-                        SafeExpansiveButton(
-                            interactionSource = forgotSource,
-                            enabled = true,
-                        ) {
-                            MorphTextButton(
+                        SafeMorphTextButton(
                                 text = "Forgot password?",
-                                interactionSource = forgotSource,
                             onClick = {
                                 val forgotUrl = when (brand) {
                                     Brand.HYUNDAI -> "https://owners.hyundaiusa.com/us/en/forgot-password"
@@ -498,7 +492,6 @@ internal fun LoginScreen(
                             },
                             contentColor = scheme.onSurfaceVariant,
                         )
-                        }
                     }
 
                     AnimatedContent(
@@ -597,19 +590,12 @@ internal fun KiaOtpDialog(otp: KiaOtpUi, loading: Boolean, vm: AppViewModel) {
                     }
                 }
             }
-            val cancelKiaSource = remember { MutableInteractionSource() }
-            SafeExpansiveButton(
-                interactionSource = cancelKiaSource,
+            SafeMorphTextButton(
+                "Cancel",
+                vm::kiaCancelOtp,
                 enabled = !loading,
-            ) {
-                MorphTextButton(
-                    "Cancel",
-                    vm::kiaCancelOtp,
-                    interactionSource = cancelKiaSource,
-                    enabled = !loading,
-                    modifier = Modifier.fillMaxWidth()
-                )
-            }
+                modifier = Modifier.fillMaxWidth()
+            )
         },
     )
 }
@@ -648,19 +634,12 @@ internal fun CanadaOtpDialog(otp: CanadaOtpUi, loading: Boolean, vm: AppViewMode
                     if (loading) LoadingIndicator() else Text("Verify", style = ButtonLabelStyle, fontWeight = FontWeight.SemiBold)
                 }
             }
-            val canadaCancelSource = remember { MutableInteractionSource() }
-            SafeExpansiveButton(
-                interactionSource = canadaCancelSource,
+            SafeMorphTextButton(
+                "Cancel",
+                vm::canadaCancelOtp,
                 enabled = !loading,
-            ) {
-                MorphTextButton(
-                    "Cancel",
-                    vm::canadaCancelOtp,
-                    interactionSource = canadaCancelSource,
-                    enabled = !loading,
-                    modifier = Modifier.fillMaxWidth()
-                )
-            }
+                modifier = Modifier.fillMaxWidth()
+            )
         },
     )
 }
