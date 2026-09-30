@@ -84,7 +84,7 @@ data class CanadaOtpUi(
  *  under normal conditions; short enough that a user who opens Settings within the first
  *  few seconds still sees a sync that's already well underway rather than one that looks
  *  like it never started. */
-private const val DRIVE_SYNC_COLD_START_DELAY_MS = 3_000L
+internal const val DRIVE_SYNC_COLD_START_DELAY_MS = 3_000L
 
 @Stable
 class AppViewModel(app: Application) : AndroidViewModel(app) {
