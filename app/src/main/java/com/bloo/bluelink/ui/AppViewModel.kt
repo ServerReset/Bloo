@@ -2,54 +2,30 @@ package com.bloo.bluelink.ui
 
 import android.app.Application
 import android.location.Geocoder
-import androidx.biometric.BiometricManager
 import androidx.compose.runtime.Stable
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.bloo.bluelink.data.AppLog
-import com.bloo.bluelink.data.BlueLinkException
-import com.bloo.bluelink.data.BlueLinkRepository
 import com.bloo.bluelink.data.Brand
 import com.bloo.bluelink.data.CarAlerts
-import com.bloo.bluelink.data.ClimatePreset
-import com.bloo.bluelink.data.ClimateRequest
 import com.bloo.bluelink.data.CredentialStore
-import com.bloo.bluelink.data.DEFAULT_CLIMATE_DURATION_MIN
-import com.bloo.bluelink.data.DEFAULT_CLIMATE_TEMP_F
 import com.bloo.bluelink.data.LiveCharge
 import com.bloo.bluelink.data.Notifications
-import com.bloo.bluelink.data.PinCrypto
 import com.bloo.bluelink.data.PinLockout
-import com.bloo.bluelink.data.PinRecord
 import com.bloo.bluelink.data.Credentials
 import com.bloo.bluelink.data.CanadaAuth
 import com.bloo.bluelink.data.CanadaRepository
-import com.bloo.bluelink.data.EuRepository
 import com.bloo.bluelink.data.KiaAuth
 import com.bloo.bluelink.data.KiaRepository
 import com.bloo.bluelink.data.VehicleRepository
-import com.bloo.bluelink.data.links
-import com.bloo.bluelink.data.LockTiming
-import com.bloo.bluelink.data.shouldRelockAfter
-import com.bloo.bluelink.data.wireKey
-import com.bloo.bluelink.data.maskEmail
-import com.bloo.bluelink.data.ReservChargeInfos
-import com.bloo.bluelink.data.TargetSOC
-import com.bloo.bluelink.data.STALE_STATUS_MS
 import com.bloo.bluelink.data.StatusCache
 import com.bloo.bluelink.data.toGeoLocation
 import com.bloo.bluelink.data.GeoLocation
-import com.bloo.bluelink.data.Powertrain
-import com.bloo.bluelink.data.VehiclePlatform
-import com.bloo.bluelink.data.isGen5W
 import com.bloo.bluelink.data.brand
-import com.bloo.bluelink.data.SeatConfig
 import com.bloo.bluelink.data.SessionStore
 import com.bloo.bluelink.data.SettingsStore
 import com.bloo.bluelink.data.SnapshotStore
-import com.bloo.bluelink.data.toClimateSync
 import com.bloo.bluelink.data.Vehicle
-import com.bloo.bluelink.data.VehicleSnapshot
 import com.bloo.bluelink.data.VehicleStatus
 import com.bloo.bluelink.data.Weather
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -70,7 +46,6 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
-import androidx.core.net.toUri
 
 /**
  * A pending Kia one-time-code challenge shown over the login form. [sentTo] is
@@ -134,7 +109,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
      *  ([coldStartAt]) -- see that property's own doc. Startup-only: nothing outside the
      *  cold-start path below calls this, since "+1234ms since app start" stops being a
      *  meaningful number once the app has been open and used for a while. */
-    private fun logStartup(message: String) {
+    internal fun logStartup(message: String) {
         AppLog.log("$message (+${System.currentTimeMillis() - coldStartAt}ms)")
         // Same breadcrumb on the greppable startup trace, so one logcat filter shows the
         // ViewModel's phases interleaved with Application/Activity/frame marks.
@@ -145,7 +120,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     // synchronously on the main thread by MainActivity's `viewModels()` dereference, so
     // anything a constructor does (opening SharedPreferences, resolving DataStore files,
     // building an ML Kit client) is on the critical path to the first frame.
-    private val store = com.bloo.bluelink.data.StartupTrace.trace("SessionStore()") { SessionStore(app) }
+    internal val store = com.bloo.bluelink.data.StartupTrace.trace("SessionStore()") { SessionStore(app) }
     internal val settingsStore = com.bloo.bluelink.data.StartupTrace.trace("SettingsStore()") { SettingsStore(app) }
     internal val credentialStore = com.bloo.bluelink.data.StartupTrace.trace("CredentialStore()") { CredentialStore(app) }
     private val snapshotStore = com.bloo.bluelink.data.StartupTrace.trace("SnapshotStore()") { SnapshotStore(app) }
@@ -161,17 +136,17 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     internal fun canadaRepo(brand: Brand): CanadaRepository = repoFor(brand) as CanadaRepository
 
-    private fun brandOf(v: Vehicle): Brand =
+    internal fun brandOf(v: Vehicle): Brand =
         Brand.fromIndicator(v.brandIndicator)
 
     internal fun repoFor(v: Vehicle): VehicleRepository = repoFor(brandOf(v))
 
     @Volatile
-    private var loadingGarage = false
+    internal var loadingGarage = false
 
     /** A pending app-icon shortcut (vin to command) awaiting the garage to load. */
     @Volatile
-    private var pendingShortcut: Pair<String, String>? = null
+    internal var pendingShortcut: Pair<String, String>? = null
 
     /** One-shot: has [refreshLiveChargeBar] forgotten this process's live-charge
      *  dismissals yet? See that function's own comment for why. */
@@ -182,7 +157,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
      *  status fetching is deferred until after unlock (avoiding recomposition jank
      *  that overlaps the lock-away blur animation). */
     @Volatile
-    private var deferredStatusLoad = false
+    internal var deferredStatusLoad = false
 
     internal val _state = MutableStateFlow(UiState())
     val state: StateFlow<UiState> = _state.asStateFlow()
@@ -216,7 +191,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
      * entirely. The handful of screen-level composables that genuinely need
      * the index collect this instead, and only they recompose.
      */
-    private val _currentIndex = MutableStateFlow(0)
+    internal val _currentIndex = MutableStateFlow(0)
     val currentIndex: StateFlow<Int> = _currentIndex.asStateFlow()
 
     /**
@@ -283,34 +258,6 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         alerts.forEach { Notifications.post(getApplication(), it.id, it.title, it.text, it.actions, it.channelId) }
         alerts.firstOrNull()?.let { a -> _state.update { it.copy(message = a.text, messageType = "error") } }
     }
-
-    // Simple notification-preference setters: each just fires a coroutine that
-    // writes one field to SettingsStore's DataStore. They don't touch _state
-    // directly because `notifications` above is already a StateFlow mirroring
-    // settingsStore.notifications, so the UI picks up the change automatically
-    // once the write completes and the underlying Flow re-emits.
-    fun setNotifyService(v: Boolean) = viewModelScope.launch { settingsStore.setNotifyService(v) }
-    fun setNotifyDoor(v: Boolean) = viewModelScope.launch { settingsStore.setNotifyDoor(v) }
-    fun setDoorOpenMinutes(m: Int) = viewModelScope.launch { settingsStore.setDoorOpenMinutes(m) }
-    fun setNotifyRunning(v: Boolean) = viewModelScope.launch { settingsStore.setNotifyRunning(v) }
-    fun setRunningMinutes(m: Int) = viewModelScope.launch { settingsStore.setRunningMinutes(m) }
-    fun setNotifyUnlocked(v: Boolean) = viewModelScope.launch { settingsStore.setNotifyUnlocked(v) }
-
-    fun setUnlockedMinutes(m: Int) = viewModelScope.launch { settingsStore.setUnlockedMinutes(m) }
-
-    /** Turning the live charging bar off clears anything already posted at
-     *  once, and kills the poll chain, rather than leaving both to linger
-     *  until they happen to notice the setting changed. */
-    fun setNotifyCharging(v: Boolean) = viewModelScope.launch {
-        settingsStore.setNotifyCharging(v)
-        if (!v) {
-            LiveCharge.cancelAll(getApplication(), _state.value.vehicles.map { it.vin })
-            com.bloo.bluelink.work.LiveChargePollWorker.cancel(getApplication())
-        }
-    }
-
-    fun setNotifyCarStarted(v: Boolean) = viewModelScope.launch { settingsStore.setNotifyCarStarted(v) }
-    fun setNotifyChargeComplete(v: Boolean) = viewModelScope.launch { settingsStore.setNotifyChargeComplete(v) }
 
     /** Write the current live status/location maps to disk (survives restart). */
     internal fun persistCache() {
@@ -455,28 +402,16 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     // --- Auth ------------------------------------------------------------
 
-
-
     // Kia sign-in is a two-step dance: password first, then (usually) a
     // one-time code sent to the account's email or phone. The credentials are
     // held here between the steps and only persisted once fully signed in.
     internal var kiaPending: Credentials? = null
-
-
-
-
-
 
     // Canada sign-in (Hyundai/Genesis/Kia) is also a two-step dance, but unlike
     // Kia US there's no destination choice (email only) and the account's PIN
     // IS required (every command needs it, see CanadaApi.pinAuth) -- so the PIN
     // typed into the login form travels straight through the OTP challenge.
     internal var canadaPending: Credentials? = null
-
-
-
-
-
 
     /**
      * Sign out of one brand. The server-side logout call is best-effort
@@ -568,202 +503,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    /** Fix a wrong/locked service PIN without re-entering the whole account. */
-    fun updatePin(brand: Brand, pin: String) {
-        if (pin.isBlank()) return
-        viewModelScope.launch {
-            store.updatePin(brand, pin.trim())
-            credentialStore.updatePin(brand, pin.trim())
-            _state.update { it.copy(accounts = credentialStore.loadAll(), message = "PIN updated for ${brand.label}", messageType = "success") }
-            AppLog.log("Updated PIN for ${brand.label}")
-        }
-    }
-
-    /** Dismiss the lock overlay (the garage was already loaded behind it).
-     *  A successful PIN verify routes through here too -- and resets the
-     *  failure counter (see [verifyAppPin]). */
-    fun unlocked() {
-        _state.update { it.copy(locked = false, lockedToLogin = false, pinAttemptRejected = false) }
-        if (_state.value.vehicles.isEmpty() && !loadingGarage) loadGarage()
-        // If status fetching was deferred waiting for the lock screen to unlock,
-        // perform the deferred fetch now — wait for the lock-away blur animation
-        // (450ms) to complete first so pebble recompositions from incoming status
-        // don't overlap the expensive unlock animation.
-        if (deferredStatusLoad) {
-            deferredStatusLoad = false
-            val vehicles = _state.value.vehicles
-            val index = _currentIndex.value
-            logStartup("unlocked(): deferred status fetch starting")
-            viewModelScope.launch {
-                delay(500)  // Wait for unlock blur animation (450ms) to complete
-                vehicles.getOrNull(index)?.let {
-                    logStartup("unlocked(): fetching status for ${it.name} (current car)")
-                    ensureStatus(it, logStartupTiming = true)
-                }
-                launch {
-                    vehicles.forEachIndexed { i, v -> if (i != index) ensureStatus(v) }
-                }
-            }
-        }
-    }
-
-    /** From the lock overlay, back out to the login screen.
-     *  Sets lockedToLogin so Cancel on the login form re-locks instead of bypassing auth. */
-    fun lockToLogin() = _state.update { it.copy(locked = false, addingAccount = true, lockedToLogin = true) }
-
-    /** Persist how long after backgrounding the app should re-lock (see
-     *  [maybeRelock], which reads this back out of [SettingsStore] on the next
-     *  foreground). Fire-and-forget: the write is async, nothing in [_state]
-     *  reflects the new value directly since the lock-timing setting itself
-     *  isn't rendered anywhere that needs it synchronously. */
-    fun setLockTiming(value: LockTiming) {
-        viewModelScope.launch { settingsStore.setLockTiming(value) }
-    }
-
-    /**
-     * Re-engage the lock when returning to the foreground, honouring the user's
-     * [LockTiming] setting. [backgroundedAtMs] is when the app was last stopped;
-     * [screenTurnedOff] is whether the screen turned off while the app was away, which
-     * [LockTiming.SCREEN_OFF] keys off.
-     */
-    fun maybeRelock(backgroundedAtMs: Long, screenTurnedOff: Boolean = false) {
-        if (_state.value.locked) return
-        viewModelScope.launch {
-            val a = settingsStore.appearance.first()
-            // Either mechanism re-arms the lock: the biometric lock when the
-            // device has usable biometrics, or the app PIN when one is set. The PIN
-            // half reads the encrypted prefs, so the whole check is taken on IO.
-            val armed = withContext(Dispatchers.IO) { (a.biometricLock && canUseBiometrics()) || pinInstalled() }
-            if (!armed) return@launch
-            val elapsed = System.currentTimeMillis() - backgroundedAtMs
-            // See LockTiming.wireKey (exhaustive, so a new enum value must be mapped) and
-            // shouldRelockAfter's own doc for the legacy wire keys it still honours.
-            if (shouldRelockAfter(elapsed, a.lockTiming.wireKey, screenTurnedOff)) _state.update { it.copy(locked = true) }
-        }
-        // Prompt to refresh if data is stale after returning from background.
-        if (backgroundedAtMs > 0 && System.currentTimeMillis() - backgroundedAtMs > STALE_STATUS_MS) {
-            val anyStale = _state.value.lastFetched.values.any { System.currentTimeMillis() - it > STALE_STATUS_MS }
-            if (anyStale) reportInfo("Data may be stale, pull down to refresh")
-        }
-    }
-
-    /** Whether the device currently has usable biometrics (biometric/face)
-     *  enrolled -- gates whether [UiState.locked] / [maybeRelock] can ever
-     *  apply, since there's nothing to authenticate against otherwise.
-     *  BIOMETRIC_WEAK is used (rather than STRONG) so a wider range of
-     *  device authenticators (including some face-only ones) still qualify. */
-    fun canUseBiometrics(): Boolean =
-        BiometricManager.from(getApplication())
-            .canAuthenticate(BiometricManager.Authenticators.BIOMETRIC_WEAK) ==
-            BiometricManager.BIOMETRIC_SUCCESS
-
-    /** Turn the biometric app-lock on/off in Settings. Persists only -- the
-     *  actual locking/unlocking flow is driven separately by [maybeRelock]
-     *  and [unlocked] reading this flag back out on each foreground. */
-    fun setBiometricLock(enabled: Boolean) {
-        viewModelScope.launch { settingsStore.setBiometricLock(enabled) }
-    }
-
-    /** Flip-cover "open your phone for settings" hint dismissal (persists). */
-    fun setCoverSettingsHintDismissed(value: Boolean) {
-        viewModelScope.launch { settingsStore.setCoverSettingsHintDismissed(value) }
-    }
-
     // --- App PIN (device unlock PIN) -------------------------------------
-
-    /** Whether a PIN record currently exists in the credential store. */
-    private fun pinInstalled(): Boolean = credentialStore.getPinRecord() != null
-
-    /** Re-mirrors PIN presence + lockout state from the credential store
-     *  into [UiState] (called on cold start and after every mutation). */
-    fun refreshPinState() {
-        // Reads CredentialStore's lazy encrypted prefs (Tink/AndroidKeystore), so this
-        // runs on IO: every caller is a state refresh, none of them can observe the
-        // result synchronously, and doing it on Main.immediate put the first
-        // EncryptedSharedPreferences construction on the cold-start critical path.
-        viewModelScope.launch(Dispatchers.IO) {
-            val pinSet = credentialStore.getPinRecord() != null
-            val lockout = PinLockout(
-                credentialStore.getPinFailures(),
-                credentialStore.getPinLockedUntil(),
-                credentialStore.getPinLockedUntilElapsed(),
-            )
-            _state.update { it.copy(appPinSet = pinSet, pinLockout = lockout) }
-        }
-    }
-
-    /**
-     * Sets (or replaces) the app PIN. The PIN is never persisted: only its
-     * PBKDF2-stretched hash + salt live in CredentialStore's encrypted
-     * storage (see [PinRecord]). The stretch runs off the main thread.
-     */
-    fun setAppPin(pin: String) {
-        viewModelScope.launch {
-            val record = withContext(Dispatchers.Default) {
-                val salt = PinCrypto.newSalt()
-                PinRecord(salt, PinCrypto.PIN_DEFAULT_ITERATIONS, PinCrypto.hash(pin, salt, PinCrypto.PIN_DEFAULT_ITERATIONS))
-            }
-            credentialStore.setPinRecord(record.encode())
-            refreshPinState()
-        }
-    }
-
-    /** Removes the app PIN entirely (the caller must have already verified
-     *  the current PIN -- see [verifyAppPin] for the gate). */
-    fun removeAppPin() {
-        viewModelScope.launch {
-            credentialStore.setPinRecord(null)
-            refreshPinState()
-        }
-    }
-
-    /**
-     * Verifies a PIN attempt against the stored record, enforcing the
-     * [PinLockout] policy: while the rejection window is open the attempt is
-     * rejected outright (no work spent on it), otherwise a wrong PIN records
-     * a failure and every fifth failure opens a window that doubles per
-     * batch (30s, 1m, 2m, ...). A correct PIN resets the counter and unlocks
-     * like a biometric would.
-     *
-     * Result surfaces through [UiState.pinAttemptRejected] /
-     * [UiState.pinLockout]; the overlay acknowledges via
-     * [acknowledgePinRejection].
-     */
-    fun verifyAppPin(pin: String) {
-        viewModelScope.launch {
-            val record = PinRecord.decode(credentialStore.getPinRecord()) ?: return@launch
-            val now = System.currentTimeMillis()
-            // The monotonic reading alongside the wall clock: the wall clock is what someone
-            // holding the device can move, and moving it used to retire the rejection window.
-            val nowElapsed = android.os.SystemClock.elapsedRealtime()
-            var lockout = PinLockout(
-                credentialStore.getPinFailures(),
-                credentialStore.getPinLockedUntil(),
-                credentialStore.getPinLockedUntilElapsed(),
-            )
-            if (lockout.isLocked(now, nowElapsed)) {
-                _state.update { it.copy(pinAttemptRejected = true) }
-                return@launch
-            }
-            val ok = withContext(Dispatchers.Default) { record.verify(pin) }
-            if (ok) {
-                credentialStore.setPinLockout(lockout.onSuccess())
-                refreshPinState()
-                _state.update { it.copy(pinAcceptedTick = it.pinAcceptedTick + 1) }
-                unlocked()
-            } else {
-                lockout = lockout.onFailure(now, nowElapsed)
-                credentialStore.setPinLockout(lockout)
-                _state.update { it.copy(pinLockout = lockout, pinAttemptRejected = true) }
-            }
-        }
-    }
-
-    /** Clears the transient "last attempt was rejected" flag the lock
-     *  overlay shows; called when the overlay re-shows its input state. */
-    fun acknowledgePinRejection() {
-        _state.update { it.copy(pinAttemptRejected = false) }
-    }
 
     // --- Garage / vehicles ----------------------------------------------
 
@@ -1111,7 +851,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
      * so a restore that didn't actually resolve first-run status falls into the normal
      * wizard instead of looping back to the choice the user just answered).
      */
-    private suspend fun resolveScreen(
+    internal suspend fun resolveScreen(
         vehicles: List<Vehicle>,
         prefs: androidx.datastore.preferences.core.Preferences,
         firstRunScreen: Screen = Screen.SyncChoice,
@@ -1437,67 +1177,11 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     fun collapse() = _state.update { it.copy(expandedIndex = null) }
 
     /**
-     * Handle an app-icon shortcut. If the garage isn't loaded yet the request is
-     * queued and run once it is.
-     */
-    fun handleShortcut(vin: String, cmd: String) {
-        pendingShortcut = vin to cmd
-        tryRunPendingShortcut()
-    }
-
-    private fun tryRunPendingShortcut() {
-        val (vin, cmd) = pendingShortcut ?: return
-        val v = _state.value.vehicles.firstOrNull { it.vin == vin } ?: return
-        pendingShortcut = null
-        val idx = _state.value.vehicles.indexOf(v)
-        if (idx >= 0) selectIndex(idx)
-        // selectIndex only updates which car is current, not which screen is
-        // showing -- tapping a car-specific shortcut while the app was sitting
-        // on Settings (or any other screen) previously selected the right car
-        // underneath without ever bringing it into view. A shortcut
-        // tap always means "look at this car," so force back to the garage.
-        _state.update { it.copy(screen = Screen.Garage, expandedIndex = null) }
-        val status = _state.value.statusFor(v)
-        when (cmd) {
-            // Toggles: do the opposite of the last-known state.
-            "doors" -> if (status?.doorLock == true) unlock(v) else lock(v)
-            "climate" -> if (status?.airCtrlOn == true) stopClimate(v) else {
-                // Gate the start on !isDriving, matching the in-app control (which
-                // goes read-only while driving) -- the car rejects remote climate
-                // while moving, so firing it would only waste a serialized request
-                // slot and surface a spurious "command failed".
-                if (!_state.value.isDriving(v)) {
-                    startClimate(v, ClimateRequest(tempF = DEFAULT_CLIMATE_TEMP_F, defrost = false, durationMinutes = DEFAULT_CLIMATE_DURATION_MIN))
-                }
-            }
-            "lock" -> lock(v)
-            "unlock" -> unlock(v)
-            "locate" -> locate(v)
-            "bluelink" -> openOemApp(v)
-            // "open" just selects the car (done above).
-        }
-    }
-
-    /** Launch the OEM Bluelink/Genesis/Kia app for this car's brand. */
-    private fun openOemApp(v: Vehicle) {
-        val ctx = getApplication<Application>()
-        val links = brandOf(v).links
-        val launch = ctx.packageManager.getLaunchIntentForPackage(links.appPackage)
-            ?: android.content.Intent(
-                android.content.Intent.ACTION_VIEW,
-                links.playStoreUrl.toUri(),
-            )
-        runCatching {
-            ctx.startActivity(launch.apply { addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK) })
-        }
-    }
-
-    /**
      * Fetches fresh status once per session. Disk-cached data is shown instantly
      * (so no UI flash), but we still pull a live update — otherwise a warm cache
      * would leave the garage permanently stale until a manual refresh.
      */
-    private fun ensureStatus(
+    internal fun ensureStatus(
         v: Vehicle,
         /** Startup-only instrumentation: when true, logs how long THIS fetch actually took
          *  once it succeeds, so [loadGarageInner]'s own cold-start timeline can report when
@@ -1857,7 +1541,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
      * mutableMapOf is safe here. It is also never iterated, which is what made the other
      * plain map in this class a ConcurrentModificationException waiting to happen.
      */
-    private fun publishDebounced(key: String) {
+    internal fun publishDebounced(key: String) {
         pendingPublishes[key]?.cancel()
         pendingPublishes[key] = viewModelScope.launch {
             delay(textFieldPublishDebounceMs)
@@ -1942,80 +1626,6 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
      *  account since the order was last saved) is appended at the end rather
      *  than dropped, so new cars still show up somewhere. */
 
-    /** Set (or, with a blank string, clear) a custom car photo URL. */
-    fun setVehicleImage(vin: String, url: String) {
-        _state.update {
-            it.copy(
-                imageUrls = if (url.isBlank()) it.imageUrls - vin else it.imageUrls + (vin to url.trim()),
-            )
-        }
-        viewModelScope.launch { settingsStore.setImageUrl(vin, url) }
-    }
-
-    fun setLicensePlate(vin: String, plate: String) {
-        _state.update {
-            it.copy(
-                licensePlates = if (plate.isBlank()) it.licensePlates - vin
-                else it.licensePlates + (vin to plate.trim()),
-            )
-        }
-        // Store write immediate (durability), cross-surface publish debounced -- see
-        // publishDebounced. Still republishes rather than waiting for the next status
-        // refresh to rebuild the snapshot; just not once per keypress.
-        viewModelScope.launch { settingsStore.setLicensePlate(vin, plate) }
-        publishDebounced("plate:$vin")
-    }
-
-    fun setLastServiceMiles(vin: String, miles: Int?) {
-        _state.update {
-            it.copy(
-                lastServiceMiles = if (miles == null) it.lastServiceMiles - vin
-                else it.lastServiceMiles + (vin to miles),
-            )
-        }
-        // See publishDebounced: write now, publish once the typing stops.
-        viewModelScope.launch { settingsStore.setLastServiceMiles(vin, miles) }
-        publishDebounced("lastService:$vin")
-    }
-
-    fun setServiceIntervalMiles(vin: String, miles: Int?) {
-        _state.update {
-            it.copy(
-                serviceIntervalMiles = if (miles == null) it.serviceIntervalMiles - vin
-                else it.serviceIntervalMiles + (vin to miles),
-            )
-        }
-        // See publishDebounced: write now, publish once the typing stops.
-        viewModelScope.launch { settingsStore.setServiceIntervalMiles(vin, miles) }
-        publishDebounced("serviceInterval:$vin")
-    }
-
-    /** Toggle one seat-heater/cooler (or steering-wheel-heat) capability flag
-     *  for a car. [field] is a short code ("dh" = driver heat, "dc" = driver
-     *  cool, "ph"/"pc" = passenger, "rlh"/"rlc"/"rrh"/"rrc" = rear left/right,
-     *  "sw" = steering wheel) mapped to the matching [SeatConfig] property;
-     *  an unrecognized code is a no-op (`else -> current`). These flags don't
-     *  come from the vehicle API -- they record which seat features the user
-     *  says this specific trim actually has, so the climate UI only offers
-     *  controls that will work. */
-    fun setSeatFlag(v: Vehicle, field: String, value: Boolean) {
-        val current = _state.value.seatConfigs[v.vin] ?: SeatConfig()
-        val updated = when (field) {
-            "dh" -> current.copy(driverHeat = value)
-            "dc" -> current.copy(driverCool = value)
-            "ph" -> current.copy(passHeat = value)
-            "pc" -> current.copy(passCool = value)
-            "rlh" -> current.copy(rearLeftHeat = value)
-            "rlc" -> current.copy(rearLeftCool = value)
-            "rrh" -> current.copy(rearRightHeat = value)
-            "rrc" -> current.copy(rearRightCool = value)
-            "sw" -> current.copy(steeringWheel = value)
-            else -> current
-        }
-        _state.update { it.copy(seatConfigs = it.seatConfigs + (v.vin to updated)) }
-        viewModelScope.launch { settingsStore.setSeatFlag(v.vin, field, value) }
-    }
-
     // --- AutoLock (app/.../autolock/) -------------------------------------
     //
     // Thin passthroughs: the Settings UI reads/writes SettingsStore directly through these
@@ -2023,68 +1633,6 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     // background, by AutoLockBluetoothReceiver/AutoLockService reading SettingsStore fresh
     // on each trigger -- there's no live-recomposition need the way seat flags have with the
     // climate pebble.
-
-    suspend fun autoLockConfig(vin: String): com.bloo.bluelink.autolock.AutoLockConfig =
-        settingsStore.autoLockConfig(vin)
-
-    fun setAutoLockConfig(vin: String, config: com.bloo.bluelink.autolock.AutoLockConfig) {
-        viewModelScope.launch {
-            settingsStore.setAutoLockConfig(vin, config)
-            val anyEnabled = settingsStore.allAutoLockConfigs().values.any { it.enabled }
-            val action = if (anyEnabled) {
-                com.bloo.bluelink.autolock.AutoLockService.ACTION_START_WATCH
-            } else {
-                com.bloo.bluelink.autolock.AutoLockService.ACTION_STOP_WATCH
-            }
-            runCatching {
-                getApplication<android.app.Application>().startForegroundService(
-                    android.content.Intent(
-                        getApplication(),
-                        com.bloo.bluelink.autolock.AutoLockService::class.java,
-                    ).setAction(action).putExtra(
-                        com.bloo.bluelink.autolock.AutoLockService.EXTRA_VIN,
-                        vin,
-                    ),
-                )
-            }.onFailure {
-                com.bloo.bluelink.data.AppLog.log("AutoLock watcher start failed: ${it.javaClass.simpleName}")
-            }
-        }
-    }
-
-    /** Re-attaches the low-power Bluetooth watcher when the app returns to the foreground.
-     *  This repairs installs upgraded from a build that had AutoLock enabled before the
-     *  watcher was introduced: their persisted config is already ON, so they never visit the
-     *  setting toggle again and would otherwise remain unwatched until the next reboot. */
-    fun ensureAutoLockWatcher() {
-        viewModelScope.launch {
-            val entry = settingsStore.allAutoLockConfigs().entries.firstOrNull { it.value.enabled }
-                ?: return@launch
-            runCatching {
-                getApplication<android.app.Application>().startForegroundService(
-                    android.content.Intent(
-                        getApplication(),
-                        com.bloo.bluelink.autolock.AutoLockService::class.java,
-                    ).setAction(com.bloo.bluelink.autolock.AutoLockService.ACTION_START_WATCH)
-                        .putExtra(com.bloo.bluelink.autolock.AutoLockService.EXTRA_VIN, entry.key),
-                )
-            }.onFailure {
-                com.bloo.bluelink.data.AppLog.log("AutoLock watcher recovery failed: ${it.javaClass.simpleName}")
-            }
-        }
-    }
-
-    /** Bonded (paired) Bluetooth devices, for the "which one is your car" picker. Empty
-     *  without BLUETOOTH_CONNECT granted -- the Settings section prompts for it first. */
-    fun pairedBluetoothDevices(): List<com.bloo.bluelink.autolock.PairedDevice> =
-        com.bloo.bluelink.autolock.BluetoothDevices.bondedDevices(getApplication())
-
-    /** "Simulate leaving" test button: runs the exact same evaluation a real Bluetooth
-     *  disconnect would, without needing to actually drive off and walk away. */
-    fun simulateAutoLockLeaving(v: Vehicle) {
-        com.bloo.bluelink.autolock.AutoLockService.start(getApplication(), v.vin)
-        AppLog.log("AutoLock: simulated leaving ${v.name}.")
-    }
 
     /** Live per-car evaluation state (detection phase + grace countdown), for the Settings
      *  section to show "watching…" / "locking in 12s" / "locked" while a test or a real
@@ -2124,111 +1672,10 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch { settingsStore.setSectionCollapsed(v.vin, section, collapsedNow) }
     }
 
-    /** [Screen.SyncChoice] -- user picked "Set up fresh" instead of restoring.
-     *  Proceeds into the normal welcome wizard exactly as if this device had
-     *  no sync option to offer at all. */
-    fun declineSyncRestore() {
-        _state.update { it.copy(screen = Screen.Onboarding) }
-    }
-
-    /**
-     * [Screen.SyncChoice] -- user picked "Restore from sync". Joins the picked
-     * file exactly like Settings' own "Backup & sync" card
-     * ([importSettingsAndSync]) does, then re-resolves which screen this
-     * device lands on from the freshly-imported config, instead of leaving it
-     * parked on the choice screen forever: straight to the garage if the
-     * import's onboarding_seen/isCarConfigured flags say this device is
-     * already fully set up, [Screen.CarSetup] for whichever cars it doesn't
-     * cover (a car added since the backup, say), or -- if the picked file
-     * turned out not to actually resolve first-run status at all (a bad file,
-     * a failed join, or one from before this app tracked those flags) -- the
-     * normal onboarding wizard, deliberately NOT back to this same choice.
-     */
-    fun restoreFromSyncThenContinue(context: android.content.Context, uri: android.net.Uri) = viewModelScope.launch {
-        importSettingsAndSyncSuspend(context, uri)
-        val vehicles = _state.value.vehicles
-        val screen = if (vehicles.isEmpty()) {
-            Screen.Onboarding
-        } else {
-            resolveScreen(vehicles, settingsStore.snapshot(), firstRunScreen = Screen.Onboarding)
-        }
-        _state.update { it.copy(screen = screen) }
-    }
-
-    /** Finish first-run onboarding (wizard complete) and land in the app. */
-    fun finishOnboarding() {
-        val vins = _state.value.vehicles.map { it.vin }
-        viewModelScope.launch {
-            settingsStore.setOnboardingSeen()
-            vins.forEach { settingsStore.setCarConfigured(it) }
-        }
-        landInApp()
-    }
-
-    /** Leave a setup flow and show the garage, clearing any stale load error. The
-     *  trailing move shared by [finishOnboarding] and [finishCarSetup], which had
-     *  it written out identically. */
-    private fun landInApp() = _state.update { it.copy(screen = Screen.Garage, garageLoadError = null) }
-
-    /** Mark newly-detected cars as configured and return to the garage. */
-    fun finishCarSetup(vins: List<String>) {
-        viewModelScope.launch { vins.forEach { settingsStore.setCarConfigured(it) } }
-        landInApp()
-    }
-
-    /** Dismiss the post-onboarding "check out Settings" hint on the garage
-     *  (in-memory only -- it's a one-time nudge, not worth persisting). */
-    fun dismissSettingsHint() = _state.update { it.copy(showSettingsHint = false) }
-
-    fun setPowertrain(v: Vehicle, value: Powertrain) {
-        _state.update { it.copy(powertrains = it.powertrains + (v.vin to value)) }
-        viewModelScope.launch { settingsStore.setPowertrain(v.vin, value); persistSnapshots() }
-    }
-
-    fun setPlatform(v: Vehicle, value: VehiclePlatform) {
-        _state.update { it.copy(platforms = it.platforms + (v.vin to value)) }
-        // persistSnapshots writes the EFFECTIVE (override-applied) generation
-        // number into the synced VehicleSnapshot -- see snapshotOf.
-        viewModelScope.launch { settingsStore.setPlatform(v.vin, value); persistSnapshots() }
-    }
-
     // --- App self-update (GitHub Actions builds; Bloo isn't on the Play Store) ---
 
     /** The GitHub Actions build number this app was compiled from (0 = local build). */
     val currentBuildNumber: Int get() = com.bloo.bluelink.BuildConfig.BUILD_RUN_NUMBER
-
-    /** Toggle whether a given car+action app-icon shortcut is shown. */
-    fun setShortcutEnabled(vin: String, cmd: String, enabled: Boolean) {
-        val universe = _state.value.vehicles.flatMap { v ->
-            com.bloo.bluelink.Shortcuts.ACTIONS.map { "${it}_${v.vin}" }
-        }.toSet()
-        val current = _state.value.shortcutSet ?: universe
-        val updated = if (enabled) current + "${cmd}_$vin" else current - "${cmd}_$vin"
-        _state.update { it.copy(shortcutSet = updated) }
-        viewModelScope.launch {
-            settingsStore.setEnabledShortcuts(updated)
-            com.bloo.bluelink.Shortcuts.refresh(getApplication(), _state.value.vehicles, updated)
-        }
-    }
-
-    /** Pin or unpin a pebble in the dual-column hot spot. */
-    fun setHotspot(v: Vehicle, section: String) {
-        _state.update {
-            val current = it.hotspotSections[v.vin]
-            // Toggle: if the section is already in the secondary slot, unpin it; otherwise pin it
-            val updated = if (current == section) null else section
-            it.copy(
-                hotspotSections = if (updated == null) it.hotspotSections - v.vin else it.hotspotSections + (v.vin to updated),
-            )
-        }
-        viewModelScope.launch { settingsStore.setHotspots(v.vin, _state.value.hotspotSections[v.vin]) }
-    }
-
-    /** Persist a new pebble order for a car (drag-and-drop on the card). */
-    fun setSectionOrder(v: Vehicle, order: List<String>) {
-        _state.update { it.copy(sectionOrders = it.sectionOrders + (v.vin to order)) }
-        viewModelScope.launch { settingsStore.setSectionOrder(v.vin, order) }
-    }
 
     /** Fetch recent EV trips once per session (the Trips pebble calls this lazily). */
     fun loadTrips(v: Vehicle) {
