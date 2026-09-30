@@ -385,7 +385,15 @@ fun SafeMorphTextButton(
     fillOnPress: Boolean = true,
 ) {
     val source = remember { MutableInteractionSource() }
-    SafeExpansiveButton(interactionSource = source, enabled = enabled, fillOnPress = fillOnPress) {
+    SafeExpansiveButton(
+        interactionSource = source,
+        enabled = enabled,
+        // The wrapper is what the group reads, so the weight has to be declared HERE -- passed only
+        // to the inner button it was silently dropped and every labelled button sat at width zero
+        // weight, never filling its line.
+        groupWeight = groupWeight,
+        fillOnPress = fillOnPress,
+    ) {
         MorphTextButton(
             text = text,
             onClick = onClick,

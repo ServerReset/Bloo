@@ -336,6 +336,8 @@ internal fun SyncDevicesSection(state: UiState, vm: AppViewModel) {
                 SafeExpansiveButton(
                     interactionSource = saveRenameSource,
                     enabled = draft.isNotBlank(),
+                    groupWeight = GroupWeightProportional,
+                    fillOnPress = true,
                 ) {
                     // MorphTextButton, not a hand-rolled MorphButton{Text(...)} -- that Text had
                     // no `style`. Primary colours stand in for the old `active = true`.

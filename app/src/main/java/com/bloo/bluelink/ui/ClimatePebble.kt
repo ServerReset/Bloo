@@ -410,6 +410,8 @@ internal fun ClimatePebble(
                     SafeExpansiveButton(
                         interactionSource = smartSource,
                         enabled = !pending && !climateOn,
+                        groupWeight = GroupWeightProportional,
+                        fillOnPress = true,
                     ) {
                         // The shared MorphActionButton: an ordinary "tap this and the car does
                         // a thing" action, so it takes the standard outlined-tonal look rather
@@ -602,6 +604,8 @@ internal fun ClimatePebble(
                     SafeExpansiveButton(
                         interactionSource = saveSource,
                         enabled = presetName.isNotBlank(),
+                        groupWeight = GroupWeightProportional,
+                        fillOnPress = true,
                     ) {
                         // MorphTextButton, not a hand-rolled MorphButton{Text(...)} -- that Text
                         // had no `style`, so it rendered at ambient size instead of
