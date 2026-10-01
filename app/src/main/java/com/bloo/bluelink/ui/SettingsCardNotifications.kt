@@ -7,8 +7,6 @@ import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.height
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.NotificationsOff
@@ -21,7 +19,6 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.core.content.ContextCompat
 import androidx.core.net.toUri
@@ -68,14 +65,7 @@ internal fun NotificationsCardContent(
     val status = if (alertsOn == 0) "All off" else "$alertsOn of ${toggles.size} on"
 
     SettingsCard("Notifications", Icons.Filled.Notifications, vm, status = status) {
-        StatusHeaderRow(
-            icon = Icons.Filled.Notifications,
-            tint = if (alertsOn > 0) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.onSurfaceVariant,
-            title = "Alerts",
-            status = status,
-        )
-        Spacer(Modifier.height(GapGroup))
-
+      Column(verticalArrangement = Arrangement.spacedBy(GapGroup)) {
         SettingsGroup("Charging") {
             // First: every other switch here is an alert the user hopes never fires, while this is
             // a live surface they watch on purpose while the car charges.
@@ -90,11 +80,10 @@ internal fun NotificationsCardContent(
                 ToggleRow(
                     "Low battery on watch",
                     notif.watchLowBattery,
-                    description = "Charging and charge-complete alerts show on the watch instead of being copied to it. These three switches match the ones on the watch.",
+                    description = "Your watch warns you when a car drops under 20% and isn't charging. Charging and charge-complete alerts show on the watch too; these switches match the ones there.",
                 ) { vm.setNotifyWatchLowBattery(it) }
             }
         }
-        Spacer(Modifier.height(GapGroup))
 
         SettingsGroup("Car alerts") {
             ToggleRow("Left unlocked", notif.unlocked) { vm.setNotifyUnlocked(it) }
@@ -122,7 +111,6 @@ internal fun NotificationsCardContent(
         // switch can be set before AutoLock is turned on.
         PopVisible(visible = autoLockOn || advanced) {
             Column {
-                Spacer(Modifier.height(GapGroup))
                 SettingsGroup("AutoLock") {
                     ToggleRow(
                         "AutoLock alerts",
@@ -170,7 +158,6 @@ internal fun NotificationsCardContent(
         val chipBlocked = notif.charging && Build.VERSION.SDK_INT >= 36 &&
             !LiveCharge.isPromotable(context)
         if (ignored >= 0 && (backgroundBlocked || activityBlocked || alarmsBlocked || chipBlocked)) {
-            Spacer(Modifier.height(GapGroup))
             SettingsGroup("Needs attention") {
                 if (backgroundBlocked) {
                     AttentionRow("Alerts may not arrive with the app closed", "Allow background activity") {
@@ -206,7 +193,6 @@ internal fun NotificationsCardContent(
         PopVisible(visible = advanced && notif.charging) {
             var showTroubleshoot by remember { mutableStateOf(false) }
             Column {
-                Spacer(Modifier.height(GapGroup))
                 SafeMorphTextButton(
                     "Charging troubleshooting",
                     onClick = { showTroubleshoot = true },
@@ -215,6 +201,7 @@ internal fun NotificationsCardContent(
                 if (showTroubleshoot) LiveUpdateTroubleshootDialog(onDismiss = { showTroubleshoot = false })
             }
         }
+      }
     }
 }
 
