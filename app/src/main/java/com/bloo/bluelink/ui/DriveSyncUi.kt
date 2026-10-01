@@ -10,33 +10,24 @@ package com.bloo.bluelink.ui
 import android.os.Build
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
-import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Devices
 import androidx.compose.material.icons.filled.DragHandle
-import androidx.compose.material.icons.filled.Cloud
-import androidx.compose.material.icons.filled.CreateNewFolder
-import androidx.compose.material.icons.filled.FileOpen
 import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Smartphone
-import androidx.compose.material.icons.filled.SubdirectoryArrowRight
-import androidx.compose.material.icons.filled.Watch
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.onClick
@@ -45,7 +36,6 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -59,7 +49,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardCapitalization
@@ -306,6 +295,7 @@ internal fun SyncDevicesSection(state: UiState, vm: AppViewModel) {
     }
 }
 
+
 /** One row in the drag-to-reorder [SyncDevicesSection]: a frosted card with a
  *  drag handle, a device icon (★ when primary), the device name (+ a "This
  *  device" chip and a rename button for self), model, and last-seen. Styled to
@@ -440,206 +430,8 @@ internal fun SyncDeviceRow(
     }
 }
 
+
 /** How far a companion is inset under its phone row. */
 private val CompanionIndent = 22.dp
+
 private const val WATCH_REFRESH_MS = 6_000L
-
-/**
- * A Wear OS companion shown UNDER the phone it belongs to, not as a peer row. Deliberately not a
- * [SyncDeviceRow]: a watch has no drag handle and no star, because it depends on its phone.
- * [onRemove] is null for a live Data Layer watch -- pairing is managed by Wear OS, not by Bloo.
- */
-@Composable
-private fun WearCompanionRow(
-    name: String,
-    detail: String,
-    modifier: Modifier = Modifier,
-    onRemove: (() -> Unit)?,
-) {
-    Row(
-        modifier
-            .fillMaxWidth()
-            .padding(horizontal = 10.dp, vertical = GapRow),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Icon(
-            Icons.Filled.SubdirectoryArrowRight,
-            contentDescription = null,
-            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.size(18.dp),
-        )
-        Spacer(Modifier.width(8.dp))
-        Icon(
-            Icons.Filled.Watch,
-            contentDescription = null,
-            tint = MaterialTheme.colorScheme.primary,
-            modifier = Modifier.size(20.dp),
-        )
-        Spacer(Modifier.width(10.dp))
-        Column(Modifier.weight(1f)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    name.ifBlank { "Watch" },
-                    style = MaterialTheme.typography.bodyLarge,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f, fill = false),
-                )
-                Spacer(Modifier.width(6.dp))
-                Text("Companion", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
-            }
-            if (detail.isNotBlank()) {
-                Text(
-                    detail,
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            }
-        }
-        if (onRemove != null) {
-            val confirmRemove = rememberConfirmArm()
-            MorphIconButton(onClick = { if (confirmRemove.armed) onRemove() else confirmRemove.arm() }) {
-                Icon(
-                    AppIcons.Close,
-                    contentDescription = if (confirmRemove.armed) "Tap again to remove ${name.ifBlank { "this watch" }}"
-                    else "Remove ${name.ifBlank { "this watch" }} from synced devices",
-                    tint = if (confirmRemove.armed) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.size(18.dp),
-                )
-            }
-        }
-    }
-}
-
-/**
- * An action hanging off a device row in the sync list: the standard button with a one-line caption
- * under it, indented to sit under the device it belongs to. "Set up watch" and "Sign watch in" are
- * both this.
- */
-@Composable
-private fun CompanionActionRow(label: String, caption: String, modifier: Modifier = Modifier, onClick: () -> Unit) {
-    Row(modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-        Icon(
-            Icons.Filled.SubdirectoryArrowRight,
-            contentDescription = null,
-            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.size(18.dp),
-        )
-        Spacer(Modifier.width(8.dp))
-        Column(Modifier.weight(1f)) {
-            SafeMorphTextButton(label, onClick = onClick, icon = Icons.Filled.Watch)
-            LabelSmallText(caption)
-        }
-    }
-}
-
-/**
- * The Google Drive sync setup dialog, shared between onboarding and the
- * Settings "Backup & sync" card so both look and behave identically (they
- * used to be two separately hand-rolled dialogs -- one BlooDialog, one plain
- * AlertDialog with an awkward confirmButton/dismissButton split -- that had
- * drifted out of sync with each other). Two tappable choice cards instead of
- * three same-weight text buttons, so "start fresh" vs. "join an existing
- * sync" reads as an actual decision rather than an arbitrary button order.
- */
-@Composable
-internal fun DriveSyncSetupDialog(
-    onDismissRequest: () -> Unit,
-    onSaveToDrive: () -> Unit,
-    onOpenFromDrive: () -> Unit,
-    // True when this device has synced before / knows about other devices. In
-    // that case "Save to Drive" would create a SEPARATE new file (Google Drive
-    // allows duplicate names) — the exact trap that leaves two devices on two
-    // files that never converge — so it's gated behind a warning + confirm, and
-    // "Open from Drive" (join the existing file) is emphasized as the right path.
-    hasExistingSync: Boolean = false,
-) {
-    val scheme = MaterialTheme.colorScheme
-    // Local warning step: first tap of "Save to Drive" while already synced flips
-    // this on and swaps the row for a warning + explicit "Create anyway"; the
-    // recommended action is to join the existing file instead.
-    var warnNewFile by remember { mutableStateOf(false) }
-    GlassAlertDialog(
-        onDismissRequest = onDismissRequest,
-        icon = Icons.Filled.Cloud,
-        title = "Google Drive sync",
-        text = {
-            BodyMediumText(
-                "Keep settings in sync across devices with one Drive file.",
-                color = scheme.onSurfaceVariant,
-            )
-            // Join first — it's the correct choice when another device already set
-            // sync up, and making it the emphasized (active) card steers people away
-            // from accidentally creating a second file.
-            DriveSyncChoiceRow(
-                icon = Icons.Filled.FileOpen,
-                title = "Open from Drive",
-                subtitle = "Join the file another device set up to share settings.",
-                emphasized = hasExistingSync,
-                onClick = onOpenFromDrive,
-            )
-            if (warnNewFile) {
-                // The trap, spelled out, with the safe alternative one tap away.
-                Column(
-                    Modifier
-                        .fillMaxWidth()
-                        .clip(StandardShape)
-                        .background(scheme.errorContainer.copy(alpha = 0.5f))
-                        .padding(14.dp),
-                    verticalArrangement = Arrangement.spacedBy(GapRow),
-                ) {
-                    Text(
-                        "Starts a new Drive file. Your devices stop sharing settings.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = scheme.onErrorContainer,
-                    )
-                    SafeMorphTextButton(
-                        text = "Create a new file anyway",
-                        onClick = onSaveToDrive,
-                        modifier = Modifier.fillMaxWidth(),
-                        emphasis = ButtonEmphasis.Destructive,
-                    )
-                }
-            } else {
-                DriveSyncChoiceRow(
-                    icon = Icons.Filled.CreateNewFolder,
-                    title = "Save to Drive",
-                    subtitle = "Start fresh with this device's settings.",
-                    onClick = { if (hasExistingSync) warnNewFile = true else onSaveToDrive() },
-                )
-            }
-        },
-        buttons = {
-            MorphTextButton("Cancel", onClick = onDismissRequest, modifier = Modifier.fillMaxWidth())
-        },
-    )
-}
-
-@Composable
-internal fun DriveSyncChoiceRow(
-    icon: ImageVector,
-    title: String,
-    subtitle: String,
-    onClick: () -> Unit,
-    // Highlights this choice as the recommended one (filled/active MorphButton).
-    emphasized: Boolean = false,
-) {
-    // The app's standard button component (MorphButton), not a bespoke
-    // Surface row -- so this dialog's actions look and feel like every other
-    // button in the app instead of a one-off.
-    MorphButton(
-        onClick = onClick,
-        active = emphasized,
-        modifier = Modifier.fillMaxWidth(),
-        contentPadding = PaddingValues(14.dp),
-    ) {
-        Icon(icon, contentDescription = null, modifier = Modifier.size(ButtonIconSize))
-        Spacer(Modifier.width(ButtonIconGap))
-        Column(horizontalAlignment = Alignment.Start) {
-            TitleSmallText(title)
-            Text(subtitle, style = MaterialTheme.typography.bodySmall)
-        }
-    }
-}
