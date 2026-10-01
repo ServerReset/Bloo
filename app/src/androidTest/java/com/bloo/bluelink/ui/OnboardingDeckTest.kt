@@ -4,7 +4,8 @@ import android.app.Application
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
-import androidx.compose.ui.test.getBoundsInRoot
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.printToString
@@ -21,40 +22,47 @@ import org.junit.Test
 class OnboardingDeckTest {
     @get:Rule val rule = createComposeRule()
 
+    private val CARDS = 5
+
     private fun viewModel() = AppViewModel(ApplicationProvider.getApplicationContext<Application>())
 
-    /** The card whose title is [text] is the one in view: present AND sitting at the start of the screen,
-     *  not just composed as a neighbour the pager keeps ready beyond the viewport. */
-    private fun isCurrent(text: String): Boolean {
-        if (rule.onAllNodesWithText(text).fetchSemanticsNodes().isEmpty()) return false
-        val b = rule.onNodeWithText(text).getBoundsInRoot()
-        return b.left.value in 0f..100f
+    /** Which card the pager is on, read from its scroll position (0 for the first). */
+    private fun pageIndex(): Int {
+        val range = rule.onNodeWithTag(DECK_PAGER_TAG).fetchSemanticsNode().config[SemanticsProperties.HorizontalScrollAxisRange]
+        val pageSize = range.maxValue() / (CARDS - 1)
+        return Math.round(range.value() / pageSize)
     }
 
-    private fun waitForCard(text: String) = rule.waitUntil(10_000) { isCurrent(text) }
+    private fun waitForPage(index: Int, what: String) {
+        try {
+            rule.waitUntil(10_000) { pageIndex() == index }
+        } catch (e: androidx.compose.ui.test.ComposeTimeoutException) {
+            throw AssertionError("expected the deck on card $index ($what) but it is on card ${pageIndex()}", e)
+        }
+    }
 
     @Test
     fun replayDeckAdvancesBySwipeAndButtonAndDismissesAtTheEnd() {
         val vm = viewModel()
         vm.showWelcomeCards()
         rule.setContent { BlooTheme { OnboardingScreen(vm, OnboardingMode.Replay) } }
-        waitForCard("Welcome to Bloo")
+        waitForPage(0, "Welcome")
         rule.onNodeWithText("Welcome to Bloo").assertIsDisplayed()
 
         // The Next button moves to the second card.
         rule.onNodeWithText("Next").performClick()
-        waitForCard("Quick setup")
+        waitForPage(1, "Quick setup")
         rule.onNodeWithText("Quick setup").assertIsDisplayed()
 
         // Swiping the card moves to the third.
         rule.onNodeWithText("Quick setup").performTouchInput { swipeLeft() }
-        waitForCard("Look and feel")
+        waitForPage(2, "Look and feel")
 
         // Two more taps reach the last card, whose button dismisses the deck.
         rule.onNodeWithText("Next").performClick()
-        waitForCard("Getting around")
+        waitForPage(3, "Getting around")
         rule.onNodeWithText("Next").performClick()
-        waitForCard("More Bloo can do")
+        waitForPage(4, "More Bloo can do")
         // The label swaps to "Dismiss" with the card; give its animation a moment to settle.
         try {
             rule.waitUntil(5_000) {

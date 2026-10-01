@@ -8,6 +8,7 @@
 package com.bloo.bluelink.ui
 
 import android.os.Build
+import androidx.compose.ui.platform.testTag
 import dev.chrisbanes.haze.hazeSource
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.draw.drawBehind
@@ -330,7 +331,7 @@ internal fun OnboardingScreen(vm: AppViewModel, mode: OnboardingMode = Onboardin
 
             androidx.compose.foundation.pager.HorizontalPager(
                 state = pagerState,
-                modifier = Modifier.weight(1f),
+                modifier = Modifier.weight(1f).testTag(DECK_PAGER_TAG),
                 contentPadding = PaddingValues(horizontal = 20.dp),
                 pageSpacing = 14.dp,
                 beyondViewportPageCount = 1,
@@ -419,6 +420,9 @@ internal fun OnboardingScreen(vm: AppViewModel, mode: OnboardingMode = Onboardin
         }
     }
 }
+
+/** Lets a UI test find the deck's pager and read which card it is on. */
+internal const val DECK_PAGER_TAG = "onboardingDeckPager"
 
 private fun replayMode(mode: OnboardingMode) = mode == OnboardingMode.Replay
 
