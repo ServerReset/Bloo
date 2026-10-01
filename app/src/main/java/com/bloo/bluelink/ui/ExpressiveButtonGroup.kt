@@ -335,7 +335,13 @@ fun ExpressiveButtonGroup(
                     // does outside it.
                     val wSum = memberIdx.sumOf { weight[it].toDouble() }
                     for (i in memberIdx) base[i] = natLine[i].toDouble()
-                    val spare = room - naturalTotal
+                    // Stretching to fill is only for a group GIVEN its width (fillMaxWidth: min == max).
+                    // A group in a Row beside a weighted label is handed a loose, bounded width as the
+                    // most it may take -- stretching to that claimed the whole row and starved the
+                    // label to nothing (the Logs header: one letter per line, buttons on top of it).
+                    val handedItsWidth = constraints.hasBoundedWidth && constraints.minWidth == constraints.maxWidth
+                    val spareRaw = room - naturalTotal
+                    val spare = if (!handedItsWidth && spareRaw > 0) 0 else spareRaw
                     total = when {
                         // Room to spare, and someone to take it: the weighted members stretch.
                         spare > 0 && wSum > 0.0 -> {
