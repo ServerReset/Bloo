@@ -100,7 +100,8 @@ internal fun GlassSurface(
                 .matchParentSize()
                 .clip(shape)
                 .then(if (canBlur) Modifier.appHazeEffect(hazeState!!) else Modifier)
-                .background(tint),
+                .background(tint)
+                .glassSheen(),
         )
         CompositionLocalProvider(LocalContentColor provides contentColor) {
             content()

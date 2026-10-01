@@ -362,6 +362,19 @@ private const val GlassCardTintAlpha = 0.42f
 
 
 /**
+ * The sheen every glass surface in the app shares: light catching the pane from its top-left and
+ * fading across, so it reads as a sheet of glass rather than a flat tint. Cards, floating chrome,
+ * dialogs, toasts and the onboarding cards all take it from here.
+ */
+internal fun Modifier.glassSheen(): Modifier = this.background(
+    androidx.compose.ui.graphics.Brush.linearGradient(
+        0f to Color.White.copy(alpha = 0.13f),
+        0.45f to Color.White.copy(alpha = 0.02f),
+        1f to Color.White.copy(alpha = 0.06f),
+    ),
+)
+
+/**
  * The standard card fill: the card's bounding box is glass -- the backdrop blurred behind a veil of
  * [tint] -- while whatever sits inside the card keeps its own, opaque panels. Every card in the app
  * (pebbles, settings cards) takes its fill from here, so they all read as the same glass. Without a
@@ -374,15 +387,7 @@ internal fun Modifier.glassCardFill(shape: Shape, tint: Color): Modifier {
         this.clip(shape)
             .appHazeEffect(haze)
             .background(tint.copy(alpha = GlassCardTintAlpha))
-            // The sheen: light catching the pane from its top-left, fading across, so it reads as a
-            // sheet of glass rather than a flat tint.
-            .background(
-                androidx.compose.ui.graphics.Brush.linearGradient(
-                    0f to Color.White.copy(alpha = 0.13f),
-                    0.45f to Color.White.copy(alpha = 0.02f),
-                    1f to Color.White.copy(alpha = 0.06f),
-                ),
-            )
+            .glassSheen()
     } else {
         this.background(tint.copy(alpha = 0.9f), shape)
     }
