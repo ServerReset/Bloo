@@ -6,15 +6,9 @@ import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.put
-import okhttp3.Cookie
-import okhttp3.CookieJar
 import okhttp3.FormBody
-import okhttp3.HttpUrl
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -75,11 +69,8 @@ class EuApi(private val brand: Brand) {
     internal val host get() = brand.host
 
     internal val userApi get() = "${brand.baseUrl}/api/v1/user/"
-
     internal val spa get() = "${brand.baseUrl}/api/v1/spa/"
-
     internal val spaV2 get() = "${brand.baseUrl}/api/v2/spa/"
-
     internal val serviceId get() = brand.clientId
 
     internal val clientSecret get() = brand.clientSecret
@@ -88,13 +79,12 @@ class EuApi(private val brand: Brand) {
     // Kia/Genesis EU are added these become brand-keyed (idpconnect-eu.kia.com,
     // redirect_uri .../oauth2/redirect for Kia).
     internal val loginFormHost get() = "https://idpconnect-eu.hyundai.com"
-
     internal val redirectUri get() = userApi + "oauth2/token"
 
     companion object {
         private const val USER_AGENT_OKHTTP = "okhttp/3.12.0"
         // The IDPConnect authorize endpoint 400s without the "_CCS_APP_AOS" suffix.
-        private const val USER_AGENT_IDP =
+        internal const val USER_AGENT_IDP =
             "Mozilla/5.0 (Linux; Android 4.1.1; Galaxy Nexus Build/JRO03C) AppleWebKit/535.19 " +
                 "(KHTML, like Gecko) Chrome/18.0.1025.166 Mobile Safari/535.19_CCS_APP_AOS"
 
@@ -109,7 +99,7 @@ class EuApi(private val brand: Brand) {
 
         private val sharedJson = Json { ignoreUnknownKeys = true; isLenient = true; coerceInputValues = true }
 
-        private val sharedClient: OkHttpClient = OkHttpClient.Builder()
+        internal val sharedClient: OkHttpClient = OkHttpClient.Builder()
             .connectTimeout(30, TimeUnit.SECONDS)
             .readTimeout(60, TimeUnit.SECONDS)
             // BASIC level logs the request/response line only (no bodies), so the
@@ -146,7 +136,6 @@ class EuApi(private val brand: Brand) {
 
     /** [apiHeaders] plus the bearer access token, device id and CCS2-support flag. */
     internal fun Request.Builder.authHeaders(session: EuSession, ccs2: Int): Request.Builder =
-
         apiHeaders()
             .header("Authorization", "Bearer ${session.accessToken}")
             .header("ccsp-device-id", session.deviceId)
@@ -156,7 +145,6 @@ class EuApi(private val brand: Brand) {
      *  AuthorizationCCSP — CCS2 control endpoints authenticate on the control
      *  token, not the plain access token. [controlToken] already carries "Bearer ". */
     internal fun Request.Builder.commandHeaders(session: EuSession, ccs2: Int, controlToken: String): Request.Builder =
-
         authHeaders(session, ccs2)
             .header("Authorization", controlToken)
             .header("AuthorizationCCSP", controlToken)
@@ -179,96 +167,6 @@ class EuApi(private val brand: Brand) {
         call(req).path("resMsg", "deviceId").str()
             ?: throw BlueLinkException("Europe device registration failed")
     }
-
-        withContext(Dispatchers.IO) {
-            // One cookie jar shared across the handshake; two clients over it that
-            // differ only in redirect-following (signin must NOT follow, so its 302
-            // Location — carrying the code — is readable).
-            val store = mutableListOf<Cookie>()
-            val jar = object : CookieJar {
-                override fun saveFromResponse(url: HttpUrl, cookies: List<Cookie>) {
-                    store.removeAll { e -> cookies.any { it.name == e.name } }
-                    store.addAll(cookies)
-                }
-                override fun loadForRequest(url: HttpUrl): List<Cookie> = store.toList()
-            }
-            val follow = sharedClient.newBuilder().cookieJar(jar).followRedirects(true).build()
-            val noFollow = sharedClient.newBuilder().cookieJar(jar).followRedirects(false).build()
-
-            fun idp(url: String) = Request.Builder().url(url).header("User-Agent", USER_AGENT_IDP)
-
-            // 1. authorize — seed IDP session cookies (follows redirect to login form).
-            //
-            // The country was pinned to "de" for every user, which is right for
-            // exactly one of the thirty-odd markets this region serves.
-            // euLoginCountry sends the device's own country instead, but only
-            // when it is one the region actually serves -- so a German owner
-            // with a US-English phone still sends "de" rather than a country
-            // this IDP has never heard of, and nobody who can sign in today
-            // stops being able to.
-            val authorizeUrl = "$loginFormHost/auth/api/v2/user/oauth2/authorize" +
-                "?response_type=code&client_id=$serviceId&redirect_uri=$redirectUri" +
-                "&lang=en&state=ccsp&country=${euLoginCountry()}"
-            follow.newCall(idp(authorizeUrl).get().build()).execute().close()
-
-            // 2. RSA public key (JWK) for password encryption.
-            val certRoot = call(idp("$loginFormHost/auth/api/v1/accounts/certs").get().build(), follow)
-            val jwk = certRoot.path("retValue") as? JsonObject
-                ?: throw BlueLinkException("Europe sign-in: could not fetch the login key")
-            val kid = jwk.path("kid").str().orEmpty()
-            val encryptedPw = rsaEncryptHex(
-                password,
-                jwk.path("n").str() ?: throw BlueLinkException("Europe sign-in: bad login key"),
-                jwk.path("e").str() ?: throw BlueLinkException("Europe sign-in: bad login key"),
-            )
-
-            // 3. signin — form POST, do NOT follow the redirect; pull code from Location.
-            val signinForm = FormBody.Builder()
-                .add("client_id", serviceId)
-                .add("encryptedPassword", "true")
-                .add("password", encryptedPw)
-                .add("redirect_uri", redirectUri)
-                .add("scope", "")
-                .add("nonce", "")
-                .add("state", "ccsp")
-                .add("username", username)
-                .add("connector_session_key", "")
-                .add("kid", kid)
-                .add("_csrf", "")
-                .build()
-            val location = noFollow.newCall(
-                idp("$loginFormHost/auth/account/signin").post(signinForm).build(),
-            ).execute().use { resp ->
-                if (resp.code != 302) {
-                    throw BlueLinkException(
-                        "Europe sign-in failed (HTTP ${resp.code}) — check your Bluelink email and password",
-                        code = resp.code,
-                    )
-                }
-                resp.header("location").orEmpty()
-            }
-            val code = Regex("[?&]code=([^&]+)").find(location)?.groupValues?.get(1)
-                ?: throw BlueLinkException(
-                    if (location.contains("authorization", true))
-                        "Bluelink needs a one-time consent in the official app/website first, then try again."
-                    else "Europe sign-in was rejected — check your Bluelink email and password.",
-                )
-
-            // 4. exchange code -> tokens (form; client_secret sent as a field).
-            val tokenForm = FormBody.Builder()
-                .add("grant_type", "authorization_code")
-                .add("code", code)
-                .add("redirect_uri", redirectUri)
-                .add("client_id", serviceId)
-                .add("client_secret", clientSecret)
-                .build()
-            val tokenRoot = call(
-                idp("$loginFormHost/auth/api/v2/user/oauth2/token").post(tokenForm).build(), follow,
-            )
-            val access = tokenRoot.path("access_token").str()
-                ?: throw BlueLinkException("Europe sign-in failed to obtain an access token")
-            EuSession(access, tokenRoot.path("refresh_token").str(), deviceId, pin)
-        }
 
     /** Exchange the refresh token for a fresh access token (no re-login). */
     suspend fun refresh(session: EuSession): EuSession = withContext(Dispatchers.IO) {
@@ -327,7 +225,6 @@ class EuApi(private val brand: Brand) {
      * handful of requests to respect EU's strict rate limits.
      */
     suspend fun status(session: EuSession, v: EuVehicleSummary, refresh: Boolean): VehicleStatus? =
-
         withContext(Dispatchers.IO) {
             val base = spa + "vehicles/${v.id}/ccs2/carstatus"
             fun readLatest(): JsonObject? =
@@ -365,22 +262,16 @@ class EuApi(private val brand: Brand) {
     // Charge target is a v1 endpoint. Bodies ported from ApiImplType1.
 
     suspend fun lock(session: EuSession, v: EuVehicleSummary, controlToken: String) =
-
         control(session, v, controlToken, "door", buildJsonObject { put("command", "close") })
 
     suspend fun unlock(session: EuSession, v: EuVehicleSummary, controlToken: String) =
-
         control(session, v, controlToken, "door", buildJsonObject { put("command", "open") })
 
     suspend fun startCharge(session: EuSession, v: EuVehicleSummary, controlToken: String) =
-
         control(session, v, controlToken, "charge", buildJsonObject { put("command", "start") })
 
     suspend fun stopCharge(session: EuSession, v: EuVehicleSummary, controlToken: String) =
-
         control(session, v, controlToken, "charge", buildJsonObject { put("command", "stop") })
-
-        control(session, v, controlToken, "temperature", buildJsonObject { put("command", "stop") })
 
     internal suspend fun control(
         session: EuSession, v: EuVehicleSummary, controlToken: String, path: String, cmd: JsonObject,
@@ -415,11 +306,9 @@ class EuApi(private val brand: Brand) {
      *  `retCode == "F"` error. The failing method+path is included in the message. */
     /** See [ResponseFraming]: GET-only retry on a fresh connection for an unframable body. */
     internal fun call(request: Request, httpClient: OkHttpClient = this.client): JsonElement =
-
         ResponseFraming.retryOnceOnFreshConnection(request) { rawCall(it, httpClient) }
 
     internal fun rawCall(request: Request, httpClient: OkHttpClient): JsonElement =
-
         httpClient.newCall(request).execute().use { resp ->
             // See BlueLinkApi.call's own doc for why this is measured separately from the
             // HttpLoggingInterceptor's own (headers-only) timing: `.string()` is what actually
@@ -474,8 +363,6 @@ class EuApi(private val brand: Brand) {
         }.getOrNull()
         return msg?.takeIf { it.isNotBlank() } ?: "Europe request failed (HTTP $code)"
     }
-
-        (this as? JsonPrimitive)?.let { it.booleanOrNull ?: it.intOrNull?.let { v -> v != 0 } }
 
     /**
      * Filters the 12V auxiliary battery reading the way the reference project's own

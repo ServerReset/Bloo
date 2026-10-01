@@ -8,6 +8,9 @@ import kotlinx.serialization.json.put
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import java.util.Locale
+import com.bloo.bluelink.data.CanadaApi.Companion.TEMP_RANGE_MODEL_YEAR
+import com.bloo.bluelink.data.CanadaApi.Companion.TEMP_RANGE_NEW
+import com.bloo.bluelink.data.CanadaApi.Companion.TEMP_RANGE_OLD
 
 /** The Canada API's status parsing and climate command, as extensions of [CanadaApi], kept out of the class so it stays readable. */
 

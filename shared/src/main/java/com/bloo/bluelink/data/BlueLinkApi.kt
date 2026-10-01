@@ -184,7 +184,6 @@ class BlueLinkApi(private val brand: Brand = Brand.HYUNDAI) {
      *  it wants. Returns null if the server responds with no vehicleStatus
      *  at all (car has never reported one). */
     suspend fun status(token: String, username: String, pin: String, v: Vehicle, refresh: Boolean): VehicleStatus? =
-
         execute {
             val request = baseRequest("/ac/v2/rcs/rvs/vehicleStatus", token, username, pin, v)
                 .get()
@@ -199,7 +198,6 @@ class BlueLinkApi(private val brand: Brand = Brand.HYUNDAI) {
      *  the coordinate plus reported speed into the platform-neutral
      *  [GeoLocation]. */
     suspend fun location(token: String, username: String, pin: String, v: Vehicle): GeoLocation? =
-
         execute {
             val request = baseRequest("/ac/v2/rcs/rfc/findMyCar", token, username, pin, v)
                 .get()
@@ -217,7 +215,6 @@ class BlueLinkApi(private val brand: Brand = Brand.HYUNDAI) {
      * return an empty list (the caller treats a failure here as "no trips").
      */
     suspend fun tripDetails(token: String, username: String, pin: String, v: Vehicle): List<EvTrip> =
-
         execute {
             val request = baseRequest("/ac/v2/ts/alerts/maintenance/evTripDetails", token, username, pin, v)
                 .header("userId", username)
@@ -229,24 +226,20 @@ class BlueLinkApi(private val brand: Brand = Brand.HYUNDAI) {
     /** Lock the doors. Confusingly named endpoint: "rdo/off" locks (remote
      *  door operation, off = secured), not the other way around. */
     suspend fun lock(token: String, username: String, pin: String, v: Vehicle) =
-
         formCommand("/ac/v2/rcs/rdo/off", token, username, pin, v)
 
     /** Unlock the doors ("rdo/on" — see [lock] for the naming logic). */
     suspend fun unlock(token: String, username: String, pin: String, v: Vehicle) =
-
         formCommand("/ac/v2/rcs/rdo/on", token, username, pin, v)
 
     /** Flash the hazard lights only. Reference client: rcs/rhl/light, same
      *  userName+vin JSON body and header set as lock/unlock. Hyundai/Genesis
      *  only -- Kia's US API has no equivalent endpoint. */
     suspend fun flashLights(token: String, username: String, pin: String, v: Vehicle) =
-
         jsonCommand("/ac/v2/rcs/rhl/light", token, username, pin, v)
 
     /** Flash the hazard lights and sound the horn. Reference client: rcs/rhl/hnl. */
     suspend fun hornAndLights(token: String, username: String, pin: String, v: Vehicle) =
-
         jsonCommand("/ac/v2/rcs/rhl/hnl", token, username, pin, v)
 
     suspend fun stopClimate(token: String, username: String, pin: String, v: Vehicle): String = execute {

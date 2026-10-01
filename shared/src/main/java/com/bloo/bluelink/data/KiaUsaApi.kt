@@ -7,10 +7,8 @@ import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.put
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
@@ -118,7 +116,6 @@ class KiaUsaApi {
      *  format HTTP's own Date header uses, which the Kia API expects as its
      *  own `date` header on every request (see [apiHeaders]). */
     internal fun rfc1123Date(): String =
-
         rfc1123Format.get()!!.format(System.currentTimeMillis())
 
     /** The full set of headers every Kia API call needs regardless of
@@ -152,7 +149,6 @@ class KiaUsaApi {
      *  session and *which* car a command applies to — every authenticated
      *  call (status, lock/unlock, climate, etc.) goes through this. */
     internal fun Request.Builder.authedHeaders(session: KiaSession, vehicle: KiaVehicleSummary): Request.Builder =
-
         apiHeaders(session.deviceId).header("sid", session.sid).header("vinkey", vehicle.key)
 
     // --- Auth ------------------------------------------------------------
@@ -266,7 +262,6 @@ class KiaUsaApi {
      *  since location doesn't need them — returns null if the fetch is
      *  empty/missing or the parsed status carries no location. */
     suspend fun location(session: KiaSession, vehicle: KiaVehicleSummary): VehicleLocation? =
-
         fetchInfo(session, vehicle)?.let { parseStatus(it).vehicleLocation }
 
     /** Shared cmm/gvi fetch+unwrap used by [status] and [location]: posts the
@@ -397,7 +392,6 @@ class KiaUsaApi {
     /** The retrying entry point: a GET whose body can't be framed is retried once on a fresh
      *  connection (see [ResponseFraming]); POSTs are never retried here. */
     internal fun call(request: Request): JsonElement =
-
         ResponseFraming.retryOnceOnFreshConnection(request) { rawCall(it) }
 
     internal fun rawCall(request: Request): JsonElement = raw(request).use { resp ->
@@ -452,11 +446,8 @@ class KiaUsaApi {
      * letting a raw SerializationException/IOException crash the app.
      */
     internal fun parseJson(text: String, code: Int): JsonElement =
-
         runCatching { json.parseToJsonElement(text) }
             .getOrElse { throw BlueLinkException(friendly(code, text), code = code) }
-
-        (this as? JsonPrimitive)?.let { it.booleanOrNull ?: it.intOrNull?.let { v -> v != 0 } }
 
     /** RFC 4122 v5 (name-based, SHA-1) UUID in the DNS namespace — matches the iOS app. */
     internal fun uuid5FromDns(name: String): String {

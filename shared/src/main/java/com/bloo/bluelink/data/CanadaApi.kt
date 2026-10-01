@@ -6,11 +6,9 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.intOrNull
-import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.put
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
@@ -86,7 +84,6 @@ class CanadaApi(private val brand: Brand) {
     }
 
     internal val apiUrl get() = "${brand.baseUrl}/"
-
     internal val host get() = brand.host
 
     internal val clientId get() = brand.clientId
@@ -119,9 +116,9 @@ class CanadaApi(private val brand: Brand) {
         // Celsius half-degree lookup tables the hex-encoded setpoint indexes
         // into — pre-2020 model-year vehicles report a narrower range. Mirrors
         // KiaUvoApiCA's temperature_range_c_old/temperature_range_c_new exactly.
-        private val TEMP_RANGE_OLD: List<Double> = (32..63).map { it * 0.5 }
-        private val TEMP_RANGE_NEW: List<Double> = (28..63).map { it * 0.5 }
-        private const val TEMP_RANGE_MODEL_YEAR = 2020
+        internal val TEMP_RANGE_OLD: List<Double> = (32..63).map { it * 0.5 }
+        internal val TEMP_RANGE_NEW: List<Double> = (28..63).map { it * 0.5 }
+        internal const val TEMP_RANGE_MODEL_YEAR = 2020
     }
 
     internal val json get() = sharedJson
@@ -149,17 +146,14 @@ class CanadaApi(private val brand: Brand) {
 
     /** [apiHeaders] plus the access token every authenticated call needs. */
     internal fun Request.Builder.authHeaders(session: CanadaSession): Request.Builder =
-
         apiHeaders(session.deviceId).header("accessToken", session.accessToken)
 
     /** [authHeaders] plus which car a vehicle-scoped call applies to. */
     internal fun Request.Builder.vehicleHeaders(session: CanadaSession, vehicleId: String): Request.Builder =
-
         authHeaders(session).header("vehicleId", vehicleId)
 
     /** [vehicleHeaders] plus the PIN-derived auth token a command needs. */
     internal fun Request.Builder.commandHeaders(session: CanadaSession, vehicleId: String, pAuth: String): Request.Builder =
-
         vehicleHeaders(session, vehicleId).header("pAuth", pAuth).header("from", "SPA")
 
     // --- Auth ----------------------------------------------------------------
@@ -167,7 +161,6 @@ class CanadaApi(private val brand: Brand) {
     /** Step 1: username/password. Returns a session directly if this device is
      *  still within its 90-day mfaYn grant, otherwise an MFA challenge. */
     suspend fun authUser(username: String, password: String, deviceId: String, pin: String?): CanadaAuth =
-
         withContext(Dispatchers.IO) {
             val body = buildJsonObject { put("loginId", username); put("password", password) }
                 .toString().toRequestBody(jsonMedia)
@@ -287,11 +280,17 @@ class CanadaApi(private val brand: Brand) {
 
     /** Cached (or, if [refresh], freshly-woken) status. */
     suspend fun status(session: CanadaSession, v: CanadaVehicleSummary, refresh: Boolean): VehicleStatus? =
+        withContext(Dispatchers.IO) {
+            val path = if (refresh) "rltmvhclsts" else "lstvhclsts"
+            val req = Request.Builder().url(apiUrl + path)
+                .post(ByteArray(0).toRequestBody(null)).vehicleHeaders(session, v.id).build()
+            val statusObj = call(req).path("result", "status") as? JsonObject ?: return@withContext null
+            parseStatus(statusObj, v.year)
+        }
 
     /** Last-known GPS fix, gated behind the account's service PIN like every
      *  other vehicle-scoped Canada command. */
     suspend fun location(session: CanadaSession, v: CanadaVehicleSummary, pAuth: String): GeoLocation? =
-
         withContext(Dispatchers.IO) {
             val body = buildJsonObject { put("pin", session.pin.orEmpty()) }.toString().toRequestBody(jsonMedia)
             val req = Request.Builder().url(apiUrl + "fndmcr").post(body)
@@ -305,23 +304,18 @@ class CanadaApi(private val brand: Brand) {
     // --- Commands --------------------------------------------------------------
 
     suspend fun lock(session: CanadaSession, v: CanadaVehicleSummary, pAuth: String) =
-
         pinCommand("drlck", session, v, pAuth)
 
     suspend fun unlock(session: CanadaSession, v: CanadaVehicleSummary, pAuth: String) =
-
         pinCommand("drulck", session, v, pAuth)
 
     suspend fun stopClimate(session: CanadaSession, v: CanadaVehicleSummary, pAuth: String) =
-
         pinCommand(if (v.isEv) "evc/rfoff" else "rmtstp", session, v, pAuth)
 
     suspend fun startCharge(session: CanadaSession, v: CanadaVehicleSummary, pAuth: String) =
-
         pinCommand("evc/rcstrt", session, v, pAuth)
 
     suspend fun stopCharge(session: CanadaSession, v: CanadaVehicleSummary, pAuth: String) =
-
         pinCommand("evc/rcstp", session, v, pAuth)
 
     /** Set EV charge target SOC for AC (plugType 1) and DC (plugType 0) percent. */
@@ -345,7 +339,6 @@ class CanadaApi(private val brand: Brand) {
      *  account's PIN in the body per the reference project, just with no
      *  other fields alongside it. */
     internal suspend fun pinCommand(path: String, session: CanadaSession, v: CanadaVehicleSummary, pAuth: String) =
-
         withContext(Dispatchers.IO) {
             val body = buildJsonObject { put("pin", session.pin.orEmpty()) }.toString().toRequestBody(jsonMedia)
             val req = Request.Builder().url(apiUrl + path).post(body).commandHeaders(session, v.id, pAuth).build()
@@ -360,7 +353,6 @@ class CanadaApi(private val brand: Brand) {
     /** The retrying entry point: a GET whose body can't be framed is retried once on a fresh
      *  connection (see [ResponseFraming]); POSTs are never retried here. */
     internal fun call(request: Request): JsonElement =
-
         ResponseFraming.retryOnceOnFreshConnection(request) { rawCall(it) }
 
     internal fun rawCall(request: Request): JsonElement = raw(request).use { resp ->
@@ -424,9 +416,6 @@ class CanadaApi(private val brand: Brand) {
     }
 
     internal fun parseJson(text: String, code: Int): JsonElement =
-
         runCatching { json.parseToJsonElement(text) }
             .getOrElse { throw BlueLinkException(friendly(code, text), code = code) }
-
-        (this as? JsonPrimitive)?.let { it.booleanOrNull ?: it.intOrNull?.let { v -> v != 0 } }
 }
