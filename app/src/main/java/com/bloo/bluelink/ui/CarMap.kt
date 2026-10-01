@@ -35,7 +35,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.derivedStateOf
-import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -64,22 +63,6 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.isActive
 import kotlin.math.floor
 import kotlin.math.roundToInt
-
-/** Zoom bounds for [CarMap]'s zoom, pinch or button-driven -- 3 is "half the
- *  continent", 19 is past what OSM actually serves tiles for. */
-internal const val CarMapMinZoom = 3
-internal const val CarMapMaxZoom = 19
-
-/** Where every [CarMapState] starts: street level, car dead-centre. */
-internal const val CarMapDefaultZoom = 15
-
-/** The inclusive tile-index range [CarMap] currently needs fetched -- see its own
- *  `range`/`derivedStateOf` doc for why this is its own equatable value rather
- *  than four loose Ints computed inline. */
-private data class TileRange(val firstX: Int, val firstY: Int, val lastX: Int, val lastY: Int)
-
-/** Null (the default) when no host has set one up. See [ExpandedMapState]'s own doc. */
-internal val LocalExpandedMap = staticCompositionLocalOf<ExpandedMapState?> { null }
 
 /**
  * A small slippy map centred on the car, assembled from key-free OpenStreetMap raw
