@@ -54,10 +54,11 @@ class ButtonGroupLayoutTest {
         val all = labels.indices.map { bounds("b$it") }
         val lines = all.groupBy { it.top.value.toInt() }.toSortedMap().values.toList()
         assertTrue("five wide buttons must wrap onto more than one line, got ${lines.size}", lines.size > 1)
+        val layout = all.joinToString { "[l=${it.left.value} t=${it.top.value} r=${it.right.value}]" }
         lines.forEach { line ->
             val right = line.maxOf { it.right.value }
             val left = line.minOf { it.left.value }
-            assertEquals("a line fills the row's full width", rowWidth.value, right - left, 2f)
+            assertEquals("a line fills the row's full width; buttons were $layout", rowWidth.value, right - left, 2f)
         }
     }
 

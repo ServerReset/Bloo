@@ -222,7 +222,7 @@ jobs:
           target: google_apis
           profile: pixel_6
           disable-animations: true
-          script: ./gradlew :app:connectedDebugAndroidTest --stacktrace
+          script: bash .github/ci-ui-tests.sh
 
       - name: Upload instrumented test reports
         if: always()

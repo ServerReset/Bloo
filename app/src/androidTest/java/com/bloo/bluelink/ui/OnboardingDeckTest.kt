@@ -44,7 +44,10 @@ class OnboardingDeckTest {
         rule.waitUntil(10_000) { shown("Getting around") }
         rule.onNodeWithText("Next").performClick()
         rule.waitUntil(10_000) { shown("More Bloo can do") }
-        rule.onNodeWithText("Dismiss").assertIsDisplayed()
+        // The label swaps to "Dismiss" with the card; give its animation a moment to settle.
+        rule.waitUntil(5_000) {
+            runCatching { rule.onNodeWithText("Dismiss").assertIsDisplayed() }.isSuccess
+        }
         assertTrue("the deck is open before dismissing", vm.state.value.welcomeCardsOpen)
         rule.onNodeWithText("Dismiss").performClick()
         rule.waitUntil(5_000) { !vm.state.value.welcomeCardsOpen }
