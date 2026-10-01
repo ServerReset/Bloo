@@ -426,39 +426,6 @@ class SnapshotStore(private val context: Context) {
         }
     }
 
-    /** Change which car is the "active" one for snapshot readers, without
-     *  touching the vehicle data itself. */
-    suspend fun setSelected(vin: String) {
-        // See saveVehiclesKeepingStatus's own comment on why this is on Dispatchers.IO.
-        withContext(Dispatchers.IO) {
-            context.snapshotDataStore.edit { prefs ->
-                val existing = decode(prefs[Keys.PAYLOAD])
-                prefs[Keys.PAYLOAD] = json.encodeToString(
-                    SnapshotPayload.serializer(),
-                    SnapshotPayload(existing.vehicles, vin),
-                )
-            }
-        }
-    }
-
-    /** Advance the snapshot selection to the next car, looping. */
-    suspend fun selectNext(): VehicleSnapshot? = withContext(Dispatchers.IO) {
-        // See saveVehiclesKeepingStatus's own comment on why this is on Dispatchers.IO.
-        var result: VehicleSnapshot? = null
-        context.snapshotDataStore.edit { prefs ->
-            val existing = decode(prefs[Keys.PAYLOAD])
-            if (existing.vehicles.isEmpty()) return@edit
-            val idx = existing.vehicles.indexOfFirst { it.vin == existing.selectedVin }
-            val next = existing.vehicles[(idx + 1).mod(existing.vehicles.size)]
-            result = next
-            prefs[Keys.PAYLOAD] = json.encodeToString(
-                SnapshotPayload.serializer(),
-                SnapshotPayload(existing.vehicles, next.vin),
-            )
-        }
-        result
-    }
-
     /** Parse the raw stored JSON string into [SnapshotData]. A null [raw]
      *  (nothing saved yet) or a JSON parse failure (corrupt/incompatible
      *  data — belt-and-suspenders alongside the DataStore-level

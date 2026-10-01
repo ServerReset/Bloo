@@ -188,20 +188,5 @@ object WearDataLayerSync {
         }
     }
 
-    /** Ask the phone to push this watch the latest watch APK (see [WatchSyncProtocol.PATH_REQUEST_APK]). */
-    fun requestWatchApk(context: Context) {
-        val app = context.applicationContext
-        scope.launch {
-            runCatching {
-                val nodes = com.google.android.gms.wearable.Wearable.getNodeClient(app)
-                    .connectedNodes.await()
-                nodes.forEach { node ->
-                    com.google.android.gms.wearable.Wearable.getMessageClient(app)
-                        .sendMessage(node.id, WatchSyncProtocol.PATH_REQUEST_APK, ByteArray(0)).await()
-                }
-            }
-        }
-    }
-
     private const val KEY_PAYLOAD = "payload"
 }

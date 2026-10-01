@@ -296,15 +296,6 @@ internal fun Modifier.hapticClickable(
     return blockPageSwipe().noRippleClickable(onClickLabel) { haptics?.click(); onClick() }
 }
 
-/**
- * Consolidates the most-repeated padding patterns. Used instead of
- * `.padding(horizontal = X, vertical = Y)` across 40+ sites.
- */
-internal fun Modifier.paddingHorizontal(horizontal: Dp) = padding(horizontal = horizontal)
-internal fun Modifier.paddingVertical(vertical: Dp) = padding(vertical = vertical)
 
 internal fun Modifier.padding16() = padding(16.dp)
 
-/** Combined padding patterns that appear across multiple files. */
-@Composable
-internal fun Modifier.paddingHorizontal24Vertical16() = padding(horizontal = 24.dp, vertical = GapSection)

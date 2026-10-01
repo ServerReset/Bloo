@@ -222,13 +222,6 @@ enum class Brand(
         fun shortLabel(brand: Brand): String =
             brand.label.removeSuffix(" (Canada)").removeSuffix(" (Europe)")
 
-        // Looks up an enum entry by its exact `name` (e.g. "KIA"); falls back to
-        // HYUNDAI (the original, pre-multi-brand default) if `name` is null or
-        // doesn't match any current entry, so a legacy/blank stored value never
-        // throws NoSuchElementException.
-        fun fromName(name: String?): Brand =
-            entries.firstOrNull { it.name == name } ?: HYUNDAI
-
         /** Map a vehicle's brand indicator back to a [Brand] -- the exact reverse
          *  of the `code` each brand stamps onto its own vehicles (see
          *  BlueLinkRepository.vehicles / KiaRepository.toVehicle / this file's CA
