@@ -28,6 +28,9 @@ import androidx.core.net.toUri
 import com.bloo.bluelink.autolock.AutoLockNotification
 import com.bloo.bluelink.data.LiveCharge
 import com.bloo.bluelink.data.SettingsStore
+import com.bloo.bluelink.data.openLiveUpdateSettings
+import com.bloo.bluelink.data.isBackgroundUnrestricted
+import com.bloo.bluelink.data.requestBackgroundUnrestricted
 
 /**
  * "Notifications" card: every alert the app can post, and everything that decides whether those

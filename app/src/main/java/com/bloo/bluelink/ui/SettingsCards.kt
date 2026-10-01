@@ -72,6 +72,8 @@ import com.bloo.bluelink.data.setPowertrain
 import com.bloo.bluelink.data.setSeatFlag
 import com.bloo.bluelink.data.setServiceIntervalMiles
 import com.bloo.bluelink.data.settingsMode
+import com.bloo.bluelink.data.openDeveloperOptions
+import com.bloo.bluelink.data.requestBackgroundUnrestricted
 
 /**
  * Ordered troubleshooting steps covering the two different ways this bar can fail to
