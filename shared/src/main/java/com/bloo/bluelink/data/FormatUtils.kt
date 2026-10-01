@@ -573,36 +573,6 @@ fun formatSpeedMph(mph: Double, metric: Boolean): String =
 fun formatTripDistance(mi: Double, metric: Boolean): String =
     if (metric) "%.1f km".format(mi * KM_PER_MI) else "%.1f mi".format(mi)
 
-/**
- * The canonical "what's this car doing right now" label, in priority order
- * (driving beats charging beats climate beats lock state). Every surface that
- * shows a one-line vehicle state — the phone widget, phone Quick Settings
- * tiles, the wear tile, and wear complications — used to reimplement this same
- * priority chain independently, and they'd drifted slightly out of sync with
- * each other. Colors stay local to each surface, but the label — and the
- * priority order that decides which state "wins" when
- * several are true at once — is exactly the kind of logic that should only
- * exist in one place.
- */
-fun vehicleStateLabel(
-    engineOn: Boolean?,
-    charging: Boolean?,
-    climateOn: Boolean?,
-    locked: Boolean?,
-): String = when {
-    // `when` evaluates branches top-to-bottom and stops at the first true
-    // condition, which is what actually encodes the priority order described
-    // above: a car that is both driving and charging (e.g. towing while
-    // plugged in) reports "Driving" because that branch is checked first.
-    // Every `== true` check treats a null (unknown/not-yet-fetched) state the
-    // same as false, so an unknown value never wins a branch by accident.
-    engineOn == true  -> "Driving"
-    charging == true  -> "Charging"
-    climateOn == true -> "Climate on"
-    locked == true    -> "Locked"
-    locked == false   -> "Unlocked"
-    else              -> "—" // locked itself unknown (null) and nothing else applies.
-}
 
 /** Raw signed miles remaining until the next scheduled service: the next-due
  *  odometer reading ([lastServiceMiles] + [intervalMiles]) minus the current

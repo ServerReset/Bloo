@@ -349,31 +349,9 @@ internal fun Modifier.hapticClickable(
  */
 internal fun Modifier.paddingHorizontal(horizontal: Dp) = padding(horizontal = horizontal)
 internal fun Modifier.paddingVertical(vertical: Dp) = padding(vertical = vertical)
-internal fun Modifier.paddingAll(all: Dp) = padding(all)
 
-/**
- * Spacing-token based padding helpers use the Settings gap scale directly.
- * `.padding16` is `.padding(horizontal = GapSection)` -- replaces
- * the ad-hoc `padding(horizontal = 16.dp)` pattern across the app.
- */
-internal fun Modifier.padding24() = padding(24.dp)
 internal fun Modifier.padding16() = padding(16.dp)
-internal fun Modifier.padding12() = padding(12.dp)
-internal fun Modifier.padding8() = padding(8.dp)
-internal fun Modifier.padding4() = padding(4.dp)
-
-internal fun Modifier.paddingHorizontal16() = paddingHorizontal(16.dp)
-internal fun Modifier.paddingHorizontal24() = paddingHorizontal(24.dp)
-internal fun Modifier.paddingHorizontal12() = paddingHorizontal(12.dp)
-internal fun Modifier.paddingHorizontal8() = paddingHorizontal(8.dp)
-
-internal fun Modifier.paddingVertical16() = paddingVertical(16.dp)
-internal fun Modifier.paddingVertical12() = paddingVertical(12.dp)
-internal fun Modifier.paddingVertical24() = paddingVertical(24.dp)
-internal fun Modifier.paddingVertical8() = paddingVertical(8.dp)
 
 /** Combined padding patterns that appear across multiple files. */
 @Composable
 internal fun Modifier.paddingHorizontal24Vertical16() = padding(horizontal = 24.dp, vertical = GapSection)
-@Composable
-internal fun Modifier.paddingHorizontal16Vertical12() = padding(horizontal = 16.dp, vertical = GapGroup)

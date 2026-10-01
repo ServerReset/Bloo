@@ -9,7 +9,7 @@ import kotlin.test.assertTrue
 /**
  * Pure-JVM tests for the FormatUtils helpers that had NO coverage at all before
  * this file: [smartClimateTargetF]/[smartClimateIsCooling], [climateChunks],
- * [tripDate], [maskEmail], [formatSpeedMph], [vehicleStateLabel] and
+ * [tripDate], [maskEmail], [formatSpeedMph] and
  * [parseOdometerMiles]. Several of these functions' own doc comments describe a
  * real historical bug they were written to fix (a flat-offset smart-climate target
  * clamping to the WRONG end of the range on an extreme day, a phone trip-date parser
@@ -170,34 +170,6 @@ class FormatUtilsTest {
     @Test
     fun formatSpeedMph_metric_convertsToKmh() {
         assertEquals("100 km/h", formatSpeedMph(62.0, metric = true))
-    }
-
-    // ---- vehicleStateLabel ----
-
-    @Test
-    fun vehicleStateLabel_priorityOrder_drivingBeatsEverything() {
-        assertEquals("Driving", vehicleStateLabel(engineOn = true, charging = true, climateOn = true, locked = true))
-    }
-
-    @Test
-    fun vehicleStateLabel_priorityOrder_chargingBeatsClimateAndLock() {
-        assertEquals("Charging", vehicleStateLabel(engineOn = false, charging = true, climateOn = true, locked = true))
-    }
-
-    @Test
-    fun vehicleStateLabel_priorityOrder_climateBeatsLock() {
-        assertEquals("Climate on", vehicleStateLabel(engineOn = false, charging = false, climateOn = true, locked = true))
-    }
-
-    @Test
-    fun vehicleStateLabel_lockStateWhenNothingElseIsTrue() {
-        assertEquals("Locked", vehicleStateLabel(engineOn = false, charging = false, climateOn = false, locked = true))
-        assertEquals("Unlocked", vehicleStateLabel(engineOn = false, charging = false, climateOn = false, locked = false))
-    }
-
-    @Test
-    fun vehicleStateLabel_allUnknown_showsEmDash() {
-        assertEquals("—", vehicleStateLabel(engineOn = null, charging = null, climateOn = null, locked = null))
     }
 
     // ---- parseOdometerMiles ----

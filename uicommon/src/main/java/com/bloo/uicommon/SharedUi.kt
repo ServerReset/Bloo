@@ -17,24 +17,6 @@ import androidx.compose.ui.unit.Dp
 import kotlinx.coroutines.delay
 
 /**
- * Draws a vertical scrim behind the content: fully [color] at the top fading to
- * transparent over [heightDp]. Foundation-only (no Material). The caller supplies
- * the color and the total height (including any status-bar inset) and positions
- * the scrim via its own [Box] alignment.
- */
-fun Modifier.topFadeScrim(color: Color, heightDp: Dp): Modifier = this.drawBehind {
-    val h = heightDp.toPx()
-    drawRect(
-        brush = Brush.verticalGradient(
-            colors = listOf(color, Color.Transparent),
-            startY = 0f,
-            endY = h,
-        ),
-        size = Size(size.width, h),
-    )
-}
-
-/**
  * Stable holder returned by [rememberConfirmArm]: [armed] is the current arm
  * state and [arm] arms it. Callers use the pattern
  * `if (confirm.armed) doAction() else confirm.arm()`.
