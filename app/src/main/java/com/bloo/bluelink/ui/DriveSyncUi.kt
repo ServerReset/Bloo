@@ -324,12 +324,12 @@ internal fun SyncDeviceRow(
      *  to leave sync on the device you're actually holding). */
     onRemove: () -> Unit,
 ) {
-    val shape = RoundedCornerShape(18.dp)
+    val shape = StandardShape
     val container =
         if (isPrimary) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.55f)
         // glassTint (GlassChrome.kt), not surfaceContainerHigh -- the same shared
         // neutral fill every other glass surface in the app uses now, no exceptions.
-        else glassTint(blurred = false)
+        else panelColor()
     Row(
         Modifier
             .fillMaxWidth()
@@ -459,8 +459,8 @@ private fun WearCompanionRow(
     Row(
         modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(18.dp))
-            .background(glassTint(blurred = false))
+            .clip(StandardShape)
+            .background(panelColor())
             .padding(horizontal = 10.dp, vertical = GapRow),
         verticalAlignment = Alignment.CenterVertically,
     ) {

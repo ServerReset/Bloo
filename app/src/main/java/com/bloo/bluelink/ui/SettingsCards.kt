@@ -40,6 +40,8 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.surfaceColorAtElevation
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.unit.Dp
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -346,15 +348,22 @@ internal fun MilesField(value: Int?, label: String, modifier: Modifier, onSet: (
     )
 }
 
+/** The fill of every panel that sits on a glass card: solid and dark, so the card's frosted edge
+ *  frames something that stays legible. One colour, used by every panel in the app. */
+@Composable
+internal fun panelColor(): Color = MaterialTheme.colorScheme.surfaceColorAtElevation(6.dp)
+
+/** The standard panel: a solid box with the standard corner and a [padding] of its own. Settings
+ *  groups, account panels, the log, the device rows and the onboarding items are all this. */
+@Composable
+internal fun Modifier.panel(padding: Dp = 12.dp): Modifier =
+    this.clip(StandardShape).background(panelColor()).padding(padding)
+
 /** A titled, boxed sub-group inside the per-car settings card, for hierarchy. */
 @Composable
 internal fun SettingsGroup(title: String, content: @Composable ColumnScope.() -> Unit) {
     Column(
-        Modifier
-            .fillMaxWidth()
-            .clip(StandardShape)
-            .background(MaterialTheme.colorScheme.surfaceColorAtElevation(6.dp))
-            .padding(12.dp),
+        Modifier.fillMaxWidth().panel(),
         verticalArrangement = Arrangement.spacedBy(GapRow),
     ) {
         Text(

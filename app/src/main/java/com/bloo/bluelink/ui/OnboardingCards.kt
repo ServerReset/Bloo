@@ -124,15 +124,6 @@ internal fun onboardingAccent(kind: OnboardingStepKind): Color {
     }
 }
 
-/** The fill of a panel sitting on a glass card: a veil of the text colour, so it reads as frosted
- *  on top of the glass rather than as a dark slab beneath it. */
-@Composable
-internal fun glassPanelFill(): Color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.07f)
-
-/** The hairline around such a panel. */
-@Composable
-internal fun glassPanelBorder(): BorderStroke = BorderStroke(1.dp, MaterialTheme.colorScheme.onSurface.copy(alpha = 0.10f))
-
 /**
  * The glyph at the head of a card: a frosted disc that floats gently over a pulsing glow of the
  * card's accent colour, and springs up when its card becomes the current one.

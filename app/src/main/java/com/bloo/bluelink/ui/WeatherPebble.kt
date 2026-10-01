@@ -342,7 +342,7 @@ internal fun WeatherStripe(weather: Weather, fahrenheit: Boolean, caption: Strin
         Modifier
             .fillMaxWidth()
             .clip(StandardShape)
-            .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+            .background(panelColor())
             .padding(horizontal = 14.dp, vertical = GapRow),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp),
