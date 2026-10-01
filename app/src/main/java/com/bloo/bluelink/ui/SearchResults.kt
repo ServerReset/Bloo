@@ -478,7 +478,7 @@ internal fun SettingsSearchResults(
  * default first.
  */
 @Composable
-private fun AutoLockSearchToggle(
+internal fun AutoLockSearchToggle(
     v: Vehicle,
     vm: AppViewModel,
     label: String,
