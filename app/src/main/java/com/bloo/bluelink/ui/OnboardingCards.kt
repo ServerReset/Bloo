@@ -1,6 +1,31 @@
 package com.bloo.bluelink.ui
 
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.material3.Icon
+import androidx.compose.material3.Text
+import androidx.compose.runtime.remember
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.text.font.FontWeight
+import dev.chrisbanes.haze.HazeState
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -75,6 +100,105 @@ internal fun OnboardingDots(count: Int, current: Int, modifier: Modifier = Modif
             androidx.compose.foundation.layout.Box(
                 Modifier.width(width).height(8.dp).clip(CircleShape).background(color),
             )
+        }
+    }
+}
+
+/** The accent a card glows with, so the deck changes colour as you move through it. */
+@Composable
+internal fun onboardingAccent(kind: OnboardingStepKind): Color {
+    val scheme = MaterialTheme.colorScheme
+    return when (kind) {
+        OnboardingStepKind.WELCOME, OnboardingStepKind.SETUP, OnboardingStepKind.FEATURES -> scheme.primary
+        OnboardingStepKind.RESTORE, OnboardingStepKind.CAR -> scheme.tertiary
+        OnboardingStepKind.LOOK, OnboardingStepKind.TIPS -> scheme.secondary
+    }
+}
+
+/** The fill of a panel sitting on a glass card: a veil of the text colour, so it reads as frosted
+ *  on top of the glass rather than as a dark slab beneath it. */
+@Composable
+internal fun glassPanelFill(): Color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.07f)
+
+/** The hairline around such a panel. */
+@Composable
+internal fun glassPanelBorder(): BorderStroke = BorderStroke(1.dp, MaterialTheme.colorScheme.onSurface.copy(alpha = 0.10f))
+
+/**
+ * The glyph at the head of a card: a frosted disc that floats gently over a pulsing glow of the
+ * card's accent colour, and springs up when its card becomes the current one.
+ */
+@Composable
+internal fun OnboardingHero(icon: ImageVector, accent: Color, current: Boolean) {
+    val pulse = rememberInfiniteTransition(label = "heroPulse")
+    val glow by pulse.animateFloat(0.55f, 1f, infiniteRepeatable(tween(2600, easing = LinearEasing), RepeatMode.Reverse), label = "glow")
+    val bob by pulse.animateFloat(-4f, 4f, infiniteRepeatable(tween(3200, easing = LinearEasing), RepeatMode.Reverse), label = "bob")
+    val pop by animateFloatAsState(
+        if (current) 1f else 0.82f,
+        spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessLow),
+        label = "heroPop",
+    )
+    Box(
+        Modifier
+            .size(92.dp)
+            .graphicsLayer { translationY = bob; scaleX = pop; scaleY = pop }
+            .drawBehind {
+                drawCircle(
+                    Brush.radialGradient(listOf(accent.copy(alpha = 0.55f * glow), Color.Transparent), radius = size.minDimension * 0.95f),
+                    radius = size.minDimension * 0.95f,
+                )
+            },
+        contentAlignment = Alignment.Center,
+    ) {
+        Box(
+            Modifier
+                .size(64.dp)
+                .clip(CircleShape)
+                .background(accent.copy(alpha = 0.22f))
+                .drawBehind {
+                    drawCircle(Brush.linearGradient(listOf(Color.White.copy(alpha = 0.35f), Color.Transparent)), style = androidx.compose.ui.graphics.drawscope.Stroke(2.dp.toPx()))
+                },
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(icon, contentDescription = null, tint = accent, modifier = Modifier.size(32.dp))
+        }
+    }
+}
+
+/**
+ * One card of the deck: frosted glass over the blurred aurora, a glowing hero glyph, a big title
+ * and its summary, then the card's own content. Replaces the pebble chrome here -- these cards
+ * are the app's first impression and want to be the most expressive thing in it.
+ */
+@Composable
+internal fun OnboardingGlassCard(
+    spec: OnboardingCardSpec,
+    accent: Color,
+    hazeState: HazeState,
+    current: Boolean,
+    content: @Composable () -> Unit,
+) {
+    val scheme = MaterialTheme.colorScheme
+    GlassSurface(
+        shape = ExtraLargeShape,
+        hazeState = hazeState,
+        modifier = Modifier.fillMaxWidth(),
+        tint = scheme.surface.copy(alpha = if (canBlurBackdrops()) 0.30f else 0.90f),
+        contentAlignment = Alignment.TopStart,
+    ) {
+        Column(Modifier.fillMaxWidth().padding(22.dp), verticalArrangement = Arrangement.spacedBy(GapGroup)) {
+            OnboardingHero(spec.icon, accent, current)
+            Column(verticalArrangement = Arrangement.spacedBy(GapHairline)) {
+                Text(
+                    spec.title,
+                    style = MaterialTheme.typography.headlineMedium,
+                    fontWeight = FontWeight.Black,
+                    color = scheme.onSurface,
+                )
+                Text(spec.summary, style = MaterialTheme.typography.bodyLarge, color = scheme.onSurfaceVariant)
+            }
+            Spacer(Modifier.size(2.dp))
+            content()
         }
     }
 }

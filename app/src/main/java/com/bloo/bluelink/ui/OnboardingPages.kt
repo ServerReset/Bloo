@@ -56,6 +56,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
+import androidx.compose.foundation.border
 import androidx.compose.animation.animateContentSize
 import androidx.compose.ui.graphics.Color
 import androidx.compose.material3.Text
@@ -385,7 +386,8 @@ internal fun OnboardingSetupCard(
         Modifier
             .fillMaxWidth()
             .clip(StandardShape)
-            .background(scheme.surfaceContainerHighest)
+            .background(glassPanelFill())
+            .border(glassPanelBorder(), StandardShape)
             .padding(14.dp)
             .animateContentSize(),
         verticalArrangement = Arrangement.spacedBy(GapGroup),
@@ -436,7 +438,8 @@ internal fun OnboardingTipCard(icon: ImageVector, title: String, body: String) {
     val scheme = MaterialTheme.colorScheme
     Surface(
         shape = StandardShape,
-        color = scheme.surfaceContainerHigh,
+        color = glassPanelFill(),
+        border = glassPanelBorder(),
         modifier = Modifier.fillMaxWidth(),
     ) {
         // The same leading-circle icon badge the search results list, the update pebble,
@@ -483,7 +486,8 @@ internal fun OnboardingCarPage(
             Modifier
                 .fillMaxWidth()
                 .clip(StandardShape)
-                .background(scheme.surfaceContainerHigh)
+                .background(glassPanelFill())
+                .border(glassPanelBorder(), StandardShape)
                 .padding(horizontal = 12.dp, vertical = GapHairline),
         ) {
             SeatPositions.forEachIndexed { i: Int, pos: SeatPosition ->

@@ -8,6 +8,9 @@
 package com.bloo.bluelink.ui
 
 import android.os.Build
+import dev.chrisbanes.haze.hazeSource
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -283,12 +286,37 @@ internal fun OnboardingScreen(vm: AppViewModel, mode: OnboardingMode = Onboardin
             .background(scheme.background)
             .pointerInput(Unit) {},
     ) {
-        AuroraBackground(Modifier.matchParentSize())
+        // The backdrop every glass surface below blurs: the aurora, washed with the colour of the
+        // card you're on, which eases from one accent to the next as you swipe.
+        val haze = remember { dev.chrisbanes.haze.HazeState() }
+        val accent by androidx.compose.animation.animateColorAsState(
+            onboardingAccent(steps.getOrNull(pageIndex)?.kind ?: OnboardingStepKind.WELCOME),
+            androidx.compose.animation.core.tween(600),
+            label = "deckAccent",
+        )
+        Box(Modifier.matchParentSize().hazeSource(haze)) {
+            AuroraBackground(Modifier.matchParentSize())
+            Box(
+                Modifier.matchParentSize().drawBehind {
+                    drawRect(
+                        androidx.compose.ui.graphics.Brush.radialGradient(
+                            listOf(accent.copy(alpha = 0.34f), androidx.compose.ui.graphics.Color.Transparent),
+                            center = androidx.compose.ui.geometry.Offset(size.width / 2f, size.height * 0.22f),
+                            radius = size.width * 1.1f,
+                        ),
+                    )
+                },
+            )
+        }
         if (isLast && firstRun) FireworksOverlay(Modifier.fillMaxSize())
 
         Column(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding()) {
             Spacer(Modifier.height(GapSection))
-            OnboardingDots(count = steps.size, current = pageIndex, modifier = Modifier.fillMaxWidth())
+            Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                GlassSurface(shape = CircleShape, hazeState = haze) {
+                    OnboardingDots(count = steps.size, current = pageIndex, modifier = Modifier.padding(horizontal = 16.dp, vertical = 11.dp))
+                }
+            }
 
             androidx.compose.foundation.pager.HorizontalPager(
                 state = pagerState,
@@ -298,65 +326,78 @@ internal fun OnboardingScreen(vm: AppViewModel, mode: OnboardingMode = Onboardin
                 beyondViewportPageCount = 1,
             ) { idx ->
                 val step = steps.getOrNull(idx) ?: return@HorizontalPager
+                // How far this card is from the centre: 0 on it, 1 a full card away. The cards
+                // shrink, fade and tilt away as they leave, so the deck has depth.
+                val distance = ((pagerState.currentPage - idx) + pagerState.currentPageOffsetFraction)
+                val away = kotlin.math.abs(distance).coerceIn(0f, 1f)
                 Column(
                     Modifier
                         .fillMaxSize()
+                        .graphicsLayer {
+                            val scale = 1f - 0.08f * away
+                            scaleX = scale; scaleY = scale
+                            alpha = 1f - 0.45f * away
+                            rotationY = -distance.coerceIn(-1f, 1f) * 14f
+                            cameraDistance = 14f * density
+                        }
                         .verticalScroll(rememberScrollState())
                         .padding(top = 16.dp, bottom = 24.dp),
                 ) {
                     val vehicle = step.vin?.let { vin -> state.vehicles.firstOrNull { it.vin == vin } }
-                    val spec = onboardingCardSpec(step.kind, vehicle?.name)
-                    PebbleShell(
-                        expanded = true,
-                        onToggle = {},
-                        icon = spec.icon,
-                        title = spec.title,
-                        summary = spec.summary,
-                        canToggle = false,
-                        forceExpanded = true,
-                        // A darker card, so the panels inside it step UP from it instead of sinking into it.
-                        containerColor = scheme.surfaceContainer,
+                    OnboardingGlassCard(
+                        spec = onboardingCardSpec(step.kind, vehicle?.name),
+                        accent = onboardingAccent(step.kind),
+                        hazeState = haze,
+                        current = idx == pageIndex,
                     ) {
-                        when (step.kind) {
-                            OnboardingStepKind.WELCOME -> OnboardingWelcomePage()
-                            OnboardingStepKind.RESTORE -> OnboardingRestorePage(vm)
-                            OnboardingStepKind.SETUP -> OnboardingSetupPage(vm, state, context, canBio, appearance.biometricLock, notifGranted) { notifGranted = it }
-                            OnboardingStepKind.LOOK -> OnboardingLookPage(appearance, vm)
-                            OnboardingStepKind.CAR -> {
-                                val sc = vehicle?.let { state.seatConfigs[it.vin] } ?: com.bloo.bluelink.data.SeatConfig()
-                                OnboardingCarPage(vehicle, state, sc, vm)
+                        Column(verticalArrangement = Arrangement.spacedBy(GapGroup)) {
+                            when (step.kind) {
+                                OnboardingStepKind.WELCOME -> OnboardingWelcomePage()
+                                OnboardingStepKind.RESTORE -> OnboardingRestorePage(vm)
+                                OnboardingStepKind.SETUP -> OnboardingSetupPage(vm, state, context, canBio, appearance.biometricLock, notifGranted) { notifGranted = it }
+                                OnboardingStepKind.LOOK -> OnboardingLookPage(appearance, vm)
+                                OnboardingStepKind.CAR -> {
+                                    val sc = vehicle?.let { state.seatConfigs[it.vin] } ?: com.bloo.bluelink.data.SeatConfig()
+                                    OnboardingCarPage(vehicle, state, sc, vm)
+                                }
+                                OnboardingStepKind.TIPS -> OnboardingTipsPage()
+                                OnboardingStepKind.FEATURES -> OnboardingFeaturesPage(state)
                             }
-                            OnboardingStepKind.TIPS -> OnboardingTipsPage()
-                            OnboardingStepKind.FEATURES -> OnboardingFeaturesPage(state)
                         }
                     }
                 }
             }
 
-            // Back / Next: the deck's buttons, for anyone who would rather tap than swipe.
-            Column(Modifier.fillMaxWidth().paddingHorizontal24Vertical16(), verticalArrangement = Arrangement.spacedBy(GapHairline)) {
-                ExpressiveButtonRow(modifier = Modifier.fillMaxWidth(), spacing = 12.dp) {
-                    if (pageIndex > 0) {
-                        SafeMorphTextButton(text = "Back", onClick = ::goBack)
+            // Back / Next on a glass bar of their own, for anyone who would rather tap than swipe.
+            GlassSurface(
+                shape = ExtraLargeShape,
+                hazeState = haze,
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 12.dp),
+            ) {
+                Column(Modifier.fillMaxWidth().padding(12.dp), verticalArrangement = Arrangement.spacedBy(GapHairline)) {
+                    ExpressiveButtonRow(modifier = Modifier.fillMaxWidth(), spacing = 12.dp) {
+                        if (pageIndex > 0) {
+                            SafeMorphTextButton(text = "Back", onClick = ::goBack)
+                        }
+                        MorphActionButton(
+                            label = when {
+                                isLast && mode == OnboardingMode.Replay -> "Dismiss"
+                                isLast && mode is OnboardingMode.NewCars -> "Done"
+                                isLast -> "Enter Bloo"
+                                firstRun && pageIndex == 0 -> "Get started"
+                                else -> "Next"
+                            },
+                            icon = if (isLast) AppIcons.CheckCircle else AppIcons.Check,
+                            onClick = ::goNext,
+                            enabled = !setupBlocked,
+                            active = true,
+                        )
                     }
-                    MorphActionButton(
-                        label = when {
-                            isLast && mode == OnboardingMode.Replay -> "Dismiss"
-                            isLast && mode is OnboardingMode.NewCars -> "Done"
-                            isLast -> "Enter Bloo"
-                            firstRun && pageIndex == 0 -> "Get started"
-                            else -> "Next"
-                        },
-                        icon = if (isLast) AppIcons.CheckCircle else AppIcons.Check,
-                        onClick = ::goNext,
-                        enabled = !setupBlocked,
-                        active = true,
-                    )
-                }
-                if (setupBlocked) {
-                    BodySmallText(
-                        if (notifRequired) "Turn on notifications above to continue." else "Set up the lock above to continue.",
-                    )
+                    if (setupBlocked) {
+                        BodySmallText(
+                            if (notifRequired) "Turn on notifications above to continue." else "Set up the lock above to continue.",
+                        )
+                    }
                 }
             }
         }
