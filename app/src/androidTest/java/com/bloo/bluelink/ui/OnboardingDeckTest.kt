@@ -4,6 +4,7 @@ import android.app.Application
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.getBoundsInRoot
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.printToString
@@ -22,30 +23,38 @@ class OnboardingDeckTest {
 
     private fun viewModel() = AppViewModel(ApplicationProvider.getApplicationContext<Application>())
 
-    private fun shown(text: String) = rule.onAllNodesWithText(text).fetchSemanticsNodes().isNotEmpty()
+    /** The card whose title is [text] is the one in view: present AND sitting at the start of the screen,
+     *  not just composed as a neighbour the pager keeps ready beyond the viewport. */
+    private fun isCurrent(text: String): Boolean {
+        if (rule.onAllNodesWithText(text).fetchSemanticsNodes().isEmpty()) return false
+        val b = rule.onNodeWithText(text).getBoundsInRoot()
+        return b.left.value in 0f..100f
+    }
+
+    private fun waitForCard(text: String) = rule.waitUntil(10_000) { isCurrent(text) }
 
     @Test
     fun replayDeckAdvancesBySwipeAndButtonAndDismissesAtTheEnd() {
         val vm = viewModel()
         vm.showWelcomeCards()
         rule.setContent { BlooTheme { OnboardingScreen(vm, OnboardingMode.Replay) } }
-        rule.waitUntil(10_000) { shown("Welcome to Bloo") }
+        waitForCard("Welcome to Bloo")
         rule.onNodeWithText("Welcome to Bloo").assertIsDisplayed()
 
         // The Next button moves to the second card.
         rule.onNodeWithText("Next").performClick()
-        rule.waitUntil(10_000) { shown("Quick setup") }
+        waitForCard("Quick setup")
         rule.onNodeWithText("Quick setup").assertIsDisplayed()
 
         // Swiping the card moves to the third.
         rule.onNodeWithText("Quick setup").performTouchInput { swipeLeft() }
-        rule.waitUntil(10_000) { shown("Look and feel") }
+        waitForCard("Look and feel")
 
         // Two more taps reach the last card, whose button dismisses the deck.
         rule.onNodeWithText("Next").performClick()
-        rule.waitUntil(10_000) { shown("Getting around") }
+        waitForCard("Getting around")
         rule.onNodeWithText("Next").performClick()
-        rule.waitUntil(10_000) { shown("More Bloo can do") }
+        waitForCard("More Bloo can do")
         // The label swaps to "Dismiss" with the card; give its animation a moment to settle.
         try {
             rule.waitUntil(5_000) {
