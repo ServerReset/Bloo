@@ -95,7 +95,7 @@ internal fun AutoLockSettingsGroup(v: Vehicle, vm: AppViewModel) {
         MutedText(
             "Locks ${v.name} when you walk away (Bluetooth disconnect + motion). Runs in dry run: it decides and logs, but never locks until you turn that off.",
         )
-        ToggleRow("Enabled", current.enabled, onChange = ::onEnabledChanged)
+        ToggleRow("Enabled", current.enabled, onChange = { onEnabledChanged(it) })
 
         // AutoLock's notification controls (its alerts, the watcher notification, and the
         // permission and reliability prompts it depends on) are in Settings -> Notifications,

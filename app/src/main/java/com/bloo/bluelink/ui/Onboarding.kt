@@ -394,7 +394,7 @@ internal fun OnboardingScreen(vm: AppViewModel, mode: OnboardingMode = Onboardin
                 Column(Modifier.fillMaxWidth().padding(12.dp), verticalArrangement = Arrangement.spacedBy(GapHairline)) {
                     ExpressiveButtonRow(modifier = Modifier.fillMaxWidth(), spacing = 12.dp) {
                         if (pageIndex > 0) {
-                            SafeMorphTextButton(text = "Back", onClick = ::goBack)
+                            SafeMorphTextButton(text = "Back", onClick = { goBack() })
                         }
                         MorphActionButton(
                             label = when {
@@ -405,7 +405,7 @@ internal fun OnboardingScreen(vm: AppViewModel, mode: OnboardingMode = Onboardin
                                 else -> "Next"
                             },
                             icon = if (isLast) AppIcons.CheckCircle else AppIcons.Check,
-                            onClick = ::goNext,
+                            onClick = { goNext() },
                             enabled = !setupBlocked,
                             active = true,
                         )
