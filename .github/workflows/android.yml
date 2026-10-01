@@ -183,6 +183,55 @@ jobs:
   # doesn't satisfy `needs` by default), silently breaking every tagged
   # release. This job already does its own complete build; it never
   # depended on the other job's outputs anyway.
+  # Runs the app for real: boots an emulator and runs the instrumented tests in
+  # app/src/androidTest -- layouts measured, gestures performed, the launch actually happening.
+  # Everything in `build` above stops at "it compiles and the JVM tests pass"; this is the job that
+  # answers "does it work". Independent of `build` so a UI regression is reported without blocking
+  # (or being hidden by) the release path.
+  ui-tests:
+    if: "!startsWith(github.ref, 'refs/tags/v')"
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Make gradlew executable
+        run: chmod +x ./gradlew
+
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Run instrumented tests on an emulator
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 34
+          arch: x86_64
+          target: google_apis
+          profile: pixel_6
+          disable-animations: true
+          script: ./gradlew :app:connectedDebugAndroidTest --stacktrace
+
+      - name: Upload instrumented test reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: androidTest-reports
+          path: app/build/reports/androidTests/
+          if-no-files-found: ignore
+
   release:
     if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest

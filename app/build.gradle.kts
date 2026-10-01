@@ -15,6 +15,7 @@ android {
         versionCode = 1
         versionName = "0.1"
         vectorDrawables { useSupportLibrary = true }
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         // The GitHub Actions run number that produced this APK (0 for a local/dev
         // build, which UpdateChecker treats as "nothing to compare against" and
         // skips). Bloo isn't on the Play Store and doesn't reliably cut tagged
@@ -251,4 +252,11 @@ dependencies {
     // and pulls JUnit transitively, so the Android unit-test task actually
     // discovers them. Version = project Kotlin 2.2.20.
     testImplementation("org.jetbrains.kotlin:kotlin-test-junit:2.2.20")
+
+    // Instrumented UI tests (run on an emulator in CI -- see .github/workflows/android.yml):
+    // real layouts, real gestures, real windows, the things a JVM unit test cannot see.
+    androidTestImplementation("androidx.compose.ui:ui-test-junit4:$composeUi")
+    androidTestImplementation("androidx.test.ext:junit:1.2.1")
+    androidTestImplementation("androidx.test:runner:1.6.2")
+    debugImplementation("androidx.compose.ui:ui-test-manifest:$composeUi")
 }
