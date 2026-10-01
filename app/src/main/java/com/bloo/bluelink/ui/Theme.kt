@@ -3,14 +3,10 @@ package com.bloo.bluelink.ui
 import android.content.Context
 import android.os.Build
 import android.provider.Settings
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.shape.CutCornerShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
-import androidx.compose.material3.LocalContentColor
-import androidx.compose.material3.MaterialExpressiveTheme
-import androidx.compose.material3.MotionScheme
 import androidx.compose.material3.Shapes
 import androidx.compose.material3.Typography
 import androidx.compose.material3.MaterialTheme
@@ -19,18 +15,11 @@ import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.produceState
-import androidx.compose.runtime.staticCompositionLocalOf
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.unit.Density
 import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontVariation
@@ -47,12 +36,14 @@ import kotlinx.serialization.Serializable
  *  choice to make. */
 enum class ThemeMode { SYSTEM, LIGHT, DARK }
 
+
 /**
  * User-selectable typeface. GOOGLE_SANS uses Google Sans Flex — Google's
  * officially open-sourced (OFL) sibling of the proprietary Product Sans — so it
  * ships legitimately as the geometric option.
  */
 enum class FontChoice { SYSTEM, ATKINSON, GOOGLE_SANS }
+
 
 /**
  * Built-in colour palettes the user can pick from when dynamic colour
@@ -69,6 +60,7 @@ enum class ColorPalette(val label: String, val swatch: Color, internal val hue: 
     ROSE("Rose", Color(0xFFB02E55), 338f),
 }
 
+
 /**
  * A user-authored colour palette. Each field stores a packed Android ARGB int
  * (same encoding as [android.graphics.Color]). Only [primaryArgb] is required;
@@ -83,8 +75,10 @@ data class CustomPaletteData(
     val tertiaryArgb: Int? = null,
 )
 
+
 /** The Expressive scheme is authored around this primary hue (see [LightExpressive]). */
 private const val BasePaletteHue = 217f
+
 
 /** Rotate a colour's hue (HSV) by [degrees]; preserves saturation/value/alpha.
  *  Converts to HSV, shifts the hue channel by [degrees] wrapping modulo 360 (the double
@@ -99,6 +93,7 @@ private fun Color.rotateHue(degrees: Float): Color {
     return Color(android.graphics.Color.HSVToColor((alpha * 255).toInt(), hsv))
 }
 
+
 /** The hue channel (0..360) of this colour in HSV space, used to measure how far a
  *  user-picked colour has drifted from the palette's reference hue. */
 private fun Color.extractHue(): Float {
@@ -106,6 +101,7 @@ private fun Color.extractHue(): Float {
     android.graphics.Color.colorToHSV(toArgb(), hsv)
     return hsv[0]
 }
+
 
 /**
  * Recolour a scheme from a [CustomPaletteData]. Primary group rotates by however
@@ -137,6 +133,7 @@ internal fun ColorScheme.applyCustomPalette(p: CustomPaletteData): ColorScheme {
     )
 }
 
+
 /** Recolour the accent roles of a scheme to match [palette] by rotating their hue. */
 internal fun ColorScheme.applyPalette(palette: ColorPalette): ColorScheme {
     val delta = palette.hue - BasePaletteHue
@@ -151,6 +148,7 @@ internal fun ColorScheme.applyPalette(palette: ColorPalette): ColorScheme {
         tertiaryContainer = tertiaryContainer.r(), onTertiaryContainer = onTertiaryContainer.r(),
     )
 }
+
 
 // Widget theme functions removed - widget system deleted
 
@@ -179,6 +177,7 @@ private val LightExpressive = lightColorScheme(
     error = Color(0xFFBA1A1A),
 )
 
+
 private val DarkExpressive = darkColorScheme(
     primary = Color(0xFFADC6FF),
     onPrimary = Color(0xFF002E69),
@@ -200,15 +199,17 @@ private val DarkExpressive = darkColorScheme(
     error = Color(0xFFFFB4AB),
 )
 
+
 // Expressive shapes: generous rounded corners, with a cut-corner accent on the
 // smallest slot to create the intentional "visual tension" of mixed geometry.
-private val ExpressiveShapes = Shapes(
+val ExpressiveShapes = Shapes(
     extraSmall = CutCornerShape(6.dp),
     small = RoundedCornerShape(16.dp),
     medium = RoundedCornerShape(24.dp),
     large = RoundedCornerShape(32.dp),
     extraLarge = RoundedCornerShape(40.dp),
 )
+
 
 /** Map each weight of a variable font via fontVariationSettings (wght axis). A variable
  *  font ships as a single file with a continuous "wght" (weight) axis rather than separate
@@ -220,6 +221,7 @@ private fun variableFont(resId: Int, weight: FontWeight, axis: Int) = Font(
     weight,
     variationSettings = FontVariation.Settings(FontVariation.weight(axis)),
 )
+
 
 /** Builds the [FontFamily] for a [FontChoice]: the system default needs nothing extra,
  *  while the two custom variable fonts register five distinct weight variants each (via
@@ -243,8 +245,9 @@ private fun fontFamilyFor(choice: FontChoice): FontFamily = when (choice) {
     )
 }
 
+
 /** Apply the chosen typeface across the type scale and lean into bold display text. */
-private fun expressiveTypography(choice: FontChoice): Typography {
+fun expressiveTypography(choice: FontChoice): Typography {
     val family = fontFamilyFor(choice)
     val base = Typography()
     return base.copy(
@@ -266,6 +269,7 @@ private fun expressiveTypography(choice: FontChoice): Typography {
     )
 }
 
+
 /**
  * A flat, no-outline button fill, pushed away from the background -- lighter in dark
  * themes, a touch darker in light themes -- so it still reads clearly with no border
@@ -281,6 +285,7 @@ fun buttonContainer(): Color = com.bloo.uicommon.BlooColors.buttonContainer(
     MaterialTheme.colorScheme.onSurface,
 )
 
+
 /** Scale a colour's saturation (HSV) by [factor]; 1 = unchanged. */
 private fun Color.saturate(factor: Float): Color {
     if (factor == 1f) return this
@@ -289,6 +294,7 @@ private fun Color.saturate(factor: Float): Color {
     hsv[1] = (hsv[1] * factor).coerceIn(0f, 1f)
     return Color(android.graphics.Color.HSVToColor((alpha * 255).toInt(), hsv))
 }
+
 
 /**
  * Resolve the final Material 3 [ColorScheme] for the given appearance, outside
@@ -369,6 +375,7 @@ fun blooColorScheme(
     }
 }
 
+
 /**
  * The app's root theme wrapper, applied once around the whole Compose tree (see
  * [com.bloo.bluelink.MainActivity]). Resolves [themeMode]/[dynamicColor]/[colorPalette]/
@@ -383,145 +390,8 @@ fun blooColorScheme(
 /** Process-wide cache for the animator-duration-scale probe -- see its use in BlooTheme. */
 private var reduceMotionCache: Boolean? = null
 
-private fun reduceMotionCached(context: android.content.Context): Boolean =
+
+fun reduceMotionCached(context: android.content.Context): Boolean =
     reduceMotionCache ?: runCatching {
         Settings.Global.getFloat(context.contentResolver, Settings.Global.ANIMATOR_DURATION_SCALE, 1f) == 0f
     }.getOrDefault(false).also { reduceMotionCache = it }
-
-@Composable
-fun BlooTheme(
-    themeMode: ThemeMode = ThemeMode.SYSTEM,
-    fontChoice: FontChoice = FontChoice.SYSTEM,
-    dynamicColor: Boolean = true,
-    colorPalette: ColorPalette = ColorPalette.BLUE,
-    customPalette: CustomPaletteData? = null,
-    uiScale: Float = 1f,
-    vibrancy: Float = 1f,
-    content: @Composable () -> Unit,
-) {
-    val dark = when (themeMode) {
-        ThemeMode.LIGHT -> false
-        ThemeMode.DARK -> true
-        ThemeMode.SYSTEM -> isSystemInDarkTheme()
-    }
-
-    val context = LocalContext.current
-    // The STATIC scheme is cheap and is what the FIRST frame paints. The dynamic (Material You)
-    // scheme extracts the user's wallpaper colours -- a synchronous binder call that can take
-    // well over a second on a cold start -- and was being computed in a `remember` on the main
-    // thread, i.e. ON the first frame. It is now resolved off the main thread and swapped in
-    // when ready; until then the static scheme is on screen, so a cold start no longer waits on
-    // the wallpaper for its first pixels.
-    val staticScheme = remember(dark, colorPalette, customPalette, vibrancy) {
-        blooColorScheme(
-            context = context,
-            dark = dark,
-            dynamicColor = false,
-            colorPalette = colorPalette,
-            customPalette = customPalette,
-            vibrancy = vibrancy,
-        )
-    }
-    val scheme by produceState(
-        initialValue = staticScheme,
-        dark, dynamicColor, colorPalette, customPalette, vibrancy,
-    ) {
-        if (dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            value = withContext(Dispatchers.Default) {
-                blooColorScheme(
-                    context = context,
-                    dark = dark,
-                    dynamicColor = true,
-                    colorPalette = colorPalette,
-                    customPalette = customPalette,
-                    vibrancy = vibrancy,
-                )
-            }
-        }
-    }
-
-    // Deliberately NOT density.fontScale * uiScale any more. That multiplied the
-    // device's own accessibility font-scale setting through, so a phone set to a
-    // large system font blew straight past every fixed-size floating overlay this
-    // app draws over its own content (the identity pill, Settings' header row) --
-    // those aren't real text flow that reflows around a bigger font, they're
-    // absolutely-positioned copies tracking a specific pixel spot, and they only
-    // stayed aligned at the font size they were tuned against. 100% is this app's
-    // own baseline regardless of what the device is set to; uiScale (the app's own
-    // "make everything bigger" preference, set inside Bloo itself, independent of
-    // the OS setting) is the only thing still allowed to scale text from here.
-    val density = LocalDensity.current
-    val scaledDensity = Density(density.density, uiScale)
-
-    // Keyed on the resolver rather than un-keyed, and read through a process-wide cache: this
-    // is a synchronous binder IPC to the settings provider, and it sat on the first-frame path
-    // inside composition. remember{} alone still pays it once per BlooTheme instance -- and the
-    // theme is applied on every screen -- so the answer is cached for the process instead. It
-    // cannot change without a configuration change that recreates everything anyway.
-    val reduceMotion = remember(context.contentResolver) { reduceMotionCached(context) }
-    // Memoize typography and motion computations to avoid recomputing on every recomposition
-    val typography = remember(fontChoice) { expressiveTypography(fontChoice) }
-    val motionScheme = remember { MotionScheme.expressive() }
-    MaterialExpressiveTheme(
-        colorScheme = scheme,
-        motionScheme = motionScheme,
-        typography = typography,
-        shapes = ExpressiveShapes,
-    ) {
-        // Defensive: this app's root Scaffold passes containerColor = Color.Transparent so the
-        // edge-to-edge gradient/aurora Box behind it shows through, and
-        // contentColorFor(Color.Transparent) resolves to Color.Unspecified since
-        // Transparent isn't one of the theme's known roles -- which means ANY bare
-        // Text() reached before something else (a Card, a themed Surface) sets its
-        // own content color falls through to whatever's ambient. Explicit here so
-        // that's always this theme's onBackground, never an unthemed framework
-        // default, regardless of which screen or dialog it is.
-        CompositionLocalProvider(
-            LocalDensity provides scaledDensity,
-            LocalReduceMotion provides reduceMotion,
-            // The vertical gap scale follows the display scale (damped -- see spaceScaleFor),
-            // so every gap/inset in the app breathes with the font-size setting together.
-            LocalSpaceScale provides spaceScaleFor(uiScale),
-            LocalContentColor provides scheme.onBackground,
-            content = content,
-        )
-    }
-}
-
-/** True when the user has disabled animations in Accessibility settings. */
-val LocalReduceMotion = staticCompositionLocalOf { false }
-
-/**
- * "Is the APP dark right now?" -- the one answer, for any composable below [BlooTheme]
- * that needs to branch on it.
- *
- * This exists because the same four-line `when (themeMode)` block was re-typed at every
- * site that needed it, and the bug it exists to stop has now been reported and fixed
- * FIVE separate times: a composable reading `isSystemInDarkTheme()` directly, which is
- * the PHONE's setting and has nothing to say about the app's own Light/Dark
- * override. Every one of those five rendered a dark-mode treatment inside a light-themed
- * app (or the reverse) whenever the two disagreed -- [pebbleCardEdge]'s pebble shadow,
- * [glassTint]'s near-solid-black floating glass, `CarMap`'s tile/pin palette
- * (WeatherPebble.kt), `carTonalBrush`'s hero fallback gradient (Hero.kt) and
- * `chargeReadoutOf`'s "Parked" line (HeroReadout.kt). Four of the five were the identical
- * copy-paste of a rule that already had a correct implementation eight lines up in
- * [BlooTheme].
- *
- * So: ONE implementation, and the call is short enough that copying the `when` back out
- * is strictly more work than calling this. LIGHT/DARK force their answer regardless of
- * the system; only SYSTEM falls through to the phone -- byte for byte what [BlooTheme]
- * itself does when it picks the colour scheme, which is the
- * property that matters: anything branching on this agrees with the scheme it is drawing
- * against, by construction rather than by two places happening to stay in step.
- *
- * NOT a `LocalIsDark` composition local, deliberately: [LocalAppearance] is already
- * provided app-wide and already carries `themeMode`, so a second local holding a value
- * derived from the first is one more thing that can be forgotten at a provider.
- */
-@Composable
-internal fun appIsDarkTheme(): Boolean = when (LocalAppearance.current.themeMode) {
-    ThemeMode.LIGHT -> false
-    ThemeMode.DARK -> true
-    ThemeMode.SYSTEM -> isSystemInDarkTheme()
-}
-

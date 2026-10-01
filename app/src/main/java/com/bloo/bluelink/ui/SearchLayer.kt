@@ -76,8 +76,7 @@ import com.bloo.bluelink.data.platform
 import com.bloo.bluelink.data.searchBubblePosition
 import com.bloo.bluelink.data.setSearchBubblePosition
 
-
-
+/** Which shape the search control is in: a bubble, a pill, or the full bar. */
 internal enum class SearchForm { BUBBLE, PILL, BAR }
 
 /**
@@ -512,4 +511,3 @@ internal fun SearchLayer(
         )
     }
 }
-
