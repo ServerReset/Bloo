@@ -15,7 +15,6 @@ import kotlin.math.roundToInt
  */
 data class GeocodedPlace(val full: String, val compact: String)
 
-
 /** "123 Main St, San Jose" -- a real street address, not just the city --
  *  built from a reverse-geocode result's house number + street name
  *  (subThoroughfare + thoroughfare) plus locality, falling back to
@@ -50,13 +49,11 @@ fun formatPlaceName(a: android.location.Address): GeocodedPlace? {
     return GeocodedPlace(full, compact)
 }
 
-
 /** "1h 20m" / "45 min" duration formatter, shared across the phone UI.
  *  Mechanism: integer-divides by 60 to get whole hours and takes the
  *  remainder as leftover minutes; below 60 it skips the hours part entirely
  *  and just prints "X min". */
 fun fmtMinutes(min: Int): String = if (min >= 60) "${min / 60}h ${min % 60}m" else "$min min"
-
 
 /** °C -> whole-degree °F, for turning a live weather reading into the
  *  [ambientF] input smart-climate calculations branch on. Was reimplemented
@@ -69,7 +66,6 @@ fun fmtMinutes(min: Int): String = if (min >= 60) "${min / 60}h ${min % 60}m" el
  *  you happened to use. */
 fun ambientFahrenheit(tempC: Double): Int = (tempC * 9.0 / 5.0 + 32.0).roundToInt()
 
-
 /** The Fahrenheit range every supported car's climate target temperature can
  *  actually be set to. Was hardcoded as (60, 85) in six different places
  *  (phone's ClimatePebble x4, TileCommandRunner, the watch's smart-climate
@@ -78,7 +74,6 @@ fun ambientFahrenheit(tempC: Double): Int = (tempC * 9.0 / 5.0 + 32.0).roundToIn
  *  A "smart" target clamped to the wrong, wider range could still ask the
  *  car for something outside what it supports. */
 val CLIMATE_TEMP_RANGE_F = 62..82
-
 
 /**
  * A one-tap "smart" target temperature for the given outside [ambientF],
@@ -108,20 +103,17 @@ fun smartClimateTargetF(ambientF: Int): Int {
     }
 }
 
-
 /** Whether [smartClimateTargetF] would be cooling (rather than heating) for the
  *  given outside [ambientF] — used by callers to pick the "Cool"/"Heat" label
  *  without recomputing the target. Matches the cool/heat partition in
  *  [smartClimateTargetF]: 70F and up is cooling, below is heating. */
 fun smartClimateIsCooling(ambientF: Int): Boolean = ambientF >= 70
 
-
 /** The valid range (in minutes) for a SINGLE remote-start climate command's
  *  duration -- the vendor API itself rejects/clamps anything past 10 minutes
  *  per command. The default within this range stays its own constant,
  *  [DEFAULT_CLIMATE_DURATION_MIN]. */
 val CLIMATE_DURATION_RANGE: IntRange = 1..10
-
 
 /** The UI-facing range for the "Run time" picker. Wider than
  *  [CLIMATE_DURATION_RANGE] on purpose: a request past the single-command cap
@@ -134,7 +126,6 @@ val CLIMATE_DURATION_RANGE: IntRange = 1..10
  *  scheduled background command that can fail/drift, so this doesn't try to
  *  support arbitrarily long runs. */
 val CLIMATE_EXTENDED_DURATION_RANGE: IntRange = 1..20
-
 
 /**
  * Splits a requested total climate-run [minutes] into the sequence of
@@ -158,14 +149,12 @@ fun climateChunks(minutes: Int): List<Int> {
     return chunks
 }
 
-
 /** The valid range for a car's AC/DC charge-limit percentage sliders. Was
  *  duplicated as a literal `50..100` at 5 call sites (phone's ChargePebble
  *  slider, the watch's setAcLimit/setDcLimit clamps and its two SliderRows)
  *  -- still consistent everywhere today, but the exact same shape as the
  *  climate-range bug: nothing forced them to stay that way. */
 val CHARGE_LIMIT_RANGE = 50..100
-
 
 /** How long a vehicle's cached status is trusted before it's treated as
  *  stale (worth nudging the user to pull-to-refresh). Three different
@@ -177,13 +166,11 @@ val CHARGE_LIMIT_RANGE = 50..100
  *  reasonable default for all three. */
 val STALE_STATUS_MS = 15L * 60 * 1000L
 
-
 /** How long an available update is snoozed for after "Remind me" / "Not
  *  now" -- was defined identically (byte-for-byte the same math) in
  *  UpdateChecker.kt (phone) and WearViewModel.kt (watch) instead of once
  *  here. */
 val UPDATE_SNOOZE_MS = 3L * 24 * 60 * 60 * 1000L
-
 
 /**
  * Whether [stamp] is within [windowMs] before [now] -- the one correct way to ask
@@ -210,9 +197,7 @@ val UPDATE_SNOOZE_MS = 3L * 24 * 60 * 60 * 1000L
  * rather than hiding data, so those are deliberately left alone.
  */
 fun withinWindow(now: Long, stamp: Long, windowMs: Long): Boolean =
-
     (now - stamp) in 0 until windowMs
-
 
 /** The climate request used when nothing else is configured -- no saved
  *  preset, no smart-climate weather data, just "turn it on." Was
@@ -222,9 +207,7 @@ fun withinWindow(now: Long, stamp: Long, windowMs: Long): Boolean =
  *  everywhere today, but exactly the same "hand-copied constant" shape as
  *  the climate-range bug. */
 const val DEFAULT_CLIMATE_TEMP_F = 72
-
 const val DEFAULT_CLIMATE_DURATION_MIN = 10
-
 
 /** The charge-limit targets used until a car's real targets load in: 80% for AC
  *  (a daily home/level-2 ceiling), 90% for DC (fast-charging past that is
@@ -235,9 +218,7 @@ const val DEFAULT_CLIMATE_DURATION_MIN = 10
  *  once defaulted BOTH to 80%, so a "Set" before the DC target loaded pushed it
  *  low). Since both pills send both values together, the two halves must agree. */
 const val DEFAULT_AC_CHARGE_LIMIT_PCT = 80
-
 const val DEFAULT_DC_CHARGE_LIMIT_PCT = 90
-
 
 /** Charger-plug type label for [EvStatus.batteryPlugin]. Was defined
  *  separately on phone and watch and had already drifted ("AC (level 2)" vs
@@ -247,7 +228,6 @@ fun chargerLabel(plugin: Int?): String? = when (plugin) {
     2 -> "AC (level 2)"
     else -> null
 }
-
 
 // The three formatters tripDate needs, built once per thread instead of three
 // times per call. tripDate renders the title of every row in the phone's trips
@@ -265,18 +245,15 @@ fun chargerLabel(plugin: Int?): String? = when (plugin) {
 private val tripOutWithWeekday = ThreadLocal.withInitial {
     java.text.SimpleDateFormat("EEE MMM d · h:mm a", java.util.Locale.US)
 }
-
 private val tripOutNoWeekday = ThreadLocal.withInitial {
     java.text.SimpleDateFormat("MMM d · h:mm a", java.util.Locale.US)
 }
-
 private val tripParsers = ThreadLocal.withInitial {
     arrayOf(
         java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", java.util.Locale.US),
         java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss", java.util.Locale.US),
     )
 }
-
 
 /** "2026-06-01 18:22:31.0" / "2026-06-01T18:22:31" -> "Mon Jun 1 · 6:22 PM"
  *  (falls back to a trimmed raw string). Was defined separately on phone and
@@ -304,7 +281,6 @@ fun tripDate(raw: String?, includeWeekday: Boolean = true): String {
     return trimmed.take(16).replace('T', ' ')
 }
 
-
 /** Mask an email for diagnostics (AppLog is in-memory/copyable in the app's
  *  own log viewer, not a place account addresses should appear in full) --
  *  "j***@gmail.com" instead of "jane.doe@gmail.com". */
@@ -321,7 +297,6 @@ fun maskEmail(email: String): String {
     return "${email.first()}***${email.substring(at)}"
 }
 
-
 /** Current GMT offset in whole hours (e.g. -5 EST, -4 EDT) -- both brand API
  *  clients send this as an auth header; kept in one place so a future fix
  *  (e.g. rounding for negative sub-hour offsets) can't apply to one and not
@@ -335,7 +310,6 @@ fun gmtOffsetHours(): String {
     val offsetMs = TimeZone.getDefault().getOffset(System.currentTimeMillis())
     return (offsetMs / 3_600_000).toString()
 }
-
 
 /** "just now" / "x min ago" / "x hr ago" for a wall-clock timestamp in ms. */
 fun relativeLabel(ms: Long?): String {
@@ -354,7 +328,6 @@ fun relativeLabel(ms: Long?): String {
         else -> "${d / 86_400_000} day${if (d / 86_400_000 != 1L) "s" else ""} ago"
     }
 }
-
 
 /**
  * A climate setpoint (the API reports it as a °F string) rendered in the user's
@@ -395,13 +368,10 @@ fun degLabel(valueF: String, fahrenheit: Boolean, sourceUnit: Int? = null): Stri
     return "${converted.roundToInt()}°${if (fahrenheit) "F" else "C"}"
 }
 
-
 /** "22.5" stays "22.5"; "22.0" becomes "22". Keeps a half-degree setpoint honest
  *  without printing a pointless ".0" on every whole one. */
 private fun trimTrailingZero(v: Double): String =
-
     if (v == v.toLong().toDouble()) v.toLong().toString() else v.toString()
-
 
 /**
  * A °F reading as a whole number in the user's chosen unit, rounded rather than
@@ -424,9 +394,7 @@ private fun trimTrailingZero(v: Double): String =
  * Fahrenheit branch too, so "71.6" displayed as "71°F".
  */
 fun degValue(valueF: Double, fahrenheit: Boolean): Int =
-
     if (fahrenheit) valueF.roundToInt() else ((valueF - 32) * 5 / 9.0).roundToInt()
-
 
 /**
  * Whether temperatures render in Fahrenheit, from a unit-system string. Imperial is
@@ -451,3 +419,211 @@ fun degValue(valueF: Double, fahrenheit: Boolean): Int =
  * for distance and jointly-negotiated for temperature.
  */
 fun useFahrenheit(unitSystem: String?): Boolean = (unitSystem ?: "imperial") != "metric"
+
+/** How urgent a charge or fuel level is, independent of any surface's palette.
+ *  See [chargeTier]. */
+enum class ChargeTier { UNKNOWN, CHARGING, CRITICAL, LOW, NORMAL }
+
+/** At or below this percentage a level is [ChargeTier.CRITICAL]. */
+const val CHARGE_CRITICAL_PCT = 15
+
+/** At or below this percentage (and above [CHARGE_CRITICAL_PCT]) a level is
+ *  [ChargeTier.LOW]. */
+const val CHARGE_LOW_PCT = 30
+
+/**
+ * Which band a charge/fuel level falls in. Charging outranks the level itself, and a
+ * null [percent] is [ChargeTier.UNKNOWN] rather than being folded into a band.
+ *
+ * The three gauges in this app each had their own copy of this and no two agreed:
+ *
+ *  - the widget's ring used `<= 0.15` / `<= 0.30`
+ *  - the watch's tile used `< 15` / `< 30`
+ *  - the watch's home ring had only `< 15` and NO amber band at all
+ *
+ * So a car at exactly 15% was red on the widget and not on either watch surface, and
+ * a car at 20% was amber on the watch's tile while its home screen showed the same
+ * car in the ordinary accent colour. The bands are inclusive here, which is the
+ * widget's reading and the safer one: "15% or less" flags at the number a user would
+ * expect it to.
+ *
+ * Only the bands are shared. Each surface maps them to its own colour system --
+ * packed ARGB ints on the phone -- which is the part that legitimately differs,
+ * including what UNKNOWN should look like.
+ */
+fun chargeTier(percent: Int?, charging: Boolean): ChargeTier = when {
+    charging -> ChargeTier.CHARGING
+    percent == null -> ChargeTier.UNKNOWN
+    percent <= CHARGE_CRITICAL_PCT -> ChargeTier.CRITICAL
+    percent <= CHARGE_LOW_PCT -> ChargeTier.LOW
+    else -> ChargeTier.NORMAL
+}
+
+/**
+ * The name to show for a car: its nickname, else its model, else the tail of its
+ * identifier -- with every step guarding against BLANK, not just null.
+ *
+ * That guard is the reason this exists. All three API parsers had their own copy of
+ * this fallback chain and only BlueLinkApi's checked for blankness. The other two
+ * used `?:` alone, and their JSON accessor filters the literal string "null" but
+ * passes an empty string straight through -- so a Kia US or Canada account whose car
+ * has a nickname set to "" got a car named "", on every surface at once: the phone
+ * header, the widget, the tile, the complication and its notifications. Hyundai and
+ * Genesis US were fine, which is why it could sit there.
+ *
+ * The last resort also can't return blank, unlike the copies it replaces: an empty
+ * identifier used to fall through to `"".takeLast(6)`, i.e. nothing at all.
+ */
+fun vehicleDisplayName(nickName: String?, modelName: String?, id: String): String =
+    nickName?.takeIf { it.isNotBlank() }
+        ?: modelName?.takeIf { it.isNotBlank() }
+        ?: id.takeLast(6).ifBlank { "Car" }
+
+/** Human-readable label for a WMO weather code integer. Mechanism: WMO codes
+ *  group many numerically-adjacent values under one user-facing label (e.g.
+ *  71/73/75/77/85/86 are all "Snow" of varying intensity/type), so each branch
+ *  lists every code in that group; anything not covered by a listed group
+ *  falls through to the "—" placeholder rather than guessing. */
+fun weatherLabel(code: Int): String = when (code) {
+    0 -> "Clear"
+    1, 2 -> "Partly cloudy"
+    3 -> "Cloudy"
+    45, 48 -> "Fog"
+    51, 53, 55, 56, 57 -> "Drizzle"
+    61, 63, 65, 66, 67 -> "Rain"
+    71, 73, 75, 77, 85, 86 -> "Snow"
+    80, 81, 82 -> "Showers"
+    95, 96, 99 -> "Thunderstorm"
+    else -> "—"
+}
+
+/** Formats a Celsius temperature as °F or °C based on the user preference.
+ *  Weather data (unlike car climate data) always arrives as Celsius, so this
+ *  is the one conversion point for it.
+ *
+ *  Rounds, in both branches. It used to truncate, and the KDoc here recorded that
+ *  as though it were a decision -- "the result is truncated (`.toInt()`, not
+ *  rounded)" -- without ever saying why, while every other temperature conversion
+ *  in the app rounded. Open-Meteo reports decimals, so truncating made every
+ *  reading on the watch (then its only caller -- the phone now reaches this same
+ *  helper too, via WeatherApi.Weather.tempLabel) up to a degree cold: 22.8°C showed
+ *  as "22°C". Same fix and same reasoning as [degValue], which the car-side
+ *  [degLabel] now shares.
+ *
+ *  Deliberately NOT routed through [degValue] by converting Celsius to Fahrenheit
+ *  first. That would be algebraically identical and numerically not, which I
+ *  checked rather than assumed: over -40..50°C there are nine half-degree inputs
+ *  where the round trip lands on the wrong side of the tie, because °C -> °F -> °C
+ *  is not exact in binary floating point. 24.5 comes back as 24.499999999999996 and
+ *  rounds to 24 instead of 25; -4.5 comes back as -4.500000000000001 and rounds to
+ *  -5 instead of -4. The metric branch rounds the Celsius it was actually given. */
+fun weatherTemp(tempC: Double, fahrenheit: Boolean): String =
+    if (fahrenheit) "${(tempC * 9 / 5 + 32).roundToInt()}°F" else "${tempC.roundToInt()}°C"
+
+/**
+ * The one mile/kilometre conversion factor, exact.
+ *
+ * There were two: this file used `* 1.609` in four places while CanadaApi's kmToMi
+ * used `* 0.621371`. Those are not reciprocals -- 1 / 0.621371 = 1.609344 -- so a
+ * Canadian metric user's value round-tripped lossily through the API boundary and
+ * back to the screen: 263 km arrived as 163.42 mi, rendered as 262 km. Dividing by
+ * this instead of multiplying by a second constant makes the two directions exact
+ * inverses by construction rather than by whoever typed the most digits.
+ */
+const val KM_PER_MI = 1.609344
+
+/** Format a distance in miles as "mi" or "km" based on the unit system. The
+ *  API's distance figures are always miles, so metric users get a multiply
+ *  by [KM_PER_MI] and a re-labelled unit; imperial users get the raw value.
+ *
+ *  Metric ROUNDS rather than truncates. Truncating compounded with the constant
+ *  mismatch above to turn a 263 km range into "262 km"; with an exact factor a
+ *  half-kilometre of truncation is still the difference between 262.94 and 263. */
+fun formatDistance(mi: Number, metric: Boolean): String =
+    if (metric) "${(mi.toDouble() * KM_PER_MI).roundToInt()} km" else "${mi.toInt()} mi"
+
+/** Format speed in km/h based on the unit system. Note the input unit here is
+ *  km/h (unlike [formatDistance]'s miles input) — imperial mode divides by
+ *  1.609 to convert back down to mph, metric mode passes the value straight
+ *  through with just a re-labelled unit. */
+fun formatSpeed(kph: Double, metric: Boolean): String =
+    if (metric) "${kph.toInt()} km/h" else "${(kph / KM_PER_MI).toInt()} mph"
+
+/**
+ * Format a speed whose input is MILES per hour, unlike [formatSpeed]'s km/h.
+ *
+ * Both exist because the two speed sources genuinely differ in unit, and having
+ * only the km/h one meant the mph source was silently run through the wrong
+ * conversion: EvTrip's avgspeed/maxspeed are mph (its own KDoc says so, and its
+ * sibling `distance` in the same payload is treated as miles by the phone,
+ * so `formatSpeed(62.0, metric = false)` rendered 62 mph as "38 mph"
+ * and metric rendered it as "62 km/h" instead of ~100. Wrong in both modes.
+ *
+ * Named for its input unit rather than overloading, so a call site cannot pick the
+ * wrong one by accident the way an overload set invites.
+ */
+fun formatSpeedMph(mph: Double, metric: Boolean): String =
+    if (metric) "${(mph * KM_PER_MI).roundToInt()} km/h" else "${mph.toInt()} mph"
+
+/** Format trip distance in miles to the user's preferred unit. Same
+ *  mi-to-km conversion factor as [formatDistance], but keeps one decimal
+ *  place (`%.1f`) instead of truncating to a whole number — trip distances
+ *  are often short enough that whole-number rounding would lose useful
+ *  precision. */
+fun formatTripDistance(mi: Double, metric: Boolean): String =
+    if (metric) "%.1f km".format(mi * KM_PER_MI) else "%.1f mi".format(mi)
+
+
+/** Raw signed miles remaining until the next scheduled service: the next-due
+ *  odometer reading ([lastServiceMiles] + [intervalMiles]) minus the current
+ *  [odometerMiles]. Returns null if any input is null. The value is intentionally
+ *  left signed (negative once service is overdue) — callers apply their own
+ *  coerceAtLeast(0) / >= comparisons depending on how they present it. */
+fun serviceDue(odometerMiles: Int?, lastServiceMiles: Int?, intervalMiles: Int?): Int? {
+    if (odometerMiles == null || lastServiceMiles == null || intervalMiles == null) return null
+    return nextServiceMiles(lastServiceMiles, intervalMiles) - odometerMiles
+}
+
+/**
+ * The ABSOLUTE odometer reading a service falls due at.
+ *
+ * Trivial arithmetic, and shared anyway for one reason: [serviceDue] is defined as
+ * `nextServiceMiles - odometer`, so the relative countdown ("in N mi") and the absolute
+ * figure ("at N mi") are two views of ONE number and must never disagree. The phone and the
+ * watch each recomputed `last + interval` inline for the absolute view while calling the
+ * shared helper for the relative one -- so the formula lived in three places and only two of
+ * them were the shared one. [serviceDue] now routes through this, which is what makes the
+ * agreement structural instead of coincidental.
+ *
+ * This file already records what happens otherwise: the widget's service field re-inlined
+ * this arithmetic, and its own comment concludes "re-inlining a shared formatter is exactly
+ * how that bug got in".
+ */
+fun nextServiceMiles(lastServiceMiles: Int, intervalMiles: Int): Int =
+    lastServiceMiles + intervalMiles
+
+/** Parse the API's odometer field (a possibly-comma-grouped, possibly-decimal
+ *  string like "12,345.6") into whole miles, or null if blank/unparseable.
+ *  Strips grouping commas and truncates any fractional part via toInt(). */
+fun parseOdometerMiles(odometer: String?): Int? =
+    odometer?.trim()?.takeIf { it.isNotBlank() }?.replace(",", "")?.toDoubleOrNull()?.toInt()
+
+/**
+ * Whether an app-lock should re-engage after [elapsedMs] in the background, given the user's
+ * lock-timing setting as its wire key ("off" / "immediate", via [LockTiming.wireKey]).
+ *
+ * The "1min"/"5min"/"10min" branches are legacy: LockTiming no longer offers those grace
+ * periods as a choice, but a value stored by an older build still resolves correctly here
+ * instead of falling through to the `else` fail-safe. `else` maps to "lock" (an unrecognised
+ * key means re-lock rather than silently stay open).
+ */
+fun shouldRelockAfter(elapsedMs: Long, timingKey: String, screenTurnedOff: Boolean = false): Boolean = when (timingKey) {
+    "off" -> false
+    "immediate" -> true
+    "screen_off" -> screenTurnedOff
+    "1min" -> elapsedMs >= 60_000L
+    "5min" -> elapsedMs >= 300_000L
+    "10min" -> elapsedMs >= 600_000L
+    else -> true
+}
+
