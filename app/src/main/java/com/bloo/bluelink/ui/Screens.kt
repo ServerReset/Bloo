@@ -50,6 +50,7 @@ import androidx.compose.runtime.State
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.SideEffect
 import dev.chrisbanes.haze.HazeState
+import dev.chrisbanes.haze.hazeSource
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
@@ -131,6 +132,7 @@ fun BlooApp(vm: AppViewModel) {
     // instead of each screen's own previously-private, unshared HazeState leaving
     // search with nothing to blur regardless of which one was on screen.
     val searchHazeState = remember { HazeState() }
+    val backdropHaze = remember { HazeState() }
     val toasts = remember { ToastState() }
     val scope = rememberCoroutineScope()
     // LocalClipboard (the non-deprecated spelling): its set API is SUSPEND, so
@@ -198,6 +200,7 @@ fun BlooApp(vm: AppViewModel) {
         LocalFloatingRegistry provides floatingRegistry,
         LocalDialogHost provides dialogHost,
         LocalToasts provides toasts,
+        LocalBackdropHaze provides backdropHaze,
         LocalHaptics provides haptics,
         // Provided once here (the app root already collects `appearance` above) so
         // every pebble/tile reads LocalAppearance.current instead of opening its own
@@ -239,9 +242,13 @@ fun BlooApp(vm: AppViewModel) {
         }
     }
     LockBlurLayer(locked = locked && contentSettled) {
+    Box(Modifier.fillMaxSize()) {
+    // The app's backdrop: a Haze source every glass card blurs. A sibling UNDER everything, not
+    // the root's own background, because a card cannot blur a source it is a child of.
     Box(
         Modifier
-            .fillMaxSize()
+            .matchParentSize()
+            .hazeSource(backdropHaze)
             .background(
                 Brush.verticalGradient(
                     listOf(
@@ -251,7 +258,7 @@ fun BlooApp(vm: AppViewModel) {
                     ),
                 ),
             ),
-    ) {
+    )
     Scaffold(
         containerColor = Color.Transparent,
         snackbarHost = {
@@ -338,7 +345,7 @@ fun BlooApp(vm: AppViewModel) {
                         // scrolling) the ambient drift would otherwise keep
                         // redrawing the blurred backdrop underneath at ~12fps --
                         // real contention on exactly the frames search is using.
-                        if (appearance.auroraBackground) AuroraBackground(Modifier.matchParentSize(), appearance, refreshing = refreshing, paused = searchOpen)
+                        if (appearance.auroraBackground) AuroraBackground(Modifier.matchParentSize().hazeSource(backdropHaze), appearance, refreshing = refreshing, paused = searchOpen)
                         GarageScreen(stateHolder, vm, hazeState = searchHazeState)
                     }
                 }

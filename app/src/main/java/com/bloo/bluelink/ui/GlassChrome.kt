@@ -349,6 +349,37 @@ internal fun Modifier.glassEffect(
         },
     )
 
+/**
+ * The blurred-background source every card sits on: the app's gradient and aurora, marked as a Haze
+ * source in Screens. Null where there is no such backdrop (a preview, a secondary window), in which
+ * case cards fall back to a nearly opaque fill.
+ */
+internal val LocalBackdropHaze = androidx.compose.runtime.staticCompositionLocalOf<HazeState?> { null }
+
+/** How much of its colour a glass card keeps over the blur: enough tint to read text on, little
+ *  enough that the backdrop shows through as frosted glass. */
+private const val GlassCardTintAlpha = 0.42f
+
+/** Whether cards can be real glass right now: a backdrop to blur, and a device/battery state that allows it. */
+@Composable
+internal fun glassCardsActive(): Boolean = LocalBackdropHaze.current != null && canBlurBackdrops()
+
+/**
+ * The standard card fill: the card's bounding box is glass -- the backdrop blurred behind a veil of
+ * [tint] -- while whatever sits inside the card keeps its own, opaque panels. Every card in the app
+ * (pebbles, settings cards) takes its fill from here, so they all read as the same glass. Without a
+ * backdrop to blur it falls back to the nearly opaque fill cards used to have.
+ */
+@Composable
+internal fun Modifier.glassCardFill(shape: Shape, tint: Color): Modifier {
+    val haze = LocalBackdropHaze.current
+    return if (haze != null && canBlurBackdrops()) {
+        this.clip(shape).appHazeEffect(haze).background(tint.copy(alpha = GlassCardTintAlpha))
+    } else {
+        this.background(tint.copy(alpha = 0.9f), shape)
+    }
+}
+
 /** The radius every glass surface blurs its backdrop by. One value, so a chip and the status
  *  bar scrim soften by the same amount. Haze 2.0 defaults blurRadius to 20dp; this matches the
  *  1.7 look the app was tuned against. */

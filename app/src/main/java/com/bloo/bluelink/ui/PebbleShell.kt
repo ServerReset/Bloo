@@ -418,7 +418,9 @@ internal fun PebbleShell(
                 // background it was nearly imperceptible, reading as "this setting
                 // does nothing" even though it was working. The dedicated, considerably
                 // bolder border this shares instead is what makes toggling it visible.
-                .pebbleCardEdge(pebbleShape, pebbleOutline),
+                .pebbleCardEdge(pebbleShape, pebbleOutline)
+                // The card's bounding box is glass; its own panels stay solid.
+                .glassCardFill(pebbleShape, containerColor),
             shape = pebbleShape,
             // No shadow elevation: the whole card is scaled by ReorderColumn's drag lift and
             // the cold-start intro (a graphicsLayer on the pebble's own Box above), and the
@@ -430,7 +432,7 @@ internal fun PebbleShell(
                 // Slightly translucent so the aurora/gradient reads faintly through the card,
                 // giving the pebbles a glassy weight instead of a flat opaque slab. Kept high
                 // enough (0.9) that text contrast is unchanged.
-                containerColor = containerColor.copy(alpha = 0.9f),
+                containerColor = Color.Transparent,
                 contentColor = contentColorFor(containerColor),
             ),
         ) {
