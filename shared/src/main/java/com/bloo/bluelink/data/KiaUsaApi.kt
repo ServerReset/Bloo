@@ -10,8 +10,6 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.contentOrNull
-import kotlinx.serialization.json.doubleOrNull
 import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.put
 import okhttp3.MediaType.Companion.toMediaType
@@ -68,7 +66,6 @@ sealed interface KiaAuth {
  * id + a reusable rmtoken, with commands keyed by `sid` + `vinkey`.
  */
 class KiaUsaApi {
-
     companion object {
         // Endpoint + client credentials come from the central Brand definition.
         val BASE = Brand.KIA.host
@@ -109,24 +106,26 @@ class KiaUsaApi {
         }
     }
 
-    private val json get() = sharedJson
-    private val jsonMedia = "application/json;charset=utf-8".toMediaType()
+    internal val json get() = sharedJson
 
-    private val client: OkHttpClient get() = sharedClient
+    internal val jsonMedia = "application/json;charset=utf-8".toMediaType()
+
+    internal val client: OkHttpClient get() = sharedClient
 
     // --- Headers ---------------------------------------------------------
 
     /** Current time formatted as an RFC 1123 date string in GMT — the exact
      *  format HTTP's own Date header uses, which the Kia API expects as its
      *  own `date` header on every request (see [apiHeaders]). */
-    private fun rfc1123Date(): String =
+    internal fun rfc1123Date(): String =
+
         rfc1123Format.get()!!.format(System.currentTimeMillis())
 
     /** The full set of headers every Kia API call needs regardless of
      *  endpoint (client/device identification, locale, a fresh timestamp) —
      *  [authedHeaders] below layers session-specific headers (sid/vinkey) on
      *  top of this for calls that need an active session. */
-    private fun Request.Builder.apiHeaders(deviceId: String): Request.Builder = this
+    internal fun Request.Builder.apiHeaders(deviceId: String): Request.Builder = this
         .header("content-type", "application/json;charset=utf-8")
         .header("accept", "application/json")
         .header("accept-language", "en-US,en;q=0.9")
@@ -152,7 +151,8 @@ class KiaUsaApi {
     /** [apiHeaders] plus the two headers that identify *which* logged-in
      *  session and *which* car a command applies to — every authenticated
      *  call (status, lock/unlock, climate, etc.) goes through this. */
-    private fun Request.Builder.authedHeaders(session: KiaSession, vehicle: KiaVehicleSummary): Request.Builder =
+    internal fun Request.Builder.authedHeaders(session: KiaSession, vehicle: KiaVehicleSummary): Request.Builder =
+
         apiHeaders(session.deviceId).header("sid", session.sid).header("vinkey", vehicle.key)
 
     // --- Auth ------------------------------------------------------------
@@ -211,45 +211,6 @@ class KiaUsaApi {
         Unit
     }
 
-    /** Step 2b: verify the code and finish login, producing a session. */
-    suspend fun verifyOtpAndComplete(
-        username: String, password: String, otpCode: String,
-        otpKey: String, xid: String, deviceId: String, pin: String?,
-    ): KiaSession = withContext(Dispatchers.IO) {
-        // Verify the code -> sid + rmtoken.
-        val verifyReq = Request.Builder().url(API + "cmm/verifyOTP")
-            .post(buildJsonObject { put("otp", otpCode) }.toString().toRequestBody(jsonMedia))
-            .apiHeaders(deviceId).header("otpkey", otpKey).header("xid", xid)
-            .build()
-        val (interimSid, rmtoken) = raw(verifyReq).use { resp ->
-            val sid = resp.header("sid")
-            val rm = resp.header("rmtoken")
-            if (sid == null || rm == null) throw BlueLinkException("Invalid code — please try again.", code = resp.code)
-            sid to rm
-        }
-        // Exchange for the final session id.
-        val finishReq = Request.Builder().url(API + "prof/authUser")
-            .post(
-                buildJsonObject {
-                    put("deviceKey", deviceId)
-                    put("deviceType", 2)
-                    put("userCredential", buildJsonObject { put("userId", username); put("password", password) })
-                }.toString().toRequestBody(jsonMedia),
-            )
-            .apiHeaders(deviceId).header("sid", interimSid).header("rmtoken", rmtoken)
-            .build()
-        // The finish exchange can itself rotate the rmtoken; prefer a freshly-
-        // issued one over the verifyOTP token when the server sends it, so a
-        // server-side rotation gets persisted (mirrors authUser's silent
-        // re-auth handling).
-        val (finalSid, finalRmtoken) = raw(finishReq).use { resp ->
-            val sid = resp.header("sid")
-                ?: throw BlueLinkException(friendly(resp.code, resp.body?.string().orEmpty()), code = resp.code)
-            sid to (resp.header("rmtoken") ?: rmtoken)
-        }
-        KiaSession(finalSid, finalRmtoken, deviceId, pin)
-    }
-
     // --- Vehicles --------------------------------------------------------
 
     /** Fetch every vehicle registered on this Kia account. Mechanism: calls
@@ -305,13 +266,14 @@ class KiaUsaApi {
      *  since location doesn't need them — returns null if the fetch is
      *  empty/missing or the parsed status carries no location. */
     suspend fun location(session: KiaSession, vehicle: KiaVehicleSummary): VehicleLocation? =
+
         fetchInfo(session, vehicle)?.let { parseStatus(it).vehicleLocation }
 
     /** Shared cmm/gvi fetch+unwrap used by [status] and [location]: posts the
      *  request body opting into location + vehicleStatus (and out of the
      *  sections this app ignores) and returns the one-element vehicleInfoList's
      *  object, or null when that array is empty/missing. */
-    private suspend fun fetchInfo(session: KiaSession, vehicle: KiaVehicleSummary): JsonObject? = withContext(Dispatchers.IO) {
+    internal suspend fun fetchInfo(session: KiaSession, vehicle: KiaVehicleSummary): JsonObject? = withContext(Dispatchers.IO) {
         val body = buildJsonObject {
             put("vehicleConfigReq", buildJsonObject {
                 put("airTempRange", "0"); put("maintenance", "1"); put("seatHeatCoolOption", "0")
@@ -333,7 +295,7 @@ class KiaUsaApi {
      * Read AC/DC charge limits from evc/gts (payload.targetSOClist). Levels of 0
      * mean "not reported yet" per the community client, so they're skipped.
      */
-    private fun chargeTargets(session: KiaSession, vehicle: KiaVehicleSummary): ReservChargeInfos? {
+    internal fun chargeTargets(session: KiaSession, vehicle: KiaVehicleSummary): ReservChargeInfos? {
         val req = Request.Builder().url(API + "evc/gts").get()
             .authedHeaders(session, vehicle).build()
         val list = call(req).path("payload", "targetSOClist") as? JsonArray ?: return null
@@ -355,103 +317,17 @@ class KiaUsaApi {
         Unit
     }
 
-    /**
-     * Map Kia's cmm/gvi payload (vehicleInfoList[0]) onto our shared
-     * [VehicleStatus]. Field paths follow the community hyundai_kia_connect_api
-     * (KiaUvoApiUSA._update_vehicle_properties).
-     */
-    private fun parseStatus(info: JsonObject): VehicleStatus {
-        val vs = info.path("lastVehicleInfo", "vehicleStatusRpt", "vehicleStatus")
-        val climate = vs.path("climate")
-        val heat = climate.path("heatingAccessory")
-        val doors = vs.path("doorStatus")
-        val seats = vs.path("seatHeaterVentState")
-        val ev = vs.path("evStatus")
-        val location = info.path("lastVehicleInfo", "location")
-        val lat = location.path("coord", "lat").dbl()
-        val lon = location.path("coord", "lon").dbl()
-
-        // Windows: ICE cars report under windowOpen, EVs under evStatus.windowStatus.
-        fun window(key: String, evKey: String): Int? =
-            vs.path("windowOpen", key).int() ?: ev.path("windowStatus", evKey).int()
-
-        val evStatus = if (ev == null) null else EvStatus(
-            batteryCharge = ev.path("batteryCharge").flag(),
-            batteryStatus = ev.path("batteryStatus").int(),
-            batteryPlugin = ev.path("batteryPlugin").int(),
-            drvDistance = run {
-                val range = ev.path("drvDistance", "0", "rangeByFuel", "totalAvailableRange")
-                    ?: ev.path("drvDistance", "0", "rangeByFuel", "evModeRange")
-                range.path("value").dbl()
-                    ?.let { listOf(DrvDistance(RangeByFuel(Dte(it, range.path("unit").int())))) }
-                    ?: emptyList()
-            },
-            remainTime2 = RemainTime2(
-                // Current-plug estimate, then AC/DC estimates, all in minutes.
-                atc = ev.path("remainChargeTime", "0", "timeInterval", "value").dbl()?.let { TimeValue(it, 1) },
-                etc1 = ev.path("remainChargeTime", "0", "etc1", "value").dbl()?.let { TimeValue(it, 1) },
-                etc3 = ev.path("remainChargeTime", "0", "etc3", "value").dbl()?.let { TimeValue(it, 1) },
-            ).takeIf { it.atc != null || it.etc1 != null || it.etc3 != null },
-        )
-
-        return VehicleStatus(
-            doorLock = vs.path("doorLock").flag(),
-            airCtrlOn = climate.path("airCtrl").flag(),
-            engine = vs.path("engine").flag(),
-            defrost = climate.path("defrost").flag(),
-            hoodOpen = doors.path("hood").flag(),
-            trunkOpen = doors.path("trunk").flag(),
-            doorOpen = DoorOpen(
-                frontLeft = doors.path("frontLeft").int(),
-                frontRight = doors.path("frontRight").int(),
-                backLeft = doors.path("backLeft").int(),
-                backRight = doors.path("backRight").int(),
-            ),
-            windowOpen = WindowOpen(
-                frontLeft = window("frontLeft", "windowFL"),
-                frontRight = window("frontRight", "windowFR"),
-                backLeft = window("backLeft", "windowRL"),
-                backRight = window("backRight", "windowRR"),
-            ),
-            tirePressureLamp = vs.path("tirePressure", "all").int()?.let {
-                TirePressureLamp(tirePressureLampAll = it)
-            },
-            airTemp = climate.path("airTemp", "value").str()?.let {
-                TempValue(it, climate.path("airTemp", "unit").int())
-            },
-            battery = vs.path("batteryStatus", "stateOfCharge").int()?.let { Battery12V(batSoc = it) },
-            steerWheelHeat = heat.path("steeringWheel").int(),
-            sideBackWindowHeat = heat.path("rearWindow").int(),
-            sideMirrorHeat = heat.path("sideMirror").int(),
-            seatHeaterVentState = if (seats == null) null else SeatHeaterVentState(
-                flSeatHeatState = seats.path("flSeatHeatState").int(),
-                frSeatHeatState = seats.path("frSeatHeatState").int(),
-                rlSeatHeatState = seats.path("rlSeatHeatState").int(),
-                rrSeatHeatState = seats.path("rrSeatHeatState").int(),
-            ),
-            washerFluidStatus = vs.path("washerFluidStatus").flag(),
-            breakOilStatus = vs.path("breakOilStatus").flag(),
-            smartKeyBatteryWarning = vs.path("smartKeyBatteryWarning").flag(),
-            fuelLevel = vs.path("fuelLevel").int(),
-            dte = vs.path("distanceToEmpty", "value").dbl()?.let {
-                Dte(it, vs.path("distanceToEmpty", "unit").int())
-            },
-            dateTime = vs.path("syncDate", "utc").str(),
-            evStatus = evStatus,
-            vehicleLocation = if (lat != null && lon != null) {
-                VehicleLocation(coord = Coord(lat, lon), time = location.path("syncDate", "utc").str())
-            } else null,
-        )
-    }
-
     // --- Commands --------------------------------------------------------
 
     // These four are simple no-body GET commands — see [getCommand] for the
     // shared mechanism (fire the request, discard the response body, only
     // care whether it succeeded).
     suspend fun lock(session: KiaSession, v: KiaVehicleSummary) = getCommand("rems/door/lock", session, v)
+
     suspend fun unlock(session: KiaSession, v: KiaVehicleSummary) = getCommand("rems/door/unlock", session, v)
+
     suspend fun stopClimate(session: KiaSession, v: KiaVehicleSummary) = getCommand("rems/stop", session, v)
+
     suspend fun stopCharge(session: KiaSession, v: KiaVehicleSummary) = getCommand("evc/cancel", session, v)
 
     /** Start charging. chargeRatio is fixed at 100 -- the actual AC/DC charge
@@ -478,63 +354,8 @@ class KiaUsaApi {
         )
     }
 
-    /** Start climate / remote start. Mechanism: Kia's API represents the two
-     *  ends of the temperature range as the literal strings "LOW"/"HIGH"
-     *  rather than accepting a numeric value outside 62-82°F, so any
-     *  requested temp beyond that range gets mapped to the matching sentinel
-     *  string instead of the number itself; seat heat/vent settings are only
-     *  included in the body at all when at least one seat isn't OFF
-     *  ([anySeat]), keeping the payload minimal when the user hasn't touched
-     *  seat controls. */
-    suspend fun startClimate(session: KiaSession, v: KiaVehicleSummary, req: ClimateRequest) = withContext(Dispatchers.IO) {
-        val tempValue: String = when {
-            req.tempF < 62 -> "LOW"
-            req.tempF > 82 -> "HIGH"
-            else -> req.tempF.toString()
-        }
-        val anySeat = listOf(req.seatFrontLeft, req.seatFrontRight, req.seatRearLeft, req.seatRearRight)
-            .any { it != SeatLevel.OFF }
-        val body = buildJsonObject {
-            put("remoteClimate", buildJsonObject {
-                put("airTemp", buildJsonObject { put("unit", 1); put("value", tempValue) })
-                put("airCtrl", true)
-                put("defrost", req.defrost)
-                put("heatingAccessory", buildJsonObject {
-                    put("rearWindow", if (req.defrost) 1 else 0)
-                    put("sideMirror", if (req.defrost) 1 else 0)
-                    put("steeringWheel", if (req.steeringWheelHeat.isOn) 1 else 0)
-                    // Best-guess mapping, unverified against real API docs: mirrors seatSettings'
-                    // own inverted step scheme just below (lower step number = MORE heat), on the
-                    // assumption Kia's steering-wheel step follows the same convention as its seat
-                    // step. Confirmed-real-car feedback said this control genuinely has two
-                    // distinct heat levels; this is the field that already exists to carry a
-                    // second one (it was previously hardcoded to 1 regardless of what the app's
-                    // own toggle showed). If a real device reports Low/High swapped, flip this.
-                    put(
-                        "steeringWheelStep",
-                        when (req.steeringWheelHeat) {
-                            WheelHeatLevel.HIGH -> 1
-                            WheelHeatLevel.LOW -> 2
-                            WheelHeatLevel.OFF -> 0
-                        },
-                    )
-                })
-                put("ignitionOnDuration", buildJsonObject { put("unit", 4); put("value", req.durationMinutes) })
-                if (anySeat) {
-                    put("heatVentSeat", buildJsonObject {
-                        put("driverSeat", seatSettings(req.seatFrontLeft.apiValue))
-                        put("passengerSeat", seatSettings(req.seatFrontRight.apiValue))
-                        put("rearLeftSeat", seatSettings(req.seatRearLeft.apiValue))
-                        put("rearRightSeat", seatSettings(req.seatRearRight.apiValue))
-                    })
-                }
-            })
-        }
-        postCommand("rems/start", session, v, body)
-    }
-
     /** Kia's heat/vent seat encoding (type 1 = heat, 2 = cool, 0 = off). */
-    private fun seatSettings(level: Int): JsonObject = when (level) {
+    internal fun seatSettings(level: Int): JsonObject = when (level) {
         8 -> buildJsonObject { put("heatVentType", 1); put("heatVentLevel", 4); put("heatVentStep", 1) }
         7 -> buildJsonObject { put("heatVentType", 1); put("heatVentLevel", 3); put("heatVentStep", 2) }
         6 -> buildJsonObject { put("heatVentType", 1); put("heatVentLevel", 2); put("heatVentStep", 3) }
@@ -548,7 +369,7 @@ class KiaUsaApi {
      *  build the URL, attach session+vehicle headers, run it via [call]
      *  (which already throws on any failure) and discard the parsed
      *  response — these commands only need a success/failure signal. */
-    private suspend fun getCommand(path: String, session: KiaSession, v: KiaVehicleSummary) = withContext(Dispatchers.IO) {
+    internal suspend fun getCommand(path: String, session: KiaSession, v: KiaVehicleSummary) = withContext(Dispatchers.IO) {
         val req = Request.Builder().url(API + path).get().authedHeaders(session, v).build()
         call(req)
         Unit
@@ -559,7 +380,7 @@ class KiaUsaApi {
      *  [getCommand], just POSTing [body] instead of a bodyless GET. Runs
      *  synchronously; callers wrap it in withContext(Dispatchers.IO)
      *  themselves. */
-    private fun postCommand(path: String, session: KiaSession, v: KiaVehicleSummary, body: JsonObject) {
+    internal fun postCommand(path: String, session: KiaSession, v: KiaVehicleSummary, body: JsonObject) {
         val req = Request.Builder().url(API + path)
             .post(body.toString().toRequestBody(jsonMedia)).authedHeaders(session, v).build()
         call(req)
@@ -575,10 +396,11 @@ class KiaUsaApi {
      */
     /** The retrying entry point: a GET whose body can't be framed is retried once on a fresh
      *  connection (see [ResponseFraming]); POSTs are never retried here. */
-    private fun call(request: Request): JsonElement =
+    internal fun call(request: Request): JsonElement =
+
         ResponseFraming.retryOnceOnFreshConnection(request) { rawCall(it) }
 
-    private fun rawCall(request: Request): JsonElement = raw(request).use { resp ->
+    internal fun rawCall(request: Request): JsonElement = raw(request).use { resp ->
         // See BlueLinkApi.call's own doc for why this is measured separately from the
         // HttpLoggingInterceptor's own (headers-only) timing: `.string()` is what actually
         // downloads the body, and that can run seconds behind a fast-looking interceptor log
@@ -613,9 +435,9 @@ class KiaUsaApi {
         root
     }
 
-    private fun raw(request: Request): Response = client.newCall(request).execute()
+    internal fun raw(request: Request): Response = client.newCall(request).execute()
 
-    private fun friendly(code: Int, body: String): String {
+    internal fun friendly(code: Int, body: String): String {
         val msg = runCatching {
             json.parseToJsonElement(body).obj()?.path("status", "errorMessage")?.str()
                 ?: json.parseToJsonElement(body).obj()?.get("errorMessage")?.str()
@@ -629,49 +451,15 @@ class KiaUsaApi {
      * [BlueLinkException] — which the repository layer already catches — instead of
      * letting a raw SerializationException/IOException crash the app.
      */
-    private fun parseJson(text: String, code: Int): JsonElement =
+    internal fun parseJson(text: String, code: Int): JsonElement =
+
         runCatching { json.parseToJsonElement(text) }
             .getOrElse { throw BlueLinkException(friendly(code, text), code = code) }
 
-    // --- JSON helpers ----------------------------------------------------
-    // Kia's payloads are deeply nested and inconsistently shaped across
-    // endpoints/vehicle generations, so rather than modeling every possible
-    // shape with @Serializable data classes, [parseStatus] and friends walk
-    // the raw JsonElement tree with these small typed-cast helpers — each one
-    // safely returns null (never throws) when the element isn't the expected
-    // type or is missing, letting the caller fall back with `?:` instead of
-    // needing try/catch everywhere.
-
-    /** Cast to a JsonObject, or null if this isn't one (missing/wrong-shaped key). */
-    private fun JsonElement?.obj(): JsonObject? = this as? JsonObject
-    /** Cast to a String, treating the literal JSON string "null" the same as
-     *  an absent value (some Kia fields are inconsistently sent as that
-     *  literal instead of a true JSON null). */
-    private fun JsonElement?.str(): String? = (this as? JsonPrimitive)?.contentOrNull?.takeIf { it != "null" }
-    private fun JsonElement?.int(): Int? = (this as? JsonPrimitive)?.intOrNull
-    private fun JsonElement?.dbl(): Double? = (this as? JsonPrimitive)?.doubleOrNull
-    private fun JsonElement?.bool(): Boolean? = (this as? JsonPrimitive)?.booleanOrNull
-
-    /** Boolean that tolerates Kia's mixed encodings: true/false or 0/1. */
-    private fun JsonElement?.flag(): Boolean? =
         (this as? JsonPrimitive)?.let { it.booleanOrNull ?: it.intOrNull?.let { v -> v != 0 } }
 
-    /** Descend through nested objects/arrays by key (numeric keys index arrays). */
-    private fun JsonElement?.path(vararg keys: String): JsonElement? {
-        var cur: JsonElement? = this
-        for (k in keys) {
-            cur = when (cur) {
-                is JsonObject -> cur[k]
-                is JsonArray -> k.toIntOrNull()?.let { cur.getOrNull(it) }
-                else -> null
-            }
-            if (cur == null) return null
-        }
-        return cur
-    }
-
     /** RFC 4122 v5 (name-based, SHA-1) UUID in the DNS namespace — matches the iOS app. */
-    private fun uuid5FromDns(name: String): String {
+    internal fun uuid5FromDns(name: String): String {
         val namespace = byteArrayOf(
             0x6b, 0xa7.toByte(), 0xb8.toByte(), 0x10, 0x9d.toByte(), 0xad.toByte(), 0x11, 0xd1.toByte(),
             0x80.toByte(), 0xb4.toByte(), 0x00, 0xc0.toByte(), 0x4f, 0xd4.toByte(), 0x30, 0xc8.toByte(),

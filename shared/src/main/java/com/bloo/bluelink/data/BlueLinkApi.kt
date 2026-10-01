@@ -20,15 +20,17 @@ import java.util.concurrent.TimeUnit
  * every call goes to https://api.telematics.hyundaiusa.com.
  */
 class BlueLinkApi(private val brand: Brand = Brand.HYUNDAI) {
-
     // These four all delegate straight to the [brand] passed at construction
     // time, so one BlueLinkApi instance can be pointed at either Hyundai or
     // Genesis (both share this same API shape, just different base URLs and
     // OAuth credentials) just by constructing it with a different Brand.
-    private val baseUrl get() = brand.baseUrl
-    private val host get() = brand.host
-    private val clientId get() = brand.clientId
-    private val clientSecret get() = brand.clientSecret
+    internal val baseUrl get() = brand.baseUrl
+
+    internal val host get() = brand.host
+
+    internal val clientId get() = brand.clientId
+
+    internal val clientSecret get() = brand.clientSecret
 
     companion object {
         // Two different User-Agent strings the real endpoints expect depending
@@ -73,16 +75,17 @@ class BlueLinkApi(private val brand: Brand = Brand.HYUNDAI) {
             .build()
     }
 
-    private val json get() = sharedJson
+    internal val json get() = sharedJson
 
-    private val client: OkHttpClient get() = sharedClient
+    internal val client: OkHttpClient get() = sharedClient
 
     // The two request-body content types this API's endpoints expect: plain
     // JSON for most commands, and form-urlencoded specifically for
     // lock/unlock (see [formCommand] below) — sending the wrong one for a
     // given endpoint results in the server rejecting the body.
-    private val jsonMedia = "application/json".toMediaType()
-    private val formMedia = "application/x-www-form-urlencoded".toMediaType()
+    internal val jsonMedia = "application/json".toMediaType()
+
+    internal val formMedia = "application/x-www-form-urlencoded".toMediaType()
 
     // --- Auth ------------------------------------------------------------
 
@@ -181,6 +184,7 @@ class BlueLinkApi(private val brand: Brand = Brand.HYUNDAI) {
      *  it wants. Returns null if the server responds with no vehicleStatus
      *  at all (car has never reported one). */
     suspend fun status(token: String, username: String, pin: String, v: Vehicle, refresh: Boolean): VehicleStatus? =
+
         execute {
             val request = baseRequest("/ac/v2/rcs/rvs/vehicleStatus", token, username, pin, v)
                 .get()
@@ -195,6 +199,7 @@ class BlueLinkApi(private val brand: Brand = Brand.HYUNDAI) {
      *  the coordinate plus reported speed into the platform-neutral
      *  [GeoLocation]. */
     suspend fun location(token: String, username: String, pin: String, v: Vehicle): GeoLocation? =
+
         execute {
             val request = baseRequest("/ac/v2/rcs/rfc/findMyCar", token, username, pin, v)
                 .get()
@@ -212,6 +217,7 @@ class BlueLinkApi(private val brand: Brand = Brand.HYUNDAI) {
      * return an empty list (the caller treats a failure here as "no trips").
      */
     suspend fun tripDetails(token: String, username: String, pin: String, v: Vehicle): List<EvTrip> =
+
         execute {
             val request = baseRequest("/ac/v2/ts/alerts/maintenance/evTripDetails", token, username, pin, v)
                 .header("userId", username)
@@ -223,20 +229,24 @@ class BlueLinkApi(private val brand: Brand = Brand.HYUNDAI) {
     /** Lock the doors. Confusingly named endpoint: "rdo/off" locks (remote
      *  door operation, off = secured), not the other way around. */
     suspend fun lock(token: String, username: String, pin: String, v: Vehicle) =
+
         formCommand("/ac/v2/rcs/rdo/off", token, username, pin, v)
 
     /** Unlock the doors ("rdo/on" — see [lock] for the naming logic). */
     suspend fun unlock(token: String, username: String, pin: String, v: Vehicle) =
+
         formCommand("/ac/v2/rcs/rdo/on", token, username, pin, v)
 
     /** Flash the hazard lights only. Reference client: rcs/rhl/light, same
      *  userName+vin JSON body and header set as lock/unlock. Hyundai/Genesis
      *  only -- Kia's US API has no equivalent endpoint. */
     suspend fun flashLights(token: String, username: String, pin: String, v: Vehicle) =
+
         jsonCommand("/ac/v2/rcs/rhl/light", token, username, pin, v)
 
     /** Flash the hazard lights and sound the horn. Reference client: rcs/rhl/hnl. */
     suspend fun hornAndLights(token: String, username: String, pin: String, v: Vehicle) =
+
         jsonCommand("/ac/v2/rcs/rhl/hnl", token, username, pin, v)
 
     suspend fun stopClimate(token: String, username: String, pin: String, v: Vehicle): String = execute {
@@ -266,122 +276,10 @@ class BlueLinkApi(private val brand: Brand = Brand.HYUNDAI) {
         call(request)
     }
 
-    /** Start climate / remote start. Temperature is Fahrenheit for US vehicles. */
-    suspend fun startClimate(
-        token: String, username: String, pin: String, v: Vehicle, req: ClimateRequest,
-    ): String = execute {
-        // Body shapes mirror the community hyundai_kia_connect_api exactly. Newer
-        // head units (Gen5W) reject the bloated body the old code sent (it included
-        // Ims/username/vin/seat info on every EV) with a 502 "could not complete
-        // your request". For EVs the accepted body is minimal; seat-heat + duration
-        // are only honoured on generation-3 cars, and Ims/username/vin are
-        // ICE-only fields.
-        fun seatInfo() = kotlinx.serialization.json.buildJsonObject {
-            put("drvSeatHeatState", kotlinx.serialization.json.JsonPrimitive(req.seatFrontLeft.apiValue))
-            put("astSeatHeatState", kotlinx.serialization.json.JsonPrimitive(req.seatFrontRight.apiValue))
-            put("rlSeatHeatState", kotlinx.serialization.json.JsonPrimitive(req.seatRearLeft.apiValue))
-            put("rrSeatHeatState", kotlinx.serialization.json.JsonPrimitive(req.seatRearRight.apiValue))
-        }
-        val isEv = v.isEv
-        val gen3 = v.generation.trim() == "3"
-        val path = if (isEv) "/ac/v2/evc/fatc/start" else "/ac/v2/rcs/rsc/start"
-        val payload = json.encodeToString(
-            kotlinx.serialization.json.JsonObject.serializer(),
-            kotlinx.serialization.json.buildJsonObject {
-                if (isEv) {
-                    put("airCtrl", kotlinx.serialization.json.JsonPrimitive(1))
-                    put("airTemp", kotlinx.serialization.json.buildJsonObject {
-                        put("value", kotlinx.serialization.json.JsonPrimitive(req.tempF.toString()))
-                        put("unit", kotlinx.serialization.json.JsonPrimitive(1))
-                    })
-                    put("defrost", kotlinx.serialization.json.JsonPrimitive(req.defrost))
-                    // heating1 is a bundle-selector, not a plain boolean: the real values are
-                    // 0 (all off), 2 (rear window + mirrors only), 3 (steering wheel only) and
-                    // 4 (steering wheel + rear window + mirrors) -- confirmed across multiple
-                    // independent reverse-engineering efforts (bluelinky issues #139/#230,
-                    // hyundai_kia_connect_api's own documented heating1 fix). This sent the
-                    // plain `1` a boolean-shaped fallback would produce, which isn't one of
-                    // those four values at all -- consistent with a real user's report that
-                    // requesting steering wheel heat landed at some other (lower) state instead
-                    // of the one asked for, on a CCNC Ioniq 5. No separate mirrors/rear-window
-                    // toggle exists in this app yet, so this only ever needs "wheel alone" (3)
-                    // or "all off" (0) -- not the combined value 4.
-                    put("heating1", kotlinx.serialization.json.JsonPrimitive(if (req.steeringWheelHeat.isOn) 3 else 0))
-                    // Older (gen-3) EVs additionally accept duration + seat heat.
-                    if (gen3) {
-                        put("igniOnDuration", kotlinx.serialization.json.JsonPrimitive(req.durationMinutes))
-                        put("seatHeaterVentInfo", seatInfo())
-                    }
-                } else {
-                    put("Ims", kotlinx.serialization.json.JsonPrimitive(0))
-                    put("airCtrl", kotlinx.serialization.json.JsonPrimitive(1))
-                    put("airTemp", kotlinx.serialization.json.buildJsonObject {
-                        put("unit", kotlinx.serialization.json.JsonPrimitive(1))
-                        put("value", kotlinx.serialization.json.JsonPrimitive(req.tempF.toString()))
-                    })
-                    put("defrost", kotlinx.serialization.json.JsonPrimitive(req.defrost))
-                    // heating1 is a bundle-selector, not a plain boolean: the real values are
-                    // 0 (all off), 2 (rear window + mirrors only), 3 (steering wheel only) and
-                    // 4 (steering wheel + rear window + mirrors) -- confirmed across multiple
-                    // independent reverse-engineering efforts (bluelinky issues #139/#230,
-                    // hyundai_kia_connect_api's own documented heating1 fix). This sent the
-                    // plain `1` a boolean-shaped fallback would produce, which isn't one of
-                    // those four values at all -- consistent with a real user's report that
-                    // requesting steering wheel heat landed at some other (lower) state instead
-                    // of the one asked for, on a CCNC Ioniq 5. No separate mirrors/rear-window
-                    // toggle exists in this app yet, so this only ever needs "wheel alone" (3)
-                    // or "all off" (0) -- not the combined value 4.
-                    put("heating1", kotlinx.serialization.json.JsonPrimitive(if (req.steeringWheelHeat.isOn) 3 else 0))
-                    put("igniOnDuration", kotlinx.serialization.json.JsonPrimitive(req.durationMinutes))
-                    put("seatHeaterVentInfo", seatInfo())
-                    put("username", kotlinx.serialization.json.JsonPrimitive(username))
-                    put("vin", kotlinx.serialization.json.JsonPrimitive(v.vin))
-                }
-            }
-        ).toRequestBody(jsonMedia)
-
-        val request = baseRequest(path, token, username, pin, v)
-            .post(payload)
-            .build()
-        // One short retry clears the occasional transient 502 without bothering
-        // the user.
-        callWithRetry(request)
-    }
-
-    /** Set EV charge target SOC for AC (plugType 1) and DC (plugType 0) in percent.
-     *  Mechanism: both targets are always sent together in one call — the
-     *  API's targetsoc/set endpoint takes the full list, so there's no way to
-     *  update just one plug type's target without also re-sending the other's
-     *  current value. */
-    suspend fun setChargeTargets(
-        token: String, username: String, pin: String, v: Vehicle, acPercent: Int, dcPercent: Int,
-    ): String = execute {
-        val payload = json.encodeToString(
-            kotlinx.serialization.json.JsonObject.serializer(),
-            kotlinx.serialization.json.buildJsonObject {
-                put("targetSOClist", kotlinx.serialization.json.buildJsonArray {
-                    add(kotlinx.serialization.json.buildJsonObject {
-                        put("plugType", kotlinx.serialization.json.JsonPrimitive(0))
-                        put("targetSOClevel", kotlinx.serialization.json.JsonPrimitive(dcPercent))
-                    })
-                    add(kotlinx.serialization.json.buildJsonObject {
-                        put("plugType", kotlinx.serialization.json.JsonPrimitive(1))
-                        put("targetSOClevel", kotlinx.serialization.json.JsonPrimitive(acPercent))
-                    })
-                })
-            }
-        ).toRequestBody(jsonMedia)
-
-        val request = baseRequest("/ac/v2/evc/charge/targetsoc/set", token, username, pin, v)
-            .post(payload)
-            .build()
-        call(request)
-    }
-
     /** Shared body for the form-urlencoded commands (lock/unlock): a
      *  minimal `userName=...&vin=...` body posted with [formMedia], on top of
      *  the usual [baseRequest] auth/vehicle headers. */
-    private suspend fun formCommand(
+    internal suspend fun formCommand(
         path: String, token: String, username: String, pin: String, v: Vehicle,
     ): String = execute {
         val form = "userName=$username&vin=${v.vin}".toRequestBody(formMedia)
@@ -393,7 +291,7 @@ class BlueLinkApi(private val brand: Brand = Brand.HYUNDAI) {
 
     /** Same userName+vin payload as [formCommand], but JSON -- the horn/lights
      *  endpoints reject the form-urlencoded body lock/unlock use. */
-    private suspend fun jsonCommand(
+    internal suspend fun jsonCommand(
         path: String, token: String, username: String, pin: String, v: Vehicle,
     ): String = execute {
         val body = json.encodeToString(
@@ -416,7 +314,7 @@ class BlueLinkApi(private val brand: Brand = Brand.HYUNDAI) {
      *  still needs to attach its own HTTP method + body before calling
      *  build(). Centralising this means a new command only has to specify
      *  what's actually different about it. */
-    private fun baseRequest(
+    internal fun baseRequest(
         path: String, token: String, username: String, pin: String, v: Vehicle,
     ): Request.Builder = Request.Builder()
         .url("$baseUrl$path")
@@ -451,7 +349,7 @@ class BlueLinkApi(private val brand: Brand = Brand.HYUNDAI) {
      * Like [call], but retries once after a short pause when the server returns a
      * transient 5xx. Used for HVAC, where Hyundai occasionally 502s a valid call.
      */
-    private suspend fun callWithRetry(request: Request): String {
+    internal suspend fun callWithRetry(request: Request): String {
         return try {
             call(request)
         } catch (e: BlueLinkException) {
@@ -479,7 +377,7 @@ class BlueLinkApi(private val brand: Brand = Brand.HYUNDAI) {
      *  request headers don't end up in the log) and throws so the caller
      *  never has to check isSuccessful itself. `.use` ensures the response
      *  body is closed even when an exception is thrown reading it. */
-    private fun call(request: Request): String {
+    internal fun call(request: Request): String {
         // The HttpLoggingInterceptor's own logged "Nms" (BASIC level) times only
         // chain.proceed() -- which OkHttp returns as soon as the response STATUS LINE and
         // HEADERS are parsed, with the body left as a lazy, unread stream tied to the live
@@ -510,7 +408,7 @@ class BlueLinkApi(private val brand: Brand = Brand.HYUNDAI) {
     }
 
     /** Pull the human-readable message out of Blue Link's JSON error envelope. */
-    private fun friendlyError(code: Int, body: String): String {
+    internal fun friendlyError(code: Int, body: String): String {
         val message = runCatching {
             json.parseToJsonElement(body).let { el ->
                 (el as? kotlinx.serialization.json.JsonObject)?.let { obj ->
@@ -538,7 +436,7 @@ class BlueLinkApi(private val brand: Brand = Brand.HYUNDAI) {
      *  while any other exception (IOException, SerializationException, etc.)
      *  is wrapped so every public method on this class has one exception
      *  type callers need to handle. */
-    private suspend fun <T> execute(block: suspend () -> T): T {
+    internal suspend fun <T> execute(block: suspend () -> T): T {
         // Logged only past a threshold, unconditionally (not just for the cold-start path --
         // see BlueLinkRepository/AppViewModel's own logStartupTiming for that): the mutex was
         // proven instant and the actual HTTP request/response were both proven fast in a real

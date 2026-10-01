@@ -4,15 +4,11 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.booleanOrNull
-import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.contentOrNull
-import kotlinx.serialization.json.doubleOrNull
 import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.put
 import okhttp3.Cookie
@@ -28,7 +24,6 @@ import java.math.BigInteger
 import java.security.KeyFactory
 import java.security.spec.RSAPublicKeySpec
 import java.util.Base64
-import java.util.Locale
 import java.util.UUID
 import java.util.concurrent.TimeUnit
 import javax.crypto.Cipher
@@ -73,23 +68,28 @@ data class EuVehicleSummary(
  * ([EuStamp], [Brand.clientSecret]) are the Hyundai EU values from that source.
  */
 class EuApi(private val brand: Brand) {
-
     init {
         require(brand.isEurope) { "EuApi requires a Europe brand, got $brand" }
     }
 
-    private val host get() = brand.host
-    private val userApi get() = "${brand.baseUrl}/api/v1/user/"
-    private val spa get() = "${brand.baseUrl}/api/v1/spa/"
-    private val spaV2 get() = "${brand.baseUrl}/api/v2/spa/"
-    private val serviceId get() = brand.clientId
-    private val clientSecret get() = brand.clientSecret
+    internal val host get() = brand.host
+
+    internal val userApi get() = "${brand.baseUrl}/api/v1/user/"
+
+    internal val spa get() = "${brand.baseUrl}/api/v1/spa/"
+
+    internal val spaV2 get() = "${brand.baseUrl}/api/v2/spa/"
+
+    internal val serviceId get() = brand.clientId
+
+    internal val clientSecret get() = brand.clientSecret
 
     // Hyundai EU sign-in form / identity host and OAuth redirect target. When
     // Kia/Genesis EU are added these become brand-keyed (idpconnect-eu.kia.com,
     // redirect_uri .../oauth2/redirect for Kia).
-    private val loginFormHost get() = "https://idpconnect-eu.hyundai.com"
-    private val redirectUri get() = userApi + "oauth2/token"
+    internal val loginFormHost get() = "https://idpconnect-eu.hyundai.com"
+
+    internal val redirectUri get() = userApi + "oauth2/token"
 
     companion object {
         private const val USER_AGENT_OKHTTP = "okhttp/3.12.0"
@@ -122,17 +122,19 @@ class EuApi(private val brand: Brand) {
             .build()
     }
 
-    private val json get() = sharedJson
-    private val jsonMedia = "application/json;charset=UTF-8".toMediaType()
-    private val client: OkHttpClient get() = sharedClient
+    internal val json get() = sharedJson
+
+    internal val jsonMedia = "application/json;charset=UTF-8".toMediaType()
+
+    internal val client: OkHttpClient get() = sharedClient
 
     // The CCAPI stamp binds to the request time in Unix SECONDS (see EuStamp).
-    private fun nowStamp(): String = EuStamp.generate(unixSeconds = System.currentTimeMillis() / 1000)
+    internal fun nowStamp(): String = EuStamp.generate(unixSeconds = System.currentTimeMillis() / 1000)
 
     // --- Headers -------------------------------------------------------------
 
     /** CCAPI service headers every prd.eu-ccapi call needs (pre- or post-auth). */
-    private fun Request.Builder.apiHeaders(): Request.Builder = this
+    internal fun Request.Builder.apiHeaders(): Request.Builder = this
         .header("Content-Type", "application/json;charset=UTF-8")
         .header("ccsp-service-id", serviceId)
         .header("ccsp-application-id", EuStamp.APP_ID)
@@ -143,7 +145,8 @@ class EuApi(private val brand: Brand) {
         .header("User-Agent", USER_AGENT_OKHTTP)
 
     /** [apiHeaders] plus the bearer access token, device id and CCS2-support flag. */
-    private fun Request.Builder.authHeaders(session: EuSession, ccs2: Int): Request.Builder =
+    internal fun Request.Builder.authHeaders(session: EuSession, ccs2: Int): Request.Builder =
+
         apiHeaders()
             .header("Authorization", "Bearer ${session.accessToken}")
             .header("ccsp-device-id", session.deviceId)
@@ -152,7 +155,8 @@ class EuApi(private val brand: Brand) {
     /** [authHeaders] with the PIN-derived control token in both Authorization and
      *  AuthorizationCCSP — CCS2 control endpoints authenticate on the control
      *  token, not the plain access token. [controlToken] already carries "Bearer ". */
-    private fun Request.Builder.commandHeaders(session: EuSession, ccs2: Int, controlToken: String): Request.Builder =
+    internal fun Request.Builder.commandHeaders(session: EuSession, ccs2: Int, controlToken: String): Request.Builder =
+
         authHeaders(session, ccs2)
             .header("Authorization", controlToken)
             .header("AuthorizationCCSP", controlToken)
@@ -176,13 +180,6 @@ class EuApi(private val brand: Brand) {
             ?: throw BlueLinkException("Europe device registration failed")
     }
 
-    /**
-     * Headless IDPConnect sign-in: authorize (seed cookies) -> fetch RSA cert ->
-     * RSA-encrypt the password -> POST the sign-in form and read the auth `code`
-     * from the 302 redirect -> exchange the code for tokens. Ported verbatim in
-     * shape from KiaUvoApiEU._login_with_password.
-     */
-    suspend fun login(username: String, password: String, deviceId: String, pin: String?): EuSession =
         withContext(Dispatchers.IO) {
             // One cookie jar shared across the handshake; two clients over it that
             // differ only in redirect-following (signin must NOT follow, so its 302
@@ -312,26 +309,6 @@ class EuApi(private val brand: Brand) {
         if (token.startsWith("Bearer ")) token else "Bearer $token"
     }
 
-    // --- Vehicles ------------------------------------------------------------
-
-    suspend fun vehicles(session: EuSession): List<EuVehicleSummary> = withContext(Dispatchers.IO) {
-        val req = Request.Builder().url(spa + "vehicles").get().authHeaders(session, 0).build()
-        val list = call(req).path("resMsg", "vehicles") as? JsonArray ?: JsonArray(emptyList())
-        list.mapNotNull { e ->
-            val o = e.obj() ?: return@mapNotNull null
-            val id = o["vehicleId"]?.str() ?: return@mapNotNull null
-            val type = o["type"]?.str()?.uppercase(Locale.US)
-            EuVehicleSummary(
-                id = id,
-                name = o["nickname"]?.str() ?: o["vehicleName"]?.str() ?: id.takeLast(6),
-                model = o["vehicleName"]?.str() ?: "Car",
-                vin = o["vin"]?.str() ?: id,
-                isEv = type == "EV" || type == "PHEV" || type == "PE",
-                ccs2 = o["ccuCCS2ProtocolSupport"]?.int() ?: 0,
-            )
-        }
-    }
-
     // --- Status / location ---------------------------------------------------
 
     /**
@@ -350,6 +327,7 @@ class EuApi(private val brand: Brand) {
      * handful of requests to respect EU's strict rate limits.
      */
     suspend fun status(session: EuSession, v: EuVehicleSummary, refresh: Boolean): VehicleStatus? =
+
         withContext(Dispatchers.IO) {
             val base = spa + "vehicles/${v.id}/ccs2/carstatus"
             fun readLatest(): JsonObject? =
@@ -382,219 +360,29 @@ class EuApi(private val brand: Brand) {
         if (lat != null && lon != null) GeoLocation(lat, lon, loc.path("speed", "value").dbl()) else null
     }
 
-    /**
-     * Maps the CCS2 `state.Vehicle` tree onto the shared [VehicleStatus] model,
-     * using the dot-paths the reference's get_child_value reads (confirmed against
-     * KiaUvoApiEU/ApiImplType1). Everything reads defensively so a firmware that
-     * omits a field yields a missing value, never a crash.
-     */
-    internal fun parseStatus(vh: JsonObject): VehicleStatus {
-        val green = vh["Green"] as? JsonObject
-        val cabin = vh["Cabin"] as? JsonObject
-        val body = vh["Body"] as? JsonObject
-        val drivetrain = vh["Drivetrain"] as? JsonObject
-        val chassis = vh["Chassis"] as? JsonObject
-        val electronics = vh["Electronics"] as? JsonObject
-
-        val soc = green.path("BatteryManagement", "BatteryRemain", "Ratio").dbl()?.toInt()
-        // NOT ChargingDoor.State -- that is the charge-port DOOR's own open/closed flag,
-        // confirmed against the reference this file is ported from (ApiImplType1.py):
-        // `charging_door_state in [0, 2] -> door closed, == 1 -> door open`, nothing to
-        // do with whether a cable is actually connected. Using it here meant popping the
-        // port door open with nothing plugged in read as "Plugged in (DC fast)" -- enabling
-        // the start/stop-charge button and showing the DC limit pill on a car with no
-        // cable attached at all, and the reverse on any car whose door auto-closes over an
-        // inserted cable.
-        //
-        // ConnectorFastening.State is the reference's actual plug-detection field (it's
-        // the LAST of two candidate assignments to ev_battery_is_plugged_in there, so it's
-        // the one that wins). It is only ever a plugged/unplugged bool, though -- neither
-        // this field nor anything else in the reference distinguishes AC from DC once
-        // connected, so [EvStatus.batteryPlugin]'s AC/DC label is approximated as DC (1)
-        // whenever a cable is present rather than genuinely known. That is a real
-        // limitation, not a guess dressed up as one: Bloo's own AC-vs-DC UI presents this
-        // as fact, so it can misname an AC session, but that is a strictly smaller error
-        // than the previous one -- it never claims "unplugged" while charging, or
-        // "plugged in" while it is not.
-        val plug = green.path("ChargingInformation", "ConnectorFastening", "State").int()
-            ?.let { if (it != 0) 1 else 0 }
-        val chargeRemain = green.path("ChargingInformation", "Charging", "RemainTime").dbl()
-        val rangeKm = (drivetrain.path("FuelSystem", "DTE", "Total")
-            ?: drivetrain.path("FuelSystem", "DTE", "EV")).dbl()
-
-        val evStatus = if (green == null) null else EvStatus(
-            batteryStatus = soc,
-            // TRUE or unknown, never a definite false derived from a time estimate.
-            //
-            // This was `chargeRemain?.let { it > 0.0 }`, which turns a missing or zero
-            // RemainTime into "the car told us it stopped charging". Notifications.LiveCharge.sync
-            // documents that its `charging = false` means exactly that and never "we don't know",
-            // and it acts on it: it cancels the live charging notification, clears the dismissal
-            // flag, and LiveChargePollWorker ends its 5-minute chain. Meanwhile the snapshot
-            // keeps charging = true through `evStatus?.batteryCharge ?: charging`, so the
-            // snapshot-driven UI still shows a green ring and TOGGLE_CHARGE resolves to
-            // CHARGE_OFF -- surfaces disagreeing, all from one parse.
-            //
-            // A remaining-time estimate is evidence of charging when present and positive, and
-            // evidence of nothing at all otherwise: cars stop reporting it near the top of a
-            // charge, and CCS2 payloads omit it entirely. null flows correctly through
-            // VehicleSnapshot.merged's `?:` as "no new information", which is the honest answer.
-            batteryCharge = if (chargeRemain != null && chargeRemain > 0.0) true else null,
-            batteryPlugin = plug,
-            drvDistance = rangeKm?.kmToMi()?.let { listOf(DrvDistance(RangeByFuel(Dte(it, 3)))) } ?: emptyList(),
-            remainTime2 = chargeRemain?.let { RemainTime2(atc = TimeValue(it, 1)) },
-            reservChargeInfos = run {
-                val ac = green.path("ChargingInformation", "TargetSoC", "Standard").int()
-                val dc = green.path("ChargingInformation", "TargetSoC", "Quick").int()
-                if (ac == null && dc == null) null
-                else ReservChargeInfos(
-                    listOfNotNull(
-                        dc?.let { TargetSOC(plugType = 0, targetSOClevel = it) },
-                        ac?.let { TargetSOC(plugType = 1, targetSOClevel = it) },
-                    ),
-                )
-            },
-        )
-
-        val door1 = cabin.path("Door", "Row1") as? JsonObject
-        val door2 = cabin.path("Door", "Row2") as? JsonObject
-        val win1 = cabin.path("Window", "Row1") as? JsonObject
-        val win2 = cabin.path("Window", "Row2") as? JsonObject
-
-        // CCS2 per-door "Lock" is inverted: 0 = locked, 1 = unlocked (the
-        // reference reads `not bool(Lock)`). The car is locked only when ALL
-        // present doors report Lock == 0.
-        val doorLocks = listOfNotNull(
-            door1.path("Driver", "Lock").int(),
-            door1.path("Passenger", "Lock").int(),
-            door2.path("Left", "Lock").int(),
-            door2.path("Right", "Lock").int(),
-        )
-
-        return VehicleStatus(
-            doorLock = if (doorLocks.isEmpty()) null else doorLocks.all { it == 0 },
-            engine = vh.path("DrivingReady").flag(),
-            trunkOpen = body.path("Trunk", "Open").flag(),
-            hoodOpen = body.path("Hood", "Open").flag(),
-            defrost = body.path("Windshield", "Front", "Defog", "State").int()?.let { it == 1 },
-            doorOpen = if (door1 == null && door2 == null) null else DoorOpen(
-                frontLeft = door1.path("Driver", "Open").int(),
-                frontRight = door1.path("Passenger", "Open").int(),
-                backLeft = door2.path("Left", "Open").int(),
-                backRight = door2.path("Right", "Open").int(),
-            ),
-            windowOpen = if (win1 == null && win2 == null) null else WindowOpen(
-                frontLeft = win1.path("Driver", "Open").int(),
-                frontRight = win1.path("Passenger", "Open").int(),
-                backLeft = win2.path("Left", "Open").int(),
-                backRight = win2.path("Right", "Open").int(),
-            ),
-            dte = rangeKm?.let { Dte(it.kmToMi(), 3) },
-            battery = normalizeBattery12V(
-                electronics.path("Battery", "Level").int(),
-                electronics.path("Battery", "SensorReliability").int(),
-            )?.let { Battery12V(batSoc = it) },
-            evStatus = evStatus,
-            dateTime = vh.path("Date").str(),
-            tirePressureLamp = (chassis.path("Axle") as? JsonObject)?.let {
-                TirePressureLamp(tirePressureLampAll = chassis.path("Axle", "Tire", "PressureLow").int())
-            },
-        )
-    }
-
     // --- Commands ------------------------------------------------------------
     // CCS2 lock/charge/climate: POST to the ccs2 control endpoints with the control token.
     // Charge target is a v1 endpoint. Bodies ported from ApiImplType1.
 
     suspend fun lock(session: EuSession, v: EuVehicleSummary, controlToken: String) =
+
         control(session, v, controlToken, "door", buildJsonObject { put("command", "close") })
 
     suspend fun unlock(session: EuSession, v: EuVehicleSummary, controlToken: String) =
+
         control(session, v, controlToken, "door", buildJsonObject { put("command", "open") })
 
     suspend fun startCharge(session: EuSession, v: EuVehicleSummary, controlToken: String) =
+
         control(session, v, controlToken, "charge", buildJsonObject { put("command", "start") })
 
     suspend fun stopCharge(session: EuSession, v: EuVehicleSummary, controlToken: String) =
+
         control(session, v, controlToken, "charge", buildJsonObject { put("command", "stop") })
 
-    suspend fun stopClimate(session: EuSession, v: EuVehicleSummary, controlToken: String) =
         control(session, v, controlToken, "temperature", buildJsonObject { put("command", "stop") })
 
-    /**
-     * Start climate / pre-conditioning. Temperature arrives as Fahrenheit
-     * ([ClimateRequest.tempF]) and is sent as a Celsius half-degree. Body shape
-     * from ApiImplType1's ccs2 temperature start.
-     *
-     * The seat states carry the user's actual settings now; they were pinned to
-     * 0 (off), so a European owner could set seat heat in the app and the car
-     * would never receive it. The encoding is [SeatLevel.apiValue] -- the same
-     * 0 / 3-5 cool / 6-8 heat scale BlueLinkApi already posts as
-     * `drvSeatHeatState` -- and the payload's SHAPE is unchanged, which is what
-     * keeps this low-risk: every key here was already being sent and verified
-     * against a live car, only the values were fixed at zero. If EU climate
-     * starts failing, this pair of lines is the thing to put back.
-     *
-     * `drvSeatLoc` and the driver/passenger mapping are derived together from
-     * [deviceDriveSide], because they have to agree: the payload names the two
-     * front seats by ROLE while Bloo names them by SIDE, so on a right-hand-drive
-     * car the driver's seat is the front RIGHT one. Sending "L" while mapping the
-     * driver to the left seat is self-consistent and was correct for every market
-     * Bloo supported before Europe; sending it to a car in Britain would put the
-     * driver's heat setting on the empty passenger seat.
-     */
-    suspend fun startClimate(
-        session: EuSession, v: EuVehicleSummary, controlToken: String, req: ClimateRequest,
-    ) {
-        val celsius = Math.round((req.tempF - 32) * 5.0 / 9.0 * 2) / 2.0
-        val driveSide = deviceDriveSide()
-        val driverSeat =
-            if (driveSide == DriveSide.RIGHT) req.seatFrontRight else req.seatFrontLeft
-        val passengerSeat =
-            if (driveSide == DriveSide.RIGHT) req.seatFrontLeft else req.seatFrontRight
-        val cmd = buildJsonObject {
-            put("command", "start")
-            put("ignitionDuration", req.durationMinutes)
-            put("strgWhlHeating", if (req.steeringWheelHeat.isOn) 1 else 0)
-            put("hvacTempType", 1)
-            put("hvacTemp", celsius)
-            put("sideRearMirrorHeating", 0)
-            put("drvSeatLoc", driveSide.ccs2Code)
-            put("seatClimateInfo", buildJsonObject {
-                // Front pair by ROLE, so it flips with the drive side. The rear
-                // pair is named by side in the payload too (rl/rr), so those map
-                // straight across and never swap.
-                put("drvSeatClimateState", driverSeat.apiValue)
-                put("psgSeatClimateState", passengerSeat.apiValue)
-                put("rrSeatClimateState", req.seatRearRight.apiValue)
-                put("rlSeatClimateState", req.seatRearLeft.apiValue)
-            })
-            put("tempUnit", "C")
-            put("windshieldFrontDefogState", req.defrost)
-        }
-        control(session, v, controlToken, "temperature", cmd)
-    }
-
-    /** Set AC (plugType 1) and DC (plugType 0) charge target SOC percentages, via
-     *  the v1 `.../charge/target` endpoint. Unlike lock/climate this authenticates
-     *  with the plain access token (NOT the PIN control token) — the reference's
-     *  set_charge_limits uses the authenticated headers, and the control token 403s. */
-    suspend fun setChargeTargets(
-        session: EuSession, v: EuVehicleSummary, acPercent: Int, dcPercent: Int,
-    ) = withContext(Dispatchers.IO) {
-        val body = buildJsonObject {
-            put("targetSOClist", buildJsonArray {
-                add(buildJsonObject { put("plugType", 0); put("targetSOClevel", dcPercent) })
-                add(buildJsonObject { put("plugType", 1); put("targetSOClevel", acPercent) })
-            })
-        }.toString().toRequestBody(jsonMedia)
-        val req = Request.Builder().url(spa + "vehicles/${v.id}/charge/target")
-            .post(body).authHeaders(session, v.ccs2).build()
-        call(req)
-        Unit
-    }
-
-    private suspend fun control(
+    internal suspend fun control(
         session: EuSession, v: EuVehicleSummary, controlToken: String, path: String, cmd: JsonObject,
     ) = withContext(Dispatchers.IO) {
         val req = Request.Builder().url(spaV2 + "vehicles/${v.id}/ccs2/control/$path")
@@ -609,7 +397,7 @@ class EuApi(private val brand: Brand) {
     /** RSA-PKCS1v1.5-encrypt [password] with the JWK public key ([nB64Url]/[eB64Url]
      *  are base64url modulus/exponent), returning lowercase hex — matching the
      *  reference's `cipher.encrypt(pw).hex()`. */
-    private fun rsaEncryptHex(password: String, nB64Url: String, eB64Url: String): String {
+    internal fun rsaEncryptHex(password: String, nB64Url: String, eB64Url: String): String {
         fun decodeUrl(s: String): ByteArray {
             val padded = s + "=".repeat((4 - s.length % 4) % 4)
             return Base64.getUrlDecoder().decode(padded)
@@ -626,10 +414,12 @@ class EuApi(private val brand: Brand) {
      *  non-2xx (401 -> [EuRepository] refreshes + retries) and on an in-band
      *  `retCode == "F"` error. The failing method+path is included in the message. */
     /** See [ResponseFraming]: GET-only retry on a fresh connection for an unframable body. */
-    private fun call(request: Request, httpClient: OkHttpClient = this.client): JsonElement =
+    internal fun call(request: Request, httpClient: OkHttpClient = this.client): JsonElement =
+
         ResponseFraming.retryOnceOnFreshConnection(request) { rawCall(it, httpClient) }
 
-    private fun rawCall(request: Request, httpClient: OkHttpClient): JsonElement =
+    internal fun rawCall(request: Request, httpClient: OkHttpClient): JsonElement =
+
         httpClient.newCall(request).execute().use { resp ->
             // See BlueLinkApi.call's own doc for why this is measured separately from the
             // HttpLoggingInterceptor's own (headers-only) timing: `.string()` is what actually
@@ -678,35 +468,18 @@ class EuApi(private val brand: Brand) {
             root
         }
 
-    private fun friendly(code: Int, body: String): String {
+    internal fun friendly(code: Int, body: String): String {
         val msg = runCatching {
             json.parseToJsonElement(body).obj()?.let { it["resMsg"] ?: it.path("error", "message") }?.str()
         }.getOrNull()
         return msg?.takeIf { it.isNotBlank() } ?: "Europe request failed (HTTP $code)"
     }
 
-    // --- JSON helpers (identical convention to CanadaApi/KiaUsaApi) -----------
-
-    private fun JsonElement?.obj(): JsonObject? = this as? JsonObject
-    private fun JsonElement?.str(): String? = (this as? JsonPrimitive)?.contentOrNull?.takeIf { it != "null" }
-    private fun JsonElement?.int(): Int? = (this as? JsonPrimitive)?.let { it.intOrNull ?: it.doubleOrNull?.toInt() }
-    private fun JsonElement?.dbl(): Double? = (this as? JsonPrimitive)?.doubleOrNull
-    private fun JsonElement?.flag(): Boolean? =
         (this as? JsonPrimitive)?.let { it.booleanOrNull ?: it.intOrNull?.let { v -> v != 0 } }
-
-    /** CCS2 reports distance in km; Bloo stores miles everywhere and converts to
-     *  km only at display time (see FormatUtils.formatDistance) — normalise here.
-     *  Divides by [KM_PER_MI] rather than its own `* 0.621371` literal -- CanadaApi
-     *  had exactly this and was fixed to the shared constant so the two directions
-     *  are exact inverses by construction; this file had drifted back to the old
-     *  style independently. The two literals happen to agree to within 9e-7 mi/km
-     *  (no rounded on-screen figure currently differs), but there's no reason for
-     *  a second source of truth to exist at all. */
-    private fun Double.kmToMi(): Double = this / KM_PER_MI
 
     /**
      * Filters the 12V auxiliary battery reading the way the reference project's own
-     * `normalize_battery_soc` does, which this file's raw `.int()` read skipped
+     * `normalize_battery_soc` does, which this file's raw `.intLoose()` read skipped
      * entirely: `Electronics.Battery.SensorReliability == 1` means the CCS2 stack is
      * flagging the reading itself as unreliable (an expected state after a 12V reset
      * or during an ICCU fault on IONIQ 5 / Kia EV, not an error to surface), and a raw
@@ -719,18 +492,5 @@ class EuApi(private val brand: Brand) {
         if (sensorReliability == 1) return null
         if (level == null || level !in 0..100) return null
         return level
-    }
-
-    private fun JsonElement?.path(vararg keys: String): JsonElement? {
-        var cur: JsonElement? = this
-        for (k in keys) {
-            cur = when (cur) {
-                is JsonObject -> cur[k]
-                is JsonArray -> k.toIntOrNull()?.let { cur.getOrNull(it) }
-                else -> null
-            }
-            if (cur == null) return null
-        }
-        return cur
     }
 }

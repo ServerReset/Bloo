@@ -9,8 +9,6 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.contentOrNull
-import kotlinx.serialization.json.doubleOrNull
 import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.put
@@ -83,15 +81,17 @@ sealed interface CanadaAuth {
  *    avoids the field being sent at all.
  */
 class CanadaApi(private val brand: Brand) {
-
     init {
         require(brand.isCanada) { "CanadaApi requires a Canada brand, got $brand" }
     }
 
-    private val apiUrl get() = "${brand.baseUrl}/"
-    private val host get() = brand.host
-    private val clientId get() = brand.clientId
-    private val clientSecret get() = brand.clientSecret
+    internal val apiUrl get() = "${brand.baseUrl}/"
+
+    internal val host get() = brand.host
+
+    internal val clientId get() = brand.clientId
+
+    internal val clientSecret get() = brand.clientSecret
 
     companion object {
         private const val USER_AGENT =
@@ -124,14 +124,16 @@ class CanadaApi(private val brand: Brand) {
         private const val TEMP_RANGE_MODEL_YEAR = 2020
     }
 
-    private val json get() = sharedJson
-    private val jsonMedia = "application/json;charset=UTF-8".toMediaType()
-    private val client: OkHttpClient get() = sharedClient
+    internal val json get() = sharedJson
+
+    internal val jsonMedia = "application/json;charset=UTF-8".toMediaType()
+
+    internal val client: OkHttpClient get() = sharedClient
 
     // --- Headers -----------------------------------------------------------
 
     /** Headers every call needs, authenticated or not. */
-    private fun Request.Builder.apiHeaders(deviceId: String): Request.Builder = this
+    internal fun Request.Builder.apiHeaders(deviceId: String): Request.Builder = this
         .header("Content-Type", "application/json;charset=UTF-8")
         .header("Accept", "application/json, text/plain, */*")
         .header("Accept-Language", "en-CA,en-US;q=0.8,en;q=0.5,fr;q=0.3")
@@ -146,15 +148,18 @@ class CanadaApi(private val brand: Brand) {
         .header("Deviceid", Base64.getEncoder().encodeToString(deviceId.toByteArray(Charsets.UTF_8)))
 
     /** [apiHeaders] plus the access token every authenticated call needs. */
-    private fun Request.Builder.authHeaders(session: CanadaSession): Request.Builder =
+    internal fun Request.Builder.authHeaders(session: CanadaSession): Request.Builder =
+
         apiHeaders(session.deviceId).header("accessToken", session.accessToken)
 
     /** [authHeaders] plus which car a vehicle-scoped call applies to. */
-    private fun Request.Builder.vehicleHeaders(session: CanadaSession, vehicleId: String): Request.Builder =
+    internal fun Request.Builder.vehicleHeaders(session: CanadaSession, vehicleId: String): Request.Builder =
+
         authHeaders(session).header("vehicleId", vehicleId)
 
     /** [vehicleHeaders] plus the PIN-derived auth token a command needs. */
-    private fun Request.Builder.commandHeaders(session: CanadaSession, vehicleId: String, pAuth: String): Request.Builder =
+    internal fun Request.Builder.commandHeaders(session: CanadaSession, vehicleId: String, pAuth: String): Request.Builder =
+
         vehicleHeaders(session, vehicleId).header("pAuth", pAuth).header("from", "SPA")
 
     // --- Auth ----------------------------------------------------------------
@@ -162,6 +167,7 @@ class CanadaApi(private val brand: Brand) {
     /** Step 1: username/password. Returns a session directly if this device is
      *  still within its 90-day mfaYn grant, otherwise an MFA challenge. */
     suspend fun authUser(username: String, password: String, deviceId: String, pin: String?): CanadaAuth =
+
         withContext(Dispatchers.IO) {
             val body = buildJsonObject { put("loginId", username); put("password", password) }
                 .toString().toRequestBody(jsonMedia)
@@ -281,17 +287,11 @@ class CanadaApi(private val brand: Brand) {
 
     /** Cached (or, if [refresh], freshly-woken) status. */
     suspend fun status(session: CanadaSession, v: CanadaVehicleSummary, refresh: Boolean): VehicleStatus? =
-        withContext(Dispatchers.IO) {
-            val path = if (refresh) "rltmvhclsts" else "lstvhclsts"
-            val req = Request.Builder().url(apiUrl + path)
-                .post(ByteArray(0).toRequestBody(null)).vehicleHeaders(session, v.id).build()
-            val statusObj = call(req).path("result", "status") as? JsonObject ?: return@withContext null
-            parseStatus(statusObj, v.year)
-        }
 
     /** Last-known GPS fix, gated behind the account's service PIN like every
      *  other vehicle-scoped Canada command. */
     suspend fun location(session: CanadaSession, v: CanadaVehicleSummary, pAuth: String): GeoLocation? =
+
         withContext(Dispatchers.IO) {
             val body = buildJsonObject { put("pin", session.pin.orEmpty()) }.toString().toRequestBody(jsonMedia)
             val req = Request.Builder().url(apiUrl + "fndmcr").post(body)
@@ -302,158 +302,26 @@ class CanadaApi(private val brand: Brand) {
             if (lat != null && lon != null) GeoLocation(lat, lon) else null
         }
 
-    /**
-     * Maps `result.status` onto the shared [VehicleStatus] model. Field names
-     * here match [VehicleStatus]'s own almost exactly (both ultimately trace
-     * back to the same community reverse-engineering lineage), so this walks
-     * the tree directly rather than via kotlinx.serialization decode, keeping
-     * the same defensive per-field null handling as [KiaUsaApi.parseStatus]
-     * for the fields whose shape does differ (evStatus.drvDistance/remainTime2).
-     */
-    private fun parseStatus(vs: JsonObject, modelYear: Int?): VehicleStatus {
-        val ev = vs["evStatus"] as? JsonObject
-        val evStatus = if (ev == null) null else EvStatus(
-            batteryCharge = ev["batteryCharge"].flag(),
-            batteryStatus = ev["batteryStatus"].int(),
-            batteryPlugin = (ev["batteryPlugin"] ?: vs["batteryPlugin"]).int(),
-            drvDistance = run {
-                // `ev` FIRST, falling back to the top-level status object -- the same shape
-                // `batteryPlugin` three lines above already uses, and for the same reason: CA
-                // puts some EV fields under evStatus and some beside it. This read was
-                // top-level ONLY, so EvStatus.drvDistance was always empty for a Canadian EV
-                // and every surface that shows electric range fell back to nothing.
-                val range = ev.path("drvDistance", "0", "rangeByFuel", "totalAvailableRange")
-                    ?: ev.path("drvDistance", "0", "rangeByFuel", "evModeRange")
-                    ?: vs.path("drvDistance", "0", "rangeByFuel", "totalAvailableRange")
-                    ?: vs.path("drvDistance", "0", "rangeByFuel", "evModeRange")
-                range?.path("value").dbl()?.kmToMi()
-                    ?.let { listOf(DrvDistance(RangeByFuel(Dte(it, range.path("unit").int())))) }
-                    ?: emptyList()
-            },
-            remainTime2 = RemainTime2(
-                atc = ev.path("remainTime2", "atc", "value").dbl()?.let { TimeValue(it, 1) },
-                etc1 = ev.path("remainTime2", "etc1", "value").dbl()?.let { TimeValue(it, 1) },
-                etc3 = ev.path("remainTime2", "etc3", "value").dbl()?.let { TimeValue(it, 1) },
-            ).takeIf { it.atc != null || it.etc1 != null || it.etc3 != null },
-            // KNOWN GAP: reservChargeInfos (the AC/DC charge-LIMIT targets) is left null for
-            // Canada. Because of that, the UI now hides the editable charge-limit controls on
-            // CA cars (Brand.supportsChargeLimits = !isCanada) rather than show sliders seeded
-            // from the 80/90 defaults, and every reading surface self-hides on the null too. So
-            // this is currently a graceful "feature absent", not a broken control -- but the
-            // underlying data is still missing. The CA status body (rltmvhclsts / lstvhclsts)
-            // does NOT carry the targets inline, unlike KiaUsaApi, which merges them from a
-            // separate read (evc/gts, see KiaUsaApi.chargeTargets). The CA read counterpart is
-            // believed to be evc/selsoc (the community myUVO/CA client's _get_charge_limits;
-            // note the CA write side already here, setChargeTargets -> evc/setsoc, uses field
-            // "level" not Kia's "targetSOClevel"). That endpoint's exact shape can't be
-            // confirmed from this repo (no CA fixtures, CI can't hit the network), so it is
-            // deliberately NOT added on inference -- doing so would ship an unverified API
-            // contract. To re-enable the controls: confirm evc/selsoc's response against a real
-            // CA account, merge it in status() with the same runCatching best-effort wrapper
-            // KiaUsaApi uses (a bad path then degrades to today's behaviour), and flip
-            // Brand.supportsChargeLimits back on.
-        )
-        return VehicleStatus(
-            doorLock = vs["doorLock"].flag(),
-            airCtrlOn = vs["airCtrlOn"].flag(),
-            engine = vs["engine"].flag(),
-            acc = vs["acc"].flag(),
-            trunkOpen = vs["trunkOpen"].flag(),
-            hoodOpen = vs["hoodOpen"].flag(),
-            defrost = vs["defrost"].flag(),
-            doorOpen = (vs["doorOpen"] as? JsonObject)?.let {
-                DoorOpen(it["frontLeft"].int(), it["frontRight"].int(), it["backLeft"].int(), it["backRight"].int())
-            },
-            windowOpen = (vs["windowOpen"] as? JsonObject)?.let {
-                WindowOpen(it["frontLeft"].int(), it["frontRight"].int(), it["backLeft"].int(), it["backRight"].int())
-            },
-            tirePressureLamp = (vs["tirePressureLamp"] as? JsonObject)?.let {
-                TirePressureLamp(
-                    tirePressureLampAll = it["tirePressureLampAll"].int(),
-                    tirePressureLampFL = it["tirePressureLampFL"].int(),
-                    tirePressureLampFR = it["tirePressureLampFR"].int(),
-                    tirePressureLampRL = it["tirePressureLampRL"].int(),
-                    tirePressureLampRR = it["tirePressureLampRR"].int(),
-                )
-            },
-            // Canada reports distance in km (the CA app has no imperial option),
-            // but the rest of Bloo treats every Dte/RangeByFuel value as miles
-            // internally, converting to km only at display time based on the
-            // user's own unit preference (see formatDistance) -- so this needs
-            // to be normalized to miles right here at the parse boundary, or a
-            // metric-mode user sees the km figure re-multiplied by 1.609 on top
-            // of an already-km number (reported by a user: Bluelink said 263 km,
-            // Bloo showed 423 km -- 263 * 1.609 ≈ 423).
-            dte = (vs["dte"] as? JsonObject)?.let { Dte(it["value"].dbl()?.kmToMi(), it["unit"].int()) },
-            airTemp = (vs["airTemp"] as? JsonObject)?.let {
-                val unit = it["unit"].int()
-                // The CA backend reports the climate setpoint the same hex-"H"
-                // Celsius-index way it ENCODES it (tempToHex, e.g. "0AH"). Decode
-                // it back to a °F numeric string here — every consumer feeds
-                // airTemp.value straight into degLabel(), which treats its input
-                // as °F, so an undecoded "0AH" rendered as garbage "0AH°". Sibling
-                // of the 868 km→mi fix on dte just above.
-                // Normalised to °F HERE, so every surface downstream -- the phone
-                // UI readers -- gets one unit rather than each having to know
-                // this backend's conventions. A reader that sees only
-                // airTemp.value through a payload with no unit code could not
-                // interpret a Celsius value correctly
-                // however careful the formatting was at that end.
-                //
-                // Two shapes arrive on unit 0. The hex "0AH" index decodes via
-                // hexTempToF. A plain number on unit 0 is a Celsius reading, and
-                // that is the one that was being read as Fahrenheit: a car sitting
-                // at 22.5°C displayed as (22.5 - 32) * 5/9 = -5°C. Reported from a
-                // real device.
-                //
-                // The unit code is rewritten to 1 alongside, because it has to keep
-                // describing the value beside it -- leaving 0 on a converted °F
-                // number would tell degLabel the value is Celsius and convert it a
-                // second time.
-                // NOT normalised to °F. Converting here would round a 22.5°C
-                // setpoint to 72.5°F and back to 22°C, and this backend's table is
-                // IN half degrees, so that loses half a degree on the common case
-                // rather than an edge one. The value stays exactly as the car
-                // reported it and the unit code says what it is.
-                val rawTemp = it["value"]?.str()
-                val decoded = hexTempToF(rawTemp, unit, modelYear)
-                TempValue(decoded, if (decoded != rawTemp) 1 else unit)
-            },
-            battery = (vs["battery"] as? JsonObject)?.let { Battery12V(batSoc = it["batSoc"].int()) },
-            evStatus = evStatus,
-            dateTime = vs.path("lastStatusDate").str(),
-            steerWheelHeat = vs["steerWheelHeat"].int(),
-            sideBackWindowHeat = vs["sideBackWindowHeat"].int(),
-            sideMirrorHeat = vs["sideMirrorHeat"].int(),
-            seatHeaterVentState = (vs["seatHeaterVentState"] as? JsonObject)?.let {
-                SeatHeaterVentState(
-                    it["flSeatHeatState"].int(), it["frSeatHeatState"].int(),
-                    it["rlSeatHeatState"].int(), it["rrSeatHeatState"].int(),
-                )
-            },
-            lowFuelLight = vs["lowFuelLight"].flag(),
-            washerFluidStatus = vs["washerFluidStatus"].flag(),
-            breakOilStatus = vs["breakOilStatus"].flag(),
-            smartKeyBatteryWarning = vs["smartKeyBatteryWarning"].flag(),
-            fuelLevel = vs["fuelLevel"].int(),
-        )
-    }
-
     // --- Commands --------------------------------------------------------------
 
     suspend fun lock(session: CanadaSession, v: CanadaVehicleSummary, pAuth: String) =
+
         pinCommand("drlck", session, v, pAuth)
 
     suspend fun unlock(session: CanadaSession, v: CanadaVehicleSummary, pAuth: String) =
+
         pinCommand("drulck", session, v, pAuth)
 
     suspend fun stopClimate(session: CanadaSession, v: CanadaVehicleSummary, pAuth: String) =
+
         pinCommand(if (v.isEv) "evc/rfoff" else "rmtstp", session, v, pAuth)
 
     suspend fun startCharge(session: CanadaSession, v: CanadaVehicleSummary, pAuth: String) =
+
         pinCommand("evc/rcstrt", session, v, pAuth)
 
     suspend fun stopCharge(session: CanadaSession, v: CanadaVehicleSummary, pAuth: String) =
+
         pinCommand("evc/rcstp", session, v, pAuth)
 
     /** Set EV charge target SOC for AC (plugType 1) and DC (plugType 0) percent. */
@@ -472,86 +340,12 @@ class CanadaApi(private val brand: Brand) {
         Unit
     }
 
-    /** Start climate / remote start. Temperature comes in as Fahrenheit
-     *  ([ClimateRequest.tempF], the shared UI's unit) and is converted to the
-     *  nearest Celsius half-degree, then hex-encoded — see [tempToHex]. */
-    suspend fun startClimate(
-        session: CanadaSession, v: CanadaVehicleSummary, pAuth: String, req: ClimateRequest,
-    ) = withContext(Dispatchers.IO) {
-        val hexTemp = tempToHex(req.tempF, v.year)
-        val anySeat = listOf(req.seatFrontLeft, req.seatFrontRight, req.seatRearLeft, req.seatRearRight)
-            .any { it != SeatLevel.OFF }
-        fun climateFields() = buildJsonObject {
-            put("airCtrl", 1)
-            put("defrost", req.defrost)
-            // heating1 is a bundle-selector, not a plain boolean -- see BlueLinkApi's own
-            // (US/Genesis) copy of this same field for the sourced values (0/2/3/4, not a
-            // 0/1 toggle) and the real-world report that motivated the fix.
-            put("heating1", if (req.steeringWheelHeat.isOn) 3 else 0)
-            put("igniOnDuration", req.durationMinutes)
-            put("airTemp", buildJsonObject {
-                put("value", hexTemp)
-                put("unit", 0)
-                put("hvacTempType", if (v.isEv) 1 else 0)
-            })
-            // Best-effort heat-only scale (0 off .. 3 high) -- see class doc:
-            // the real per-seat command encoding isn't documented anywhere in
-            // the reference project this was ported from.
-            if (anySeat) {
-                fun cmd(level: SeatLevel) = if (level.isHeat) (level.apiValue - 5) else 0
-                put("seatHeaterVentCMD", buildJsonObject {
-                    put("drvSeatOptCmd", cmd(req.seatFrontLeft))
-                    put("astSeatOptCmd", cmd(req.seatFrontRight))
-                    put("rlSeatOptCmd", cmd(req.seatRearLeft))
-                    put("rrSeatOptCmd", cmd(req.seatRearRight))
-                })
-            }
-        }
-        val body = if (v.isEv) {
-            buildJsonObject { put("pin", session.pin.orEmpty()); put("hvacInfo", climateFields()) }
-        } else {
-            buildJsonObject { put("setting", climateFields()); put("pin", session.pin.orEmpty()) }
-        }
-        val path = if (v.isEv) "evc/rfon" else "rmtstrt"
-        val request = Request.Builder().url(apiUrl + path)
-            .post(body.toString().toRequestBody(jsonMedia)).commandHeaders(session, v.id, pAuth).build()
-        call(request)
-        Unit
-    }
-
-    /** Convert a Fahrenheit setpoint to the API's zero-padded-hex-plus-"H"
-     *  index encoding. Mirrors KiaUvoApiCA's get_index_into_hex_temp exactly:
-     *  the nearest half-degree Celsius value's *index* into the model-year's
-     *  lookup table, hex-formatted as e.g. "0AH". */
-    private fun tempToHex(tempF: Int, modelYear: Int?): String {
-        val celsius = (tempF - 32) * 5.0 / 9.0
-        val table = if ((modelYear ?: TEMP_RANGE_MODEL_YEAR) >= TEMP_RANGE_MODEL_YEAR) TEMP_RANGE_NEW else TEMP_RANGE_OLD
-        val rounded = Math.round(celsius * 2) / 2.0
-        val clamped = rounded.coerceIn(table.first(), table.last())
-        val index = table.indices.minByOrNull { kotlin.math.abs(table[it] - clamped) } ?: 0
-        return Integer.toHexString(index).padStart(2, '0').uppercase(Locale.US) + "H"
-    }
-
-    /** Inverse of [tempToHex]: decode the API's hex-"H" Celsius-index setpoint
-     *  (e.g. "0AH") back to a °F numeric string for display. Mirrors KiaUvoApiCA's
-     *  get_hex_temp_into_index guard — only `unit == 0` hex-"H" values are the
-     *  encoded setpoint; anything else (a plain number, "OFF", unit != 0) is
-     *  passed through untouched so [degLabel] handles it. Round-trips with
-     *  tempToHex to within the table's half-degree resolution. */
-    private fun hexTempToF(raw: String?, unit: Int?, modelYear: Int?): String? {
-        if (raw == null) return null
-        if (unit != 0 || !raw.endsWith("H")) return raw
-        val index = raw.dropLast(1).toIntOrNull(16) ?: return raw
-        val table = if ((modelYear ?: TEMP_RANGE_MODEL_YEAR) >= TEMP_RANGE_MODEL_YEAR) TEMP_RANGE_NEW else TEMP_RANGE_OLD
-        val celsius = table.getOrNull(index) ?: return raw
-        return (celsius * 9.0 / 5.0 + 32.0).toString()
-    }
-
     /** Shared shape for the no-extra-body PIN-gated commands (lock/unlock/
      *  stop-climate/start-stop-charge): every one of these still needs the
      *  account's PIN in the body per the reference project, just with no
      *  other fields alongside it. */
-    private suspend fun pinCommand(path: String, session: CanadaSession, v: CanadaVehicleSummary, pAuth: String) =
+    internal suspend fun pinCommand(path: String, session: CanadaSession, v: CanadaVehicleSummary, pAuth: String) =
+
         withContext(Dispatchers.IO) {
             val body = buildJsonObject { put("pin", session.pin.orEmpty()) }.toString().toRequestBody(jsonMedia)
             val req = Request.Builder().url(apiUrl + path).post(body).commandHeaders(session, v.id, pAuth).build()
@@ -565,10 +359,11 @@ class CanadaApi(private val brand: Brand) {
      *  on an expired session (surfaced as 401 so the repository re-authenticates). */
     /** The retrying entry point: a GET whose body can't be framed is retried once on a fresh
      *  connection (see [ResponseFraming]); POSTs are never retried here. */
-    private fun call(request: Request): JsonElement =
+    internal fun call(request: Request): JsonElement =
+
         ResponseFraming.retryOnceOnFreshConnection(request) { rawCall(it) }
 
-    private fun rawCall(request: Request): JsonElement = raw(request).use { resp ->
+    internal fun rawCall(request: Request): JsonElement = raw(request).use { resp ->
         // See BlueLinkApi.call's own doc for why this is measured separately from the
         // HttpLoggingInterceptor's own (headers-only) timing: `.string()` is what actually
         // downloads the body, and that can run seconds behind a fast-looking interceptor log
@@ -615,9 +410,9 @@ class CanadaApi(private val brand: Brand) {
         root
     }
 
-    private fun raw(request: Request): Response = client.newCall(request).execute()
+    internal fun raw(request: Request): Response = client.newCall(request).execute()
 
-    private fun friendly(code: Int, body: String): String {
+    internal fun friendly(code: Int, body: String): String {
         val msg = runCatching {
             // CA envelope puts the human message at error.errorDesc; keep the old
             // key paths as harmless fallbacks for any endpoint that differs.
@@ -628,39 +423,10 @@ class CanadaApi(private val brand: Brand) {
         return msg?.takeIf { it.isNotBlank() } ?: "Canada request failed (HTTP $code)"
     }
 
-    private fun parseJson(text: String, code: Int): JsonElement =
+    internal fun parseJson(text: String, code: Int): JsonElement =
+
         runCatching { json.parseToJsonElement(text) }
             .getOrElse { throw BlueLinkException(friendly(code, text), code = code) }
 
-    // --- JSON helpers (see KiaUsaApi for the identical convention) ----------
-
-    private fun JsonElement?.obj(): JsonObject? = this as? JsonObject
-    private fun JsonElement?.str(): String? = (this as? JsonPrimitive)?.contentOrNull?.takeIf { it != "null" }
-    private fun JsonElement?.int(): Int? = (this as? JsonPrimitive)?.intOrNull
-    private fun JsonElement?.dbl(): Double? = (this as? JsonPrimitive)?.doubleOrNull
-    private fun JsonElement?.flag(): Boolean? =
         (this as? JsonPrimitive)?.let { it.booleanOrNull ?: it.intOrNull?.let { v -> v != 0 } }
-
-    /** Canada's status payload reports distance in km; Bloo's shared models
-     *  (Dte/RangeByFuel) store distance as miles everywhere else, converting
-     *  to km only at display time per the user's own unit setting (see
-     *  FormatUtils.formatDistance) -- so every raw distance value coming out
-     *  of this API needs to be normalized to miles right here. */
-    /** Exact inverse of [KM_PER_MI]. Was `* 0.621371`, whose reciprocal is 1.609344 --
-     *  not the 1.609 the formatters used -- so a metric user's own value came back a
-     *  kilometre short after the round trip (263 -> 163.42 mi -> "262 km"). */
-    private fun Double.kmToMi(): Double = this / KM_PER_MI
-
-    private fun JsonElement?.path(vararg keys: String): JsonElement? {
-        var cur: JsonElement? = this
-        for (k in keys) {
-            cur = when (cur) {
-                is JsonObject -> cur[k]
-                is JsonArray -> k.toIntOrNull()?.let { cur.getOrNull(it) }
-                else -> null
-            }
-            if (cur == null) return null
-        }
-        return cur
-    }
 }
