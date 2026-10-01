@@ -338,11 +338,14 @@ internal fun Modifier.glassEffect(
 }
 
 
- internal fun Modifier.appHazeEffect(state: HazeState, progressive: Boolean = false): Modifier =
+ internal fun Modifier.appHazeEffect(state: HazeState, progressive: Boolean = false, cheap: Boolean = false): Modifier =
     this.hazeBlur(
         input = HazeInput.Sources(state),
         style = HazeBlurStyle {
-            blurRadius(StandardBlurRadius)
+            // [cheap] is for surfaces there are many of at once (every card on screen): a smaller
+            // radius is a smaller blur kernel per pixel, and no grain pass at all.
+            blurRadius(if (cheap) CardBlurRadius else StandardBlurRadius)
+            if (cheap) noiseFactor(0f)
             if (progressive) this.progressive(StandardBlurProgressive)
         },
     )
@@ -385,7 +388,7 @@ internal fun Modifier.glassCardFill(shape: Shape, tint: Color): Modifier {
     val haze = LocalBackdropHaze.current
     return if (haze != null && canBlurBackdrops()) {
         this.clip(shape)
-            .appHazeEffect(haze)
+            .appHazeEffect(haze, cheap = true)
             .background(tint.copy(alpha = GlassCardTintAlpha))
             .glassSheen()
     } else {
@@ -398,3 +401,6 @@ internal fun Modifier.glassCardFill(shape: Shape, tint: Color): Modifier {
  *  bar scrim soften by the same amount. Haze 2.0 defaults blurRadius to 20dp; this matches the
  *  1.7 look the app was tuned against. */
 private val StandardBlurRadius = 20.dp
+
+/** The softer, cheaper blur cards use -- see [appHazeEffect]'s `cheap`. */
+private val CardBlurRadius = 14.dp

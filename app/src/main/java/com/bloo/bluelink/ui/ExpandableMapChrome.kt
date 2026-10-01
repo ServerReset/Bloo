@@ -384,7 +384,7 @@ internal fun MapTopBar(
                 // Extra right padding pushes the button further right (away from the edges).
                 GlassSurface(
                     shape = CircleShape,
-                    modifier = Modifier.align(Alignment.CenterEnd).size(40.dp).padding(end = 12.dp),
+                    modifier = Modifier.align(Alignment.CenterEnd).padding(end = 12.dp).size(40.dp),
                     hazeState = mapHazeState,
                     onClick = onRefreshLocation,
                     contentDescription = "Refresh location",
