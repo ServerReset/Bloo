@@ -80,13 +80,6 @@ class PhoneWatchSyncService : WearableListenerService() {
                     }
             }
         }
-        if (messageEvent.path == WatchSyncProtocol.PATH_REQUEST_APK) {
-            val url = lastWatchApkUrl
-            if (url != null) {
-                AppLog.log("WatchSync: watch requested the APK; pushing.")
-                pushWatchApk(applicationContext, url)
-            }
-        }
     }
 
     private suspend fun runCommand(request: WatchCommandRequest) {
@@ -114,10 +107,6 @@ class PhoneWatchSyncService : WearableListenerService() {
 
     companion object {
         private const val KEY_PAYLOAD = "payload"
-
-        /** The most recent watch APK URL the phone advertised, so a "push me the APK" request
-         *  from the watch can be served without a fresh update check. */
-        @Volatile private var lastWatchApkUrl: String? = null
 
         /**
          * Push the current snapshot + lock config to every paired watch, now. Called from the
@@ -162,8 +151,6 @@ class PhoneWatchSyncService : WearableListenerService() {
             watchUpdateApkUrl: String? = null,
             watchUpdateNotes: String? = null,
         ) {
-            // Remember the URL so a "push me the APK" request from the watch can be served.
-            lastWatchApkUrl = watchUpdateApkUrl
             val app = context.applicationContext
             val job = CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
                 val snapshot = SnapshotStore(app).current()

@@ -57,9 +57,6 @@ object WatchSyncProtocol {
      *  an asset; the watch writes it to a cache file and hands it to the system package
      *  installer, so the user never leaves the watch or opens a browser. */
     const val PATH_WATCH_APK = "/bloo/watch_apk"
-    /** Watch → phone: "please push me the watch APK". The phone then downloads it and pushes
-     *  [PATH_WATCH_APK]. A no-op if nothing is newer. */
-    const val PATH_REQUEST_APK = "/bloo/request_apk"
     /** Phone → watch: a command the watch wants run (see [WatchCommandRequest]). */
     const val PATH_COMMAND = "/bloo/command"
     /** Phone → watch: the result of a command the watch asked for, so the watch can clear its
