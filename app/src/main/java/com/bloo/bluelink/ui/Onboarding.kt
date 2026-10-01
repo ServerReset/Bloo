@@ -8,6 +8,7 @@
 package com.bloo.bluelink.ui
 
 import android.os.Build
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
