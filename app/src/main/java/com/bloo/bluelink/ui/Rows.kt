@@ -15,8 +15,12 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.selection.toggleable
@@ -36,11 +40,14 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.onClick
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -235,7 +242,6 @@ internal fun CropScreen(vin: String, uriString: String, onCancel: () -> Unit, on
         }
     }
 }
-
 // --- Settings -------------------------------------------------------------
 // (The settings screen is owned by SettingsScreen.kt's family: SettingsScreen,
 // SettingsCards, SettingsIndex, SettingsSearch, SettingsWidgets.)
@@ -324,7 +330,6 @@ internal fun StatusRow(label: String, value: String, valueMono: Boolean = false)
     }
 }
 
-
 /** A small bold group heading used inside the Car-info pebble. */
 @Composable
 internal fun SectionLabel(text: String) {
@@ -334,7 +339,6 @@ internal fun SectionLabel(text: String) {
         color = LocalContentColor.current.copy(alpha = 0.85f),
     )
 }
-
 
 @Composable
 internal fun StepRow(label: String, value: String, valueColor: Color = Color.Unspecified) {
@@ -358,7 +362,6 @@ internal fun StepRow(label: String, value: String, valueColor: Color = Color.Uns
         ) { v -> Text(v, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Medium, color = valueColor, maxLines = 1) }
     }
 }
-
 
 /**
  * The app's one toggle control for boolean settings. Ground-up redesign away
@@ -403,7 +406,6 @@ fun ToggleRow(
     }
 }
 
-
 /**
  * The caption style shared by [ToggleRow]'s own `description` and by the settings rows that
  * need one without a switch attached. Bottom padding, not top: it belongs to the control it
@@ -427,7 +429,6 @@ internal fun SettingsCaption(
         color = MaterialTheme.colorScheme.onSurfaceVariant,
     )
 }
-
 
 /**
  * A bare toggle, with no row and no label around it -- what a card puts on its own title row
@@ -457,14 +458,12 @@ private fun Modifier.hapticToggleable(checked: Boolean, onChange: (Boolean) -> U
     }
 }
 
-
 @Composable
 internal fun InlineToggle(checked: Boolean, onChange: (Boolean) -> Unit) {
     Box(Modifier.hapticToggleable(checked, onChange)) {
         MorphToggleTrack(checked)
     }
 }
-
 
 @Composable
 private fun ToggleRowControl(label: String, checked: Boolean, onChange: (Boolean) -> Unit) {
@@ -496,3 +495,86 @@ private fun ToggleRowControl(label: String, checked: Boolean, onChange: (Boolean
         MorphToggleTrack(checked)
     }
 }
+
+/**
+ * A pill track + circular thumb, spring-timed like [MorphButton] instead of
+ * the stock Material [Switch]. Purely visual -- [ToggleRow]'s own toggleable()
+ * modifier owns the real click target and semantics, so this clears its own.
+ */
+@Composable
+internal fun MorphToggleTrack(checked: Boolean) {
+    val trackColor by androidx.compose.animation.animateColorAsState(
+        if (checked) MaterialTheme.colorScheme.primary else buttonContainer(),
+        animationSpec = lowPowerAwareSpring(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = Spring.StiffnessMediumLow),
+        label = "toggleTrackBg",
+    )
+    val thumbColor by androidx.compose.animation.animateColorAsState(
+        if (checked) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
+        animationSpec = lowPowerAwareSpring(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = Spring.StiffnessMediumLow),
+        label = "toggleThumbFg",
+    )
+    val trackWidth = 44.dp
+    val trackHeight = 26.dp
+    val inset = 3.dp
+    val thumbSize by animateDpAsState(
+        if (checked) 20.dp else 16.dp,
+        animationSpec = lowPowerAwareSpring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessMediumLow),
+        label = "toggleThumbSize",
+    )
+    val thumbOffset by animateDpAsState(
+        if (checked) trackWidth - thumbSize - inset else inset,
+        animationSpec = lowPowerAwareSpring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessMediumLow),
+        label = "toggleThumbOffset",
+    )
+    Box(
+        Modifier
+            .size(trackWidth, trackHeight)
+            .clip(RoundedCornerShape(50))
+            .background(trackColor)
+            .border(BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.18f)), RoundedCornerShape(50))
+            .clearAndSetSemantics {},
+        contentAlignment = Alignment.CenterStart,
+    ) {
+        Box(
+            Modifier
+                .padding(start = thumbOffset)
+                .size(thumbSize)
+                .clip(CircleShape)
+                .background(thumbColor),
+        )
+    }
+}
+
+/** One seat's heat + cool capability toggles, shown as two compact filter chips. */
+@Composable
+internal fun SeatConfigRow(
+    label: String,
+    heat: Boolean,
+    cool: Boolean,
+    onHeat: (Boolean) -> Unit,
+    onCool: (Boolean) -> Unit,
+) {
+    Row(
+        Modifier.fillMaxWidth().padding(vertical = 2.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            label,
+            Modifier.weight(1f),
+            style = MaterialTheme.typography.bodyMedium,
+            // The two chips are fixed-width; cap the label so a long seat name at a
+            // large font size wraps at spaces rather than being crushed mid-word.
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+        )
+        Spacer(Modifier.width(8.dp))
+        // A group, so pressing Heat takes width from Cool rather than shoving it -- the pair is
+        // exactly the "several buttons in one space" case, and it was a plain Row.
+        ExpressiveButtonRow(spacing = 8.dp) {
+            MorphChip(selected = heat, onClick = { onHeat(!heat) }, label = "Heat")
+            MorphChip(selected = cool, onClick = { onCool(!cool) }, label = "Cool")
+        }
+    }
+}
+
+

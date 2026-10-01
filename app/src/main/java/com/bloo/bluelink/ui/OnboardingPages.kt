@@ -13,6 +13,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.compose.ui.platform.LocalContext
 import com.bloo.bluelink.data.SettingsStore
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -20,11 +21,14 @@ import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.Build
+import androidx.compose.material.icons.filled.DragHandle
 import androidx.compose.material.icons.filled.CloudSync
 import androidx.compose.material.icons.filled.Cloud
 import androidx.compose.material.icons.filled.CheckCircle
@@ -32,6 +36,8 @@ import androidx.compose.material.icons.filled.Fingerprint
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Thermostat
 import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.ui.semantics.onClick
@@ -49,6 +55,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
@@ -86,7 +93,6 @@ internal fun OnboardingWelcomePage() {
         ),
     )
 }
-
 
 /**
  * Step 2: get the app set up to actually work. Two things are REQUIRED before Next unlocks,
@@ -211,7 +217,6 @@ internal fun OnboardingSetupPage(
     }
 }
 
-
 /** One card in the onboarding Setup step: icon + title + body on a solid
  *  surface -- not directly on the animated Aurora background, which made
  *  plain text here hard to read against a busy, colourful, moving backdrop
@@ -252,7 +257,6 @@ internal fun OnboardingRestorePage(vm: AppViewModel) {
     BodySmallText("New here? Swipe on to set up fresh.", color = MaterialTheme.colorScheme.onSurfaceVariant)
 }
 
-
 /** How the app looks and reads: theme and units, the two choices everyone has an opinion on. */
 @Composable
 internal fun OnboardingLookPage(appearance: SettingsStore.Appearance, vm: AppViewModel) {
@@ -277,7 +281,6 @@ internal fun OnboardingLookPage(appearance: SettingsStore.Appearance, vm: AppVie
     )
     BodySmallText("Both live in Settings whenever you want to change them.", color = MaterialTheme.colorScheme.onSurfaceVariant)
 }
-
 
 /**
  * The create-a-PIN mini form used by onboarding (and, in a slimmer re-use,
@@ -352,7 +355,6 @@ internal fun OnboardingPinForm(
     }
 }
 
-
 @Composable
 internal fun OnboardingSetupCard(
     icon: ImageVector,
@@ -389,7 +391,6 @@ internal fun OnboardingSetupCard(
     }
 }
 
-
 /** A small filled pill: the "On" / "Required" tag on a setup card. */
 @Composable
 private fun StatusChip(label: String, container: Color, content: Color) {
@@ -403,7 +404,6 @@ private fun StatusChip(label: String, container: Color, content: Color) {
         )
     }
 }
-
 
 /**
  * A single "tip" row: a primary-tinted icon beside a bold title and a muted one-line body, with a
@@ -431,7 +431,6 @@ internal fun OnboardingTipCard(icon: ImageVector, title: String, body: String) {
         )
     }
 }
-
 
 /** One card per car: powertrain, head-unit generation, seats and steering-wheel heat, wired straight to the view model. */
 @Composable
@@ -494,4 +493,67 @@ internal fun OnboardingCarPage(
         // stops using.
         ToggleRow("Heated steering wheel", sc.steeringWheel) { vm.setSeatFlag(vehicle, "sw", it) }
     }
+}
+
+/**
+ * The shared shape all three intro/closing pages ([OnboardingIntroPage],
+ * [OnboardingCrashCoursePage], [OnboardingFeaturesPage]) turned out to want: an emoji, a big
+ * title, a supporting line, then a list of tip cards. Extracted after finding it hand-written
+ * three times over -- the pages differ only in their copy, [titleStyle] (the intro page's
+ * welcome is a size up from the other two), and their tip list, never in shape, so a future
+ * fourth page (or a copy edit to any existing one) has exactly one place to change.
+ *
+ * Deliberately no per-item entrance animation on the tip list, matching what
+ * [OnboardingIntroPage] itself already settled on: [AnimatedContent]'s own slide/fade in
+ * [OnboardingScreen] already animates the whole page in, and this exact page family already
+ * tried layering a second per-card entrance on top of that once (see intro's own history) and
+ * found it fought with the page slide, reading as jittery rather than smooth. The two closing
+ * pages get the same plain, instant stack intro already uses -- not a separate animation
+ * choice per page that happens to agree today.
+ */
+@Composable
+internal fun OnboardingTipListPage(tips: List<Triple<ImageVector, String, String>>) {
+    tips.forEach { (icon, cardTitle, body) ->
+        OnboardingTipCard(icon, cardTitle, body)
+    }
+}
+
+/** Second-to-last step: a quick tip list covering the app's core gestures. Followed by
+ *  [OnboardingFeaturesPage], the actual final step. */
+@Composable
+internal fun OnboardingTipsPage() {
+    OnboardingTipListPage(
+        tips = listOf(
+            Triple(Icons.Filled.SwapHoriz, "Swipe between cars", "Swipe left or right on any pebble's top row, or anywhere on the hero card, to change cars, even when a pebble is open"),
+            Triple(Icons.Filled.DragHandle, "Tap to expand, hold to reorder", "Tap any pebble for details, or hold and drag to rearrange them"),
+            Triple(Icons.Filled.Refresh, "Hold to refresh", "Press and hold the refresh control to pull the latest status from your car"),
+            Triple(AppIcons.Settings, "Tune it anytime", "Powertrain, seats, and lock settings all live in Settings if things change"),
+        ),
+    )
+}
+
+/**
+ * The actual final step -- the one screen shown right before "Enter Bloo" hands off to the
+ * garage, so it is the one place every new user is guaranteed to see these highlighted at
+ * least once, unlike a feature that only shows itself to someone who happens to open
+ * Settings. Distinct from [OnboardingCrashCoursePage] just before it: that page is about
+ * *how to use the screen you're about to land on* (gestures); this one is about
+ * *things the app can do that aren't obvious from looking at it* (AutoLock, live charging,
+ * natural-language search). On-device AI is the one entry gated on
+ * [UiState.aiSupported] -- the others work on every device, but advertising a feature this
+ * phone's own hardware can't run would be a promise the app can't keep.
+ */
+@Composable
+internal fun OnboardingFeaturesPage(state: UiState) {
+    val tips = buildList<Triple<ImageVector, String, String>> {
+        add(Triple(AppIcons.Lock, "AutoLock", "Locks your car when you walk away -- enable it per car in Settings"))
+        add(Triple(AppIcons.Bolt, "Live charging updates", "Watch an EV's charge progress from your lock screen while plugged in"))
+        add(Triple(AppIcons.Search, "Just ask", "Search \"lock my car\" or \"start climate at 70\" to run it from the bar"))
+        if (state.aiSupported) {
+            add(Triple(AppIcons.AutoAwesome, "On-device AI summaries", "Plain-language status summaries, generated on your phone"))
+        }
+    }
+    OnboardingTipListPage(
+        tips = tips,
+    )
 }
