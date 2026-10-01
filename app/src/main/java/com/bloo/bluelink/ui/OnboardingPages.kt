@@ -405,16 +405,9 @@ private fun StatusChip(label: String, container: Color, content: Color) {
     }
 }
 
-/** One step per car: powertrain, seats, and steering-wheel heat together on a
- *  single dedicated screen -- reuses the exact same persisted-flag wiring as
- *  [CarFeatureWizard]'s per-feature pages, just consolidated into one page
- *  per vehicle instead of three. */
 /**
- * A single tinted "tip" card: a rounded [surfaceContainerHigh] surface holding a
- * primary-tinted icon beside a bold title and a muted one-line body. The onboarding
- * intro and crash-course pages each render a list of these; the card chrome was
- * copied verbatim between them, so it lives here and each page just maps its own
- * `Triple(icon, title, body)` list onto it.
+ * A single "tip" row: a primary-tinted icon beside a bold title and a muted one-line body, with a
+ * hairline edge on the glass card. The welcome, tips and features cards each render a list of these.
  */
 @Composable
 internal fun OnboardingTipCard(icon: ImageVector, title: String, body: String) {
@@ -439,6 +432,7 @@ internal fun OnboardingTipCard(icon: ImageVector, title: String, body: String) {
     }
 }
 
+/** One card per car: powertrain, head-unit generation, seats and steering-wheel heat, wired straight to the view model. */
 @Composable
 internal fun OnboardingCarPage(
     vehicle: com.bloo.bluelink.data.Vehicle?,

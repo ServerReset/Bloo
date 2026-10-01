@@ -360,10 +360,6 @@ internal val LocalBackdropHaze = androidx.compose.runtime.staticCompositionLocal
  *  enough that the backdrop shows through as frosted glass. */
 private const val GlassCardTintAlpha = 0.42f
 
-/** Whether cards can be real glass right now: a backdrop to blur, and a device/battery state that allows it. */
-@Composable
-internal fun glassCardsActive(): Boolean = LocalBackdropHaze.current != null && canBlurBackdrops()
-
 /**
  * The standard card fill: the card's bounding box is glass -- the backdrop blurred behind a veil of
  * [tint] -- while whatever sits inside the card keeps its own, opaque panels. Every card in the app
