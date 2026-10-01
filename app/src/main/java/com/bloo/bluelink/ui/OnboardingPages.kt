@@ -93,7 +93,7 @@ import com.bloo.bluelink.data.syncUri
  * closing pages -- this page is where that rule was originally learned the hard way.
  */
 @Composable
-internal fun OnboardingIntroPage() {
+internal fun OnboardingWelcomePage() {
     OnboardingTipListPage(
         tips = listOf(
             Triple(AppIcons.Bolt, "Live status", "Battery, fuel, and lock state at a glance"),
@@ -265,6 +265,64 @@ internal fun OnboardingSetupPage(
  *  handled" cue, matching the checkmark treatment MorphButton itself already
  *  uses for its own active state. */
 /**
+ * First-run only: bring this device's setup in from another one. Picking a sync file joins it and
+ * re-resolves where this device lands (straight to the app if the file already covered everything).
+ * Anyone starting fresh just swipes on.
+ */
+@Composable
+internal fun OnboardingRestorePage(vm: AppViewModel) {
+    val context = LocalContext.current
+    var restoring by remember { mutableStateOf(false) }
+    val restoreLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri != null) {
+            restoring = true
+            vm.restoreFromSyncThenContinue(context, uri)
+        }
+    }
+    OnboardingSetupCard(
+        icon = Icons.Filled.CloudSync,
+        title = "Restore from sync",
+        body = "Already use Bloo elsewhere? Pick the sync file that device uses and its theme, layout, alerts, presets and car setup come with it.",
+        done = false,
+    ) {
+        MorphActionButton(
+            label = "Choose sync file",
+            icon = Icons.Filled.Cloud,
+            onClick = { restoreLauncher.launch(arrayOf("application/json")) },
+            modifier = Modifier.fillMaxWidth(),
+            enabled = !restoring,
+            pending = restoring,
+        )
+    }
+    BodySmallText("New here? Swipe on to set up fresh.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+}
+
+/** How the app looks and reads: theme and units, the two choices everyone has an opinion on. */
+@Composable
+internal fun OnboardingLookPage(appearance: SettingsStore.Appearance, vm: AppViewModel) {
+    SettingsSegmentedRow(
+        label = "Appearance",
+        options = listOf(
+            SegmentOption(ThemeMode.SYSTEM.name, "System", null),
+            SegmentOption(ThemeMode.LIGHT.name, "Light", null),
+            SegmentOption(ThemeMode.DARK.name, "Dark", null),
+        ),
+        selectedKey = appearance.themeMode.name,
+        onSelect = { vm.setThemeMode(ThemeMode.valueOf(it)) },
+    )
+    SettingsSegmentedRow(
+        label = "Units",
+        options = listOf(
+            SegmentOption("imperial", "Imperial", null),
+            SegmentOption("metric", "Metric", null),
+        ),
+        selectedKey = appearance.unitSystem,
+        onSelect = { vm.setUnitSystem(it) },
+    )
+    BodySmallText("Both live in Settings whenever you want to change them.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+}
+
+/**
  * The create-a-PIN mini form used by onboarding (and, in a slimmer re-use,
  * the building block of the Settings set/change/remove dialogs): two
  * matching 4-8 digit fields, a haptic'd Save only once valid. [existing]
@@ -419,23 +477,6 @@ internal fun OnboardingTipCard(icon: ImageVector, title: String, body: String) {
     }
 }
 
-/**
- * The three-line header every setup-wizard page opens with: a primary-coloured
- * eyebrow, a large title, and a supporting paragraph. Emitted as bare siblings (NOT
- * wrapped in a Column) because the callers place them as direct children of a Column
- * with its own `Arrangement.spacedBy`, which spaces the header lines and the gap to
- * the page content below -- an inner Column would collapse that spacing. The title is
- * pinned to `onSurface` (== `onBackground` in every scheme this app produces), so all
- * four pages render pixel-identically to how they did when hand-rolled.
- */
-@Composable
-internal fun WizardPageHeader(eyebrow: String, title: String, body: String) {
-    val scheme = MaterialTheme.colorScheme
-    Text(eyebrow, style = MaterialTheme.typography.labelLarge, color = scheme.primary, fontWeight = FontWeight.Bold)
-    Text(title, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Black, color = scheme.onSurface)
-    BodyMediumText(body, color = scheme.onSurfaceVariant)
-}
-
 @Composable
 internal fun OnboardingCarPage(
     vehicle: com.bloo.bluelink.data.Vehicle?,
@@ -526,7 +567,7 @@ internal fun OnboardingTipListPage(tips: List<Triple<ImageVector, String, String
 /** Second-to-last step: a quick tip list covering the app's core gestures. Followed by
  *  [OnboardingFeaturesPage], the actual final step. */
 @Composable
-internal fun OnboardingCrashCoursePage() {
+internal fun OnboardingTipsPage() {
     OnboardingTipListPage(
         tips = listOf(
             Triple(Icons.Filled.SwapHoriz, "Swipe between cars", "Swipe left or right on any pebble's top row, or anywhere on the hero card, to change cars, even when a pebble is open"),

@@ -51,19 +51,9 @@ sealed interface Screen {
      *  (Screens.kt) for why nothing else belongs here. */
     data object Loading : Screen
     data object Login : Screen
-    /**
-     * Shown once, right after a first-time sign-in resolves at least one
-     * vehicle -- BEFORE [Onboarding] -- asking whether to pull an existing
-     * Drive-synced setup or start fresh. Exists so a second phone (or a
-     * reinstall) never has to sit through the whole welcome wizard just to
-     * find the "Sync across devices" card buried in its SETUP step; see
-     * [AppViewModel.restoreFromSyncThenContinue]/[AppViewModel.declineSyncRestore]
-     * for where this leads next.
-     */
-    data object SyncChoice : Screen
-    /** First-run welcome wizard that sets up car features before reaching the app. */
+    /** First-run deck of welcome cards: restore, setup, look and feel, and a card per car. */
     data object Onboarding : Screen
-    /** Feature-setup wizard for one or more newly-detected cars (post-first-run). */
+    /** The same deck, with just a card per newly detected car (post-first-run). */
     data class CarSetup(val vins: List<String>) : Screen
     /** Main screen: the car carousel/grid. Also where a zero-vehicle account
      *  lands now -- GarageScreen folds a "no connection"/"not signed in"/"no

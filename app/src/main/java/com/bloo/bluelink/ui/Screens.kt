@@ -354,15 +354,10 @@ fun BlooApp(vm: AppViewModel) {
                     kiaOtp?.let { otp -> KiaOtpDialog(otp, loading = loading, vm = vm) }
                     canadaOtp?.let { otp -> CanadaOtpDialog(otp, loading = loading, vm = vm) }
                 }
-                // Shown once, right after sign-in resolves at least one vehicle for
-                // a first-run device -- before Onboarding -- so a second phone (or
-                // reinstall) never has to click through the whole welcome wizard
-                // just to find the "Sync across devices" card buried in its SETUP
-                // step. See Screen.SyncChoice's own doc for exactly what each choice
-                // leads to.
-                Screen.SyncChoice -> SyncChoiceScreen(vm)
+                // One deck of cards for every setup flow: first run (restore, setup, look, cars),
+                // and the cars detected later.
                 Screen.Onboarding -> OnboardingScreen(vm)
-                is Screen.CarSetup -> CarSetupWizardScreen(vm, screen.vins)
+                is Screen.CarSetup -> OnboardingScreen(vm, OnboardingMode.NewCars(screen.vins))
                 Screen.Garage -> {
                     com.bloo.bluelink.data.StartupTrace.once("screen-garage", "screen: Garage composed (first garage frame next)")
                     // Reuses the outer `appearance` (already collected once above
@@ -440,7 +435,7 @@ fun BlooApp(vm: AppViewModel) {
     
     // The welcome cards, when summoned from Settings: over the app, dismissed back to it.
     if (state.welcomeCardsOpen) {
-        Box(Modifier.fillMaxSize()) { OnboardingScreen(vm, replay = true) }
+        Box(Modifier.fillMaxSize()) { OnboardingScreen(vm, OnboardingMode.Replay) }
     }
     // Every open dialog, above everything else.
     DialogLayer(dialogHost)

@@ -1,0 +1,102 @@
+package com.bloo.bluelink.ui
+
+import com.bloo.bluelink.data.Brand
+import com.bloo.bluelink.data.Vehicle
+import com.bloo.bluelink.data.platformOverridable
+import kotlin.test.Test
+import kotlin.test.assertEquals
+
+/**
+ * Pins for [buildOnboardingSteps]: which cards each deck holds and in what order. The order is
+ * cheap to get wrong (add a card to the wrong branch and a user sees "tips, then setup") and
+ * cheap to test, because the builder is pure over [Vehicle] data.
+ */
+class OnboardingStepsTest {
+
+    private fun vehicle(
+        vin: String,
+        indicator: String,
+        generation: String = "5",
+    ) = Vehicle(
+        vin = vin, regId = "reg-$vin", name = "Car $vin",
+        model = "Model", generation = generation, brandIndicator = indicator,
+        isEv = false,
+    )
+
+    private val usHyundai = vehicle("V1", "H")
+    private val usGenesis = vehicle("V2", "G")
+    private val usKia = vehicle("V3", "K")
+    private val canHyundai = vehicle("V4", Brand.HYUNDAI_CA.code)
+    private val euHyundai = vehicle("V5", Brand.HYUNDAI_EU.code)
+
+    // --- platformOverridable itself (the rule the pages key off) -------------
+
+    @Test
+    fun platformOverridable_onlyTrueForUsHyundaiGenesis() {
+        assertEquals(true, usHyundai.platformOverridable)
+        assertEquals(true, usGenesis.platformOverridable)
+        assertEquals(false, usKia.platformOverridable)
+        assertEquals(false, canHyundai.platformOverridable)
+        assertEquals(false, euHyundai.platformOverridable)
+    }
+
+    private val usHyundai = vehicle("V1", "H")
+    private val usKia = vehicle("V3", "K")
+
+    private fun kinds(steps: List<OnboardingStep>) = steps.map { it.kind }
+
+    @Test
+    fun platformOverridable_onlyTrueForUsHyundaiGenesis() {
+        assertEquals(true, usHyundai.platformOverridable)
+        assertEquals(false, usKia.platformOverridable)
+        assertEquals(false, vehicle("V4", Brand.HYUNDAI_CA.code).platformOverridable)
+        assertEquals(false, vehicle("V5", Brand.HYUNDAI_EU.code).platformOverridable)
+    }
+
+    @Test
+    fun firstRun_walksWelcomeToFeatures_withACardPerCar() {
+        val steps = buildOnboardingSteps(OnboardingMode.FirstRun, listOf(usHyundai, usKia))
+        assertEquals(
+            listOf(
+                OnboardingStepKind.WELCOME, OnboardingStepKind.RESTORE, OnboardingStepKind.SETUP, OnboardingStepKind.LOOK,
+                OnboardingStepKind.CAR, OnboardingStepKind.CAR, OnboardingStepKind.TIPS, OnboardingStepKind.FEATURES,
+            ),
+            kinds(steps),
+        )
+        assertEquals(listOf(usHyundai.vin, usKia.vin), steps.filter { it.kind == OnboardingStepKind.CAR }.map { it.vin })
+    }
+
+    @Test
+    fun firstRun_skipsCarsARestoredBackupAlreadyConfigured() {
+        val steps = buildOnboardingSteps(OnboardingMode.FirstRun, listOf(usHyundai, usKia), preConfiguredVins = setOf(usHyundai.vin))
+        assertEquals(listOf(usKia.vin), steps.filter { it.kind == OnboardingStepKind.CAR }.map { it.vin })
+    }
+
+    @Test
+    fun firstRun_withNoCars_hasNoCarCards() {
+        assertEquals(
+            listOf(
+                OnboardingStepKind.WELCOME, OnboardingStepKind.RESTORE, OnboardingStepKind.SETUP,
+                OnboardingStepKind.LOOK, OnboardingStepKind.TIPS, OnboardingStepKind.FEATURES,
+            ),
+            kinds(buildOnboardingSteps(OnboardingMode.FirstRun, emptyList())),
+        )
+    }
+
+    @Test
+    fun newCars_isJustACardForEachNamedCar() {
+        val steps = buildOnboardingSteps(OnboardingMode.NewCars(listOf(usKia.vin)), listOf(usHyundai, usKia))
+        assertEquals(listOf(OnboardingStep(OnboardingStepKind.CAR, usKia.vin)), steps)
+    }
+
+    @Test
+    fun replay_dropsRestoreAndCars() {
+        assertEquals(
+            listOf(
+                OnboardingStepKind.WELCOME, OnboardingStepKind.SETUP, OnboardingStepKind.LOOK,
+                OnboardingStepKind.TIPS, OnboardingStepKind.FEATURES,
+            ),
+            kinds(buildOnboardingSteps(OnboardingMode.Replay, listOf(usHyundai, usKia))),
+        )
+    }
+}

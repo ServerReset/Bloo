@@ -11,15 +11,8 @@ import com.bloo.bluelink.data.snapshot
 
 // --- Onboarding completion and sync-restore choice (extracted from AppViewModel) --
 
-/** [Screen.SyncChoice] -- user picked "Set up fresh" instead of restoring.
- *  Proceeds into the normal welcome wizard exactly as if this device had
- *  no sync option to offer at all. */
-fun AppViewModel.declineSyncRestore() {
-    _state.update { it.copy(screen = Screen.Onboarding) }
-}
-
 /**
- * [Screen.SyncChoice] -- user picked "Restore from sync". Joins the picked
+ * The onboarding deck's restore card. Joins the picked
  * file exactly like Settings' own "Backup & sync" card
  * ([importSettingsAndSync]) does, then re-resolves which screen this
  * device lands on from the freshly-imported config, instead of leaving it

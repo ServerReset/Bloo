@@ -92,7 +92,7 @@ private fun AppViewModel.isDeviceOnline(): Boolean {
  *
  * Only fires on the cold-start path (screen still Loading) and only when the resolved
  * screen is Garage, so a first run or a car still needing its powertrain/seats set up
- * keeps going through SyncChoice/CarSetup exactly as before.
+ * keeps going through Onboarding/CarSetup exactly as before.
  */
 private suspend fun AppViewModel.publishCachedGarage() {
     if (_state.value.screen != Screen.Loading) return
@@ -379,17 +379,15 @@ private suspend fun AppViewModel.loadGarageInner() {
  * then [Screen.CarSetup] for any vehicle that first-run screen doesn't cover (a car
  * added since, or one a partial restore didn't configure), else straight to the garage.
  *
- * Shared by [loadGarageInner] (a fresh vehicle fetch, where "first run" means
- * [Screen.SyncChoice] -- ask before assuming anything) and
- * [restoreFromSyncThenContinue] (an import that can flip onboarding_seen/isCarConfigured
- * without any new vehicle fetch at all -- there [firstRunScreen] is [Screen.Onboarding],
- * so a restore that didn't actually resolve first-run status falls into the normal
- * wizard instead of looping back to the choice the user just answered).
+ * Shared by [loadGarageInner] (a fresh vehicle fetch) and [restoreFromSyncThenContinue]
+ * (an import that can flip onboarding_seen/isCarConfigured without any new vehicle fetch at
+ * all). First run is the onboarding deck either way: its restore card is where a second
+ * phone brings its setup in.
  */
 internal suspend fun AppViewModel.resolveScreen(
     vehicles: List<Vehicle>,
     prefs: androidx.datastore.preferences.core.Preferences,
-    firstRunScreen: Screen = Screen.SyncChoice,
+    firstRunScreen: Screen = Screen.Onboarding,
 ): Screen {
     val firstRun = !settingsStore.onboardingSeen(prefs)
     val unconfiguredVins = vehicles.filter { !settingsStore.isCarConfigured(it.vin, prefs) }.map { it.vin }

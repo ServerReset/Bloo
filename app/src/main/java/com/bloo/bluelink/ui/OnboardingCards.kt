@@ -10,6 +10,8 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.filled.CloudSync
+import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.DirectionsCar
 import androidx.compose.material.icons.filled.TouchApp
 import androidx.compose.material.icons.filled.Tune
@@ -27,20 +29,28 @@ import androidx.compose.ui.unit.dp
 internal data class OnboardingCardSpec(val icon: ImageVector, val title: String, val summary: String)
 
 internal fun onboardingCardSpec(kind: OnboardingStepKind, carName: String?): OnboardingCardSpec = when (kind) {
-    OnboardingStepKind.INTRO -> OnboardingCardSpec(
+    OnboardingStepKind.WELCOME -> OnboardingCardSpec(
         Icons.Filled.WavingHand, "Welcome to Bloo",
-        "Lock, climate, charge and more for your Hyundai, Genesis or Kia. Swipe to set it up.",
+        "Lock, climate, charge and more for your Hyundai, Genesis or Kia.",
+    )
+    OnboardingStepKind.RESTORE -> OnboardingCardSpec(
+        Icons.Filled.CloudSync, "Restore a setup",
+        "Bring in everything from another device, or skip it.",
     )
     OnboardingStepKind.SETUP -> OnboardingCardSpec(
         Icons.Filled.Tune, "Quick setup",
-        "Two quick things and you're in: let Bloo reach you, and lock the app.",
+        "Let Bloo reach you, and lock the app.",
+    )
+    OnboardingStepKind.LOOK -> OnboardingCardSpec(
+        Icons.Filled.Palette, "Look and feel",
+        "How Bloo looks and which units it speaks.",
     )
     OnboardingStepKind.CAR -> OnboardingCardSpec(
         Icons.Filled.DirectionsCar, carName ?: "Your car",
         "Set powertrain and features once so the right controls appear.",
     )
-    OnboardingStepKind.CRASH_COURSE -> OnboardingCardSpec(
-        Icons.Filled.TouchApp, "You're all set",
+    OnboardingStepKind.TIPS -> OnboardingCardSpec(
+        Icons.Filled.TouchApp, "Getting around",
         "A few things that make Bloo quick to use.",
     )
     OnboardingStepKind.FEATURES -> OnboardingCardSpec(
