@@ -430,9 +430,6 @@ internal fun SettingsScreen(
                 // to be enabled. OpenStreetMap's own tile usage policy in particular expects
                 // a visible attribution; this is that, even if it isn't literally overlaid
                 // on the map itself.
-                WelcomeCardsCardContent(vm)
-            }
-            item {
                 CreditsCardContent(vm)
             }
           // Same reason as the leading spacer above: this is the list's own

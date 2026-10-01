@@ -24,6 +24,7 @@ import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Straighten
+import androidx.compose.material.icons.filled.Style
 import androidx.compose.material.icons.filled.TextFields
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.BugReport
@@ -342,6 +343,13 @@ internal fun DisplayCardContent(appearance: SettingsStore.Appearance, advanced: 
                     ),
                     selectedKey = appearance.unitSystem,
                     onSelect = { vm.setUnitSystem(it) },
+                )
+                // The first-run cards, brought back to read again or show someone.
+                Spacer(Modifier.height(GapGroup))
+                MorphActionButton(
+                    label = "Show welcome cards",
+                    icon = Icons.Filled.Style,
+                    onClick = { vm.showWelcomeCards() },
                 )
             }
 }
