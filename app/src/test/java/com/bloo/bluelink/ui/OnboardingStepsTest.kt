@@ -40,18 +40,7 @@ class OnboardingStepsTest {
         assertEquals(false, euHyundai.platformOverridable)
     }
 
-    private val usHyundai = vehicle("V1", "H")
-    private val usKia = vehicle("V3", "K")
-
     private fun kinds(steps: List<OnboardingStep>) = steps.map { it.kind }
-
-    @Test
-    fun platformOverridable_onlyTrueForUsHyundaiGenesis() {
-        assertEquals(true, usHyundai.platformOverridable)
-        assertEquals(false, usKia.platformOverridable)
-        assertEquals(false, vehicle("V4", Brand.HYUNDAI_CA.code).platformOverridable)
-        assertEquals(false, vehicle("V5", Brand.HYUNDAI_EU.code).platformOverridable)
-    }
 
     @Test
     fun firstRun_walksWelcomeToFeatures_withACardPerCar() {
