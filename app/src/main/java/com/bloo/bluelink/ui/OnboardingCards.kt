@@ -28,6 +28,7 @@ import androidx.compose.ui.text.font.FontWeight
 import dev.chrisbanes.haze.HazeState
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.height
@@ -53,7 +54,7 @@ import androidx.compose.ui.unit.dp
 /** What a welcome card's header says: the same icon / title / summary a pebble carries. */
 internal data class OnboardingCardSpec(val icon: ImageVector, val title: String, val summary: String)
 
-internal fun onboardingCardSpec(kind: OnboardingStepKind, carName: String?): OnboardingCardSpec = when (kind) {
+internal fun onboardingCardSpec(kind: OnboardingStepKind, carName: String?, newCar: Boolean = false): OnboardingCardSpec = when (kind) {
     OnboardingStepKind.WELCOME -> OnboardingCardSpec(
         Icons.Filled.WavingHand, "Welcome to Bloo",
         "Lock, climate, charge and more for your Hyundai, Genesis or Kia.",
@@ -70,10 +71,17 @@ internal fun onboardingCardSpec(kind: OnboardingStepKind, carName: String?): Onb
         Icons.Filled.Palette, "Look and feel",
         "How Bloo looks and which units it speaks.",
     )
-    OnboardingStepKind.CAR -> OnboardingCardSpec(
-        Icons.Filled.DirectionsCar, carName ?: "Your car",
-        "Set powertrain and features once so the right controls appear.",
-    )
+    OnboardingStepKind.CAR -> if (newCar) {
+        OnboardingCardSpec(
+            Icons.Filled.DirectionsCar, "Meet ${carName ?: "your new car"}",
+            "A new car just joined your garage. Tell Bloo what it can do and it's ready to go.",
+        )
+    } else {
+        OnboardingCardSpec(
+            Icons.Filled.DirectionsCar, carName ?: "Your car",
+            "Set powertrain and features once so the right controls appear.",
+        )
+    }
     OnboardingStepKind.TIPS -> OnboardingCardSpec(
         Icons.Filled.TouchApp, "Getting around",
         "A few things that make Bloo quick to use.",
@@ -129,7 +137,7 @@ internal fun glassPanelBorder(): BorderStroke = BorderStroke(1.dp, MaterialTheme
  * card's accent colour, and springs up when its card becomes the current one.
  */
 @Composable
-internal fun OnboardingHero(icon: ImageVector, accent: Color, current: Boolean) {
+internal fun OnboardingHero(icon: ImageVector, accent: Color, current: Boolean, onTap: () -> Unit = {}) {
     val pulse = rememberInfiniteTransition(label = "heroPulse")
     val glow by pulse.animateFloat(0.55f, 1f, infiniteRepeatable(tween(2600, easing = LinearEasing), RepeatMode.Reverse), label = "glow")
     val bob by pulse.animateFloat(-4f, 4f, infiniteRepeatable(tween(3200, easing = LinearEasing), RepeatMode.Reverse), label = "bob")
@@ -138,10 +146,23 @@ internal fun OnboardingHero(icon: ImageVector, accent: Color, current: Boolean) 
         spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessLow),
         label = "heroPop",
     )
+    // Poke it and it squishes: a small reward for curiosity (see the deck for what five pokes do).
+    var squish by remember { androidx.compose.runtime.mutableStateOf(false) }
+    val squishScale by animateFloatAsState(
+        if (squish) 0.78f else 1f,
+        spring(dampingRatio = Spring.DampingRatioHighBouncy, stiffness = Spring.StiffnessMedium),
+        label = "heroSquish",
+        finishedListener = { squish = false },
+    )
     Box(
         Modifier
             .size(92.dp)
-            .graphicsLayer { translationY = bob; scaleX = pop; scaleY = pop }
+            .graphicsLayer { translationY = bob; scaleX = pop * squishScale; scaleY = pop * squishScale }
+            .clip(CircleShape)
+            .clickable(interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }, indication = null) {
+                squish = true
+                onTap()
+            }
             .drawBehind {
                 drawCircle(
                     Brush.radialGradient(listOf(accent.copy(alpha = 0.55f * glow), Color.Transparent), radius = size.minDimension * 0.95f),
@@ -176,6 +197,7 @@ internal fun OnboardingGlassCard(
     accent: Color,
     hazeState: HazeState,
     current: Boolean,
+    onHeroTap: () -> Unit = {},
     content: @Composable () -> Unit,
 ) {
     val scheme = MaterialTheme.colorScheme
@@ -187,7 +209,7 @@ internal fun OnboardingGlassCard(
         contentAlignment = Alignment.TopStart,
     ) {
         Column(Modifier.fillMaxWidth().padding(22.dp), verticalArrangement = Arrangement.spacedBy(GapGroup)) {
-            OnboardingHero(spec.icon, accent, current)
+            OnboardingHero(spec.icon, accent, current, onHeroTap)
             Column(verticalArrangement = Arrangement.spacedBy(GapHairline)) {
                 Text(
                     spec.title,

@@ -272,12 +272,49 @@ internal fun OnboardingScreen(vm: AppViewModel, mode: OnboardingMode = Onboardin
     // Back steps back through the cards and never out of a setup the user still has to finish.
     BackHandler { goBack() }
 
-    LaunchedEffect(isLast) {
-        if (isLast && firstRun) {
+    // --- Fun: a fireworks burst, a sound and a buzz for every little win -------------------
+    // [burst] is re-keyed to replay the overlay; [bigBurst] picks the fanfare over the small ding.
+    var burst by remember { mutableIntStateOf(0) }
+    fun celebrate(big: Boolean) {
+        burst++
+        if (big) {
             Fireworks.playSound(context)
             haptics?.fireworks()
+        } else {
+            OnboardingSounds.ding()
+            haptics?.heavy()
         }
     }
+    // The finish: the closing card of a first run (and of a new car's setup) goes off like New Year's.
+    LaunchedEffect(isLast) {
+        if (isLast && !replayMode(mode)) celebrate(big = true)
+    }
+    // Each card settling gets a tick and a blip, so swiping has a feel.
+    var lastSettled by remember { mutableIntStateOf(-1) }
+    LaunchedEffect(pagerState.settledPage) {
+        if (lastSettled >= 0 && pagerState.settledPage != lastSettled) {
+            haptics?.tick()
+            OnboardingSounds.blip()
+        }
+        lastSettled = pagerState.settledPage
+    }
+    // Every setup item that flips to done: notifications, the lock, Drive sync.
+    val setupDone = (if (notifGranted) 1 else 0) +
+        (if (appearance.biometricLock || state.appPinSet) 1 else 0) +
+        (if (state.syncUri != null) 1 else 0)
+    var lastSetupDone by remember { mutableIntStateOf(-1) }
+    LaunchedEffect(setupDone) {
+        if (lastSetupDone >= 0 && setupDone > lastSetupDone) celebrate(big = false)
+        lastSetupDone = setupDone
+    }
+    // Every car that gets its powertrain chosen.
+    var lastCarsDone by remember { mutableIntStateOf(-1) }
+    LaunchedEffect(state.powertrains.size) {
+        if (lastCarsDone >= 0 && state.powertrains.size > lastCarsDone) celebrate(big = false)
+        lastCarsDone = state.powertrains.size
+    }
+    // Poke the glyph five times and it's a party.
+    var pokes by remember { mutableIntStateOf(0) }
 
     Box(
         Modifier
@@ -309,7 +346,7 @@ internal fun OnboardingScreen(vm: AppViewModel, mode: OnboardingMode = Onboardin
                 },
             )
         }
-        if (isLast && firstRun) FireworksOverlay(Modifier.fillMaxSize())
+        if (burst > 0) androidx.compose.runtime.key(burst) { FireworksOverlay(Modifier.fillMaxSize()) }
 
         Column(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding()) {
             Spacer(Modifier.height(GapSection))
@@ -346,10 +383,16 @@ internal fun OnboardingScreen(vm: AppViewModel, mode: OnboardingMode = Onboardin
                 ) {
                     val vehicle = step.vin?.let { vin -> state.vehicles.firstOrNull { it.vin == vin } }
                     OnboardingGlassCard(
-                        spec = onboardingCardSpec(step.kind, vehicle?.name),
+                        spec = onboardingCardSpec(step.kind, vehicle?.name, newCar = mode is OnboardingMode.NewCars),
                         accent = onboardingAccent(step.kind),
                         hazeState = haze,
                         current = idx == pageIndex,
+                        onHeroTap = {
+                            haptics?.click()
+                            OnboardingSounds.blip()
+                            pokes++
+                            if (pokes % 5 == 0) celebrate(big = true)
+                        },
                     ) {
                         Column(verticalArrangement = Arrangement.spacedBy(GapGroup)) {
                             when (step.kind) {
@@ -404,6 +447,8 @@ internal fun OnboardingScreen(vm: AppViewModel, mode: OnboardingMode = Onboardin
         }
     }
 }
+
+private fun replayMode(mode: OnboardingMode) = mode == OnboardingMode.Replay
 
 /** Index of the SETUP card in a first-run deck (welcome, restore, setup). */
 private const val FIRST_RUN_SETUP_INDEX = 2
