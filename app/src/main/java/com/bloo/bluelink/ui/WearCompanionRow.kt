@@ -64,7 +64,7 @@ fun WearCompanionRow(
     Row(
         modifier
             .fillMaxWidth()
-            .padding(horizontal = 10.dp, vertical = GapRow),
+            .outlinedPanel(10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Icon(

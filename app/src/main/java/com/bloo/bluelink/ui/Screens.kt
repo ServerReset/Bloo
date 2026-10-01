@@ -58,6 +58,7 @@ import androidx.compose.ui.draw.blur
 import androidx.lifecycle.repeatOnLifecycle
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalClipboard
@@ -257,7 +258,25 @@ fun BlooApp(vm: AppViewModel) {
                         scheme.surfaceContainerLow,
                     ),
                 ),
-            ),
+            )
+            // Ambient colour under the glass: two soft glows of the theme's own colours, so cards
+            // have something to blur and refract even when the aurora is off.
+            .drawBehind {
+                drawRect(
+                    Brush.radialGradient(
+                        listOf(scheme.primary.copy(alpha = 0.22f), Color.Transparent),
+                        center = androidx.compose.ui.geometry.Offset(size.width * 0.15f, size.height * 0.2f),
+                        radius = size.width * 0.9f,
+                    ),
+                )
+                drawRect(
+                    Brush.radialGradient(
+                        listOf(scheme.tertiary.copy(alpha = 0.18f), Color.Transparent),
+                        center = androidx.compose.ui.geometry.Offset(size.width * 0.9f, size.height * 0.75f),
+                        radius = size.width * 0.9f,
+                    ),
+                )
+            },
     )
     Scaffold(
         containerColor = Color.Transparent,

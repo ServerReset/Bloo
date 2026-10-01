@@ -371,7 +371,18 @@ private const val GlassCardTintAlpha = 0.42f
 internal fun Modifier.glassCardFill(shape: Shape, tint: Color): Modifier {
     val haze = LocalBackdropHaze.current
     return if (haze != null && canBlurBackdrops()) {
-        this.clip(shape).appHazeEffect(haze).background(tint.copy(alpha = GlassCardTintAlpha))
+        this.clip(shape)
+            .appHazeEffect(haze)
+            .background(tint.copy(alpha = GlassCardTintAlpha))
+            // The sheen: light catching the pane from its top-left, fading across, so it reads as a
+            // sheet of glass rather than a flat tint.
+            .background(
+                androidx.compose.ui.graphics.Brush.linearGradient(
+                    0f to Color.White.copy(alpha = 0.13f),
+                    0.45f to Color.White.copy(alpha = 0.02f),
+                    1f to Color.White.copy(alpha = 0.06f),
+                ),
+            )
     } else {
         this.background(tint.copy(alpha = 0.9f), shape)
     }
