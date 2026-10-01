@@ -32,7 +32,7 @@ data class WorkflowRun(
      *  notes in the update tile. Null for a release with no body. */
     val releaseNotes: String? = null,
     /** The same release's WATCH APK asset URL, so a paired watch can be offered its update
-     *  from the phone (the watch has no network of its own). Null when the release carries no
+     *  from the phone. Null when the release carries no
      *  watch asset -- an older release, or a watch build that failed to upload. */
     val watchApkUrl: String? = null,
 )

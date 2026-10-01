@@ -21,7 +21,7 @@ import com.bloo.bluelink.data.WatchLockTiming
  * fields; verification reads the wall clock AND the monotonic clock exactly as the phone does.
  *
  * Stored in plain SharedPreferences: everything here is either public (the timing), a one-way
- * hash (the PIN record), or non-secret (lockout counters). No credential is stored.
+ * hash (the PIN record), or non-secret (lockout counters). No account credential is stored here (those live in the encrypted stores, see WearCredentialSync).
  */
 class WatchPinStore(private val context: Context) {
 

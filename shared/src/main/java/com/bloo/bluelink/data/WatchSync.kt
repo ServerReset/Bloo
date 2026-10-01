@@ -28,7 +28,7 @@ data class WatchSyncPayload(
     /** The newest watch build the phone knows about, and the direct APK URL for it. Null when
      *  the phone has not seen a newer watch build than the one the watch runs. The watch shows
      *  an "Update" affordance and opens that URL in the system browser / package installer;
-     *  the watch itself never checks for updates (no network). */
+     *  the watch also checks for updates itself (see WearUpdateChecker); this is the fast path. */
     val watchUpdateRunNumber: Int? = null,
     val watchUpdateApkUrl: String? = null,
     val watchUpdateNotes: String? = null,
@@ -80,8 +80,8 @@ object WatchSyncProtocol {
 }
 
 /**
- * A command request the watch sends to the phone to run. The watch never executes a car
- * command itself (no network, no session) -- it asks the phone, which runs the command through
+ * A command request the watch sends to the phone to run. Used when the watch has not been
+ * signed in itself (see WatchCredentialTransfer) -- it asks the phone, which runs the command through
  * its normal [CarCommandRunner] and pushes [WatchCommandResult] back.
  *
  * [requestId] is echoed in the result so a stale result cannot clear a newer request's pending
