@@ -358,11 +358,11 @@ internal fun Modifier.outlinedPanel(padding: Dp = 12.dp): Modifier =
         .border(1.dp, MaterialTheme.colorScheme.onSurface.copy(alpha = 0.14f), StandardShape)
         .padding(padding)
 
-/** A titled sub-group inside a settings card: a heading, then its controls, straight on the card. */
+/** A titled sub-group inside a settings card: a heading, then its controls, in an outlined box. */
 @Composable
 internal fun SettingsGroup(title: String, content: @Composable ColumnScope.() -> Unit) {
     Column(
-        Modifier.fillMaxWidth(),
+        Modifier.fillMaxWidth().outlinedPanel(),
         verticalArrangement = Arrangement.spacedBy(GapRow),
     ) {
         Text(

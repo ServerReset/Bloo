@@ -35,7 +35,6 @@ import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.selection.SelectionContainer
@@ -55,11 +54,9 @@ import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.ui.Alignment
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
@@ -180,14 +177,8 @@ internal fun CreditsCardContent(vm: AppViewModel) {
                                 ),
                             )
                         }
-                        credits.forEachIndexed { index, entry ->
-                            CreditRow(entry)
-                            if (index != credits.lastIndex) {
-                                HorizontalDivider(
-                                    modifier = Modifier.padding(vertical = GapRow),
-                                    color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f),
-                                )
-                            }
+                        Column(verticalArrangement = Arrangement.spacedBy(GapRow)) {
+                            credits.forEach { entry -> CreditRow(entry) }
                         }
                     }
                 }
@@ -212,7 +203,7 @@ private data class CreditEntry(
 private fun CreditRow(entry: CreditEntry) {
     val context = LocalContext.current
     Row(
-        Modifier.fillMaxWidth(),
+        Modifier.fillMaxWidth().outlinedPanel(),
         horizontalArrangement = Arrangement.spacedBy(14.dp),
     ) {
         IconBadge(
