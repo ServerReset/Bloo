@@ -48,7 +48,7 @@ import com.bloo.bluelink.data.snapshot
 // frame was trying to draw" cost that fix already called out elsewhere. Everything else here
 // is a pure, already-in-memory Preferences read (no real suspension), so hopping dispatchers
 // once for the whole function costs one context switch, not one per getter.
-suspend fun AppViewModel.perCarConfig(
+internal suspend fun AppViewModel.perCarConfig(
     vehicles: List<Vehicle>,
     prefs: androidx.datastore.preferences.core.Preferences,
 ): PerCarConfig = withContext(Dispatchers.Default) {
