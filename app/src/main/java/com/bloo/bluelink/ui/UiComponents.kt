@@ -154,26 +154,6 @@ internal fun TitleSmallText(
 }
 
 /**
- * Icon with a single color and size. Consolidates the most-repeated icon pattern.
- * Used for: status icons, nav icons, control icons throughout the app.
- */
-@Composable
-internal fun ThemedIcon(
-    imageVector: androidx.compose.ui.graphics.vector.ImageVector,
-    modifier: Modifier = Modifier,
-    contentDescription: String? = null,
-    tint: Color = MaterialTheme.colorScheme.onSurface,
-    size: Dp = 24.dp,
-) {
-    androidx.compose.material3.Icon(
-        imageVector,
-        contentDescription = contentDescription,
-        modifier = modifier.size(size),
-        tint = tint,
-    )
-}
-
-/**
  * The circular tinted container [IconBadge] draws itself into -- pulled out under its own,
  * non-overloaded name (rather than a second `IconBadge` overload) after that overload was the
  * trigger for a Kotlin "recursive type checking" compiler error at several call sites that fed

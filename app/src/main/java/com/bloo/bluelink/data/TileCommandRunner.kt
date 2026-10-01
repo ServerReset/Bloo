@@ -396,29 +396,6 @@ object TileCommandRunner {
         return "Starting climate"
     }
 
-    /**
-     * Short "doing it" toast text for a tap, based on the last-known state.
-     * This is purely a UI-feedback label shown immediately on tap (before
-     * [run]'s network call even starts), computed from the same "toggle against
-     * last-known snapshot" logic [run] itself uses -- so the toast text and the
-     * command actually dispatched agree on which direction ("locking" vs.
-     * "unlocking", etc.) is about to happen. `snap` may be null (e.g. no
-     * snapshot yet cached), in which case every toggle defaults to its "starting"
-     * phrasing via Kotlin's `== true` short-circuiting to false for a null flag.
-     */
-    fun ackText(cmd: String, snap: VehicleSnapshot?): String = when (cmd) {
-        "doors" -> if (snap?.locked == true) "Unlocking…" else "Locking…"
-        "lock" -> "Locking…"
-        "unlock" -> "Unlocking…"
-        "climate" -> if (snap?.climateOn == true) "Stopping climate…" else "Starting climate…"
-        "climate_on" -> "Starting climate…"
-        "climate_off" -> "Stopping climate…"
-        "charge" -> if (snap?.charging == true) "Stopping charge…" else "Starting charge…"
-        "charge_on" -> "Starting charge…"
-        "charge_off" -> "Stopping charge…"
-        else -> "Sending…"
-    }
-
     /** The snapshot a tile command is expected to produce, for instant feedback.
      *  Delegates to [CarCommandRunner.optimistic] (mapping the tile's own
      *  "doors"/"lock"/"unlock"/"charge"/"charge_on"/"charge_off"/"climate"/
