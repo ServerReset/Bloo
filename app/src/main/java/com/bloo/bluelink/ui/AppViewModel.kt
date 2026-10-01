@@ -6,9 +6,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.bloo.bluelink.data.AppLog
 import com.bloo.bluelink.data.Brand
-import com.bloo.bluelink.data.CarAlerts
 import com.bloo.bluelink.data.CredentialStore
-import com.bloo.bluelink.data.Notifications
 import com.bloo.bluelink.data.PinLockout
 import com.bloo.bluelink.data.Credentials
 import com.bloo.bluelink.data.CanadaAuth
@@ -22,14 +20,12 @@ import com.bloo.bluelink.data.SessionStore
 import com.bloo.bluelink.data.SettingsStore
 import com.bloo.bluelink.data.SnapshotStore
 import com.bloo.bluelink.data.Vehicle
-import com.bloo.bluelink.data.VehicleStatus
 import com.bloo.bluelink.data.Weather
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
@@ -39,14 +35,9 @@ import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import com.bloo.bluelink.data.aiEnabled
-import com.bloo.bluelink.data.setDefaultClimatePreset
-import com.bloo.bluelink.data.setLastVehicleVin
-import com.bloo.bluelink.data.setSectionCollapsed
 import com.bloo.bluelink.data.setSettingsMode
-import com.bloo.bluelink.data.setVehicleOrder
 import com.bloo.bluelink.data.snapshot
 
 /**
@@ -95,7 +86,6 @@ internal const val DRIVE_SYNC_COLD_START_DELAY_MS = 3_000L
 
 @Stable
 class AppViewModel(app: Application) : AndroidViewModel(app) {
-
     // Set before any other property below, so every timing log this class writes measures
     // from the actual first instant this constructor started running -- the moment
     // MainActivity.onCreate's `by viewModels()` dereference (see its own comment) forces
@@ -123,11 +113,17 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     // anything a constructor does (opening SharedPreferences, resolving DataStore files,
     // building an ML Kit client) is on the critical path to the first frame.
     internal val store = com.bloo.bluelink.data.StartupTrace.trace("SessionStore()") { SessionStore(app) }
+
     internal val settingsStore = com.bloo.bluelink.data.StartupTrace.trace("SettingsStore()") { SettingsStore(app) }
+
     internal val credentialStore = com.bloo.bluelink.data.StartupTrace.trace("CredentialStore()") { CredentialStore(app) }
+
     internal val snapshotStore = com.bloo.bluelink.data.StartupTrace.trace("SnapshotStore()") { SnapshotStore(app) }
+
     internal val statusCache = com.bloo.bluelink.data.StartupTrace.trace("StatusCache()") { StatusCache(app) }
+
     internal val ai = com.bloo.bluelink.data.StartupTrace.trace("Ai()") { com.bloo.bluelink.data.Ai(app) }
+
     // One repository per signed-in brand (any mix of brands can be active).
     internal val repos = mutableMapOf<Brand, VehicleRepository>()
 
@@ -162,6 +158,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     internal var deferredStatusLoad = false
 
     internal val _state = MutableStateFlow(UiState())
+
     val state: StateFlow<UiState> = _state.asStateFlow()
 
     /**
@@ -194,6 +191,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
      * the index collect this instead, and only they recompose.
      */
     internal val _currentIndex = MutableStateFlow(0)
+
     val currentIndex: StateFlow<Int> = _currentIndex.asStateFlow()
 
     /**
@@ -205,6 +203,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
      * UpdateAvailableTile, so a chunk now invalidates just the progress bar and percent text.
      */
     internal val _updateDownloadProgress = MutableStateFlow<Float?>(null)
+
     val updateDownloadProgress: StateFlow<Float?> = _updateDownloadProgress.asStateFlow()
 
     /** The pending "Not now" undo-window timer (see dismissUpdate). */
@@ -246,20 +245,6 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             SharingStarted.Eagerly,
             SettingsStore.NotificationPrefs(),
         )
-
-    /**
-     * Evaluates this car's freshly-fetched [status] against the user's alert
-     * thresholds (door-open duration, engine-running duration, etc. — see
-     * [CarAlerts]), posts a system notification for every alert that fires, and
-     * additionally surfaces the FIRST one as an in-app snackbar message so it's
-     * visible even if the app is already in the foreground (where a system
-     * notification is easy to miss). Called after every successful status load.
-     */
-    internal suspend fun checkAlerts(v: Vehicle, status: VehicleStatus) {
-        val alerts = CarAlerts.evaluate(settingsStore, v, status)
-        alerts.forEach { Notifications.post(getApplication(), it.id, it.title, it.text, it.actions, it.channelId, it.localOnly) }
-        alerts.firstOrNull()?.let { a -> _state.update { it.copy(message = a.text, messageType = "error") } }
-    }
 
     /** Write the current live status/location maps to disk (survives restart). */
     internal fun persistCache() {
@@ -415,108 +400,26 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     // typed into the login form travels straight through the OTP challenge.
     internal var canadaPending: Credentials? = null
 
-    // --- App PIN (device unlock PIN) -------------------------------------
-
-    // --- Garage / vehicles ----------------------------------------------
-
-    /**
-     * Switch the visible car (swipe). Updates the index, and lazily loads this
-     * car's status only if we don't already have it — so already-loaded cars are
-     * never re-fetched on a swipe, but a car that failed to load at startup gets
-     * another chance when you view it.
-     */
-    fun selectIndex(index: Int) {
-        val v = _state.value.vehicles.getOrNull(index) ?: return
-        // A no-op selection must not emit. UiState is threaded into every
-        // pebble and is unstable, so one emission recomposes every car page
-        // currently in composition -- and this is called from a snapshotFlow on
-        // the pager's settledPage, which re-fires whenever the pager re-settles
-        // on the car it was already showing (a wrap snap, an external select
-        // that matched, a settle that never left the page). Paying three full
-        // car-page rebuilds to set currentIndex to the value it already holds
-        // is the worst kind of hitch: invisible work at exactly the moment the
-        // user is watching the gesture finish.
-        if (_currentIndex.value == index) {
-            ensureStatus(v)
-            return
-        }
-        _currentIndex.value = index
-        viewModelScope.launch { settingsStore.setLastVehicleVin(v.vin) }
-        ensureStatus(v)
-    }
-
     /** Large-screen only: expand one car to full screen (also selects it, so
      *  the two indices never disagree about which car is "current"). */
     fun expand(index: Int) {
         _currentIndex.value = index
         _state.update { it.copy(expandedIndex = index) }
     }
+
     /** Back out of the expanded single-car view to the grid. */
     fun collapse() = _state.update { it.copy(expandedIndex = null) }
-
-    /** Persist a new car display order (drag-and-drop in Settings). */
-    fun reorderVehicles(order: List<Vehicle>) {
-        _state.update { s ->
-            // Keep the same CAR selected across a reorder, not the same
-            // position -- selectIndex/expand always update currentIndex
-            // together with vehicles, but this was the one place that moved
-            // vehicles without it, so dragging a car above the currently
-            // selected one silently swapped which car the detail view showed.
-            val selectedVin = s.vehicles.getOrNull(_currentIndex.value)?.vin
-            val newIndex = order.indexOfFirst { it.vin == selectedVin }
-            if (newIndex >= 0) _currentIndex.value = newIndex
-            s.copy(vehicles = order)
-        }
-        viewModelScope.launch {
-            settingsStore.setVehicleOrder(order.map { it.vin })
-            persistSnapshots(order)
-        }
-    }
 
     /**
      * How long a text field must be quiet before its change is published to the other
      * surfaces. Long enough to collapse a whole typed word, short enough that letting go
      * of the keyboard feels immediate.
      */
-    private val textFieldPublishDebounceMs = 400L
+    internal val textFieldPublishDebounceMs = 400L
 
     /** In-flight debounced publishes, keyed so two fields -- or the same field on two
      *  cars -- never cancel each other's pending work. */
-    private val pendingPublishes = mutableMapOf<String, Job>()
-
-    /**
-     * Publish after [textFieldPublishDebounceMs] of quiet on [key], superseding any
-     * publish still pending for that same key.
-     *
-     * This exists because three settings are edited through raw `onValueChange` text
-     * fields -- licence plate, last-service miles, service interval -- and each one used
-     * to run the full [persistSnapshots] fan-out on every single typed character. That
-     * is a full snapshot re-encode and disk commit, then a re-read and re-decode of the
-     * whole snapshot payload by every interested surface. Typing a seven-character plate
-     * did all of that seven times.
-     *
-     * What is NOT debounced, deliberately: the `_state` update (so the field the user is
-     * typing in stays responsive) and the SettingsStore write itself (so the value is
-     * durable the instant it's typed, and closing the app mid-word cannot lose it). Only
-     * the cross-surface publish waits, and only for as long as the user keeps typing.
-     *
-     * [persistSnapshots] reads `_state`, never the settings store, so a debounced publish
-     * always carries the latest typed value rather than whatever was current when it was
-     * scheduled.
-     *
-     * The map is only ever touched from the main dispatcher -- viewModelScope's default,
-     * and there is no suspension point between the read and the write below -- so a plain
-     * mutableMapOf is safe here. It is also never iterated, which is what made the other
-     * plain map in this class a ConcurrentModificationException waiting to happen.
-     */
-    internal fun publishDebounced(key: String) {
-        pendingPublishes[key]?.cancel()
-        pendingPublishes[key] = viewModelScope.launch {
-            delay(textFieldPublishDebounceMs)
-            persistSnapshots()
-            pendingPublishes.remove(key)
-        }
-    }
+    internal val pendingPublishes = mutableMapOf<String, Job>()
 
     internal suspend fun persistSnapshots(vehicles: List<Vehicle> = _state.value.vehicles) {
         snapshotStore.saveVehicles(vehicles.map { snapshotOf(it, _state.value.statuses[it.vin], _state.value) })
@@ -557,59 +460,10 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         .map { it.collapsedPebbles }
         .stateIn(viewModelScope, SharingStarted.Eagerly, emptySet())
 
-    /**
-     * Settings cards call this exact function too, via the placeholder
-     * [SettingsPseudoVehicle] (its `vin` is the only field [togglePebble] ever reads) --
-     * not a separate `toggleSettingsCard` that used to duplicate this whole body under
-     * [SETTINGS_CARD_VIN] by hand. Same state, same store, same persistence -- so a
-     * Settings card remembers whether it was open across launches exactly the way a
-     * car's pebble does, through the literal same code path rather than a lookalike.
-     */
-    fun togglePebble(v: Vehicle, section: String) {
-        val key = "${v.vin}:$section"
-        val collapsedNow = key !in _state.value.collapsedPebbles
-        _state.update {
-            it.copy(
-                collapsedPebbles = if (collapsedNow) it.collapsedPebbles + key else it.collapsedPebbles - key,
-            )
-        }
-        viewModelScope.launch { settingsStore.setSectionCollapsed(v.vin, section, collapsedNow) }
-    }
-
     // --- App self-update (GitHub Actions builds; Bloo isn't on the Play Store) ---
 
     /** The GitHub Actions build number this app was compiled from (0 = local build). */
     val currentBuildNumber: Int get() = com.bloo.bluelink.BuildConfig.BUILD_RUN_NUMBER
-
-    /** Fetch recent EV trips once per session (the Trips pebble calls this lazily). */
-    fun loadTrips(v: Vehicle) {
-        if (v.vin in _state.value.trips || _state.value.isPending(v.vin, "trips")) return
-        viewModelScope.launch {
-            _state.update { it.copy(pending = it.pending + "${v.vin}:trips") }
-            // Only cache the result on a successful fetch -- caching emptyList()
-            // on a transient failure looked identical to "genuinely no trips",
-            // and since the vin's presence in the map is what gates a re-fetch
-            // above, one bad network blip permanently stuck this car at "no
-            // trips" for the rest of the session with no way to retry.
-            // Serialize with every other repo call via the account-wide statusMutex:
-            // Blue Link rejects overlapping requests ("a previous request is pending"),
-            // and an unlocked trips() call could also race a concurrent 401 refresh
-            // using the same stale refresh token. Every other repo.* path takes this
-            // lock (loadStatus/runCommand/loadGarage/loadTrips); this
-            // was the lone gap. Only the network call is inside the lock — the filter
-            // and result handling stay outside, matching loadStatus's minimal scope.
-            val fetched = runCatching { statusMutex.withLock { repoFor(v).trips(v) } }
-                .onFailure { e -> AppLog.log("⚠ Trips for ${v.name}: ${e.message ?: "failed"}") }
-                .getOrNull()
-                ?.filter { (it.distance ?: 0.0) > 0 }
-            _state.update {
-                it.copy(
-                    trips = if (fetched != null) it.trips + (v.vin to fetched) else it.trips,
-                    pending = it.pending - "${v.vin}:trips",
-                )
-            }
-        }
-    }
 
     /** Per-VIN pending debounced climate save (see saveClimateDebounced). */
     internal val climateSaveJobs = mutableMapOf<String, kotlinx.coroutines.Job>()
@@ -619,24 +473,6 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     /** The in-flight [loadNearbyChargers] fetch, if any -- see its own doc for why a
      *  superseded one is cancelled outright rather than just having its result ignored. */
     internal var chargerJob: kotlinx.coroutines.Job? = null
-
-    // beginLiveDeviceLocation / locate moved to AppViewModelCommands.kt.
-
-    // lock / unlock / flashLights / hornAndLights / stopClimate / startClimate /
-    // toggleClimate / startCharge / stopCharge / setChargeLimits / runCommand /
-    // recordRemoteAction moved to AppViewModelCommands.kt.
-
-    // --- Settings / nav --------------------------------------------------
-
-    /** Kept in sync by the garage pager's and the compact cover pager's own
-     *  settle effects -- see
-     *  [UiState.onSettingsPageSlot]'s own doc. Guarded the same way, so
-     *  settling on the same kind of page repeatedly (two cars in a row, or
-     *  two settles on the Settings slot) doesn't emit a redundant UiState
-     *  update every time. */
-    fun setOnSettingsPageSlot(value: Boolean) {
-        if (_state.value.onSettingsPageSlot != value) _state.update { it.copy(onSettingsPageSlot = value) }
-    }
 
     // toggleChargersVisible / loadNearbyChargers / setChargerApiKey / setChargerMinKw /
     // toggleChargerNetwork moved to AppViewModelChargers.kt (extension functions).
@@ -659,7 +495,9 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     internal val weather = WeatherController(getApplication(), settingsStore, _state, viewModelScope)
 
     fun clearWeatherLocation() = weather.clearWeatherLocation()
+
     fun loadHomeWeather(force: Boolean = false) = weather.loadHomeWeather(force)
+
     fun loadCarWeather(v: Vehicle, force: Boolean = false) = weather.loadCarWeather(v, force)
 
     // setColumnsFlipped / setUiScaleSoon / setVibrancySoon / setHapticsEnabled /
@@ -670,6 +508,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     /** Wipe the in-memory activity log shown in Settings (not persisted, so
      *  nothing to clear on disk). */
     fun clearLogs() = AppLog.clear()
+
     /** Dismiss the current snackbar. Also resets [UiState.messageType] back to
      *  the "error" default so a prior success/info message can't leave the type
      *  sticky -- the next raw `message = ...` set (e.g. a command/status/login
@@ -692,54 +531,5 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     fun setSettingsMode(mode: String) {
         _state.update { it.copy(settingsMode = mode) }
         viewModelScope.launch { settingsStore.setSettingsMode(mode) }
-    }
-
-    /** Set (or clear, with null) which saved preset the one-tap climate Start
-     *  button runs for this car -- read back out in [bootstrapDriveSync]'s
-     *  restore step into [UiState.defaultClimatePresets]. */
-    fun setDefaultClimatePreset(vin: String, id: String?) = viewModelScope.launch {
-        settingsStore.setDefaultClimatePreset(vin, id)
-        // The STATE write, which was missing. UiState.defaultClimatePresets is populated
-        // exactly once per process, inside bootstrapDriveSync -- which is guarded by an
-        // AtomicBoolean and so never runs again. So this wrote to disk and nothing on screen
-        // changed: the one-tap climate Start button kept using the OLD default for the rest of
-        // the session, and the setting only appeared to take effect after a restart.
-        _state.update {
-            it.copy(
-                defaultClimatePresets = if (id == null) {
-                    it.defaultClimatePresets - vin
-                } else {
-                    it.defaultClimatePresets + (vin to id)
-                },
-            )
-        }
-    }
-
-    // syncNow / setPrimaryDevice / pullFromPrimary / renameThisDevice / removeSyncedDevice /
-    // testSync / runDriveSyncNow moved to AppViewModelSync.kt.
-
-    /**
-     * Shared wrapper for the handful of operations that should show the
-     * app-wide loading spinner ([UiState.loading]) rather than a per-action
-     * one: sets loading=true and clears any stale message, runs [block] inside
-     * viewModelScope, and in a finally-block always clears loading=false
-     * regardless of success/failure -- so a thrown exception can never leave
-     * the spinner stuck on. Any exception [block] throws is caught here,
-     * logged, and turned into a snackbar message instead of crashing the
-     * ViewModel's coroutine scope.
-     */
-    internal fun launchBusy(block: suspend () -> Unit) {
-        viewModelScope.launch {
-            _state.update { it.copy(loading = true, message = null) }
-            try {
-                block()
-            } catch (e: Exception) {
-                val msg = e.message ?: "Something went wrong"
-                AppLog.log("⚠ $msg")
-                _state.update { it.copy(message = msg, messageType = "error") }
-            } finally {
-                _state.update { it.copy(loading = false) }
-            }
-        }
     }
 }
