@@ -63,24 +63,6 @@ internal fun SettingsGroup(title: String, content: @Composable ColumnScope.() ->
     }
 }
 
-/** A titled sub-group inside a settings card: a heading, then its controls, in an outlined box. */
-@Composable
-internal fun SettingsGroup(title: String, content: @Composable ColumnScope.() -> Unit) {
-    Column(
-        Modifier.fillMaxWidth().outlinedPanel(),
-        verticalArrangement = Arrangement.spacedBy(GapRow),
-    ) {
-        Text(
-            title,
-            style = MaterialTheme.typography.labelLarge,
-            fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.primary,
-            modifier = Modifier.semantics { heading() },
-        )
-        content()
-    }
-}
-
 /**
  * A digits-only "minutes" field for the notification-delay settings, clamped to 1..120.
  * It owns the edit buffer: [initial] seeds it and re-seeds whenever the persisted value
