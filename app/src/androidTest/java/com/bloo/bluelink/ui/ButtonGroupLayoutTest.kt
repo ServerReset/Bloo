@@ -58,8 +58,16 @@ class ButtonGroupLayoutTest {
         lines.forEach { line ->
             val right = line.maxOf { it.right.value }
             val left = line.minOf { it.left.value }
-            assertEquals("a line fills the row's full width; buttons were $layout", rowWidth.value, right - left, 2f)
+            if (line.size > 1) {
+                assertEquals("a shared line fills the row's full width; buttons were $layout", rowWidth.value, right - left, 2f)
+            } else {
+                // A button alone on its line rests at its own width on the start edge.
+                assertTrue("a lone button keeps its natural width; buttons were $layout", right - left < rowWidth.value - 40f)
+                assertEquals("and starts at the start edge; buttons were $layout", 0f, left, 1.5f)
+            }
         }
+        // Balanced: no more lines than the width needs (two buttons to a line here, so three lines).
+        assertEquals("five buttons of this width balance into three lines; buttons were $layout", 3, lines.size)
     }
 
     @Test

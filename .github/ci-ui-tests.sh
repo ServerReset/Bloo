@@ -5,8 +5,8 @@ set +e
 adb logcat -c
 ./gradlew :app:connectedDebugAndroidTest --stacktrace
 status=$?
-echo "=== logcat: crashes ==="
-adb logcat -d -v time AndroidRuntime:E ActivityManager:W '*:S' | tail -150
-echo "=== logcat: Bloo ==="
-adb logcat -d -v time | grep -i "bloo\|StartupTrace\|FATAL" | tail -150
+echo "=== logcat: crash buffer ==="
+adb logcat -d -b crash -v time | head -120
+echo "=== logcat: app lines (all buffers) ==="
+adb logcat -d -b all -v time | grep -i "com.bloo\|StartupTrace\|FATAL\|AndroidRuntime\|ANR in\|Process com.bloo" | grep -v "Slow operation" | head -150
 exit $status

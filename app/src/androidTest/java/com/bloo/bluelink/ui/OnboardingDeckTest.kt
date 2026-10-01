@@ -5,6 +5,8 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.onRoot
+import androidx.compose.ui.test.printToString
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.swipeLeft
@@ -45,8 +47,12 @@ class OnboardingDeckTest {
         rule.onNodeWithText("Next").performClick()
         rule.waitUntil(10_000) { shown("More Bloo can do") }
         // The label swaps to "Dismiss" with the card; give its animation a moment to settle.
-        rule.waitUntil(5_000) {
-            runCatching { rule.onNodeWithText("Dismiss").assertIsDisplayed() }.isSuccess
+        try {
+            rule.waitUntil(5_000) {
+                runCatching { rule.onNodeWithText("Dismiss").assertIsDisplayed() }.isSuccess
+            }
+        } catch (e: androidx.compose.ui.test.ComposeTimeoutException) {
+            throw AssertionError("The last card never showed a Dismiss button. Semantics:\n" + rule.onRoot().printToString(40), e)
         }
         assertTrue("the deck is open before dismissing", vm.state.value.welcomeCardsOpen)
         rule.onNodeWithText("Dismiss").performClick()
