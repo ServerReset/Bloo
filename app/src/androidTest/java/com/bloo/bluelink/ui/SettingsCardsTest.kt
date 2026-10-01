@@ -39,12 +39,24 @@ class SettingsCardsTest {
             }
         }
         rule.waitUntil(10_000) { exists(title) }
+        // Whether a card starts open is the app's own default; make it open either way, then
+        // close it and open it again so toggling is exercised too.
+        fun open() {
+            if (!exists(expected)) rule.onAllNodesWithText(title).onFirst().performClick()
+            try {
+                rule.waitUntil(8_000) { exists(expected) }
+            } catch (e: androidx.compose.ui.test.ComposeTimeoutException) {
+                throw AssertionError("the \"$title\" card never showed \"$expected\"", e)
+            }
+        }
+        open()
         rule.onAllNodesWithText(title).onFirst().performClick()
         try {
-            rule.waitUntil(8_000) { exists(expected) }
+            rule.waitUntil(8_000) { !exists(expected) }
         } catch (e: androidx.compose.ui.test.ComposeTimeoutException) {
-            throw AssertionError("the \"$title\" card never showed \"$expected\" after opening", e)
+            throw AssertionError("the \"$title\" card did not close when its title was tapped", e)
         }
+        open()
         assertTrue(exists(expected))
     }
 
