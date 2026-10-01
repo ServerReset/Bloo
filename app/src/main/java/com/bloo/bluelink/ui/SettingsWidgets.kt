@@ -39,7 +39,6 @@ import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Power
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.LocalGasStation
-import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff

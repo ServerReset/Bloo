@@ -73,7 +73,6 @@ import com.bloo.bluelink.data.distanceMilesTo
 import com.bloo.bluelink.data.formatDistance
 import com.bloo.bluelink.data.formatSpeed
 import kotlinx.coroutines.launch
-import com.bloo.bluelink.data.platform
 import com.bloo.bluelink.data.unitSystem
 
 /**

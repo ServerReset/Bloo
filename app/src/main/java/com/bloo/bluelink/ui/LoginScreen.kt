@@ -23,7 +23,6 @@ import androidx.compose.foundation.background
 import androidx.compose.material.icons.filled.MailOutline
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
-import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -46,7 +45,6 @@ import androidx.compose.ui.semantics.onClick
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
-import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -76,7 +74,6 @@ import com.bloo.bluelink.data.brand
 import kotlinx.coroutines.flow.first
 import kotlin.math.max
 import androidx.core.net.toUri
-import com.bloo.bluelink.data.platform
 
 /**
  * Sign-in form supporting every brand (US Hyundai/Genesis/Kia plus the three

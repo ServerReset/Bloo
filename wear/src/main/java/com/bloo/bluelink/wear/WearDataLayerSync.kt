@@ -7,8 +7,6 @@ import com.bloo.bluelink.data.VehicleSnapshot
 import com.bloo.bluelink.data.WatchCommandRequest
 import com.bloo.bluelink.data.WatchSyncPayload
 import com.bloo.bluelink.data.WatchSyncProtocol
-import com.google.android.gms.wearable.DataEvent
-import com.google.android.gms.wearable.DataEventBuffer
 import com.google.android.gms.wearable.DataMapItem
 import com.google.android.gms.wearable.PutDataMapRequest
 import com.google.android.gms.wearable.Wearable

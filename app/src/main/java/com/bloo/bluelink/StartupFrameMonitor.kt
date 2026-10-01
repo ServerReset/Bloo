@@ -1,7 +1,6 @@
 package com.bloo.bluelink
 
 import android.os.SystemClock
-import android.util.Log
 import android.view.Choreographer
 import com.bloo.bluelink.data.AppLog
 import com.bloo.bluelink.data.StartupTrace

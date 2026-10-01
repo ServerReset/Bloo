@@ -18,7 +18,6 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.animation.core.snap
-import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -77,7 +76,6 @@ import androidx.compose.ui.unit.round
 import androidx.compose.ui.unit.dp
 import com.bloo.bluelink.data.SettingsStore
 import com.bloo.uicommon.rememberConfirmArm
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlin.math.abs
 import kotlin.math.max

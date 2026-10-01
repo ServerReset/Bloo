@@ -27,7 +27,6 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Build
-import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.DirectionsCar
 import androidx.compose.material.icons.filled.Info
@@ -35,7 +34,6 @@ import androidx.compose.material.icons.filled.Settings
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.onClick
 import androidx.compose.ui.semantics.heading
-import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.material3.Card
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -57,18 +55,14 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
-import com.bloo.bluelink.data.brand
 import com.bloo.bluelink.data.LiveCharge
 import com.bloo.bluelink.data.Powertrain
 import com.bloo.bluelink.data.platformOverridable
 import com.bloo.bluelink.data.SeatConfig
-import com.bloo.bluelink.data.SettingsStore
 import com.bloo.bluelink.data.Vehicle
-import com.bloo.bluelink.data.Weather
 import kotlinx.coroutines.delay
 import com.bloo.bluelink.data.climatePresets
 import com.bloo.bluelink.data.lastServiceMiles
-import com.bloo.bluelink.data.platform
 import com.bloo.bluelink.data.serviceIntervalMiles
 import com.bloo.bluelink.data.setDefaultClimatePreset
 import com.bloo.bluelink.data.setLastServiceMiles

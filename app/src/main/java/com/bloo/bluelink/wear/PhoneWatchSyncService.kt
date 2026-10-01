@@ -15,7 +15,6 @@ import com.bloo.bluelink.data.setNotifyChargeComplete
 import com.bloo.bluelink.data.setNotifyCharging
 import com.bloo.bluelink.data.setNotifyWatchLowBattery
 import com.bloo.bluelink.data.WatchSyncProtocol
-import com.bloo.bluelink.data.WatchLockTiming
 import com.google.android.gms.wearable.DataEvent
 import com.google.android.gms.wearable.DataEventBuffer
 import com.google.android.gms.wearable.DataMapItem

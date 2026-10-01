@@ -7,12 +7,10 @@
 
 package com.bloo.bluelink.ui
 
-import android.os.Build
 import android.content.Context
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
-import androidx.compose.animation.core.snap
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -21,20 +19,16 @@ import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Pin
 import androidx.compose.material.icons.filled.LockReset
-import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.Vibration
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.LockOpen
-import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.filled.Warning
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.onClick
 import androidx.compose.ui.semantics.selected
@@ -52,36 +46,23 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import com.bloo.bluelink.data.LiveCharge
 import com.bloo.bluelink.data.LockTiming
 import com.bloo.bluelink.data.SettingsStore
 import kotlinx.coroutines.launch
 import com.bloo.bluelink.data.deleteCustomPalette
-import com.bloo.bluelink.data.platform
 import com.bloo.bluelink.data.saveCustomPalette
 import com.bloo.bluelink.data.setActiveCustomPaletteId
 import com.bloo.bluelink.data.setAuroraBackground
 import com.bloo.bluelink.data.setAuroraMotion
 import com.bloo.bluelink.data.setBiometricLock
 import com.bloo.bluelink.data.setColorPalette
-import com.bloo.bluelink.data.setDoorOpenMinutes
 import com.bloo.bluelink.data.setDynamicColor
 import com.bloo.bluelink.data.setHapticsEnabled
 import com.bloo.bluelink.data.setLockTiming
-import com.bloo.bluelink.data.setNotifyCarStarted
-import com.bloo.bluelink.data.setNotifyChargeComplete
-import com.bloo.bluelink.data.setNotifyCharging
-import com.bloo.bluelink.data.setNotifyDoor
-import com.bloo.bluelink.data.setNotifyRunning
-import com.bloo.bluelink.data.setNotifyService
-import com.bloo.bluelink.data.setNotifyUnlocked
 import com.bloo.bluelink.data.setPebbleOutline
-import com.bloo.bluelink.data.setRunningMinutes
 import com.bloo.bluelink.data.setThemeMode
-import com.bloo.bluelink.data.setUnlockedMinutes
 
 /** "Security" card content -- see the call site in [SettingsScreen] for context. */
 @Composable

@@ -35,7 +35,6 @@ import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.displayCutout
 import androidx.compose.foundation.layout.union
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
@@ -45,14 +44,11 @@ import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.VerticalPager
 import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
-import androidx.compose.ui.semantics.onClick
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.SideEffect
@@ -80,13 +76,11 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.composed
 import androidx.compose.ui.unit.dp
-import com.bloo.bluelink.data.brand
 import com.bloo.bluelink.data.SettingsStore
 import com.bloo.bluelink.data.Vehicle
 import com.bloo.bluelink.data.isGen5W
 import kotlin.math.abs
 import kotlin.math.max
-import com.bloo.bluelink.data.platform
 
 /**
  * Flip-cover Settings: the REAL scrollable SettingsScreen (the settings grid

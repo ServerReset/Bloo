@@ -11,7 +11,6 @@ import com.bloo.bluelink.data.CarCommandRunner
 import com.bloo.bluelink.data.CredentialStore
 import com.bloo.bluelink.data.Credentials
 import com.bloo.bluelink.data.SessionStore
-import com.bloo.bluelink.data.WatchCredentialBundle
 import com.bloo.bluelink.data.WatchCredentialTransfer
 import com.bloo.bluelink.data.WatchSyncProtocol
 import com.google.android.gms.wearable.Wearable

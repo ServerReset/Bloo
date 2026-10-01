@@ -38,7 +38,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.bloo.bluelink.R
 import kotlinx.serialization.Serializable
-import com.bloo.bluelink.data.platform
 
 /** User-selectable appearance. */
 /** Dark mode is always true-black (OLED-friendly) now -- see [blooColorScheme]'s own

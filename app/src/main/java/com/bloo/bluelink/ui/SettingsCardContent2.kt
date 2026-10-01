@@ -85,7 +85,6 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.CoroutineScope
 import kotlin.math.max
 import android.content.ClipData
-import com.bloo.bluelink.data.platform
 import com.bloo.bluelink.data.setChargerApiKey
 
 /**

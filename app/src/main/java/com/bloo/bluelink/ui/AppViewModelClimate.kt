@@ -9,7 +9,6 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import com.bloo.bluelink.data.climatePresets
 import com.bloo.bluelink.data.deleteClimatePreset
-import com.bloo.bluelink.data.saveClimate
 import com.bloo.bluelink.data.saveClimatePreset
 import com.bloo.bluelink.data.savedClimate
 import com.bloo.bluelink.data.setClimatePresets

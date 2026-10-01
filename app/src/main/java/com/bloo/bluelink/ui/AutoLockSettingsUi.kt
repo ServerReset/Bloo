@@ -13,8 +13,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Bluetooth
-import androidx.compose.material.icons.filled.NotificationsOff
-import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -27,18 +25,13 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import com.bloo.bluelink.autolock.AutoLockConfig
-import com.bloo.bluelink.autolock.AutoLockNotification
 import com.bloo.bluelink.autolock.DetectionState
-import com.bloo.bluelink.data.LiveCharge
 import com.bloo.bluelink.data.Vehicle
 import kotlin.math.roundToInt
 import com.bloo.bluelink.data.autoLockConfig
-import com.bloo.bluelink.data.platform
 import com.bloo.bluelink.data.setAutoLockConfig
 
 /**

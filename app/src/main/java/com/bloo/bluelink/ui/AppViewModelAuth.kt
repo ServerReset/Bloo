@@ -1,6 +1,5 @@
 package com.bloo.bluelink.ui
 
-import androidx.lifecycle.viewModelScope
 import com.bloo.bluelink.data.AppLog
 import com.bloo.bluelink.data.BlueLinkRepository
 import com.bloo.bluelink.data.CanadaAuth
@@ -9,7 +8,6 @@ import com.bloo.bluelink.data.Brand
 import com.bloo.bluelink.data.Credentials
 import com.bloo.bluelink.data.EuRepository
 import com.bloo.bluelink.data.maskEmail
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.update
 
 // --- Sign-in: brand logins, one-time-code steps, add-account (extracted from AppViewModel) --

@@ -32,8 +32,6 @@ import com.bloo.bluelink.data.SettingsStore
 import com.bloo.bluelink.data.degValue
 import com.bloo.bluelink.data.TileCommandRunner
 import com.bloo.bluelink.data.Vehicle
-import com.bloo.bluelink.data.Weather
-import com.bloo.bluelink.data.links
 import com.bloo.bluelink.data.degLabel
 import kotlin.math.max
 import com.bloo.bluelink.data.aiEnabled

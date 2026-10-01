@@ -2,7 +2,6 @@
 
 package com.bloo.bluelink.ui
 
-import androidx.compose.foundation.background
 import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column

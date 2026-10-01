@@ -12,7 +12,6 @@ package com.bloo.bluelink.ui
  * PresetPill, ChargeLimitPill -- extracted from Pebbles.kt.
  */
 
-import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -27,7 +26,6 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -38,18 +36,15 @@ import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AcUnit
 import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Thermostat
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.onClick
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
@@ -59,9 +54,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -77,25 +70,13 @@ import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.text.lerp
 import androidx.compose.ui.unit.lerp
 import androidx.compose.ui.unit.dp
-import com.bloo.bluelink.data.ambientFahrenheit
 import com.bloo.bluelink.data.CHARGE_LIMIT_RANGE
-import com.bloo.bluelink.data.CLIMATE_TEMP_RANGE_F
-import com.bloo.bluelink.data.DEFAULT_CLIMATE_DURATION_MIN
-import com.bloo.bluelink.data.DEFAULT_CLIMATE_TEMP_F
 import com.bloo.bluelink.data.ClimatePreset
 import com.bloo.bluelink.data.ClimateRequest
-import com.bloo.bluelink.data.SeatConfig
 import com.bloo.bluelink.data.SeatLevel
 import com.bloo.bluelink.data.WheelHeatLevel
 import com.bloo.bluelink.data.degValue
-import com.bloo.bluelink.data.smartClimateTargetF
-import com.bloo.bluelink.data.Vehicle
 import com.bloo.uicommon.splitPillShapes
-import com.bloo.bluelink.data.VehicleStatus
-import com.bloo.bluelink.data.isGen5W
-import com.bloo.bluelink.data.smartClimateIsCooling
-import com.bloo.bluelink.data.CLIMATE_DURATION_RANGE
-import com.bloo.bluelink.data.CLIMATE_EXTENDED_DURATION_RANGE
 import com.bloo.uicommon.rememberConfirmArm
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
