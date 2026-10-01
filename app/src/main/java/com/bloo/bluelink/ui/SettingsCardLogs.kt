@@ -156,7 +156,7 @@ internal fun LogsCardContent(logs: List<String>, vm: AppViewModel, clipboardScop
                     fontFamily = FontFamily.Monospace,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .panel()
+                        .outlinedPanel()
                         .heightIn(max = 300.dp)
                         .fadingEdges(scroll)
                         .verticalScroll(scroll),

@@ -329,7 +329,7 @@ internal fun SyncDeviceRow(
         if (isPrimary) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.55f)
         // glassTint (GlassChrome.kt), not surfaceContainerHigh -- the same shared
         // neutral fill every other glass surface in the app uses now, no exceptions.
-        else panelColor()
+        else androidx.compose.ui.graphics.Color.Transparent
     Row(
         Modifier
             .fillMaxWidth()
@@ -459,8 +459,6 @@ private fun WearCompanionRow(
     Row(
         modifier
             .fillMaxWidth()
-            .clip(StandardShape)
-            .background(panelColor())
             .padding(horizontal = 10.dp, vertical = GapRow),
         verticalAlignment = Alignment.CenterVertically,
     ) {

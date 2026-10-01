@@ -41,6 +41,7 @@ import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.surfaceColorAtElevation
 import androidx.compose.ui.graphics.Color
+import androidx.compose.foundation.border
 import androidx.compose.ui.unit.Dp
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -348,22 +349,21 @@ internal fun MilesField(value: Int?, label: String, modifier: Modifier, onSet: (
     )
 }
 
-/** The fill of every panel that sits on a glass card: solid and dark, so the card's frosted edge
- *  frames something that stays legible. One colour, used by every panel in the app. */
+/**
+ * A hairline-outlined box, for the few things that need a visible edge on a glass card (a log, an
+ * onboarding item). No fill: cards are glass, and a solid dark box dropped on them read as a hole.
+ */
 @Composable
-internal fun panelColor(): Color = MaterialTheme.colorScheme.surfaceColorAtElevation(6.dp)
+internal fun Modifier.outlinedPanel(padding: Dp = 12.dp): Modifier =
+    this.clip(StandardShape)
+        .border(1.dp, MaterialTheme.colorScheme.onSurface.copy(alpha = 0.14f), StandardShape)
+        .padding(padding)
 
-/** The standard panel: a solid box with the standard corner and a [padding] of its own. Settings
- *  groups, account panels, the log, the device rows and the onboarding items are all this. */
-@Composable
-internal fun Modifier.panel(padding: Dp = 12.dp): Modifier =
-    this.clip(StandardShape).background(panelColor()).padding(padding)
-
-/** A titled, boxed sub-group inside the per-car settings card, for hierarchy. */
+/** A titled sub-group inside a settings card: a heading, then its controls, straight on the card. */
 @Composable
 internal fun SettingsGroup(title: String, content: @Composable ColumnScope.() -> Unit) {
     Column(
-        Modifier.fillMaxWidth().panel(),
+        Modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(GapRow),
     ) {
         Text(

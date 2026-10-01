@@ -371,9 +371,7 @@ internal fun OnboardingSetupCard(
     Column(
         Modifier
             .fillMaxWidth()
-            .clip(StandardShape)
-            .background(panelColor())
-            .padding(14.dp)
+            .outlinedPanel(14.dp)
             .animateContentSize(),
         verticalArrangement = Arrangement.spacedBy(GapGroup),
     ) {
@@ -423,7 +421,8 @@ internal fun OnboardingTipCard(icon: ImageVector, title: String, body: String) {
     val scheme = MaterialTheme.colorScheme
     Surface(
         shape = StandardShape,
-        color = panelColor(),
+        color = androidx.compose.ui.graphics.Color.Transparent,
+        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.onSurface.copy(alpha = 0.14f)),
         modifier = Modifier.fillMaxWidth(),
     ) {
         // The same leading-circle icon badge the search results list, the update pebble,
@@ -469,9 +468,7 @@ internal fun OnboardingCarPage(
         Column(
             Modifier
                 .fillMaxWidth()
-                .clip(StandardShape)
-                .background(panelColor())
-                .padding(horizontal = 12.dp, vertical = GapHairline),
+                .outlinedPanel(12.dp),
         ) {
             SeatPositions.forEachIndexed { i: Int, pos: SeatPosition ->
                 if (i > 0) SectionDivider(alpha = 0.35f)
