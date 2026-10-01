@@ -278,12 +278,10 @@ internal fun OnboardingScreen(vm: AppViewModel, mode: OnboardingMode = Onboardin
     Box(
         Modifier
             .fillMaxSize()
-            // Opaque and touch-proof: the deck can sit over Settings, and nothing behind it may
-            // show through or receive a swipe meant for a card.
+            // Opaque, and a pointer target of its own so touches never fall through to what the
+            // deck sits over; it takes none of them, so the cards and buttons above get every one.
             .background(scheme.background)
-            .pointerInput(Unit) {
-                awaitPointerEventScope { while (true) awaitPointerEvent().changes.forEach { it.consume() } }
-            },
+            .pointerInput(Unit) {},
     ) {
         AuroraBackground(Modifier.matchParentSize())
         if (isLast && firstRun) FireworksOverlay(Modifier.fillMaxSize())
@@ -316,6 +314,8 @@ internal fun OnboardingScreen(vm: AppViewModel, mode: OnboardingMode = Onboardin
                         summary = spec.summary,
                         canToggle = false,
                         forceExpanded = true,
+                        // A darker card, so the panels inside it step UP from it instead of sinking into it.
+                        containerColor = scheme.surfaceContainer,
                     ) {
                         when (step.kind) {
                             OnboardingStepKind.WELCOME -> OnboardingWelcomePage()

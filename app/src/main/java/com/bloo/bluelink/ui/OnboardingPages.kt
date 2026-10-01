@@ -56,6 +56,8 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
+import androidx.compose.animation.animateContentSize
+import androidx.compose.ui.graphics.Color
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -141,11 +143,11 @@ internal fun OnboardingSetupPage(
             required = true,
         ) {
             MorphActionButton(
-                label = if (notifGranted) "Notifications on" else "Turn on notifications",
-                icon = if (notifGranted) AppIcons.CheckCircle else Icons.Filled.Notifications,
-                onClick = { if (!notifGranted) notifLauncher.launch(android.Manifest.permission.POST_NOTIFICATIONS) },
+                label = "Turn on notifications",
+                icon = Icons.Filled.Notifications,
+                onClick = { notifLauncher.launch(android.Manifest.permission.POST_NOTIFICATIONS) },
                 modifier = Modifier.fillMaxWidth(),
-                active = notifGranted,
+                emphasis = ButtonEmphasis.Primary,
             )
         }
     }
@@ -161,23 +163,21 @@ internal fun OnboardingSetupPage(
             required = true,
         ) {
             MorphActionButton(
-                label = if (bioEnabled) "Biometric lock on" else "Turn on biometric lock",
-                icon = if (bioEnabled) AppIcons.CheckCircle else Icons.Filled.Fingerprint,
+                label = "Turn on biometric lock",
+                icon = Icons.Filled.Fingerprint,
                 onClick = {
-                    if (!bioEnabled) {
-                        context.findFragmentActivity()?.let { activity ->
-                            showBiometricPrompt(
-                                activity = activity,
-                                title = "Enable biometric lock",
-                                subtitle = "Confirm to require it when opening Bloo",
-                                onSuccess = { vm.setBiometricLock(true) },
-                                onError = {},
-                            )
-                        }
+                    context.findFragmentActivity()?.let { activity ->
+                        showBiometricPrompt(
+                            activity = activity,
+                            title = "Enable biometric lock",
+                            subtitle = "Confirm to require it when opening Bloo",
+                            onSuccess = { vm.setBiometricLock(true) },
+                            onError = {},
+                        )
                     }
                 },
                 modifier = Modifier.fillMaxWidth(),
-                active = bioEnabled,
+                emphasis = ButtonEmphasis.Primary,
             )
         }
     } else {
@@ -217,45 +217,16 @@ internal fun OnboardingSetupPage(
         body = if (syncEnabled) {
             "Your settings and car photos back up to Google Drive automatically."
         } else {
-            "Join an existing backup to restore your car photos and setup, or start fresh."
+            "Keep your settings, layout and car photos the same on every device."
         },
         done = syncEnabled,
     ) {
-        // AnimatedContent, not a bare if/else -- this used to snap straight
-        // from the "Set up Drive sync" button to the "enabled" row the instant
-        // the dialog finished, the one un-animated content swap left in a step
-        // whose sibling cards (notifications, biometric) at least keep the
-        // same MorphButton in place and only recolor it.
-        AnimatedContent(
-            targetState = syncEnabled,
-            // Explicit, not the implicit default -- every other AnimatedContent
-            // in this file specifies its own transitionSpec; this one didn't,
-            // which meant a real height difference between the two states (the
-            // MorphButton's Material3 minimum touch target vs. the plain
-            // "enabled" row) snapped instantly under the fade instead of
-            // animating, a small but visible pop right when Drive sync
-            // finishes setting up.
-            transitionSpec = {
-                (fadeIn(tween(180)) togetherWith fadeOut(tween(180)))
-                    .using(SizeTransform(clip = false))
-            },
-            label = "onboardingSyncDone",
-        ) { enabled: Boolean ->
-            if (enabled) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(AppIcons.CheckCircle, contentDescription = null, tint = scheme.primary, modifier = Modifier.size(18.dp))
-                    Spacer(Modifier.width(8.dp))
-                    Text("Drive sync enabled", fontWeight = FontWeight.SemiBold, color = scheme.primary)
-                }
-            } else {
-                MorphActionButton(
-                    label = "Set up Drive sync",
-                    icon = Icons.Filled.Cloud,
-                    onClick = { showDriveDialog = true },
-                    modifier = Modifier.fillMaxWidth(),
-                )
-            }
-        }
+        MorphActionButton(
+            label = "Set up Drive sync",
+            icon = Icons.Filled.Cloud,
+            onClick = { showDriveDialog = true },
+            modifier = Modifier.fillMaxWidth(),
+        )
     }
 }
 
@@ -403,46 +374,49 @@ internal fun OnboardingSetupCard(
     title: String,
     body: String,
     done: Boolean,
-    /** Required to leave this step: shows a "Required" chip until [done], so the user
-     *  knows why Next is disabled rather than just finding it greyed out. */
+    /** Required to leave this card: a "Required" chip until [done], so the user knows why Next
+     *  is disabled rather than just finding it greyed out. */
     required: Boolean = false,
+    /** The action that gets it done. Shown only until [done]: a finished item says so and gets out of the way. */
     content: @Composable () -> Unit,
 ) {
     val scheme = MaterialTheme.colorScheme
-    Surface(
-        shape = LargeShape,
-        color = scheme.surfaceContainerHigh,
-        modifier = Modifier.fillMaxWidth(),
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .clip(StandardShape)
+            .background(scheme.surfaceContainerHighest)
+            .padding(14.dp)
+            .animateContentSize(),
+        verticalArrangement = Arrangement.spacedBy(GapGroup),
     ) {
-        Column(Modifier.padding16(), verticalArrangement = Arrangement.spacedBy(GapGroup)) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                IconBadge(
-                    if (done) AppIcons.CheckCircle else icon,
-                    tint = if (done) scheme.onPrimaryContainer else scheme.primary,
-                    containerColor = if (done) scheme.primaryContainer else scheme.surfaceContainerHighest,
-                    iconSize = 20.dp,
-                )
-                Column(Modifier.weight(1f)) {
-                    TitleSmallText(title, color = scheme.onSurface)
-                    MutedText(body)
+        IconLeadRow(
+            if (done) AppIcons.CheckCircle else icon,
+            tint = if (done) scheme.primary else scheme.onSurfaceVariant,
+            title = title,
+            subtitle = body,
+            trailing = {
+                when {
+                    done -> StatusChip("On", scheme.primary, scheme.onPrimary)
+                    required -> StatusChip("Required", scheme.tertiaryContainer, scheme.onTertiaryContainer)
                 }
-                if (required && !done) {
-                    Surface(
-                        shape = RoundedCornerShape(50),
-                        color = scheme.tertiaryContainer,
-                    ) {
-                        Text(
-                            "Required",
-                            style = MaterialTheme.typography.labelMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = scheme.onTertiaryContainer,
-                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
-                        )
-                    }
-                }
-            }
-            content()
-        }
+            },
+        )
+        if (!done) content()
+    }
+}
+
+/** A small filled pill: the "On" / "Required" tag on a setup card. */
+@Composable
+private fun StatusChip(label: String, container: Color, content: Color) {
+    Surface(shape = RoundedCornerShape(50), color = container) {
+        Text(
+            label,
+            style = MaterialTheme.typography.labelMedium,
+            fontWeight = FontWeight.Bold,
+            color = content,
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+        )
     }
 }
 
