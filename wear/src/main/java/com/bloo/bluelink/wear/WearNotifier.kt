@@ -62,7 +62,7 @@ class WearNotificationPrefs(context: Context) {
  *
  *  - an ongoing "Charging" card with a progress bar and a Stop action, while a car charges;
  *  - "Charged" when a charge finishes near full;
- *  - "Low battery" when a car drops under [LOW_PERCENT] and isn't charging.
+ *  - "Low battery" when a car drops under [WEAR_LOW_PERCENT] and isn't charging.
  *
  * Each notification's actions run through [WearActionReceiver], so a tap on the notification is
  * the same thing as the button in the app.
@@ -70,8 +70,6 @@ class WearNotificationPrefs(context: Context) {
 object WearNotifier {
     private const val CHANNEL_CHARGING = "watch_charging"
     private const val CHANNEL_ALERTS = "watch_alerts"
-    const val LOW_PERCENT = 20
-    private const val FULL_PERCENT = 95
 
     /** Compare [old] with [new] and raise/clear whatever changed. [old] empty means first sight: no alerts. */
     fun onVehicles(context: Context, old: List<VehicleSnapshot>, new: List<VehicleSnapshot>) {
@@ -84,20 +82,14 @@ object WearNotifier {
         val manager = app.getSystemService(NotificationManager::class.java)
         new.forEach { now ->
             val before = old.firstOrNull { it.vin == now.vin }
+            val plan = planWearAlerts(before, now, prefs.current())
             val pct = now.percent
             val id = now.vin.hashCode()
-            // Ongoing charging card.
-            if (now.charging == true && prefs.charging) {
-                manager.notify(id, chargingCard(app, now))
-            } else {
-                manager.cancel(id)
-            }
-            if (before == null) return@forEach
-            if (prefs.chargeComplete && before.charging == true && now.charging != true && pct != null && pct >= FULL_PERCENT) {
+            if (plan.chargingCard) manager.notify(id, chargingCard(app, now)) else manager.cancel(id)
+            if (plan.chargeComplete) {
                 manager.notify(id + 1, alert(app, now, "${now.name} is charged", "Battery at $pct%", null))
             }
-            val was = before.percent
-            if (prefs.lowBattery && was != null && pct != null && was >= LOW_PERCENT && pct < LOW_PERCENT && now.charging != true) {
+            if (plan.lowBattery) {
                 manager.notify(id + 2, alert(app, now, "${now.name} battery is low", "$pct% left" + (now.rangeMi?.let { " · $it mi" } ?: ""), null))
             }
         }
