@@ -286,27 +286,16 @@ internal fun SyncDevicesSection(state: UiState, vm: AppViewModel) {
                 )
             },
             buttons = {
-                val saveRenameSource = remember { MutableInteractionSource() }
-                SafeExpansiveButton(
-                    interactionSource = saveRenameSource,
+                MorphTextButton(
+                    "Save",
+                    onClick = {
+                        if (draft.isNotBlank()) vm.renameThisDevice(draft)
+                        renaming = false
+                    },
                     enabled = draft.isNotBlank(),
-                    groupWeight = GroupWeightProportional,
-                    fillOnPress = true,
-                ) {
-                    // MorphTextButton, not a hand-rolled MorphButton{Text(...)} -- that Text had
-                    // no `style`. Primary colours stand in for the old `active = true`.
-                    MorphTextButton(
-                        "Save",
-                        onClick = {
-                            if (draft.isNotBlank()) vm.renameThisDevice(draft)
-                            renaming = false
-                        },
-                        interactionSource = saveRenameSource,
-                        enabled = draft.isNotBlank(),
-                        emphasis = ButtonEmphasis.Primary,
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-                }
+                    emphasis = ButtonEmphasis.Primary,
+                    modifier = Modifier.fillMaxWidth(),
+                )
                 SafeMorphTextButton(
                     "Cancel",
                     onClick = { renaming = false },

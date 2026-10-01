@@ -370,29 +370,17 @@ internal fun ClimatePebble(
                 val smartLabel = if (smartClimateIsCooling(ambientF)) "Cool to $targetLabel" else "Heat to $targetLabel"
                 Column(verticalArrangement = Arrangement.spacedBy(GapRow)) {
                     SectionLabel("Smart climate")
-                    val smartSource = remember { MutableInteractionSource() }
-                    SafeExpansiveButton(
-                        interactionSource = smartSource,
+                    MorphActionButton(
+                        label = smartLabel,
+                        icon = Icons.Filled.AcUnit,
+                        onClick = {
+                            tempF = smartTarget
+                            defrost = false
+                            activePresetId = null
+                            startClimateWithEngineCheck(currentReq.copy(tempF = smartTarget, defrost = false))
+                        },
                         enabled = !pending && !climateOn,
-                        groupWeight = GroupWeightProportional,
-                        fillOnPress = true,
-                    ) {
-                        // The shared MorphActionButton: an ordinary "tap this and the car does
-                        // a thing" action, so it takes the standard outlined-tonal look rather
-                        // than the bare default fill at its own one-off 12dp vertical padding.
-                        MorphActionButton(
-                            label = smartLabel,
-                            icon = Icons.Filled.AcUnit,
-                            onClick = {
-                                tempF = smartTarget
-                                defrost = false
-                                activePresetId = null
-                                startClimateWithEngineCheck(currentReq.copy(tempF = smartTarget, defrost = false))
-                            },
-                            enabled = !pending && !climateOn,
-                            interactionSource = smartSource,
-                        )
-                    }
+                    )
                     Text(
                         "It's $ambientLabel by your car. Smart climate targets $targetLabel.",
                         style = MaterialTheme.typography.bodySmall,
@@ -564,31 +552,18 @@ internal fun ClimatePebble(
                     )
                 },
                 buttons = {
-                    val saveSource = remember { MutableInteractionSource() }
-                    SafeExpansiveButton(
-                        interactionSource = saveSource,
+                    MorphTextButton(
+                        "Save",
+                        onClick = {
+                            if (presetName.isNotBlank()) {
+                                vm.saveClimatePreset(v, presetName.trim(), currentReq)
+                                showAddPreset = false
+                            }
+                        },
                         enabled = presetName.isNotBlank(),
-                        groupWeight = GroupWeightProportional,
-                        fillOnPress = true,
-                    ) {
-                        // MorphTextButton, not a hand-rolled MorphButton{Text(...)} -- that Text
-                        // had no `style`, so it rendered at ambient size instead of
-                        // ButtonLabelStyle. Primary colours stand in for the old `active = true`,
-                        // which MorphTextButton has no direct param for.
-                        MorphTextButton(
-                            "Save",
-                            onClick = {
-                                if (presetName.isNotBlank()) {
-                                    vm.saveClimatePreset(v, presetName.trim(), currentReq)
-                                    showAddPreset = false
-                                }
-                            },
-                            enabled = presetName.isNotBlank(),
-                            interactionSource = saveSource,
-                            emphasis = ButtonEmphasis.Primary,
-                            modifier = Modifier.fillMaxWidth(),
-                        )
-                    }
+                        emphasis = ButtonEmphasis.Primary,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
                     SafeMorphTextButton(
                         "Cancel",
                         onClick = { showAddPreset = false },

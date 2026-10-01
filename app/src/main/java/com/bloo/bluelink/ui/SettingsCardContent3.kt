@@ -222,21 +222,11 @@ internal fun SecurityCardContent(
                 )
                 Spacer(Modifier.height(GapGroup))
                 ExpressiveButtonRow(spacing = 8.dp) {
-                    val pinSource = remember { MutableInteractionSource() }
-                    SafeExpansiveButton(
-                        interactionSource = pinSource,
-                        enabled = true,
-                    ) {
-                        // The shared action button. "Remove" beside it keeps its errorContainer
-                        // tone on purpose -- red is the one difference in this row that carries
-                        // meaning, so the OTHER half is what had to move onto the standard look.
-                        MorphActionButton(
-                            label = if (pinSet) "Change PIN" else "Set up PIN",
-                            icon = if (pinSet) Icons.Filled.LockReset else AppIcons.Lock,
-                            onClick = { pinDialog = "set" },
-                            interactionSource = pinSource,
-                        )
-                    }
+                    MorphActionButton(
+                        label = if (pinSet) "Change PIN" else "Set up PIN",
+                        icon = if (pinSet) Icons.Filled.LockReset else AppIcons.Lock,
+                        onClick = { pinDialog = "set" },
+                    )
                     if (pinSet) {
                         SafeMorphTextButton(
                             "Remove",

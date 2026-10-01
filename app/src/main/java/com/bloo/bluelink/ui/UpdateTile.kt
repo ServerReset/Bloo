@@ -290,38 +290,20 @@ internal fun UpdateAvailableTile(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.weight(1f),
                     )
-                    val undoSource = remember { MutableInteractionSource() }
-                    SafeExpansiveButton(
-                        interactionSource = undoSource,
+                    MorphTextButton(
+                        "Keep it",
+                        onClick = { vm.undoDismissUpdate() },
                         enabled = !state.updateDownloading,
-                    ) {
-                        // MorphTextButton, not a hand-rolled MorphButton{Text(...)} -- that Text
-                        // had no `style`. Primary colours stand in for the old `active = true`.
-                        MorphTextButton(
-                            "Keep it",
-                            onClick = { vm.undoDismissUpdate() },
-                            enabled = !state.updateDownloading,
-                            interactionSource = undoSource,
-                            emphasis = ButtonEmphasis.Primary,
-                        )
-                    }
+                        emphasis = ButtonEmphasis.Primary,
+                    )
                 }
             } else {
                 ExpressiveButtonRow(modifier = Modifier.fillMaxWidth(), spacing = 8.dp) {
-                    val remindSource = remember { MutableInteractionSource() }
-                    SafeExpansiveButton(
-                        interactionSource = remindSource,
+                    MorphTextButton(
+                        "Remind me",
+                        onClick = { vm.snoozeUpdate() },
                         enabled = !state.updateDownloading,
-                    ) {
-                        // MorphTextButton, not a hand-rolled MorphButton{Text(...)} -- that Text
-                        // had neither `style` nor `fontWeight`, unlike "Not now" beside it.
-                        MorphTextButton(
-                            "Remind me",
-                            onClick = { vm.snoozeUpdate() },
-                            enabled = !state.updateDownloading,
-                            interactionSource = remindSource,
-                        )
-                    }
+                    )
                     SafeMorphTextButton(
                         "Not now",
                         onClick = vm::dismissUpdate,

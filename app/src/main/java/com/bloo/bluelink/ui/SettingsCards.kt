@@ -134,20 +134,11 @@ internal fun LiveUpdateTroubleshootDialog(onDismiss: () -> Unit) {
             }
         },
         buttons = {
-            val bgSource = remember { MutableInteractionSource() }
-            SafeExpansiveButton(
-                interactionSource = bgSource,
-                enabled = true,
-            ) {
-                // MorphTextButton, not a hand-rolled MorphButton{Text(...)} -- that Text had no
-                // `style`, unlike "Close" below it.
-                MorphTextButton(
-                    "Allow background activity",
-                    onClick = { LiveCharge.requestBackgroundUnrestricted(context) },
-                    interactionSource = bgSource,
-                    modifier = Modifier.fillMaxWidth(),
-                )
-            }
+            MorphTextButton(
+                "Allow background activity",
+                onClick = { LiveCharge.requestBackgroundUnrestricted(context) },
+                modifier = Modifier.fillMaxWidth(),
+            )
             if (isSamsung) {
                 SafeMorphTextButton(
                     "Open Developer options",
