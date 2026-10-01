@@ -197,6 +197,7 @@ fun BlooApp(vm: AppViewModel) {
         LocalRippleConfiguration provides null,
         LocalFloatingRegistry provides floatingRegistry,
         LocalDialogHost provides dialogHost,
+        LocalToasts provides toasts,
         LocalHaptics provides haptics,
         // Provided once here (the app root already collects `appearance` above) so
         // every pebble/tile reads LocalAppearance.current instead of opening its own

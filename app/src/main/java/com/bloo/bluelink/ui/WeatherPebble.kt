@@ -100,6 +100,7 @@ import com.bloo.bluelink.data.unitSystem
 @Composable
 internal fun rememberLocateAction(vm: AppViewModel, v: Vehicle): () -> Unit {
     val context = LocalContext.current
+    val toasts = LocalToasts.current
     val fineLocationLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
         androidx.activity.result.contract.ActivityResultContracts.RequestPermission(),
     ) { granted ->
@@ -118,11 +119,7 @@ internal fun rememberLocateAction(vm: AppViewModel, v: Vehicle): () -> Unit {
             // with no further symptom to go on. A permanent denial can only be undone from
             // the system's own app-info screen, not from another in-app prompt, so the toast
             // points there instead of re-asking.
-            android.widget.Toast.makeText(
-                context,
-                "Location permission denied. Enable it in Settings > Apps > Bloo to see your position.",
-                android.widget.Toast.LENGTH_LONG,
-            ).show()
+            toasts?.show("Location permission denied. Enable it in Settings > Apps > Bloo to see your position.", "error")
         }
     }
     return {

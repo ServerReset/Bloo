@@ -79,6 +79,9 @@ internal class Toast(val id: Long, val message: String, val type: String, expire
  * long each message happens to be. A repeat of the newest message refreshes it instead of
  * stacking an identical copy.
  */
+/** The app's one toast stack, for any composable that needs to tell the user something. */
+internal val LocalToasts = androidx.compose.runtime.staticCompositionLocalOf<ToastState?> { null }
+
 @Stable
 internal class ToastState {
     val items = mutableStateListOf<Toast>()
