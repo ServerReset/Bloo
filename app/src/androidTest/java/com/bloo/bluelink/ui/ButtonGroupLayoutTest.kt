@@ -34,6 +34,8 @@ class ButtonGroupLayoutTest {
 
     private fun bounds(tag: String) = rule.onNodeWithTag(tag).getBoundsInRoot()
 
+    private fun widthOf(tag: String) = bounds(tag).let { it.right.value - it.left.value }
+
     @Test
     fun wrappedButtonsFillEachLineEdgeToEdge() {
         val labels = listOf("Alpha button", "Bravo button", "Charlie button", "Delta button", "Echo button")
@@ -72,10 +74,10 @@ class ButtonGroupLayoutTest {
         }
         rule.waitForIdle()
         val rest = bounds("lone")
-        assertTrue("a lone button rests narrower than its row", rest.width.value < rowWidth.value - 40f)
+        assertTrue("a lone button rests narrower than its row", widthOf("lone") < rowWidth.value - 40f)
         assertEquals("and sits on the start edge", 0f, rest.left.value, 1.5f)
         rule.onNodeWithTag("lone").performTouchInput { down(center) }
-        rule.waitUntil(3_000) { bounds("lone").width.value > rowWidth.value - 8f }
+        rule.waitUntil(3_000) { widthOf("lone") > rowWidth.value - 8f }
         rule.onNodeWithTag("lone").performTouchInput { up() }
     }
 
