@@ -22,7 +22,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Devices
 import androidx.compose.material.icons.filled.DragHandle
 import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.Close
@@ -81,8 +80,15 @@ import com.bloo.bluelink.data.watchLockTiming
  */
 @Composable
 internal fun SyncDevicesSection(state: UiState, vm: AppViewModel) {
+    if (state.syncDevices.isEmpty()) return
+    SettingsGroup("Synced devices") { SyncDevicesContent(state, vm) }
+}
+
+/** The inside of the "Synced devices" box: a hint, every phone (drag the top one to make it primary)
+ *  with its watch tucked underneath, and a warning when a device has gone quiet. */
+@Composable
+private fun SyncDevicesContent(state: UiState, vm: AppViewModel) {
     val devices = state.syncDevices
-    if (devices.isEmpty()) return
     var renaming by remember { mutableStateOf(false) }
 
     // Order the list so the primary is on top (that's the invariant the drag
@@ -96,27 +102,7 @@ internal fun SyncDevicesSection(state: UiState, vm: AppViewModel) {
         )
     }
 
-    Spacer(Modifier.height(GapGroup))
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        Icon(
-            Icons.Filled.Devices,
-            contentDescription = null,
-            tint = MaterialTheme.colorScheme.primary,
-            modifier = Modifier.size(18.dp),
-        )
-        Spacer(Modifier.width(8.dp))
-        TitleSmallText("Synced devices")
-    }
-    Spacer(Modifier.height(2.dp))
-    BodySmallText(
-        "Drag to reorder. The top device is primary. A paired watch rides under its phone.",
-    )
-    Spacer(Modifier.height(GapRow))
-
-    // A watch is a COMPANION, not a peer: it never appears as a reorderable, primary-eligible
-    // row. It rides UNDER the phone that owns it. The watch that is connected over the Data Layer
-    // belongs to THIS phone (the registry can't say -- the watch never writes to Drive); any
-    // watch the registry does carry rides under the primary phone.
+    BodySmallText("Drag to reorder. The top device is primary. A paired watch rides under its phone.")
     val phones = ordered.filter { !it.isWatch }
     val registryWatches = ordered.filter { it.isWatch }
     val watchHost = phones.firstOrNull { it.id == state.syncPrimaryId } ?: phones.firstOrNull()

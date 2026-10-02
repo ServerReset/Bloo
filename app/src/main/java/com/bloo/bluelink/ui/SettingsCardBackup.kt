@@ -115,21 +115,22 @@ internal fun BackupSyncCardContent(
                 SafeMorphTextButton("Sync now", onClick = { vm.syncNow() }, icon = Icons.Filled.CloudSync, emphasis = ButtonEmphasis.Primary)
                 state.syncError?.let { SyncErrorBanner(it) }
                 SyncDevicesSection(state = state, vm = vm)
-                SettingsGroup("Sync over") {
-                    MorphSegmented(
+                SettingsGroup("Drive file") {
+                    SettingsSegmentedRow(
+                        label = "Sync over",
                         options = listOf(SegmentOption("wifi", "Wi-Fi only", null), SegmentOption("any", "Any network", null)),
                         selectedKey = if (state.syncWifiOnly) "wifi" else "any",
                         onSelect = { vm.setSyncWifiOnly(it == "wifi") },
                     )
-                }
-                val disable = rememberConfirmArm()
-                ExpressiveButtonRow(modifier = Modifier.fillMaxWidth(), spacing = 8.dp) {
-                    SafeMorphTextButton("Change Drive file", onClick = { showDriveDialog = true })
-                    SafeMorphTextButton(
-                        text = if (disable.armed) "Tap again to disable" else "Disable",
-                        onClick = { if (disable.armed) vm.clearSyncUri() else disable.arm() },
-                        emphasis = ButtonEmphasis.Destructive,
-                    )
+                    val disable = rememberConfirmArm()
+                    ExpressiveButtonRow(modifier = Modifier.fillMaxWidth(), spacing = 8.dp) {
+                        SafeMorphTextButton("Change Drive file", onClick = { showDriveDialog = true })
+                        SafeMorphTextButton(
+                            text = if (disable.armed) "Tap again to disable" else "Disable",
+                            onClick = { if (disable.armed) vm.clearSyncUri() else disable.arm() },
+                            emphasis = ButtonEmphasis.Destructive,
+                        )
+                    }
                 }
                 SyncDiagnostics(state, vm)
             }
