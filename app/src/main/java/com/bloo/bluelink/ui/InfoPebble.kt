@@ -74,7 +74,7 @@ import com.bloo.bluelink.data.unitSystem
 internal fun InfoPebble(v: Vehicle, status: VehicleStatus?, state: UiState, vm: AppViewModel, modifier: Modifier) {
     val context = LocalContext.current
     val appearance = LocalAppearance.current
-    val metric = appearance.unitSystem == "metric"
+    val metric = appearance.metricDistance
     val location = state.locations[v.vin]
     val odoInt = parseOdometerMiles(v.odometer)
     val plate = state.licensePlates[v.vin]
@@ -131,7 +131,7 @@ internal fun InfoPebble(v: Vehicle, status: VehicleStatus?, state: UiState, vm: 
                     StatusRow(if (state.hasBattery(v)) "Charge" else "Fuel", "$it%")
                 }
                 status.rangeMiFor(state.hasBattery(v))?.let { StatusRow("Range", formatDistance(it, metric)) }
-                status.battery?.batSoc?.let { StatusRow("12V battery", "$it%") }
+                status.battery?.level?.let { StatusRow("12V battery", "$it%") }
                 // Comfort heaters (read-only; mirror/rear-window heat track defrost).
                 status.steerWheelHeat?.takeIf { it != 0 }?.let { StatusRow("Steering wheel heat", "On") }
                 status.sideMirrorHeat?.takeIf { it != 0 }?.let { StatusRow("Mirror heat", "On") }

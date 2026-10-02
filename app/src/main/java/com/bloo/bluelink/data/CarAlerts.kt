@@ -103,7 +103,7 @@ object CarAlerts {
                     // metric user while the phone service pebble (also formatDistance)
                     // showed the same figures in km -- so the one
                     // surface that interrupts you was the one in the wrong unit.
-                    val metric = settings.unitSystem() == "metric"
+                    val metric = settings.metricDistance()
                     // odo and due are both non-null in this branch (remaining != null requires
                     // all three inputs), but the compiler can't carry that through serviceDue's
                     // signature -- odo is Int? from parseOdometerMiles. `?.let ?: ""` keeps it

@@ -148,7 +148,7 @@ internal fun ChargePebble(v: Vehicle, status: VehicleStatus?, enabled: Boolean, 
                 state.hasBattery(v),
                 state.hasFuel(v),
                 state.drivingLabel(v),
-                metric = LocalAppearance.current.unitSystem == "metric",
+                metric = LocalAppearance.current.metricDistance,
             )
         }
         // Its own PopVisible: this row arrives/leaves live while the pebble is open --
@@ -189,7 +189,7 @@ internal fun ChargePebble(v: Vehicle, status: VehicleStatus?, enabled: Boolean, 
  */
 @Composable
 internal fun FuelPebble(v: Vehicle, status: VehicleStatus?, state: UiState, vm: AppViewModel, modifier: Modifier) {
-    val metric = LocalAppearance.current.unitSystem == "metric"
+    val metric = LocalAppearance.current.metricDistance
     val fuelPct = status?.fuelLevel
     val range = status?.dte?.value?.toInt()
     val summary = when {

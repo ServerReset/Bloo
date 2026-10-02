@@ -209,6 +209,21 @@ suspend fun SettingsStore.setUnitSystem(value: String) {
     editTracked { it[SettingsStore.Keys.UNIT_SYSTEM] = value.takeIf { it in setOf("imperial", "metric") } ?: "imperial" }
 }
 
+suspend fun SettingsStore.setTempUnit(value: String) {
+    editTracked { it[SettingsStore.Keys.TEMP_UNIT] = value.takeIf { it in setOf("auto", "f", "c") } ?: "auto" }
+}
+
+suspend fun SettingsStore.setDistanceUnit(value: String) {
+    editTracked { it[SettingsStore.Keys.DISTANCE_UNIT] = value.takeIf { it in setOf("auto", "mi", "km") } ?: "auto" }
+}
+
+/** True when distances are shown in km, honouring the distance override -- the one-shot read for
+ *  non-Compose callers (CarAlerts building a notification string) that the [appearance] flow serves elsewhere. */
+suspend fun SettingsStore.metricDistance(): Boolean {
+    val p = context.settingsDataStore.data.first()
+    return resolveMetricDistance(p[SettingsStore.Keys.UNIT_SYSTEM], p[SettingsStore.Keys.DISTANCE_UNIT])
+}
+
 /** Settings view mode: "simple" or "advanced". */
 suspend fun SettingsStore.settingsMode(): String = settingsMode(context.settingsDataStore.data.first())
 

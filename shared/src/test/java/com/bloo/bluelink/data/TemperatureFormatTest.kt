@@ -285,6 +285,12 @@ class Battery12VTest {
     @Test
     fun unknownIsNotAnIssue() {
         kotlin.test.assertFalse(Battery12V(batSoc = null).needsAttention)
+        // A sentinel such as 255 is "no reading", not 255% and not "Good".
+        kotlin.test.assertEquals(null, Battery12V(batSoc = 255).level)
+        kotlin.test.assertEquals(null, Battery12V(batSoc = 255).health)
+        kotlin.test.assertEquals(null, Battery12V(batSoc = -1).level)
+        kotlin.test.assertEquals(100, Battery12V(batSoc = 100).level)
+        kotlin.test.assertFalse(Battery12V(batSoc = 255).needsAttention)
         kotlin.test.assertEquals(null, Battery12V(batSoc = null).health)
     }
 

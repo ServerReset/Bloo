@@ -23,8 +23,13 @@ import kotlinx.coroutines.flow.update
  * and the garage is (re)loaded to pull in the newly-added account's cars.
  */
 fun AppViewModel.login(username: String, password: String, pin: String, brand: Brand) {
-    if (username.isBlank() || password.isBlank() || (pin.isBlank() && brand.requiresPin)) {
-        _state.update { it.copy(message = "Email, password and PIN are all required", messageType = "error") }
+    if (username.isBlank() || password.isBlank() || (pin.isBlank() && brand.pinRequiredToSignIn)) {
+        _state.update {
+            it.copy(
+                message = if (brand.pinRequiredToSignIn) "Email, password and PIN are all required" else "Email and password are required",
+                messageType = "error",
+            )
+        }
         return
     }
     if (brand == Brand.KIA) {

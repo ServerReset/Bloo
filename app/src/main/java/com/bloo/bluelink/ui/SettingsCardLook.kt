@@ -30,6 +30,8 @@ import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import com.bloo.bluelink.data.setFontChoice
 import com.bloo.bluelink.data.setShowSearch
 import com.bloo.bluelink.data.setUnitSystem
+import com.bloo.bluelink.data.setTempUnit
+import com.bloo.bluelink.data.setDistanceUnit
 import com.bloo.bluelink.data.unitSystem
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.ui.semantics.contentDescription
@@ -63,11 +65,24 @@ internal fun DisplayCardContent(appearance: SettingsStore.Appearance, advanced: 
         Column(verticalArrangement = Arrangement.spacedBy(GapGroup)) {
             SettingsGroup("Units") {
                 SettingsSegmentedRow(
-                    label = "Temperature, distance and speed",
+                    label = "Units",
                     options = listOf(SegmentOption("imperial", "Imperial", null), SegmentOption("metric", "Metric", null)),
                     selectedKey = appearance.unitSystem,
                     onSelect = { vm.setUnitSystem(it) },
                 )
+                SettingsSegmentedRow(
+                    label = "Temperature",
+                    options = listOf(SegmentOption("auto", "Auto", null), SegmentOption("f", "°F", null), SegmentOption("c", "°C", null)),
+                    selectedKey = appearance.tempUnit,
+                    onSelect = { vm.setTempUnit(it) },
+                )
+                SettingsSegmentedRow(
+                    label = "Distance and mileage",
+                    options = listOf(SegmentOption("auto", "Auto", null), SegmentOption("mi", "Miles", null), SegmentOption("km", "Km", null)),
+                    selectedKey = appearance.distanceUnit,
+                    onSelect = { vm.setDistanceUnit(it) },
+                )
+                BodySmallText("Auto follows Units, so you can mix them: Celsius with miles, say.")
             }
             SettingsGroup("Car screen") {
                 ToggleRow(

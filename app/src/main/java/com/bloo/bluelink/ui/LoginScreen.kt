@@ -296,7 +296,10 @@ internal fun LoginScreen(
                         exit = expandExitSized(Alignment.Bottom),
                     ) {
                         Column(verticalArrangement = Arrangement.spacedBy(GapGroup)) {
-                            MutedText("Service PIN")
+                            MutedText(if (brand.pinRequiredToSignIn) "Service PIN" else "Service PIN (optional)")
+                            if (!brand.pinRequiredToSignIn) {
+                                BodySmallText("Only needed to run remote commands. Leave it blank if you never set one in the Hyundai app; you can add it later in Settings.")
+                            }
                             BlooTextField(
                                 value = pin,
                                 onValueChange = { pin = it },

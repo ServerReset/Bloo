@@ -285,7 +285,7 @@ internal fun LocationPebble(v: Vehicle, state: UiState, vm: AppViewModel, modifi
                 // lock-state / odometer rows elsewhere in this app already follow.
                 if (!coverGlance) {
                     state.deviceLocation?.let { device ->
-                        StatusRow("Distance", formatDistance(device.distanceMilesTo(loc), appearance.unitSystem == "metric"))
+                        StatusRow("Distance", formatDistance(device.distanceMilesTo(loc), appearance.metricDistance))
                     }
                 }
                 // Weather where the car is parked. Fetched lazily once we have a fix.
@@ -308,7 +308,7 @@ internal fun LocationPebble(v: Vehicle, state: UiState, vm: AppViewModel, modifi
                         if (coverGlance) {
                             WeatherStripe(carWeather, fahrenheit, place ?: "At the car")
                         } else {
-                            WeatherDetail(carWeather, fahrenheit, appearance.unitSystem == "metric")
+                            WeatherDetail(carWeather, fahrenheit, appearance.metricDistance)
                         }
                     }
                 }

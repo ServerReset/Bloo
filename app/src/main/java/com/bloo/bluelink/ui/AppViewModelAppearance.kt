@@ -21,6 +21,8 @@ import com.bloo.bluelink.data.setShowSearch
 import com.bloo.bluelink.data.setThemeMode
 import com.bloo.bluelink.data.setUiScale
 import com.bloo.bluelink.data.setUnitSystem
+import com.bloo.bluelink.data.setTempUnit
+import com.bloo.bluelink.data.setDistanceUnit
 import com.bloo.bluelink.data.setVibrancy
 
 // --- Appearance / UI preference setters (extracted from AppViewModel) ------
@@ -105,3 +107,7 @@ fun AppViewModel.setAuroraMotion(value: String) = viewModelScope.launch { settin
 
 /** Imperial vs. metric display throughout the app. */
 fun AppViewModel.setUnitSystem(value: String) = viewModelScope.launch { settingsStore.setUnitSystem(value) }
+
+fun AppViewModel.setTempUnit(value: String) = viewModelScope.launch { settingsStore.setTempUnit(value) }
+
+fun AppViewModel.setDistanceUnit(value: String) = viewModelScope.launch { settingsStore.setDistanceUnit(value) }

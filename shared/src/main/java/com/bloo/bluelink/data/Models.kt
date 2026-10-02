@@ -228,13 +228,21 @@ data class Battery12V(
     // {"batWarning":65} rather than a number, which would break parsing. It's
     // unused, so we let ignoreUnknownKeys skip it whatever its shape.
 ) {
+    /**
+     * The state of charge, or null when the car reported something that isn't a percentage. Some cars
+     * send a sentinel (255, -1) for "no reading" after a 12V reset or an ICCU fault; showing that as
+     * "255%" read as a real value, and calling it "Good" was worse. Every display goes through this.
+     */
+    val level: Int?
+        get() = batSoc?.takeIf { it in 0..100 }
+
     /** Coarse 12V battery health from state of charge / state flag. */
     val health: String?
         get() = when {
-            batSoc == null -> null
+            level == null -> null
             batState == 0 -> "Needs attention"
-            batSoc >= 75 -> "Good"
-            batSoc >= 50 -> "Fair"
+            level!! >= 75 -> "Good"
+            level!! >= 50 -> "Fair"
             else -> "Low"
         }
 

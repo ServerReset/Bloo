@@ -428,7 +428,7 @@ internal fun CoverMainTile(v: Vehicle, state: State<UiState>, vm: AppViewModel) 
     // action bar inside it) in every emission's invalidation set for as long as the cover was
     // showing. One derived read per value actually drawn.
     val status by remember(v.vin) { derivedStateOf { state.value.statusFor(v) } }
-    val metric = LocalAppearance.current.unitSystem == "metric"
+    val metric = LocalAppearance.current.metricDistance
     val imageUrl by remember(v.vin) { derivedStateOf { state.value.imageUrls[v.vin] } }
     val hasBattery by remember(v.vin) { derivedStateOf { state.value.hasBattery(v) } }
     val hasFuel by remember(v.vin) { derivedStateOf { state.value.hasFuel(v) } }

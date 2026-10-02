@@ -451,3 +451,21 @@ fun degValue(valueF: Double, fahrenheit: Boolean): Int =
  * for distance and jointly-negotiated for temperature.
  */
 fun useFahrenheit(unitSystem: String?): Boolean = (unitSystem ?: "imperial") != "metric"
+
+/**
+ * Temperature unit with its own override. [tempUnit] is "f", "c", or anything else (normally
+ * "auto") to follow the main Units setting -- so someone can read temperatures in Celsius and
+ * distances in miles, or the other way round, while everyone else still sets one switch.
+ */
+fun resolveFahrenheit(unitSystem: String?, tempUnit: String?): Boolean = when (tempUnit) {
+    "f" -> true
+    "c" -> false
+    else -> useFahrenheit(unitSystem)
+}
+
+/** Distance (mileage, range, trips, speed) unit with its own override: "km", "mi", or follow Units. */
+fun resolveMetricDistance(unitSystem: String?, distanceUnit: String?): Boolean = when (distanceUnit) {
+    "km" -> true
+    "mi" -> false
+    else -> (unitSystem ?: "imperial") == "metric"
+}

@@ -84,6 +84,8 @@ class SettingsStore(internal val context: Context) {
         val AURORA = stringPreferencesKey("aurora_background")
         val AURORA_MOTION = stringPreferencesKey("aurora_motion")
         val UNIT_SYSTEM = stringPreferencesKey("unit_system")
+        val TEMP_UNIT = stringPreferencesKey("temp_unit")
+        val DISTANCE_UNIT = stringPreferencesKey("distance_unit")
         val LAST_VIN = stringPreferencesKey("last_vehicle_vin")
         val ORDER = stringPreferencesKey("vehicle_order")
         val SETTINGS_MODE = stringPreferencesKey("settings_mode")
@@ -119,8 +121,14 @@ class SettingsStore(internal val context: Context) {
          *  location mode". False whenever a place is set explicitly, or the location is
          *  cleared -- see [setWeatherLocation]. */
         val weatherFollowsDevice: Boolean = false,
-        /** True for imperial (°F), false for metric (°C). Derived from [unitSystem]. */
+        /** True for °F, false for °C. Derived from [unitSystem], unless [tempUnit] overrides it. */
         val useFahrenheit: Boolean = true,
+        /** True for km (and km/h), false for miles. Derived from [unitSystem], unless [distanceUnit] overrides it. */
+        val metricDistance: Boolean = false,
+        /** "auto" (follow [unitSystem]), "f" or "c". */
+        val tempUnit: String = "auto",
+        /** "auto" (follow [unitSystem]), "mi" or "km". */
+        val distanceUnit: String = "auto",
         val biometricLock: Boolean = false,
         /** When the biometric lock re-engages after leaving the foreground. */
         val lockTiming: LockTiming = LockTiming.IMMEDIATE,
@@ -215,7 +223,10 @@ class SettingsStore(internal val context: Context) {
             unitSystem = prefs[Keys.UNIT_SYSTEM] ?: "imperial",
             // Shared rule -- see FormatUtils.useFahrenheit for why this stopped being
             // written out separately per surface.
-            useFahrenheit = useFahrenheit(prefs[Keys.UNIT_SYSTEM]),
+            useFahrenheit = resolveFahrenheit(prefs[Keys.UNIT_SYSTEM], prefs[Keys.TEMP_UNIT]),
+            metricDistance = resolveMetricDistance(prefs[Keys.UNIT_SYSTEM], prefs[Keys.DISTANCE_UNIT]),
+            tempUnit = prefs[Keys.TEMP_UNIT] ?: "auto",
+            distanceUnit = prefs[Keys.DISTANCE_UNIT] ?: "auto",
             pebbleOutline = prefs[Keys.PEBBLE_OUTLINE]?.toBooleanStrictOrNull() ?: false,
             coverSettingsHintDismissed = prefs[Keys.COVER_SETTINGS_HINT]?.toBooleanStrictOrNull() ?: false,
             showSearch = prefs[Keys.SHOW_SEARCH]?.toBooleanStrictOrNull() ?: true,

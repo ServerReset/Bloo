@@ -90,7 +90,7 @@ internal fun CriticalContent(
         }
     }
     val drivingLabel by remember(v.vin) { derivedStateOf { stateSource.value.drivingLabel(v) } }
-    val metric = LocalAppearance.current.unitSystem == "metric"
+    val metric = LocalAppearance.current.metricDistance
     HeroHeader(
         v, status, imageUrl, hasBattery, hasFuel, vm,
         modifier = modifier,

@@ -59,6 +59,8 @@ import com.bloo.bluelink.data.setServiceIntervalMiles
 import com.bloo.bluelink.data.setShowSearch
 import com.bloo.bluelink.data.setThemeMode
 import com.bloo.bluelink.data.setUnitSystem
+import com.bloo.bluelink.data.setTempUnit
+import com.bloo.bluelink.data.setDistanceUnit
 import com.bloo.bluelink.data.settingsMode
 import com.bloo.bluelink.data.unitSystem
 
@@ -175,6 +177,22 @@ internal fun buildSettingsSearchEntries(
             onSelect = { vm.setUnitSystem(it) },
         )
     }
+    add("Temperature unit", "temperature celsius fahrenheit degrees c f units") {
+        SettingsSegmentedRow(
+            label = "Temperature",
+            options = listOf(SegmentOption("auto", "Auto", null), SegmentOption("f", "°F", null), SegmentOption("c", "°C", null)),
+            selectedKey = appearance.tempUnit,
+            onSelect = { vm.setTempUnit(it) },
+        )
+    }
+    add("Distance unit", "distance mileage odometer range miles kilometres km units") {
+        SettingsSegmentedRow(
+            label = "Distance and mileage",
+            options = listOf(SegmentOption("auto", "Auto", null), SegmentOption("mi", "Miles", null), SegmentOption("km", "Km", null)),
+            selectedKey = appearance.distanceUnit,
+            onSelect = { vm.setDistanceUnit(it) },
+        )
+    }
     add("Font", "typeface atkinson hyperlegible google sans accessibility low vision") {
         val labels = mapOf(
             FontChoice.SYSTEM to "System default",
@@ -212,7 +230,7 @@ internal fun buildSettingsSearchEntries(
             )
         }
         parseOdometerMiles(v.odometer)?.let { odoInt ->
-            add("Odometer · ${v.name}", "odometer mileage miles ${v.name}") { StatusRow("Odometer", formatDistance(odoInt, appearance.unitSystem == "metric")) }
+            add("Odometer · ${v.name}", "odometer mileage miles ${v.name}") { StatusRow("Odometer", formatDistance(odoInt, appearance.metricDistance)) }
         }
         add("VIN · ${v.name}", "vin identification ${v.name} ${v.vin}") {
             SelectionContainer { StatusRow("VIN", v.vin) }
@@ -221,7 +239,7 @@ internal fun buildSettingsSearchEntries(
         // character-for-character (battery-range-else-null ?: dte, then toInt). One source of
         // truth for "what range do we show for this powertrain".
         st?.rangeMiFor(state.hasBattery(v))?.let { r ->
-            add("Range · ${v.name}", "range distance dte empty ${v.name}") { StatusRow("Range", formatDistance(r, appearance.unitSystem == "metric")) }
+            add("Range · ${v.name}", "range distance dte empty ${v.name}") { StatusRow("Range", formatDistance(r, appearance.metricDistance)) }
         }
         if (state.hasBattery(v)) {
             st?.evStatus?.batteryStatus?.let { b ->

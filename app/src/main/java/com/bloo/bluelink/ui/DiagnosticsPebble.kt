@@ -61,7 +61,7 @@ internal data class DiagRow(val label: String, val value: String, val indent: Bo
 internal fun DiagnosticsPebble(v: Vehicle, status: VehicleStatus?, state: UiState, vm: AppViewModel, modifier: Modifier) {
     val a = LocalAppearance.current
     val fahrenheit = a.useFahrenheit
-    val metric = a.unitSystem == "metric"
+    val metric = a.metricDistance
     val rows = remember(status, fahrenheit, metric) { buildList {
         status?.tirePressureLamp?.let { tp ->
             // No psi suffix. `TirePressure.all` was only ever populated FROM the warning lamp --
@@ -76,7 +76,7 @@ internal fun DiagnosticsPebble(v: Vehicle, status: VehicleStatus?, state: UiStat
             tp.rearRight?.let { add(DiagRow("Rear right", warn(it), indent = true)) }
         }
         status?.battery?.let { b ->
-            b.batSoc?.let { soc ->
+            b.level?.let { soc ->
                 add(DiagRow("12V battery", "$soc%"))
             }
         }

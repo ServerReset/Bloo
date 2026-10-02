@@ -212,7 +212,7 @@ fun AppViewModel.startClimate(v: Vehicle, req: ClimateRequest) =
         "climate",
         "Climate on (${com.bloo.bluelink.data.degLabel(
             req.tempF.toString(),
-            fahrenheit = appearance.value.unitSystem != "metric",
+            fahrenheit = appearance.value.useFahrenheit,
         )})",
         { it.copy(airCtrlOn = true) },
     ) {

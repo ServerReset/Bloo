@@ -238,7 +238,8 @@ internal fun SettingsSearchResults(
     // submitted (Enter/search key, or a suggestion tap), never mid-typing off
     // a debounce timer. Typing "lock my car" used to run the lock the moment
     // the debounce elapsed, whether or not that's what the user meant to do.
-    val metricUnits = appearance.unitSystem == "metric"
+    // parseVehicleCommand reads a bare temperature ("climate at 70"), so this follows the TEMPERATURE unit.
+    val metricUnits = !appearance.useFahrenheit
     var command by remember(submittedQuery, metricUnits) {
         mutableStateOf(if (submittedQuery.isBlank()) null else parseVehicleCommand(submittedQuery, metricUnits))
     }

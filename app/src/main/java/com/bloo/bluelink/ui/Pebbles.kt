@@ -258,7 +258,7 @@ internal fun SinglePebble(section: String, v: Vehicle, state: State<UiState>, vm
     // recomposed the whole pebble stack -- the per-pebble `stateSlice` calls below exist to
     // stop exactly that, and this one line was undoing them for the pebble's own scope.
     val status by remember(v.vin) { derivedStateOf { state.value.statuses[v.vin] } }
-    val metric = LocalAppearance.current.unitSystem == "metric"
+    val metric = LocalAppearance.current.metricDistance
     when (section) {
         "summary" -> {
             val heroState = stateSlice(state, v) { s ->

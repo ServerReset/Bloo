@@ -120,6 +120,11 @@ enum class Brand(
      *  the login form's PIN field filled in. */
     val requiresPin: Boolean get() = this != KIA
 
+    /** Whether sign-in itself is blocked without a PIN. Europe signs in with just email and password
+     *  (the PIN is only used to authorise remote commands, and many EU owners have never set one), so
+     *  the field is optional there; everywhere else it is needed up front. */
+    val pinRequiredToSignIn: Boolean get() = requiresPin && !isEurope
+
     /** True for the three Canada brands, which share [CanadaApi]/[CanadaRepository]
      *  rather than [BlueLinkApi]/[KiaUsaApi]. */
     val isCanada: Boolean get() = this == HYUNDAI_CA || this == GENESIS_CA || this == KIA_CA

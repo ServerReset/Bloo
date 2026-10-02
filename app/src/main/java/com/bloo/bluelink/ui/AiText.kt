@@ -51,7 +51,7 @@ internal fun summaryPrompt(v: Vehicle, status: VehicleStatus?, state: UiState): 
         if (state.hasFuel(v)) status.fuelLevel?.let { parts += "Fuel is at $it%." }
         status.rangeMiFor(state.hasBattery(v))?.let { parts += "Estimated driving range is $it miles." }
         status.airCtrlOn?.let { parts += "Climate is ${if (it) "on" else "off"}." }
-        status.battery?.batSoc?.let { parts += "The 12V starter battery is at $it%." }
+        status.battery?.level?.let { parts += "The 12V starter battery is at $it%." }
         v.odometer?.trim()?.takeIf { it.isNotBlank() }?.let { parts += "The odometer reads $it miles." }
         state.placeNames[v.vin]?.let { parts += "Last known location: $it." }
         // Warnings.
