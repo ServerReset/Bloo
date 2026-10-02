@@ -371,7 +371,7 @@ private const val GlassCardTintAlpha = 0.12f
  */
 internal fun Modifier.glassSheen(): Modifier = this.background(
     androidx.compose.ui.graphics.Brush.linearGradient(
-        0f to Color.White.copy(alpha = 0.10f),
+        0f to Color.White.copy(alpha = 0.06f),
         0.45f to Color.White.copy(alpha = 0.0f),
         1f to Color.White.copy(alpha = 0.04f),
     ),
@@ -389,6 +389,8 @@ internal fun Modifier.glassCardFill(shape: Shape, tint: Color): Modifier {
     return if (haze != null && canBlurBackdrops()) {
         this.clip(shape)
             .appGlassEffect(haze, shape, card = true)
+            // A faint dark veil in dark mode keeps text legible over the now-clear glass.
+            .background(if (appIsDarkTheme()) Color.Black.copy(alpha = 0.20f) else Color.Transparent)
             .background(tint.copy(alpha = GlassCardTintAlpha))
             .glassSheen()
     } else {

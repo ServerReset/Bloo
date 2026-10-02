@@ -35,21 +35,27 @@ internal fun Modifier.appGlassEffect(state: HazeState, shape: Shape, card: Boole
 }
 
 @OptIn(ExperimentalHazeApi::class)
-private fun glassStyle(shape: RoundedCornerShape, card: Boolean): GlassStyle = GlassStyle.regular.then {
+private fun glassStyle(shape: RoundedCornerShape, card: Boolean): GlassStyle = GlassStyle.clear.then {
+    // Liquid glass: nearly clear in the middle (a whisper of blur, no milky white lift), with the
+    // bending concentrated in a bezel at the edge and a specular glint riding it. Starts from Haze's
+    // "clear" material, which keeps the backdrop legible, rather than the frosted "regular" one.
     shape(shape)
     optics(
         GlassOptics(
-            refractionStrength = if (card) 1f else 0.9f,
-            refractionHeightFraction = 0.3f,
-            refractionDisplacement = if (card) 44.dp else 18.dp,
-            depth = OpticalSizeValue.Fixed(0.8f),
-            blurRadius = OpticalSizeValue.Fixed(if (card) 9.dp else 8.dp),
-            refractionDetailIntensity = if (card) 0.7f else 0.4f,
-            refractionProfile = RefractionProfile.Edge(if (card) 38.dp else 14.dp),
+            refractionStrength = 1f,
+            refractionHeightFraction = 0.35f,
+            refractionDisplacement = if (card) 40.dp else 16.dp,
+            depth = OpticalSizeValue.Fixed(1f),
+            blurRadius = OpticalSizeValue.Fixed(if (card) 3.dp else 2.dp),
+            refractionDetailIntensity = if (card) 0.8f else 0.5f,
+            refractionProfile = RefractionProfile.Edge(if (card) 30.dp else 12.dp),
         ),
     )
-    chromaticAberrationStrength(if (card) 0.09f else 0.06f)
+    chromaticAberrationStrength(if (card) 0.07f else 0.05f)
     chromaticAberrationMode(ChromaticAberrationMode.Simple)
-    specularIntensity(0.55f)
-    ambientResponse(0.3f)
+    specularIntensity(0.7f)
+    ambientResponse(0.45f)
+    whitePoint(0.05f)
+    chromaMultiplier(1.1f)
+    contrast(0.04f)
 }
