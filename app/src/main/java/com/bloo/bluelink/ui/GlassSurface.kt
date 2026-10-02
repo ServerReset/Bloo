@@ -101,7 +101,8 @@ internal fun GlassSurface(
                 .clip(shape)
                 .then(if (canBlur) Modifier.appHazeEffect(hazeState!!) else Modifier)
                 .background(tint)
-                .glassSheen(),
+                .glassSheen()
+                .glassRefraction(shape),
         )
         CompositionLocalProvider(LocalContentColor provides contentColor) {
             content()
