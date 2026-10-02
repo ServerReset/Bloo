@@ -12,13 +12,13 @@ import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.compose.ui.platform.LocalContext
 import com.bloo.bluelink.data.SettingsStore
+import androidx.compose.material.icons.filled.Watch
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
@@ -55,9 +55,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import com.bloo.bluelink.data.PinCrypto
-import com.bloo.bluelink.data.Powertrain
 import com.bloo.bluelink.data.SeatConfig
-import com.bloo.bluelink.data.platformOverridable
 import com.bloo.bluelink.data.Vehicle
 import kotlinx.coroutines.launch
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -433,65 +431,104 @@ internal fun OnboardingTipCard(icon: ImageVector, title: String, body: String) {
 }
 
 
-/** One card per car: powertrain, head-unit generation, seats and steering-wheel heat, wired straight to the view model. */
+/** The "this is right" button every per-car card ends with: it confirms the answers on the card and
+ *  lets the deck move on. Once confirmed it reads as done and stops being a button. */
 @Composable
-internal fun OnboardingCarPage(
-    vehicle: com.bloo.bluelink.data.Vehicle?,
-    state: UiState,
-    sc: com.bloo.bluelink.data.SeatConfig,
-    vm: AppViewModel,
-) {
-    val scheme = MaterialTheme.colorScheme
-    if (vehicle == null) return
-    Column(verticalArrangement = Arrangement.spacedBy(GapRow)) {
-        Text("Powertrain", style = MaterialTheme.typography.labelMedium, color = scheme.primary, fontWeight = FontWeight.SemiBold)
-        val currentPt = state.powertrainOf(vehicle)
-        PowertrainPicker(current = currentPt) { pt -> vm.setPowertrain(vehicle, pt) }
-    }
-
-    // Only Hyundai/Genesis US vehicles have a real head-unit generation to
-    // confirm -- see platformOverridable's own doc.
-    if (vehicle.platformOverridable) {
-        Column(verticalArrangement = Arrangement.spacedBy(GapRow)) {
-            Text("Head-unit generation", style = MaterialTheme.typography.labelMedium, color = scheme.primary, fontWeight = FontWeight.SemiBold)
-            PlatformPicker(current = state.platformOf(vehicle)) { pt -> vm.setPlatform(vehicle, pt) }
-        }
-    }
-
-    Column(verticalArrangement = Arrangement.spacedBy(GapRow)) {
-        Text("Seats", style = MaterialTheme.typography.labelMedium, color = scheme.primary, fontWeight = FontWeight.SemiBold)
-        Column(
-            Modifier
-                .fillMaxWidth()
-                .outlinedPanel(12.dp),
-        ) {
-            SeatPositions.forEachIndexed { i: Int, pos: SeatPosition ->
-                if (i > 0) SectionDivider(alpha = 0.35f)
-                // The shared SeatConfigRow (Rows.kt) -- the exact row, with the exact
-                // signature, that the per-car Settings card renders. The wizard used to keep
-                // its own copy (WizardSeatRow + WizardToggleChip): same label + Heat/Cool
-                // pair, but on half-height bespoke pills instead of MorphChip, and its "Cool"
-                // chip carried a ❄️ the Settings one never had. One row, two places.
-                SeatConfigRow(
-                    pos.label,
-                    pos.heat(sc),
-                    pos.cool(sc),
-                    onHeat = { enabled: Boolean -> vm.setSeatFlag(vehicle, pos.heatKey, enabled) },
-                    onCool = { enabled: Boolean -> vm.setSeatFlag(vehicle, pos.coolKey, enabled) },
-                )
-            }
-        }
-    }
-
-    Column(verticalArrangement = Arrangement.spacedBy(GapRow)) {
-        Text("Extras", style = MaterialTheme.typography.labelMedium, color = scheme.primary, fontWeight = FontWeight.SemiBold)
-        // ToggleRow -- the app's one boolean-setting control, and the same row the
-        // per-car Settings card shows this exact flag on ("Heated steering wheel").
-        // This was a bespoke checkmark-pill MorphButton: a THIRD treatment of one
-        // boolean, next to Settings' ToggleRow and the wizard's own steering page
-        // (which hand-rolled a switch row of its own, see WizardSteeringPage). Same
-        // label as Settings too, so the wizard doesn't teach a name the app then
-        // stops using.
-        ToggleRow("Heated steering wheel", sc.steeringWheel) { vm.setSeatFlag(vehicle, "sw", it) }
+private fun ConfirmButton(label: String, confirmed: Boolean, onConfirm: () -> Unit) {
+    if (confirmed) {
+        IconLeadRow(AppIcons.CheckCircle, tint = MaterialTheme.colorScheme.primary, title = "Confirmed", badgeSize = 32.dp)
+    } else {
+        MorphActionButton(
+            label = label,
+            icon = AppIcons.Check,
+            onClick = onConfirm,
+            modifier = Modifier.fillMaxWidth(),
+            emphasis = ButtonEmphasis.Primary,
+        )
     }
 }
+
+/** Card 1 of a car: what powers it, which decides whether it shows a battery, a fuel gauge, or both. */
+@Composable
+internal fun OnboardingPowertrainPage(
+    vehicle: com.bloo.bluelink.data.Vehicle,
+    state: UiState,
+    vm: AppViewModel,
+    confirmed: Boolean,
+    onConfirm: () -> Unit,
+) {
+    BodySmallText("Sets the right status tiles: battery for an EV, fuel for gas, both for a plug-in hybrid. Pick what your ${vehicle.name} is.")
+    PowertrainPicker(current = state.powertrainOf(vehicle)) { pt ->
+        vm.setPowertrain(vehicle, pt)
+        onConfirm()
+    }
+    ConfirmButton("Yes, that's my car", confirmed, onConfirm)
+}
+
+/** Card 2 of a Hyundai/Genesis US car: its head-unit generation, which the API can't always tell. */
+@Composable
+internal fun OnboardingPlatformPage(
+    vehicle: com.bloo.bluelink.data.Vehicle,
+    state: UiState,
+    vm: AppViewModel,
+    confirmed: Boolean,
+    onConfirm: () -> Unit,
+) {
+    BodySmallText("Confirm the ${vehicle.name}'s head unit. Some features only show when the car supports them.")
+    PlatformPicker(current = state.platformOf(vehicle)) { pt ->
+        vm.setPlatform(vehicle, pt)
+        onConfirm()
+    }
+    ConfirmButton("That's right", confirmed, onConfirm)
+}
+
+/** Card 3 of a car: which seats heat or cool, and whether the wheel heats, so the climate controls match. */
+@Composable
+internal fun OnboardingClimatePage(
+    vehicle: com.bloo.bluelink.data.Vehicle,
+    state: UiState,
+    vm: AppViewModel,
+    confirmed: Boolean,
+    onConfirm: () -> Unit,
+) {
+    val sc = state.seatConfigs[vehicle.vin] ?: com.bloo.bluelink.data.SeatConfig()
+    BodySmallText("Switch on what your ${vehicle.name} actually has. Leave a seat off if it can't heat or cool.")
+    Column(Modifier.fillMaxWidth().outlinedPanel(12.dp)) {
+        SeatPositions.forEachIndexed { i: Int, pos: SeatPosition ->
+            if (i > 0) SectionDivider(alpha = 0.35f)
+            SeatConfigRow(
+                pos.label,
+                pos.heat(sc),
+                pos.cool(sc),
+                onHeat = { enabled: Boolean -> vm.setSeatFlag(vehicle, pos.heatKey, enabled) },
+                onCool = { enabled: Boolean -> vm.setSeatFlag(vehicle, pos.coolKey, enabled) },
+            )
+        }
+    }
+    ToggleRow("Heated steering wheel", sc.steeringWheel) { vm.setSeatFlag(vehicle, "sw", it) }
+    ConfirmButton("These are my car's features", confirmed, onConfirm)
+}
+
+/** Which alerts to get. The same switches as Settings → Notifications, the ones most people want decided up front. */
+@Composable
+internal fun OnboardingAlertsPage(notif: SettingsStore.NotificationPrefs, vm: AppViewModel) {
+    BodySmallText("Choose what Bloo tells you about. You can change any of these later in Settings.")
+    Column(Modifier.fillMaxWidth().outlinedPanel(12.dp)) {
+        ToggleRow("Live charging updates", notif.charging, description = "Progress and a Stop button while a car charges.") { vm.setNotifyCharging(it) }
+        ToggleRow("Charge complete", notif.chargeComplete) { vm.setNotifyChargeComplete(it) }
+        ToggleRow("Left unlocked", notif.unlocked) { vm.setNotifyUnlocked(it) }
+        ToggleRow("Door left open", notif.doorOpen) { vm.setNotifyDoor(it) }
+        ToggleRow("Service due", notif.service) { vm.setNotifyService(it) }
+    }
+}
+
+/** The watch: optional, so it is offered rather than required, with the same setup dialog Settings uses. */
+@Composable
+internal fun OnboardingWatchPage(state: UiState) {
+    var show by remember { mutableStateOf(false) }
+    BodySmallText("Got a Wear OS watch? Bloo has a watch app with quick actions, a Tile and its own notifications. It installs straight from this phone, no Play Store needed.")
+    SafeMorphTextButton("Set up my watch", onClick = { show = true }, icon = Icons.Filled.Watch)
+    BodySmallText("No watch? Swipe on. You can set one up later from Settings → Backup & sync.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+    if (show) SetupWatchDialog(phoneName = "this phone", onDismiss = { show = false })
+}
+

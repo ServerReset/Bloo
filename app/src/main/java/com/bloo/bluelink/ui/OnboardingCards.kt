@@ -36,7 +36,11 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.filled.AcUnit
 import androidx.compose.material.icons.filled.CloudSync
+import androidx.compose.material.icons.filled.Memory
+import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material.icons.filled.Watch
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.DirectionsCar
 import androidx.compose.material.icons.filled.TouchApp
@@ -71,17 +75,26 @@ internal fun onboardingCardSpec(kind: OnboardingStepKind, carName: String?, newC
         Icons.Filled.Palette, "Look and feel",
         "How Bloo looks and which units it speaks.",
     )
-    OnboardingStepKind.CAR -> if (newCar) {
-        OnboardingCardSpec(
-            Icons.Filled.DirectionsCar, "Meet ${carName ?: "your new car"}",
-            "A new car just joined your garage. Tell Bloo what it can do and it's ready to go.",
-        )
-    } else {
-        OnboardingCardSpec(
-            Icons.Filled.DirectionsCar, carName ?: "Your car",
-            "Set powertrain and features once so the right controls appear.",
-        )
-    }
+    OnboardingStepKind.ALERTS -> OnboardingCardSpec(
+        Icons.Filled.Notifications, "What to tell you",
+        "Pick the alerts you want. Change them any time in Settings.",
+    )
+    OnboardingStepKind.WATCH -> OnboardingCardSpec(
+        Icons.Filled.Watch, "Your watch",
+        "Quick actions, a Tile and notifications on your wrist.",
+    )
+    OnboardingStepKind.CAR_POWERTRAIN -> OnboardingCardSpec(
+        Icons.Filled.DirectionsCar, if (newCar) "Meet ${carName ?: "your new car"}" else "${carName ?: "Your car"}: what powers it",
+        if (newCar) "A new car just joined your garage. First: what powers it?" else "Gas, hybrid, plug-in or electric.",
+    )
+    OnboardingStepKind.CAR_PLATFORM -> OnboardingCardSpec(
+        Icons.Filled.Memory, "${carName ?: "Your car"}: head unit",
+        "Which generation of infotainment it has.",
+    )
+    OnboardingStepKind.CAR_CLIMATE -> OnboardingCardSpec(
+        Icons.Filled.AcUnit, "${carName ?: "Your car"}: seats and climate",
+        "Heated and ventilated seats, heated wheel.",
+    )
     OnboardingStepKind.TIPS -> OnboardingCardSpec(
         Icons.Filled.TouchApp, "Getting around",
         "A few things that make Bloo quick to use.",
@@ -118,8 +131,9 @@ internal fun onboardingAccent(kind: OnboardingStepKind): Color {
     val scheme = MaterialTheme.colorScheme
     return when (kind) {
         OnboardingStepKind.WELCOME, OnboardingStepKind.SETUP, OnboardingStepKind.FEATURES -> scheme.primary
-        OnboardingStepKind.RESTORE, OnboardingStepKind.CAR -> scheme.tertiary
-        OnboardingStepKind.LOOK, OnboardingStepKind.TIPS -> scheme.secondary
+        OnboardingStepKind.RESTORE, OnboardingStepKind.CAR_POWERTRAIN, OnboardingStepKind.CAR_PLATFORM,
+        OnboardingStepKind.CAR_CLIMATE -> scheme.tertiary
+        OnboardingStepKind.LOOK, OnboardingStepKind.TIPS, OnboardingStepKind.ALERTS, OnboardingStepKind.WATCH -> scheme.secondary
     }
 }
 
@@ -129,9 +143,20 @@ internal fun onboardingAccent(kind: OnboardingStepKind): Color {
  */
 @Composable
 internal fun OnboardingHero(icon: ImageVector, accent: Color, current: Boolean, onTap: () -> Unit = {}) {
-    val pulse = rememberInfiniteTransition(label = "heroPulse")
-    val glow by pulse.animateFloat(0.55f, 1f, infiniteRepeatable(tween(2600, easing = LinearEasing), RepeatMode.Reverse), label = "glow")
-    val bob by pulse.animateFloat(-4f, 4f, infiniteRepeatable(tween(3200, easing = LinearEasing), RepeatMode.Reverse), label = "bob")
+    // Only the card in view breathes and floats; the neighbours the pager keeps ready stay still,
+    // so a deck of seven runs one animation, not seven.
+    // States, read only inside the draw and layer lambdas below, so a frame of the animation redraws
+    // the glyph without recomposing it.
+    val glow: androidx.compose.runtime.State<Float>
+    val bob: androidx.compose.runtime.State<Float>
+    if (current) {
+        val pulse = rememberInfiniteTransition(label = "heroPulse")
+        glow = pulse.animateFloat(0.55f, 1f, infiniteRepeatable(tween(2600, easing = LinearEasing), RepeatMode.Reverse), label = "glow")
+        bob = pulse.animateFloat(-4f, 4f, infiniteRepeatable(tween(3200, easing = LinearEasing), RepeatMode.Reverse), label = "bob")
+    } else {
+        glow = remember { androidx.compose.runtime.mutableFloatStateOf(0.8f) }
+        bob = remember { androidx.compose.runtime.mutableFloatStateOf(0f) }
+    }
     val pop by animateFloatAsState(
         if (current) 1f else 0.82f,
         spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessLow),
@@ -148,7 +173,7 @@ internal fun OnboardingHero(icon: ImageVector, accent: Color, current: Boolean, 
     Box(
         Modifier
             .size(92.dp)
-            .graphicsLayer { translationY = bob; scaleX = pop * squishScale; scaleY = pop * squishScale }
+            .graphicsLayer { translationY = bob.value; scaleX = pop * squishScale; scaleY = pop * squishScale }
             .clip(CircleShape)
             .clickable(interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }, indication = null) {
                 squish = true
@@ -156,7 +181,7 @@ internal fun OnboardingHero(icon: ImageVector, accent: Color, current: Boolean, 
             }
             .drawBehind {
                 drawCircle(
-                    Brush.radialGradient(listOf(accent.copy(alpha = 0.55f * glow), Color.Transparent), radius = size.minDimension * 0.95f),
+                    Brush.radialGradient(listOf(accent.copy(alpha = 0.55f * glow.value), Color.Transparent), radius = size.minDimension * 0.95f),
                     radius = size.minDimension * 0.95f,
                 )
             },
@@ -194,9 +219,11 @@ internal fun OnboardingGlassCard(
     val scheme = MaterialTheme.colorScheme
     GlassSurface(
         shape = ExtraLargeShape,
-        hazeState = hazeState,
+        // Only the card in view is blurred glass; the neighbours are a plain tint (they are mostly
+        // faded out) -- three live blurs per frame was a large part of the swipe lag.
+        hazeState = if (current) hazeState else null,
         modifier = Modifier.fillMaxWidth(),
-        tint = scheme.surface.copy(alpha = if (canBlurBackdrops()) 0.30f else 0.90f),
+        tint = scheme.surface.copy(alpha = if (current && canBlurBackdrops()) 0.30f else 0.55f),
         contentAlignment = Alignment.TopStart,
     ) {
         Column(Modifier.fillMaxWidth().padding(22.dp), verticalArrangement = Arrangement.spacedBy(GapGroup)) {

@@ -42,50 +42,63 @@ class OnboardingStepsTest {
 
     private fun kinds(steps: List<OnboardingStep>) = steps.map { it.kind }
 
+    private val firstRunHead = listOf(
+        OnboardingStepKind.WELCOME, OnboardingStepKind.RESTORE, OnboardingStepKind.SETUP,
+        OnboardingStepKind.LOOK, OnboardingStepKind.ALERTS,
+    )
+    private val tail = listOf(OnboardingStepKind.WATCH, OnboardingStepKind.TIPS, OnboardingStepKind.FEATURES)
+
     @Test
-    fun firstRun_walksWelcomeToFeatures_withACardPerCar() {
+    fun firstRun_asksEveryCarForPowertrainHeadUnitAndSeats() {
         val steps = buildOnboardingSteps(OnboardingMode.FirstRun, listOf(usHyundai, usKia))
         assertEquals(
-            listOf(
-                OnboardingStepKind.WELCOME, OnboardingStepKind.RESTORE, OnboardingStepKind.SETUP, OnboardingStepKind.LOOK,
-                OnboardingStepKind.CAR, OnboardingStepKind.CAR, OnboardingStepKind.TIPS, OnboardingStepKind.FEATURES,
-            ),
+            firstRunHead +
+                // A US Hyundai has a head unit to confirm; a US Kia does not.
+                listOf(OnboardingStepKind.CAR_POWERTRAIN, OnboardingStepKind.CAR_PLATFORM, OnboardingStepKind.CAR_CLIMATE) +
+                listOf(OnboardingStepKind.CAR_POWERTRAIN, OnboardingStepKind.CAR_CLIMATE) + tail,
             kinds(steps),
         )
-        assertEquals(listOf(usHyundai.vin, usKia.vin), steps.filter { it.kind == OnboardingStepKind.CAR }.map { it.vin })
+        assertEquals(
+            listOf(usHyundai.vin, usHyundai.vin, usHyundai.vin, usKia.vin, usKia.vin),
+            steps.filter { it.kind.needsConfirmation() }.map { it.vin },
+        )
     }
 
     @Test
     fun firstRun_skipsCarsARestoredBackupAlreadyConfigured() {
         val steps = buildOnboardingSteps(OnboardingMode.FirstRun, listOf(usHyundai, usKia), preConfiguredVins = setOf(usHyundai.vin))
-        assertEquals(listOf(usKia.vin), steps.filter { it.kind == OnboardingStepKind.CAR }.map { it.vin })
+        assertEquals(setOf(usKia.vin), steps.filter { it.kind.needsConfirmation() }.map { it.vin }.toSet())
     }
 
     @Test
     fun firstRun_withNoCars_hasNoCarCards() {
-        assertEquals(
-            listOf(
-                OnboardingStepKind.WELCOME, OnboardingStepKind.RESTORE, OnboardingStepKind.SETUP,
-                OnboardingStepKind.LOOK, OnboardingStepKind.TIPS, OnboardingStepKind.FEATURES,
-            ),
-            kinds(buildOnboardingSteps(OnboardingMode.FirstRun, emptyList())),
-        )
+        assertEquals(firstRunHead + tail, kinds(buildOnboardingSteps(OnboardingMode.FirstRun, emptyList())))
     }
 
     @Test
-    fun newCars_isJustACardForEachNamedCar() {
+    fun newCars_isJustTheCarCardsForEachNamedCar() {
         val steps = buildOnboardingSteps(OnboardingMode.NewCars(listOf(usKia.vin)), listOf(usHyundai, usKia))
-        assertEquals(listOf(OnboardingStep(OnboardingStepKind.CAR, usKia.vin)), steps)
+        assertEquals(
+            listOf(OnboardingStep(OnboardingStepKind.CAR_POWERTRAIN, usKia.vin), OnboardingStep(OnboardingStepKind.CAR_CLIMATE, usKia.vin)),
+            steps,
+        )
     }
 
     @Test
     fun replay_dropsRestoreAndCars() {
         assertEquals(
             listOf(
-                OnboardingStepKind.WELCOME, OnboardingStepKind.SETUP, OnboardingStepKind.LOOK,
-                OnboardingStepKind.TIPS, OnboardingStepKind.FEATURES,
+                OnboardingStepKind.WELCOME, OnboardingStepKind.SETUP, OnboardingStepKind.LOOK, OnboardingStepKind.ALERTS,
+                OnboardingStepKind.WATCH, OnboardingStepKind.TIPS, OnboardingStepKind.FEATURES,
             ),
             kinds(buildOnboardingSteps(OnboardingMode.Replay, listOf(usHyundai, usKia))),
         )
+    }
+
+    @Test
+    fun onlyTheCarCardsNeedConfirming() {
+        OnboardingStepKind.entries.forEach { kind ->
+            assertEquals(kind.name.startsWith("CAR_"), kind.needsConfirmation(), kind.name)
+        }
     }
 }

@@ -55,7 +55,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
-import com.bloo.bluelink.data.SeatConfig
 import com.bloo.bluelink.data.Vehicle
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
@@ -64,7 +63,16 @@ import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 
-internal enum class OnboardingStepKind { WELCOME, RESTORE, SETUP, LOOK, CAR, TIPS, FEATURES }
+internal enum class OnboardingStepKind {
+    WELCOME, RESTORE, SETUP, LOOK, ALERTS, WATCH,
+    /** The three per-car questions. Each one blocks until it is answered: see [needsConfirmation]. */
+    CAR_POWERTRAIN, CAR_PLATFORM, CAR_CLIMATE,
+    TIPS, FEATURES,
+}
+
+/** The per-car cards, whose answers shape which controls a car gets, so they must be confirmed. */
+internal fun OnboardingStepKind.needsConfirmation(): Boolean =
+    this == OnboardingStepKind.CAR_POWERTRAIN || this == OnboardingStepKind.CAR_PLATFORM || this == OnboardingStepKind.CAR_CLIMATE
 
 internal data class OnboardingStep(val kind: OnboardingStepKind, val vin: String? = null)
 
@@ -117,10 +125,11 @@ internal fun setupIsBlocked(
 /**
  * The cards in a deck, in order.
  *
- *  - First run: welcome, restore-from-sync, setup (notifications, lock, Drive), look and feel,
- *    then one card per car that isn't already configured, tips, and the closing features card.
- *  - New cars: just a card per car in [OnboardingMode.NewCars.vins].
- *  - Replay: welcome, setup, look, tips, features -- the answers already given are not asked again.
+ *  - First run: welcome, restore-from-sync, setup (notifications, lock, Drive), look and feel, which
+ *    alerts to get, then three cards for each car that isn't already configured (powertrain, head
+ *    unit where it applies, seats and steering wheel), the watch, tips and the features card.
+ *  - New cars: just those three cards for each car in [OnboardingMode.NewCars.vins].
+ *  - Replay: welcome, setup, look, alerts, watch, tips, features -- the per-car answers are not asked again.
  *
  * [preConfiguredVins] skips a car's card on first run: a backup restored on the RESTORE card can
  * bring in real powertrain/seat config for a car already set up on another device.
@@ -130,13 +139,20 @@ internal fun buildOnboardingSteps(
     vehicles: List<com.bloo.bluelink.data.Vehicle>,
     preConfiguredVins: Set<String> = emptySet(),
 ): List<OnboardingStep> = buildList {
+    fun carCards(v: com.bloo.bluelink.data.Vehicle) {
+        add(OnboardingStep(OnboardingStepKind.CAR_POWERTRAIN, v.vin))
+        // Only Hyundai/Genesis US cars have a head-unit generation to confirm.
+        if (v.platformOverridable) add(OnboardingStep(OnboardingStepKind.CAR_PLATFORM, v.vin))
+        add(OnboardingStep(OnboardingStepKind.CAR_CLIMATE, v.vin))
+    }
     when (mode) {
-        is OnboardingMode.NewCars ->
-            vehicles.filter { it.vin in mode.vins }.forEach { add(OnboardingStep(OnboardingStepKind.CAR, it.vin)) }
+        is OnboardingMode.NewCars -> vehicles.filter { it.vin in mode.vins }.forEach(::carCards)
         OnboardingMode.Replay -> {
             add(OnboardingStep(OnboardingStepKind.WELCOME))
             add(OnboardingStep(OnboardingStepKind.SETUP))
             add(OnboardingStep(OnboardingStepKind.LOOK))
+            add(OnboardingStep(OnboardingStepKind.ALERTS))
+            add(OnboardingStep(OnboardingStepKind.WATCH))
             add(OnboardingStep(OnboardingStepKind.TIPS))
             add(OnboardingStep(OnboardingStepKind.FEATURES))
         }
@@ -145,7 +161,9 @@ internal fun buildOnboardingSteps(
             add(OnboardingStep(OnboardingStepKind.RESTORE))
             add(OnboardingStep(OnboardingStepKind.SETUP))
             add(OnboardingStep(OnboardingStepKind.LOOK))
-            vehicles.forEach { if (it.vin !in preConfiguredVins) add(OnboardingStep(OnboardingStepKind.CAR, it.vin)) }
+            add(OnboardingStep(OnboardingStepKind.ALERTS))
+            vehicles.filter { it.vin !in preConfiguredVins }.forEach(::carCards)
+            add(OnboardingStep(OnboardingStepKind.WATCH))
             add(OnboardingStep(OnboardingStepKind.TIPS))
             add(OnboardingStep(OnboardingStepKind.FEATURES))
         }
@@ -166,6 +184,7 @@ internal fun OnboardingScreen(vm: AppViewModel, mode: OnboardingMode = Onboardin
     val canBio = remember { vm.canUseBiometrics() }
     val scheme = MaterialTheme.colorScheme
     val appearance by vm.appearance.collectAsStateWithLifecycle()
+    val notif by vm.notifications.collectAsStateWithLifecycle()
     val firstRun = mode == OnboardingMode.FirstRun
     // Notifications are REQUIRED on the setup card (API 33+), so the grant must be visible to
     // the Next gate here, not only to the card's own button. Re-checked on resume so returning
@@ -209,16 +228,32 @@ internal fun OnboardingScreen(vm: AppViewModel, mode: OnboardingMode = Onboardin
     // First run only: the setup card is BLOCKING. Notifications (API 33+) and a lock (biometrics
     // when the device has them, else a PIN) are both required before Next unlocks.
     val notificationsSupported = Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU
-    val onSetup = firstRun && steps.getOrNull(pageIndex)?.kind == OnboardingStepKind.SETUP
-    val notifRequired = notifRequiredOnSetup(onSetup, notificationsSupported, notifGranted)
-    val setupBlocked = setupIsBlocked(onSetup, notificationsSupported, notifGranted, canBio, appearance.biometricLock, state.appPinSet)
-    val setupIndex = steps.indexOfFirst { it.kind == OnboardingStepKind.SETUP }
-    val setupUnmet = firstRun &&
+    // Car cards ask a real question (does it have heated seats? is it a hybrid?), so each one must
+    // be answered -- confirmed -- before the deck lets you past it. Confirmed answers are kept for
+    // the life of the deck, keyed by card kind and car.
+    var confirmed by remember { mutableStateOf(emptySet<String>()) }
+    fun confirmKey(step: OnboardingStep) = "${step.kind}:${step.vin}"
+    val confirm: (OnboardingStep) -> Unit = { step -> confirmed = confirmed + confirmKey(step) }
+    val setupUnmetNow = firstRun &&
         setupIsBlocked(true, notificationsSupported, notifGranted, canBio, appearance.biometricLock, state.appPinSet)
-    // Swiping is free, but not past the setup card while what it requires is undone: the deck
-    // settles back onto it, the same gate the Next button enforces.
-    LaunchedEffect(pagerState.settledPage, setupUnmet) {
-        if (setupUnmet && setupIndex >= 0 && pagerState.settledPage > setupIndex) pagerState.animateScrollToPage(setupIndex)
+    /** Whether leaving card [i] is blocked right now, and why. */
+    fun blockReason(i: Int): String? {
+        val step = steps.getOrNull(i) ?: return null
+        return when {
+            step.kind == OnboardingStepKind.SETUP && setupUnmetNow ->
+                if (notifRequiredOnSetup(true, notificationsSupported, notifGranted)) "Turn on notifications above to continue."
+                else "Set up the lock above to continue."
+            step.kind.needsConfirmation() && !replayMode(mode) && confirmKey(step) !in confirmed ->
+                "Confirm your answer above to continue."
+            else -> null
+        }
+    }
+    val blockedHere = blockReason(pageIndex)
+    val gateIndex = steps.indices.firstOrNull { blockReason(it) != null } ?: Int.MAX_VALUE
+    // Swiping is free, but not past a card whose question is still open: the deck settles back onto it,
+    // the same gate the Next button enforces.
+    LaunchedEffect(pagerState.settledPage, gateIndex) {
+        if (pagerState.settledPage > gateIndex) pagerState.animateScrollToPage(gateIndex)
     }
 
     fun finish() = when (mode) {
@@ -306,7 +341,8 @@ internal fun OnboardingScreen(vm: AppViewModel, mode: OnboardingMode = Onboardin
             label = "deckAccent",
         )
         Box(Modifier.matchParentSize().hazeSource(haze)) {
-            AuroraBackground(Modifier.matchParentSize())
+            // Frozen: a drifting aurora under blurred glass re-blurs every frame.
+            AuroraBackground(Modifier.matchParentSize(), paused = true)
             Box(
                 Modifier.matchParentSize().drawBehind {
                     drawRect(
@@ -339,17 +375,17 @@ internal fun OnboardingScreen(vm: AppViewModel, mode: OnboardingMode = Onboardin
                 val step = steps.getOrNull(idx) ?: return@HorizontalPager
                 // How far this card is from the centre: 0 on it, 1 a full card away. The cards
                 // shrink, fade and tilt away as they leave, so the deck has depth.
-                val distance = ((pagerState.currentPage - idx) + pagerState.currentPageOffsetFraction)
-                val away = kotlin.math.abs(distance).coerceIn(0f, 1f)
+                // Read INSIDE graphicsLayer, never here: a read in this scope recomposed every page's
+                // whole content on every drag frame, which is what made swiping lag.
                 Column(
                     Modifier
                         .fillMaxSize()
                         .graphicsLayer {
+                            val away = kotlin.math.abs((pagerState.currentPage - idx) + pagerState.currentPageOffsetFraction)
+                                .coerceIn(0f, 1f)
                             val scale = 1f - 0.08f * away
                             scaleX = scale; scaleY = scale
                             alpha = 1f - 0.45f * away
-                            rotationY = -distance.coerceIn(-1f, 1f) * 14f
-                            cameraDistance = 14f * density
                         }
                         .verticalScroll(rememberScrollState())
                         .padding(top = 16.dp, bottom = 24.dp),
@@ -373,9 +409,16 @@ internal fun OnboardingScreen(vm: AppViewModel, mode: OnboardingMode = Onboardin
                                 OnboardingStepKind.RESTORE -> OnboardingRestorePage(vm)
                                 OnboardingStepKind.SETUP -> OnboardingSetupPage(vm, state, context, canBio, appearance.biometricLock, notifGranted) { notifGranted = it }
                                 OnboardingStepKind.LOOK -> OnboardingLookPage(appearance, vm)
-                                OnboardingStepKind.CAR -> {
-                                    val sc = vehicle?.let { state.seatConfigs[it.vin] } ?: com.bloo.bluelink.data.SeatConfig()
-                                    OnboardingCarPage(vehicle, state, sc, vm)
+                                OnboardingStepKind.ALERTS -> OnboardingAlertsPage(notif, vm)
+                                OnboardingStepKind.WATCH -> OnboardingWatchPage(state)
+                                OnboardingStepKind.CAR_POWERTRAIN -> vehicle?.let {
+                                    OnboardingPowertrainPage(it, state, vm, confirmKey(step) in confirmed) { confirm(step) }
+                                }
+                                OnboardingStepKind.CAR_PLATFORM -> vehicle?.let {
+                                    OnboardingPlatformPage(it, state, vm, confirmKey(step) in confirmed) { confirm(step) }
+                                }
+                                OnboardingStepKind.CAR_CLIMATE -> vehicle?.let {
+                                    OnboardingClimatePage(it, state, vm, confirmKey(step) in confirmed) { confirm(step) }
                                 }
                                 OnboardingStepKind.TIPS -> OnboardingTipsPage()
                                 OnboardingStepKind.FEATURES -> OnboardingFeaturesPage(state)
@@ -406,15 +449,11 @@ internal fun OnboardingScreen(vm: AppViewModel, mode: OnboardingMode = Onboardin
                             },
                             icon = if (isLast) AppIcons.CheckCircle else AppIcons.Check,
                             onClick = { goNext() },
-                            enabled = !setupBlocked,
+                            enabled = blockedHere == null,
                             active = true,
                         )
                     }
-                    if (setupBlocked) {
-                        BodySmallText(
-                            if (notifRequired) "Turn on notifications above to continue." else "Set up the lock above to continue.",
-                        )
-                    }
+                    blockedHere?.let { BodySmallText(it) }
                 }
             }
         }

@@ -21,7 +21,7 @@ import org.junit.Test
 class OnboardingDeckTest {
     @get:Rule val rule = createComposeRule()
 
-    private val CARDS = 5
+    private val CARDS = 7
 
     private fun viewModel() = AppViewModel(ApplicationProvider.getApplicationContext<Application>())
 
@@ -57,11 +57,11 @@ class OnboardingDeckTest {
         rule.onNodeWithText("Quick setup").performTouchInput { swipeLeft() }
         waitForPage(2, "Look and feel")
 
-        // Two more taps reach the last card, whose button dismisses the deck.
-        rule.onNodeWithText("Next").performClick()
-        waitForPage(3, "Getting around")
-        rule.onNodeWithText("Next").performClick()
-        waitForPage(4, "More Bloo can do")
+        // Four more taps reach the last card, whose button dismisses the deck.
+        rule.onNodeWithText("Next").performClick(); waitForPage(3, "What to tell you")
+        rule.onNodeWithText("Next").performClick(); waitForPage(4, "Your watch")
+        rule.onNodeWithText("Next").performClick(); waitForPage(5, "Getting around")
+        rule.onNodeWithText("Next").performClick(); waitForPage(6, "More Bloo can do")
         // The label swaps to "Dismiss" with the card; give its animation a moment to settle.
         try {
             rule.waitUntil(5_000) {
