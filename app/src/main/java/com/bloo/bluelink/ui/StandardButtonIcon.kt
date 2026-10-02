@@ -57,6 +57,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
@@ -229,6 +230,9 @@ fun MorphButtonLabel(
         return
     }
     val gap = ButtonIconGap
+    // Written from placement (no composable reads it), so it costs no recomposition.
+    var collapsed by remember { mutableStateOf(false) }
+    LabelHintHost(label, icon, collapsed = { collapsed }) {
     Layout(
         content = {
             MorphButtonGlyph(icon, pending, iconSize, spinning, iconTint)
@@ -268,12 +272,14 @@ fun MorphButtonLabel(
                         // natural height, already measured above).
                         val h = maxOf(glyph.height, text.height)
                         return layout(w, h) {
+                            if (!collapsed) collapsed = true
                             glyph.place((w - glyph.width) / 2, (h - glyph.height) / 2)
                         }
                     }
                     val w = glyph.width + gapPx + text.width
                     val h = maxOf(glyph.height, text.height)
                     return layout(w, h) {
+                        if (collapsed) collapsed = false
                         glyph.place(0, (h - glyph.height) / 2)
                         text.place(glyph.width + gapPx, (h - text.height) / 2)
                     }
@@ -304,6 +310,7 @@ fun MorphButtonLabel(
             }
         },
     )
+    }
 }
 
 
