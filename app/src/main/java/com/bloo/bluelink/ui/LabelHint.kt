@@ -93,8 +93,10 @@ internal fun LabelHintHost(
             awaitEachGesture {
                 awaitFirstDown(requireUnconsumed = false)
                 if (!collapsed()) return@awaitEachGesture
-                val early = withTimeoutOrNull(timeout) { waitForUpOrCancellation() }
-                if (early != null || !collapsed()) return@awaitEachGesture
+                // Held, rather than lifted or taken over by a scroll: only a timeout counts.
+                var ended = false
+                withTimeoutOrNull(timeout) { waitForUpOrCancellation(); ended = true }
+                if (ended || !collapsed()) return@awaitEachGesture
                 // Held long enough: show the name, and swallow the lift so the button is not clicked.
                 hideJob?.cancel()
                 shown = true
@@ -130,14 +132,14 @@ internal fun LabelHintHost(
 @Composable
 private fun LabelHintBubble(label: String, icon: ImageVector, modifier: Modifier) {
     val scheme = MaterialTheme.colorScheme
-    val fill = scheme.inverseSurface.copy(alpha = 0.94f)
+    val fill = scheme.primaryContainer.copy(alpha = 0.96f)
     Box(modifier.padding(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 6.dp)) {
         Box(
             Modifier
                 .padding(bottom = 7.dp)
-                .dropShadow(CircleShape, color = Color.Black.copy(alpha = 0.35f), blurRadius = 16.dp, offsetY = 5.dp)
+                .dropShadow(CircleShape, color = scheme.primary.copy(alpha = 0.35f), blurRadius = 16.dp, offsetY = 5.dp)
                 .background(fill, CircleShape)
-                .border(1.dp, Color.White.copy(alpha = 0.22f), CircleShape),
+                .border(1.dp, scheme.primary.copy(alpha = 0.45f), CircleShape),
         ) {
             Row(
                 Modifier.padding(start = 6.dp, end = 16.dp, top = 6.dp, bottom = 6.dp),
@@ -154,7 +156,7 @@ private fun LabelHintBubble(label: String, icon: ImageVector, modifier: Modifier
                     label,
                     style = MaterialTheme.typography.labelLarge,
                     fontWeight = FontWeight.SemiBold,
-                    color = scheme.inverseOnSurface,
+                    color = scheme.onPrimaryContainer,
                     maxLines = 1,
                 )
             }
