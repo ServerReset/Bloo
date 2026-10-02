@@ -358,6 +358,7 @@ internal fun GarageScreen(
                 mapState = expandedMap.mapStateFor(expandedVehicle.vin),
                 hazeState = hazeState,
                 onRefreshLocation = locateExpandedVehicle,
+                deviceRequest = rememberDeviceLocationRequest(vm),
                 // The real command-pending flag, not a guessed timer -- see
                 // MapTopBar's own doc -- so the refresh icon's spin genuinely
                 // tracks the in-flight fetch this same button just kicked off.

@@ -67,6 +67,36 @@ import com.bloo.bluelink.data.GeoLocation
 import kotlinx.coroutines.flow.first
 
 /**
+ * The "Me" button's action: centre the map on the phone. With no fix yet it asks for location (see
+ * [DeviceLocationRequest]) and centres as soon as the first fix lands.
+ */
+@Composable
+internal fun rememberShowMyLocation(
+    location: GeoLocation,
+    deviceLocation: GeoLocation?,
+    mapState: CarMapState,
+    request: DeviceLocationRequest?,
+): () -> Unit {
+    var pending by remember { mutableStateOf(false) }
+    LaunchedEffect(pending, deviceLocation) {
+        val d = deviceLocation
+        if (pending && d != null) {
+            mapState.showDevice(location.latitude, location.longitude, d.latitude, d.longitude)
+            pending = false
+        }
+    }
+    return {
+        val d = deviceLocation
+        if (d != null) {
+            mapState.showDevice(location.latitude, location.longitude, d.latitude, d.longitude)
+        } else {
+            pending = true
+            request?.ask?.invoke()
+        }
+    }
+}
+
+/**
  * The buttons under a map: one standard [MorphActionButton] per [MapFeature] in the app's standard
  * [ExpressiveButtonRow] -- as many to a line as fit, each line balanced and filled edge to edge,
  * a press pushing its neighbours, a button alone on its line resting on the start edge and widening
@@ -155,6 +185,7 @@ internal fun CarMapSheet(
     onRefreshLocation: (() -> Unit)? = null,
     /** See [MapTopBar]'s own doc -- the real command-pending flag, not a guess. */
     refreshing: Boolean = false,
+    deviceRequest: DeviceLocationRequest? = null,
     onDismiss: () -> Unit,
 ) {
     // The Dialog-based fallback for hosts that don't provide a LocalExpandedMap
@@ -194,6 +225,7 @@ internal fun CarMapSheet(
             hazeState = null,
             onRefreshLocation = onRefreshLocation,
             refreshing = refreshing,
+            deviceRequest = deviceRequest,
             onDismiss = onDismiss,
         )
     }

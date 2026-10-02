@@ -25,6 +25,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.DirectionsCar
 import androidx.compose.material.icons.filled.Map
 import androidx.compose.material.icons.filled.MyLocation
 import androidx.compose.material.icons.filled.Refresh
@@ -121,8 +122,11 @@ internal fun CarMapSheetBody(
     onRefreshLocation: (() -> Unit)? = null,
     /** See [MapTopBar]'s own doc -- the real command-pending flag, not a guess. */
     refreshing: Boolean = false,
+    deviceRequest: DeviceLocationRequest? = null,
     onDismiss: () -> Unit,
 ) {
+    LaunchedEffect(Unit) { if (deviceLocation == null) deviceRequest?.askOnce?.invoke() }
+    val showMe = rememberShowMyLocation(location, deviceLocation, mapState, deviceRequest)
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val density = LocalDensity.current
@@ -328,7 +332,8 @@ internal fun CarMapSheetBody(
             // the same action was reported directly as unwanted clutter.
             MapFeatureRow(
                 features = listOf(
-                    MapFeature(Icons.Filled.MyLocation, "Recentre") { mapState.recenter() },
+                    MapFeature(Icons.Filled.DirectionsCar, "Car") { mapState.recenter() },
+                    MapFeature(Icons.Filled.MyLocation, "Me") { showMe() },
                     MapFeature(Icons.Filled.Share, "Share") {
                         shareLocation(context, location, vehicleName)
                     },

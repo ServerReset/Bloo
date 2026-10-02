@@ -167,7 +167,19 @@ fun ExpressiveButtonGroup(
             // exactly as before.
             val maxW = if (constraints.hasBoundedWidth) constraints.maxWidth else Int.MAX_VALUE
             val lines = ArrayList<IntArray>()
-            if (!wrap) {
+            // True when the labels do not fit on one line but every member has a symbol it can shrink to,
+            // and those symbols all fit together on one line.
+            fun collapsesInsteadOfWrapping(): Boolean {
+                if (n < 2 || maxW == Int.MAX_VALUE || member.any { !it }) return false
+                if (full.sum() + gapPx * (n - 1) <= maxW) return false
+                val c = compact ?: IntArray(n) { i -> measurables[i].minIntrinsicWidth(h).coerceIn(0, full[i]) }
+                    .also { compact = it; naturals.compact = it }
+                return (0 until n).all { c[it] < full[it] } && c.sum() + gapPx * (n - 1) <= maxW
+            }
+            if (!wrap || collapsesInsteadOfWrapping()) {
+                // A row whose buttons all have a symbol never breaks into lines: when the labels do not
+                // fit, every button drops to its symbol (the fit rule below) and the one line fills the
+                // width. Wrapping is for buttons that have nothing to collapse to.
                 lines.add(IntArray(n) { it })
             } else {
                 val broken = balancedLineBreaks(full, gapPx, maxW)

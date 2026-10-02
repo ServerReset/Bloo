@@ -28,7 +28,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -72,7 +71,48 @@ import com.bloo.bluelink.data.distanceMilesTo
 import com.bloo.bluelink.data.formatDistance
 import com.bloo.bluelink.data.formatSpeed
 import kotlinx.coroutines.launch
-import com.bloo.bluelink.data.unitSystem
+
+/**
+ * Asking for the phone's own position, so the map can draw "you are here". [ask] always asks (the
+ * Me button); [askOnce] is for the moment a map opens with no fix yet, and asks at most once per
+ * app run so a refusal is not nagged about every time the map is opened. Granting starts the live
+ * subscription straight away, so the dot appears in the same session.
+ */
+internal class DeviceLocationRequest(val ask: () -> Unit, val askOnce: () -> Unit)
+
+private var askedForDeviceLocationThisRun = false
+
+@Composable
+internal fun rememberDeviceLocationRequest(vm: AppViewModel): DeviceLocationRequest {
+    val context = LocalContext.current
+    val launcher = androidx.activity.compose.rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.RequestPermission(),
+    ) { granted ->
+        if (granted) {
+            vm.beginLiveDeviceLocation(restart = true)
+            vm.refreshDeviceLocation()
+        }
+    }
+    return remember(vm) {
+        val ask = {
+            val granted = androidx.core.content.ContextCompat.checkSelfPermission(
+                context, android.Manifest.permission.ACCESS_FINE_LOCATION,
+            ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+            if (granted) {
+                vm.beginLiveDeviceLocation()
+                vm.refreshDeviceLocation()
+            } else {
+                launcher.launch(android.Manifest.permission.ACCESS_FINE_LOCATION)
+            }
+        }
+        DeviceLocationRequest(ask = ask, askOnce = {
+            if (!askedForDeviceLocationThisRun) {
+                askedForDeviceLocationThisRun = true
+                ask()
+            }
+        })
+    }
+}
 
 /**
  * A "Locate" action for [v] that requests ACCESS_FINE_LOCATION first if it isn't already
@@ -139,6 +179,7 @@ internal fun LocationPebble(v: Vehicle, state: UiState, vm: AppViewModel, modifi
     // requested from AutoLock's settings screen, so tying the request to a "Locate" action
     // is what lets a user who's never touched AutoLock grant it at all.
     val locateWithPermission = rememberLocateAction(vm, v)
+    val deviceRequest = rememberDeviceLocationRequest(vm)
     // On the cover, this becomes the identity pill's own headline, riding beside the car name
     // ("810 Devonshire Way, Sunnyvale  ·  Daisy") -- the long form there reliably wrapped
     // that pill onto two lines, a real reported "looks bad" bug. The compact form (street +
@@ -269,6 +310,7 @@ internal fun LocationPebble(v: Vehicle, state: UiState, vm: AppViewModel, modifi
                             // (LocalExpandedMap) path instead of leaving it behind.
                             onRefreshLocation = { locateWithPermission() },
                             refreshing = locating,
+                            deviceRequest = deviceRequest,
                         ) { showMapSheet = false }
                     }
                 }

@@ -26,6 +26,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.DirectionsCar
 import androidx.compose.material.icons.filled.Map
 import androidx.compose.material.icons.filled.MyLocation
 import androidx.compose.material.icons.filled.Share
@@ -89,12 +90,17 @@ internal fun ExpandableMapLayer(
     onRefreshLocation: () -> Unit,
     /** See [MapTopBar]'s own doc -- the real command-pending flag, not a guess. */
     refreshing: Boolean = false,
+    /** Asks for the phone's location so its dot can be drawn; see [DeviceLocationRequest]. */
+    deviceRequest: DeviceLocationRequest? = null,
     onDismiss: () -> Unit,
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val density = LocalDensity.current
     val mapHazeState = remember { HazeState() }
+    // Opening the map with no phone fix yet asks for location (once per run), so the dot just appears.
+    LaunchedEffect(isExpanded) { if (isExpanded && deviceLocation == null) deviceRequest?.askOnce?.invoke() }
+    val showMe = rememberShowMyLocation(location, deviceLocation, mapState, deviceRequest)
 
     // Animate from pebble size to full screen. Always starts at 0f: GarageScreen
     // only ever composes this with isExpanded=true (it stops rendering the whole
@@ -293,7 +299,8 @@ internal fun ExpandableMapLayer(
                 ) {
                     MapFeatureRow(
                         features = listOf(
-                            MapFeature(Icons.Filled.MyLocation, "Recentre") { mapState.recenter() },
+                            MapFeature(Icons.Filled.DirectionsCar, "Car") { mapState.recenter() },
+                            MapFeature(Icons.Filled.MyLocation, "Me") { showMe() },
                             MapFeature(Icons.Filled.Share, "Share") {
                                 shareLocation(context, location, vehicleName)
                             },

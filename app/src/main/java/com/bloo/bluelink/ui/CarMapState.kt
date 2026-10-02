@@ -138,6 +138,15 @@ internal class CarMapState {
      * the visible box, not just near an edge, so nothing after that default ever
      * brought it into view on its own.
      */
+    /** Pan so the DEVICE is at the centre of the view, at the current zoom. The car is the map's origin
+     *  (pan 0 = car centred), so the offset is the device's tile distance from it, negated. */
+    fun showDevice(carLat: Double, carLon: Double, deviceLat: Double, deviceLon: Double) {
+        userAdjusted = true
+        scale = 1f
+        panX = -(MapTiles.tileX(deviceLon, zoom) - MapTiles.tileX(carLon, zoom)) * MapTiles.TILE_PX
+        panY = -(MapTiles.tileY(deviceLat, zoom) - MapTiles.tileY(carLat, zoom)) * MapTiles.TILE_PX
+    }
+
     fun fitBothLocations(
         carLat: Double, carLon: Double,
         deviceLat: Double, deviceLon: Double,
