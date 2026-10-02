@@ -16,15 +16,10 @@ package com.bloo.bluelink.ui
  * [WeatherDetail]'s own doc.
  */
 
-import android.content.Context
-import android.content.Intent
-import androidx.browser.customtabs.CustomTabsIntent
-import androidx.core.net.toUri
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -35,12 +30,9 @@ import androidx.compose.material.icons.filled.Fullscreen
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Map
 import androidx.compose.material.icons.filled.Settings
-import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.onClick
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -52,24 +44,18 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionOnScreen
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.toSize
-import com.bloo.bluelink.data.GeoLocation
 import com.bloo.bluelink.data.Vehicle
 import com.bloo.bluelink.data.Weather
-import com.bloo.bluelink.data.WeatherCode
 import com.bloo.bluelink.data.coordString
 import com.bloo.bluelink.data.distanceMilesTo
 import com.bloo.bluelink.data.formatDistance
-import com.bloo.bluelink.data.formatSpeed
 import kotlinx.coroutines.launch
 
 /**
@@ -363,148 +349,3 @@ internal fun LocationPebble(v: Vehicle, state: UiState, vm: AppViewModel, modifi
 }
 
 // --- Weather --------------------------------------------------------------
-
-/** The icon for a condition, picking a sun/moon variant by day vs night. */
-internal fun weatherIcon(code: WeatherCode, isDay: Boolean): ImageVector =
-    com.bloo.uicommon.weatherIcon(code.toCode(), isDay)
-
-@Composable
-internal fun weatherTint(code: WeatherCode, isDay: Boolean): Color =
-    com.bloo.uicommon.weatherTint(code.toCode(), isDay, MaterialTheme.colorScheme.onSurfaceVariant)
-
-/**
- * A compact one-line weather readout: icon, temperature and condition, with a
- * small caption (place name) underneath. Used inside the Location pebble.
- */
-@Composable
-internal fun WeatherStripe(weather: Weather, fahrenheit: Boolean, caption: String) {
-    val tint = weatherTint(weather.condition, weather.isDay)
-    Row(
-        Modifier
-            .fillMaxWidth()
-            .outlinedPanel(14.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
-        Icon(weatherIcon(weather.condition, weather.isDay), contentDescription = null, tint = tint, modifier = Modifier.size(30.dp))
-        Column(Modifier.weight(1f)) {
-            Text(weather.condition.label, fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.bodyLarge)
-            Text(caption, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        }
-        RollingNumber(
-            text = weather.tempLabel(fahrenheit),
-            style = MaterialTheme.typography.headlineSmall,
-            fontWeight = FontWeight.Bold,
-        )
-    }
-}
-
-/**
- * Full weather detail for [weather]: icon, big temperature, condition, and
- * feels-like/high-low/humidity/wind rows. Used inside [LocationPebble] for the
- * car's own local weather -- this used to be the standalone "Weather" pebble's
- * body (a separate global readout of the user's configured "home" location,
- * shown identically on every car), folded in here once the Location pebble
- * became the one place a car's surroundings are shown. `state.homeWeather` and
- * [AppViewModel.loadHomeWeather] still exist -- [ClimatePebble] falls back to
- * home weather for its smart-climate ambient estimate when a car has no fix of
- * its own yet -- only the dedicated garage card for it is gone.
- */
-@Composable
-internal fun WeatherDetail(weather: Weather, fahrenheit: Boolean, metric: Boolean) {
-    val tint = weatherTint(weather.condition, weather.isDay)
-    // ONE child, not five. This is rendered inside [PopVisible]'s AnimatedVisibility, and
-    // AnimatedVisibility's own layout places every root composable it is given at the SAME
-    // origin -- it is a slot for one child (or for a container that stacks several). A bare
-    // Row followed by four StatusRows therefore stacked all five on top of each other, which
-    // is the reported "overlap on tons of the text" in the weather stats. A Column gives the
-    // slot the single child it expects, and spaces the rows by the same 12dp the location
-    // pebble's own Column was providing before this AnimatedVisibility sat between them.
-    Column(verticalArrangement = Arrangement.spacedBy(GapGroup)) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(16.dp),
-        ) {
-            Icon(
-                weatherIcon(weather.condition, weather.isDay),
-                contentDescription = weather.condition.label,
-                tint = tint,
-                modifier = Modifier.size(64.dp),
-            )
-            Column(Modifier.weight(1f)) {
-                RollingNumber(
-                    text = weather.tempLabel(fahrenheit),
-                    style = MaterialTheme.typography.displaySmall,
-                    fontWeight = FontWeight.Bold,
-                )
-                Text(weather.condition.label, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-            }
-        }
-        StatusRow("Feels like", weather.feelsLikeLabel(fahrenheit))
-        weather.highLowLabel(fahrenheit)?.let { StatusRow("High / low", it) }
-        weather.humidity?.let { StatusRow("Humidity", "$it%") }
-        StatusRow("Wind", formatSpeed(weather.windKph, metric))
-    }
-}
-
-// --- Service & links ------------------------------------------------------
-
-
-/**
- * Opens the car's location in the device's default Maps app -- a `geo:` intent
- * rather than hardcoding Google Maps, since the OS resolves it to whatever the user
- * actually has set. Shared by [LocationPebble]'s own "Open in maps" button and
- * [CarMapFullScreenDialog]'s [MapFeature] row so the two never drift on the URI
- * format.
- */
-internal fun openInExternalMaps(context: Context, location: GeoLocation, label: String) {
-    val uri = (
-        "geo:${location.latitude},${location.longitude}" +
-            "?q=${location.latitude},${location.longitude}($label)"
-    ).toUri()
-    runCatching {
-        context.startActivity(Intent(Intent.ACTION_VIEW, uri).apply { addFlags(Intent.FLAG_ACTIVITY_NEW_TASK) })
-    }
-}
-
-/**
- * Shares the car's location through the system share sheet -- a Google-Maps link, so any
- * receiving app can resolve it. The second real [MapFeature] the expanded map's bottom row
- * gained (see [MapFeatureRow]); the share chooser is deliberately the OS's own, not a
- * hand-rolled contact picker.
- */
-internal fun shareLocation(context: Context, location: GeoLocation, label: String) {
-    val text = "$label: https://maps.google.com/?q=${location.latitude},${location.longitude}"
-    runCatching {
-        val send = Intent(Intent.ACTION_SEND).apply {
-            type = "text/plain"
-            putExtra(Intent.EXTRA_TEXT, text)
-        }
-        context.startActivity(
-            Intent.createChooser(send, "Share location").apply { addFlags(Intent.FLAG_ACTIVITY_NEW_TASK) },
-        )
-    }
-}
-
-internal fun openUrl(context: Context, url: String) {
-    val uri = url.toUri()
-    runCatching { CustomTabsIntent.Builder().build().launchUrl(context, uri) }
-        .onFailure {
-            runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, uri).apply { addFlags(Intent.FLAG_ACTIVITY_NEW_TASK) }) }
-        }
-}
-
-internal fun openApp(context: Context, packages: List<String>, fallbackUrl: String) {
-    for (p in packages) {
-        context.packageManager.getLaunchIntentForPackage(p)?.let {
-            runCatching { context.startActivity(it) }.onSuccess { return }
-        }
-    }
-    openUrl(context, fallbackUrl)
-}
-
-internal fun dial(context: Context, number: String) {
-    runCatching {
-        context.startActivity(Intent(Intent.ACTION_DIAL, "tel:$number".toUri()).apply { addFlags(Intent.FLAG_ACTIVITY_NEW_TASK) })
-    }
-}
