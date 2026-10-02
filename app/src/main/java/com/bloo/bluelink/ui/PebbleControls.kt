@@ -47,6 +47,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.layout
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import com.bloo.bluelink.data.brand
 import com.bloo.bluelink.data.Vehicle
@@ -189,9 +190,11 @@ internal fun ControlsPebble(v: Vehicle, state: UiState, vm: AppViewModel, modifi
                     ) { showHistory = !showHistory; true },
                 )
             }
-            .pebbleCardEdge(shape, pebbleOutline),
+            .pebbleCardEdge(shape, pebbleOutline)
+            // The same glass fill every PebbleShell card has: this card used to be a solid slab.
+            .glassCardFill(shape, MaterialTheme.colorScheme.surfaceVariant),
         shape = shape,
-        color = MaterialTheme.colorScheme.surfaceVariant,
+        color = Color.Transparent,
         // contentColorFor(the container), exactly as PebbleShell's own
         // CardDefaults.cardColors(...) resolves it -- so onSurfaceVariant, not the onSurface
         // this used to hardcode. Every muted label in the app is LocalContentColor at
@@ -206,7 +209,7 @@ internal fun ControlsPebble(v: Vehicle, state: UiState, vm: AppViewModel, modifi
         // neighbours. Tonal elevation is left at 0 on purpose: it would be a no-op anyway
         // (Surface only tints when the colour IS colorScheme.surface) and the shadow is the
         // part Card actually contributes here.
-        shadowElevation = 1.dp,
+        shadowElevation = 0.dp,
     ) {
         Column(Modifier.fillMaxWidth()) {
             // Asymmetric padding to match pebble header alignment: more left, less right.
