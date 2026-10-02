@@ -232,7 +232,7 @@ fun MorphButtonLabel(
     val gap = ButtonIconGap
     // Written from placement (no composable reads it), so it costs no recomposition.
     var collapsed by remember { mutableStateOf(false) }
-    LabelHintHost(label, icon, collapsed = { collapsed }) {
+    run /* LabelHintHost bisect */ {
     Layout(
         content = {
             MorphButtonGlyph(icon, pending, iconSize, spinning, iconTint)
