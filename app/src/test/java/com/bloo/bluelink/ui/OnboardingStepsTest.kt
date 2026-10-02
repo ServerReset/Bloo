@@ -85,10 +85,11 @@ class OnboardingStepsTest {
     }
 
     @Test
-    fun replay_dropsRestoreAndCars() {
+    fun replay_dropsRestoreButKeepsCars() {
         assertEquals(
             listOf(
                 OnboardingStepKind.WELCOME, OnboardingStepKind.SETUP, OnboardingStepKind.LOOK, OnboardingStepKind.ALERTS,
+                *buildOnboardingSteps(OnboardingMode.NewCars(listOf(usHyundai.vin, usKia.vin)), listOf(usHyundai, usKia)).map { it.kind }.toTypedArray(),
                 OnboardingStepKind.WATCH, OnboardingStepKind.TIPS, OnboardingStepKind.FEATURES,
             ),
             kinds(buildOnboardingSteps(OnboardingMode.Replay, listOf(usHyundai, usKia))),

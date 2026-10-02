@@ -130,7 +130,7 @@ internal fun setupIsBlocked(
  *    alerts to get, then three cards for each car that isn't already configured (powertrain, head
  *    unit where it applies, seats and steering wheel), the watch, tips and the features card.
  *  - New cars: just those three cards for each car in [OnboardingMode.NewCars.vins].
- *  - Replay: welcome, setup, look, alerts, watch, tips, features -- the per-car answers are not asked again.
+ *  - Replay: welcome, setup, look, alerts, every car's cards (ungated, to revisit answers), watch, tips, features.
  *
  * [preConfiguredVins] skips a car's card on first run: a backup restored on the RESTORE card can
  * bring in real powertrain/seat config for a car already set up on another device.
@@ -153,6 +153,7 @@ internal fun buildOnboardingSteps(
             add(OnboardingStep(OnboardingStepKind.SETUP))
             add(OnboardingStep(OnboardingStepKind.LOOK))
             add(OnboardingStep(OnboardingStepKind.ALERTS))
+            vehicles.forEach(::carCards)
             add(OnboardingStep(OnboardingStepKind.WATCH))
             add(OnboardingStep(OnboardingStepKind.TIPS))
             add(OnboardingStep(OnboardingStepKind.FEATURES))
@@ -262,12 +263,24 @@ internal fun OnboardingScreen(vm: AppViewModel, mode: OnboardingMode = Onboardin
         is OnboardingMode.NewCars -> vm.finishCarSetup(mode.vins)
         OnboardingMode.Replay -> vm.dismissWelcomeCards()
     }
+    // The exit: fanfare, then the whole deck eases away (shrinks toward the app, fades) before the
+    // mode's finish runs, so ending never just snaps to the next screen.
+    var leaving by remember { mutableStateOf(false) }
+    val exit by androidx.compose.animation.core.animateFloatAsState(
+        if (leaving) 1f else 0f,
+        androidx.compose.animation.core.tween(650, delayMillis = 350),
+        label = "deckExit",
+        finishedListener = { if (it == 1f) finish() },
+    )
     fun goNext() {
+        if (leaving) return
         if (!isLast) {
             haptics?.click()
             pageScope.launch { pagerState.animateScrollToPage(pageIndex + 1) }
         } else {
-            finish()
+            leaving = true
+            haptics?.fireworks()
+            Fireworks.playSound(context)
         }
     }
     fun goBack() {
@@ -330,6 +343,11 @@ internal fun OnboardingScreen(vm: AppViewModel, mode: OnboardingMode = Onboardin
             .fillMaxSize()
             // Opaque, and a pointer target of its own so touches never fall through to what the
             // deck sits over; it takes none of them, so the cards and buttons above get every one.
+            .graphicsLayer {
+                val e = exit
+                alpha = 1f - e
+                scaleX = 1f + 0.12f * e; scaleY = scaleX
+            }
             .background(scheme.background)
             .pointerInput(Unit) {},
     ) {
@@ -356,7 +374,7 @@ internal fun OnboardingScreen(vm: AppViewModel, mode: OnboardingMode = Onboardin
                 },
             )
         }
-        if (burst > 0) androidx.compose.runtime.key(burst) { FireworksOverlay(Modifier.fillMaxSize()) }
+        if (burst > 0 || leaving) androidx.compose.runtime.key(burst, leaving) { FireworksOverlay(Modifier.fillMaxSize()) }
 
         Column(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding()) {
             Spacer(Modifier.height(GapSection))
@@ -371,7 +389,7 @@ internal fun OnboardingScreen(vm: AppViewModel, mode: OnboardingMode = Onboardin
                 modifier = Modifier.weight(1f).testTag(DECK_PAGER_TAG),
                 contentPadding = PaddingValues(horizontal = 20.dp),
                 pageSpacing = 14.dp,
-                beyondViewportPageCount = 1,
+                beyondViewportPageCount = 0,
             ) { idx ->
                 val step = steps.getOrNull(idx) ?: return@HorizontalPager
                 // How far this card is from the centre: 0 on it, 1 a full card away. The cards
