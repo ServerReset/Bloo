@@ -48,7 +48,12 @@ internal fun LiquidGlassLayer(shape: Shape, modifier: Modifier = Modifier) {
                 enableSensorHighlight = true
                 enableAdaptiveTint = true
                 enablePressEffect = false
-                dispersionStrength = 0.12f
+                // Bendy at the rim: a deep, tall bevel whose bending falls off gently so it is read
+                // across the whole edge band rather than as a thin line, with a visible colour split.
+                refractionHeight = 240f
+                bevelWidth = 72f
+                refractionFalloff = 1.2f
+                dispersionStrength = 0.2f
                 isClickable = false
                 isFocusable = false
                 importantForAccessibility = android.view.View.IMPORTANT_FOR_ACCESSIBILITY_NO

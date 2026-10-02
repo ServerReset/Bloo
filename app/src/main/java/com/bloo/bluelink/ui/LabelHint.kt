@@ -86,7 +86,10 @@ internal fun LabelHintHost(
         }
     }
     Box(
-        Modifier.pointerInput(label) {
+        // propagateMinConstraints: the label has to receive the button's own minimum width, exactly
+        // as it did before this wrapper existed, or buttons that fill a width would collapse to it.
+        propagateMinConstraints = true,
+        modifier = Modifier.pointerInput(label) {
             awaitEachGesture {
                 awaitFirstDown(requireUnconsumed = false)
                 if (!collapsed()) return@awaitEachGesture

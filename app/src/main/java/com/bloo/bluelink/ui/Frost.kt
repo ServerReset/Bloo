@@ -48,6 +48,8 @@ internal fun Modifier.frosted(
     shape: Shape = SmallShape,
     blurRadius: Dp = 5.dp,
     rim: Boolean = true,
+    /** False for a button: just soften and fade it, leaving its own (morphing) shape alone. */
+    veil: Boolean = true,
 ): Modifier {
     val amount by animateFloatAsState(if (active) 1f else 0f, tween(420), label = "frost")
     if (amount <= 0.001f) return this
@@ -57,11 +59,12 @@ internal fun Modifier.frosted(
     val rimColor = if (dark) Color(0xFFBFE3FF) else Color(0xFFFFFFFF)
     val veilAlpha = if (dark) 0.20f else 0.46f
     return this
-        .clip(shape)
+        .then(if (veil) Modifier.clip(shape) else Modifier)
         .then(if (canBlur) Modifier.blur(blurRadius * amount, BlurredEdgeTreatment.Unbounded) else Modifier)
         .graphicsLayer { alpha = 1f - (if (canBlur) 0.12f else 0.4f) * amount }
         .drawWithContent {
             drawContent()
+            if (!veil) return@drawWithContent
             // The veil: cool white, strongest where the light hits (top-left), clearing across.
             drawRect(
                 Brush.linearGradient(

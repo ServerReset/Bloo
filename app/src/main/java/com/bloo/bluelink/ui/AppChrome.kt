@@ -63,7 +63,6 @@ import androidx.compose.ui.draw.BlurredEdgeTreatment
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.layout.layout
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
@@ -414,21 +413,8 @@ internal fun AuroraBackground(
         }
     }
     fun mix(a: Float, b: Float, f: Float) = a + (b - a) * f
-    // Two more hues, rotated off the primary, so the wash has warm and cool pools to refract.
-    val (hueA, hueB) = remember(basePrimary) {
-        fun rot(c: Color, by: Float): Color {
-            val hsv = FloatArray(3)
-            android.graphics.Color.colorToHSV(c.toArgb(), hsv)
-            hsv[0] = (hsv[0] + by) % 360f
-            hsv[1] = hsv[1].coerceAtLeast(0.55f)
-            hsv[2] = hsv[2].coerceAtLeast(0.75f)
-            return Color(android.graphics.Color.HSVToColor(hsv))
-        }
-        rot(basePrimary, 70f) to rot(basePrimary, 250f)
-    }
-    Box(modifier.fillMaxSize()) {
     Box(
-        Modifier
+        modifier
             .fillMaxSize()
             // Lighter than before (was 120dp): that much blur smoothed three
             // drifting blobs into a wash that barely changed frame to frame,
@@ -449,42 +435,12 @@ internal fun AuroraBackground(
                 fun blob(c: Color, fx: Float, fy: Float, r: Float) =
                     drawCircle(c, radius = size.minDimension * r, center = Offset(size.width * fx, size.height * fy))
                 val a = appear.value
-                blob(basePrimary.copy(alpha = (0.44f * explodeAlpha() * a).coerceIn(0f, 1f)), (mix(0.26f, 0.74f, p1) + tiltX) * explodeSpread(), (mix(0.30f, 0.65f, p2) + tiltY) * explodeSpread(), 0.45f * explodeSize())
-                blob(baseTertiary.copy(alpha = (0.38f * explodeAlpha() * a).coerceIn(0f, 1f)), (mix(0.32f, 0.68f, p2) - tiltX) * explodeSpread(), (mix(0.35f, 0.70f, p3) - tiltY) * explodeSpread(), 0.40f * explodeSize())
+                blob(basePrimary.copy(alpha = (0.30f * explodeAlpha() * a).coerceIn(0f, 1f)), (mix(0.26f, 0.74f, p1) + tiltX) * explodeSpread(), (mix(0.30f, 0.65f, p2) + tiltY) * explodeSpread(), 0.45f * explodeSize())
+                blob(baseTertiary.copy(alpha = (0.25f * explodeAlpha() * a).coerceIn(0f, 1f)), (mix(0.32f, 0.68f, p2) - tiltX) * explodeSpread(), (mix(0.35f, 0.70f, p3) - tiltY) * explodeSpread(), 0.40f * explodeSize())
                 // fx range was 0.22-0.58 (centred at 0.40, visibly left of the
                 // other two blobs' 0.50) -- the whole composite wash read as
                 // biased toward one side even before any tilt was applied.
-                blob(hueA.copy(alpha = (0.30f * explodeAlpha() * a).coerceIn(0f, 1f)), (mix(0.70f, 0.30f, p3) - tiltX) * explodeSpread(), (mix(0.72f, 0.88f, p1) + tiltY) * explodeSpread(), 0.34f * explodeSize())
-                blob(hueB.copy(alpha = (0.26f * explodeAlpha() * a).coerceIn(0f, 1f)), (mix(0.12f, 0.40f, p2) + tiltX) * explodeSpread(), (mix(0.10f, 0.30f, p3) - tiltY) * explodeSpread(), 0.30f * explodeSize())
-                blob(baseSecondary.copy(alpha = (0.34f * explodeAlpha() * a).coerceIn(0f, 1f)), (mix(0.32f, 0.68f, p3) + tiltX) * explodeSpread(), (mix(0.28f, 0.62f, p1) + tiltY) * explodeSpread(), 0.38f * explodeSize())
+                blob(baseSecondary.copy(alpha = (0.20f * explodeAlpha() * a).coerceIn(0f, 1f)), (mix(0.32f, 0.68f, p3) + tiltX) * explodeSpread(), (mix(0.28f, 0.62f, p1) + tiltY) * explodeSpread(), 0.38f * explodeSize())
             },
     )
-    // Unblurred drifting motes: tiny glows that catch the eye and give the glass something to
-    // blur and bend. Positions ride the same slow drift values as the blobs, so this adds no timer.
-    Box(
-        Modifier.fillMaxSize().drawBehind {
-            val a = appear.value
-            val d = density
-            for (i in 0 until 26) {
-                val sx = ((i * 0.6180339f) % 1f)
-                val sy = ((i * 0.3819660f + 0.17f * (i % 5)) % 1f)
-                val par = 0.04f + 0.03f * (i % 4)
-                val x = ((sx + (p1 - 0.5f) * par * 3f + tiltX * 0.5f) % 1f + 1f) % 1f
-                val y = ((sy + (p2 - 0.5f) * par * 3f + tiltY * 0.5f) % 1f + 1f) % 1f
-                val tw = 0.5f + 0.5f * kotlin.math.sin(p3 * 55f + i * 1.7f)
-                val r = (2.5f + (i % 4) * 2.2f) * d
-                val c = when (i % 3) { 0 -> Color.White; 1 -> basePrimary; else -> baseTertiary }
-                drawCircle(
-                    Brush.radialGradient(
-                        listOf(c.copy(alpha = (0.55f * tw + 0.12f) * a), Color.Transparent),
-                        center = Offset(size.width * x, size.height * y),
-                        radius = r * 2.4f,
-                    ),
-                    radius = r * 2.4f,
-                    center = Offset(size.width * x, size.height * y),
-                )
-            }
-        },
-    )
-    }
 }

@@ -187,7 +187,7 @@ fun MorphButton(
                     // leverage place to fix it.
                     .semantics { selected = active }
                     // Can't be pressed right now: iced out, the app's one disabled look (see [frosted]).
-                    .frosted(!enabled, RoundedCornerShape(pillCornerPercent.toInt()), blurRadius = 2.dp, rim = false)
+                    .frosted(!enabled, RoundedCornerShape(pillCornerPercent.toInt()), blurRadius = 3.dp, rim = false, veil = false)
                     // Skipped while SafeExpansiveButton is already smoothly driving this
                     // button's width on press (LocalExpressiveGrowth -- see its own doc):
                     // animateContentSize exists for a genuine content change (a label
