@@ -270,8 +270,15 @@ internal fun OnboardingScreen(vm: AppViewModel, mode: OnboardingMode = Onboardin
         if (leaving) 1f else 0f,
         androidx.compose.animation.core.tween(650, delayMillis = 350),
         label = "deckExit",
-        finishedListener = { if (it == 1f) finish() },
     )
+    // The finish runs off a plain delay rather than the animation's end callback, so it fires even
+    // if the animation is interrupted or the window is idle.
+    LaunchedEffect(leaving) {
+        if (leaving) {
+            kotlinx.coroutines.delay(1100)
+            finish()
+        }
+    }
     fun goNext() {
         if (leaving) return
         if (!isLast) {
