@@ -65,7 +65,6 @@ import com.bloo.bluelink.data.parseOdometerMiles
 import com.bloo.bluelink.data.isPluggedOrCharging
 import com.bloo.bluelink.data.lastServiceMiles
 import com.bloo.bluelink.data.serviceIntervalMiles
-import com.bloo.bluelink.data.unitSystem
 
 
 // --- Car info (status + service + links combined) -------------------------

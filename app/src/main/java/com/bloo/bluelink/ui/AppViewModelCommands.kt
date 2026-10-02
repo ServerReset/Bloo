@@ -13,7 +13,6 @@ import com.bloo.bluelink.data.toGeoLocation
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.withLock
-import com.bloo.bluelink.data.unitSystem
 import com.bloo.bluelink.data.saveClimate
 
 // --- Live device location + remote vehicle commands (extracted from AppViewModel) --

@@ -61,7 +61,6 @@ import com.bloo.bluelink.data.aiEnabled
 import com.bloo.bluelink.data.autoLockConfig
 import com.bloo.bluelink.data.setAutoLockConfig
 import com.bloo.bluelink.data.settingsMode
-import com.bloo.bluelink.data.unitSystem
 
 internal const val SEARCH_RESULT_STAGGER_MS = 35L
 
