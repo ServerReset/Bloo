@@ -165,6 +165,8 @@ fun MorphButton(
     // provides it internally (the shared core is foundation-only and cannot
     // reach material3's LocalContentColor).
     val resolvedContent = if (active) activeContentColor else contentColor
+    // What this button's label (if it has one) reports, for the long-press name hint.
+    val hint = remember { LabelHintState() }
     val providedContent = if (enabled) {
         resolvedContent
     } else {
@@ -174,7 +176,7 @@ fun MorphButton(
         disabledContentColor ?: resolvedContent
     }
     val body: @Composable () -> Unit = {
-        CompositionLocalProvider(LocalContentColor provides providedContent) {
+        CompositionLocalProvider(LocalContentColor provides providedContent, LocalLabelHint provides hint) {
             MorphButtonCore(
                 onClick = { clickHaptic(); onClick() },
                 modifier = modifier
@@ -219,11 +221,14 @@ fun MorphButton(
                 disabledContainerColor = glassTint(canBlurBackdrops()),
                 disabledBorder = BorderStroke(1.dp, MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f)),
                 interactionSource = interactionSource,
-                onLongClick = onLongClick,
+                onLongClick = onLongClick ?: hint::onLongPress,
                 pillCornerPercent = pillCornerPercent,
                 morphedCornerPercent = morphedCornerPercent,
                 shapeForCorner = shapeForCorner,
-                content = content,
+                content = {
+                    content()
+                    LabelHintPopup(hint)
+                },
             )
         }
     }

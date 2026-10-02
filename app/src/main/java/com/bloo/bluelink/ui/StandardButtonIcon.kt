@@ -55,6 +55,7 @@ import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -230,9 +231,10 @@ fun MorphButtonLabel(
         return
     }
     val gap = ButtonIconGap
-    // Written from placement (no composable reads it), so it costs no recomposition.
-    var collapsed by remember { mutableStateOf(false) }
-    run /* LabelHintHost bisect */ {
+    // The button this label sits in (if it is a MorphButton) learns what to say and whether it has
+    // shrunk to its symbol, so a long press can show the name. Plain fields: nothing recomposes.
+    val hint = LocalLabelHint.current
+    SideEffect { hint?.describe(label, icon) }
     Layout(
         content = {
             MorphButtonGlyph(icon, pending, iconSize, spinning, iconTint)
@@ -272,14 +274,14 @@ fun MorphButtonLabel(
                         // natural height, already measured above).
                         val h = maxOf(glyph.height, text.height)
                         return layout(w, h) {
-                            if (!collapsed) collapsed = true
+                            hint?.collapsed = true
                             glyph.place((w - glyph.width) / 2, (h - glyph.height) / 2)
                         }
                     }
                     val w = glyph.width + gapPx + text.width
                     val h = maxOf(glyph.height, text.height)
                     return layout(w, h) {
-                        if (collapsed) collapsed = false
+                        hint?.collapsed = false
                         glyph.place(0, (h - glyph.height) / 2)
                         text.place(glyph.width + gapPx, (h - text.height) / 2)
                     }
@@ -310,7 +312,6 @@ fun MorphButtonLabel(
             }
         },
     )
-    }
 }
 
 

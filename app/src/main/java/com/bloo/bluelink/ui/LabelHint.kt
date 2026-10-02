@@ -6,9 +6,6 @@ import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.gestures.awaitEachGesture
-import androidx.compose.foundation.gestures.awaitFirstDown
-import androidx.compose.foundation.gestures.waitForUpOrCancellation
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
@@ -22,7 +19,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
@@ -33,8 +29,6 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.platform.LocalViewConfiguration
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntRect
@@ -45,85 +39,64 @@ import androidx.compose.ui.window.Popup
 import androidx.compose.ui.window.PopupPositionProvider
 import androidx.compose.ui.window.PopupProperties
 import com.bloo.uicommon.dropShadow
-import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withTimeoutOrNull
 
-/** How long the hint lingers after the finger lifts, so it can actually be read. */
-private const val HINT_LINGER_MS = 1100L
+/** How long the hint stays up after the long press that opened it. */
+private const val HINT_SHOW_MS = 1600L
+
+/** What a button's label says about itself, so its long press can show the name. */
+internal class LabelHintState {
+    var label: String = ""
+    var icon: ImageVector? = null
+    /** True while the button is showing only its symbol. Written from placement. */
+    var collapsed: Boolean = false
+    var shown by mutableStateOf(false)
+
+    fun describe(label: String, icon: ImageVector) { this.label = label; this.icon = icon }
+
+    /** The button's long press: only a symbol-only button has anything to explain. */
+    fun onLongPress() { if (collapsed && label.isNotEmpty()) shown = true }
+}
+
+/** The button whose label is being composed, if any. Null outside a [MorphButton]. */
+internal val LocalLabelHint = androidx.compose.runtime.staticCompositionLocalOf<LabelHintState?> { null }
 
 /**
- * Long-press help for a button that has shrunk to its symbol. Hold it and a glass bubble springs up
- * above it with the symbol and the button's full name, a heavy tick under the finger; let go and it
- * stays a moment, then fades. The press that opened it never counts as a tap, so reading what a
- * button does can't fire it. While the button still shows its label this does nothing at all and
- * never touches the gesture, so ordinary taps are exactly as they were.
- *
- * [collapsed] is read when a press starts, never during composition.
+ * Long-press help for a button that has shrunk to its symbol: a glass bubble springs up above it with
+ * the symbol and the button's full name, then fades. The press arrives through the button's own long
+ * click (its clickable chrome), so this never sits in the way of a tap: a pointer handler over a
+ * button's content would swallow the touch before the chrome underneath ever saw it.
  */
 @Composable
-internal fun LabelHintHost(
-    label: String,
-    icon: ImageVector,
-    collapsed: () -> Boolean,
-    content: @Composable () -> Unit,
-) {
-    val haptics = LocalHaptics.current
-    val timeout = LocalViewConfiguration.current.longPressTimeoutMillis
-    val scope = rememberCoroutineScope()
-    var shown by remember { mutableStateOf(false) }
-    var present by remember { mutableStateOf(false) }
+internal fun LabelHintPopup(state: LabelHintState) {
     val t = remember { Animatable(0f) }
-    var hideJob by remember { mutableStateOf<Job?>(null) }
-    LaunchedEffect(shown) {
-        if (shown) {
+    var present by remember { mutableStateOf(false) }
+    LaunchedEffect(state.shown) {
+        if (state.shown) {
             present = true
+            val hide = launch { delay(HINT_SHOW_MS); state.shown = false }
             t.animateTo(1f, spring(dampingRatio = 0.5f, stiffness = Spring.StiffnessMedium))
+            hide.join()
         } else if (present) {
             t.animateTo(0f, tween(170))
             present = false
         }
     }
-    Box(
-        // propagateMinConstraints: the label has to receive the button's own minimum width, exactly
-        // as it did before this wrapper existed, or buttons that fill a width would collapse to it.
-        propagateMinConstraints = true,
-        modifier = Modifier.pointerInput(label) {
-            awaitEachGesture {
-                awaitFirstDown(requireUnconsumed = false)
-                if (!collapsed()) return@awaitEachGesture
-                // Held, rather than lifted or taken over by a scroll: only a timeout counts.
-                var ended = false
-                withTimeoutOrNull(timeout) { waitForUpOrCancellation(); ended = true }
-                if (ended || !collapsed()) return@awaitEachGesture
-                // Held long enough: show the name, and swallow the lift so the button is not clicked.
-                hideJob?.cancel()
-                shown = true
-                haptics?.heavy()
-                waitForUpOrCancellation()?.consume()
-                hideJob = scope.launch {
-                    delay(HINT_LINGER_MS)
-                    shown = false
-                }
-            }
-        },
-    ) {
-        content()
-        if (present) {
-            Popup(
-                popupPositionProvider = remember { AboveAnchorPositionProvider },
-                properties = PopupProperties(focusable = false, clippingEnabled = false),
-            ) {
-                LabelHintBubble(label, icon, Modifier.graphicsLayer {
-                    val p = t.value
-                    val s = 0.45f + 0.55f * p
-                    scaleX = s; scaleY = s
-                    alpha = p.coerceIn(0f, 1f)
-                    translationY = (1f - p) * 14.dp.toPx()
-                    transformOrigin = TransformOrigin(0.5f, 1f)
-                })
-            }
+    val icon = state.icon
+    if (present && icon != null) {
+        Popup(
+            popupPositionProvider = remember { AboveAnchorPositionProvider },
+            properties = PopupProperties(focusable = false, clippingEnabled = false),
+        ) {
+            LabelHintBubble(state.label, icon, Modifier.graphicsLayer {
+                val p = t.value
+                val s = 0.45f + 0.55f * p
+                scaleX = s; scaleY = s
+                alpha = p.coerceIn(0f, 1f)
+                translationY = (1f - p) * 14.dp.toPx()
+                transformOrigin = TransformOrigin(0.5f, 1f)
+            })
         }
     }
 }
