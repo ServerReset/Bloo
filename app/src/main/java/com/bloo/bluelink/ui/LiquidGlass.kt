@@ -25,7 +25,9 @@ import com.example.liquidglass.LiquidGlassView
 @Composable
 internal fun rememberLiquidGlassSupported(): Boolean = remember {
     Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
-        Build.SUPPORTED_ABIS.any { it.startsWith("arm") } &&
+        // The PRIMARY abi, not any: an x86 emulator lists arm as a translated secondary one.
+        Build.SUPPORTED_ABIS.firstOrNull()?.startsWith("arm") == true &&
+        !Build.FINGERPRINT.contains("generic") && !Build.HARDWARE.contains("ranchu") &&
         runCatching { Class.forName("com.example.liquidglass.LiquidGlassView") }.isSuccess
 } && canBlurBackdrops()
 
