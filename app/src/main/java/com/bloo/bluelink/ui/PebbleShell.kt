@@ -393,12 +393,8 @@ internal fun PebbleShell(
             Modifier
                 .fillMaxWidth()
                 .then(if (fillHeight) Modifier.fillMaxHeight() else Modifier)
-                // pebbleCardEdge (GlassChrome.kt): frostedRim's alpha (0.10-0.24) is
-                // tuned for chrome floating over an unpredictable car photo, where it
-                // only has to beat that photo's contrast -- against a flat dark pebble
-                // background it was nearly imperceptible, reading as "this setting
-                // does nothing" even though it was working. The dedicated, considerably
-                // bolder border this shares instead is what makes toggling it visible.
+                // The dedicated pebble border (pebbleCardEdge), bolder than the floating-chrome rim:
+                // against a flat card the rim was nearly invisible, so toggling it read as doing nothing.
                 .pebbleCardEdge(pebbleShape, pebbleOutline)
                 // The card's bounding box is glass; its own panels stay solid.
                 .glassCardFill(pebbleShape, containerColor),

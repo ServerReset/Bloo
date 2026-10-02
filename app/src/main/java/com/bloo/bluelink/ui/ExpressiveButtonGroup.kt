@@ -210,19 +210,9 @@ fun ExpressiveButtonGroup(
                     continue
                 }
 
-                // Per-seam reserve for a given content basis (full or compact) -- see
-                // ExpressivePressGrowth's own doc for why this replaced a flat per-member
-                // allowance. Each member's OWN half of a seam is sized off ITS OWN content, not
-                // the bigger of the two sides -- a small icon-only chevron next to a wide labelled
-                // action was inheriting the action's own (much bigger) growth need as ITS OWN
-                // resting padding under a shared-max formula, which read as exactly the "too much
-                // padding" a small button has no business carrying just because a big neighbour
-                // sits beside it (confirmed from a real screenshot). One member's total reserve is
-                // the sum of its own halves across every seam it actually borders, so a member
-                // with two neighbours carries two (smaller) halves rather than one padded to match
-                // whichever neighbour happens to be bigger. Used twice below: once (against
-                // `full`) to estimate an unbounded line's own room, and once (against whichever
-                // `basis` the fit rule below actually picks) for the real layout.
+                // Per-seam reserve for a content basis (full or compact): each member's half of a seam is
+                // sized off ITS OWN content (a small chevron beside a wide action keeps a small
+                // reserve), and a member's total is the sum of its halves across the seams it borders.
                 fun seamReserve(basis: IntArray): IntArray {
                     val out = IntArray(n)
                     for (k in 0 until memberIdx.size - 1) {
@@ -240,19 +230,11 @@ fun ExpressiveButtonGroup(
                     memberIdx.sumOf { full[it] + r[it] }
                 }
 
-                // THE FIT RULE, all-or-nothing. If this line cannot give every member the room
-                // its label needs, every member on it drops to its glyph -- not the ones that
-                // happen to be longest. A row where some buttons carry words and others do not
-                // reads as a mistake, and which ones lost their words would change with the
-                // text, the font size and the language.
-                //
-                // Decided here rather than by each button, because only the line knows what the
-                // line has. Each button then finds itself measured below its own full width and
-                // shows its glyph alone -- see MorphButtonLabel.
-                // The test is against CONTENT, not content-plus-reserve. The reserve is
-                // headroom for the press, not something that has to fit -- compacting a row
-                // whose labels fit perfectly well, purely because their squash allowance did
-                // not, would be a much worse trade than a row that simply cannot squash.
+                // THE FIT RULE, all-or-nothing: if the line cannot give every member the room its label
+                // needs, EVERY member drops to its glyph (see MorphButtonLabel), never just the longest,
+                // so which buttons lose their words can't change with the text, font size or language.
+                // The test is against CONTENT, not content plus reserve: the reserve is press headroom,
+                // not something that has to fit.
                 val basis = if (constraints.hasBoundedWidth && memberIdx.sumOf { full[it] } > room) {
                     val c = compact ?: IntArray(n) { i ->
                         if (member[i]) measurables[i].minIntrinsicWidth(h).coerceIn(0, full[i]) else full[i]

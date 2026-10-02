@@ -325,15 +325,9 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             // repoFor(it) lazily creates+caches one VehicleRepository per brand
             // in the `repos` map (see repoFor above) so later calls just reuse it.
             //
-            // Wrapped in try/catch, unlike before Screen.Loading existed: this
-            // block used to have nothing riding on it completing -- the
-            // default screen was Login itself, so any exception here just
-            // left the user looking at an already-correct (if not-yet-auto-
-            // filled) login form. Now the default is a static Loading screen
-            // with no interactive escape, so an exception ANYWHERE before
-            // loadGarage() itself takes over (which has its own, separate
-            // per-brand error handling -- see loadGarageInner) must not leave
-            // the user stuck looking at it forever.
+            // In try/catch because the default screen is a static Loading screen with no interactive
+            // escape: an exception anywhere before loadGarage() takes over (it has its own per-brand
+            // handling, see loadGarageInner) must not leave the user stuck on it.
             try {
                 // The LOCK decision first: it is what puts the lock screen on the glass, the
                 // first thing a returning user sees, and it needs only the appearance (warmed
@@ -472,14 +466,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
 
 
-    // Appearance/preference setters (setThemeMode through setColorPalette,
-    // and again setPebbleOutline/setAuroraBackground/.../setUnitSystem further
-    // below): each just writes one field to SettingsStore's DataStore and
-    // returns. None of them touch _state directly because `appearance` above
-    // is already a StateFlow mirroring settingsStore.appearance -- the UI
-    // picks up the change automatically once the DataStore write completes
-    // and that Flow re-emits. setDynamicColor is the exception
-    // that does extra work (see its own comment).
+    // Appearance/preference setters each just write one field to SettingsStore; `appearance` is a
+    // StateFlow mirroring it, so the UI follows once the DataStore write re-emits (none touch _state).
     // setThemeMode / setFontChoice / setDynamicColor / setColorPalette / saveCustomPalette /
     // deleteCustomPalette / setActiveCustomPaletteId moved to AppViewModelAppearance.kt.
 

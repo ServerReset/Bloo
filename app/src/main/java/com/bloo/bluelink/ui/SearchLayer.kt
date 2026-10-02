@@ -126,13 +126,9 @@ internal fun SearchLayer(
     var submitted by rememberSaveable { mutableStateOf("") }
     var focused by rememberSaveable { mutableStateOf(false) }
     val open = focused || query.isNotEmpty()
-    // Where the user has dragged the bubble, in dp from the top-left. NaN =
-    // never dragged, so it rests in its default corner. Saved, because having
-    // to re-park it after every rotation would make dragging it pointless.
-    // mutableStateOf, not mutableFloatStateOf: rememberSaveable needs a Saver
-    // for whatever it is handed, and the boxed-Float one is the guaranteed
-    // path. This changes twice a gesture, not twice a frame -- the boxing is
-    // not worth a runtime "no Saver found" on some Compose version.
+    // Where the bubble was dragged, in dp from the top-left (NaN = never, so it rests in its corner).
+    // Saved so it survives rotation. mutableStateOf, not mutableFloatStateOf: rememberSaveable's
+    // guaranteed Saver path; this changes twice a gesture, so the boxing doesn't matter.
     @Suppress("AutoboxingStateCreation")
     var dragX by rememberSaveable { mutableStateOf(Float.NaN) }
     @Suppress("AutoboxingStateCreation")
