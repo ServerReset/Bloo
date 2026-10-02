@@ -157,19 +157,7 @@ internal fun CropScreen(vin: String, uriString: String, onCancel: () -> Unit, on
                             },
                     ) {
                         Canvas(Modifier.fillMaxSize()) {
-                            val wpx = size.width
-                            val hpx = size.height
-                            val cover = max(wpx / image.width, hpx / image.height)
-                            val s = cover * scale
-                            val maxX = ((image.width * s - wpx) / 2f).coerceAtLeast(0f)
-                            val maxY = ((image.height * s - hpx) / 2f).coerceAtLeast(0f)
-                            val cx = offset.x.coerceIn(-maxX, maxX)
-                            val cy = offset.y.coerceIn(-maxY, maxY)
-                            val m = android.graphics.Matrix().apply {
-                                postTranslate(-image.width / 2f, -image.height / 2f)
-                                postScale(s, s)
-                                postTranslate(wpx / 2f + cx, hpx / 2f + cy)
-                            }
+                            val m = cropMatrix(image.width, image.height, size.width, size.height, scale, offset)
                             drawIntoCanvas { it.nativeCanvas.drawBitmap(image, m, null) }
                         }
                     }
@@ -192,21 +180,11 @@ internal fun CropScreen(vin: String, uriString: String, onCancel: () -> Unit, on
                             runCatching {
                                 val wpx = f.width.toFloat()
                                 val hpx = f.height.toFloat()
-                                val cover = max(wpx / image.width, hpx / image.height)
-                                val s = cover * scale
-                                val maxX = ((image.width * s - wpx) / 2f).coerceAtLeast(0f)
-                                val maxY = ((image.height * s - hpx) / 2f).coerceAtLeast(0f)
-                                val cx = offset.x.coerceIn(-maxX, maxX)
-                                val cy = offset.y.coerceIn(-maxY, maxY)
                                 val outScale = 1080f / wpx
                                 val out = createBitmap(1080, (hpx * outScale).toInt(), Bitmap.Config.ARGB_8888)
                                 val canvas = android.graphics.Canvas(out)
-                                val m = android.graphics.Matrix().apply {
-                                    postTranslate(-image.width / 2f, -image.height / 2f)
-                                    postScale(s, s)
-                                    postTranslate(wpx / 2f + cx, hpx / 2f + cy)
-                                    postScale(outScale, outScale)
-                                }
+                                val m = cropMatrix(image.width, image.height, wpx, hpx, scale, offset)
+                                    .apply { postScale(outScale, outScale) }
                                 canvas.drawBitmap(image, m, android.graphics.Paint(android.graphics.Paint.FILTER_BITMAP_FLAG))
                                 val dir = java.io.File(context.filesDir, "cars").apply { mkdirs() }
                                 // Preserve transparency: alpha sources are saved as PNG (so the
@@ -494,5 +472,22 @@ private fun ToggleRowControl(label: String, checked: Boolean, onChange: (Boolean
         )
         Spacer(Modifier.width(10.dp))
         MorphToggleTrack(checked)
+    }
+}
+
+
+/**
+ * The matrix that draws an image of [imgW] x [imgH] into a [wpx] x [hpx] frame the way the crop
+ * editor shows it: scaled to cover the frame, zoomed by [scale], panned by [offset] but never far
+ * enough to show an edge. The preview and the saved bitmap both use it, so they cannot disagree.
+ */
+private fun cropMatrix(imgW: Int, imgH: Int, wpx: Float, hpx: Float, scale: Float, offset: androidx.compose.ui.geometry.Offset): android.graphics.Matrix {
+    val s = max(wpx / imgW, hpx / imgH) * scale
+    val maxX = ((imgW * s - wpx) / 2f).coerceAtLeast(0f)
+    val maxY = ((imgH * s - hpx) / 2f).coerceAtLeast(0f)
+    return android.graphics.Matrix().apply {
+        postTranslate(-imgW / 2f, -imgH / 2f)
+        postScale(s, s)
+        postTranslate(wpx / 2f + offset.x.coerceIn(-maxX, maxX), hpx / 2f + offset.y.coerceIn(-maxY, maxY))
     }
 }
