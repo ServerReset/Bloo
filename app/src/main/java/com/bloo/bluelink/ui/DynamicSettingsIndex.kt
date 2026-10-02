@@ -20,6 +20,8 @@ import com.bloo.bluelink.data.settingsMode
 internal val ADVANCED_ONLY_SETTINGS = setOf(
     // Per-car settings in Advanced mode only
     "Default climate start", // Car settings card - advanced-only per-car setting
+    "Temperature unit", // Units group - per-measurement override
+    "Distance unit", // Units group - per-measurement override
 
     // App-wide settings in Advanced mode only
     "Palette override", // Appearance card - custom palette override

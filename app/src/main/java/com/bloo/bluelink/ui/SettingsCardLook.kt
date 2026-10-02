@@ -70,19 +70,23 @@ internal fun DisplayCardContent(appearance: SettingsStore.Appearance, advanced: 
                     selectedKey = appearance.unitSystem,
                     onSelect = { vm.setUnitSystem(it) },
                 )
-                SettingsSegmentedRow(
-                    label = "Temperature",
-                    options = listOf(SegmentOption("auto", "Auto", null), SegmentOption("f", "°F", null), SegmentOption("c", "°C", null)),
-                    selectedKey = appearance.tempUnit,
-                    onSelect = { vm.setTempUnit(it) },
-                )
-                SettingsSegmentedRow(
-                    label = "Distance and mileage",
-                    options = listOf(SegmentOption("auto", "Auto", null), SegmentOption("mi", "Miles", null), SegmentOption("km", "Km", null)),
-                    selectedKey = appearance.distanceUnit,
-                    onSelect = { vm.setDistanceUnit(it) },
-                )
-                BodySmallText("Auto follows Units, so you can mix them: Celsius with miles, say.")
+                PopVisible(visible = advanced) {
+                    Column(verticalArrangement = Arrangement.spacedBy(GapRow)) {
+                        SettingsSegmentedRow(
+                            label = "Temperature",
+                            options = listOf(SegmentOption("auto", "Auto", null), SegmentOption("f", "°F", null), SegmentOption("c", "°C", null)),
+                            selectedKey = appearance.tempUnit,
+                            onSelect = { vm.setTempUnit(it) },
+                        )
+                        SettingsSegmentedRow(
+                            label = "Distance and mileage",
+                            options = listOf(SegmentOption("auto", "Auto", null), SegmentOption("mi", "Miles", null), SegmentOption("km", "Km", null)),
+                            selectedKey = appearance.distanceUnit,
+                            onSelect = { vm.setDistanceUnit(it) },
+                        )
+                        BodySmallText("Auto follows Units, so you can mix them: Celsius with miles, say.")
+                    }
+                }
             }
             SettingsGroup("Car screen") {
                 ToggleRow(

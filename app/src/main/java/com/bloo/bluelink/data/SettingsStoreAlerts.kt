@@ -221,7 +221,9 @@ suspend fun SettingsStore.setDistanceUnit(value: String) {
  *  non-Compose callers (CarAlerts building a notification string) that the [appearance] flow serves elsewhere. */
 suspend fun SettingsStore.metricDistance(): Boolean {
     val p = context.settingsDataStore.data.first()
-    return resolveMetricDistance(p[SettingsStore.Keys.UNIT_SYSTEM], p[SettingsStore.Keys.DISTANCE_UNIT])
+    // Overrides only count in Advanced mode (see the Appearance decode).
+    val override = p[SettingsStore.Keys.DISTANCE_UNIT].takeIf { p[SettingsStore.Keys.SETTINGS_MODE] == "advanced" }
+    return resolveMetricDistance(p[SettingsStore.Keys.UNIT_SYSTEM], override)
 }
 
 /** Settings view mode: "simple" or "advanced". */
