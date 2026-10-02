@@ -99,10 +99,9 @@ internal fun GlassSurface(
             Modifier
                 .matchParentSize()
                 .clip(shape)
-                .then(if (canBlur) Modifier.appHazeEffect(hazeState!!) else Modifier)
+                .then(if (canBlur) Modifier.appGlassEffect(hazeState!!, shape, card = false) else Modifier)
                 .background(tint)
-                .glassSheen()
-                .glassRefraction(shape),
+                .glassSheen(),
         )
         CompositionLocalProvider(LocalContentColor provides contentColor) {
             content()

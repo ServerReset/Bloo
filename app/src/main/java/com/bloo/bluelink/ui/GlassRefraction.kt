@@ -1,62 +1,55 @@
 package com.bloo.bluelink.ui
 
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.drawWithCache
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.Shape
-import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.graphics.drawscope.clipPath
-import androidx.compose.ui.graphics.drawscope.translate
+import androidx.compose.ui.unit.dp
+import dev.chrisbanes.haze.ExperimentalHazeApi
+import dev.chrisbanes.haze.HazeInput
+import dev.chrisbanes.haze.HazeState
+import dev.chrisbanes.haze.glass.ChromaticAberrationMode
+import dev.chrisbanes.haze.glass.GlassOptics
+import dev.chrisbanes.haze.glass.GlassStyle
+import dev.chrisbanes.haze.glass.OpticalSizeValue
+import dev.chrisbanes.haze.glass.RefractionProfile
+import dev.chrisbanes.haze.glass.hazeGlass
 
 /**
- * The edge of a pane of glass catching light: a bright bevel along the top-left and a fainter
- * caustic along the bottom-right, with a thin chromatic split (cyan one way, magenta the other) just
- * inside the rim, which is how a real glass edge bends white light into its colours. Everything is
- * clipped to [shape] and drawn in one cached pass, so it costs nothing per frame.
+ * Real glass: the backdrop is blurred AND refracted. Light bends where the pane curves, so what is
+ * behind a card is displaced and split into its colours along the edge, with a specular rim on top.
+ * Haze's glass effect does this in an AGSL shader on Android 13+, and on older devices it falls back
+ * to its own simplified renderer, so every caller gets the best the device can do.
  *
- * This is a simulated refraction (it draws the look of one over the blurred backdrop rather than
- * bending the pixels behind it); a true lens warp of the backdrop is the next step.
+ * Only rounded-rectangle shapes can be refracted (a circle counts); anything else keeps the plain
+ * blur. [card] picks the wider, stronger bezel big cards carry over the tighter one chips and pills
+ * use, because a bezel as wide as a chip would refract its whole face.
  */
+@OptIn(ExperimentalHazeApi::class)
 @Composable
-internal fun Modifier.glassRefraction(shape: Shape): Modifier {
-    val dark = appIsDarkTheme()
-    val lit = if (dark) Color.White else Color.White.copy(alpha = 0.9f)
-    val boost = if (dark) 1f else 0.8f
-    return this.drawWithCache {
-        val outline = shape.createOutline(size, layoutDirection, this)
-        val path = Path().apply { addOutline(outline) }
-        val px = density
-        val bevel = Brush.linearGradient(
-            0f to lit.copy(alpha = 0.60f * boost),
-            0.35f to lit.copy(alpha = 0.06f),
-            0.7f to lit.copy(alpha = 0.04f),
-            1f to lit.copy(alpha = 0.34f * boost),
-            start = Offset.Zero,
-            end = Offset(size.width, size.height),
-        )
-        val cyan = Color(0xFF5CE1FF).copy(alpha = 0.26f * boost)
-        val magenta = Color(0xFFFF6BD6).copy(alpha = 0.22f * boost)
-        val glow = Brush.linearGradient(
-            0f to lit.copy(alpha = 0.16f * boost),
-            0.5f to Color.Transparent,
-            1f to lit.copy(alpha = 0.10f * boost),
-            start = Offset.Zero,
-            end = Offset(size.width, size.height),
-        )
-        onDrawBehind {
-            clipPath(path) {
-                // Soft inner glow: the pane's thickness.
-                drawPath(path, glow, style = Stroke(width = 14f * px))
-                // Chromatic split, offset in opposite directions along the light.
-                translate(1.6f * px, 1.6f * px) { drawPath(path, cyan, style = Stroke(width = 1.4f * px)) }
-                translate(-1.6f * px, -1.6f * px) { drawPath(path, magenta, style = Stroke(width = 1.4f * px)) }
-                // The bright bevel on the very edge.
-                drawPath(path, bevel, style = Stroke(width = 2.2f * px))
-            }
-        }
-    }
+internal fun Modifier.appGlassEffect(state: HazeState, shape: Shape, card: Boolean): Modifier {
+    if (shape !is RoundedCornerShape) return this.appHazeEffect(state, cheap = card)
+    val style = remember(shape, card) { glassStyle(shape, card) }
+    return this.hazeGlass(input = HazeInput.Sources(state), style = style)
+}
+
+@OptIn(ExperimentalHazeApi::class)
+private fun glassStyle(shape: RoundedCornerShape, card: Boolean): GlassStyle = GlassStyle.regular then {
+    shape(shape)
+    optics(
+        GlassOptics(
+            refractionStrength = if (card) 0.85f else 0.7f,
+            refractionHeightFraction = 0.3f,
+            refractionDisplacement = if (card) 26.dp else 12.dp,
+            depth = OpticalSizeValue.Fixed(1f),
+            blurRadius = OpticalSizeValue.Fixed(if (card) 18.dp else 16.dp),
+            refractionDetailIntensity = if (card) 0.35f else 0f,
+            refractionProfile = RefractionProfile.Edge(if (card) 22.dp else 10.dp),
+        ),
+    )
+    chromaticAberrationStrength(if (card) 0.05f else 0.03f)
+    chromaticAberrationMode(ChromaticAberrationMode.Simple)
+    specularIntensity(0.4f)
+    ambientResponse(0.2f)
 }

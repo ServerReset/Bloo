@@ -388,10 +388,9 @@ internal fun Modifier.glassCardFill(shape: Shape, tint: Color): Modifier {
     val haze = LocalBackdropHaze.current
     return if (haze != null && canBlurBackdrops()) {
         this.clip(shape)
-            .appHazeEffect(haze, cheap = true)
+            .appGlassEffect(haze, shape, card = true)
             .background(tint.copy(alpha = GlassCardTintAlpha))
             .glassSheen()
-            .glassRefraction(shape)
     } else {
         this.background(tint.copy(alpha = 0.9f), shape)
     }

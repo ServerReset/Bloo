@@ -220,6 +220,8 @@ dependencies {
     implementation("dev.chrisbanes.haze:haze:2.0.0")
     // The built-in Blur effect (HazeBlurStyle/hazeBlur), split out of the core artifact in 2.0.
     implementation("dev.chrisbanes.haze:haze-blur:2.0.0")
+    // Glass: refraction, chromatic dispersion and a specular rim on top of the blur (AGSL on API 33+).
+    implementation("dev.chrisbanes.haze:haze-glass:2.0.0")
 
 
 
