@@ -58,11 +58,7 @@ import com.bloo.bluelink.data.setPowertrain
 import com.bloo.bluelink.data.setServiceIntervalMiles
 import com.bloo.bluelink.data.setShowSearch
 import com.bloo.bluelink.data.setThemeMode
-import com.bloo.bluelink.data.setUnitSystem
-import com.bloo.bluelink.data.setTempUnit
-import com.bloo.bluelink.data.setDistanceUnit
 import com.bloo.bluelink.data.settingsMode
-import com.bloo.bluelink.data.unitSystem
 
 /**
  * Every searchable setting as a [SearchEntry]: its title, the words that find it, and the control
@@ -167,31 +163,13 @@ internal fun buildSettingsSearchEntries(
         ToggleRow("Search on the car screen", appearance.showSearch) { vm.setShowSearch(it) }
     }
     add("Units", "unit system metric imperial temperature distance speed miles km") {
-        SettingsSegmentedRow(
-            label = "Units",
-            options = listOf(
-                SegmentOption("imperial", "Imperial", null),
-                SegmentOption("metric", "Metric", null),
-            ),
-            selectedKey = appearance.unitSystem,
-            onSelect = { vm.setUnitSystem(it) },
-        )
+        UnitSystemRow(appearance, vm)
     }
     add("Temperature unit", "temperature celsius fahrenheit degrees c f units") {
-        SettingsSegmentedRow(
-            label = "Temperature",
-            options = listOf(SegmentOption("auto", "Auto", null), SegmentOption("f", "°F", null), SegmentOption("c", "°C", null)),
-            selectedKey = appearance.tempUnit,
-            onSelect = { vm.setTempUnit(it) },
-        )
+        TempUnitRow(appearance, vm)
     }
     add("Distance unit", "distance mileage odometer range miles kilometres km units") {
-        SettingsSegmentedRow(
-            label = "Distance and mileage",
-            options = listOf(SegmentOption("auto", "Auto", null), SegmentOption("mi", "Miles", null), SegmentOption("km", "Km", null)),
-            selectedKey = appearance.distanceUnit,
-            onSelect = { vm.setDistanceUnit(it) },
-        )
+        DistanceUnitRow(appearance, vm)
     }
     add("Font", "typeface atkinson hyperlegible google sans accessibility low vision") {
         val labels = mapOf(
