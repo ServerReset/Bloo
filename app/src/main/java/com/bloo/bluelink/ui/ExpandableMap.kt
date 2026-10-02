@@ -34,7 +34,6 @@ import androidx.compose.ui.semantics.onClick
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.activity.compose.BackHandler
-import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -252,31 +251,7 @@ internal fun ExpandableMapLayer(
                     mapHazeState = mapHazeState,
                     onRefreshLocation = onRefreshLocation,
                     refreshing = refreshing,
-                    dragModifier = Modifier.pointerInput(Unit) {
-                        detectVerticalDragGestures(
-                            onVerticalDrag = { change, amount ->
-                                change.consume()
-                                scope.launch { dragPx.snapTo((dragPx.value + amount).coerceAtLeast(0f)) }
-                            },
-                            onDragEnd = {
-                                // Distance, not velocity -- a fixed 96dp pull is a
-                                // close enough stand-in for "the user clearly meant
-                                // to close this". Same threshold CarMapSheetBody's
-                                // own handle uses.
-                                val thresholdPx = with(density) { 96.dp.toPx() }
-                                if (dragPx.value > thresholdPx) {
-                                    close()
-                                } else {
-                                    scope.launch {
-                                        dragPx.animateTo(0f, dragSpring)
-                                    }
-                                }
-                            },
-                            onDragCancel = {
-                                scope.launch { dragPx.animateTo(0f, dragSpring) }
-                            },
-                        )
-                    },
+                    dragModifier = Modifier.pullDownToDismiss(dragPx, scope, density, dragSpring, ::close),
                     modifier = Modifier
                         .align(Alignment.TopCenter)
                         .padding(start = 16.dp, end = 16.dp, top = 16.dp)

@@ -50,7 +50,9 @@ import androidx.compose.animation.core.tween
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.ui.input.pointer.pointerInput
+import kotlinx.coroutines.launch
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalView
@@ -440,4 +442,30 @@ internal fun MapTopBar(
             }
         }
     }
+}
+
+
+/**
+ * The pull-down-to-close drag both map sheets use on their top bar: the sheet follows the finger
+ * ([dragPx]), and on release a pull of 96dp or more closes it while anything less springs back.
+ * Distance, not velocity: a fixed 96dp pull is a close enough stand-in for "clearly meant to close".
+ */
+internal fun Modifier.pullDownToDismiss(
+    dragPx: androidx.compose.animation.core.Animatable<Float, androidx.compose.animation.core.AnimationVector1D>,
+    scope: kotlinx.coroutines.CoroutineScope,
+    density: androidx.compose.ui.unit.Density,
+    spring: androidx.compose.animation.core.AnimationSpec<Float>,
+    close: () -> Unit,
+): Modifier = this.pointerInput(Unit) {
+    detectVerticalDragGestures(
+        onVerticalDrag = { change, amount ->
+            change.consume()
+            scope.launch { dragPx.snapTo((dragPx.value + amount).coerceAtLeast(0f)) }
+        },
+        onDragEnd = {
+            val thresholdPx = with(density) { 96.dp.toPx() }
+            if (dragPx.value > thresholdPx) close() else scope.launch { dragPx.animateTo(0f, spring) }
+        },
+        onDragCancel = { scope.launch { dragPx.animateTo(0f, spring) } },
+    )
 }
