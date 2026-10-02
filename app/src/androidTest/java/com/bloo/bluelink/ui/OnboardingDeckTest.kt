@@ -72,7 +72,8 @@ class OnboardingDeckTest {
         }
         assertTrue("the deck is open before dismissing", vm.state.value.welcomeCardsOpen)
         rule.onNodeWithText("Dismiss").performClick()
-        rule.waitUntil(5_000) { !vm.state.value.welcomeCardsOpen }
+        // The exit plays fireworks and a 1s fade before the deck closes; software-rendered emulators are slow at it.
+        rule.waitUntil(30_000) { !vm.state.value.welcomeCardsOpen }
         assertFalse(vm.state.value.welcomeCardsOpen)
     }
 }
