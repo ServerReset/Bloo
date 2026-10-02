@@ -4,6 +4,7 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
@@ -43,38 +44,26 @@ internal fun LockedControls(
     modifier: Modifier = Modifier,
     content: @Composable ColumnScope.() -> Unit,
 ) {
-    val hazeState = remember { HazeState() }
-    val dim by animateFloatAsState(if (locked) 0.5f else 1f, label = "lockedControlsDim")
     Box(modifier) {
         Column(
-            Modifier.graphicsLayer { alpha = dim }.hazeSource(hazeState),
+            Modifier.frosted(locked),
             verticalArrangement = Arrangement.spacedBy(GapRow),
             content = content,
         )
         AnimatedVisibility(
             visible = locked,
             modifier = Modifier.matchParentSize(),
-            enter = fadeIn(),
+            enter = fadeIn() + scaleIn(initialScale = 0.9f),
             exit = fadeOut(),
         ) {
-            GlassSurface(
-                shape = SmallShape,
-                hazeState = hazeState,
-                modifier = Modifier
+            // Swallows taps (nothing underneath can be pressed) but not drags, so the page still scrolls.
+            Box(
+                Modifier
                     .fillMaxSize()
                     .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) { },
+                contentAlignment = Alignment.Center,
             ) {
-                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(AppIcons.Lock, contentDescription = null, modifier = Modifier.size(18.dp))
-                        Spacer(Modifier.width(8.dp))
-                        Text(
-                            message,
-                            style = MaterialTheme.typography.labelLarge,
-                            color = MaterialTheme.colorScheme.onSurface,
-                        )
-                    }
-                }
+                FrostMessage(message)
             }
         }
     }

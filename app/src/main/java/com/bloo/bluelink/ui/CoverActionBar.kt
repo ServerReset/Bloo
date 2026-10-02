@@ -246,7 +246,7 @@ internal fun CoverActionButton(
         // means there's nothing left to override.
         modifier = Modifier
             .height(if (compact) 44.dp else 56.dp)
-            .alpha(if (enabled) 1f else 0.45f),
+            .frosted(!enabled, CircleShape, blurRadius = 2.dp, rim = false),
         expressive = true,
     ) {
     val glyph: @Composable () -> Unit = {
