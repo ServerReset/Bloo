@@ -150,6 +150,7 @@ internal fun GarageStatusCard(state: State<UiState>, vm: AppViewModel, hazeState
             // like a real car page's own content does.
             GlassSurface(
                 shape = ExtraLargeShape,
+                liquid = false,
                 modifier = Modifier
                     .widthIn(max = 400.dp)
                     .fillMaxWidth()

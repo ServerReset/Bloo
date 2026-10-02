@@ -219,6 +219,7 @@ internal fun OnboardingGlassCard(
     val scheme = MaterialTheme.colorScheme
     GlassSurface(
         shape = ExtraLargeShape,
+        liquid = false,
         // Only the card in view is blurred glass; the neighbours are a plain tint (they are mostly
         // faded out) -- three live blurs per frame was a large part of the swipe lag.
         hazeState = if (current) hazeState else null,
