@@ -20,7 +20,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.EvStation
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -53,7 +52,6 @@ import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import coil.imageLoader
 import coil.request.ImageRequest
-import com.bloo.bluelink.data.ChargerStation
 import com.bloo.bluelink.data.GeoLocation
 import com.bloo.bluelink.data.MapTiles
 import kotlinx.coroutines.currentCoroutineContext
@@ -104,14 +102,6 @@ internal fun CarMap(
      * omits the marker.
      */
     deviceLocation: GeoLocation? = null,
-    /** Nearby EV chargers to plot alongside the car/device pins -- see
-     *  [com.bloo.bluelink.data.ChargerApi]'s own doc. Empty (the default) for every
-     *  caller that hasn't opted into the "Chargers" map feature. */
-    chargers: List<ChargerStation> = emptyList(),
-    /** Tapping a charger pin -- null (the default) draws them but ignores taps,
-     *  for a caller (like the compact pebble map) that never populates [chargers]
-     *  in the first place. */
-    onChargerClick: ((ChargerStation) -> Unit)? = null,
 ) {
     val context = LocalContext.current
     // Cold-start diagnostic -- see HeroVisual's matching mark for why. If the map is
@@ -497,37 +487,6 @@ internal fun CarMap(
                     .padding(3.dp)
                     .background(deviceLocationColor, CircleShape),
             )
-        }
-        // Nearby chargers, each going through the SAME full tile-coordinate
-        // conversion the device dot above does (its own tile position minus the
-        // car's, in pixels, plus however far the user has panned) -- there can be
-        // dozens of these, unlike the one device dot, so key() gives each pin a
-        // stable identity across recompositions the way the tile loop above already
-        // does for tiles. A fixed, always-visible green -- not a theme role like the
-        // car/device pins -- since it needs to read as "a charger" against any
-        // palette the car pin/device dot happen to be using today.
-        for (charger in chargers) {
-            key(charger.id) {
-                val dx = (MapTiles.tileX(charger.longitude, zoom) - xTileF) * tilePx
-                val dy = (MapTiles.tileY(charger.latitude, zoom) - yTileF) * tilePx
-                Icon(
-                    Icons.Filled.EvStation,
-                    contentDescription = charger.name,
-                    tint = ChargeGreen,
-                    modifier = Modifier
-                        .align(Alignment.Center)
-                        .offset { IntOffset((state.panX + dx).roundToInt(), (state.panY + dy).roundToInt()) }
-                        .size(28.dp)
-                        .offset(y = (-14).dp)
-                        .then(
-                            if (onChargerClick != null) {
-                                Modifier.noRippleClickable(onClickLabel = charger.name) { onChargerClick(charger) }
-                            } else {
-                                Modifier
-                            },
-                        ),
-                )
-            }
         }
         } // close the scaled tiles/pin/dot layer
         // No buttons drawn over the map any more -- reported directly from a

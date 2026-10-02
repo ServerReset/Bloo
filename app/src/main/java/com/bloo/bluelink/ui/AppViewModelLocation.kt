@@ -4,7 +4,6 @@ import android.location.Geocoder
 import androidx.lifecycle.viewModelScope
 import com.bloo.bluelink.data.GeoLocation
 import kotlinx.coroutines.async
-import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -72,17 +71,6 @@ internal suspend fun AppViewModel.reverseGeocode(loc: GeoLocation): com.bloo.blu
  *  re-emits this. */
 fun AppViewModel.setMapExpanded(value: Boolean) {
     if (_state.value.mapExpanded != value) _state.update { it.copy(mapExpanded = value) }
-    // The map itself just collapsed: drop whatever charger state belonged to
-    // it -- the toggle AND the fetched list/error, not just the toggle -- so
-    // the next car's map (or this same one reopened) starts completely fresh
-    // instead of `toggleChargersVisible`'s own `chargers.isEmpty()` check
-    // seeing a non-empty list left over from a DIFFERENT car's location and
-    // skipping the fetch, silently showing that other car's stations (wrong
-    // pins, wrong distances, wrong count) as though they were near this one.
-    val s = _state.value
-    if (!value && (s.chargersVisible || s.chargers.isNotEmpty() || s.chargersError != null)) {
-        _state.update { it.copy(chargersVisible = false, chargers = emptyList(), chargersError = null) }
-    }
 }
 
 fun AppViewModel.setWeatherPlace(query: String) = weather.setWeatherPlace(query)

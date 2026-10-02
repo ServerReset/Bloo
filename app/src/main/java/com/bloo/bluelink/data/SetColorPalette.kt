@@ -118,15 +118,6 @@ suspend fun SettingsStore.setActiveCustomPaletteId(id: String?) {
 }
 
 
-/** Sets or clears (blank/null) the user's own Open Charge Map API key -- see
- *  [SettingsStore.Appearance.chargerApiKey]'s own doc. */
-suspend fun SettingsStore.setChargerApiKey(key: String?) {
-    editTracked {
-        if (key.isNullOrBlank()) it.remove(SettingsStore.Keys.CHARGER_API_KEY) else it[SettingsStore.Keys.CHARGER_API_KEY] = key.trim()
-    }
-}
-
-
 /** Set or clear the weather location. Passing null lat/lon clears it. Always
  *  resets [SettingsStore.Appearance.weatherFollowsDevice] to false -- every caller of this
  *  EXCEPT [setWeatherFromDeviceLocation] is setting an explicit, static

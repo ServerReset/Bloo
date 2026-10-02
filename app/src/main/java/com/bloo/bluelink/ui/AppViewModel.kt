@@ -470,12 +470,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     internal var liveLocationJob: kotlinx.coroutines.Job? = null
 
-    /** The in-flight [loadNearbyChargers] fetch, if any -- see its own doc for why a
-     *  superseded one is cancelled outright rather than just having its result ignored. */
-    internal var chargerJob: kotlinx.coroutines.Job? = null
 
-    // toggleChargersVisible / loadNearbyChargers / setChargerApiKey / setChargerMinKw /
-    // toggleChargerNetwork moved to AppViewModelChargers.kt (extension functions).
 
     // Appearance/preference setters (setThemeMode through setColorPalette,
     // and again setPebbleOutline/setAuroraBackground/.../setUnitSystem further

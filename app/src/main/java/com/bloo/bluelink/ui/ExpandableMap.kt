@@ -26,7 +26,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.EvStation
 import androidx.compose.material.icons.filled.Map
 import androidx.compose.material.icons.filled.MyLocation
 import androidx.compose.material.icons.filled.Share
@@ -59,9 +58,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.toSize
 import dev.chrisbanes.haze.HazeState
 import dev.chrisbanes.haze.hazeSource
-import com.bloo.bluelink.data.ChargerFilters
-import com.bloo.bluelink.data.ChargerStation
-import com.bloo.bluelink.data.matches
 import com.bloo.bluelink.data.GeoLocation
 import kotlinx.coroutines.launch
 
@@ -94,23 +90,6 @@ internal fun ExpandableMapLayer(
     /** See [MapTopBar]'s own doc -- the real command-pending flag, not a guess. */
     refreshing: Boolean = false,
     onDismiss: () -> Unit,
-    /** The "Chargers" [MapFeature] -- see [ChargerFinder]'s own doc for the whole
-     *  group. All default to "off"/"nothing loaded" so every OTHER existing caller's
-     *  behaviour is unchanged; GarageScreen's own call site is the only one that
-     *  wires these to real state today. */
-    chargersVisible: Boolean = false,
-    chargersLoading: Boolean = false,
-    /** Set only on a genuine fetch failure (network/auth/parse) -- see
-     *  [com.bloo.bluelink.data.ChargerApi.search]'s own doc for why that's kept
-     *  distinct from [chargers] simply being empty. */
-    chargersError: String? = null,
-    chargers: List<ChargerStation> = emptyList(),
-    chargerFilters: ChargerFilters = ChargerFilters(),
-    onToggleChargersVisible: () -> Unit = {},
-    onRetryChargers: () -> Unit = {},
-    onSetChargerMinKw: (Int) -> Unit = {},
-    onToggleChargerNetwork: (String) -> Unit = {},
-    onSetChargerApiKey: (String?) -> Unit = {},
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -155,28 +134,6 @@ internal fun ExpandableMapLayer(
     // Same reason as dragSpring above -- read here, not inside the scope.launch{} in close().
     val closeSpring = lowPowerAwareSpring<Float>(dampingRatio = 0.95f, stiffness = Spring.StiffnessMedium)
     var closing by remember { mutableStateOf(false) }
-    // Which charger pin (if any) the user just tapped -- see the info card below.
-    // Cleared whenever the layer itself is hidden so reopening it never shows a
-    // stale popup for a pin that isn't even drawn any more.
-    var selectedCharger by remember { mutableStateOf<ChargerStation?>(null) }
-    LaunchedEffect(chargersVisible) { if (!chargersVisible) selectedCharger = null }
-    // Also cleared the moment the selected pin itself stops matching the active
-    // filters (or drops out of a fresh fetch entirely) -- its pin is no longer
-    // drawn on the map at that point (see the `chargers.filter { it.matches(...) }`
-    // passed to CarMap below), so leaving the info card up would keep describing a
-    // charger the user can no longer even see.
-    LaunchedEffect(chargerFilters, chargers) {
-        selectedCharger?.let { sel -> if (sel !in chargers || !sel.matches(chargerFilters)) selectedCharger = null }
-    }
-    // Memoized, not recomputed inline at the CarMap call site below: this composable
-    // also recomposes on drag/pan/expand-animation state that has nothing to do with
-    // chargers, chargersVisible or chargerFilters, and re-filtering the whole list on
-    // every one of those frames would be pure waste -- the same reasoning ChargerFilterBar
-    // (below) already applies to its own equivalent filter/count.
-    val visibleChargers = remember(chargersVisible, chargers, chargerFilters) {
-        if (chargersVisible) chargers.filter { it.matches(chargerFilters) } else emptyList()
-    }
-
     fun close() {
         if (closing) return
         closing = true
@@ -274,13 +231,6 @@ internal fun ExpandableMapLayer(
                     Modifier.fillMaxSize().hazeSource(mapHazeState),
                     state = mapState,
                     deviceLocation = deviceLocation,
-                    // Filtered here, not passed raw: CarMap draws exactly what's handed to
-                    // it and has no notion of ChargerFilters of its own -- keeping that
-                    // narrowing at this call site is what lets every OTHER caller (the
-                    // compact pebble map, the cover screen) stay on CarMap's plain
-                    // empty-list default with nothing to opt out of.
-                    chargers = visibleChargers,
-                    onChargerClick = { selectedCharger = it },
                 )
             }
 
@@ -328,13 +278,7 @@ internal fun ExpandableMapLayer(
                 )
             }
 
-            // Bottom buttons (appear when expanded), plus -- above them, in the same
-            // bottom-anchored column -- the charger info popup and/or filter bar,
-            // whichever are relevant right now. Stacking them in one Column rather
-            // than each with its own hand-placed padding is what lets the filter
-            // bar's own height (it wraps, so it's taller with a network row than
-            // without) push the buttons down naturally instead of the two
-            // overlapping whenever the bar grows.
+            // Bottom buttons, which appear once the map is expanded.
             if (isExpanded && expandFraction.value > 0.1f) {
                 Column(
                     modifier = Modifier
@@ -343,58 +287,13 @@ internal fun ExpandableMapLayer(
                         .navigationBarsPadding()
                         // This whole app runs edge-to-edge (MainActivity's enableEdgeToEdge()),
                         // which turns off the manifest's own adjustResize for every surface --
-                        // each one has to lift itself above the keyboard explicitly now. This
-                        // column is the one that actually needs it: the charger API key field
-                        // inside ChargerFilterBar sits right where the keyboard covers it,
-                        // reported directly from a screenshot.
+                        // each one has to lift itself above the keyboard explicitly now.
                         .imePadding()
                         .graphicsLayer { alpha = expandFraction.value.coerceIn(0f, 1f) },
                 ) {
-                    // lastSelectedCharger, not selectedCharger directly, inside the PopVisible
-                    // content below: PopVisible's exit animation still has to render SOMETHING
-                    // while it fades/shrinks out, and selectedCharger itself goes null the
-                    // instant it's dismissed -- rendering that null directly would blank the
-                    // card the moment the exit starts instead of letting it visibly fade away.
-                    var lastSelectedCharger by remember { mutableStateOf<ChargerStation?>(null) }
-                    LaunchedEffect(selectedCharger) {
-                        selectedCharger?.let { lastSelectedCharger = it }
-                    }
-                    PopVisible(
-                        visible = selectedCharger != null,
-                        sizeAnimated = true,
-                        modifier = Modifier.align(Alignment.CenterHorizontally),
-                    ) {
-                        lastSelectedCharger?.let { charger ->
-                            ChargerInfoCard(
-                                charger = charger,
-                                mapHazeState = mapHazeState,
-                                onDismiss = { selectedCharger = null },
-                                modifier = Modifier.padding(horizontal = 16.dp, vertical = GapRow),
-                            )
-                        }
-                    }
-                    PopVisible(
-                        visible = chargersVisible,
-                        sizeAnimated = true,
-                        modifier = Modifier.align(Alignment.CenterHorizontally),
-                    ) {
-                        ChargerFilterBar(
-                            chargers = chargers,
-                            filters = chargerFilters,
-                            loading = chargersLoading,
-                            error = chargersError,
-                            mapHazeState = mapHazeState,
-                            onSetMinKw = onSetChargerMinKw,
-                            onToggleNetwork = onToggleChargerNetwork,
-                            onRetry = onRetryChargers,
-                            onSetApiKey = onSetChargerApiKey,
-                            modifier = Modifier.padding(horizontal = 16.dp, vertical = GapRow),
-                        )
-                    }
                     MapFeatureRow(
                         features = listOf(
                             MapFeature(Icons.Filled.MyLocation, "Recentre") { mapState.recenter() },
-                            MapFeature(Icons.Filled.EvStation, "Chargers") { onToggleChargersVisible() },
                             MapFeature(Icons.Filled.Share, "Share") {
                                 shareLocation(context, location, vehicleName)
                             },

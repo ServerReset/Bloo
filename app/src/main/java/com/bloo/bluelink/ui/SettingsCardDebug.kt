@@ -65,52 +65,38 @@ import androidx.compose.ui.text.font.FontWeight
 import com.bloo.bluelink.data.links
 import kotlin.math.max
 
-/** The "Logs" card: the activity log, copyable and clearable. */
+/** The "Debug" card: this device's diagnostics and the activity log, one place for support troubleshooting. */
 @Composable
-internal fun LogsCardContent(logs: List<String>, vm: AppViewModel, clipboardScope: CoroutineScope, clipboard: Clipboard) {
-    SettingsCard("Logs", AppIcons.Info, vm, status = "${logs.size} lines") {
+internal fun DebugCardContent(logs: List<String>, vm: AppViewModel, clipboardScope: CoroutineScope, clipboard: Clipboard) {
+    fun copy(label: String, text: String) {
+        clipboardScope.launch { clipboard.setClipEntry(ClipEntry(ClipData.newPlainText(label, text))) }
+    }
+    SettingsCard("Debug", Icons.Filled.BugReport, vm, status = "${logs.size} log lines") {
         Column(verticalArrangement = Arrangement.spacedBy(GapGroup)) {
-            IconLeadRow(
-                AppIcons.Info,
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                title = "Activity log",
-                subtitle = "${logs.size} lines, newest last",
-            )
-            ExpressiveButtonRow(modifier = Modifier.fillMaxWidth(), spacing = 8.dp) {
-                SafeMorphTextButton("Copy", onClick = {
-                    clipboardScope.launch {
-                        clipboard.setClipEntry(ClipEntry(ClipData.newPlainText("bloo logs", logs.joinToString("\n"))))
-                    }
-                })
-                SafeMorphTextButton("Clear", onClick = { vm.clearLogs() }, emphasis = ButtonEmphasis.Destructive)
+            SettingsGroup("Device info") {
+                DebugSettingsPanel(onCopyToClipboard = { copy("bloo debug", it) })
             }
-            val scroll = rememberScrollState()
-            SelectionContainer {
-                Text(
-                    text = logs.joinToString("\n").ifBlank { "No activity yet." },
-                    style = MaterialTheme.typography.bodySmall,
-                    fontFamily = FontFamily.Monospace,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .outlinedPanel()
-                        .heightIn(max = 300.dp)
-                        .fadingEdges(scroll)
-                        .verticalScroll(scroll),
-                )
+            SettingsGroup("Activity log") {
+                BodySmallText("${logs.size} lines, newest last.")
+                ExpressiveButtonRow(modifier = Modifier.fillMaxWidth(), spacing = 8.dp) {
+                    SafeMorphTextButton("Copy", onClick = { copy("bloo logs", logs.joinToString("\n")) })
+                    SafeMorphTextButton("Clear", onClick = { vm.clearLogs() }, emphasis = ButtonEmphasis.Destructive)
+                }
+                val scroll = rememberScrollState()
+                SelectionContainer {
+                    Text(
+                        text = logs.joinToString("\n").ifBlank { "No activity yet." },
+                        style = MaterialTheme.typography.bodySmall,
+                        fontFamily = FontFamily.Monospace,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .heightIn(max = 300.dp)
+                            .fadingEdges(scroll)
+                            .verticalScroll(scroll),
+                    )
+                }
             }
         }
-    }
-}
-
-/** The "Debug" card: the developer panel. */
-@Composable
-internal fun DebugCardContent(vm: AppViewModel, clipboardScope: CoroutineScope, clipboard: Clipboard) {
-    SettingsCard("Debug", Icons.Filled.BugReport, vm) {
-        DebugSettingsPanel(
-            onCopyToClipboard = { text ->
-                clipboardScope.launch { clipboard.setClipEntry(ClipEntry(ClipData.newPlainText("bloo debug", text))) }
-            },
-        )
     }
 }
 

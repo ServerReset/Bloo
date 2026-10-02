@@ -37,7 +37,6 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.material.icons.filled.Map
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
@@ -227,7 +226,6 @@ internal fun SettingsScreen(
         // card, hoisted together so none of the five item{} sites below has to break that rule.
         val advTransition0 = rememberGridItemVisibility(advVisible[0])
         val advTransition1 = rememberGridItemVisibility(advVisible[1])
-        val advTransition2 = rememberGridItemVisibility(advVisible[2])
         LazyColumn(
             state = settingsListState,
             modifier = Modifier
@@ -351,11 +349,10 @@ internal fun SettingsScreen(
             }
             if (advTransition1.targetState || !advTransition1.isIdle) item {
 
-            // Debug -- app/device diagnostics for support troubleshooting. A power-user
-            // diagnostic card like Logs, and it takes its OWN slot in this screen's stagger
-            // sequence rather than sharing Logs': the two animate independently.
+            // Debug -- device info and the activity log together, for support troubleshooting.
+            // A power-user card, so it only exists in Advanced mode.
             AnimatedVisibility(visibleState = advTransition1, enter = expandEnterSized(), exit = expandExitSized()) {
-            DebugCardContent(vm, clipboardScope, clipboard)
+            DebugCardContent(logs, vm, clipboardScope, clipboard)
             }
             }
             item {
@@ -384,18 +381,6 @@ internal fun SettingsScreen(
             // doc. So "My location" was already one location feeding both weather and the
             // map; this card just never said so.
             LocationCardContent(appearance, vm)
-            }
-            if (advTransition2.targetState || !advTransition2.isIdle) item {
-
-            // Logs
-            AnimatedVisibility(visibleState = advTransition2, enter = expandEnterSized(), exit = expandExitSized()) {
-            LogsCardContent(logs, vm, clipboardScope, clipboard)
-            }
-            }
-            item {
-
-            // Map & Navigation
-            MapNavigationCardContent(appearance, vm)
             }
             item {
 

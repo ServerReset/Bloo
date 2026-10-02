@@ -74,11 +74,6 @@ class SettingsCardsTest {
         LocationCardContent(appearance, vm)
     }
 
-    @Test fun mapAndNavigation() = checkCard("Map & Navigation", "Save key") { vm ->
-        val appearance by vm.appearance.collectAsState()
-        MapNavigationCardContent(appearance, vm)
-    }
-
     @Test fun display() = checkCard("Display", "Show welcome cards") { vm ->
         val appearance by vm.appearance.collectAsState()
         DisplayCardContent(appearance, advanced = true, vm = vm)
@@ -105,8 +100,8 @@ class SettingsCardsTest {
         AiCardContent(state, advanced = true, vm = vm)
     }
 
-    @Test fun logs() = checkCard("Logs", "Activity log") { vm ->
-        LogsCardContent(
+    @Test fun debugAndLogsAreOneCard() = checkCard("Debug", "Activity log") { vm ->
+        DebugCardContent(
             listOf("one", "two"), vm, CoroutineScope(Dispatchers.Main),
             androidx.compose.ui.platform.LocalClipboard.current,
         )

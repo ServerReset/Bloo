@@ -50,7 +50,6 @@ import androidx.compose.ui.unit.dp
 import com.bloo.bluelink.data.STALE_STATUS_MS
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import com.bloo.bluelink.data.setChargerApiKey
 
 /**
  * Top-level garage screen: picks between three fundamentally different
@@ -105,11 +104,6 @@ internal fun GarageScreen(
     val refreshing by remember { derivedStateOf { state.value.refreshing } }
     val expandedIndex by remember { derivedStateOf { state.value.expandedIndex } }
     val deviceLocation by remember { derivedStateOf { state.value.deviceLocation } }
-    val chargersVisible by remember { derivedStateOf { state.value.chargersVisible } }
-    val chargersLoading by remember { derivedStateOf { state.value.chargersLoading } }
-    val chargersError by remember { derivedStateOf { state.value.chargersError } }
-    val chargers by remember { derivedStateOf { state.value.chargers } }
-    val chargerFilters by remember { derivedStateOf { state.value.chargerFilters } }
     val showSettingsHint by remember { derivedStateOf { state.value.showSettingsHint } }
     // No more early return on an empty garage: a zero-vehicle account is now
     // just another state of this SAME screen (see `slots`/GarageStatusCard
@@ -369,16 +363,6 @@ internal fun GarageScreen(
                 // tracks the in-flight fetch this same button just kicked off.
                 refreshing = state.value.isPending(expandedVehicle.vin, "locate"),
                 onDismiss = { expandedMap.vin = null },
-                chargersVisible = chargersVisible,
-                chargersLoading = chargersLoading,
-                chargersError = chargersError,
-                chargers = chargers,
-                chargerFilters = chargerFilters,
-                onToggleChargersVisible = { vm.toggleChargersVisible(expandedLocation) },
-                onRetryChargers = { vm.loadNearbyChargers(expandedLocation) },
-                onSetChargerMinKw = { vm.setChargerMinKw(it) },
-                onToggleChargerNetwork = { vm.toggleChargerNetwork(it) },
-                onSetChargerApiKey = { vm.setChargerApiKey(it, expandedLocation) },
             )
         }
     }

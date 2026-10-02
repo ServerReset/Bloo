@@ -29,16 +29,12 @@ import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material.icons.filled.Map
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.MyLocation
 import androidx.compose.material.icons.filled.Place
 import androidx.compose.material3.Text
-import androidx.compose.runtime.key
 import androidx.compose.ui.text.input.ImeAction
-import com.bloo.bluelink.data.setChargerApiKey
 
 /** The "Location" card: the place weather and "my location" follow. */
 @Composable
@@ -82,29 +78,6 @@ internal fun LocationCardContent(appearance: SettingsStore.Appearance, vm: AppVi
                     onClick = { permission.launch(android.Manifest.permission.ACCESS_COARSE_LOCATION) },
                 )
             }
-        }
-    }
-}
-
-/** The "Map & Navigation" card: the Open Charge Map key that powers nearby chargers. */
-@Composable
-internal fun MapNavigationCardContent(appearance: SettingsStore.Appearance, vm: AppViewModel) {
-    val saved = appearance.chargerApiKey ?: ""
-    SettingsCard("Map & Navigation", Icons.Filled.Map, vm, status = if (saved.isBlank()) "No API key" else "Key set") {
-        var key by remember { mutableStateOf(saved) }
-        val commit = { vm.setChargerApiKey(key.ifBlank { null }, null) }
-        SettingsGroup("Open Charge Map API key") {
-            BodySmallText("Needed for nearby EV chargers. Get a free key at openchargemap.org/site/develop/api.")
-            BlooTextField(
-                value = key,
-                onValueChange = { key = it },
-                placeholder = { Text("Paste API key here") },
-                singleLine = true,
-                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
-                keyboardActions = KeyboardActions(onDone = { commit() }),
-                modifier = Modifier.fillMaxWidth(),
-            )
-            SafeMorphTextButton("Save key", onClick = { commit() }, enabled = key != saved, emphasis = ButtonEmphasis.Primary)
         }
     }
 }
