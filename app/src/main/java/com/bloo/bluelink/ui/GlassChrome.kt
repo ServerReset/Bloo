@@ -361,7 +361,7 @@ internal val LocalBackdropHaze = androidx.compose.runtime.staticCompositionLocal
 
 /** How much of its colour a glass card keeps over the blur: enough tint to read text on, little
  *  enough that the backdrop shows through as frosted glass. */
-private const val GlassCardTintAlpha = 0.30f
+private const val GlassCardTintAlpha = 0.12f
 
 
 /**
@@ -371,9 +371,9 @@ private const val GlassCardTintAlpha = 0.30f
  */
 internal fun Modifier.glassSheen(): Modifier = this.background(
     androidx.compose.ui.graphics.Brush.linearGradient(
-        0f to Color.White.copy(alpha = 0.13f),
-        0.45f to Color.White.copy(alpha = 0.02f),
-        1f to Color.White.copy(alpha = 0.06f),
+        0f to Color.White.copy(alpha = 0.10f),
+        0.45f to Color.White.copy(alpha = 0.0f),
+        1f to Color.White.copy(alpha = 0.04f),
     ),
 )
 

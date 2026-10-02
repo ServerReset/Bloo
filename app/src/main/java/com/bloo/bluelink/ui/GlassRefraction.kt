@@ -35,21 +35,21 @@ internal fun Modifier.appGlassEffect(state: HazeState, shape: Shape, card: Boole
 }
 
 @OptIn(ExperimentalHazeApi::class)
-private fun glassStyle(shape: RoundedCornerShape, card: Boolean): GlassStyle = GlassStyle.regular then {
+private fun glassStyle(shape: RoundedCornerShape, card: Boolean): GlassStyle = GlassStyle.regular.then {
     shape(shape)
     optics(
         GlassOptics(
-            refractionStrength = if (card) 0.85f else 0.7f,
+            refractionStrength = if (card) 1f else 0.9f,
             refractionHeightFraction = 0.3f,
-            refractionDisplacement = if (card) 26.dp else 12.dp,
-            depth = OpticalSizeValue.Fixed(1f),
-            blurRadius = OpticalSizeValue.Fixed(if (card) 18.dp else 16.dp),
-            refractionDetailIntensity = if (card) 0.35f else 0f,
-            refractionProfile = RefractionProfile.Edge(if (card) 22.dp else 10.dp),
+            refractionDisplacement = if (card) 44.dp else 18.dp,
+            depth = OpticalSizeValue.Fixed(0.8f),
+            blurRadius = OpticalSizeValue.Fixed(if (card) 9.dp else 8.dp),
+            refractionDetailIntensity = if (card) 0.7f else 0.4f,
+            refractionProfile = RefractionProfile.Edge(if (card) 38.dp else 14.dp),
         ),
     )
-    chromaticAberrationStrength(if (card) 0.05f else 0.03f)
+    chromaticAberrationStrength(if (card) 0.09f else 0.06f)
     chromaticAberrationMode(ChromaticAberrationMode.Simple)
-    specularIntensity(0.4f)
-    ambientResponse(0.2f)
+    specularIntensity(0.55f)
+    ambientResponse(0.3f)
 }
