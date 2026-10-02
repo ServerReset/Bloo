@@ -143,8 +143,8 @@ internal class CarMapState {
     fun showDevice(carLat: Double, carLon: Double, deviceLat: Double, deviceLon: Double) {
         userAdjusted = true
         scale = 1f
-        panX = -(MapTiles.tileX(deviceLon, zoom) - MapTiles.tileX(carLon, zoom)) * MapTiles.TILE_PX
-        panY = -(MapTiles.tileY(deviceLat, zoom) - MapTiles.tileY(carLat, zoom)) * MapTiles.TILE_PX
+        panX = (-(MapTiles.tileX(deviceLon, zoom) - MapTiles.tileX(carLon, zoom)) * MapTiles.TILE_PX).toFloat()
+        panY = (-(MapTiles.tileY(deviceLat, zoom) - MapTiles.tileY(carLat, zoom)) * MapTiles.TILE_PX).toFloat()
     }
 
     fun fitBothLocations(
