@@ -298,6 +298,25 @@ internal fun StateControl(
                 }
             }
         }
+        // The lock/unlock button itself: alone it keeps the pill<->rounded-square morph; as the last
+        // segment of a connected group the group's static silhouette ([shapeForCorner]) takes over.
+        val mainButton: @Composable (((Float, Int) -> androidx.compose.ui.graphics.Shape)?) -> Unit = { shapeForCorner ->
+            MorphButton(
+                onClick = { if (isOn == true) onDeactivate() else onActivate() },
+                onClickHaptic = { haptics?.heavy() },
+                enabled = enabled && !pending,
+                interactionSource = mainSource,
+                active = highlighted,
+                activeContainerColor = highlightColor,
+                activeContentColor = highlightContentColor,
+                shapeForCorner = shapeForCorner,
+                contentPadding = PaddingValues(horizontal = 14.dp, vertical = GapRow),
+                modifier = Modifier.heightIn(min = groupBtnSize),
+                expressive = true,
+            ) {
+                lockContent()
+            }
+        }
         if (groupActions.isEmpty()) {
             // No ExpressiveButtonRow at all here -- most cars have no horn/lights support
             // (Kia's US API has none, see the doc above), so this is the common case, and it
@@ -312,20 +331,7 @@ internal fun StateControl(
             // silently applied to the one-segment case too. SafeExpansiveButton's OTHER path
             // (outside a group) grows the button for real, which is exactly the fallback a
             // solitary button wants and every other lone MorphButton in the app already gets.
-            MorphButton(
-                onClick = { if (isOn == true) onDeactivate() else onActivate() },
-                onClickHaptic = { haptics?.heavy() },
-                enabled = enabled && !pending,
-                interactionSource = mainSource,
-                active = highlighted,
-                activeContainerColor = highlightColor,
-                activeContentColor = highlightContentColor,
-                contentPadding = PaddingValues(horizontal = 14.dp, vertical = GapRow),
-                modifier = Modifier.heightIn(min = groupBtnSize),
-                expressive = true,
-            ) {
-                lockContent()
-            }
+            mainButton(null)
         } else {
             ExpressiveButtonRow(
                 // Caps this group's own room at groupMaxWidth -- see that val's own doc above
@@ -353,21 +359,7 @@ internal fun StateControl(
                 // group, where the connected shape takes over (see MorphButton's
                 // shape param doc): a connected group's silhouette is static, not
                 // something one segment morphs independently of the others.
-                MorphButton(
-                    onClick = { if (isOn == true) onDeactivate() else onActivate() },
-                    onClickHaptic = { haptics?.heavy() },
-                    enabled = enabled && !pending,
-                    interactionSource = mainSource,
-                    active = highlighted,
-                    activeContainerColor = highlightColor,
-                    activeContentColor = highlightContentColor,
-                    shapeForCorner = { morph, cp -> connectedGroupShape(segmentCount - 1, segmentCount, cp, morph) },
-                    contentPadding = PaddingValues(horizontal = 14.dp, vertical = GapRow),
-                    modifier = Modifier.heightIn(min = groupBtnSize),
-                    expressive = true,
-                ) {
-                    lockContent()
-                }
+                mainButton { morph, cp -> connectedGroupShape(segmentCount - 1, segmentCount, cp, morph) }
             }
         }
     }
