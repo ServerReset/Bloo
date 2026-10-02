@@ -80,7 +80,7 @@ internal fun SyncDeviceRow(
             )
             .clip(shape)
             .background(if (isPrimary) scheme.primaryContainer.copy(alpha = 0.40f) else Color.Transparent)
-            .border(1.dp, (if (isPrimary) scheme.primary else scheme.onSurface).copy(alpha = if (isPrimary) 0.45f else 0.14f), shape)
+            .border(1.dp, if (isPrimary) scheme.primary.copy(alpha = 0.45f) else hairlineColor(), shape)
             .padding(horizontal = 10.dp, vertical = GapRow),
         verticalAlignment = Alignment.CenterVertically,
     ) {

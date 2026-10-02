@@ -42,7 +42,7 @@ import kotlinx.coroutines.delay
 @Composable
 internal fun Modifier.outlinedPanel(padding: Dp = 12.dp): Modifier =
     this.clip(StandardShape)
-        .border(1.dp, MaterialTheme.colorScheme.onSurface.copy(alpha = 0.14f), StandardShape)
+        .border(1.dp, hairlineColor(), StandardShape)
         .padding(padding)
 
 /** A titled sub-group inside a settings card: a heading, then its controls, in an outlined box. */

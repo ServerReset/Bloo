@@ -219,7 +219,7 @@ fun MorphButton(
                 // frosted rim, so a dimmed button reads as an inert pane of glass sitting
                 // in the layout rather than a broken button.
                 disabledContainerColor = glassTint(canBlurBackdrops()),
-                disabledBorder = BorderStroke(1.dp, MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f)),
+                disabledBorder = BorderStroke(1.dp, hairlineColor()),
                 interactionSource = interactionSource,
                 onLongClick = onLongClick ?: hint::onLongPress,
                 pillCornerPercent = pillCornerPercent,

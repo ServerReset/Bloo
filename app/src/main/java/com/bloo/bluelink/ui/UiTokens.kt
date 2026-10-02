@@ -339,3 +339,11 @@ internal val StandardBlurProgressive
         startIntensity = 1f,
         endIntensity = 0f
     )
+
+
+/** The one hairline: the outline of an inner box, a disabled button's rim, a divider-weight edge. */
+internal const val HairlineAlpha = 0.14f
+
+@androidx.compose.runtime.Composable
+internal fun hairlineColor(): androidx.compose.ui.graphics.Color =
+    androidx.compose.material3.MaterialTheme.colorScheme.onSurface.copy(alpha = HairlineAlpha)

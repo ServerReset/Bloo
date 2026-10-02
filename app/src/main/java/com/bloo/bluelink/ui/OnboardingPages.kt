@@ -408,7 +408,7 @@ internal fun OnboardingTipCard(icon: ImageVector, title: String, body: String) {
     Surface(
         shape = StandardShape,
         color = androidx.compose.ui.graphics.Color.Transparent,
-        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.onSurface.copy(alpha = 0.14f)),
+        border = androidx.compose.foundation.BorderStroke(1.dp, hairlineColor()),
         modifier = Modifier.fillMaxWidth(),
     ) {
         // The same leading-circle icon badge the search results list, the update pebble,
