@@ -245,8 +245,7 @@ internal fun CoverActionButton(
         // X regardless of what the parent offers -- no `fillMaxHeight()` in the chain
         // means there's nothing left to override.
         modifier = Modifier
-            .height(if (compact) 44.dp else 56.dp)
-            .frosted(!enabled, CircleShape, blurRadius = 2.dp, rim = false),
+            .height(if (compact) 44.dp else 56.dp),
         expressive = true,
     ) {
     val glyph: @Composable () -> Unit = {

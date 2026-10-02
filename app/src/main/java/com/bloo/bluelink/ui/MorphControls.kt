@@ -50,6 +50,7 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.foundation.shape.CircleShape
 import kotlinx.coroutines.flow.first
 
 /**
@@ -110,7 +111,8 @@ fun MorphIconButton(
             // On the button, not the icon: scaling the icon alone shrinks the glyph
             // inside a target that stays put, which reads as a glitch rather than a
             // press.
-            modifier = modifier.graphicsLayer { scaleX = scale; scaleY = scale },
+            modifier = modifier.graphicsLayer { scaleX = scale; scaleY = scale }
+                .frosted(!enabled, CircleShape, blurRadius = 2.dp, rim = false),
             enabled = enabled,
             interactionSource = interactionSource,
             content = content,

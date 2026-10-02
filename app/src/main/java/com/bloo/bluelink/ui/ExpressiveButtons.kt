@@ -20,7 +20,6 @@ import androidx.compose.ui.semantics.disabled
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.unit.dp
-import androidx.compose.foundation.shape.CircleShape
 import kotlin.math.roundToInt
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
@@ -275,7 +274,6 @@ fun SafeExpansiveButton(
                 } else {
                     Box(
                         Modifier
-                            .frosted(true, CircleShape, blurRadius = 2.dp, rim = false)
                             .semantics(mergeDescendants = true) { disabled() }
                     ) {
                         content()
@@ -305,7 +303,6 @@ fun SafeExpansiveButton(
                 } else {
                     Box(
                         Modifier
-                            .frosted(true, CircleShape, blurRadius = 2.dp, rim = false)
                             .semantics(mergeDescendants = true) { disabled() }
                     ) {
                         content()

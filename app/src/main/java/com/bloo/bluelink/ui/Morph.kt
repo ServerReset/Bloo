@@ -52,6 +52,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.foundation.shape.RoundedCornerShape
 import com.bloo.uicommon.MorphButtonCore
 import com.bloo.uicommon.connectedGroupShape
 
@@ -170,7 +171,7 @@ fun MorphButton(
         // Keep the button's full background when disabled (only the label
         // fades) instead of M3's default onSurface@12%, which is invisible
         // against light cards and made disabled buttons look backgroundless.
-        disabledContentColor ?: resolvedContent.copy(alpha = 0.38f)
+        disabledContentColor ?: resolvedContent
     }
     val body: @Composable () -> Unit = {
         CompositionLocalProvider(LocalContentColor provides providedContent) {
@@ -185,6 +186,8 @@ fun MorphButton(
                     // the app's one button framework, so this is the single highest-
                     // leverage place to fix it.
                     .semantics { selected = active }
+                    // Can't be pressed right now: iced out, the app's one disabled look (see [frosted]).
+                    .frosted(!enabled, RoundedCornerShape(pillCornerPercent.toInt()), blurRadius = 2.dp, rim = false)
                     // Skipped while SafeExpansiveButton is already smoothly driving this
                     // button's width on press (LocalExpressiveGrowth -- see its own doc):
                     // animateContentSize exists for a genuine content change (a label
