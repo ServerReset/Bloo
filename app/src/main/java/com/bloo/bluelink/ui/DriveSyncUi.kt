@@ -102,7 +102,12 @@ private fun SyncDevicesContent(state: UiState, vm: AppViewModel) {
         )
     }
 
-    BodySmallText("Drag to reorder. The top device is primary. A paired watch rides under its phone.")
+    val primaryName = ordered.firstOrNull { it.id == state.syncPrimaryId }?.name?.ifBlank { null }
+    BodySmallText(
+        "${devices.count { !it.isWatch }} phone${if (devices.count { !it.isWatch } == 1) "" else "s"}" +
+            (primaryName?.let { " · $it is primary" } ?: "") +
+            ". Drag to reorder: the top device is primary, and a paired watch rides under its phone.",
+    )
     val phones = ordered.filter { !it.isWatch }
     val registryWatches = ordered.filter { it.isWatch }
     val watchHost = phones.firstOrNull { it.id == state.syncPrimaryId } ?: phones.firstOrNull()
@@ -205,27 +210,8 @@ private fun SyncDevicesContent(state: UiState, vm: AppViewModel) {
         )
     }
 
-    // Advisory: if a peer hasn't checked in for a while but this device just
-    // synced, it likely drifted onto a DIFFERENT Drive file (a device can't see
-    // another's file directly — the File ID at the top is the real cross-check).
-    val now = System.currentTimeMillis()
-    val stalePeer = devices.any { it.id != state.thisDeviceId && it.lastSeenMs > 0 && now - it.lastSeenMs > STALE_DEVICE_MS }
-    if (stalePeer) {
-        Spacer(Modifier.height(GapRow))
-        Row(verticalAlignment = Alignment.Top) {
-            Icon(
-                Icons.Filled.ErrorOutline,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.error,
-                modifier = Modifier.size(16.dp).padding(top = 2.dp),
-            )
-            Spacer(Modifier.width(8.dp))
-            Text(
-                "A device hasn't synced recently. It may be on a different Drive file. Reconnect via Change Drive file → Open from Drive.",
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
+    ExpressiveButtonRow(modifier = Modifier.fillMaxWidth(), spacing = 12.dp) {
+        SafeMorphTextButton(text = "Sync now", icon = AppIcons.Refresh, onClick = { vm.syncNow() })
     }
 
     if (renaming) {
@@ -278,141 +264,6 @@ private fun SyncDevicesContent(state: UiState, vm: AppViewModel) {
                 )
             },
         )
-    }
-}
-
-
-/** One row in the drag-to-reorder [SyncDevicesSection]: a frosted card with a
- *  drag handle, a device icon (★ when primary), the device name (+ a "This
- *  device" chip and a rename button for self), model, and last-seen. Styled to
- *  match the card language of the rest of Settings; lifts slightly while dragged. */
-@Composable
-internal fun SyncDeviceRow(
-    device: com.bloo.bluelink.data.SyncMerge.SyncDevice,
-    isSelf: Boolean,
-    isPrimary: Boolean,
-    dragging: Boolean,
-    modifier: Modifier,
-    onRename: () -> Unit,
-    /** Kick this device out of the registry -- never offered for [isSelf] (see
-     *  SettingsStore.removeSyncedDevice's own doc for why this can't remove
-     *  yourself: it's a courtesy prune of a stale/unrecognised peer, not a way
-     *  to leave sync on the device you're actually holding). */
-    onRemove: () -> Unit,
-) {
-    val shape = StandardShape
-    val container =
-        if (isPrimary) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.55f)
-        // glassTint (GlassChrome.kt), not surfaceContainerHigh -- the same shared
-        // neutral fill every other glass surface in the app uses now, no exceptions.
-        else androidx.compose.ui.graphics.Color.Transparent
-    Row(
-        Modifier
-            .fillMaxWidth()
-            .clip(shape)
-            .background(container)
-            // The drag-lift shadow, at a weight the current theme can carry. It used
-            // to be dropShadow's bare default colour (0.38-alpha black), and this row
-            // is the worst case for that: its fill is glassTint(blurred = false),
-            // which in light mode is surfaceContainer at 0.12 alpha -- so the lifted
-            // row was a barely-there pale film with a hard black silhouette under it,
-            // i.e. a black smudge following the finger rather than a card lifting off
-            // the page. Same split as glassDropShadow (GlassChrome.kt), where the same
-            // root cause was finally tracked down for every floating GlassSurface.
-            .then(
-                if (dragging) {
-                    Modifier.dropShadow(
-                        shape,
-                        color = Color.Black.copy(alpha = if (appIsDarkTheme()) 0.38f else 0.12f),
-                        blurRadius = 14.dp,
-                        offsetY = 4.dp,
-                    )
-                } else {
-                    Modifier
-                },
-            )
-            .padding(horizontal = 10.dp, vertical = GapRow),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        // Drag handle — the grab affordance, same idiom as the car-order list.
-        Icon(
-            Icons.Filled.DragHandle,
-            contentDescription = "Drag to reorder",
-            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = modifier.size(20.dp),
-        )
-        Spacer(Modifier.width(10.dp))
-        Icon(
-            if (isPrimary) Icons.Filled.Star else Icons.Filled.Smartphone,
-            contentDescription = if (isPrimary) "Primary device" else null,
-            tint = if (isPrimary) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.size(20.dp),
-        )
-        Spacer(Modifier.width(10.dp))
-        Column(Modifier.weight(1f)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    device.name.ifBlank { "Unnamed device" },
-                    style = MaterialTheme.typography.bodyLarge,
-                    fontWeight = if (isPrimary || isSelf) FontWeight.SemiBold else FontWeight.Normal,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f, fill = false),
-                )
-                if (isSelf) {
-                    Spacer(Modifier.width(6.dp))
-                    Text(
-                        "This device",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.primary,
-                    )
-                }
-            }
-            val seen = com.bloo.bluelink.data.relativeLabel(device.lastSeenMs)
-            val sub = buildString {
-                if (isPrimary) append("Primary")
-                val model = device.model.takeIf { it.isNotBlank() }
-                if (isPrimary && model != null) append(" · ")
-                if (model != null) append(model)
-                if (seen.isNotBlank()) { if (isNotEmpty()) append(" · "); append(seen) }
-            }
-            if (sub.isNotBlank()) {
-                Text(
-                    sub,
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            }
-        }
-        if (isSelf) {
-            MorphIconButton(onClick = onRename) {
-                Icon(Icons.Filled.Edit, contentDescription = "Rename this device", modifier = Modifier.size(18.dp))
-            }
-        } else {
-            // Tap-again-to-confirm, same 4s-auto-reset pattern as every other
-            // destructive action in the app (account sign-out, palette/preset
-            // delete) -- one accidental tap on a device you use daily should
-            // never kick it, but a real kick shouldn't need a whole dialog either.
-            val confirmRemove = rememberConfirmArm()
-            MorphIconButton(
-                onClick = {
-                    if (confirmRemove.armed) onRemove() else confirmRemove.arm()
-                },
-            ) {
-                Icon(
-                    AppIcons.Close,
-                    contentDescription = if (confirmRemove.armed) {
-                        "Tap again to remove ${device.name.ifBlank { "this device" }}"
-                    } else {
-                        "Remove ${device.name.ifBlank { "this device" }} from synced devices"
-                    },
-                    tint = if (confirmRemove.armed) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.size(18.dp),
-                )
-            }
-        }
     }
 }
 
