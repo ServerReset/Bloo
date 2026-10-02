@@ -85,3 +85,7 @@
 -dontwarn org.conscrypt.**
 -dontwarn org.bouncycastle.**
 -dontwarn io.github.muntashirakon.adb.**
+
+# Liquid glass widget: JNI-backed blur, called by name from native code.
+-keep class com.example.liquidglass.** { *; }
+-dontwarn com.example.liquidglass.**

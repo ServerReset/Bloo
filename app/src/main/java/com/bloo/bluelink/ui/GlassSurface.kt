@@ -70,6 +70,7 @@ internal fun GlassSurface(
     content: @Composable () -> Unit = {},
 ) {
     val canBlur = hazeState != null && canBlurBackdrops()
+    val liquid = rememberLiquidGlassSupported()
     val interaction = interactionSource ?: remember { MutableInteractionSource() }
     Box(
         modifier = modifier
@@ -99,10 +100,13 @@ internal fun GlassSurface(
             Modifier
                 .matchParentSize()
                 .clip(shape)
-                .then(if (canBlur) Modifier.appGlassEffect(hazeState!!, shape, card = false) else Modifier)
+                // Liquid glass where the device can run it (it blurs and refracts the window behind
+                // it itself); the plain Haze blur everywhere else.
+                .then(if (canBlur && !liquid) Modifier.appHazeEffect(hazeState!!) else Modifier)
                 .background(tint)
                 .glassSheen(),
         )
+        if (liquid) LiquidGlassLayer(shape, Modifier.matchParentSize())
         CompositionLocalProvider(LocalContentColor provides contentColor) {
             content()
         }

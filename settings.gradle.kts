@@ -25,10 +25,13 @@ dependencyResolutionManagement {
     repositories {
         google()
         mavenCentral()
-        // Only for the ADB client used to sideload the watch app.
+        // The ADB client used to sideload the watch app, and the liquid-glass widget.
         maven {
             url = uri("https://jitpack.io")
-            content { includeGroupByRegex("com\\.github\\.MuntashirAkon.*") }
+            content {
+                includeGroupByRegex("com\\.github\\.MuntashirAkon.*")
+                includeGroupByRegex("com\\.github\\.QWEA0.*")
+            }
         }
     }
 }

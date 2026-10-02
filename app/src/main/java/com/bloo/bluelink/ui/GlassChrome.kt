@@ -361,7 +361,7 @@ internal val LocalBackdropHaze = androidx.compose.runtime.staticCompositionLocal
 
 /** How much of its colour a glass card keeps over the blur: enough tint to read text on, little
  *  enough that the backdrop shows through as frosted glass. */
-private const val GlassCardTintAlpha = 0.12f
+private const val GlassCardTintAlpha = 0.42f
 
 
 /**
@@ -371,9 +371,9 @@ private const val GlassCardTintAlpha = 0.12f
  */
 internal fun Modifier.glassSheen(): Modifier = this.background(
     androidx.compose.ui.graphics.Brush.linearGradient(
-        0f to Color.White.copy(alpha = 0.06f),
-        0.45f to Color.White.copy(alpha = 0.0f),
-        1f to Color.White.copy(alpha = 0.04f),
+        0f to Color.White.copy(alpha = 0.13f),
+        0.45f to Color.White.copy(alpha = 0.02f),
+        1f to Color.White.copy(alpha = 0.06f),
     ),
 )
 
@@ -388,9 +388,7 @@ internal fun Modifier.glassCardFill(shape: Shape, tint: Color): Modifier {
     val haze = LocalBackdropHaze.current
     return if (haze != null && canBlurBackdrops()) {
         this.clip(shape)
-            .appGlassEffect(haze, shape, card = true)
-            // A faint dark veil in dark mode keeps text legible over the now-clear glass.
-            .background(if (appIsDarkTheme()) Color.Black.copy(alpha = 0.20f) else Color.Transparent)
+            .appHazeEffect(haze, cheap = true)
             .background(tint.copy(alpha = GlassCardTintAlpha))
             .glassSheen()
     } else {
@@ -405,4 +403,4 @@ internal fun Modifier.glassCardFill(shape: Shape, tint: Color): Modifier {
 private val StandardBlurRadius = 20.dp
 
 /** The softer, cheaper blur cards use -- see [appHazeEffect]'s `cheap`. */
-private val CardBlurRadius = 18.dp
+private val CardBlurRadius = 20.dp
