@@ -401,11 +401,31 @@ private fun SegmentTrack(
                 val f = p - i
                 val l = lefts[i] + (lefts[j] - lefts[i]) * f
                 val r = rights[i] + (rights[j] - rights[i]) * f
+                // A pane of tinted glass rather than a flat chip: the theme colour at ~three quarters so the
+                // track shows through, a bright sheen across the top, and a light-catching rim.
+                val topLeft = Offset(l, 0f)
+                val sz = Size((r - l).coerceAtLeast(0f), size.height)
+                val corner = CornerRadius(12.dp.toPx())
+                drawRoundRect(indicatorColor.copy(alpha = indicatorColor.alpha * 0.78f * vis), topLeft, sz, corner)
                 drawRoundRect(
-                    indicatorColor.copy(alpha = indicatorColor.alpha * vis),
-                    topLeft = Offset(l, 0f),
-                    size = Size((r - l).coerceAtLeast(0f), size.height),
-                    cornerRadius = CornerRadius(12.dp.toPx()),
+                    androidx.compose.ui.graphics.Brush.verticalGradient(
+                        0f to Color.White.copy(alpha = 0.30f * vis),
+                        0.55f to Color.Transparent,
+                        1f to Color.Black.copy(alpha = 0.10f * vis),
+                        startY = 0f,
+                        endY = size.height,
+                    ),
+                    topLeft, sz, corner,
+                )
+                drawRoundRect(
+                    androidx.compose.ui.graphics.Brush.verticalGradient(
+                        0f to Color.White.copy(alpha = 0.55f * vis),
+                        1f to Color.White.copy(alpha = 0.12f * vis),
+                        startY = 0f,
+                        endY = size.height,
+                    ),
+                    topLeft, sz, corner,
+                    style = androidx.compose.ui.graphics.drawscope.Stroke(1.dp.toPx()),
                 )
             },
     ) { measurables, constraints ->

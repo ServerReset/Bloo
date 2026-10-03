@@ -25,6 +25,9 @@ import kotlin.math.roundToInt
  * live press fraction down to this layout (as parent data, read at LAYOUT time -- so a press
  * animates widths without recomposing anything).
  */
+/** Extra room a symbol-only group needs before it goes back to showing its labels. */
+private val CompactHysteresis = 28.dp
+
 @Composable
 fun ExpressiveButtonGroup(
     modifier: Modifier = Modifier,
@@ -112,6 +115,8 @@ fun ExpressiveButtonGroup(
             if (n == 0) return@Layout layout(0, 0) {}
             val gapPx = spacing.roundToPx()
             val lineGapPx = lineSpacing.roundToPx()
+            // Once collapsed to symbols a group needs this much spare room before it shows words again.
+            val hysteresisPx = CompactHysteresis.roundToPx()
             val childConstraints = constraints.copy(minWidth = 0, minHeight = 0)
 
             // Press fractions come from parent data and are READ HERE, at layout time, so a
@@ -171,7 +176,7 @@ fun ExpressiveButtonGroup(
             // and those symbols all fit together on one line.
             fun collapsesInsteadOfWrapping(): Boolean {
                 if (n < 2 || maxW == Int.MAX_VALUE || member.any { !it }) return false
-                if (full.sum() + gapPx * (n - 1) <= maxW) return false
+                if (full.sum() + gapPx * (n - 1) <= maxW - (if (naturals.compacted) hysteresisPx else 0)) return false
                 val c = compact ?: IntArray(n) { i -> measurables[i].minIntrinsicWidth(h).coerceIn(0, full[i]) }
                     .also { compact = it; naturals.compact = it }
                 return (0 until n).all { c[it] < full[it] } && c.sum() + gapPx * (n - 1) <= maxW
@@ -235,7 +240,12 @@ fun ExpressiveButtonGroup(
                 // so which buttons lose their words can't change with the text, font size or language.
                 // The test is against CONTENT, not content plus reserve: the reserve is press headroom,
                 // not something that has to fit.
-                val basis = if (constraints.hasBoundedWidth && memberIdx.sumOf { full[it] } > room) {
+                // Hysteresis: words come back only with CompactHysteresis to spare, so a width hovering at
+                // the threshold doesn't flip the buttons between icon and text.
+                val collapse = constraints.hasBoundedWidth &&
+                    memberIdx.sumOf { full[it] } > room - (if (naturals.compacted) hysteresisPx else 0)
+                if (constraints.hasBoundedWidth) naturals.compacted = collapse
+                val basis = if (collapse) {
                     val c = compact ?: IntArray(n) { i ->
                         if (member[i]) measurables[i].minIntrinsicWidth(h).coerceIn(0, full[i]) else full[i]
                     }.also { compact = it; naturals.compact = it }

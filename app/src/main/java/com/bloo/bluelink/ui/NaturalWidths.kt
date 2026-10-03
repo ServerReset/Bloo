@@ -15,6 +15,14 @@ import androidx.compose.ui.unit.Density
  *  this is a plain object and not snapshot state. */
 internal class NaturalWidths {
     /**
+     * Whether this group's last layout dropped its members to their symbols. Sticky: the group only
+     * goes back to words once there is a clear margin to spare (see ExpressiveButtonGroup's fit rule),
+     * so a width that hovers around the threshold (a rotation, a keyboard, a pane drag) cannot make
+     * the buttons flip between icon and text on every pixel.
+     */
+    var compacted: Boolean = false
+
+    /**
      * The standalone button's own single resting width, cached from its last resting measure.
      *
      * Only [SafeExpansiveButton]'s non-group path uses this; the group derives its widths from

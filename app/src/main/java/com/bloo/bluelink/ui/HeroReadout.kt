@@ -52,6 +52,7 @@ import androidx.compose.ui.text.lerp
 import androidx.compose.ui.unit.lerp
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import kotlin.math.roundToInt
 import com.bloo.bluelink.data.VehicleStatus
 import com.bloo.bluelink.data.percentFor
 import com.bloo.bluelink.data.rangeMiFor
@@ -259,6 +260,14 @@ internal fun HeroCollapsedNumbers(
         // Inside the faded Row, so it leaves with the numbers rather than holding a
         // 10dp hole open in the title row after they have gone.
         Modifier
+            // Keeps reporting its position but gives up its WIDTH as the card opens: once expanded this
+            // anchor paints nothing, yet it used to keep reserving its full width in the title row and
+            // squeezed the car's name down to "Da..." in a narrow column.
+            .layout { measurable, constraints ->
+                val p = measurable.measure(constraints.copy(maxWidth = androidx.compose.ui.unit.Constraints.Infinity))
+                val w = (p.width * fade).roundToInt().coerceAtMost(constraints.maxWidth)
+                layout(w, p.height) { p.place(0, 0) }
+            }
             .graphicsLayer { alpha = if (hoisted) 0f else fade }
             .padding(start = 10.dp)
             .onGloballyPositioned(onPositioned),
