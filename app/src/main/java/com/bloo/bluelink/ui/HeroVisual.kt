@@ -86,8 +86,10 @@ internal fun carTonalBrush(scheme: ColorScheme): Brush {
         // Dark mode: vivid primary/tertiary/secondary with light text over them
         listOf(scheme.primary, scheme.tertiary, scheme.secondary)
     } else {
-        // Light mode: use very light surface variants for minimal visual weight
-        listOf(scheme.surfaceContainerLowest, scheme.surfaceContainerLowest, scheme.surfaceContainer)
+        // Light mode: the same family, softened. The hero's text is light-on-photo, so a near-white
+        // fallback made it unreadable (and needed a heavy dark scrim, which is what made a
+        // photo-less card's edges look dark); a soft vivid wash keeps white text readable.
+        listOf(scheme.primary.copy(alpha = 0.80f), scheme.tertiary.copy(alpha = 0.70f), scheme.secondary.copy(alpha = 0.75f))
     }
     return Brush.linearGradient(colors)
 }
@@ -133,13 +135,25 @@ internal fun HeroPhotoBackdrop(
 ) {
     Box(if (fill) Modifier.fillMaxSize() else Modifier.fillMaxWidth()) {
         HeroVisual(v, imageUrl, height, corner, aspectRatio = aspectRatio, fill = fill)
-        val scrim = remember {
-            Brush.verticalGradient(
-                0f to Color.Black.copy(alpha = 0.55f),
-                0.30f to Color.Black.copy(alpha = 0.22f),
-                0.62f to Color.Black.copy(alpha = 0.28f),
-                1f to Color.Black.copy(alpha = 0.62f),
-            )
+        // A photo needs the full contrast scrim. With no photo in light mode the fallback is already a
+        // colour wash and the heavy scrim only darkened its edges, so it gets a gentle one.
+        val gentle = imageUrl.isNullOrBlank() && !appIsDarkTheme()
+        val scrim = remember(gentle) {
+            if (gentle) {
+                Brush.verticalGradient(
+                    0f to Color.Black.copy(alpha = 0.14f),
+                    0.30f to Color.Black.copy(alpha = 0.04f),
+                    0.62f to Color.Black.copy(alpha = 0.06f),
+                    1f to Color.Black.copy(alpha = 0.20f),
+                )
+            } else {
+                Brush.verticalGradient(
+                    0f to Color.Black.copy(alpha = 0.55f),
+                    0.30f to Color.Black.copy(alpha = 0.22f),
+                    0.62f to Color.Black.copy(alpha = 0.28f),
+                    1f to Color.Black.copy(alpha = 0.62f),
+                )
+            }
         }
         Spacer(Modifier.matchParentSize().background(scrim))
     }

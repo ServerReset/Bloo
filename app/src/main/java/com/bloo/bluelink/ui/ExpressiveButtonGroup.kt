@@ -141,10 +141,17 @@ fun ExpressiveButtonGroup(
             // bug the trial measure had -- inside a parent that forces a width, the "natural"
             // width recorded WAS that forced width, so the button had nothing to grow from.
             val h = if (constraints.hasBoundedHeight) constraints.maxHeight else 0
-            if (naturals.content == null || naturals.content!!.size != n) {
-                naturals.content = IntArray(n) { measurables[it].maxIntrinsicWidth(h).coerceAtLeast(0) }
-                // Invalidated, not recomputed here -- see the lazy read below for why.
-                naturals.compact = null
+            // Re-read whenever the group is at rest, cached only while a press animates it: a child's
+            // label can change (checking... / done) and the old widths would leave its neighbours sized
+            // for text that is gone. A press runs this pass every frame, which is what the cache is for.
+            val resting = press.all { it == 0f }
+            if (resting || naturals.content == null || naturals.content!!.size != n) {
+                val fresh = IntArray(n) { measurables[it].maxIntrinsicWidth(h).coerceAtLeast(0) }
+                if (naturals.content?.contentEquals(fresh) != true) {
+                    naturals.content = fresh
+                    // Invalidated, not recomputed here -- see the lazy read below for why.
+                    naturals.compact = null
+                }
             }
             // What each child's content actually asked for -- the only intrinsic width this
             // group pays for by default.
