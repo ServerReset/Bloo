@@ -102,13 +102,7 @@ internal fun SeatControl(
         // The level text (e.g. "High cool") wears the slider's colour, so OFF is
         // neutral, cooling reads blue and heating reads red - no caption needed.
         StepRow(label, current.label, valueColor = tint)
-        AnimatedSlider(
-            value = index.toFloat(),
-            onValueChange = { onChange(range[it.roundToInt().coerceIn(0, range.lastIndex)]) },
-            valueRange = 0f..range.lastIndex.toFloat(),
-            steps = (range.size - 2).coerceAtLeast(0),
-            accent = tint,
-        )
+        LevelSlider(index, range, tint, onChange)
     }
 }
 
@@ -130,13 +124,7 @@ internal fun WheelHeatControl(level: WheelHeatLevel, onChange: (WheelHeatLevel) 
     )
     Column {
         StepRow("Steering wheel heat", level.label, valueColor = tint)
-        AnimatedSlider(
-            value = index.toFloat(),
-            onValueChange = { onChange(range[it.roundToInt().coerceIn(0, range.lastIndex)]) },
-            valueRange = 0f..range.lastIndex.toFloat(),
-            steps = (range.size - 2).coerceAtLeast(0),
-            accent = tint,
-        )
+        LevelSlider(index, range, tint, onChange)
     }
 }
 
@@ -491,4 +479,22 @@ internal fun ChargeLimitPill(
         )
         Spacer(Modifier.height(GapHairline))
     }
+}
+
+/**
+ * The stepped level slider both [SeatControl] and [WheelHeatControl] drive: a
+ * discrete [range] of levels, the current [index] into it, and the tint the level
+ * (and its label above) wears. The two callers had this block verbatim -- a
+ * `steps = (range.size - 2)` index-to-value mapping is easy to get subtly wrong,
+ * so it lives once.
+ */
+@Composable
+private fun <T> LevelSlider(index: Int, range: List<T>, tint: Color, onChange: (T) -> Unit) {
+    AnimatedSlider(
+        value = index.toFloat(),
+        onValueChange = { onChange(range[it.roundToInt().coerceIn(0, range.lastIndex)]) },
+        valueRange = 0f..range.lastIndex.toFloat(),
+        steps = (range.size - 2).coerceAtLeast(0),
+        accent = tint,
+    )
 }
