@@ -93,6 +93,12 @@ fun AnimatedSlider(
         if (!dragging && !settling && !anim.isRunning && anim.value != value) anim.snapTo(value)
     }
 
+    // 0 at rest, 1 while a finger is on it: the thumb narrows, glows, and the dots near it swell.
+    val press by androidx.compose.animation.core.animateFloatAsState(
+        targetValue = if (dragging) 1f else 0f,
+        animationSpec = spring(dampingRatio = 0.6f, stiffness = Spring.StiffnessMedium),
+        label = "sliderPress",
+    )
     val trackThickness = 14.dp
     val thumbW = 6.dp
     val thumbH = 44.dp
@@ -304,8 +310,14 @@ fun AnimatedSlider(
             // segment above, only drawn if there's room left before the thumb.
             val acEnd = (thumbX - cut).coerceAtLeast(0f)
             if (acEnd > 0f) {
+                // Fades in as it grows past a pill's own width, so at the minimum there is no stub.
+                val grow = (acEnd / th).coerceIn(0f, 1f)
                 drawRoundRect(
-                    accent,
+                    androidx.compose.ui.graphics.Brush.horizontalGradient(
+                        listOf(accent.copy(alpha = 0.78f * grow), accent.copy(alpha = grow)),
+                        startX = 0f,
+                        endX = acEnd,
+                    ),
                     topLeft = Offset(0f, top),
                     size = Size(acEnd, th),
                     cornerRadius = radius,
@@ -324,17 +336,37 @@ fun AnimatedSlider(
                     val tf = i.toFloat() / (n - 1)
                     val x = padPx + travel * tf
                     if (abs(x - thumbX) < cut) continue
-                    drawCircle(if (x <= thumbX) dotOnActive else dotOnInactive, rPx, Offset(x, cy))
+                    // Near the thumb the dots swell while it is held, like they are being pulled along.
+                    val near = (1f - abs(x - thumbX) / (padPx * 4f)).coerceIn(0f, 1f)
+                    drawCircle(if (x <= thumbX) dotOnActive else dotOnInactive, rPx * (1f + 0.7f * near * press), Offset(x, cy))
                 }
             }
             // The thumb itself: a tall, narrow, fully-rounded (pill-shaped, since its
             // corner radius equals half its own width) rectangle centred on thumbX and
             // spanning the full height of the control.
-            val twPx = thumbW.toPx()
+            // A glow under the thumb while held, then the thumb itself, narrowing as it is pressed.
+            if (press > 0.01f) {
+                drawCircle(
+                    androidx.compose.ui.graphics.Brush.radialGradient(
+                        listOf(accent.copy(alpha = 0.38f * press), Color.Transparent),
+                        center = Offset(thumbX, cy),
+                        radius = 30.dp.toPx(),
+                    ),
+                    radius = 30.dp.toPx(),
+                    center = Offset(thumbX, cy),
+                )
+            }
+            val twPx = thumbW.toPx() * (1f - 0.25f * press)
             drawRoundRect(
                 accent,
-                topLeft = Offset(thumbX - twPx / 2f, 0f),
-                size = Size(twPx, size.height),
+                topLeft = Offset(thumbX - twPx / 2f, -2.dp.toPx() * press),
+                size = Size(twPx, size.height + 4.dp.toPx() * press),
+                cornerRadius = CornerRadius(twPx / 2f),
+            )
+            drawRoundRect(
+                Color.White.copy(alpha = 0.35f),
+                topLeft = Offset(thumbX - twPx / 2f + twPx * 0.2f, 4.dp.toPx()),
+                size = Size(twPx * 0.25f, size.height * 0.4f),
                 cornerRadius = CornerRadius(twPx / 2f),
             )
         }
