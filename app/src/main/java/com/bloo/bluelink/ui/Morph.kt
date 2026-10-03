@@ -317,7 +317,8 @@ fun MorphTextButton(
     MorphButton(
         onClick = onClick,
         modifier = modifier,
-        enabled = enabled,
+        // A pending action (a request in flight) is inert and iced out like any button that can't be pressed.
+        enabled = enabled && !pending,
         groupWeight = groupWeight,
         interactionSource = interactionSource,
         containerColor = containerColor.takeOrElse { emphasis.container() },
@@ -436,7 +437,8 @@ fun MorphActionButton(
     MorphButton(
         onClick = onClick,
         modifier = modifier,
-        enabled = enabled,
+        // A pending action (a request in flight) is inert and iced out like any button that can't be pressed.
+        enabled = enabled && !pending,
         active = active,
         interactionSource = interactionSource,
         groupWeight = groupWeight,
