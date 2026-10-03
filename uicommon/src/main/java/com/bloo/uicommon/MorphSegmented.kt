@@ -72,6 +72,34 @@ fun segmentWeights(n: Int, pos: Float, shown: Float, ratio: Float): FloatArray =
     1f + (ratio - 1f) * shown * (1f - abs(pos - i)).coerceAtLeast(0f)
 }
 
+/**
+ * Pixel widths for the segments: [free] split by [weights], except no segment goes below its
+ * [naturals] (the width its label needs), so a squashed neighbour never truncates its text. Segments
+ * that would fall short are pinned at their natural width and the rest share what is left by weight.
+ * When even the naturals don't fit, they are scaled down evenly.
+ */
+fun fitSegmentWidths(free: Float, weights: FloatArray, naturals: FloatArray): FloatArray {
+    val n = weights.size
+    if (naturals.sum() >= free) {
+        val total = naturals.sum().coerceAtLeast(0.01f)
+        return FloatArray(n) { free * naturals[it] / total }
+    }
+    val pinned = BooleanArray(n)
+    val out = FloatArray(n)
+    repeat(n) {
+        val pinnedSum = (0 until n).filter { pinned[it] }.sumOf { naturals[it].toDouble() }.toFloat()
+        val share = (free - pinnedSum).coerceAtLeast(0f)
+        val total = (0 until n).filter { !pinned[it] }.sumOf { weights[it].toDouble() }.toFloat().coerceAtLeast(0.01f)
+        var changed = false
+        for (i in 0 until n) {
+            out[i] = if (pinned[i]) naturals[i] else share * weights[i] / total
+            if (!pinned[i] && out[i] < naturals[i]) { pinned[i] = true; changed = true }
+        }
+        if (!changed) return out
+    }
+    return FloatArray(n) { maxOf(out[it], naturals[it]) }
+}
+
 /** How much wider the chosen segment is than each of the others, by option count. */
 private fun stretchRatio(n: Int): Float = when {
     n <= 2 -> 2.2f
@@ -156,18 +184,15 @@ fun MorphSegmented(
         modifier = modifier.blockPageSwipe().fillMaxWidth().clip(trackShape).background(containerColor)
             .then(if (borderColor != null) Modifier.border(BorderStroke(1.dp, borderColor), trackShape) else Modifier),
     ) {
-        var trackWidthPx by remember { mutableStateOf(0f) }
         val gapPx = with(androidx.compose.ui.platform.LocalDensity.current) { gap.toPx() }
-        /** Which segment sits under x right now, using the live (mid-spring) widths. */
+        // The segment widths of the last layout, written by the track and read by touch handling.
+        val widths = remember(n) { FloatArray(n) }
+        /** Which segment sits under x right now, using the live (mid-spring) widths of the last layout. */
         fun indexAt(x: Float): Int {
-            val free = (trackWidthPx - gapPx * (n - 1)).coerceAtLeast(1f)
-            val ws = weightsNow()
-            val total = ws.sum().coerceAtLeast(0.01f)
             var left = 0f
             for (i in 0 until n) {
-                val w = free * ws[i] / total
-                if (x < left + w + gapPx / 2f) return i
-                left += w + gapPx
+                if (x < left + widths[i] + gapPx / 2f) return i
+                left += widths[i] + gapPx
             }
             return n - 1
         }
@@ -179,7 +204,7 @@ fun MorphSegmented(
             shown = { shown.value },
             gap = gap,
             height = trackHeight,
-            onWidth = { trackWidthPx = it },
+            widths = widths,
             // The chosen segment's fill is painted behind the labels at that segment's live size.
             indicatorColor = indicatorColor,
             segmentShape = segmentShape,
@@ -305,7 +330,7 @@ private fun SegmentTrack(
     weights: () -> FloatArray,
     gap: Dp,
     height: Dp,
-    onWidth: (Float) -> Unit,
+    widths: FloatArray,
     position: () -> Float,
     shown: () -> Float,
     indicatorColor: Color,
@@ -321,16 +346,13 @@ private fun SegmentTrack(
                 val vis = shown()
                 if (vis <= 0.01f) return@drawBehind
                 val g = gap.toPx()
-                val w = weights()
-                val total = w.sum().coerceAtLeast(0.01f)
-                val free = size.width - g * (n - 1)
-                // Left and right edge of every segment at this instant.
+                // Left and right edge of every segment, from the widths the last layout settled on.
                 val lefts = FloatArray(n)
                 val rights = FloatArray(n)
                 var x = 0f
                 for (i in 0 until n) {
                     lefts[i] = x
-                    x += free * w[i] / total
+                    x += widths[i]
                     rights[i] = x
                     x += g
                 }
@@ -351,16 +373,13 @@ private fun SegmentTrack(
     ) { measurables, constraints ->
         val g = gap.roundToPx()
         val full = if (constraints.hasBoundedWidth) constraints.maxWidth else 0
-        onWidth(full.toFloat())
-        val w = weights()
-        val total = w.sum().coerceAtLeast(0.01f)
         val free = (full - g * (n - 1)).coerceAtLeast(0)
         val h = constraints.maxHeight.takeIf { it != Constraints.Infinity } ?: height.roundToPx()
+        val naturals = FloatArray(n) { measurables[it].maxIntrinsicWidth(h).toFloat() }
+        val fitted = fitSegmentWidths(free.toFloat(), weights(), naturals)
+        for (i in 0 until n) widths[i] = fitted[i]
         var left = 0
-        val placeables = measurables.mapIndexed { i, m ->
-            val width = (free * w[i] / total).toInt().coerceAtLeast(0)
-            m.measure(Constraints.fixed(width, h))
-        }
+        val placeables = measurables.mapIndexed { i, m -> m.measure(Constraints.fixed(fitted[i].toInt().coerceAtLeast(0), h)) }
         layout(full, h) {
             placeables.forEachIndexed { i, p ->
                 p.placeRelative(left, 0)
