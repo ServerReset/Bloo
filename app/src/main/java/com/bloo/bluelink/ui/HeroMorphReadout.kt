@@ -154,7 +154,8 @@ internal fun HeroMorphReadout(
             // SURFACE role: on a light-themed app it drew "Fuel 40%" and its pump glyph
             // in near-black over a dark photo, invisible, while the percentage and range
             // beside it -- both painted from the hero's LocalContentColor provider, which
-            // travels onSurface -> HeroOnPhoto as the card opens -- were near-white. Under
+            // travels onSurface -> heroOnPhoto (theme-inverted) as the card opens -- were
+            // near-white in light mode. Under
             // a custom palette active it also picked up a slice of the seed
             // colour, so it came out a tinted grey belonging to no backdrop at all.
             // MutedContentAlpha keeps it subordinate to the numbers the way the muted

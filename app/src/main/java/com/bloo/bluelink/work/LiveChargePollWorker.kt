@@ -102,13 +102,7 @@ class LiveChargePollWorker(context: Context, params: WorkerParameters) : Corouti
                 fetched[v.vin] = status
                 runCatching {
                     // charging local was `ev?.batteryCharge == true`, which the overload derives.
-                    LiveCharge.sync(
-                        context = applicationContext,
-                        settings = settings,
-                        vin = v.vin,
-                        carName = v.name,
-                        ev = ev,
-                    )
+                    LiveCharge.sync(context = applicationContext, settings = settings, v = v, ev = ev)
                 }
             }
         }

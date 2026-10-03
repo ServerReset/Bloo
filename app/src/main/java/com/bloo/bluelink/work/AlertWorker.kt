@@ -145,13 +145,7 @@ class AlertWorker(context: Context, params: WorkerParameters) : CoroutineWorker(
                     // too coarse for a bar meant to look live.
                     if (ev?.batteryCharge == true) LiveChargePollWorker.kick(applicationContext)
                     runCatching {
-                        LiveCharge.sync(
-                            context = applicationContext,
-                            settings = settings,
-                            vin = v.vin,
-                            carName = v.name,
-                            ev = ev,
-                        )
+                        LiveCharge.sync(context = applicationContext, settings = settings, v = v, ev = ev)
                     }
                 }
             }

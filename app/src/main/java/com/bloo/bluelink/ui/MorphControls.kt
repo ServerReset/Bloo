@@ -2,7 +2,6 @@ package com.bloo.bluelink.ui
 
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.snap
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.PaddingValues
@@ -12,8 +11,6 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.onClick
 import androidx.compose.ui.semantics.onLongClick
@@ -218,20 +215,8 @@ internal fun MorphExpandButton(
     onPressChange: ((Boolean) -> Unit)? = null,
 ) {
     val haptics = LocalHaptics.current
-    val rotation by animateFloatAsState(
-        targetValue = if (expanded) 180f else 0f,
-        animationSpec = lowPowerAwareSpring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessLow),
-        label = "morphChevron",
-    )
-
-    // Easter egg: same hold as SplitExpandButton — long-press spins + vibrates
-    var easterEggTriggered by remember { mutableStateOf(false) }
-    val easterEggSpin by animateFloatAsState(
-        targetValue = if (easterEggTriggered) 360f else 0f,
-        animationSpec = if (easterEggTriggered) lowPowerAwareSpring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessLow) else snap(),
-        label = "easterEggMorphSpin",
-        finishedListener = { if (easterEggTriggered) easterEggTriggered = false },
-    )
+    // Shared with SplitExpandButton's own chevron -- see [rememberChevronSpin].
+    val chevron = rememberChevronSpin(expanded, label = "morphChevron")
     // This button is a FIXED 50dp square, so a 50% corner is a true circle and
     // 10dp is exactly 20%. The default 28 (the app's standard rounded square)
     // is deliberately overridden to keep this control's 10dp corners, which
@@ -256,10 +241,8 @@ internal fun MorphExpandButton(
             onClickHaptic = { if (expanded) haptics?.tick() else haptics?.click() },
             onLongClick = {
                 // Easter egg: hold the chevron to spin it + vibrate.
-                if (!easterEggTriggered) {
-                    easterEggTriggered = true
-                    haptics?.heavy()
-                }
+                chevron.spin()
+                haptics?.heavy()
             },
             // Expanded highlight = the SAME active state as lock/unlock: primary
             // fill, onPrimary content, straight from MorphButton's defaults.
@@ -279,18 +262,7 @@ internal fun MorphExpandButton(
                 .size(ButtonTargetHeight)
                 .semantics { stateDescription = if (expanded) "Expanded" else "Collapsed" },
         ) {
-            Icon(
-                Icons.Filled.KeyboardArrowDown,
-                contentDescription = if (expanded) "Collapse" else "Expand",
-                // Larger chevron icon (24dp to match action button icon size), with
-                // easter egg spin animation when the chevron is held.
-                // Draw-phase read -- see PebbleShell's identical chevron for why
-                // Modifier.rotate() (which takes the angle as an argument, and so reads
-                // the spring in composition) is the wrong tool here.
-                modifier = Modifier.size(ButtonIconOnlySize).graphicsLayer {
-                    rotationZ = rotation + easterEggSpin
-                },
-            )
+            ExpandChevronIcon(expanded, chevron)
         }
     }
 }

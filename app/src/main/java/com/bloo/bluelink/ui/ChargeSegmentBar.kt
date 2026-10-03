@@ -99,11 +99,12 @@ internal fun ChargeSegmentBar(
     charging: Boolean,
     modifier: Modifier = Modifier,
     /** True when the segment sits on a genuinely dark backdrop (the hero's
-     *  photo + scrim, the cover tile): the "won't charge past here" zone then
-     *  paints LIGHT so it stays legible. The LocalContentColor heuristic
-     *  this used got the hero wrong (HeroOnPhoto is near-white content, but
-     *  the BACKDROP behind it is the dark scrim), which is exactly the two
-     *  impossible-to-infer facts this override exists for. */
+     *  photo + scrim in light mode, the cover tile): the "won't charge past
+     *  here" zone then paints LIGHT so it stays legible. The LocalContentColor
+     *  heuristic this used got the hero wrong, because the hero's on-photo
+     *  content colour (heroOnPhoto) is INVERTED against the theme while the
+     *  backdrop behind it follows the theme -- neither can be inferred from
+     *  the other, which is exactly why this override exists. */
     darkBackdrop: Boolean = false,
 ) {
     val scheme = MaterialTheme.colorScheme
@@ -116,7 +117,7 @@ internal fun ChargeSegmentBar(
     // on a dark hero photo the dim gray almost disappears, and on a light card
     // it reads as nothing. The bar now matches its own host's contrast
     // language instead: LocalContentColor is the SAME tone every surrounding
-    // element already checked against this backdrop (HeroOnPhoto white over the
+    // element already checked against this backdrop (heroOnPhoto over the
     // photo scrim, onSurface on flat cards), so the "won't fill past here"
     // zone paints WHITE-on-dark and DARK-on-light by construction -- black
     // backdrop -> white segment, white backdrop -> dark segment, and it tracks

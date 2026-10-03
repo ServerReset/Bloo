@@ -185,6 +185,26 @@ object LiveCharge {
     )
 
     /**
+     * [sync] for a caller holding a [Vehicle] and its current [EvStatus], which is how both
+     * background workers reach it: each wrote out
+     * `sync(context = applicationContext, settings = settings, vin = v.vin, carName = v.name, ev = ev)`
+     * verbatim. The vehicle's own vin/name are the arguments here, so those two call sites
+     * shrink to one call and can't drift on which field goes where.
+     */
+    suspend fun sync(
+        context: Context,
+        settings: SettingsStore,
+        v: Vehicle,
+        ev: EvStatus?,
+    ) = sync(
+        context = context,
+        settings = settings,
+        vin = v.vin,
+        carName = v.name,
+        ev = ev,
+    )
+
+    /**
      * The one entry point callers should use: applies the dismissal rule, then delegates
      * to [update].
      *

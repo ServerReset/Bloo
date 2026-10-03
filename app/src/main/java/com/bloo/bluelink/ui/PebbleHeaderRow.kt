@@ -147,7 +147,7 @@ internal fun PebbleHeaderRow(
         // same place -- and until now only the title did. That split is the
         // reported "the car icon before the car's name doesn't follow the
         // theme" bug, raised repeatedly: on the hero the header is drawn over
-        // a scrimmed car photo and the title travels to HeroOnPhoto for it
+        // a scrimmed car photo and the title travels to heroOnPhoto for it
         // (see titleColor's own doc), while this Icon kept inheriting the
         // CARD's content colour -- near-black in a light theme, and tinted by
         // whatever slice of the seed colour an active custom palette

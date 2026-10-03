@@ -12,7 +12,6 @@ package com.bloo.bluelink.ui
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.snap
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.IntrinsicSize
@@ -28,8 +27,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CornerSize
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.onClick
@@ -110,23 +107,9 @@ internal fun SplitExpandButton(
     onChevronPressChange: ((Boolean) -> Unit)? = null,
 ) {
     val haptics = LocalHaptics.current
-    val rotation by animateFloatAsState(
-        targetValue = if (expanded) 180f else 0f,
-        animationSpec = lowPowerAwareSpring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessLow),
-        label = "splitChevron",
-    )
-
-    // Easter egg: HOLD the chevron (long-press) to trigger a one-shot spin
-    // animation with a vibration. A long press does NOT toggle the pebble --
-    // only a plain tap does. After the spin completes the chevron returns to
-    // normal operation and can be held again.
-    var easterEggTriggered by remember { mutableStateOf(false) }
-    val easterEggSpin by animateFloatAsState(
-        targetValue = if (easterEggTriggered) 360f else 0f,
-        animationSpec = if (easterEggTriggered) lowPowerAwareSpring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessLow) else snap(),
-        label = "easterEggSpin",
-        finishedListener = { if (easterEggTriggered) easterEggTriggered = false },
-    )
+    // Shared with MorphExpandButton's own chevron -- see [rememberChevronSpin]. A long press
+    // does NOT toggle the pebble; only a plain tap does.
+    val chevron = rememberChevronSpin(expanded, label = "splitChevron")
 
     // The row's own real, measured height. The halves' corners are expressed
     // as a PERCENT of the short side (the shared MorphButton model -- exact
@@ -366,10 +349,8 @@ internal fun SplitExpandButton(
                     onClickHaptic = { if (expanded) haptics?.tick() else haptics?.click() },
                     onLongClick = {
                         // Easter egg: hold the chevron to spin it + vibrate.
-                        if (!easterEggTriggered) {
-                            easterEggTriggered = true
-                            haptics?.heavy()
-                        }
+                        chevron.spin()
+                        haptics?.heavy()
                     },
                     active = expanded,
                     interactionSource = chevronSource,
@@ -388,19 +369,7 @@ internal fun SplitExpandButton(
                     modifier = Modifier.fillMaxHeight().widthIn(min = rowHeightDp)
                         .semantics { stateDescription = if (expanded) "Expanded" else "Collapsed" },
                 ) {
-                    Icon(
-                        Icons.Filled.KeyboardArrowDown,
-                        contentDescription = if (expanded) "Collapse" else "Expand",
-                        // Larger chevron icon (24dp to match action button icon size), with
-                        // easter egg spin animation when the chevron is held.
-                        // rotationZ in a graphicsLayer LAMBDA, not Modifier.rotate(): rotate()
-                        // takes the angle as an argument, so the spring is read in COMPOSITION
-                        // and this Icon recomposes on every frame of every expand/collapse, on
-                        // every pebble header in the app. Read in the lambda it is draw-phase.
-                        modifier = Modifier.size(ButtonIconOnlySize).graphicsLayer {
-                            rotationZ = rotation + easterEggSpin
-                        },
-                    )
+                    ExpandChevronIcon(expanded, chevron)
                 }
             }
         }
