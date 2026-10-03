@@ -99,20 +99,14 @@ internal fun PaletteSwatch(
             contentAlignment = Alignment.Center,
         ) {
             if (selected) {
-                Icon(
-                    Icons.Filled.Check,
-                    contentDescription = null,
-                    tint = Color.White,
-                    modifier = Modifier.size(22.dp),
-                )
+                SelectedCheck()
             }
         }
         Spacer(Modifier.height(GapHairline))
         Text(
             palette.label,
             style = MaterialTheme.typography.labelSmall,
-            color = if (selected) MaterialTheme.colorScheme.onSurface
-            else MaterialTheme.colorScheme.onSurfaceVariant,
+            color = swatchLabelColor(selected),
         )
     }
 }
@@ -168,12 +162,7 @@ internal fun CustomPaletteSwatch(
                 contentAlignment = Alignment.Center,
             ) {
                 if (selected) {
-                    Icon(
-                        Icons.Filled.Check,
-                        contentDescription = null,
-                        tint = Color.White,
-                        modifier = Modifier.size(22.dp),
-                    )
+                    SelectedCheck()
                 }
             }
         }
@@ -184,8 +173,7 @@ internal fun CustomPaletteSwatch(
             Text(
                 palette.name,
                 style = MaterialTheme.typography.labelSmall,
-                color = if (selected) MaterialTheme.colorScheme.onSurface
-                else MaterialTheme.colorScheme.onSurfaceVariant,
+                color = swatchLabelColor(selected),
             )
             // A bare 10dp clickable Icon (no IconButton) was well under the
             // minimum touch target guideline and had no button semantics --
@@ -394,3 +382,21 @@ internal fun ColorPickerCanvas(
 
 /** Rounds [v] to the nearest multiple of [step]: the colour picker only offers fixed values, never free ones. */
 private fun snapStep(v: Float, step: Float): Float = Math.round(v / step) * step
+
+/** The check mark a chosen swatch wears. Shared by the two swatch rows (the built-in
+ *  palettes and the custom ones) so the chosen marker is identical in both. */
+@Composable
+private fun SelectedCheck() {
+    Icon(
+        Icons.Filled.Check,
+        contentDescription = null,
+        tint = Color.White,
+        modifier = Modifier.size(22.dp),
+    )
+}
+
+/** A swatch caption's colour: full-strength when its swatch is the chosen one, muted
+ *  otherwise -- the same pairing in both swatch rows. */
+@Composable
+private fun swatchLabelColor(selected: Boolean): Color =
+    if (selected) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant
