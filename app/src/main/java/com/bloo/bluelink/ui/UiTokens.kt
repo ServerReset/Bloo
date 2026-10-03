@@ -199,6 +199,7 @@ object AppIcons {
   val Lock = Icons.Filled.Lock
   val Bolt = Icons.Filled.Bolt
   val Close = Icons.Filled.Close
+  val ArrowForward = Icons.AutoMirrored.Filled.ArrowForward
   val Build = Icons.Filled.Build
   val Search = Icons.Filled.Search
   val Refresh = Icons.Filled.Refresh

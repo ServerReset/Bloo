@@ -394,6 +394,10 @@ internal fun SettingsHeroCard(state: UiState, vm: AppViewModel, compact: Boolean
                         // Same tonal Surface the update PEBBLE wraps this exact shared
                         // composable in (UpdateTile.kt) -- same shared composable, same
                         // chrome around it, in both places.
+                        UpdateDeltaHero(vm.currentBuildNumber, updateInfo.run.runNumber)
+                        val settingsDownloadProgress by vm.updateDownloadProgress.collectAsStateWithLifecycle()
+                        UpdateDownloadBar(visible = state.updateDownloading, progress = settingsDownloadProgress)
+                        Spacer(Modifier.height(GapRow))
                         Surface(
                             modifier = Modifier.fillMaxWidth(),
                             shape = SmallShape,
