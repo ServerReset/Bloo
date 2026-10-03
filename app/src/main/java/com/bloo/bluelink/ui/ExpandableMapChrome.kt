@@ -141,8 +141,8 @@ internal fun MapFeatureRow(
 internal fun MapTopBar(
     vehicleName: String,
     mapHazeState: HazeState,
-    dragModifier: Modifier,
     modifier: Modifier = Modifier,
+    dragModifier: Modifier,
     /** "88% · 415 km": the car's charge and range, under its name. Null leaves the name alone. */
     statusLine: String? = null,
     onRefreshLocation: (() -> Unit)? = null,
