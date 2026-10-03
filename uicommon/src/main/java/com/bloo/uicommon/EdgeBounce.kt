@@ -36,35 +36,3 @@ fun rubberBand(extra: Float, limit: Float): Float {
     if (extra <= 0f || limit <= 0f) return 0f
     return limit * (1f - 1f / (1f + extra / limit))
 }
-
-/**
- * A small velocity-aware kick for an edge impact, so hitting the end of a
- * slider/segmented control registers physically rather than silently stopping:
- * scales a release velocity (px/s) into an extra overscroll nudge, clamped so a
- * hard flick does not throw the value off-screen.
- *
- * @param velocityPxPerSec the drag velocity at release (Compose convention).
- * @param limit the same elastic budget [rubberBand] takes.
- * @param strength 0..1, how much of the velocity becomes displacement.
- */
-fun edgeKick(velocityPxPerSec: Float, limit: Float, strength: Float = 0.15f): Float {
-    if (limit <= 0f) return 0f
-    return (velocityPxPerSec * strength).coerceIn(-limit, limit)
-}
-
-/** True when [value] is outside the inclusive [range] built from [min]..[max]. */
-fun isOverEdge(value: Float, min: Float, max: Float): Boolean = value < min || value > max
-
-/** Distance past the nearer edge of `min..max`, or 0 when inside it. */
-fun overshoot(value: Float, min: Float, max: Float): Float = when {
-    value < min -> min - value
-    value > max -> value - max
-    else -> 0f
-}
-
-/** The sign of the nearest crossing: -1 past [min], +1 past [max], 0 inside. */
-fun overshootSign(value: Float, min: Float, max: Float): Int = when {
-    value < min -> -1
-    value > max -> 1
-    else -> 0
-}

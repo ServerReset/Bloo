@@ -45,11 +45,4 @@ class EdgeBounceTest {
         val out = rubberBand(0.1f, 10f)
         assertTrue("first 0.1 of pull should be > 0.09 of movement", out > 0.09f)
     }
-
-    @Test
-    fun `edgeKick is clamped to the budget`() {
-        assertEquals(10f, edgeKick(1_000_000f, 10f, strength = 1f), 0.001f)
-        assertEquals(-10f, edgeKick(-1_000_000f, 10f, strength = 1f), 0.001f)
-        assertEquals(0f, edgeKick(500f, 0f), 0.001f)
-    }
 }

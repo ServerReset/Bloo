@@ -1,10 +1,8 @@
 package com.bloo.bluelink.ui
 
 import dev.chrisbanes.haze.HazeState
-import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.core.Spring
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
@@ -22,17 +20,13 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material.icons.filled.SystemUpdate
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -163,43 +157,6 @@ internal fun StatusChip(
     }
 }
 
-/**
- * [SettingsHeroCard]'s tonal update-status chip, split out of the card body so the
- * spring-animated tint (`updateTint`) only recomposes this small Row/Icon/Text
- * scope on every animation frame, instead of the whole card content lambda
- * (which also hosts the RollingNumber hero stat and outer Surface/Row layout).
- */
-@Composable
-internal fun UpdateStatusChip(state: UiState, compact: Boolean = false) {
-    val updateTint by androidx.compose.animation.animateColorAsState(
-        targetValue = when {
-            state.updateAvailable != null -> MaterialTheme.colorScheme.tertiary
-            else -> MaterialTheme.colorScheme.onSurfaceVariant
-        },
-        // Sprung rather than snapped -- "up to date" turning tertiary the instant
-        // a check lands is the one moment this card actually has news, and a cut
-        // read as flat next to how much of the rest of the app now springs.
-        animationSpec = lowPowerAwareSpring(
-            dampingRatio = SoftDamping,
-            stiffness = androidx.compose.animation.core.Spring.StiffnessLow,
-        ),
-        label = "settingsUpdateTint",
-    )
-    StatusChip(
-        tint = updateTint,
-        icon = Icons.Filled.SystemUpdate,
-    ) {
-        // [compact]: just the glyph, for a header too narrow to give the title its room.
-        if (!compact) androidx.compose.animation.AnimatedContent(
-            targetState = when {
-                state.updateChecking -> "Checking…"
-                state.updateAvailable != null -> "Build ${state.updateAvailable.run.runNumber} ready"
-                else -> "Up to date"
-            },
-            label = "settingsUpdateChipText",
-        ) { text -> Text(text) }
-    }
-}
 
 /**
  * The small "there's something new" notification dot every update card now wears on
