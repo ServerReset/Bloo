@@ -140,23 +140,29 @@ internal fun WheelHeatControl(level: WheelHeatLevel, onChange: (WheelHeatLevel) 
     }
 }
 
-/** Steering wheel heat tint by intensity -- same light->dark red ramp [seatTint] uses
- *  for a seat's own heat half. */
+/** Steering wheel heat tint by intensity -- the same light->dark red ramp [seatTint] uses
+ *  for a seat's own heat half, both derived from the canonical heat red so the two never
+ *  drift onto different pastels. */
 @Composable
 internal fun wheelHeatTint(level: WheelHeatLevel): Color = when (level) {
     WheelHeatLevel.OFF -> MaterialTheme.colorScheme.onSurfaceVariant
-    WheelHeatLevel.LOW -> Color(0xFFFF8A80)
-    WheelHeatLevel.HIGH -> Color(0xFFC62828)
+    WheelHeatLevel.LOW -> androidx.compose.ui.graphics.lerp(Heat, MaterialTheme.colorScheme.surface, 0.45f)
+    WheelHeatLevel.HIGH -> Heat
 }
 
-/** Seat colour by intensity: light->dark blue for cool, light->dark red for heat. */
+/** Seat colour by intensity: light->dark blue for cool, light->dark red for heat, both on
+ *  the canonical [Cool]/[Heat] tokens (the light end is that token toward the surface). */
 @Composable
 internal fun seatTint(level: SeatLevel): Color = when {
     level.isCool -> androidx.compose.ui.graphics.lerp(
-        Color(0xFF82B1FF), Color(0xFF1A45C0), ((level.apiValue - 3) / 2f).coerceIn(0f, 1f),
+        androidx.compose.ui.graphics.lerp(Cool, MaterialTheme.colorScheme.surface, 0.45f),
+        Cool,
+        ((level.apiValue - 3) / 2f).coerceIn(0f, 1f),
     )
     level.isHeat -> androidx.compose.ui.graphics.lerp(
-        Color(0xFFFF8A80), Color(0xFFC62828), ((level.apiValue - 6) / 2f).coerceIn(0f, 1f),
+        androidx.compose.ui.graphics.lerp(Heat, MaterialTheme.colorScheme.surface, 0.45f),
+        Heat,
+        ((level.apiValue - 6) / 2f).coerceIn(0f, 1f),
     )
     else -> MaterialTheme.colorScheme.onSurfaceVariant
 }

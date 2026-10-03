@@ -34,6 +34,7 @@ import androidx.wear.compose.material3.AppScaffold
 import androidx.wear.compose.material3.MaterialTheme
 import androidx.wear.compose.material3.ScreenScaffold
 import androidx.wear.compose.material3.TimeText
+import com.bloo.bluelink.data.BlooColors
 import com.bloo.bluelink.data.VehicleSnapshot
 import com.bloo.bluelink.data.supportsHornLights
 import com.bloo.bluelink.data.WatchPinPolicy
@@ -261,7 +262,7 @@ private fun VehicleSnapshot.stateLine(): String? = listOfNotNull(
 /** Charge/fuel reads in the brand accent; a lock-only car reads in the plain on-background tone. */
 @Composable
 private fun VehicleSnapshot.heroTint(): Color =
-    if (percent != null) Color(0xFF2EBD59) else MaterialTheme.colorScheme.onBackground
+    if (percent != null) Color(BlooColors.chargeGreen) else MaterialTheme.colorScheme.onBackground
 
 /** The watch's notification switches: a pebble of three toggles, kept deliberately short. */
 @Composable

@@ -149,7 +149,7 @@ internal fun SearchPill(
         label = "searchEntrance",
     )
     val pressScale by animateFloatAsState(
-        targetValue = if (pressed) 0.94f else 1f,
+        targetValue = if (pressed) 0.97f else 1f,
         animationSpec = lowPowerAwareSpring(dampingRatio = PebbleCloseDamping, stiffness = Spring.StiffnessHigh),
         label = "searchPress",
     )

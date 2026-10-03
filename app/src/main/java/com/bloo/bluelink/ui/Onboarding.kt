@@ -298,7 +298,6 @@ internal fun OnboardingScreen(vm: AppViewModel, mode: OnboardingMode = Onboardin
             Fireworks.playSound(context)
             haptics?.fireworks()
         } else {
-            OnboardingSounds.ding()
             haptics?.heavy()
         }
     }
@@ -306,12 +305,11 @@ internal fun OnboardingScreen(vm: AppViewModel, mode: OnboardingMode = Onboardin
     LaunchedEffect(isLast) {
         if (isLast && !replayMode(mode)) celebrate(big = true)
     }
-    // Each card settling gets a tick and a blip, so swiping has a feel.
+    // Each card settling gets a tick, so swiping has a feel.
     var lastSettled by remember { mutableIntStateOf(-1) }
     LaunchedEffect(pagerState.settledPage) {
         if (lastSettled >= 0 && pagerState.settledPage != lastSettled) {
             haptics?.tick()
-            OnboardingSounds.blip()
         }
         lastSettled = pagerState.settledPage
     }
@@ -413,7 +411,6 @@ internal fun OnboardingScreen(vm: AppViewModel, mode: OnboardingMode = Onboardin
                         current = idx == pageIndex,
                         onHeroTap = {
                             haptics?.click()
-                            OnboardingSounds.blip()
                             pokes++
                             if (pokes % 5 == 0) celebrate(big = true)
                         },

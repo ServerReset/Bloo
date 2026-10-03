@@ -79,12 +79,13 @@ internal fun AnimatedText(
 }
 
 /**
- * The app's squash for anything tappable that isn't a button. [amount] tuned down from 0.04 to
- * 0.025 and the height multiplier from 1.3 to 0.6, matching MorphButtonCore: at 0.04 * 1.3 the
- * release rebound was visibly taller and narrower than the rest, which read as wobble.
+ * The app's squash for anything tappable that isn't a button. [amount] tuned down repeatedly
+ * (0.04 -> 0.025 -> 0.02 -> 0.012) and the height multiplier from 1.3 to 1.0: the release
+ * rebound at the original values was visibly taller and narrower than the rest, and even the
+ * gentler passes still read as more motion than a press needs. Now a hint of give only.
  */
 @Composable
-internal fun Modifier.pressScale(source: MutableInteractionSource, amount: Float = 0.02f): Modifier {
+internal fun Modifier.pressScale(source: MutableInteractionSource, amount: Float = 0.012f): Modifier {
     val isPressed by source.collectIsPressedAsState()
     val p by animateFloatAsState(
         targetValue = if (isPressed) 1f else 0f,
@@ -92,7 +93,7 @@ internal fun Modifier.pressScale(source: MutableInteractionSource, amount: Float
         label = "squashStretch",
     )
     return this.graphicsLayer {
-        scaleX = 1f + amount * 0.6f * p
+        scaleX = 1f + amount * 0.5f * p
         scaleY = 1f - amount * p
     }
 }

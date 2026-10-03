@@ -123,6 +123,11 @@ internal fun chargeReadoutOf(
         statusColor = when {
             charging -> ChargeGreen
             drivingLabel == "Driving" || drivingLabel == "Running" -> MaterialTheme.colorScheme.primary
+            // "Parked" is a real state, not a caption -- it was rendering in the muted
+            // MutedContentAlpha caption tone, so the one word that says what the car is
+            // doing was the dimmest thing in the readout. Full-strength content colour
+            // instead; "Battery"/"Fuel" (the fallback descriptors) keep the muted tone.
+            drivingLabel == "Parked" -> LocalContentColor.current
             else -> {
                 // The inherited content colour, muted -- NOT a surface role or a raw
                 // isSystemInDarkTheme() test. Reading LocalContentColor tracks the active

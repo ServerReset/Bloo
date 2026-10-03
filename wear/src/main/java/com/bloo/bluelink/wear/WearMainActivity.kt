@@ -52,7 +52,7 @@ class WearMainActivity : ComponentActivity() {
 private fun WearTheme(content: @Composable () -> Unit) {
     MaterialTheme(
         colorScheme = darkColorScheme(
-            primary = Color(0xFF7B83EB),
+            primary = Color(com.bloo.bluelink.data.BlooColors.brandAccent),
             onPrimary = Color.White,
             secondaryContainer = Color(0xFF2A2A33),
             onSecondaryContainer = Color.White,

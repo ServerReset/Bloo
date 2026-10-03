@@ -35,7 +35,7 @@ fun weatherIcon(code: Int, isDay: Boolean): ImageVector = when (code) {
  * their Material theme) for overcast/fog/unknown conditions.
  */
 fun weatherTint(code: Int, isDay: Boolean, neutralColor: Color): Color = when (code) {
-    0 -> if (isDay) Color(0xFFFFB300) else Color(0xFFB0BEC5)
+    0 -> if (isDay) Color(com.bloo.bluelink.data.BlooColors.warn) else Color(0xFFB0BEC5)
     1, 2 -> Color(0xFF90A4AE)
     3, 45, 48 -> neutralColor
     51, 53, 55, 56, 57, 61, 63, 65, 66, 67, 80, 81, 82 -> Color(0xFF4FC3F7)

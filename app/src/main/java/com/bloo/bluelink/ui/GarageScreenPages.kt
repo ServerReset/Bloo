@@ -433,14 +433,10 @@ internal fun CollapsedGaragePager(
             // made it disappear while swiping between cars, reported directly as
             // wanting it to always be there.
             StatusBarScrim(hazeState = hazeState)
-            // Pager dots removed: user requested no page indicators at the top of the screen
-            // No global refresh indicator here for now -- a floating button standing in
-            // for the multi-car grid's own perPage>1-only RefreshIndicatorBadge caused a
-            // string of real, reported visual bugs (a stuck "blob" look from a busy-state
-            // binding mismatch, then bleeding through underneath the expanded map's own
-            // translucent top bar even after that was fixed) -- pulled out entirely rather
-            // than keep patching a design that kept finding new ways to look broken. The
-            // per-car pull-to-refresh (Refreshable, on each car's own page) is untouched.
+            // Pager dots removed: user requested no page indicators at the top of the screen.
+            // No refresh indicator anywhere in the app: the drawn pull-to-refresh indicator
+            // (and the app-level overlay that replaced it) was removed app-wide after several
+            // rounds of real visual bugs. The pull gesture still refreshes; nothing is drawn.
             // No floating name badge here at all any more -- removed as unwanted UI.
         }
 }

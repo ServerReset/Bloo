@@ -91,7 +91,7 @@ fun MorphIconButton(
     // lambda modifier like `graphicsLayer {}` / `offset {}` / `drawBehind {}` (already
     // deferred, nothing to do). This site is the second kind.
     val scale by animateFloatAsState(
-        targetValue = if (pressed) 0.94f else 1f,
+        targetValue = if (pressed) 0.97f else 1f,
         animationSpec = lowPowerAwareSpring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessMedium),
         label = "morphIconPress",
     )
@@ -109,11 +109,12 @@ fun MorphIconButton(
             // inside a target that stays put, which reads as a glitch rather than a
             // press.
             modifier = modifier.graphicsLayer {
-                // The family's squash, tuned down twice from the original 0.5 / 0.9 at a
-                // 0.88 dip: keep it a breath of motion, not a bounce.
+                // The family's squash, tuned down three times now (0.5/0.9 -> 0.3/0.5 ->
+                // 0.25/0.5 -> here) and the dip softened to 0.97: at this point it is a
+                // hint of give under the finger, not a visible squash.
                 val dip = 1f - scale
-                scaleX = 1f + dip * 0.25f
-                scaleY = 1f - dip * 0.5f
+                scaleX = 1f + dip * 0.15f
+                scaleY = 1f - dip * 0.3f
             }
                 .then(frost),
             enabled = enabled,

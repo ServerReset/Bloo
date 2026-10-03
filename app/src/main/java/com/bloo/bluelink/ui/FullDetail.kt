@@ -105,12 +105,12 @@ internal fun VehicleDetailContent(
     // Narrowed, not `state.value.refreshing`: a bare read here would subscribe this whole page
     // -- all three of them live at once in the pager -- to every UiState emission.
     val refreshing by remember { derivedStateOf { state.value.refreshing } }
-    Refreshable(refreshing, onRefresh = { vm.refreshStatus(v) }, hazeState = hazeState) {
+    Refreshable(refreshing, onRefresh = { vm.refreshStatus(v) }) {
         Column(
             Modifier
                 .fillMaxSize()
                 .verticalScroll(scroll)
-                .padding(horizontal = 16.dp),
+                .padding(horizontal = ScreenGutter),
             verticalArrangement = Arrangement.spacedBy(GapGroup),
         ) {
             // Inset spacer (not padding) so content scrolls *behind* the bars --
@@ -229,7 +229,7 @@ internal fun ExpandedCar(
         PebbleList(v, state, vm, exclude = setOf("summary"))
     }
     CompositionLocalProvider(LocalHotSeatDrag provides hotDrag) {
-    Refreshable(refreshing, onRefresh = { vm.refreshStatus(v) }, hazeState = hazeState) {
+    Refreshable(refreshing, onRefresh = { vm.refreshStatus(v) }) {
         // The two columns live in a genuinely infinite horizontal pager now: real page 0 is
         // [controls | pebbles], real page 1 is [pebbles | controls], and the wrap pager loops
         // them without end -- dragging left/right slides the pair around forever instead of the
@@ -269,7 +269,13 @@ internal fun ExpandedCar(
             val rightCol = if (isFlipped) controls else pebbles
             val leftScroll = if (isFlipped) pebblesScroll else controlsScroll
             val rightScroll = if (isFlipped) controlsScroll else pebblesScroll
-            val topSpacerHeight = topInset + HeaderCornerGap + HeaderButtonSize + HeaderContentClearance
+            // Just the status-bar inset, matching [VehicleDetailContent]'s single-column
+            // page (which uses a bare `Spacer(topInset)`). This used to reserve
+            // `topInset + HeaderCornerGap + HeaderButtonSize + HeaderContentClearance`
+            // (~72dp) for a free-floating expand/back button -- but those moved onto the
+            // hero card's own header, so the whole band became dead space above every
+            // dual-column page. The shared StatusBarScrim still blurs the bar itself.
+            val topSpacerHeight = topInset
             val bottomSpacerHeight = searchBarClearance(fallback = bottomInset + 132.dp)
             Box(
                 Modifier.fillMaxSize(),
@@ -280,7 +286,7 @@ internal fun ExpandedCar(
                         .fillMaxHeight()
                         .widthIn(max = 960.dp)
                         .fillMaxWidth()
-                        .padding(horizontal = 16.dp),
+                        .padding(horizontal = ScreenGutter),
                     horizontalArrangement = Arrangement.spacedBy(GapSection),
                 ) {
                     Column(

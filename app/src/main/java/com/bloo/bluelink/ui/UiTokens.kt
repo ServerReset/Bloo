@@ -71,12 +71,19 @@ import com.bloo.bluelink.data.platform
 internal val ChargeGreen = Color(com.bloo.bluelink.data.BlooColors.chargeGreen)
 internal val ChargeGreenDark = Color(com.bloo.bluelink.data.BlooColors.chargeGreenDark)
 
+/** Climate seat/wheel tints, on the canonical semantic tokens rather than the
+ *  cluster of one-off reds and blues (a bright pastel, a deep pastel, a mid
+ *  blue) this file used to carry -- those had drifted from the shared
+ *  heat/cool values and from each other. */
+internal val Heat = Color(com.bloo.bluelink.data.BlooColors.heat)
+internal val Cool = Color(com.bloo.bluelink.data.BlooColors.cool)
+
 /** The one "there's something new" colour -- the small notification dot on an update
- *  card's corner when a build is available, unread-count orange rather than a
- *  theme-relative tint, so it reads the same "you should look at this" way regardless
- *  of the active colour palette (unlike ChargeGreen/error, this isn't standing in for a
- *  car state the theme might reasonably recolour). */
-internal val UpdateAvailableAmber = Color(0xFFFF9800)
+ *  card's corner when a build is available. The canonical warning amber rather than its
+ *  own 0xFFFF9800: that and BlooColors.warn's 0xFFF5A623 were two ambers a few degrees
+ *  apart doing the same "look here" job, which is exactly the near-duplicate this palette
+ *  is meant not to carry. */
+internal val UpdateAvailableAmber = Color(com.bloo.bluelink.data.BlooColors.warn)
 
 /** The charge bar's "topped up" state: the pack has reached its own configured limit,
  *  so the fill reads as done rather than still climbing. See ChargeSegmentBar. */
@@ -141,6 +148,15 @@ internal val HeroReadoutBottomInset = 14.dp
  * directly above it.
  */
 internal val PebbleContentInset = 16.dp
+
+/**
+ * The one horizontal gutter a full page's content sits inside -- the single-column
+ * car page, the dual-column car page, and the Settings page all reserve this before
+ * their content starts. They each typed a bare `16.dp` before; it is named now so a
+ * page added later lines up with them instead of picking its own close-but-not-quite
+ * edge (the exact class of drift [HeaderCornerGap]'s own doc describes).
+ */
+internal val ScreenGutter = 16.dp
 
 /**
  * The app's vertical rhythm: ONE base unit ([SpaceUnit]) that every gap, inset and arrangement

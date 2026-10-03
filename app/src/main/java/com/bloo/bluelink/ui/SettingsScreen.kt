@@ -226,7 +226,7 @@ internal fun SettingsScreen(
                 // the keyboard opens, same fix as ExpandableMapLayer's own bottom column got
                 // for its charger API key field, reported from the same screenshot.
                 .imePadding()
-                .padding(horizontal = 16.dp),
+                .padding(horizontal = ScreenGutter),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             // Content scrolls behind the status bar; clear the floating back-arrow/

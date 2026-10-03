@@ -12,6 +12,7 @@ import androidx.wear.protolayout.TimelineBuilders
 import androidx.wear.tiles.RequestBuilders
 import androidx.wear.tiles.TileBuilders
 import androidx.wear.tiles.TileService
+import com.bloo.bluelink.data.BlooColors
 import com.bloo.bluelink.data.SnapshotStore
 import com.bloo.bluelink.data.VehicleSnapshot
 import com.google.common.util.concurrent.ListenableFuture
@@ -106,6 +107,6 @@ class BlooTileService : TileService() {
         const val RESOURCES_VERSION = "1"
         const val WHITE = 0xFFFFFFFF.toInt()
         const val MUTED = 0xFFB8B8C4.toInt()
-        const val GREEN = 0xFF2EBD59.toInt()
+        val GREEN = BlooColors.chargeGreen
     }
 }

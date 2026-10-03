@@ -124,7 +124,7 @@ internal fun GarageStatusCard(state: State<UiState>, vm: AppViewModel, hazeState
     // covers a single car's own status fetch) -- that's the flag this card's
     // pull gesture needs to reflect for the indicator/release behaviour to
     // track the request it actually triggers.
-    Refreshable(refreshing = loading, onRefresh = { vm.loadGarage() }, hazeState = hazeState) {
+    Refreshable(refreshing = loading, onRefresh = { vm.loadGarage() }) {
         Box(
             Modifier
                 .fillMaxSize()
