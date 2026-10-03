@@ -60,7 +60,7 @@ internal fun Modifier.frosted(
     return this
         .then(if (veil) Modifier.clip(shape) else Modifier)
         .then(if (canBlur) Modifier.blur(blurRadius * amount, BlurredEdgeTreatment.Unbounded) else Modifier)
-        .graphicsLayer { alpha = 1f - (if (canBlur) 0.12f else 0.4f) * amount }
+        .graphicsLayer { alpha = 1f - (if (canBlur) 0.08f else 0.4f) * amount }
         .drawWithContent {
             drawContent()
             if (!veil) return@drawWithContent

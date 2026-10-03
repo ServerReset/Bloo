@@ -1,9 +1,11 @@
 package com.bloo.bluelink.ui
 
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.unit.dp
 import dev.chrisbanes.haze.ExperimentalHazeApi
@@ -29,16 +31,20 @@ import dev.chrisbanes.haze.glass.hazeGlass
 @Composable
 internal fun Modifier.appGlassEffect(state: HazeState, shape: Shape): Modifier {
     if (shape !is RoundedCornerShape) return this.appHazeEffect(state)
-    val style = remember(shape) { glassStyle(shape) }
+    // A theme-matched backing behind the refracted backdrop, so a floating element is never a black
+    // hole where the backdrop has nothing to show (light mode especially).
+    val backing = MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 0.45f)
+    val style = remember(shape, backing) { glassStyle(shape, backing) }
     return this.hazeGlass(input = HazeInput.Sources(state), style = style)
 }
 
 @OptIn(ExperimentalHazeApi::class)
-private fun glassStyle(shape: RoundedCornerShape): GlassStyle = GlassStyle.clear.then {
+private fun glassStyle(shape: RoundedCornerShape, backing: Color): GlassStyle = GlassStyle.clear.then {
     // Liquid glass: nearly clear in the middle (a whisper of blur, no milky white lift), with the
     // bending concentrated in a bezel at the edge and a specular glint riding it. Starts from Haze's
     // "clear" material, which keeps the backdrop legible, rather than the frosted "regular" one.
     shape(shape)
+    backgroundColor(backing)
     optics(
         GlassOptics(
             refractionStrength = 1f,

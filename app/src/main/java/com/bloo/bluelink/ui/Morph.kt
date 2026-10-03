@@ -36,6 +36,10 @@ import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.collectLatest
+import androidx.compose.foundation.interaction.PressInteraction
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -167,6 +171,23 @@ fun MorphButton(
     val resolvedContent = if (active) activeContentColor else contentColor
     // What this button's label (if it has one) reports, for the long-press name hint.
     val hint = remember { LabelHintState() }
+    // Press and hold a symbol-only button and the phone builds a vibration until the name pops out:
+    // ticks that come faster and then harder, so the pop is felt coming.
+    if (enabled && onLongClick == null) {
+        LaunchedEffect(interactionSource) {
+            interactionSource.interactions.collectLatest { interaction ->
+                if (interaction is PressInteraction.Press && hint.collapsed) {
+                    delay(120)
+                    var gap = 85L
+                    repeat(6) { i ->
+                        if (i < 3) haptics?.tick() else haptics?.click()
+                        delay(gap)
+                        gap = (gap * 0.8f).toLong().coerceAtLeast(30L)
+                    }
+                }
+            }
+        }
+    }
     val providedContent = if (enabled) {
         resolvedContent
     } else {
@@ -189,7 +210,7 @@ fun MorphButton(
                     // leverage place to fix it.
                     .semantics { selected = active }
                     // Can't be pressed right now: iced out, the app's one disabled look (see [frosted]).
-                    .frosted(!enabled, RoundedCornerShape(pillCornerPercent.toInt()), blurRadius = 3.dp, rim = false, veil = false)
+                    .frosted(!enabled, RoundedCornerShape(pillCornerPercent.toInt()), blurRadius = 1.2.dp, rim = false, veil = false)
                     // Skipped while SafeExpansiveButton is already smoothly driving this
                     // button's width on press (LocalExpressiveGrowth -- see its own doc):
                     // animateContentSize exists for a genuine content change (a label

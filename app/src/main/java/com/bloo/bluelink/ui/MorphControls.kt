@@ -112,7 +112,7 @@ fun MorphIconButton(
             // inside a target that stays put, which reads as a glitch rather than a
             // press.
             modifier = modifier.graphicsLayer { scaleX = scale; scaleY = scale }
-                .frosted(!enabled, CircleShape, blurRadius = 3.dp, rim = false, veil = false),
+                .frosted(!enabled, CircleShape, blurRadius = 1.2.dp, rim = false, veil = false),
             enabled = enabled,
             interactionSource = interactionSource,
             content = content,
