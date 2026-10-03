@@ -147,15 +147,15 @@ internal fun StatusBarScrim(
                     // applied identically either way) still does the same legibility
                     // tinting job it always did, now over a genuinely blurred backdrop.
                     //
-                    // appHazeEffect: the one shared Haze configuration (see its own doc)
-                    // every blurred surface in the app now goes through. progressive = true
-                    // here specifically -- reported directly, once, as wanting the blur
-                    // itself to actually be strong right at the status bar and taper to
-                    // none by this Box's own bottom edge, "like a gradient of blur" -- the
-                    // one shape this scrim actually needs, unlike a small floating chip
-                    // (appHazeEffect's own default), which reads better with a flat,
-                    // uniformly full-strength blur instead.
-                    Modifier.fadeOutBottom().appGlassEffect(hazeState, RoundedCornerShape(0.dp), fadeOut = true)
+                    // appGlassEffect: the one shared Haze configuration (see its own doc)
+                    // every blurred surface in the app now goes through. fadeOut = true so the
+                    // blur is strong at the status bar and tapers to none by this Box's bottom
+                    // edge, and edgeWarp = false so it uses Haze's SURFACE refraction profile --
+                    // a full-width strip has no visible curved rim for the Edge profile to bend
+                    // at, so it warped only a hairline top and bottom and read as a plain blur.
+                    // Surface refracts across the whole bar, the pronounced warp behind the
+                    // status bar this wants.
+                    Modifier.fadeOutBottom().appGlassEffect(hazeState, RoundedCornerShape(0.dp), fadeOut = true, edgeWarp = false)
                 } else {
                     Modifier
                 },

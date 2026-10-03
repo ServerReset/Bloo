@@ -26,10 +26,24 @@ import dev.chrisbanes.haze.glass.hazeGlass
  *
  * For FLOATING elements only (chips, pills, dialogs, the search bar); cards keep the flat blur. Only
  * rounded-rectangle shapes can be refracted (a circle counts); anything else keeps the plain blur.
+ *
+ * [edgeWarp] picks the refraction profile:
+ *  - true (default): [RefractionProfile.Edge], bending concentrated in a bezel at the shape's own
+ *    boundary. Right for a small chip/pill, where the eye reads the curve at its rim.
+ *  - false: [RefractionProfile.Surface], which refracts across the WHOLE surface, scaled by
+ *    `refractionHeightFraction` of the shape's shortest side. Right for the full-width status-bar
+ *    scrim: its "edge" is a straight line the user never sees curve, so the Edge profile bent light
+ *    only in a hairline at the top/bottom and left the middle flat, which is why the top bar stopped
+ *    looking like glass at all. Surface warps the entire strip behind the status bar.
  */
 @OptIn(ExperimentalHazeApi::class)
 @Composable
-internal fun Modifier.appGlassEffect(state: HazeState, shape: Shape, fadeOut: Boolean = false): Modifier {
+internal fun Modifier.appGlassEffect(
+    state: HazeState,
+    shape: Shape,
+    fadeOut: Boolean = false,
+    edgeWarp: Boolean = true,
+): Modifier {
     if (shape !is RoundedCornerShape) return this.appHazeEffect(state)
     // A theme-matched backing behind the refracted backdrop, so a floating element is never a black
     // hole where the backdrop has nothing to show (light mode especially).
@@ -38,26 +52,37 @@ internal fun Modifier.appGlassEffect(state: HazeState, shape: Shape, fadeOut: Bo
     val clarity = LocalAppearance.current.glassClarity
     val backing = MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 0.97f * (1f - clarity))
     val blur = (18f - 16.5f * clarity).dp
-    val style = remember(shape, backing, blur, fadeOut) { glassStyle(shape, backing, blur, fadeOut) }
+    val style = remember(shape, backing, blur, fadeOut, edgeWarp) { glassStyle(shape, backing, blur, fadeOut, edgeWarp) }
     return this.hazeGlass(input = HazeInput.Sources(state), style = style)
 }
 
 @OptIn(ExperimentalHazeApi::class)
-private fun glassStyle(shape: RoundedCornerShape, backing: Color, blur: androidx.compose.ui.unit.Dp, fadeOut: Boolean): GlassStyle = GlassStyle.clear.then {
+private fun glassStyle(
+    shape: RoundedCornerShape,
+    backing: Color,
+    blur: androidx.compose.ui.unit.Dp,
+    fadeOut: Boolean,
+    edgeWarp: Boolean,
+): GlassStyle = GlassStyle.clear.then {
     // Liquid glass: nearly clear in the middle (a whisper of blur, no milky white lift), with the
-    // bending concentrated in a bezel at the edge and a specular glint riding it. Starts from Haze's
-    // "clear" material, which keeps the backdrop legible, rather than the frosted "regular" one.
+    // bending riding the material and a specular glint on top. Starts from Haze's "clear" material,
+    // which keeps the backdrop legible, rather than the frosted "regular" one.
     shape(shape)
     backgroundColor(backing)
     optics(
         GlassOptics(
-            refractionStrength = 0.85f,
-            refractionHeightFraction = 0.35f,
-            refractionDisplacement = 18.dp,
+            refractionStrength = if (edgeWarp) 0.85f else 1f,
+            // Surface profile scales its refraction by this fraction of the SHORTEST side, so on a
+            // ~status-bar-height strip a large fraction is what makes the warp read across the whole
+            // bar instead of a faint ripple. Edge ignores it for refraction (lighting only).
+            refractionHeightFraction = if (edgeWarp) 0.35f else 1f,
+            refractionDisplacement = if (edgeWarp) 18.dp else 32.dp,
             depth = OpticalSizeValue.Fixed(1f),
             blurRadius = OpticalSizeValue.Fixed(blur),
-            refractionDetailIntensity = 0.7f,
-            refractionProfile = RefractionProfile.Edge(16.dp),
+            // Fold + detail to max on the surface warp so the bend is pronounced, not a gentle haze.
+            refractionFoldStrength = if (edgeWarp) 0f else 0.6f,
+            refractionDetailIntensity = if (edgeWarp) 0.7f else 1f,
+            refractionProfile = if (edgeWarp) RefractionProfile.Edge(16.dp) else RefractionProfile.Surface,
             // The status-bar scrim: full strength at the top, thinning to nothing at its bottom edge.
             progressive = if (fadeOut) dev.chrisbanes.haze.HazeProgressive.verticalGradient(startIntensity = 1f, endIntensity = 0f) else null,
         ),
