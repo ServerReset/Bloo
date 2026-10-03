@@ -268,16 +268,7 @@ fun SafeExpansiveButton(
             // file's standalone one, so MorphButton's animateContentSize still needs to step
             // aside for the same reason.
             CompositionLocalProvider(LocalExpressiveGroup provides false, LocalExpressiveGrowth provides true) {
-                if (enabled) {
-                    content()
-                } else {
-                    Box(
-                        Modifier
-                            .semantics(mergeDescendants = true) { disabled() }
-                    ) {
-                        content()
-                    }
-                }
+                ExpressiveContent(enabled, content)
             }
         }
         return
@@ -297,16 +288,7 @@ fun SafeExpansiveButton(
     Layout(
         content = {
             CompositionLocalProvider(LocalExpressiveGrowth provides true) {
-                if (enabled) {
-                    content()
-                } else {
-                    Box(
-                        Modifier
-                            .semantics(mergeDescendants = true) { disabled() }
-                    ) {
-                        content()
-                    }
-                }
+                ExpressiveContent(enabled, content)
             }
         },
         modifier = modifier,
@@ -374,3 +356,19 @@ internal val LocalExpressiveGroup = staticCompositionLocalOf { false }
  * case, so the two needed to be readable independently.
  */
 internal val LocalExpressiveGrowth = staticCompositionLocalOf { false }
+
+/**
+ * Renders [content], or -- when [enabled] is false -- the same content inside a Box that
+ * merges its children's semantics and reports the disabled state, so a screen reader
+ * announces the control (and its label) once, as disabled, instead of reading each child
+ * separately with no disabled cue. The two branches of [SafeExpansiveButton] (in a group,
+ * and standalone) had this block verbatim.
+ */
+@Composable
+private fun ExpressiveContent(enabled: Boolean, content: @Composable () -> Unit) {
+    if (enabled) {
+        content()
+    } else {
+        Box(Modifier.semantics(mergeDescendants = true) { disabled() }) { content() }
+    }
+}
