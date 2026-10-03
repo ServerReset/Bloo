@@ -406,7 +406,7 @@ internal val LocalForceExpanded = staticCompositionLocalOf { false }
 internal val LocalPebbleFillHeight = staticCompositionLocalOf { false }
 
 
-/** Tile names that [CompactCar] can render — unknown sections are excluded. */
+/** Tile names that [CoverCar] can render — unknown sections are excluded. */
 internal val CompactKnownTiles = setOf(
     // No "controls" here, deliberately. It was added when the lock/horn
     // controls were unreachable on the cover, but as its own page it was one

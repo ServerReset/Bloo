@@ -10,7 +10,6 @@ package com.bloo.bluelink.ui
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
@@ -30,9 +29,6 @@ import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.DirectionsCar
-import androidx.compose.material.icons.filled.Lock
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.material3.Card
@@ -43,9 +39,6 @@ import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.runtime.State
-import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
@@ -61,7 +54,6 @@ import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import com.bloo.bluelink.data.brand
 import com.bloo.bluelink.data.Vehicle
 
 /**
@@ -390,107 +382,5 @@ internal fun CoverTile(
             }
         }
       }
-    }
-}
-
-
-/**
- * The flip cover's home tile: the car, its charge, and its controls on ONE
- * screen.
- *
- * It replaces two separate cover pages that were each mostly empty. The old
- * home tile was the phone's HeroHeader reused verbatim -- a card built around
- * a photo -- but landed on a flat gradient here instead: HeroHeader never went
- * through PebbleShell/CoverTile's fill-height cover treatment, so its own
- * `cover` branch stopped being reachable once this tile replaced it as the
- * cover's actual home page, leaving that photo path built but orphaned. The
- * lock/horn controls then lived on their own second page with the same
- * emptiness under them. Neither page filled a screen; both together do, and
- * merging them means the thing you most want with the phone shut -- lock
- * state and the lock button -- is on the page it opens on rather than one
- * swipe away.
- *
- * The car's photo is now this tile's own background (via CoverTile's
- * `background` slot), full-bleed with the same scrim [HeroPhotoBackdrop]
- * already builds for the phone hero -- reusing that composable rather than a
- * second implementation, so the two can't drift. No photo set -> HeroVisual's
- * own brand-gradient fallback fills the same way, so the tile is never a
- * dead inset rectangle either way.
- *
- * The car's name leads, at headline size. It used to be a labelMedium line in
- * the shared top overlay, sharing that space with the page dots, which on this
- * screen made the single most identifying thing on it the smallest text on it.
- */
-@Composable
-internal fun CoverMainTile(v: Vehicle, state: State<UiState>, vm: AppViewModel) {
-    // Derived, not body reads: this tile used to take the whole UiState and the caller had to
-    // read state.value to hand it over -- which put both the caller AND this tile (and the
-    // action bar inside it) in every emission's invalidation set for as long as the cover was
-    // showing. One derived read per value actually drawn.
-    val status by remember(v.vin) { derivedStateOf { state.value.statusFor(v) } }
-    val metric = LocalAppearance.current.metricDistance
-    val imageUrl by remember(v.vin) { derivedStateOf { state.value.imageUrls[v.vin] } }
-    val hasBattery by remember(v.vin) { derivedStateOf { state.value.hasBattery(v) } }
-    val hasFuel by remember(v.vin) { derivedStateOf { state.value.hasFuel(v) } }
-    val drivingLabel by remember(v.vin) { derivedStateOf { state.value.drivingLabel(v) } }
-    val hasPhoto = !imageUrl.isNullOrBlank()
-    // The car's own name is this tile's title -- the template's title band is
-    // where every other page says what it is, so the home page says which car.
-    // Lock leads the subtitle because it is the reason to look at a shut
-    // phone; driving/charging state is left to ChargeFuelBar's own status
-    // line, which is directly below it and already says both.
-    val bits = listOfNotNull(
-        status?.doorLock?.let { if (it) "Locked" else "Unlocked" },
-        if (status?.airCtrlOn == true) "Climate on" else null,
-    )
-    // Same trade the phone hero makes over its own photo (HeroPhotoBackdrop's scrim
-    // is built for HeroOnPhoto text): a fixed near-white reads correctly against
-    // that scrim regardless of the photo's own brightness, where the theme's usual
-    // onSurface/error tones would not. Lock's own attention colour (error, an
-    // unlocked car) still needs to read as a WARNING over a photo, not just legible
-    // -- swapped to a fixed warm red rather than the theme's errorContainer-tuned
-    // MaterialTheme.colorScheme.error, which is calibrated against a flat surface.
-    val titleColor = if (hasPhoto) HeroOnPhoto else MaterialTheme.colorScheme.onSurface
-    val subtitleColor = when {
-        status?.doorLock == false -> if (hasPhoto) Color(0xFFFF8A80) else MaterialTheme.colorScheme.error
-        hasPhoto -> HeroOnPhoto.copy(alpha = MutedContentAlpha)
-        else -> null
-    }
-    CoverTile(
-        title = v.name,
-        icon = Icons.Filled.DirectionsCar,
-        // This hero tile's identity pill drops its own car glyph (see showIdentityIcon's own
-        // doc) -- the tile itself IS the car, named right there in the pill's own text, so
-        // the icon repeated information already on screen while costing width the action
-        // row needed. `icon` above stays required/unused here rather than made optional
-        // tile-wide: every OTHER CoverTile still wants its icon shown.
-        showIdentityIcon = false,
-        // Lock/climate state rides the END of the header row rather than a second line beneath
-        // it -- the same slot a section tile uses for the car's name, which the home tile does
-        // not need because its headline IS the car. One line instead of two, and the state a
-        // person opens a shut phone to check sits on the same line as the name rather than in
-        // muted text under it. subtitleColor still turns it red on an unlocked car.
-        trailingLabel = bits.joinToString(" · ").ifBlank { null },
-        subtitleColor = subtitleColor,
-        iconTint = if (hasPhoto) HeroOnPhoto else MaterialTheme.colorScheme.primary,
-        titleColor = titleColor,
-        background = {
-            // height is inert when fill = true -- HeroVisual only reads it in the
-            // non-fill, non-aspectRatio branch (see its own `sizeModifier` when) --
-            // so there's no real value to pass; this Box has no BoxWithConstraints
-            // scope to measure one from anyway.
-            HeroPhotoBackdrop(v, imageUrl, height = 0.dp, corner = PebbleCornerExpanded, fill = true)
-        },
-        actions = { CoverActionBar(v, state, vm) },
-    ) {
-        CompositionLocalProvider(LocalContentColor provides titleColor) {
-        ChargeFuelBar(
-            status,
-            hasBattery,
-            hasFuel,
-            drivingLabel,
-            metric = metric,
-        )
-        }
     }
 }

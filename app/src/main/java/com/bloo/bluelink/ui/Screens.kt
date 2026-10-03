@@ -20,7 +20,6 @@ import androidx.compose.animation.core.spring
 import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.WindowInsets
@@ -56,7 +55,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
 import androidx.lifecycle.repeatOnLifecycle
-import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.layout.layout
@@ -449,21 +447,6 @@ fun BlooApp(vm: AppViewModel) {
 // Owns the lock-overlay fade animation in its own small recompose scope, for
 // the same reason as [LockBlurLayer].
 
-
-
-
-/**
- * Caches the edge-trace ring's rounded-rect perimeter Path + PathMeasure
- * (and a reusable output Path) keyed on Canvas size, so the hold-to-refresh
- * gesture animation -- which redraws every frame -- doesn't reallocate 2
- * Path objects + a PathMeasure on every single frame. Only `measure.getSegment`
- * needs to re-run per frame; the perimeter only changes when size does.
- */
-internal class EdgeTracePerimeterCache {
-    var size: androidx.compose.ui.geometry.Size? = null
-    val measure = androidx.compose.ui.graphics.PathMeasure()
-    val traced = androidx.compose.ui.graphics.Path()
-}
 
 
 

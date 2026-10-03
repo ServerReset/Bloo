@@ -45,7 +45,6 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.State
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.remember
@@ -160,7 +159,6 @@ internal fun CompactGarage(state: State<UiState>, vm: AppViewModel, appearance: 
     }
     // True while the page scrubber is active; suspends car-switching swipes so a
     // scrub gesture can't be hijacked into flipping to the next car.
-    val scrubbing = remember { mutableStateOf(false) }
     // Fades the floating chrome while a refresh is in flight (pull-to-refresh /
     // manual refresh) so the loading indicator owns the screen.
     // Held as State, not read via `by` — see the same treatment in GarageScreen.
@@ -201,7 +199,6 @@ internal fun CompactGarage(state: State<UiState>, vm: AppViewModel, appearance: 
         HorizontalPager(
             state = pager,
             modifier = Modifier.fillMaxSize().hazeSource(hazeState),
-            userScrollEnabled = !scrubbing.value,
             // NOT a flat 1 -- see GarageScreen's own matching fix for the full
             // reasoning (a real, reported crash: ArrayIndexOutOfBoundsException
             // inside Compose's RememberEventDispatcher, surfacing through this
@@ -260,15 +257,8 @@ internal fun CompactGarage(state: State<UiState>, vm: AppViewModel, appearance: 
             // updated when that got fixed there. Just the cheap graphicsLayer
             // fade/scale transforms now, consistent with the other pagers.
             Box(Modifier.fillMaxSize().pagerDepth(pager, page)) {
-                CompositionLocalProvider(
-                    LocalCoverScrubbing provides scrubbing,
-                    // The car's name is deliberately NOT put on the tile any more: a cover
-                    // tile is one line tall, and the name ate a chunk of its header row. The
-                    // name still shows on the camera band where one exists; the tiles get
-                    // their full width back either way.
-                    LocalCoverCarName provides null,
-                ) {
-                    CompactCar(v, state, vm, hazeState = hazeState)
+                CompositionLocalProvider(LocalCoverCarName provides null) {
+                    CoverCar(v, state, vm, hazeState = hazeState)
                 }
             }
         }

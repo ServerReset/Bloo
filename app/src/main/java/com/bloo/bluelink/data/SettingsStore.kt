@@ -4,7 +4,6 @@ import androidx.compose.runtime.Immutable
 import android.content.Context
 import android.os.Build
 import androidx.datastore.preferences.core.Preferences
-import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import com.bloo.bluelink.ui.ColorPalette
