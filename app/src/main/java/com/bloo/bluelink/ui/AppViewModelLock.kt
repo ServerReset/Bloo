@@ -122,8 +122,6 @@ fun AppViewModel.setBiometricLock(enabled: Boolean) {
     viewModelScope.launch { settingsStore.setBiometricLock(enabled) }
 }
 
-}
-
 /** Whether a PIN record currently exists in the credential store. */
 private fun AppViewModel.pinInstalled(): Boolean = credentialStore.getPinRecord() != null
 

@@ -8,8 +8,6 @@ suspend fun SettingsStore.setHapticsEnabled(value: Boolean) {
     editTracked { it[SettingsStore.Keys.HAPTICS] = value.toString() }
 }
 
-}
-
 suspend fun SettingsStore.setPebbleOutline(value: Boolean) {
     editTracked { it[SettingsStore.Keys.PEBBLE_OUTLINE] = value.toString() }
 }
