@@ -9,7 +9,6 @@ package com.bloo.bluelink.ui
 
 import android.os.Build
 import androidx.compose.ui.platform.testTag
-import dev.chrisbanes.haze.hazeSource
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.foundation.shape.CircleShape
@@ -358,35 +357,37 @@ internal fun OnboardingScreen(vm: AppViewModel, mode: OnboardingMode = Onboardin
             .background(scheme.background)
             .pointerInput(Unit) {},
     ) {
-        // The backdrop every glass surface below blurs: the aurora, washed with the colour of the
-        // card you're on, which eases from one accent to the next as you swipe.
-        val haze = remember { dev.chrisbanes.haze.HazeState() }
+        // A cheap, static backdrop: the theme's own surface with a wash of the colour of the card you're
+        // on, easing from one accent to the next as you swipe. No aurora and no backdrop blur here: a
+        // full-screen blur plus a blur per card was the whole of this screen's lag. The accent is read in
+        // the draw block, so the colour change costs a redraw, not a recomposition.
         val accent by androidx.compose.animation.animateColorAsState(
             onboardingAccent(steps.getOrNull(pageIndex)?.kind ?: OnboardingStepKind.WELCOME),
-            androidx.compose.animation.core.tween(600),
+            androidx.compose.animation.core.tween(MotionLong),
             label = "deckAccent",
         )
-        Box(Modifier.matchParentSize().hazeSource(haze)) {
-            // Frozen: a drifting aurora under blurred glass re-blurs every frame.
-            AuroraBackground(Modifier.matchParentSize(), paused = true)
-            Box(
-                Modifier.matchParentSize().drawBehind {
-                    drawRect(
-                        androidx.compose.ui.graphics.Brush.radialGradient(
-                            listOf(accent.copy(alpha = 0.34f), androidx.compose.ui.graphics.Color.Transparent),
-                            center = androidx.compose.ui.geometry.Offset(size.width / 2f, size.height * 0.22f),
-                            radius = size.width * 1.1f,
-                        ),
-                    )
-                },
-            )
-        }
+        Box(
+            Modifier.matchParentSize().drawBehind {
+                drawRect(
+                    androidx.compose.ui.graphics.Brush.verticalGradient(
+                        listOf(scheme.surface, scheme.surfaceContainerHigh, scheme.surface),
+                    ),
+                )
+                drawRect(
+                    androidx.compose.ui.graphics.Brush.radialGradient(
+                        listOf(accent.copy(alpha = 0.34f), androidx.compose.ui.graphics.Color.Transparent),
+                        center = androidx.compose.ui.geometry.Offset(size.width / 2f, size.height * 0.22f),
+                        radius = size.width * 1.1f,
+                    ),
+                )
+            },
+        )
         if (burst > 0 || leaving) androidx.compose.runtime.key(burst, leaving) { FireworksOverlay(Modifier.fillMaxSize()) }
 
         Column(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding()) {
             Spacer(Modifier.height(GapSection))
             Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-                GlassSurface(shape = CircleShape, hazeState = haze) {
+                GlassSurface(shape = CircleShape, liquid = false, tint = scheme.surfaceContainerHighest.copy(alpha = 0.7f)) {
                     OnboardingDots(count = steps.size, current = pageIndex, modifier = Modifier.padding(horizontal = 16.dp, vertical = 11.dp))
                 }
             }
@@ -420,7 +421,6 @@ internal fun OnboardingScreen(vm: AppViewModel, mode: OnboardingMode = Onboardin
                     OnboardingGlassCard(
                         spec = onboardingCardSpec(step.kind, vehicle?.name, newCar = mode is OnboardingMode.NewCars),
                         accent = onboardingAccent(step.kind),
-                        hazeState = haze,
                         current = idx == pageIndex,
                         onHeroTap = {
                             haptics?.click()
@@ -457,7 +457,8 @@ internal fun OnboardingScreen(vm: AppViewModel, mode: OnboardingMode = Onboardin
             // Back / Next on a glass bar of their own, for anyone who would rather tap than swipe.
             GlassSurface(
                 shape = ExtraLargeShape,
-                hazeState = haze,
+                liquid = false,
+                tint = scheme.surfaceContainerHighest.copy(alpha = 0.7f),
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 12.dp),
             ) {
                 Column(Modifier.fillMaxWidth().padding(12.dp), verticalArrangement = Arrangement.spacedBy(GapHairline)) {

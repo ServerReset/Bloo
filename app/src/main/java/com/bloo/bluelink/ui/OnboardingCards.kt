@@ -25,7 +25,6 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.font.FontWeight
-import dev.chrisbanes.haze.HazeState
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -211,7 +210,6 @@ internal fun OnboardingHero(icon: ImageVector, accent: Color, current: Boolean, 
 internal fun OnboardingGlassCard(
     spec: OnboardingCardSpec,
     accent: Color,
-    hazeState: HazeState,
     current: Boolean,
     onHeroTap: () -> Unit = {},
     content: @Composable () -> Unit,
@@ -220,11 +218,10 @@ internal fun OnboardingGlassCard(
     GlassSurface(
         shape = ExtraLargeShape,
         liquid = false,
-        // Only the card in view is blurred glass; the neighbours are a plain tint (they are mostly
-        // faded out) -- three live blurs per frame was a large part of the swipe lag.
-        hazeState = if (current) hazeState else null,
+        shadow = false,
+        // No backdrop blur on the deck (it was the swipe lag): a plain, mostly opaque tint over the backdrop.
         modifier = Modifier.fillMaxWidth(),
-        tint = scheme.surface.copy(alpha = if (current && canBlurBackdrops()) 0.30f else 0.55f),
+        tint = scheme.surfaceContainerHigh.copy(alpha = 0.82f),
         contentAlignment = Alignment.TopStart,
     ) {
         Column(Modifier.fillMaxWidth().padding(22.dp), verticalArrangement = Arrangement.spacedBy(GapGroup)) {

@@ -25,6 +25,7 @@ import androidx.compose.foundation.text.BasicText
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
@@ -177,7 +178,15 @@ fun MorphSegmented(
             shown.animateTo(0f, spring(stiffness = Spring.StiffnessMedium))
         }
     }
-    fun weightsNow(): FloatArray = segmentWeights(n, pos.value, shown.value, ratio)
+    // While a finger is down the highlight is the finger's: [dragFrac] is its fractional position
+    // (NaN = no drag) and [lag] is how far it still trails the finger after the initial resistance.
+    var dragFrac by remember { mutableFloatStateOf(Float.NaN) }
+    val lag = remember { Animatable(0f) }
+    // Equal widths while dragging, so the highlight is the same size under the finger all the way along;
+    // the stretch springs back in on release.
+    val stretch = remember { Animatable(1f) }
+    fun posNow(): Float = if (dragFrac.isNaN()) pos.value else (dragFrac - lag.value).coerceIn(0f, (n - 1).toFloat())
+    fun weightsNow(): FloatArray = segmentWeights(n, posNow(), shown.value * stretch.value, ratio)
 
     val gap = 4.dp
     Box(
@@ -200,7 +209,7 @@ fun MorphSegmented(
         SegmentTrack(
             n = n,
             weights = ::weightsNow,
-            position = { pos.value },
+            position = ::posNow,
             shown = { shown.value },
             gap = gap,
             height = trackHeight,
@@ -215,7 +224,13 @@ fun MorphSegmented(
                         val down = awaitFirstDown(requireUnconsumed = false)
                         val slop = viewConfiguration.touchSlop
                         var claimed = false
+                        var crossed = false
+                        var startFrac = 0f
                         var last = -1
+                        val stepPx = widths.sum() / n + gapPx
+                        // The first few dp of a drag are held back (it resists), then it lets go and
+                        // catches up to the finger.
+                        val resistPx = 18.dp.toPx()
                         try {
                             while (true) {
                                 val event = awaitPointerEvent()
@@ -232,37 +247,60 @@ fun MorphSegmented(
                                     }
                                     break
                                 }
+                                val dxPx = change.position.x - down.position.x
                                 if (!claimed) {
-                                    val dx = abs(change.position.x - down.position.x)
                                     val dy = abs(change.position.y - down.position.y)
                                     when {
-                                        dx > slop && dx >= dy -> {
+                                        abs(dxPx) > slop && abs(dxPx) >= dy -> {
                                             claimed = true
                                             change.consume()
-                                            last = indexAt(change.position.x)
-                                            dragIndex = last
+                                            startFrac = pos.value
+                                            dragFrac = startFrac
+                                            scope.launch { lag.snapTo(0f); stretch.animateTo(0f, spring(stiffness = Spring.StiffnessHigh)) }
                                             currentOnTick()
                                         }
                                         dy > slop -> break
                                     }
-                                } else if (change.positionChanged()) {
+                                }
+                                if (claimed && change.positionChanged()) {
                                     change.consume()
-                                    val idx = indexAt(change.position.x)
-                                    if (idx != last) {
-                                        last = idx
-                                        dragIndex = idx
-                                        currentOnTick()
+                                    val target = startFrac + dxPx / stepPx
+                                    if (!crossed && abs(dxPx) < resistPx) {
+                                        dragFrac = startFrac + dxPx * 0.3f / stepPx
+                                    } else {
+                                        if (!crossed) {
+                                            crossed = true
+                                            val heldAt = startFrac + (if (dxPx > 0) 1f else -1f) * resistPx * 0.3f / stepPx
+                                            scope.launch { lag.snapTo(target - heldAt); lag.animateTo(0f, spring(0.8f, Spring.StiffnessMedium)) }
+                                        }
+                                        dragFrac = target
                                     }
+                                    val idx = Math.round(posNow()).coerceIn(0, n - 1)
+                                    dragIndex = idx
+                                    if (idx != last) { last = idx; currentOnTick() }
                                 }
                             }
                             if (claimed) {
-                                val idx = dragIndex ?: indexAt(down.position.x)
+                                val idx = Math.round(posNow()).coerceIn(0, n - 1)
                                 pendingIndex = idx
                                 val key = currentOptions[idx].key
                                 if (key != currentSelectedKey) currentOnSelect(key)
                             }
                         } finally {
+                            val from = posNow()
+                            val land = Math.round(from).coerceIn(0, n - 1)
                             dragIndex = null
+                            if (claimed) {
+                                // Hand the highlight back to its own spring from exactly where the finger left
+                                // it, and let it snap to the option it is over.
+                                scope.launch {
+                                    pos.snapTo(from)
+                                    dragFrac = Float.NaN
+                                    lag.snapTo(0f)
+                                    launch { stretch.animateTo(1f, spring(0.7f, Spring.StiffnessMediumLow)) }
+                                    pos.animateTo(land.toFloat(), spring(dampingRatio = 0.62f, stiffness = Spring.StiffnessMediumLow))
+                                }
+                            }
                         }
                     }
                 },
