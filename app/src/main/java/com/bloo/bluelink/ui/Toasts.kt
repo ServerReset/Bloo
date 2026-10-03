@@ -8,12 +8,13 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
@@ -127,7 +128,13 @@ internal fun ToastHost(
     Column(
         modifier
             .fillMaxWidth()
+            // IME first, then the navigation bar: the keyboard's inset wins when it is up
+            // (the toast rides just above it), and the bar's inset keeps the toast clear of
+            // the gesture bar otherwise. This host used to be the Scaffold's snackbar, which
+            // the Scaffold lifted above the navigation bar for free -- as an edge-to-edge
+            // overlay of its own it has to ask for that inset now.
             .imePadding()
+            .navigationBarsPadding()
             .padding(horizontal = 16.dp, vertical = 8.dp),
         verticalArrangement = Arrangement.spacedBy(GapRow),
     ) {
@@ -206,8 +213,12 @@ private fun ToastCard(toast: Toast, onDismiss: () -> Unit, hazeState: HazeState,
             },
     ) {
     GlassSurface(
-        // A pill, like the search bar it came out of.
-        shape = CircleShape,
+        // A rounded card, not the search bar's own pill shape: a one-line toast read fine as
+        // a pill, but a five-line error became a stadium with fully-round ends, which looked
+        // like a sliver of text wrapped in a lozenge. The blob STILL emerges from the search
+        // circle (see `origin`/`BlobShape`, which morphs rect -> full over `emerge`), so the
+        // "it came out of search" read is unchanged; only the resting shape is.
+        shape = RoundedCornerShape(24.dp),
         hazeState = hazeState,
         // Mostly clear: the glass does the work (refraction over a barely-there tint), but enough tint
         // that the words read the instant it lands.
@@ -268,10 +279,27 @@ private fun ToastCard(toast: Toast, onDismiss: () -> Unit, hazeState: HazeState,
                     maxLines = 5,
                 )
             }
-            // Only errors are worth copying (to paste into a bug report); a "Saved" toast is not.
-            if (toast.type != "success" && toast.type != "info") {
-                MorphIconButton(onClick = { onCopy(toast.message) }) {
-                    Icon(Icons.Filled.ContentCopy, contentDescription = "Copy")
+            // Copy is always offered now, not only on errors. An error detail is the
+            // message that most often wants pasting into a bug report, but a build number,
+            // an address, or any other info toast is worth a tap too -- gating it by type
+            // meant the one time a user DID want a success text there was no button. The
+            // glyph swaps to a check for a moment so the tap visibly registers.
+            var copied by remember(toast.id) { mutableStateOf(false) }
+            val copyScope = rememberCoroutineScope()
+            MorphIconButton(
+                onClick = {
+                    onCopy(toast.message)
+                    copied = true
+                    copyScope.launch {
+                        delay(1400)
+                        copied = false
+                    }
+                },
+            ) {
+                if (copied) {
+                    Icon(AppIcons.Check, contentDescription = "Copied", tint = accent)
+                } else {
+                    Icon(Icons.Filled.ContentCopy, contentDescription = "Copy message")
                 }
             }
             MorphIconButton(onClick = onDismiss) {

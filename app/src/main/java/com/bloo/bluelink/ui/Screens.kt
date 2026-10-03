@@ -41,6 +41,7 @@ import dev.chrisbanes.haze.HazeState
 import dev.chrisbanes.haze.hazeSource
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
 import androidx.lifecycle.repeatOnLifecycle
@@ -267,15 +268,10 @@ fun BlooApp(vm: AppViewModel) {
     )
     Scaffold(
         containerColor = Color.Transparent,
-        snackbarHost = {
-            ToastHost(
-                state = toasts,
-                hazeState = searchHazeState,
-                onCopy = { text ->
-                    scope.launch { clipboard.setClipEntry(ClipEntry(ClipData.newPlainText("bloo", text))) }
-                },
-            )
-        },
+        // Toasts are NOT the Scaffold's snackbar any more -- see the ToastHost call
+        // below the screen switch for why (they belong ABOVE search, and a
+        // snackbarHost is drawn under everything the Scaffold's content draws).
+        snackbarHost = {},
     ) { padding ->
         // Adding an account shows the login form even while already signed in.
         val target = if (addingAccount) Screen.Login else screen
@@ -407,6 +403,23 @@ fun BlooApp(vm: AppViewModel) {
                 )
             }
         }
+    }
+    // Toasts live HERE -- inside the app's outer Box, after the screen switch and
+    // after SearchLayer (both drawn inside the Scaffold above), so they stack ABOVE
+    // search. They used to be the Scaffold's `snackbarHost`, which is drawn UNDER
+    // all of the Scaffold's content including that SearchLayer sibling -- so a toast
+    // that blobbed out of the search bubble then slid behind the very panel it came
+    // from. Still above them sits the lock overlay and the dialogs (drawn below,
+    // outside this Box): a toast is informational, a dialog is modal.
+    Box(Modifier.fillMaxSize()) {
+        ToastHost(
+            state = toasts,
+            hazeState = searchHazeState,
+            onCopy = { text ->
+                scope.launch { clipboard.setClipEntry(ClipEntry(ClipData.newPlainText("bloo", text))) }
+            },
+            modifier = Modifier.align(Alignment.BottomCenter),
+        )
     }
     }
     }
