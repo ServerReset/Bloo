@@ -112,16 +112,7 @@ internal fun SoundsVibrationCardContent(appearance: SettingsStore.Appearance, vm
 private fun ThemeGroups(appearance: SettingsStore.Appearance, advanced: Boolean, vm: AppViewModel) {
     Column(verticalArrangement = Arrangement.spacedBy(GapGroup)) {
             SettingsGroup("Mode") {
-                SettingsSegmentedRow(
-                    label = "Appearance",
-                    options = listOf(
-                        SegmentOption(ThemeMode.SYSTEM.name, "System", null),
-                        SegmentOption(ThemeMode.LIGHT.name, "Light", null),
-                        SegmentOption(ThemeMode.DARK.name, "Dark", null),
-                    ),
-                    selectedKey = appearance.themeMode.name,
-                    onSelect = { vm.setThemeMode(ThemeMode.valueOf(it)) },
-                )
+                ThemeModeSegmentedRow(appearance) { vm.setThemeMode(it) }
             }
             PopVisible(visible = advanced) {
                 Column(verticalArrangement = Arrangement.spacedBy(GapGroup)) {

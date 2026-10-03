@@ -235,16 +235,7 @@ internal fun OnboardingRestorePage(vm: AppViewModel) {
 /** How the app looks and reads: theme and units, the two choices everyone has an opinion on. */
 @Composable
 internal fun OnboardingLookPage(appearance: SettingsStore.Appearance, vm: AppViewModel) {
-    SettingsSegmentedRow(
-        label = "Appearance",
-        options = listOf(
-            SegmentOption(ThemeMode.SYSTEM.name, "System", null),
-            SegmentOption(ThemeMode.LIGHT.name, "Light", null),
-            SegmentOption(ThemeMode.DARK.name, "Dark", null),
-        ),
-        selectedKey = appearance.themeMode.name,
-        onSelect = { vm.setThemeMode(ThemeMode.valueOf(it)) },
-    )
+    ThemeModeSegmentedRow(appearance) { vm.setThemeMode(it) }
     SettingsSegmentedRow(
         label = "Units",
         options = listOf(

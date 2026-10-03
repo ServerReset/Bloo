@@ -58,6 +58,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.bloo.bluelink.data.Powertrain
+import com.bloo.bluelink.data.SettingsStore
 import com.bloo.bluelink.data.platformOverridable
 import kotlin.math.max
 import com.bloo.bluelink.data.collapsedSections
@@ -147,6 +148,32 @@ internal fun PlatformPicker(current: com.bloo.bluelink.data.VehiclePlatform, onS
     )
 }
 
+
+/** The three theme modes as segment options, stated once: three call sites
+ *  (the onboarding look page, the Display card, the Settings search entry) had
+ *  copied the same list, and a fourth mode added to [ThemeMode] would have had
+ *  to be remembered in each. */
+val ThemeModeOptions = listOf(
+    SegmentOption(ThemeMode.SYSTEM.name, "System", null),
+    SegmentOption(ThemeMode.LIGHT.name, "Light", null),
+    SegmentOption(ThemeMode.DARK.name, "Dark", null),
+)
+
+/** The Display card's own "Appearance" segmented row, shared with its two
+ *  clones (the Settings search entry renders the same control in the same
+ *  card shape; onboarding shows it during setup). */
+@Composable
+fun ThemeModeSegmentedRow(
+    appearance: SettingsStore.Appearance,
+    onSelect: (ThemeMode) -> Unit,
+) {
+    SettingsSegmentedRow(
+        label = "Appearance",
+        options = ThemeModeOptions,
+        selectedKey = appearance.themeMode.name,
+        onSelect = { onSelect(ThemeMode.valueOf(it)) },
+    )
+}
 
 /**
  * A labelled [MorphSegmented]: a small caption above a full-width segmented
