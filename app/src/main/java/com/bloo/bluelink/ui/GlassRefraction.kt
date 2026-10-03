@@ -36,7 +36,7 @@ internal fun Modifier.appGlassEffect(state: HazeState, shape: Shape, fadeOut: Bo
     // The user's clarity setting drives both the backing's opacity and how much it blurs: frosted is a
     // thick soft pane, clear is a thin one with the refraction showing.
     val clarity = LocalAppearance.current.glassClarity
-    val backing = MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 0.92f - 0.88f * clarity)
+    val backing = MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 0.97f * (1f - clarity))
     val blur = (18f - 16.5f * clarity).dp
     val style = remember(shape, backing, blur, fadeOut) { glassStyle(shape, backing, blur, fadeOut) }
     return this.hazeGlass(input = HazeInput.Sources(state), style = style)

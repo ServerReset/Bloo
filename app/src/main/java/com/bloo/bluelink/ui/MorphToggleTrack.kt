@@ -73,8 +73,6 @@ internal fun MorphToggleTrack(checked: Boolean) {
         animationSpec = lowPowerAwareSpring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessMediumLow),
         label = "toggleThumbOffset",
     )
-    // Un-clipped wrapper so the sparkles that fly out when it switches ON can leave the pill.
-    Box(Modifier.sparkleBurst(checked)) {
     Box(
         Modifier
             .size(trackWidth, trackHeight)
@@ -91,7 +89,6 @@ internal fun MorphToggleTrack(checked: Boolean) {
                 .clip(CircleShape)
                 .background(thumbColor),
         )
-    }
     }
 }
 

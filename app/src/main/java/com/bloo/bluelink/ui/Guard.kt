@@ -212,7 +212,7 @@ internal fun LockOverlay(vm: AppViewModel, opaqueBackdrop: Boolean = false) {
     // whole lock screen "going transparent" in one frame; a short cross-fade makes the
     // hand-off to the blurred garage imperceptible.
     val backdropAlpha by animateFloatAsState(
-        targetValue = if (opaqueBackdrop) 1f else 0.45f,
+        targetValue = if (opaqueBackdrop) 1f else 0.30f,
         animationSpec = tween(MotionMedium),
         label = "lockBackdropAlpha",
     )
@@ -250,6 +250,17 @@ internal fun LockOverlay(vm: AppViewModel, opaqueBackdrop: Boolean = false) {
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             if (showBiometric) {
+                // The same liquid glass as the rest of the app, over the force-blurred app behind it: the blur
+                // (LockBlurLayer) is what keeps data from leaking, the glass is what makes this one of us.
+                GlassSurface(
+                    shape = RoundedCornerShape(28.dp),
+                    modifier = Modifier.fillMaxWidth(),
+                    hazeState = LocalBackdropHaze.current,
+                ) {
+                Column(
+                    Modifier.padding(horizontal = 24.dp, vertical = 24.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                ) {
                 // --- Classic biometric prompt ---------------------------------
                 Icon(
                     Icons.Filled.Fingerprint,
@@ -271,14 +282,13 @@ internal fun LockOverlay(vm: AppViewModel, opaqueBackdrop: Boolean = false) {
                     color = lockFg.copy(alpha = 0.85f),
                 )
                 Spacer(Modifier.height(28.dp))
-                // White pill for maximum contrast over the dimmed blur.
                 val unlockSource = remember { MutableInteractionSource() }
                 MorphButton(
                     onClick = { authenticateBiometric() },
                     modifier = Modifier.height(ControlHeight),
                     interactionSource = unlockSource,
-                    containerColor = lockFg,
-                    contentColor = lockBg,
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    contentColor = MaterialTheme.colorScheme.onPrimary,
                     contentPadding = PaddingValues(horizontal = 40.dp, vertical = 18.dp),
                     expressive = true,
                     fillOnPress = true,
@@ -298,6 +308,8 @@ internal fun LockOverlay(vm: AppViewModel, opaqueBackdrop: Boolean = false) {
                         contentColor = lockFg,
                     )
                 }
+                }
+                }
             } else if (appState.appPinSet) {
                 // --- PIN prompt (device has no biometrics, or user chose PIN) --
                 // GlassSurface (GlassChrome.kt): the same fill/rim/shadow every other
@@ -309,6 +321,7 @@ internal fun LockOverlay(vm: AppViewModel, opaqueBackdrop: Boolean = false) {
                 GlassSurface(
                     shape = RoundedCornerShape(28.dp),
                     modifier = Modifier.fillMaxWidth(),
+                    hazeState = LocalBackdropHaze.current,
                 ) {
                     Column(Modifier.padding(horizontal = 24.dp, vertical = 20.dp)) {
                         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {

@@ -127,8 +127,8 @@ class SettingsStore(internal val context: Context) {
         val uiScale: Float = 1f,
         /** Colour vibrancy multiplier (0.5–1.6, 1 = default). */
         val vibrancy: Float = 1f,
-        /** How clear liquid glass is: 0 = heavily frosted backing, 1 = nearly clear. */
-        val glassClarity: Float = 0.55f,
+        /** How transparent the backing of floating glass is: 0 = solid, 1 = none (one of [GlassStops]). */
+        val glassClarity: Float = 0.7f,
         /** Show an aurora gradient as the app background instead of solid surface. */
         val auroraBackground: Boolean = false,
         /** Aurora motion mode: "off", "static", "motion". */
@@ -192,7 +192,7 @@ class SettingsStore(internal val context: Context) {
             // user out of Settings, so a bad stored value can never take effect.
             uiScale = (prefs[Keys.UI_SCALE]?.toFloatOrNull() ?: 1f).coerceIn(0.85f, 1.3f),
             vibrancy = (prefs[Keys.VIBRANCY]?.toFloatOrNull() ?: 1f).coerceIn(0.5f, 1.6f),
-            glassClarity = (prefs[Keys.GLASS_CLARITY]?.toFloatOrNull() ?: 0.55f).coerceIn(0f, 1f),
+            glassClarity = (prefs[Keys.GLASS_CLARITY]?.toFloatOrNull() ?: 0.7f).coerceIn(0f, 1f),
             hapticsEnabled = prefs[Keys.HAPTICS]?.toBooleanStrictOrNull() ?: true,
             auroraBackground = prefs[Keys.AURORA]?.toBooleanStrictOrNull() ?: false,
             auroraMotion = prefs[Keys.AURORA_MOTION] ?: "static",

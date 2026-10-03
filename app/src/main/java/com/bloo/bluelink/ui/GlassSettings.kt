@@ -14,24 +14,35 @@ import kotlin.math.roundToInt
  */
 @Composable
 internal fun GlassClaritySlider(appearance: SettingsStore.Appearance, vm: AppViewModel) {
-    // Five fixed stops, never a free value.
-    var draft by remember(appearance.glassClarity) { mutableFloatStateOf((appearance.glassClarity * 4).roundToInt() / 4f) }
-    StepRow(
-        "Glass clarity",
-        GlassClarityLabels[(draft * (GlassClarityLabels.size - 1)).roundToInt().coerceIn(0, GlassClarityLabels.size - 1)],
-    )
+    // Five fixed stops, never a free value: how TRANSPARENT the glass is.
+    var index by remember(appearance.glassClarity) { mutableFloatStateOf(nearestGlassStop(appearance.glassClarity).toFloat()) }
+    val stop = GlassStops[index.roundToInt().coerceIn(0, GlassStops.lastIndex)]
+    StepRow("Glass", "${stop.name} · ${(stop.transparency * 100).roundToInt()}% transparent")
     AnimatedSlider(
-        value = draft,
-        onValueChange = { draft = it },
-        valueRange = 0f..1f,
-        steps = 3,
+        value = index,
+        onValueChange = { index = it },
+        valueRange = 0f..GlassStops.lastIndex.toFloat(),
+        steps = GlassStops.size - 2,
         onValueSettled = {
-            val stop = (it * 4).roundToInt() / 4f
-            draft = stop
-            vm.setGlassClaritySoon(stop)
+            val i = it.roundToInt().coerceIn(0, GlassStops.lastIndex)
+            index = i.toFloat()
+            vm.setGlassClaritySoon(GlassStops[i].transparency)
         },
     )
-    BodySmallText("Floating elements: from a frosted backing to a mostly clear pane that shows the refraction.")
+    BodySmallText("How see-through the backing of floating glass is, from solid to nothing but the bending edge.")
 }
 
-private val GlassClarityLabels = listOf("Frosted", "Soft", "Balanced", "Clear", "Crystal")
+/** One fixed stop on the glass slider: its name and how transparent the backing is (0 = solid, 1 = none). */
+internal class GlassStop(val name: String, val transparency: Float)
+
+internal val GlassStops = listOf(
+    GlassStop("Solid", 0f),
+    GlassStop("Frosted", 0.25f),
+    GlassStop("Misted", 0.70f),
+    GlassStop("Clear", 0.90f),
+    GlassStop("Crystal", 1f),
+)
+
+/** The stop closest to a stored [transparency] (older versions stored free values). */
+internal fun nearestGlassStop(transparency: Float): Int =
+    GlassStops.indices.minByOrNull { kotlin.math.abs(GlassStops[it].transparency - transparency) } ?: 2
