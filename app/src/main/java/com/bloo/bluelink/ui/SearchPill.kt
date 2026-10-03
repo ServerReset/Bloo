@@ -68,7 +68,6 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.graphics.SolidColor
@@ -442,12 +441,7 @@ internal fun SearchSuggestions(state: UiState, compact: Boolean = false, onPick:
                     // three different surfaces. Same split, and the same reasoning,
                     // as glassDropShadow (GlassChrome.kt): unchanged in dark, a
                     // soft contact shadow in light.
-                    modifier = Modifier.dropShadow(
-                        RoundedCornerShape(50),
-                        color = Color.Black.copy(alpha = if (appIsDarkTheme()) 0.38f else 0.12f),
-                        blurRadius = 8.dp,
-                        offsetY = 3.dp,
-                    ),
+                    modifier = Modifier.themedDropShadow(RoundedCornerShape(50), blurRadius = 8.dp, offsetY = 3.dp),
                     expressive = true,
                 ) {
                     Text(

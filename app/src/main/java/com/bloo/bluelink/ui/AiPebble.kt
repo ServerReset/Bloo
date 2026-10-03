@@ -33,7 +33,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.unit.dp
 import com.bloo.bluelink.data.Vehicle
 
 /** Optional on-device Gemini Nano summary of the car's last-refreshed status. */

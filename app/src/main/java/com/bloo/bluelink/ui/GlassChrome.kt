@@ -404,3 +404,21 @@ private val StandardBlurRadius = 20.dp
 
 /** The softer, cheaper blur cards use -- see [appHazeEffect]'s `cheap`. */
 private val CardBlurRadius = 20.dp
+
+
+/**
+ * A drop shadow at the weight the current theme can carry: full strength in dark, a soft contact
+ * shadow in light (a heavy black one on a pale surface reads as a smudge). For lifted chips and
+ * dragged rows; floating glass uses [glassEdge].
+ */
+@Composable
+internal fun Modifier.themedDropShadow(
+    shape: Shape,
+    blurRadius: androidx.compose.ui.unit.Dp = 14.dp,
+    offsetY: androidx.compose.ui.unit.Dp = 4.dp,
+): Modifier = this.dropShadow(
+    shape,
+    color = Color.Black.copy(alpha = if (appIsDarkTheme()) 0.38f else 0.12f),
+    blurRadius = blurRadius,
+    offsetY = offsetY,
+)

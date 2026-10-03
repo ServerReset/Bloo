@@ -28,7 +28,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.bloo.bluelink.data.SyncMerge
-import com.bloo.uicommon.dropShadow
 import com.bloo.uicommon.rememberConfirmArm
 
 private const val ACTIVE_DEVICE_MS = 10L * 60 * 1000
@@ -68,12 +67,7 @@ internal fun SyncDeviceRow(
             .fillMaxWidth()
             .then(
                 if (dragging) {
-                    Modifier.dropShadow(
-                        shape,
-                        color = Color.Black.copy(alpha = if (appIsDarkTheme()) 0.38f else 0.12f),
-                        blurRadius = 14.dp,
-                        offsetY = 4.dp,
-                    )
+                    Modifier.themedDropShadow(shape)
                 } else {
                     Modifier
                 },
