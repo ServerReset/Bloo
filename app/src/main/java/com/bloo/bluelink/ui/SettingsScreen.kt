@@ -142,11 +142,6 @@ import com.bloo.bluelink.data.settingsMode
 @Composable
 internal fun SettingsScreen(
     vm: AppViewModel,
-    /** True on the flip cover, where every dimension is precious: tighter
-     *  gutters, a slimmer header, closer card spacing. The grid still
-     *  scrolls exactly as it does on the phone -- compactness here is
-     *  density, not reachability. */
-    compact: Boolean = false,
     /** GarageScreen passes its own shared instance (the same one its car pages
      *  get) so the floating search bar/results panel hosted ABOVE it gets one
      *  real blur source regardless of which page is actually showing. Cover
@@ -241,8 +236,8 @@ internal fun SettingsScreen(
                 // the keyboard opens, same fix as ExpandableMapLayer's own bottom column got
                 // for its charger API key field, reported from the same screenshot.
                 .imePadding()
-                .padding(horizontal = if (compact) 10.dp else 16.dp),
-            verticalArrangement = Arrangement.spacedBy(if (compact) 8.dp else 12.dp),
+                .padding(horizontal = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             // Content scrolls behind the status bar; clear the floating back-arrow/
             // segmented-toggle bar above. This is the list's own leading spacer, not
@@ -251,14 +246,14 @@ internal fun SettingsScreen(
             item {
                 // Clears the Simple/Advanced tab that hangs below the status bar (its corner gap + its height) with a
                 // breath to spare, so the first card never sits under it.
-                Spacer(Modifier.height(topInset + HeaderCornerGap + HeaderButtonSize + (if (compact) 10.dp else 14.dp)))
+                Spacer(Modifier.height(topInset + HeaderCornerGap + HeaderButtonSize + 14.dp))
             }
             // Settings' own page hero -- the same role a car page's hero photo card
             // plays (a glanceable top card), here showing the app identity, version and
             // build instead of a car's photo and charge. Makes this read as another
             // standard page in the pager rather than a differently-designed screen.
             item {
-                SettingsHeroCard(state, vm, compact)
+                SettingsHeroCard(state, vm)
             }
             run {
                 val advanced = state.settingsMode == "advanced"

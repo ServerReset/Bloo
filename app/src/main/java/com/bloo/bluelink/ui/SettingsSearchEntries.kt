@@ -162,7 +162,7 @@ internal fun buildSettingsSearchEntries(
         // Deferred-commit, same as the main Appearance card's slider — see there.
         VibrancySlider(appearance, vm)
     }
-    add("Search on the car screen", "search bubble car screen cover home garage ask command") {
+    add("Search on the car screen", "search bubble car screen home garage ask command") {
         ToggleRow("Search on the car screen", appearance.showSearch) { vm.setShowSearch(it) }
     }
     add("Units", "unit system metric imperial temperature distance speed miles km") {

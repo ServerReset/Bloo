@@ -195,7 +195,7 @@ internal fun LocationPebble(v: Vehicle, state: UiState, vm: AppViewModel, modifi
         // the reported "can no longer collapse the location card". Five other pebbles carried
         // the same mistake and were fixed earlier; these were the two that were missed.
     ) {
-        val coverGlance = LocalForceExpanded.current
+        val glance = LocalForceExpanded.current
         AnimatedVisibility(
             visible = location == null,
             enter = expandEnterSized(Alignment.Bottom),
@@ -221,7 +221,7 @@ internal fun LocationPebble(v: Vehicle, state: UiState, vm: AppViewModel, modifi
                 // COVER SCREEN: lead with the place-name hero (the cover drops the header
                 // where the place summary otherwise shows), and shrink the map so hero +
                 // map + coords + weather + button fit without overflowing the ~1-inch tile.
-                if (coverGlance) {
+                if (glance) {
                     // The subline used to always be the raw coordinate string, even
                     // once `place` had resolved into the headline right next to it --
                     // showing an address and its own coordinates in the same glance.
@@ -246,7 +246,7 @@ internal fun LocationPebble(v: Vehicle, state: UiState, vm: AppViewModel, modifi
                         loc,
                         Modifier
                             .fillMaxWidth()
-                            .height(if (coverGlance) 130.dp else 220.dp)
+                            .height(if (glance) 130.dp else 220.dp)
                             .clip(StandardShape)
                             .onGloballyPositioned {
                                 expandedMap.originBoundsFor(v.vin).value = Rect(it.positionOnScreen(), it.size.toSize())
@@ -274,7 +274,7 @@ internal fun LocationPebble(v: Vehicle, state: UiState, vm: AppViewModel, modifi
                         loc,
                         Modifier
                             .fillMaxWidth()
-                            .height(if (coverGlance) 130.dp else 220.dp)
+                            .height(if (glance) 130.dp else 220.dp)
                             .clip(StandardShape)
                             .onGloballyPositioned { mapOriginBounds = Rect(it.positionOnScreen(), it.size.toSize()) },
                         state = remember { CarMapState() },
@@ -304,13 +304,13 @@ internal fun LocationPebble(v: Vehicle, state: UiState, vm: AppViewModel, modifi
                 // row here was redundant with it every single time -- exactly what
                 // "should be an address, not coordinates" was pointing at. Only shown
                 // as a fallback while geocoding hasn't (yet, or ever) resolved a name.
-                if (!coverGlance && place == null) StatusRow("Location", loc.coordString())
+                if (!glance && place == null) StatusRow("Location", loc.coordString())
                 // How far the phone is from the car right now -- the phone's own
                 // last-known fix (kept live app-wide via AppViewModel.beginLiveDeviceLocation)
                 // against this car's. Absent (not just zero) until a device fix has ever
                 // landed, same "don't assert a number you don't actually have" rule the
                 // lock-state / odometer rows elsewhere in this app already follow.
-                if (!coverGlance) {
+                if (!glance) {
                     state.deviceLocation?.let { device ->
                         StatusRow("Distance", formatDistance(device.distanceMilesTo(loc), appearance.metricDistance))
                     }
@@ -332,7 +332,7 @@ internal fun LocationPebble(v: Vehicle, state: UiState, vm: AppViewModel, modifi
                 // loss of detail, not just a relocation.
                 PopVisible(visible = carWeather != null) {
                     if (carWeather != null) {
-                        if (coverGlance) {
+                        if (glance) {
                             WeatherStripe(carWeather, fahrenheit, place ?: "At the car")
                         } else {
                             WeatherDetail(carWeather, fahrenheit, appearance.metricDistance)

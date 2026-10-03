@@ -380,7 +380,6 @@ fun BlooApp(vm: AppViewModel) {
         // route any more, for any vehicle count), so it doesn't need a
         // separate entry here.
         val searchable = target == Screen.Garage
-        val cover = isCompactCoverScreen()
         val notifPrefs by vm.notifications.collectAsStateWithLifecycle()
         // On the garage (and the cover) it is the user's switch. On the Settings
         // PAGE of that same pager it is always there -- that is how you find a
@@ -415,8 +414,7 @@ fun BlooApp(vm: AppViewModel) {
                     state = stateHolder,
                     appearance = appearance,
                     notif = notifPrefs,
-                    onSettings = effectivelyInSettings && !cover,
-                    compact = cover,
+                    onSettings = effectivelyInSettings,
                     onOpenChanged = { searchOpen = it },
                     hazeState = searchHazeState,
                 )

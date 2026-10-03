@@ -7,7 +7,6 @@
 
 package com.bloo.bluelink.ui
 
-import android.os.Build
 import dev.chrisbanes.haze.HazeState
 import dev.chrisbanes.haze.hazeSource
 import androidx.activity.compose.BackHandler
@@ -39,12 +38,10 @@ import androidx.compose.runtime.State
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.unit.dp
 import com.bloo.bluelink.data.STALE_STATUS_MS
@@ -201,42 +198,7 @@ internal fun GarageScreen(
     val slots = maxOf(count, 1)
     val windowInfo = LocalWindowInfo.current
     val widthDp = with(LocalDensity.current) { windowInfo.containerSize.width.toDp() }
-    val large = widthDp >= COVER_SCREEN_WIDTH_DP.dp
-    val compact = isCompactCoverScreen()
-    // Only show cover-screen hints once per session.
-    var coverHintShown by rememberSaveable { mutableStateOf(false) }
-    // Detect a device that likely has a cover screen: look for a camera cutout
-    // (punch-hole) on a short screen, indicating a flip/fold cover display.
-    val view = LocalView.current
-    val hasCameraCutout = remember(view) {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P)
-            view.rootWindowInsets?.displayCutout?.boundingRects?.isNotEmpty() == true
-        else false
-    }
-    // `compact` is part of the CONDITION, not just of the message choice. It used
-    // to set coverHintShown before testing it, so the once-per-session latch was
-    // spent by any device with a punch-hole -- which is essentially every modern
-    // phone -- while unfolded, showing nothing. Fold/unfold is a configuration
-    // change, and coverHintShown is rememberSaveable precisely to survive one, so
-    // a user who opened the app unfolded and then closed the phone reached the
-    // cover screen with the hint already marked shown and never saw it: the hint
-    // was reliably consumed everywhere except the one screen it exists for.
-    LaunchedEffect(compact, hasCameraCutout) {
-        if (compact && hasCameraCutout && !coverHintShown) {
-            coverHintShown = true
-            vm.reportInfo("Open your phone for the full Bloo experience")
-        }
-    }
-    if (compact) {
-        // Returns BEFORE publishing the chrome targets below. CompactGarage is a child of this
-        // composable and publishes its own, so leaving this screen's SideEffect above the
-        // short-circuit meant two writers on one shared pair of fields in a single composition.
-        // They agreed only by accident -- the compact path returns before LocalPullFraction is
-        // provided, so `pulling` was always false here and both reduced to `refreshing`. One
-        // change to either expression and it becomes last-writer-wins flicker.
-        CompactGarage(state, vm, appearance, hazeState = hazeState)
-        return
-    }
+    val large = widthDp >= TWO_COLUMN_MIN_DP.dp
     val chromeHidden = refreshing || pulling
     // SideEffect, not a bare assignment: these are snapshot writes, and writing state during
     // composition invalidates the composition that is running.

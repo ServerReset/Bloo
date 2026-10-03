@@ -104,7 +104,6 @@ internal fun SearchPill(
     form: SearchForm,
     width: Dp,
     height: Dp,
-    compact: Boolean,
     onQueryChange: (String) -> Unit,
     onFocusChange: (Boolean) -> Unit,
     onSubmit: () -> Unit,
@@ -251,7 +250,7 @@ internal fun SearchPill(
                 // with no light/dark gate, which on a light theme is the smudge in the
                 // screenshots). One call now, so the next change to what a floating edge
                 // looks like reaches this pill too instead of stopping one file short.
-                .then(if (compact) Modifier else Modifier.glassEdge(pillShape))
+                .glassEdge(pillShape)
                 // appHazeEffect, clipped to pillShape explicitly -- this whole
                 // modifier chain runs BEFORE Surface's own internal shape-clip
                 // (Surface appends that itself, after everything the caller
@@ -297,11 +296,11 @@ internal fun SearchPill(
             ) { (shape, isOpen) ->
                 when {
                     isOpen -> Row(
-                        Modifier.fillMaxSize().padding(horizontal = if (compact) 12.dp else 16.dp),
+                        Modifier.fillMaxSize().padding(horizontal = 16.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        Icon(Icons.Filled.Search, contentDescription = null, modifier = Modifier.size(if (compact) 18.dp else 20.dp))
-                        Spacer(Modifier.width(if (compact) 6.dp else 10.dp))
+                        Icon(Icons.Filled.Search, contentDescription = null, modifier = Modifier.size(20.dp))
+                        Spacer(Modifier.width(10.dp))
                         Box(Modifier.weight(1f)) {
                             BasicTextField(
                                 value = query,
@@ -324,7 +323,7 @@ internal fun SearchPill(
                                 decorationBox = { inner ->
                                     if (query.isEmpty()) {
                                         Text(
-                                            if (compact) "Search" else "Search settings, commands & data",
+                                            "Search settings, commands & data",
                                             style = MaterialTheme.typography.bodyLarge,
                                             color = scheme.onSurfaceVariant,
                                             maxLines = 1,
@@ -361,7 +360,7 @@ internal fun SearchPill(
                             // 18dp inside a 40dp circle left a ring of empty
                             // surface wider than the glyph; the button read as
                             // a blob with something small in it.
-                            modifier = Modifier.size(if (compact) 21.dp else 22.dp),
+                            modifier = Modifier.size(22.dp),
                         )
                     }
                 }

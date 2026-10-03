@@ -22,7 +22,6 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import com.bloo.bluelink.data.setBiometricLock
-import com.bloo.bluelink.data.setCoverSettingsHintDismissed
 import com.bloo.bluelink.data.setLockTiming
 
 // --- App PIN, lock timing, and biometric lock (extracted from AppViewModel) --
@@ -123,9 +122,6 @@ fun AppViewModel.setBiometricLock(enabled: Boolean) {
     viewModelScope.launch { settingsStore.setBiometricLock(enabled) }
 }
 
-/** Flip-cover "open your phone for settings" hint dismissal (persists). */
-fun AppViewModel.setCoverSettingsHintDismissed(value: Boolean) {
-    viewModelScope.launch { settingsStore.setCoverSettingsHintDismissed(value) }
 }
 
 /** Whether a PIN record currently exists in the credential store. */

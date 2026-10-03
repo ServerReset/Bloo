@@ -31,7 +31,6 @@ import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.only
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -39,7 +38,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.filled.Settings
-import androidx.compose.ui.semantics.onClick
 import androidx.compose.ui.semantics.heading
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -333,53 +331,6 @@ internal fun PebbleShell(
         },
         label = "pebbleCorner",
     )
-    val fillHeight = LocalPebbleFillHeight.current
-    // On the cover screen a pebble IS a cover tile -- same template as the
-    // home tile and every other page (title band, centred body, actions
-    // band). It used to be this same Card with the header row dropped and a
-    // 30dp icon badge floating over the body's corner, which meant a pebble
-    // page looked like a different kind of object from the home page and
-    // named itself only to someone who already knew the iconography.
-    // headerAction becomes the actions band, so the pebble's one control
-    // lands in the same place, at the same size, as the home tile's four.
-    if (fillHeight && expanded) {
-        val act = headerAction?.takeIf { it.label.isNotEmpty() }
-        CoverTile(
-            title = title,
-            icon = icon,
-            // The summary IS this tile's glanceable value, so it goes on the header row at
-            // headline size rather than as a muted second line under a title that repeats what
-            // the icon already says. See CoverTile.headline.
-            headline = summary,
-            // Which car this section belongs to. Cover pebbles are header-less, so a section
-            // tile ("Charge", "Climate") named the section and nothing else -- which is what the
-            // floating car-name overlay was added to fix, by drawing a second title over the
-            // one this tile already has. On the title row it costs no height and cannot collide.
-            trailingLabel = LocalCoverCarName.current,
-            containerColor = containerColor,
-            scrollState = LocalCoverScrollState.current,
-            actions = if (act == null) {
-                null
-            } else {
-                {
-                    CoverActionButton(
-                        icon = act.icon,
-                        label = act.label,
-                        onClick = act.onClick,
-                        active = act.active,
-                        pending = act.pending,
-                        enabled = act.enabled,
-                        // A section tile has exactly one action and the whole row to put it in,
-                        // so it takes the shorter side-by-side pill rather than the stacked form
-                        // that exists for fitting four into one row. 12dp back on every tile.
-                        compact = true,
-                    )
-                }
-            },
-            body = content,
-        )
-        return
-    }
     val pebbleShape = RoundedCornerShape(corner)
     // Off by default -- see Appearance.pebbleOutline's doc comment. Most
     // floating chrome always has a rim, but pebbles are the majority of
@@ -387,11 +338,10 @@ internal fun PebbleShell(
     // visual commitment than one more floating button.
     val pebbleAppearance = LocalAppearance.current
     val pebbleOutline = pebbleAppearance.pebbleOutline
-    Box(Modifier.fillMaxWidth().then(if (fillHeight) Modifier.fillMaxHeight() else Modifier)) {
+    Box(Modifier.fillMaxWidth()) {
         Card(
             Modifier
                 .fillMaxWidth()
-                .then(if (fillHeight) Modifier.fillMaxHeight() else Modifier)
                 // The dedicated pebble border (pebbleCardEdge), bolder than the floating-chrome rim:
                 // against a flat card the rim was nearly invisible, so toggling it read as doing nothing.
                 .pebbleCardEdge(pebbleShape, pebbleOutline)
@@ -426,9 +376,7 @@ internal fun PebbleShell(
                 // frame of the inner animation is itself a "content size changed"
                 // event the outer animateContentSize then re-animates towards,
                 // compounding two springs where the collapse only needs one.
-                Column(
-                    if (fillHeight) Modifier.fillMaxHeight() else Modifier,
-                ) {
+                Column {
                     PebbleHeaderRow(
                         icon = icon,
                         title = title,

@@ -95,10 +95,10 @@ internal fun TripsPebble(v: Vehicle, state: UiState, vm: AppViewModel, modifier:
                 // COVER SCREEN: a small "Recent trips" header + only the 3 most recent,
                 // so the tile fits the small square without scrolling and you land at
                 // the top. Phone keeps up to 8 with no header. Gated on forceExpanded.
-                val coverGlance = LocalForceExpanded.current
+                val glance = LocalForceExpanded.current
                 // No cover hero: the summary already says "3 recent" and is now the tile's
                 // headline. The same count in two different words helped nobody.
-                trips.take(if (coverGlance) 3 else 8).forEach { TripRow(it, metric = tMetric) }
+                trips.take(if (glance) 3 else 8).forEach { TripRow(it, metric = tMetric) }
             }
         }
     }

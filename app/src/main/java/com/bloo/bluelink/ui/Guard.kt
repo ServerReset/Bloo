@@ -137,7 +137,6 @@ internal fun LockAlphaOverlay(locked: Boolean, vm: AppViewModel, opaqueBackdrop:
 @Composable
 internal fun LockOverlay(vm: AppViewModel, opaqueBackdrop: Boolean = false) {
     val context = LocalContext.current
-    val compact = isCompactCoverScreen()
     val appState by vm.state.collectAsStateWithLifecycle()
     // The device-biometric gate is a binder call -- evaluate once per overlay
     // mount, not per recomposition of the (frequently updating) state below.
@@ -255,13 +254,13 @@ internal fun LockOverlay(vm: AppViewModel, opaqueBackdrop: Boolean = false) {
                 Icon(
                     Icons.Filled.Fingerprint,
                     contentDescription = null,
-                    modifier = Modifier.size(if (compact) 44.dp else 72.dp),
+                    modifier = Modifier.size(72.dp),
                     tint = lockFg,
                 )
-                Spacer(Modifier.height(if (compact) 10.dp else 18.dp))
+                Spacer(Modifier.height(18.dp))
                 Text(
                     "Bloo is locked",
-                    style = if (compact) MaterialTheme.typography.titleLarge else MaterialTheme.typography.headlineSmall,
+                    style = MaterialTheme.typography.headlineSmall,
                     fontWeight = FontWeight.Bold,
                     color = lockFg,
                 )
@@ -271,12 +270,12 @@ internal fun LockOverlay(vm: AppViewModel, opaqueBackdrop: Boolean = false) {
                     style = MaterialTheme.typography.bodyMedium,
                     color = lockFg.copy(alpha = 0.85f),
                 )
-                Spacer(Modifier.height(if (compact) 16.dp else 28.dp))
+                Spacer(Modifier.height(28.dp))
                 // White pill for maximum contrast over the dimmed blur.
                 val unlockSource = remember { MutableInteractionSource() }
                 MorphButton(
                     onClick = { authenticateBiometric() },
-                    modifier = Modifier.height(if (compact) 56.dp else ControlHeight),
+                    modifier = Modifier.height(ControlHeight),
                     interactionSource = unlockSource,
                     containerColor = lockFg,
                     contentColor = lockBg,
@@ -308,7 +307,7 @@ internal fun LockOverlay(vm: AppViewModel, opaqueBackdrop: Boolean = false) {
                 // appGlassRim's shared gradient one and Ambient.kt's now-removed
                 // dialog override) -- no more per-site exceptions.
                 GlassSurface(
-                    shape = RoundedCornerShape(if (compact) 20.dp else 28.dp),
+                    shape = RoundedCornerShape(28.dp),
                     modifier = Modifier.fillMaxWidth(),
                 ) {
                     Column(Modifier.padding(horizontal = 24.dp, vertical = 20.dp)) {
@@ -395,7 +394,7 @@ internal fun LockOverlay(vm: AppViewModel, opaqueBackdrop: Boolean = false) {
                 Icon(
                     Icons.Filled.Lock,
                     contentDescription = null,
-                    modifier = Modifier.size(if (compact) 44.dp else 72.dp),
+                    modifier = Modifier.size(72.dp),
                     tint = lockFg,
                 )
                 Spacer(Modifier.height(GapSection))

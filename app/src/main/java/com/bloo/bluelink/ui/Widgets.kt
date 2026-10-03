@@ -28,7 +28,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.onClick
@@ -43,7 +42,6 @@ import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -397,46 +395,6 @@ internal val LocalAppearance = staticCompositionLocalOf { SettingsStore.Appearan
 
 
 internal val LocalForceExpanded = staticCompositionLocalOf { false }
-
-
-/**
- * When true (cover-screen tiles), a pebble stretches to fill the available height
- * and scrolls internally if its content is taller - so each tile fills the screen.
- */
-internal val LocalPebbleFillHeight = staticCompositionLocalOf { false }
-
-
-/** Tile names that [CoverCar] can render — unknown sections are excluded. */
-internal val CompactKnownTiles = setOf(
-    // No "controls" here, deliberately. It was added when the lock/horn
-    // controls were unreachable on the cover, but as its own page it was one
-    // short row of buttons above two thirds of an empty screen. Those same
-    // controls now live in CoverMainTile's permanent action bar, on the page
-    // the cover opens on -- so a separate page for them would be a second,
-    // emptier copy of something already on screen.
-    // "update" IS here: the update-available card is a first-class pebble on
-    // every phone page, and it silently vanished from the cover (reported).
-    // Rendered through the same SinglePebble routing as every other tile, so
-    // the Install/Remind-me/Not-now card works on the flip screen exactly as
-    // it does unfolded.
-    "climate", "charge", "location", "trips", "info", "diagnostics", "ai", "update"
-)
-
-
-/**
- * When set, [Pebble] in fill-height cover-screen mode uses this scroll state
- * instead of creating a local one — lets the parent observe scroll position
- * to decide whether to switch pager pages or scroll tile content.
- */
-internal val LocalCoverScrollState = compositionLocalOf<ScrollState?> { null }
-
-
-/**
- * Shared flag set true while the cover-screen page scrubber is active, so the
- * parent [CompactGarage] can suspend horizontal car-switching swipes during a
- * scrub. Provided around the HorizontalPager content.
- */
-internal val LocalCoverScrubbing = staticCompositionLocalOf<MutableState<Boolean>?> { null }
 
 
 /**

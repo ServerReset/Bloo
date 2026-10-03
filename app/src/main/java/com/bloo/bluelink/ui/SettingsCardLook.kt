@@ -73,7 +73,7 @@ internal fun DisplayCardContent(appearance: SettingsStore.Appearance, advanced: 
                 ToggleRow(
                     "Search on the car screen",
                     appearance.showSearch,
-                    description = "The search bubble on the car and cover screens. Ask about the car, run a command, or jump to a setting.",
+                    description = "The search bubble on the car screen. Ask about the car, run a command, or jump to a setting.",
                 ) { vm.setShowSearch(it) }
             }
             // A knob you set once, so advanced only.

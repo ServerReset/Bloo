@@ -240,7 +240,7 @@ internal fun StatusHeaderRow(icon: ImageVector, tint: Color, title: String, stat
  * what the old card showed once opened.
  */
 @Composable
-internal fun SettingsHeroCard(state: UiState, vm: AppViewModel, compact: Boolean) {
+internal fun SettingsHeroCard(state: UiState, vm: AppViewModel) {
     val number = vm.currentBuildNumber
     val label = com.bloo.bluelink.data.buildLabel(number, com.bloo.bluelink.BuildConfig.BUILD_BRANCH)
     val carCount = state.vehicles.size
@@ -254,10 +254,10 @@ internal fun SettingsHeroCard(state: UiState, vm: AppViewModel, compact: Boolean
     UpdateBadgedCard(visible = state.updateAvailable != null, modifier = Modifier.fillMaxWidth()) {
     Surface(
         modifier = Modifier.fillMaxWidth().semantics { heading() },
-        shape = RoundedCornerShape(if (compact) 18.dp else 22.dp),
+        shape = RoundedCornerShape(22.dp),
         color = MaterialTheme.colorScheme.surfaceContainerHigh,
     ) {
-        Column(Modifier.padding(if (compact) 16.dp else 20.dp)) {
+        Column(Modifier.padding(20.dp)) {
             // Narrow (a split pane, a cover screen): the update chip drops its words so the title keeps its room.
             androidx.compose.foundation.layout.BoxWithConstraints(Modifier.fillMaxWidth()) {
             val narrow = maxWidth < 340.dp
@@ -266,14 +266,14 @@ internal fun SettingsHeroCard(state: UiState, vm: AppViewModel, compact: Boolean
                     AppIcons.Settings,
                     tint = MaterialTheme.colorScheme.onSecondaryContainer,
                     containerColor = MaterialTheme.colorScheme.secondaryContainer,
-                    size = if (compact) 40.dp else 48.dp,
+                    size = 48.dp,
                     iconSize = 24.dp,
                 )
                 Spacer(Modifier.width(GapGroup))
                 Column(Modifier.weight(1f)) {
                     Text(
                         "Bloo",
-                        style = if (compact) MaterialTheme.typography.titleLarge else MaterialTheme.typography.headlineSmall,
+                        style = MaterialTheme.typography.headlineSmall,
                         fontWeight = FontWeight.Bold,
                         maxLines = 1,
                         softWrap = false,
@@ -292,7 +292,7 @@ internal fun SettingsHeroCard(state: UiState, vm: AppViewModel, compact: Boolean
                 )
             }
             }
-            Spacer(Modifier.height(if (compact) 12.dp else 16.dp))
+            Spacer(Modifier.height(16.dp))
             // The build number is the app's real version here (versionName stays
             // "0.1" on purpose), so it carries the hero stat the same way a car's
             // charge % or range does -- with the full label as its caption.

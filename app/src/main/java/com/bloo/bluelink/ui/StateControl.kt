@@ -265,12 +265,8 @@ internal fun StateControl(
         // groupMaxWidth). The phone sizes are the right ones for a pebble in a column,
         // which is what the hot-spot slot is.
         //
-        // Kept as a branch rather than deleted: it is the correct treatment for a genuine
-        // cover tile, and the cover already renders pebbles through this same SinglePebble
-        // path, so a "controls" tile becoming available there needs no new plumbing.
-        val coverTargets = LocalPebbleFillHeight.current
-        val groupBtnSize = if (coverTargets) 58.dp else 50.dp
-        val actionIconSize = if (coverTargets) 26.dp else 22.dp
+        val groupBtnSize = 50.dp
+        val actionIconSize = 22.dp
         // Standard gap between connected button elements (matches SplitExpandButton's
         // own 3dp gap for visual consistency across all grouped controls).
         // ExpressiveButtonRow, not a plain Row. THIS is the app's clearest "several buttons

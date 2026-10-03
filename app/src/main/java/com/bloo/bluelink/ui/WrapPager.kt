@@ -10,9 +10,7 @@ package com.bloo.bluelink.ui
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.only
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.pager.PagerState
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -26,10 +24,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.layout.layout
-import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.platform.LocalWindowInfo
-import androidx.compose.ui.unit.dp
 import kotlin.math.floor
 import kotlin.math.abs
 
@@ -159,26 +153,4 @@ internal fun Modifier.pagerDepth(pager: PagerState, page: Int): Modifier = graph
         .coerceIn(0f, 1f)
     scaleX = 1f - off * PAGER_SHRINK
     scaleY = 1f - off * PAGER_SHRINK
-}
-
-/** Screen height (dp) below which the phone gets the compact cover-screen
- *  layout -- a folding phone's small outer display (Galaxy Z Flip's ~260-280dp
- *  square cover, for instance), not a full unfolded/candybar phone screen.
- *  GarageScreen and LockOverlay used to each pick their own cutoff (570 vs
- *  440), so a screen sized between them got the compact UI on one but the
- *  full-size one on the other for the exact same physical device -- one
- *  shared threshold instead. Width is checked separately (see isCompactCoverScreen)
- *  so a wide-but-short screen (a tablet in landscape) doesn't false-positive. */
-const val COVER_SCREEN_HEIGHT_DP = 570
-const val COVER_SCREEN_WIDTH_DP = 600
-
-/** True on a folding phone's compact cover screen; false on a full phone,
- *  foldable-unfolded, or tablet screen. See [COVER_SCREEN_HEIGHT_DP]. */
-@Composable
-internal fun isCompactCoverScreen(): Boolean {
-    val windowInfo = LocalWindowInfo.current
-    return with(LocalDensity.current) {
-        windowInfo.containerSize.width.toDp() < COVER_SCREEN_WIDTH_DP.dp &&
-            windowInfo.containerSize.height.toDp() < COVER_SCREEN_HEIGHT_DP.dp
-    }
 }

@@ -64,7 +64,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.shadow
-import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.composed
 import androidx.compose.ui.unit.dp
@@ -109,7 +108,6 @@ internal fun SearchLayer(
     appearance: SettingsStore.Appearance,
     notif: SettingsStore.NotificationPrefs,
     onSettings: Boolean,
-    compact: Boolean,
     /** Reports whether the search UI is open (pill/panel showing) -- the
      *  ambient blurred aurora behind it pauses while this is true, so the
      *  keyboard/typing frames don't contend with a full-screen blur redraw. */
@@ -135,8 +133,6 @@ internal fun SearchLayer(
     var dockName by rememberSaveable { mutableStateOf(SearchDock.RIGHT.name) }
     val dock = SearchDock.valueOf(dockName)
     var lastDx by remember { mutableFloatStateOf(0f) }
-    @Suppress("AutoboxingStateCreation")
-    var dragY by rememberSaveable { mutableStateOf(Float.NaN) }
     // True only between finger-down and finger-up on the bubble. The position
     // animation is BYPASSED while it is true -- see the spec choice below.
     var dragging by remember { mutableStateOf(false) }
@@ -204,7 +200,7 @@ internal fun SearchLayer(
         // -- the blurred aurora redrawing underneath every IME frame -- is
         // handled at the source: AuroraBackground's `paused`, which the root
         // drives from this layer's `onOpenChanged`.)
-        val edge = if (compact) 8.dp else 16.dp
+        val edge = 16.dp
         // On the cover, a camera band beside the island (see coverCutoutBand)
         // is real, unoccluded space with nothing else fixed in it once the
         // name has taken its share -- a better home for search than a corner
@@ -213,17 +209,16 @@ internal fun SearchLayer(
         // band Row leaves for it; undocked (no band, or not compact) it's the
         // free-floating, draggable circle this always was. "Fixed when the
         // space is there, floating when it isn't."
-        val band = if (compact) coverCutoutBand() else null
-        val bubble = if (band != null) CoverBandSearchDock else if (compact) 40.dp else 52.dp
+        val bubble = 52.dp
         val barW = minOf(maxWidth - edge * 2, 640.dp)
         val barH = 52.dp
         val freeAbovePill = (maxHeight - bottomInset - barH - edge * 2 - 24.dp).coerceAtLeast(96.dp)
         // A medium pill: wide enough for the icon and the word with room
         // around them, and nowhere near the bar's span.
-        val pillW = minOf(if (compact) 132.dp else 168.dp, barW)
+        val pillW = minOf(168.dp, barW)
         val form = when {
             open -> SearchForm.BAR
-            onSettings || (!compact && dock == SearchDock.CENTER) -> SearchForm.PILL
+            onSettings || dock == SearchDock.CENTER -> SearchForm.PILL
             else -> SearchForm.BUBBLE
         }
 
@@ -243,64 +238,15 @@ internal fun SearchLayer(
         // Subtracting the same inset back out here is what puts this bubble
         // in the same coordinate space as that Row, so the two agree on
         // where the band actually is.
-        val safeDrawing = WindowInsets.safeDrawing.asPaddingValues()
-        val insetLeftDp = safeDrawing.calculateLeftPadding(LocalLayoutDirection.current).value
-        val insetTopDp = safeDrawing.calculateTopPadding().value
-        // Flush against whichever end of the band the camera touches --
-        // exactly the edge CompactGarage's own Arrangement groups its
-        // dockSpacer reservation against -- and vertically centred in it.
-        val dockedX = band?.let {
-            (if (it.nearCameraAtEnd) it.xDp + it.widthDp - 6f - CoverBandSearchDock.value
-            else it.xDp + 6f) - insetLeftDp
-        }
-        val dockedY = band?.let { (it.yDp + (it.heightDp - CoverBandSearchDock.value) / 2f) - insetTopDp }
-        // Restore the user's last-parked spot from durable storage, once -- if this
-        // composition doesn't already have one in memory. rememberSaveable's dragX/
-        // dragY survive a LIVE session (rotation, a mode switch while the process
-        // stays alive), but not a killed-and-restarted process, which is routine for
-        // a flip phone that's been closed a while: reported as "drag it, leave flip
-        // mode, come back -- it's not where I put it", which a purely in-memory Saver
-        // can't fix on its own. Stored and restored as FRACTIONS of the drag range
-        // (see SettingsStore's own doc), not raw dp, so this stays correct even if
-        // minX/maxX/minY/maxY come out slightly different than when it was saved.
-        // Plain arithmetic rather than androidx.compose.ui.unit.lerp -- two
-        // multiplies don't need an import.
         LaunchedEffect(Unit) {
-            if (!compact) {
-                vm.searchBubblePosition()?.let { (xFrac, _) -> dockName = SearchDock.fromFrac(xFrac).name }
-            } else if (dragX.isNaN()) {
-                vm.searchBubblePosition()?.let { (xFrac, yFrac) ->
-                    dragX = (minX + (maxX - minX) * xFrac).value
-                    dragY = (minY + (maxY - minY) * yFrac).value
-                }
-            }
+            vm.searchBubblePosition()?.let { (xFrac, _) -> dockName = SearchDock.fromFrac(xFrac).name }
         }
-        // dragX/dragY are ONLY consulted in compact (flip) mode. They are one
-        // shared pair of saved floats -- dragging is only possible in flip
-        // mode, but before this gate the normal-mode bubble read the exact
-        // same state, so once the flip bubble had ever been moved, switching
-        // to the normal phone screen showed it wherever flip mode had left it
-        // instead of the fixed bottom-right corner. Normal mode now always
-        // rests at restX/restY, full stop -- what dragX/dragY hold is purely
-        // flip mode's memory, and normal mode has no memory of its own by
-        // design (there's nowhere on that screen to remember: one fixed spot
-        // is the whole point).
-        // Docked beats dragged beats resting: a band, when there's one to dock
-        // into, always wins over wherever the bubble was last left -- fixed
-        // when the space is there, floating (and rememberable) only when it
-        // isn't.
         val bubbleX = when {
-            dockedX != null -> dockedX.dp
-            compact && !dragX.isNaN() -> dragX.dp.coerceIn(minX, maxX)
-            !compact && dragging && !dragX.isNaN() -> dragX.dp.coerceIn(minX, maxX)
-            !compact && dock == SearchDock.LEFT -> minX
+            dragging && !dragX.isNaN() -> dragX.dp.coerceIn(minX, maxX)
+            dock == SearchDock.LEFT -> minX
             else -> restX
         }
-        val bubbleY = when {
-            dockedY != null -> dockedY.dp
-            compact && !dragY.isNaN() -> dragY.dp.coerceIn(minY, maxY)
-            else -> restY
-        }
+        val bubbleY = restY
 
         val targetW = when (form) {
             SearchForm.BAR -> barW
@@ -311,7 +257,7 @@ internal fun SearchLayer(
         val targetX = when {
             form == SearchForm.BUBBLE -> bubbleX
             // A pill being carried follows the finger; at rest it is centred.
-            !compact && dragging && !dragX.isNaN() -> dragX.dp.coerceIn(minX, (maxWidth - targetW - edge).coerceAtLeast(minX))
+            dragging && !dragX.isNaN() -> dragX.dp.coerceIn(minX, (maxWidth - targetW - edge).coerceAtLeast(minX))
             else -> (maxWidth - targetW) / 2
         }
         val targetY = if (form == SearchForm.BUBBLE) bubbleY else maxHeight - barH - edge - bottomInset
@@ -345,10 +291,10 @@ internal fun SearchLayer(
         // nothing to do with anything the user just did. Restarted, it is
         // already home when the mode appears, and the entrance spring inside
         // SearchPill is what you see instead.
-        val w = key(compact) { animateDpAsState(targetW, sizeSpec, label = "searchW").value }
-        val h = key(compact) { animateDpAsState(targetH, sizeSpec, label = "searchH").value }
-        val x = key(compact) { animateDpAsState(targetX, posSpec, label = "searchX").value }
-        val y = key(compact) { animateDpAsState(targetY, posSpec, label = "searchY").value }
+        val w = animateDpAsState(targetW, sizeSpec, label = "searchW").value
+        val h = animateDpAsState(targetH, sizeSpec, label = "searchH").value
+        val x = animateDpAsState(targetX, posSpec, label = "searchX").value
+        val y = animateDpAsState(targetY, posSpec, label = "searchY").value
 
         // Dismiss scrim. Below the pill in this Box, so it never eats its taps. Same
         // effects spec collapseEnter/collapseExit use for every pebble's own fade,
@@ -379,7 +325,7 @@ internal fun SearchLayer(
             modifier = Modifier.align(Alignment.BottomCenter)
                 .padding(bottom = barH + edge + bottomInset + 10.dp),
         ) {
-            val panelShape = RoundedCornerShape(if (compact) 20.dp else 28.dp)
+            val panelShape = RoundedCornerShape(28.dp)
             // GlassSurface (GlassChrome.kt): the one shared fill/rim/shadow, replacing
             // this panel's own one-off alpha and its own separately-hand-rolled flat
             // BorderStroke rim (yet another divergent one, next to appGlassRim's shared
@@ -392,10 +338,10 @@ internal fun SearchLayer(
                 Column(
                     Modifier
                         .fillMaxWidth()
-                        .heightIn(max = minOf(if (compact) 180.dp else 360.dp, freeAbovePill))
+                        .heightIn(max = minOf(360.dp, freeAbovePill))
                         .verticalScroll(rememberScrollState())
-                        .padding(if (compact) 10.dp else 14.dp),
-                    verticalArrangement = Arrangement.spacedBy(if (compact) 8.dp else 10.dp),
+                        .padding(14.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp),
                 ) {
                     if (query.isNotBlank()) {
                         // Fewer results while the keyboard is up. This is what
@@ -410,14 +356,13 @@ internal fun SearchLayer(
                             // Two results that are fully visible beat six you
                             // have to scroll blind through.
                             limit = when {
-                                compact && keyboardUp -> 2
                                 keyboardUp -> 4
                                 else -> Int.MAX_VALUE
                             },
                             hazeState = hazeState,
                         )
                     } else {
-                        SearchSuggestions(state.value, compact = compact || keyboardUp) { picked ->
+                        SearchSuggestions(state.value, compact = keyboardUp) { picked ->
                             query = picked
                             submitted = picked
                         }
@@ -432,7 +377,6 @@ internal fun SearchLayer(
             form = form,
             width = w,
             height = h,
-            compact = compact,
             onQueryChange = { query = it },
             onFocusChange = { focused = it },
             onSubmit = { submitted = query },
@@ -442,64 +386,25 @@ internal fun SearchLayer(
             // Docked into a camera band, there is nowhere to drag it TO --
             // the whole point of the fixed spot is that it's the one place
             // guaranteed not to cover something else.
-            onDrag = when {
-                form == SearchForm.BUBBLE && compact && band == null -> { dx, dy ->
-                    dragX = ((if (dragX.isNaN()) bubbleX else dragX.dp) + dx).coerceIn(minX, maxX).value
-                    dragY = ((if (dragY.isNaN()) bubbleY else dragY.dp) + dy).coerceIn(minY, maxY).value
-                }
-                // Normal layout: the bubble (or the open-out pill) is carried sideways along the bottom.
-                !compact && form != SearchForm.BAR -> { dx, _ ->
+            onDrag = if (form != SearchForm.BAR) {
+                { dx, _ ->
                     dragX = ((if (dragX.isNaN()) x else dragX.dp) + dx).coerceIn(minX, maxX).value
                     lastDx = dx.value
                 }
-                else -> null
-            },
+            } else null,
             onDragStart = {
                 dragging = true
-                if (!compact) { dragX = Float.NaN; lastDx = 0f }
+                dragX = Float.NaN
+                lastDx = 0f
             },
             onDragEnd = {
-                if (!compact) {
-                    // Land in a dock: thrown the way it was flung, or dropped where it was let go.
-                    val widthNow = if (form == SearchForm.PILL) pillW else bubble
-                    val center = (if (dragX.isNaN()) x else dragX.dp) + widthNow / 2
-                    val next = SearchDock.landing((center / maxWidth).coerceIn(0f, 1f), lastDx, dock)
-                    dockName = next.name
-                    dragX = Float.NaN
-                    vm.setSearchBubblePosition(next.xFrac, 1f)
-                } else
-                // Snaps to the NEAREST of the four edges (compact/cover): free to park anywhere ALONG an
-                // edge, never in the open middle. Only the axis perpendicular to the chosen edge moves.
-                if (!dragX.isNaN() && !dragY.isNaN()) {
-                    val cx = dragX.dp
-                    val cy = dragY.dp
-                    val toLeft = cx - minX
-                    val toRight = maxX - cx
-                    val toTop = cy - minY
-                    val toBottom = maxY - cy
-                    // minOf has no 4-argument overload in the stdlib -- nested
-                    // 2-argument calls, not a 4-element list, to avoid an
-                    // allocation on every drag release for four numbers.
-                    val nearest = minOf(minOf(toLeft, toRight), minOf(toTop, toBottom))
-                    when {
-                        nearest == toLeft -> dragX = minX.value
-                        nearest == toRight -> dragX = maxX.value
-                        nearest == toTop -> dragY = minY.value
-                        else -> dragY = maxY.value
-                    }
-                    // Persisted durably (see SettingsStore.setSearchBubblePosition),
-                    // not just left in rememberSaveable -- once per gesture release,
-                    // not per drag frame. Guarded against a zero-width/height range
-                    // (a degenerate tiny screen) rather than dividing by it.
-                    val spanX = (maxX - minX).value
-                    val spanY = (maxY - minY).value
-                    if (spanX > 0f && spanY > 0f) {
-                        vm.setSearchBubblePosition(
-                            ((dragX - minX.value) / spanX).coerceIn(0f, 1f),
-                            ((dragY - minY.value) / spanY).coerceIn(0f, 1f),
-                        )
-                    }
-                }
+                // Land in a dock: thrown the way it was flung, or dropped where it was let go.
+                val widthNow = if (form == SearchForm.PILL) pillW else bubble
+                val center = (if (dragX.isNaN()) x else dragX.dp) + widthNow / 2
+                val next = SearchDock.landing((center / maxWidth).coerceIn(0f, 1f), lastDx, dock)
+                dockName = next.name
+                dragX = Float.NaN
+                vm.setSearchBubblePosition(next.xFrac, 1f)
                 dragging = false
                 // click(), not the generic platform feedback this used to fire --
                 // matches the edge-snap spring's own "bounced off the edge" physical

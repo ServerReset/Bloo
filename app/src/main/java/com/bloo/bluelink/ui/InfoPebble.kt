@@ -90,7 +90,7 @@ internal fun InfoPebble(v: Vehicle, status: VehicleStatus?, state: UiState, vm: 
     // no lock word until we actually know -- rather than asserting a state as fact in visible
     // text and to TalkBack. Matches CoverMainTile / StateControl, which already handle unknown.
     val infoSummary = status?.doorLock?.let { if (it) "Locked" else "Unlocked" }
-    val coverGlance = LocalForceExpanded.current
+    val glance = LocalForceExpanded.current
     // NOT alwaysExpandedInSimpleMode: that flag is for pebbles with a single setting
     // that reads better inline without an expand/collapse control (see its own doc).
     // This one renders ~15 info rows (below), so forcing it always open in simple
@@ -99,7 +99,7 @@ internal fun InfoPebble(v: Vehicle, status: VehicleStatus?, state: UiState, vm: 
         // COVER SCREEN only: lead with a big lock-state hero. On the cover the info
         // tile drops its header (so the "Locked/Unlocked" summary is otherwise
         // buried as one row among ~15). A large icon + word makes it the glance
-        // value. Phone is untouched (coverGlance = LocalForceExpanded, false there).
+        // value. Phone is untouched (glance = LocalForceExpanded, false there).
         // No cover hero: this pebble's summary is already "Locked"/"Unlocked" and CoverTile
         // renders it as the tile's headline. The lock state used to appear THREE times on one
         // tile -- as the summary, as this hero, and again as the "Doors" status row below.
@@ -146,7 +146,7 @@ internal fun InfoPebble(v: Vehicle, status: VehicleStatus?, state: UiState, vm: 
                 // onto two lines, a real reported "looks bad" bug. Phone keeps the long form,
                 // which has the room for it.
                 location?.let {
-                    val place = if (coverGlance) state.placeZips[v.vin] ?: state.placeNames[v.vin] else state.placeNames[v.vin]
+                    val place = if (glance) state.placeZips[v.vin] ?: state.placeNames[v.vin] else state.placeNames[v.vin]
                     StatusRow("Location", place ?: it.coordString())
                 }
                 rememberRelativeTime(state.fetchedAt(v))?.let { StatusRow("Last refreshed", it) }
@@ -164,9 +164,9 @@ internal fun InfoPebble(v: Vehicle, status: VehicleStatus?, state: UiState, vm: 
         // "Service & identity" (VIN/plate/odometer/service) and the owner-links block
         // are lookup/management surfaces with no at-a-glance value on a ~1-inch cover
         // tile, and they're what overflows it into a long scroll. Show them only on
-        // the phone (not coverGlance). Odometer stays visible on the cover as one
+        // the phone (not glance). Odometer stays visible on the cover as one
         // quick row since it's genuinely glanceable.
-        if (coverGlance) {
+        if (glance) {
             odoInt?.let { StatusRow("Odometer", formatDistance(it, metric)) }
         } else {
             SectionLabel("Service & identity")
