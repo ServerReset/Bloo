@@ -381,16 +381,8 @@ class BlueLinkApi(private val brand: Brand = Brand.HYUNDAI) {
         // unlock, then instantly smooth", i.e. exactly this network wait, not a UI-thread
         // stall (this whole function already runs on Dispatchers.IO -- see this class's own
         // doc). Logged only past a threshold so a normal fast body read on Wi-Fi says nothing.
-        val respondedAt = System.currentTimeMillis()
         client.newCall(request).execute().use { resp ->
-            val text = resp.body?.string().orEmpty()
-            val bodyReadMs = System.currentTimeMillis() - respondedAt
-            if (bodyReadMs > 500) {
-                AppLog.log(
-                    "${request.method} ${request.url.encodedPath}: response body " +
-                        "(${text.length} chars) took ${bodyReadMs}ms to download/read",
-                )
-            }
+            val text = resp.bodyWithSlowReadLog()
             if (!resp.isSuccessful) {
                 val message = friendlyError(resp.code, text)
                 AppLog.log("ERROR ${resp.code} ${request.method} ${request.url.encodedPath}: $message")

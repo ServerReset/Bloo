@@ -81,3 +81,27 @@ object ResponseFraming {
             null
         }
 }
+
+/**
+ * Downloads and returns the response body, logging when the download was slow.
+ *
+ * Measured separately from HttpLoggingInterceptor's own (headers-only) timing:
+ * `.string()` is what actually downloads the body, and that can run seconds behind
+ * a fast-looking interceptor log on a slow/cellular connection with a real payload.
+ * Logged only past a threshold so a normal fast body read on Wi-Fi says nothing.
+ *
+ * All four brand clients call this before their own success/envelope dispatch, in
+ * place of four copies of the same five-line measure+log block.
+ */
+fun okhttp3.Response.bodyWithSlowReadLog(): String {
+    val startedAt = System.currentTimeMillis()
+    val text = body?.string().orEmpty()
+    val bodyReadMs = System.currentTimeMillis() - startedAt
+    if (bodyReadMs > 500) {
+        AppLog.log(
+            "${request.method} ${request.url.encodedPath}: response body " +
+                "(${text.length} chars) took ${bodyReadMs}ms to download/read",
+        )
+    }
+    return text
+}
