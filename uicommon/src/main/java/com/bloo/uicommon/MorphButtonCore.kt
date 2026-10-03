@@ -291,7 +291,13 @@ private fun BoxScope.MorphChrome(
             //   - In unbounded heights, chrome measures the Row's actual height
             //     (not Infinity) and draws the background correctly
             .matchParentSize()
-            .graphicsLayer { scaleX = scale; scaleY = scale }
+            .graphicsLayer {
+                // Squash and stretch: pressed it flattens and widens a touch; the bouncy release spring
+                // carries it past rest (taller, narrower) before it settles.
+                val dip = 1f - scale
+                scaleX = 1f + dip * 0.7f
+                scaleY = 1f - dip * 1.2f
+            }
             .clip(shape)
             .then(
                 if (resolvedBorder != null) {

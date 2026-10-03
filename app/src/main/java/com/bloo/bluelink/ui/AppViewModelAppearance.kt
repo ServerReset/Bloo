@@ -17,7 +17,6 @@ import com.bloo.bluelink.data.setHapticsEnabled
 import com.bloo.bluelink.data.setPebbleOutline
 import com.bloo.bluelink.data.setSeamlessInstallShizuku
 import com.bloo.bluelink.data.setSearchBubblePosition
-import com.bloo.bluelink.data.setShowSearch
 import com.bloo.bluelink.data.setThemeMode
 import com.bloo.bluelink.data.setUiScale
 import com.bloo.bluelink.data.setUnitSystem
@@ -67,7 +66,6 @@ fun AppViewModel.setHapticsEnabled(value: Boolean) = viewModelScope.launch { set
 // `appearance` StateFlow mirror. setAuroraMotion configures the animated
 // background's speed; its colors always derive from the current theme.
 fun AppViewModel.setPebbleOutline(value: Boolean) = viewModelScope.launch { settingsStore.setPebbleOutline(value) }
-fun AppViewModel.setShowSearch(value: Boolean) = viewModelScope.launch { settingsStore.setShowSearch(value) }
 
 /** Where the cover screen's floating search bubble was last dragged to (fractions
  *  of its own drag range), or null if never dragged. See SettingsStore's own doc. */

@@ -394,7 +394,7 @@ fun BlooApp(vm: AppViewModel) {
         // (Recentre/Open in Maps) sitting in the same corner the floating search bubble
         // does -- the two overlapped and clipped into each other, reported directly from
         // a screenshot. See UiState.mapExpanded's own doc.
-        if (searchable && !locked && !mapExpanded && (appearance.showSearch || effectivelyInSettings)) {
+        if (searchable && !locked && !mapExpanded) {
             // fillMaxSize() alone, no `.padding(padding)` -- SearchLayer already
             // reads WindowInsets itself for every edge it cares about (its own
             // `bottomInset`, `insetTopDp` for the compact docked band), the same

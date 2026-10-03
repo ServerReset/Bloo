@@ -26,6 +26,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.BlurEffect
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.positionChanged
 import androidx.compose.ui.layout.onSizeChanged
@@ -129,8 +130,15 @@ fun AnimatedSlider(
     fun trackTo(x: Float) {
         val raw = rawForX(x)
         val span = (valueRange.endInclusive - valueRange.start)
-        val overshoot = span * 0.045f
-        val visual = raw.coerceIn(valueRange.start - overshoot, valueRange.endInclusive + overshoot)
+        // Past either end the handle keeps going, but it has to work for it: a rubber band whose pull
+        // eases off the further you drag, and the track stretches with it (see the Canvas's layer).
+        val over = span * 0.07f
+        fun rubber(extra: Float) = over * (1f - 1f / (1f + extra / over))
+        val visual = when {
+            raw < valueRange.start -> valueRange.start - rubber(valueRange.start - raw)
+            raw > valueRange.endInclusive -> valueRange.endInclusive + rubber(raw - valueRange.endInclusive)
+            else -> raw
+        }
         scope.launch { anim.snapTo(visual) }
         val clamped = raw.coerceIn(valueRange.start, valueRange.endInclusive)
         val s = snapToStep(clamped, valueRange, steps)
@@ -274,7 +282,24 @@ fun AnimatedSlider(
         // `frac` derived from anim.value, so reading anim.value in this draw scope
         // (rather than in a @Composable read further up) means dragging/settling
         // repaints without triggering a recomposition of this whole function.
-        Canvas(Modifier.fillMaxWidth().height(thumbH)) {
+        Canvas(
+            Modifier
+                .fillMaxWidth()
+                .height(thumbH)
+                .graphicsLayer {
+                    // Hit the end and the whole slider stretches out along the edge it is pulled past
+                    // (anchored at the far end), thinning a little, then snaps back with the settle spring.
+                    val lo = valueRange.start
+                    val hi = valueRange.endInclusive
+                    val spanNow = (hi - lo).coerceAtLeast(0.001f)
+                    val pastEnd = ((anim.value - hi) / spanNow).coerceAtLeast(0f)
+                    val pastStart = ((lo - anim.value) / spanNow).coerceAtLeast(0f)
+                    val pull = maxOf(pastEnd, pastStart)
+                    scaleX = 1f + pull * 4f
+                    scaleY = 1f - pull * 2f
+                    transformOrigin = androidx.compose.ui.graphics.TransformOrigin(if (pastStart > 0f) 1f else 0f, 0.5f)
+                },
+        ) {
             // Where the thumb sits along the track, as a 0..1 fraction of valueRange.
             val span = (valueRange.endInclusive - valueRange.start).coerceAtLeast(0.001f)
             val frac = (anim.value - valueRange.start) / span

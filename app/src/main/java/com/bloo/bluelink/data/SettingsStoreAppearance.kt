@@ -12,10 +12,6 @@ suspend fun SettingsStore.setPebbleOutline(value: Boolean) {
     editTracked { it[SettingsStore.Keys.PEBBLE_OUTLINE] = value.toString() }
 }
 
-suspend fun SettingsStore.setShowSearch(value: Boolean) {
-    editTracked { it[SettingsStore.Keys.SHOW_SEARCH] = value.toString() }
-}
-
 suspend fun SettingsStore.setSeamlessInstallShizuku(value: Boolean) {
     editTracked { it[SettingsStore.Keys.SEAMLESS_INSTALL_SHIZUKU] = value.toString() }
 }

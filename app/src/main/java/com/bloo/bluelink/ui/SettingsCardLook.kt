@@ -12,7 +12,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.only
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Style
-import androidx.compose.material.icons.filled.Search
 import androidx.compose.ui.semantics.onClick
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -25,7 +24,6 @@ import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import com.bloo.bluelink.data.setFontChoice
-import com.bloo.bluelink.data.setShowSearch
 import com.bloo.bluelink.data.unitSystem
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.ui.semantics.contentDescription
@@ -70,13 +68,6 @@ internal fun VisualsCardContent(appearance: SettingsStore.Appearance, advanced: 
                         BodySmallText("Auto follows Units, so you can mix them: Celsius with miles, say.")
                     }
                 }
-            }
-            SettingsGroup("Car screen") {
-                ToggleRow(
-                    "Search on the car screen",
-                    appearance.showSearch,
-                    description = "The search bubble on the car screen. Ask about the car, run a command, or jump to a setting.",
-                ) { vm.setShowSearch(it) }
             }
             // A knob you set once, so advanced only.
             PopVisible(visible = advanced) {

@@ -56,7 +56,6 @@ import com.bloo.bluelink.data.setLockTiming
 import com.bloo.bluelink.data.setPlatform
 import com.bloo.bluelink.data.setPowertrain
 import com.bloo.bluelink.data.setServiceIntervalMiles
-import com.bloo.bluelink.data.setShowSearch
 import com.bloo.bluelink.data.setThemeMode
 import com.bloo.bluelink.data.settingsMode
 
@@ -161,9 +160,6 @@ internal fun buildSettingsSearchEntries(
     add("Colour vibrancy", "color saturation vivid material you monochrome best buy tv") {
         // Deferred-commit, same as the main Appearance card's slider — see there.
         VibrancySlider(appearance, vm)
-    }
-    add("Search on the car screen", "search bubble car screen home garage ask command") {
-        ToggleRow("Search on the car screen", appearance.showSearch) { vm.setShowSearch(it) }
     }
     add("Units", "unit system metric imperial temperature distance speed miles km") {
         UnitSystemRow(appearance, vm)

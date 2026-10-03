@@ -11,6 +11,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import com.bloo.bluelink.data.migrateSchema
 import com.bloo.bluelink.data.pruneOrphanPhotos
 import com.bloo.bluelink.data.lastSyncError
 import com.bloo.bluelink.data.lastSyncMs
@@ -174,6 +175,8 @@ internal fun AppViewModel.bootstrapDriveSync() {
     // directory is cheap, but not free, and there is no reason for it to compete.
     viewModelScope.launch {
         kotlinx.coroutines.delay(PHOTO_SWEEP_DELAY_MS)
+        // Retire settings that no longer exist (see SyncSchema), then sweep unreferenced photos.
+        runCatching { settingsStore.migrateSchema() }
         runCatching { settingsStore.pruneOrphanPhotos() }
     }
 }

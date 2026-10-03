@@ -51,18 +51,22 @@ internal fun AnimatedText(
     }
 }
 
-/** A springy dip while [source] is pressed: the standard press feedback for a tappable that isn't a button. */
+/**
+ * The app's squash and stretch for anything tappable that isn't a button: pressed it flattens and widens
+ * a touch; an under-damped spring then carries it past rest (taller, narrower) before it settles. Mild,
+ * volume-ish, and the same on every surface that uses it, so the whole app moves like one material.
+ */
 @Composable
-internal fun Modifier.pressScale(source: MutableInteractionSource, pressed: Float = 0.97f): Modifier {
+internal fun Modifier.pressScale(source: MutableInteractionSource, amount: Float = 0.04f): Modifier {
     val isPressed by source.collectIsPressedAsState()
-    val scale by animateFloatAsState(
-        targetValue = if (isPressed) pressed else 1f,
-        animationSpec = spring(dampingRatio = 0.6f, stiffness = Spring.StiffnessMedium),
-        label = "pressScale",
+    val p by animateFloatAsState(
+        targetValue = if (isPressed) 1f else 0f,
+        animationSpec = spring(dampingRatio = 0.42f, stiffness = Spring.StiffnessMedium),
+        label = "squashStretch",
     )
     return this.graphicsLayer {
-        scaleX = scale
-        scaleY = scale
+        scaleX = 1f + amount * p
+        scaleY = 1f - amount * 1.3f * p
     }
 }
 

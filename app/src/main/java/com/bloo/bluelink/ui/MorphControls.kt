@@ -111,7 +111,12 @@ fun MorphIconButton(
             // On the button, not the icon: scaling the icon alone shrinks the glyph
             // inside a target that stays put, which reads as a glitch rather than a
             // press.
-            modifier = modifier.graphicsLayer { scaleX = scale; scaleY = scale }
+            modifier = modifier.graphicsLayer {
+                // The family's squash and stretch: wider and shorter pressed, taller on the rebound.
+                val dip = 1f - scale
+                scaleX = 1f + dip * 0.5f
+                scaleY = 1f - dip * 0.9f
+            }
                 .frosted(!enabled, CircleShape, blurRadius = 1.2.dp, rim = false, veil = false),
             enabled = enabled,
             interactionSource = interactionSource,

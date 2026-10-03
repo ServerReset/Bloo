@@ -76,6 +76,8 @@ object SyncMerge {
         // auto-pushed to Drive, and then roamed -- changing the car on the phone yanked the
         // tablet to the same car, and every swipe cost a sync round trip.
         "last_vehicle_vin",
+        // Which version of the settings schema this install last migrated to (see [SyncSchema]).
+        "settings_schema",
     )
 
     /** Per-VIN keys whose NAMES carry a dynamic suffix (the VIN), so they can't be
@@ -116,7 +118,9 @@ object SyncMerge {
     /** Whether [name] is device-local (exact key or dynamic per-VIN prefix) and so must
      *  never be exported, imported, merged, or folded into the content hash. */
     fun isDeviceLocal(name: String): Boolean =
-        name in DEVICE_LOCAL_KEYS || DEVICE_LOCAL_PREFIXES.any { name.startsWith(it) }
+        name in DEVICE_LOCAL_KEYS || DEVICE_LOCAL_PREFIXES.any { name.startsWith(it) } ||
+            // A retired setting never travels either: not exported, not imported, not in the hash.
+            SyncSchema.isDeprecated(name)
 
     /** A device that syncs this Drive file, as recorded in the file's `devices`
      *  registry. Purely informational (drives the phone's "your devices" list and
