@@ -36,6 +36,8 @@ import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.LaunchedEffect
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
@@ -171,6 +173,15 @@ fun MorphButton(
     val resolvedContent = if (active) activeContentColor else contentColor
     // What this button's label (if it has one) reports, for the long-press name hint.
     val hint = remember { LabelHintState() }
+    // The frost's animation state only exists for a button that has ever been inert: nearly all never are,
+    // and this runs for every button in the app.
+    var everInert by remember { mutableStateOf(!enabled) }
+    SideEffect { if (!enabled) everInert = true }
+    val frost = if (everInert || !enabled) {
+        Modifier.frosted(!enabled, RoundedCornerShape(pillCornerPercent.toInt()), blurRadius = 1.2.dp, rim = false, veil = false)
+    } else {
+        Modifier
+    }
     // Press and hold a symbol-only button and the phone builds a vibration until the name pops out:
     // ticks that come faster and then harder, so the pop is felt coming.
     if (enabled && onLongClick == null) {
@@ -210,7 +221,7 @@ fun MorphButton(
                     // leverage place to fix it.
                     .semantics { selected = active }
                     // Can't be pressed right now: iced out, the app's one disabled look (see [frosted]).
-                    .frosted(!enabled, RoundedCornerShape(pillCornerPercent.toInt()), blurRadius = 1.2.dp, rim = false, veil = false)
+                    .then(frost)
                     // Skipped while SafeExpansiveButton is already smoothly driving this
                     // button's width on press (LocalExpressiveGrowth -- see its own doc):
                     // animateContentSize exists for a genuine content change (a label

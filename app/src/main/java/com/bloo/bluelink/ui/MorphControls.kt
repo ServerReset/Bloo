@@ -35,6 +35,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -105,6 +106,13 @@ fun MorphIconButton(
         animationSpec = lowPowerAwareSpring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessMedium),
         label = "morphIconPress",
     )
+    var everInert by remember { mutableStateOf(!enabled) }
+    SideEffect { if (!enabled) everInert = true }
+    val frost = if (everInert || !enabled) {
+        Modifier.frosted(!enabled, CircleShape, blurRadius = 1.2.dp, rim = false, veil = false)
+    } else {
+        Modifier
+    }
     val body: @Composable () -> Unit = {
         IconButton(
             onClick = { haptics?.click(); onClick() },
@@ -117,7 +125,7 @@ fun MorphIconButton(
                 scaleX = 1f + dip * 0.5f
                 scaleY = 1f - dip * 0.9f
             }
-                .frosted(!enabled, CircleShape, blurRadius = 1.2.dp, rim = false, veil = false),
+                .then(frost),
             enabled = enabled,
             interactionSource = interactionSource,
             content = content,
