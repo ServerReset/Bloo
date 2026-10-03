@@ -181,7 +181,7 @@ internal fun StatusChip(
  * (which also hosts the RollingNumber hero stat and outer Surface/Row layout).
  */
 @Composable
-internal fun UpdateStatusChip(state: UiState) {
+internal fun UpdateStatusChip(state: UiState, compact: Boolean = false) {
     val updateTint by androidx.compose.animation.animateColorAsState(
         targetValue = when {
             state.updateAvailable != null -> MaterialTheme.colorScheme.tertiary
@@ -200,7 +200,8 @@ internal fun UpdateStatusChip(state: UiState) {
         tint = updateTint,
         icon = Icons.Filled.SystemUpdate,
     ) {
-        androidx.compose.animation.AnimatedContent(
+        // [compact]: just the glyph, for a header too narrow to give the title its room.
+        if (!compact) androidx.compose.animation.AnimatedContent(
             targetState = when {
                 state.updateChecking -> "Checking…"
                 state.updateAvailable != null -> "Build ${state.updateAvailable.run.runNumber} ready"

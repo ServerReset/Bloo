@@ -258,6 +258,9 @@ internal fun SettingsHeroCard(state: UiState, vm: AppViewModel, compact: Boolean
         color = MaterialTheme.colorScheme.surfaceContainerHigh,
     ) {
         Column(Modifier.padding(if (compact) 16.dp else 20.dp)) {
+            // Narrow (a split pane, a cover screen): the update chip drops its words so the title keeps its room.
+            androidx.compose.foundation.layout.BoxWithConstraints(Modifier.fillMaxWidth()) {
+            val narrow = maxWidth < 340.dp
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 IconBadge(
                     AppIcons.Settings,
@@ -272,6 +275,8 @@ internal fun SettingsHeroCard(state: UiState, vm: AppViewModel, compact: Boolean
                         "Bloo",
                         style = if (compact) MaterialTheme.typography.titleLarge else MaterialTheme.typography.headlineSmall,
                         fontWeight = FontWeight.Bold,
+                        maxLines = 1,
+                        softWrap = false,
                     )
                     Text(
                         if (carCount == 0) "No vehicles yet" else "$carCount car${if (carCount == 1) "" else "s"}",
@@ -279,12 +284,13 @@ internal fun SettingsHeroCard(state: UiState, vm: AppViewModel, compact: Boolean
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
-                UpdateStatusChip(state)
+                UpdateStatusChip(state, compact = narrow)
                 Spacer(Modifier.width(GapHairline))
                 MorphExpandButton(
                     expanded = expanded,
                     onToggle = { vm.togglePebble(SettingsPseudoVehicle, "Updates") },
                 )
+            }
             }
             Spacer(Modifier.height(if (compact) 12.dp else 16.dp))
             // The build number is the app's real version here (versionName stays
