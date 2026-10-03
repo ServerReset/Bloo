@@ -10,7 +10,6 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.only
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
@@ -93,8 +92,8 @@ internal fun rememberPhotoModel(url: String): Any =
 // with the reasoning that goes with them. 14 call sites in this file still use them.
 
 /**
- * The car photo plus the contrast scrim that makes text on top of it legible. ONE
- * definition, used by the phone hero's expanded background and by the flip cover's tile.
+ * The car photo plus the contrast scrim that makes text on top of it legible. The phone
+ * hero's expanded background uses it.
  *
  * Contrast, not decoration. Every element overlaid on the hero -- title, chevron, the whole
  * charge readout -- sits on an arbitrary car photo, and against a light car they all
@@ -110,7 +109,7 @@ internal fun rememberPhotoModel(url: String): Any =
  * remember-ed: Brush.verticalGradient allocates a stop list, and this sits inside a card
  * that recomposes on every status change.
  *
- * [aspectRatio] null means size by [height] -- the flip cover, whose tile height is given.
+ * [aspectRatio] null means size by [height]; the phone hero passes 16:9.
  */
 @Composable
 internal fun HeroPhotoBackdrop(
@@ -119,11 +118,9 @@ internal fun HeroPhotoBackdrop(
     height: Dp,
     aspectRatio: Float? = null,
     corner: Dp = PebbleCornerExpanded,
-    /** See [HeroVisual.fill] -- the flip cover fills its tile. */
-    fill: Boolean = false,
 ) {
-    Box(if (fill) Modifier.fillMaxSize() else Modifier.fillMaxWidth()) {
-        HeroVisual(v, imageUrl, height, corner, aspectRatio = aspectRatio, fill = fill)
+    Box(Modifier.fillMaxWidth()) {
+        HeroVisual(v, imageUrl, height, corner, aspectRatio = aspectRatio)
         // A photo needs a full contrast scrim. The scrim INVERTS with the theme to match the
         // now-inverted on-photo text (heroOnPhoto): LIGHT theme draws near-white text, so the
         // scrim darkens; DARK theme draws near-black text, so the scrim LIGHTENS. Both keep the
@@ -213,14 +210,9 @@ internal fun HeroVisual(
      *  the image keeps its shape at any screen width instead of being letterboxed or
      *  cropped by a fixed dp height. */
     aspectRatio: Float? = null,
-    /** Fill the parent in BOTH axes, ignoring [height] and [aspectRatio] -- the flip cover,
-     *  whose tile height is the frame, so cropping to fill it is what a full-screen glance
-     *  wants. Requires a bounded parent, which the cover tile is (its Card fills height). */
-    fill: Boolean = false,
 ) {
     com.bloo.bluelink.data.StartupTrace.once("hero-visual-${v.vin}", "HeroVisual composing for ${v.name}")
     val sizeModifier = when {
-        fill -> Modifier.fillMaxSize()
         aspectRatio != null -> Modifier.fillMaxWidth().aspectRatio(aspectRatio)
         else -> Modifier.fillMaxWidth().height(height)
     }
