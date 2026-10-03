@@ -120,10 +120,11 @@ fun MorphIconButton(
             // inside a target that stays put, which reads as a glitch rather than a
             // press.
             modifier = modifier.graphicsLayer {
-                // The family's squash and stretch: wider and shorter pressed, taller on the rebound.
+                // The family's squash and stretch, matching MorphButtonCore's own tuned-down
+                // multipliers (was 0.5 / 0.9 -- read as overly elastic for a 40dp target).
                 val dip = 1f - scale
-                scaleX = 1f + dip * 0.5f
-                scaleY = 1f - dip * 0.9f
+                scaleX = 1f + dip * 0.3f
+                scaleY = 1f - dip * 0.5f
             }
                 .then(frost),
             enabled = enabled,

@@ -224,7 +224,26 @@ object Notifications {
         ) {
             return false
         }
-        return runCatching { NotificationManagerCompat.from(context).notify(id, builder.build()) }
-            .isSuccess
+        return postBuilt(context, id, builder)
     }
+}
+
+/**
+ * The one place a BUILT notification is handed to the system.
+ *
+ * Every caller used to re-implement the same three-step guard — a runtime `POST_NOTIFICATIONS`
+ * re-read (lint's contract at the call site), a [runCatching] around `notify()` because that
+ * check is a TOCTOU race, and a boolean/nothing return so callers can record whether it went
+ * out. Three copies had already drifted (one returned `Boolean`, two returned `Unit` on the
+ * same failure); one function keeps them honest, and every new notification surface starts
+ * from this instead of another copy.
+ */
+internal fun postBuilt(context: Context, id: Int, builder: androidx.core.app.NotificationCompat.Builder): Boolean {
+    if (androidx.core.app.ActivityCompat.checkSelfPermission(
+            context, android.Manifest.permission.POST_NOTIFICATIONS,
+        ) != android.content.pm.PackageManager.PERMISSION_GRANTED
+    ) {
+        return false
+    }
+    return runCatching { NotificationManagerCompat.from(context).notify(id, builder.build()) }.isSuccess
 }

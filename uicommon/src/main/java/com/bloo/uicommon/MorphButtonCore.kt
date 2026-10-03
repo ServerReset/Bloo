@@ -292,11 +292,14 @@ private fun BoxScope.MorphChrome(
             //     (not Infinity) and draws the background correctly
             .matchParentSize()
             .graphicsLayer {
-                // Squash and stretch: pressed it flattens and widens a touch; the bouncy release spring
-                // carries it past rest (taller, narrower) before it settles.
+                // Squash and stretch: pressed it flattens a touch. The multipliers were tuned
+                // down (0.35 / 0.6, from 0.7 / 1.2) -- at the old values this pill squashed to
+                // about 76% of its height at its lowest pressScale, which read as the button
+                // melting rather than pressing. Widening is kept smaller than the height dip so
+                // the shape reads as "pressed in" rather than as a separate animation.
                 val dip = 1f - scale
-                scaleX = 1f + dip * 0.7f
-                scaleY = 1f - dip * 1.2f
+                scaleX = 1f + dip * 0.35f
+                scaleY = 1f - dip * 0.6f
             }
             .clip(shape)
             .then(

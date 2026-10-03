@@ -428,19 +428,9 @@ object LiveCharge {
             // countdown chronometer is a nicer idea and I had added one, but it is an
             // unverified change to the exact surface that is broken, so it goes until the
             // chip is confirmed back.
-            .setShowWhen(false)
-            .apply { percent?.let { setShortCriticalText("${it.coerceIn(0, 100)}%") } }
+        .setShowWhen(false)
+        .apply { percent?.let { setShortCriticalText("${it.coerceIn(0, 100)}%") } }
 
-        // Same TOCTOU reasoning as Notifications.post: permission could be
-        // revoked between the hasPermission() check above and this call.
-        // The local check is explicit so lint's MissingPermission analysis
-        // sees the grant right next to the notify and stays honest.
-        if (androidx.core.app.ActivityCompat.checkSelfPermission(
-                context, android.Manifest.permission.POST_NOTIFICATIONS,
-            ) != android.content.pm.PackageManager.PERMISSION_GRANTED
-        ) {
-            return
-        }
-        runCatching { NotificationManagerCompat.from(context).notify(id, builder.build()) }
+        postBuilt(context, id, builder)
     }
 }
