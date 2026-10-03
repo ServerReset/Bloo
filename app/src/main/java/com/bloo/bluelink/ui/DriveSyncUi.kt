@@ -192,10 +192,6 @@ private fun SyncDevicesContent(state: UiState, vm: AppViewModel) {
         )
     }
 
-    ExpressiveButtonRow(modifier = Modifier.fillMaxWidth(), spacing = GapGroup) {
-        SafeMorphTextButton(text = "Sync now", icon = AppIcons.Refresh, onClick = { vm.syncNow() })
-    }
-
     if (renaming) {
         var draft by remember { mutableStateOf(state.syncDeviceName) }
         val scheme = MaterialTheme.colorScheme
