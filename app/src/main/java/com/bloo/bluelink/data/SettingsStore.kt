@@ -25,23 +25,14 @@ import androidx.core.graphics.scale
 /**
  * App appearance preferences, kept separate from the session so sign-out keeps them.
  *
- * Mechanically, this class is a thin typed wrapper around a single Jetpack
- * DataStore<Preferences> instance ([Context.settingsDataStore]), which is itself
- * just a flat string/boolean key-value bag persisted to a file on disk. There is
- * no schema migration framework here: every getter reads the current value (or a
- * hardcoded default when the key is absent, which is what "this preference was
- * never set" always looks like) and every setter writes through [editTracked],
- * a wrapper around DataStore's `edit {}` that also records which keys changed so
- * Google Drive sync (see [performMainToMainSync]) can tell which values are "dirty"
- * (changed locally but not yet uploaded).
+ * A thin typed wrapper over one Jetpack DataStore<Preferences> ([Context.settingsDataStore]), a flat
+ * key-value bag. Getters read the current value or a hardcoded default when the key was never set;
+ * setters write through [editTracked], which also records which keys changed so Drive sync (see
+ * [performMainToMainSync]) knows which values are "dirty" (changed locally, not yet uploaded).
  *
- * Because DataStore only stores primitives, anything structured (climate presets,
- * custom palettes, the full settings backup itself) is
- * JSON-encoded with kotlinx.serialization into a single string value under one
- * key, then decoded back out on read. Anything keyed per-car interpolates the
- * vehicle's VIN directly into the preference key name (e.g. "plate_$vin",
- * "climate_$vin") rather than using a nested/structured key space, since
- * Preferences DataStore only supports a flat namespace.
+ * Only primitives are stored, so anything structured (climate presets, custom palettes, the full
+ * backup) is JSON-encoded into one string under one key. Per-car keys interpolate the VIN into the
+ * key name ("plate_$vin"), since the namespace is flat.
  */
 class SettingsStore(internal val context: Context) {
 
@@ -169,14 +160,9 @@ class SettingsStore(internal val context: Context) {
          *  or an enhanced-frosted fallback below that. */
     )
 
-    // A reactive view of every appearance-related preference at once: each time
-    // the underlying DataStore file changes (from any editTracked() call, on
-    // this device or, via Drive sync, effectively from another), the Flow
-    // re-emits a freshly-decoded Appearance snapshot. Every field below applies
-    // the same pattern: read the raw string/boolean for its key, and if it's
-    // absent (never set) or fails to parse (enum renamed, corrupt value) fall
-    // back to a hardcoded default rather than throwing — this flow is collected
-    // eagerly near app launch, so a decode failure here must never crash startup.
+    // A reactive view of every appearance preference: re-emits a freshly decoded Appearance snapshot
+    // on any DataStore change (here, or via Drive sync). Each field falls back to its default when the
+    // key is absent or fails to parse, because this flow is collected at launch and must never crash.
     val appearance: Flow<Appearance> = context.settingsDataStore.data.map { prefs ->
         Appearance(
             // "AMOLED"/"SYSTEM_AMOLED" are legacy values remapped to the nearest modern mode, so
@@ -234,15 +220,9 @@ class SettingsStore(internal val context: Context) {
         // first frame was trying to draw.
         .flowOn(Dispatchers.Default)
 
-    // Simple appearance setters below: each just writes one Keys.* string value
-    // through editTracked() (which persists it to DataStore and marks the key
-    // dirty for the next Drive sync upload). Booleans are stored as their
-    // String.toString() ("true"/"false") rather than a native boolean pref
-    // because Preferences DataStore keys are typed per-instance (a
-    // booleanPreferencesKey and stringPreferencesKey with the same name are
-    // different keys) and this file mixes both conventions depending on when
-    // the field was added; the corresponding read side above always parses
-    // with toBooleanStrictOrNull() and falls back to the field's default.
+    // Simple appearance setters: each writes one Keys.* string through editTracked() (persist + mark
+    // dirty for Drive sync). Booleans are stored as "true"/"false" strings (typed keys of different
+    // kinds with one name are different keys); the read side parses with toBooleanStrictOrNull().
 
     // --- Notifications --------------------------------------------------
 

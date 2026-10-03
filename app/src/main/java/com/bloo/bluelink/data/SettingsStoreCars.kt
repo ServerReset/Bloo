@@ -142,15 +142,9 @@ suspend fun SettingsStore.setImageUrl(vin: String, url: String) {
  * Reads the per-seat heat/cool capability flags for [vin], each stored under
  * its own short-suffixed key (e.g. "seat_dh_$vin" for driver-heat).
  *
- * Migration mechanism: earlier app versions only tracked one flag per axle
- * (front heat/cool, rear heat/cool) rather than per-individual-seat. Each new
- * per-seat key is looked up first; if it's absent (the user's data predates
- * the per-seat split, or this specific seat was never touched since), the
- * matching old grouped flag is used as the fallback, and if THAT is also
- * absent a hardcoded default applies. This means an existing user's old
- * front-heat=true setting transparently becomes both driver-heat=true and
- * passenger-heat=true the first time this is read, without any explicit
- * one-time migration step or version bump.
+ * Migration: older versions tracked one flag per axle (front/rear heat/cool). Each per-seat key is read
+ * first; if absent, the old grouped flag is the fallback, then a hardcoded default, so an old
+ * front-heat=true becomes driver and passenger heat on first read with no explicit migration.
  */
 suspend fun SettingsStore.seatConfig(vin: String): SeatConfig =
 
