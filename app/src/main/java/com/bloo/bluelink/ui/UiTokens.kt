@@ -199,7 +199,6 @@ internal val SettingsCardGap: Dp @Composable get() = SpaceUnit * 2.5f
 internal val TinyShape = RoundedCornerShape(8.dp)    // Inline tap targets, swatches
 internal val SmallShape = RoundedCornerShape(12.dp)   // Smaller components, chips
 internal val StandardShape = RoundedCornerShape(16.dp) // Buttons, most cards
-internal val LargeShape = RoundedCornerShape(20.dp)   // Large cards, sheets
 internal val ExtraLargeShape = RoundedCornerShape(28.dp) // Modal dialogs
 
 // ---- Icons ----------------------------------------------------------------------
@@ -222,17 +221,13 @@ object AppIcons {
   val Bolt = Icons.Filled.Bolt
   val Close = Icons.Filled.Close
   val ArrowForward = Icons.AutoMirrored.Filled.ArrowForward
-  val Build = Icons.Filled.Build
   val Search = Icons.Filled.Search
-  val Refresh = Icons.Filled.Refresh
   val Check = Icons.Filled.Check
   val CheckCircle = Icons.Filled.CheckCircle
-  val LockOpen = Icons.Filled.LockOpen
   val Info = Icons.Filled.Info
   val DirectionsCar = Icons.Filled.DirectionsCar
   val AutoAwesome = Icons.Filled.AutoAwesome
   val Warning = Icons.Filled.Warning
-  val Thermostat = Icons.Filled.Thermostat
 }
 
 // ---- Blur -----------------------------------------------------------------------
