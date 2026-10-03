@@ -57,7 +57,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.isSpecified
 import kotlinx.coroutines.launch
 import kotlin.math.abs
 
@@ -330,24 +329,33 @@ fun MorphSegmented(
                     },
                 contentAlignment = Alignment.Center,
             ) {
-                Row(horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
+                // The label eases between its chosen and squashed size instead of snapping a font size.
+                val emphasis by animateFloatAsState(
+                    if (isSelected) 1f else 0f,
+                    spring(dampingRatio = 0.7f, stiffness = Spring.StiffnessMediumLow),
+                    label = "segEmphasis",
+                )
+                Row(
+                    Modifier.graphicsLayer {
+                        val k = 0.88f + 0.12f * emphasis
+                        scaleX = k
+                        scaleY = k
+                    },
+                    horizontalArrangement = Arrangement.Center,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
                     opt.icon?.let { icon ->
                         Image(
                             painter = rememberVectorPainter(icon),
                             contentDescription = null,
                             colorFilter = ColorFilter.tint(fg),
-                            modifier = Modifier.size(if (isSelected) 16.dp else 14.dp),
+                            modifier = Modifier.size(16.dp),
                         )
-                        Spacer(Modifier.width(if (isSelected) 6.dp else 4.dp))
+                        Spacer(Modifier.width(6.dp))
                     }
                     BasicText(
                         opt.label,
-                        style = if (isSelected) {
-                            textStyle.copy(color = fg, fontWeight = FontWeight.SemiBold)
-                        } else {
-                            val unselected = textStyle.copy(color = fg, fontWeight = FontWeight.Normal)
-                            if (textStyle.fontSize.isSpecified) unselected.copy(fontSize = textStyle.fontSize * 0.88f) else unselected
-                        },
+                        style = textStyle.copy(color = fg, fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal),
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
