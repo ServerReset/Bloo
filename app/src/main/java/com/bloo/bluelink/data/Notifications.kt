@@ -9,9 +9,9 @@ import android.content.pm.PackageManager
 import android.os.Build
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
-import androidx.core.content.ContextCompat
 import androidx.core.net.toUri
 import com.bloo.bluelink.R
+import com.bloo.bluelink.ui.hasPermission
 
 /** Posts Bloo's local alerts (service due, door left open, car left running). */
 object Notifications {
@@ -104,9 +104,9 @@ object Notifications {
      * narrower question than the one being asked.
      */
     fun hasPermission(context: Context, channelId: String = CHANNEL): Boolean {
-        val runtimeGranted = Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU ||
-            ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) ==
-            PackageManager.PERMISSION_GRANTED
+        val runtimeGranted = context.hasPermission(
+            Manifest.permission.POST_NOTIFICATIONS, Build.VERSION_CODES.TIRAMISU,
+        )
         if (!runtimeGranted) return false
         val mgr = NotificationManagerCompat.from(context)
         if (!mgr.areNotificationsEnabled()) return false

@@ -2,8 +2,6 @@ package com.bloo.bluelink.autolock
 
 import android.Manifest
 import android.content.Context
-import android.content.pm.PackageManager
-import androidx.core.content.ContextCompat
 import com.google.android.gms.location.LocationCallback
 import com.google.android.gms.location.LocationRequest
 import com.google.android.gms.location.LocationResult
@@ -14,6 +12,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlin.coroutines.resume
+import com.bloo.bluelink.ui.hasPermission
 
 /** A single best-effort current-location read (the phone's own last-known position), and
  *  a continuous stream of the same for surfaces that want it live. Originally added for
@@ -25,8 +24,7 @@ import kotlin.coroutines.resume
  *  the platform `LocationManager` instead. */
 object LocationHelper {
     private fun hasPermission(context: Context): Boolean =
-        ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) ==
-            PackageManager.PERMISSION_GRANTED
+        context.hasPermission(Manifest.permission.ACCESS_FINE_LOCATION)
 
     suspend fun currentLocation(context: Context): android.location.Location? {
         if (!hasPermission(context)) return null

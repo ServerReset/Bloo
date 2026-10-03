@@ -69,11 +69,11 @@ internal fun AnimatedText(
  * release rebound was visibly taller and narrower than the rest, which read as wobble.
  */
 @Composable
-internal fun Modifier.pressScale(source: MutableInteractionSource, amount: Float = 0.03f): Modifier {
+internal fun Modifier.pressScale(source: MutableInteractionSource, amount: Float = 0.02f): Modifier {
     val isPressed by source.collectIsPressedAsState()
     val p by animateFloatAsState(
         targetValue = if (isPressed) 1f else 0f,
-        animationSpec = spring(dampingRatio = 0.42f, stiffness = Spring.StiffnessMedium),
+        animationSpec = spring(dampingRatio = 0.6f, stiffness = Spring.StiffnessMedium),
         label = "squashStretch",
     )
     return this.graphicsLayer {

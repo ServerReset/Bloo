@@ -32,7 +32,8 @@ import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import dev.chrisbanes.haze.HazeState
@@ -94,7 +95,7 @@ private fun DialogEntryView(host: DialogHost, entry: DialogEntry, isTop: Boolean
     BackHandler(enabled = isTop && !entry.leaving) { entry.onDismiss() }
 
     val scheme = MaterialTheme.colorScheme
-    val screenHeightPx = with(LocalDensity.current) { LocalConfiguration.current.screenHeightDp.dp.toPx() }
+    val screenHeightPx = with(LocalDensity.current) { LocalWindowInfo.current.containerSize.height.toDp().toPx() }
     Box(
         Modifier
             .fillMaxSize()

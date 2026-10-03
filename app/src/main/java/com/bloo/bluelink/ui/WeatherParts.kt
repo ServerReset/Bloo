@@ -144,6 +144,21 @@ internal fun Context.tryStart(intent: Intent): Boolean = runCatching {
 }.isSuccess
 
 /**
+ * The one permission check.
+ *
+ * Five objects kept a `fun hasPermission(context)` that differed only in the permission
+ * string and the OS level where the check stops being needed — and each had to be re-read
+ * (or, more often, forgotten) by every new caller. One extension answers it: [minSdk]
+ * encodes "below this OS level the permission is unconditionally granted", so a caller
+ * states the OS-version knowledge it already has rather than re-deriving it.
+ */
+@Suppress("ObsoleteSdkInt") // minSdk is a caller-supplied OS level, not a literal
+internal fun Context.hasPermission(permission: String, minSdk: Int = 1): Boolean =
+    android.os.Build.VERSION.SDK_INT < minSdk ||
+        androidx.core.content.ContextCompat.checkSelfPermission(this, permission) ==
+            android.content.pm.PackageManager.PERMISSION_GRANTED
+
+/**
  * Opens the car's location in the device's default Maps app -- a `geo:` intent
  * rather than hardcoding Google Maps, since the OS resolves it to whatever the user
  * actually has set. Shared by [LocationPebble]'s own "Open in maps" button and

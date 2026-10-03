@@ -298,8 +298,8 @@ private fun BoxScope.MorphChrome(
                 // melting rather than pressing. Widening is kept smaller than the height dip so
                 // the shape reads as "pressed in" rather than as a separate animation.
                 val dip = 1f - scale
-                scaleX = 1f + dip * 0.35f
-                scaleY = 1f - dip * 0.6f
+                scaleX = 1f + dip * 0.2f
+                scaleY = 1f - dip * 0.35f
             }
             .clip(shape)
             .then(
