@@ -30,7 +30,6 @@ dependencyResolutionManagement {
             url = uri("https://jitpack.io")
             content {
                 includeGroupByRegex("com\\.github\\.MuntashirAkon.*")
-                includeGroupByRegex("com\\.github\\.QWEA0.*")
             }
         }
     }

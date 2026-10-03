@@ -67,14 +67,13 @@ internal fun GlassSurface(
      *  another already-elevated card instead of genuinely floating over the
      *  screen. */
     shadow: Boolean = true,
-    /** Real liquid glass (see [LiquidGlassLayer]) instead of the flat blur. Floating elements want
+    /** Real liquid glass (see [appGlassEffect]: refraction, dispersion, a specular rim) instead of the flat blur. Floating elements want
      *  it; a large card or a panel nested in one wants the flat blur, so it follows [shadow] by
      *  default (nested = no shadow) and a card that floats on its own passes false. */
     liquid: Boolean = shadow,
     content: @Composable () -> Unit = {},
 ) {
     val canBlur = hazeState != null && canBlurBackdrops()
-    val liquid = liquid && rememberLiquidGlassSupported()
     val interaction = interactionSource ?: remember { MutableInteractionSource() }
     Box(
         modifier = modifier
@@ -104,13 +103,17 @@ internal fun GlassSurface(
             Modifier
                 .matchParentSize()
                 .clip(shape)
-                // Liquid glass where the device can run it (it blurs and refracts the window behind
-                // it itself); the plain Haze blur everywhere else.
-                .then(if (liquid) Modifier else Modifier.hazeWhenAble(hazeState))
+                // Floating glass refracts what is behind it; a nested panel or card keeps the flat blur.
+                .then(
+                    when {
+                        !canBlur -> Modifier
+                        liquid && hazeState != null -> Modifier.appGlassEffect(hazeState, shape)
+                        else -> Modifier.hazeWhenAble(hazeState)
+                    },
+                )
                 .background(tint)
                 .glassSheen(),
         )
-        if (liquid) LiquidGlassLayer(shape, Modifier.matchParentSize())
         CompositionLocalProvider(LocalContentColor provides contentColor) {
             content()
         }

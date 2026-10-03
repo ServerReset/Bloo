@@ -193,10 +193,6 @@ internal fun SearchPill(
         // caller-supplied modifier, too late to bound a blur added inside it).
         val pillShape = RoundedCornerShape(50)
         val canBlur = hazeState != null && canBlurBackdrops()
-        // Liquid glass behind the pill where the device can run it (it blurs and refracts the window
-        // itself, so the Haze blur below steps aside); the plain blur everywhere else.
-        val liquid = rememberLiquidGlassSupported()
-        if (liquid) LiquidGlassLayer(pillShape, Modifier.matchParentSize())
         Surface(
             onClick = { if (!expanded) onFocusChange(true) },
             shape = pillShape,
@@ -259,7 +255,7 @@ internal fun SearchPill(
                 // passes in), so a blur added here without its own clip would
                 // render as a soft-edged rectangle poking past the pill's actual
                 // rounded/stadium outline instead of stopping at it.
-                .then(if (canBlur && !liquid) Modifier.clip(pillShape).hazeWhenAble(hazeState) else Modifier)
+                .then(if (canBlur && hazeState != null) Modifier.clip(pillShape).appGlassEffect(hazeState, pillShape) else Modifier)
                 .then(
                     if (onDrag != null) {
                         Modifier.pointerInput(Unit) {

@@ -220,9 +220,9 @@ dependencies {
     implementation("dev.chrisbanes.haze:haze:2.0.0")
     // The built-in Blur effect (HazeBlurStyle/hazeBlur), split out of the core artifact in 2.0.
     implementation("dev.chrisbanes.haze:haze-blur:2.0.0")
-    // Liquid glass (SDF refraction, dispersion, sensor-driven specular) for floating elements. A View
-    // widget with native code for arm only, so GlassSurface guards its use (see LiquidGlass.kt).
-    implementation("com.github.QWEA0:liquidglass:v2.0.11")
+    // Glass: refraction, chromatic dispersion and a specular rim on top of the blur (AGSL on API 33+,
+    // Haze's own simplified renderer below). Used for floating elements.
+    implementation("dev.chrisbanes.haze:haze-glass:2.0.0")
 
 
 
