@@ -119,11 +119,16 @@ object TileCommandRunner {
         // live inside the lock too, so the toggle direction and the flip are
         // atomic with the network dispatch.
         return BlueLinkGate.statusMutex.withLock {
+            // Snapshot read + repo construction both funnel through carContext, so a
+            // background command surface starts from the shared helper rather than a
+            // second copy of the resolve dance. The read stays inside the lock -- see
+            // this function's own step-2 note on toggle atomicity.
             val snap = SnapshotStore(ctx).current().vehicles.firstOrNull { it.vin == vin }
                 ?: return@withLock Result(false, "Car not found")
-            val v = snap.toVehicle()
-            val brand = Brand.fromIndicator(v.brandIndicator)
-            val repo = repositoryFor(brand, SessionStore(ctx), CredentialStore(ctx))
+            val car = carContext(ctx, snap)
+            val v = car.vehicle
+            val brand = car.brand
+            val repo = car.repository()
             runCatching {
                 when (cmd) {
                     "doors" ->

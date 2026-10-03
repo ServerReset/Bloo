@@ -13,6 +13,7 @@ import com.bloo.bluelink.data.Vehicle
 import com.bloo.bluelink.data.VehicleStatus
 import com.bloo.bluelink.data.CarAction
 import com.bloo.bluelink.data.CarCommand
+import com.bloo.bluelink.data.carContext
 import com.bloo.bluelink.data.repositoryFor
 import com.bloo.bluelink.data.runCarCommand
 import kotlinx.coroutines.CancellationException
@@ -230,8 +231,8 @@ object AutoLockController {
     }
 
     private suspend fun statusFor(context: Context, v: Vehicle): VehicleStatus? {
-        val repo = repositoryFor(Brand.fromIndicator(v.brandIndicator), SessionStore(context), CredentialStore(context))
-        return withTimeoutOrNull(30_000) { BlueLinkGate.statusMutex.withLock { repo.status(v, refresh = false) } }
+        val car = carContext(context, SnapshotStore(context).current().vehicles.firstOrNull { it.vin == v.vin } ?: return null)
+        return withTimeoutOrNull(30_000) { BlueLinkGate.statusMutex.withLock { car.repository().status(car.vehicle, refresh = false) } }
     }
 
     private suspend fun performLock(context: Context, vin: String, carName: String, settings: AutoLockConfig) {
