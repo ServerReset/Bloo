@@ -177,10 +177,11 @@ internal fun HeroMorphReadout(
             limitPct = data.limitPct,
             stuckAtLimit = data.stuckAtLimit,
             charging = data.charging,
-            // This readout's bar always sits over the hero's photo + dark
-            // scrim when the card is open -- the fixed-white "won't charge
-            // past here" zone reads against it, regardless of theme.
-            darkBackdrop = true,
+            // This readout's bar sits over the hero's photo + scrim when the card is
+            // open. The scrim (and the on-photo text) now INVERT with the theme, so the
+            // backdrop is dark in light mode and light in dark mode -- the "won't charge
+            // past here" zone has to follow, or it paints the wrong tone in one of them.
+            darkBackdrop = !appIsDarkTheme(),
         )
     }
 }

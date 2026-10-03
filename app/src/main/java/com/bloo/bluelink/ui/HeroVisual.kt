@@ -124,11 +124,24 @@ internal fun HeroPhotoBackdrop(
 ) {
     Box(if (fill) Modifier.fillMaxSize() else Modifier.fillMaxWidth()) {
         HeroVisual(v, imageUrl, height, corner, aspectRatio = aspectRatio, fill = fill)
-        // A photo needs the full contrast scrim. With no photo in light mode the fallback is already a
-        // colour wash and the heavy scrim only darkened its edges, so it gets a gentle one.
-        val gentle = imageUrl.isNullOrBlank() && !appIsDarkTheme()
-        val scrim = remember(gentle) {
-            if (gentle) {
+        // A photo needs a full contrast scrim. The scrim INVERTS with the theme to match the
+        // now-inverted on-photo text (heroOnPhoto): LIGHT theme draws near-white text, so the
+        // scrim darkens; DARK theme draws near-black text, so the scrim LIGHTENS. Both keep the
+        // text legible against an arbitrary car photo, which is the whole job of this layer.
+        // With no photo in light mode the fallback is already a colour wash and the heavy scrim
+        // only darkened its edges, so it gets a gentle one.
+        val dark = appIsDarkTheme()
+        val gentle = imageUrl.isNullOrBlank() && !dark
+        val scrim = remember(gentle, dark) {
+            if (dark) {
+                // Dark theme: lighten behind the dark text.
+                Brush.verticalGradient(
+                    0f to Color.White.copy(alpha = 0.55f),
+                    0.30f to Color.White.copy(alpha = 0.22f),
+                    0.62f to Color.White.copy(alpha = 0.28f),
+                    1f to Color.White.copy(alpha = 0.62f),
+                )
+            } else if (gentle) {
                 Brush.verticalGradient(
                     0f to Color.Black.copy(alpha = 0.14f),
                     0.30f to Color.Black.copy(alpha = 0.04f),

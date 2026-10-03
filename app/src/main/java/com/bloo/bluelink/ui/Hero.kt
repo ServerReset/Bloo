@@ -227,7 +227,7 @@ internal fun HeroHeader(
     // t, so the name has to travel from the surface's own colour to the light one
     // the scrim is built for. Snapping at a threshold would flash a white name
     // onto a still-white card for the frames before the photo arrives.
-    val heroTitleColorNow = lerp(MaterialTheme.colorScheme.onSurface, HeroOnPhoto, heroT)
+    val heroTitleColorNow = lerp(MaterialTheme.colorScheme.onSurface, heroOnPhoto(), heroT)
     PebbleShell(
         expanded = photoExpanded,
         onToggle = { vm.togglePebble(v, com.bloo.bluelink.data.HERO_PHOTO_SECTION) },

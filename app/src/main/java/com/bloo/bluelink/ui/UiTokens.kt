@@ -96,15 +96,22 @@ internal const val MutedContentAlpha = 0.7f
 /**
  * Text and icons drawn ON the hero's car photo.
  *
- * Fixed rather than theme-derived, because what sits behind it is a photograph and
- * a dark scrim, not a themed surface -- so it is the same in light and dark, and the
- * colour scheme's own `onSurface` is the wrong answer in both. It was what the
- * expanded hero used, which rendered the car's name in near-black on a dark photo.
+ * INVERTED against the theme on purpose. A car photo is a contrasty, unpredictable
+ * backdrop, so the reliable pairing is the opposite of the surface's own: the app's
+ * LIGHT theme draws near-black body text on pale surfaces, which over a photo would
+ * vanish, so the hero uses near-white there; the app's DARK theme draws near-white
+ * text, which over a photo would glare, so the hero uses near-black there. Before this
+ * it was a single fixed near-white, which read fine on a dark photo but was the wrong
+ * answer half the time -- reported directly as wanting it inverted.
  *
- * Slightly off pure white: at full white the name reads as harsher than the photo
- * behind it, and every other light-on-dark surface in the app lands here too.
+ * Resolved through [appIsDarkTheme] (the app's own Light/Dark override), NOT
+ * `isSystemInDarkTheme()` -- see that function's own doc for the five bugs that
+ * distinction already fixed. Off pure white/near-black for the same reason every other
+ * on-photo surface in the app is: full white reads harsher than the photo behind it.
  */
-internal val HeroOnPhoto = Color(0xFFF2F2F5)
+@Composable
+internal fun heroOnPhoto(): Color =
+    if (appIsDarkTheme()) Color(0xFF1A1B20) else Color(0xFFF2F2F5)
 
 // ---- Sizing -------------------------------------------------------------------
 
