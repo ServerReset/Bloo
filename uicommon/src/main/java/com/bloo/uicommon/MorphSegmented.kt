@@ -63,6 +63,15 @@ import kotlin.math.abs
 /** One option in a [MorphSegmented] control. [icon] is optional. */
 data class SegmentOption(val key: String, val label: String, val icon: ImageVector? = null)
 
+/**
+ * Each segment's share of the track at highlight position [pos] (fractional while travelling): 1, plus
+ * up to ([ratio] - 1) where the highlight sits, fading linearly to the neighbour as it moves, scaled
+ * by [shown] (0 = nothing selected, all equal). The weights always hand off continuously.
+ */
+fun segmentWeights(n: Int, pos: Float, shown: Float, ratio: Float): FloatArray = FloatArray(n) { i ->
+    1f + (ratio - 1f) * shown * (1f - abs(pos - i)).coerceAtLeast(0f)
+}
+
 /** How much wider the chosen segment is than each of the others, by option count. */
 private fun stretchRatio(n: Int): Float = when {
     n <= 2 -> 2.2f
@@ -140,10 +149,7 @@ fun MorphSegmented(
             shown.animateTo(0f, spring(stiffness = Spring.StiffnessMedium))
         }
     }
-    /** Each segment's share of the width at the current position: 1, plus a stretch where the highlight is. */
-    fun weightsNow(): FloatArray = FloatArray(n) { i ->
-        1f + (ratio - 1f) * shown.value * (1f - abs(pos.value - i)).coerceAtLeast(0f)
-    }
+    fun weightsNow(): FloatArray = segmentWeights(n, pos.value, shown.value, ratio)
 
     val gap = 4.dp
     Box(
