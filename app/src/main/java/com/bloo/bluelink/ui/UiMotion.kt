@@ -1,4 +1,3 @@
-@file:OptIn(ExperimentalMaterial3ExpressiveApi::class)
 
 package com.bloo.bluelink.ui
 
@@ -26,7 +25,6 @@ import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 // No `motionScheme` import: it is a member of the MaterialTheme object (verified as
 // MaterialTheme.getMotionScheme in the resolved material3 AAR), as are defaultEffectsSpec
 // and defaultSpatialSpec on MotionScheme. Screens.kt imports none of them either.

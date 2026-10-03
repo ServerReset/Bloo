@@ -1,10 +1,3 @@
-@file:OptIn(
-    ExperimentalMaterial3Api::class,
-    ExperimentalMaterial3ExpressiveApi::class,
-    ExperimentalFoundationApi::class,
-    ExperimentalLayoutApi::class,
-)
-
 package com.bloo.bluelink.ui
 
 import androidx.compose.foundation.layout.Arrangement
@@ -19,10 +12,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import com.bloo.bluelink.data.SettingsStore
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
-import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import com.bloo.bluelink.data.setFontChoice
 import com.bloo.bluelink.data.unitSystem
 import androidx.compose.foundation.layout.FlowRow

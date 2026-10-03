@@ -103,6 +103,16 @@ androidComponents {
 kotlin {
     compilerOptions {
         jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
+        // The four opt-ins every UI file used to restate in its own
+        // @file:OptIn(...) header -- roughly ninety copies of the same block.
+        // Opting in at the module level moves the declaration to one place; a
+        // file that needs something rarer (Haze, Coil) still states that itself.
+        freeCompilerArgs.addAll(
+            "-opt-in=androidx.compose.material3.ExperimentalMaterial3Api",
+            "-opt-in=androidx.compose.material3.ExperimentalMaterial3ExpressiveApi",
+            "-opt-in=androidx.compose.foundation.ExperimentalFoundationApi",
+            "-opt-in=androidx.compose.foundation.layout.ExperimentalLayoutApi",
+        )
     }
 }
 

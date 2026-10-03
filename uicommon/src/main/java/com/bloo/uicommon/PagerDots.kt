@@ -1,8 +1,3 @@
-@file:OptIn(
-    ExperimentalFoundationApi::class,
-    ExperimentalLayoutApi::class,
-)
-
 package com.bloo.uicommon
 
 /**
@@ -53,8 +48,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import com.bloo.uicommon.dropShadow
 import kotlinx.coroutines.delay
-import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.runtime.Immutable
 import androidx.compose.ui.graphics.StrokeCap
 

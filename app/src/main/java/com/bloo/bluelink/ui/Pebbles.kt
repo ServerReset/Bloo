@@ -1,10 +1,3 @@
-@file:OptIn(
-    ExperimentalMaterial3Api::class,
-    ExperimentalMaterial3ExpressiveApi::class,
-    ExperimentalFoundationApi::class,
-    ExperimentalLayoutApi::class,
-)
-
 package com.bloo.bluelink.ui
 
 import androidx.compose.foundation.layout.Box
@@ -35,10 +28,6 @@ import com.bloo.uicommon.ReorderColumn
 import com.bloo.uicommon.animatePlacement
 import androidx.compose.runtime.mutableStateSetOf
 import androidx.compose.runtime.derivedStateOf
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
-import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
 
 /** A friendly label for a pebble/section id. */
 internal fun sectionLabel(section: String): String = when (section) {

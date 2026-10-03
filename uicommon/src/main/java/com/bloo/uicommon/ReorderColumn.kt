@@ -1,8 +1,3 @@
-@file:OptIn(
-    ExperimentalFoundationApi::class,
-    ExperimentalLayoutApi::class,
-)
-
 package com.bloo.uicommon
 
 /**
@@ -54,8 +49,6 @@ import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
-import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.ui.composed
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.unit.IntOffset

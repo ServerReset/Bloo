@@ -1,10 +1,3 @@
-@file:OptIn(
-    ExperimentalMaterial3Api::class,
-    ExperimentalMaterial3ExpressiveApi::class,
-    ExperimentalFoundationApi::class,
-    ExperimentalLayoutApi::class,
-)
-
 package com.bloo.bluelink.ui
 
 import android.os.Build
@@ -58,10 +51,6 @@ import com.bloo.bluelink.data.Vehicle
 import com.bloo.bluelink.data.platformOverridable
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
-import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
 
 internal enum class OnboardingStepKind {
     WELCOME, RESTORE, SETUP, LOOK, ALERTS, WATCH,

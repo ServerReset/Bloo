@@ -1,10 +1,3 @@
-@file:OptIn(
-    ExperimentalMaterial3Api::class,
-    ExperimentalMaterial3ExpressiveApi::class,
-    ExperimentalFoundationApi::class,
-    ExperimentalLayoutApi::class,
-)
-
 package com.bloo.bluelink.ui
 
 import androidx.compose.animation.core.animateFloatAsState
@@ -51,10 +44,6 @@ import com.bloo.bluelink.data.Vehicle
 import kotlin.math.abs
 import com.bloo.uicommon.ReorderColumn
 import androidx.compose.runtime.derivedStateOf
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
-import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
 
 /**
  * The dual-column "hot spot": slots under the car-info column for pinned pebbles.
