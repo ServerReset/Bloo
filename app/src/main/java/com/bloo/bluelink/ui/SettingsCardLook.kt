@@ -175,6 +175,7 @@ internal fun ThemeCardContent(appearance: SettingsStore.Appearance, advanced: Bo
                     }
                     SettingsGroup("Style") {
                         ToggleRow("Pebble outline", appearance.pebbleOutline) { vm.setPebbleOutline(it) }
+                        GlassClaritySlider(appearance, vm)
                     }
                 }
             }

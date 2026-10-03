@@ -23,6 +23,7 @@ import com.bloo.bluelink.data.setUiScale
 import com.bloo.bluelink.data.setUnitSystem
 import com.bloo.bluelink.data.setTempUnit
 import com.bloo.bluelink.data.setDistanceUnit
+import com.bloo.bluelink.data.setGlassClarity
 import com.bloo.bluelink.data.setVibrancy
 
 // --- Appearance / UI preference setters (extracted from AppViewModel) ------
@@ -55,6 +56,8 @@ fun AppViewModel.setColumnsFlipped(flipped: Boolean) = viewModelScope.launch { s
 // that beat can't drop the change.
 fun AppViewModel.setUiScaleSoon(value: Float) =
     viewModelScope.launch { settingsStore.setUiScale(value) }
+fun AppViewModel.setGlassClaritySoon(value: Float) =
+    viewModelScope.launch { settingsStore.setGlassClarity(value) }
 fun AppViewModel.setVibrancySoon(value: Float) =
     viewModelScope.launch { settingsStore.setVibrancy(value) }
 fun AppViewModel.setHapticsEnabled(value: Boolean) = viewModelScope.launch { settingsStore.setHapticsEnabled(value) }

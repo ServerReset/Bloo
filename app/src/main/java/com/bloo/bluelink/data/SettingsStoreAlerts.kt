@@ -188,6 +188,10 @@ suspend fun SettingsStore.setUiScale(value: Float) {
     editTracked { it[SettingsStore.Keys.UI_SCALE] = value.toString() }
 }
 
+suspend fun SettingsStore.setGlassClarity(value: Float) {
+    editTracked { it[SettingsStore.Keys.GLASS_CLARITY] = value.coerceIn(0f, 1f).toString() }
+}
+
 suspend fun SettingsStore.setVibrancy(value: Float) {
     editTracked { it[SettingsStore.Keys.VIBRANCY] = value.toString() }
 }
