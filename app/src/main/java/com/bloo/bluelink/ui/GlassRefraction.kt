@@ -29,7 +29,7 @@ import dev.chrisbanes.haze.glass.hazeGlass
  */
 @OptIn(ExperimentalHazeApi::class)
 @Composable
-internal fun Modifier.appGlassEffect(state: HazeState, shape: Shape): Modifier {
+internal fun Modifier.appGlassEffect(state: HazeState, shape: Shape, fadeOut: Boolean = false): Modifier {
     if (shape !is RoundedCornerShape) return this.appHazeEffect(state)
     // A theme-matched backing behind the refracted backdrop, so a floating element is never a black
     // hole where the backdrop has nothing to show (light mode especially).
@@ -38,12 +38,12 @@ internal fun Modifier.appGlassEffect(state: HazeState, shape: Shape): Modifier {
     val clarity = LocalAppearance.current.glassClarity
     val backing = MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 0.92f - 0.88f * clarity)
     val blur = (18f - 16.5f * clarity).dp
-    val style = remember(shape, backing, blur) { glassStyle(shape, backing, blur) }
+    val style = remember(shape, backing, blur, fadeOut) { glassStyle(shape, backing, blur, fadeOut) }
     return this.hazeGlass(input = HazeInput.Sources(state), style = style)
 }
 
 @OptIn(ExperimentalHazeApi::class)
-private fun glassStyle(shape: RoundedCornerShape, backing: Color, blur: androidx.compose.ui.unit.Dp): GlassStyle = GlassStyle.clear.then {
+private fun glassStyle(shape: RoundedCornerShape, backing: Color, blur: androidx.compose.ui.unit.Dp, fadeOut: Boolean): GlassStyle = GlassStyle.clear.then {
     // Liquid glass: nearly clear in the middle (a whisper of blur, no milky white lift), with the
     // bending concentrated in a bezel at the edge and a specular glint riding it. Starts from Haze's
     // "clear" material, which keeps the backdrop legible, rather than the frosted "regular" one.
@@ -58,6 +58,8 @@ private fun glassStyle(shape: RoundedCornerShape, backing: Color, blur: androidx
             blurRadius = OpticalSizeValue.Fixed(blur),
             refractionDetailIntensity = 0.7f,
             refractionProfile = RefractionProfile.Edge(18.dp),
+            // The status-bar scrim: full strength at the top, thinning to nothing at its bottom edge.
+            progressive = if (fadeOut) dev.chrisbanes.haze.HazeProgressive.verticalGradient(startIntensity = 1f, endIntensity = 0f) else null,
         ),
     )
     // A visible colour fringe along the edge, where the glass bends the light.

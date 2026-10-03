@@ -58,6 +58,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.foundation.shape.RoundedCornerShape
 import com.bloo.bluelink.data.SettingsStore
 import kotlinx.coroutines.flow.first
 import com.bloo.uicommon.SegmentOption
@@ -171,7 +172,7 @@ internal fun StatusBarScrim(
                     // one shape this scrim actually needs, unlike a small floating chip
                     // (appHazeEffect's own default), which reads better with a flat,
                     // uniformly full-strength blur instead.
-                    Modifier.appHazeEffect(hazeState, progressive = true)
+                    Modifier.appGlassEffect(hazeState, RoundedCornerShape(0.dp), fadeOut = true)
                 } else {
                     Modifier
                 },

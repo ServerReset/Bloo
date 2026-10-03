@@ -173,6 +173,9 @@ internal fun SearchPill(
     // the time competes with everything the user is actually looking at. The
     // pill's affordance is now just its filled shape and border below --
     // legible without needing to move to prove it's there.
+    val latestDrag = androidx.compose.runtime.rememberUpdatedState(onDrag)
+    val latestDragStart = androidx.compose.runtime.rememberUpdatedState(onDragStart)
+    val latestDragEnd = androidx.compose.runtime.rememberUpdatedState(onDragEnd)
     Box(
         modifier.size(width, height).graphicsLayer {
             val k = pressScale * entrance
@@ -258,14 +261,17 @@ internal fun SearchPill(
                 .then(if (canBlur && hazeState != null) Modifier.clip(pillShape).appGlassEffect(hazeState, pillShape) else Modifier)
                 .then(
                     if (onDrag != null) {
+                        // The callbacks are read through rememberUpdatedState: pointerInput(key) keeps the
+                        // lambda of the composition that installed it, so reading `onDrag`/`onDragEnd`
+                        // directly acted on stale dock, position and form values.
                         Modifier.pointerInput(Unit) {
                             detectDragGestures(
-                                onDragStart = { onDragStart() },
-                                onDragEnd = { onDragEnd() },
-                                onDragCancel = { onDragEnd() },
+                                onDragStart = { latestDragStart.value() },
+                                onDragEnd = { latestDragEnd.value() },
+                                onDragCancel = { latestDragEnd.value() },
                             ) { change, amount ->
                                 change.consume()
-                                with(density) { onDrag(amount.x.toDp(), amount.y.toDp()) }
+                                with(density) { latestDrag.value?.invoke(amount.x.toDp(), amount.y.toDp()) }
                             }
                         }
                     } else Modifier,

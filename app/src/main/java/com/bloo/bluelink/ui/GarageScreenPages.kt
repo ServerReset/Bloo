@@ -215,7 +215,7 @@ internal fun CollapsedGaragePager(
         // window math (window width), which no longer exists -- the only
         // thing that can invalidate this effect's closure now is `total`
         // itself changing (a car added/removed).
-        LaunchedEffect(pager, total) {
+        LaunchedEffect(pager, total, perPage) {
             snapshotFlow { pager.settledPage }.collect { page ->
                 val real = realItem(page)
                 // Guarded: settling on the Settings page (real == slots), or
@@ -226,7 +226,9 @@ internal fun CollapsedGaragePager(
                 // See UiState.onSettingsPageSlot's own doc -- it's the one
                 // "are we on Settings" signal now, there's no standalone route
                 // left to also track.
-                vm.setOnSettingsPageSlot(real == slots)
+                // Settings counts as "on screen" if it sits in ANY of the visible columns, not just the
+                // first: on a multi-column layout the search bar expands whenever Settings is showing.
+                vm.setOnSettingsPageSlot((0 until perPage.coerceAtLeast(1)).any { realItem(page + it) == slots })
                 wrap.recenterIfNearEdge()
             }
         }

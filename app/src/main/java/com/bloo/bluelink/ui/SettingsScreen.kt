@@ -249,7 +249,9 @@ internal fun SettingsScreen(
             // a card, but a single-column list needs no separate "full width" marker
             // for that the way the old grid's span did.
             item {
-                Spacer(Modifier.height(topInset + (if (compact) 42.dp else 56.dp)))
+                // Clears the Simple/Advanced tab that hangs below the status bar (its corner gap + its height) with a
+                // breath to spare, so the first card never sits under it.
+                Spacer(Modifier.height(topInset + HeaderCornerGap + HeaderButtonSize + (if (compact) 10.dp else 14.dp)))
             }
             // Settings' own page hero -- the same role a car page's hero photo card
             // plays (a glanceable top card), here showing the app identity, version and
