@@ -249,6 +249,7 @@ What is the user most likely trying to do? Answer with ONLY the command name (e.
             else -> null
         }
     } catch (e: Exception) {
+        if (e is kotlinx.coroutines.CancellationException) throw e
         // Graceful fallback - return original parse result
         null
     }

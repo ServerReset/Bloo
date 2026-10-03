@@ -333,7 +333,7 @@ internal fun Modifier.glassEffect(
     val canBlur = hazeState != null && canBlurBackdrops()
     val tint = glassTint(canBlur)
     return this
-        .then(if (canBlur) Modifier.appHazeEffect(hazeState!!, progressive) else Modifier)
+        .hazeWhenAble(hazeState, progressive)
         .background(tint)
 }
 
@@ -422,3 +422,9 @@ internal fun Modifier.themedDropShadow(
     blurRadius = blurRadius,
     offsetY = offsetY,
 )
+
+
+/** [appHazeEffect] when there is a backdrop to blur AND the device can do it; unchanged otherwise. */
+@Composable
+internal fun Modifier.hazeWhenAble(state: HazeState?, progressive: Boolean = false): Modifier =
+    if (state != null && canBlurBackdrops()) appHazeEffect(state, progressive) else this

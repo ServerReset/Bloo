@@ -106,7 +106,7 @@ internal fun GlassSurface(
                 .clip(shape)
                 // Liquid glass where the device can run it (it blurs and refracts the window behind
                 // it itself); the plain Haze blur everywhere else.
-                .then(if (canBlur && !liquid) Modifier.appHazeEffect(hazeState!!) else Modifier)
+                .then(if (liquid) Modifier else Modifier.hazeWhenAble(hazeState))
                 .background(tint)
                 .glassSheen(),
         )
@@ -164,7 +164,7 @@ internal fun ScrimBlur(hazeState: HazeState?, progress: () -> Float, modifier: M
             modifier
                 .fillMaxSize()
                 .graphicsLayer { alpha = progress().coerceIn(0f, 1f) }
-                .appHazeEffect(hazeState!!, progressive = true),
+                .hazeWhenAble(hazeState, progressive = true),
         )
     }
 }

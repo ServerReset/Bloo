@@ -359,6 +359,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 logStartup("Cold start: calling loadGarage()")
                 loadGarage()
             } catch (e: Exception) {
+                if (e is kotlinx.coroutines.CancellationException) throw e
                 AppLog.log("⚠ cold-start auto-login failed: ${e.message}")
                 _state.update { if (it.screen == Screen.Loading) it.copy(screen = Screen.Login) else it }
             }

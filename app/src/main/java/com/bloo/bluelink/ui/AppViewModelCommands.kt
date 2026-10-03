@@ -376,6 +376,7 @@ internal fun AppViewModel.runCommand(
             // Auto-AI: a command changed the car's state, refresh the summary.
             _state.value.vehicles.firstOrNull { it.vin == vin }?.let { autoSummarize(it) }
         } catch (e: Exception) {
+            if (e is kotlinx.coroutines.CancellationException) throw e
             val msg = e.message ?: "Command failed"
             recordRemoteAction(vin, success, status = "Failed", details = msg)
             AppLog.log("⚠ $msg")

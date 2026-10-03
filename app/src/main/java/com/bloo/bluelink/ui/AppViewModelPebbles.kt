@@ -225,6 +225,7 @@ internal fun AppViewModel.launchBusy(block: suspend () -> Unit) {
         try {
             block()
         } catch (e: Exception) {
+            if (e is kotlinx.coroutines.CancellationException) throw e
             val msg = e.message ?: "Something went wrong"
             AppLog.log("⚠ $msg")
             _state.update { it.copy(message = msg, messageType = "error") }

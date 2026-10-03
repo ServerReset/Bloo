@@ -255,7 +255,7 @@ internal fun SearchPill(
                 // passes in), so a blur added here without its own clip would
                 // render as a soft-edged rectangle poking past the pill's actual
                 // rounded/stadium outline instead of stopping at it.
-                .then(if (canBlur) Modifier.clip(pillShape).appHazeEffect(hazeState!!) else Modifier)
+                .then(if (canBlur) Modifier.clip(pillShape).hazeWhenAble(hazeState) else Modifier)
                 .then(
                     if (onDrag != null) {
                         Modifier.pointerInput(Unit) {

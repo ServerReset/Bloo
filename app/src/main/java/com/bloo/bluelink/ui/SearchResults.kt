@@ -251,6 +251,7 @@ internal fun SettingsSearchResults(
                     command = enhanced
                 }
             } catch (e: Exception) {
+                if (e is kotlinx.coroutines.CancellationException) throw e
                 // Graceful fallback if AI enhancement fails
             }
         }

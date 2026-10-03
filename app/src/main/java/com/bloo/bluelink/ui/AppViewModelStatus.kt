@@ -202,6 +202,7 @@ internal fun AppViewModel.loadStatus(
             }
             logSuccess?.let { AppLog.log(it()) }
         } catch (e: Exception) {
+            if (e is kotlinx.coroutines.CancellationException) throw e
             val msg = com.bloo.bluelink.data.ResponseFraming.userMessage(e)
                 ?: e.message
                 ?: errorMessage

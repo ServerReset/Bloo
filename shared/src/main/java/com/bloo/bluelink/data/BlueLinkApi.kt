@@ -449,6 +449,8 @@ class BlueLinkApi(private val brand: Brand = Brand.HYUNDAI) {
             } catch (e: BlueLinkException) {
                 throw e
             } catch (e: Exception) {
+                // A cancelled coroutine is not a network error: let it unwind as itself.
+                if (e is kotlinx.coroutines.CancellationException) throw e
                 throw BlueLinkException(e.message ?: "Network error", e)
             }
         }
