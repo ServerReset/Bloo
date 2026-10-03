@@ -303,22 +303,10 @@ internal fun SearchLayer(
         val targetX = if (form == SearchForm.BUBBLE) bubbleX else (maxWidth - targetW) / 2
         val targetY = if (form == SearchForm.BUBBLE) bubbleY else maxHeight - barH - edge - bottomInset
 
-        // Two springs, not one, and this is the part that makes the resize
-        // read well: SIZE gets a little overshoot so the pill arrives with
-        // some give, while POSITION stays critically damped. Sharing one
-        // bouncy spring meant the whole element slid past its resting place
-        // and came back -- the wobble that made growing into the bar look
-        // loose rather than deliberate. Width and height still share their
-        // spring, so the shape stays coherent while it changes.
-        //
-        // PebbleBounceDamping/PebbleBounceStiffness, not this element's own
-        // hand-tuned numbers -- this used to carry its own separately-picked
-        // damping ratios (0.62 here, 0.72 below), close to but not actually the
-        // same values the pebble bounce settled on, which is exactly what "not
-        // standard across every surface" was pointing at: two controls that both
-        // bounce but by measurably different amounts read as two different
-        // design systems, not one. Reusing the literal shared tokens is what
-        // makes this ACTUALLY the same spring, not just a similar-looking one.
+        // Two springs: SIZE overshoots a little so the pill arrives with some give, POSITION stays
+        // critically damped (one bouncy spring made the whole element slide past its rest and come
+        // back). Width and height share theirs so the shape stays coherent. The numbers are the shared
+        // PebbleBounceDamping/PebbleBounceStiffness tokens, so this is the same spring as the pebbles.
         val sizeSpec = lowPowerAwareSpring<Dp>(dampingRatio = PebbleBounceDamping, stiffness = PebbleBounceStiffness)
         // A spring is right for the morph and WRONG for a drag: routing the
         // finger's position through one meant the bubble trailed behind the
@@ -449,22 +437,10 @@ internal fun SearchLayer(
             } else null,
             onDragStart = { dragging = true },
             onDragEnd = {
-                // Snaps to the NEAREST of the four edges, not a fixed corner
-                // and not wherever the finger happened to be. A version of
-                // this once sprang back to one specific corner on every
-                // release, which defeated the entire point of dragging it --
-                // this is the middle ground: it can be parked anywhere ALONG
-                // an edge, freely, but it never rests out in the open middle
-                // of the screen, where a floating circle covers whatever a
-                // one-inch display was showing there with nothing to be
-                // gained by it sitting exactly there rather than at the edge
-                // just past it.
-                //
-                // Only the axis PERPENDICULAR to the chosen edge moves; the
-                // position along that edge is whatever the drag ended at, so
-                // "somewhere along the left edge, a third of the way down" is
-                // a real resting place this remembers, not just the four
-                // corners.
+                // Snaps to the NEAREST of the four edges: free to park anywhere ALONG an edge, but never
+                // resting in the open middle of the screen where it would cover what is there. Only the
+                // axis perpendicular to the chosen edge moves; the position along it is where the drag
+                // ended, so "a third of the way down the left edge" is a remembered resting place.
                 if (!dragX.isNaN() && !dragY.isNaN()) {
                     val cx = dragX.dp
                     val cy = dragY.dp

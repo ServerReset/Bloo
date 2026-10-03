@@ -86,15 +86,9 @@ internal const val DRIVE_SYNC_COLD_START_DELAY_MS = 3_000L
 
 @Stable
 class AppViewModel(app: Application) : AndroidViewModel(app) {
-    // Set before any other property below, so every timing log this class writes measures
-    // from the actual first instant this constructor started running -- the moment
-    // MainActivity.onCreate's `by viewModels()` dereference (see its own comment) forces
-    // this ViewModel into existence, ahead of setContent. Reported directly as still
-    // stuttering hard on first load even with BlooApplication's "App starting" and this
-    // class's own "Garage loaded" breadcrumbs in place -- those two points bracket the
-    // WHOLE cold start with nothing in between, so a slow stretch anywhere inside it had no
-    // way to show up in a report. Every `logStartup` call below narrows that down to one
-    // specific stage instead.
+    // Set before any other property, so every timing log measures from the first instant this
+    // constructor runs (MainActivity's `by viewModels()` forces it ahead of setContent). Each
+    // `logStartup` call below narrows a slow cold start down to one stage.
     internal val coldStartAt = System.currentTimeMillis()
 
     /** Logs [message] to [AppLog] with elapsed time since this ViewModel was constructed
@@ -257,13 +251,9 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     init {
         logStartup("AppViewModel constructed")
         // Probe on-device Gemini Nano once; the AI toggle only appears if present.
-        // Dispatchers.IO -- like the Shizuku probe right below, and for the same
-        // reason its own comment states but this one didn't follow: ai.isSupported()
-        // touches a `by lazy` Summarizer client on first call (Ai.kt), constructing
-        // an ML Kit client synchronously before the real suspension point, and
-        // viewModelScope defaults to Dispatchers.Main.immediate. That construction
-        // cost was landing on the main thread at exactly the moment of the reported
-        // cold-start lag, alongside every other init-block probe.
+        // On Dispatchers.IO, like the probe below: ai.isSupported() builds an ML Kit client
+        // synchronously on first call, which on viewModelScope's Main.immediate landed on the main
+        // thread during cold start.
         viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
             val startedAt = System.currentTimeMillis()
             val supported = ai.isSupported()
@@ -329,11 +319,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             // escape: an exception anywhere before loadGarage() takes over (it has its own per-brand
             // handling, see loadGarageInner) must not leave the user stuck on it.
             try {
-                // The LOCK decision first: it is what puts the lock screen on the glass, the
-                // first thing a returning user sees, and it needs only the appearance (warmed
-                // DataStore) and the PIN record (warmed crypto) -- NOT the repo construction or
-                // the full credential list, which feed the garage, not the lock. Those run in
-                // parallel just below, behind the lock screen.
+                // The LOCK decision first: it puts the lock screen up, and needs only the appearance and
+                // the PIN record, not repo construction or credentials (those run in parallel below).
                 val appearance = settingsStore.appearance.first()
                 val (lockMechanisms, appPinSet, lockout) = withContext(Dispatchers.IO) {
                     val pinSet = credentialStore.getPinRecord() != null
@@ -352,12 +339,9 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                     logStartup("Cold start: lock screen required, deferring garage load until unlock")
                     _state.update { it.copy(locked = true) }
                 }
-                // The garage load's two independent blocking pieces, started together. Repo
-                // construction builds a shared OkHttp client per brand (Dispatcher,
-                // ExecutorService, ConnectionPool, route database, the whole OkHttp class
-                // graph); the encrypted credential load is CredentialStore's lazy prefs
-                // (MasterKey + EncryptedSharedPreferences + Tink keyset parse). Both belong off
-                // Main (this block runs on Main.immediate) and neither depends on the other.
+                // The garage load's two independent blocking pieces, started together: building each
+                // brand's shared OkHttp client, and the encrypted credential load (MasterKey +
+                // EncryptedSharedPreferences). Both belong off Main (this runs on Main.immediate).
                 val parallelIoStartedAt = System.currentTimeMillis()
                 val accounts = withContext(Dispatchers.IO) {
                     coroutineScope {
@@ -429,11 +413,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     // --- AutoLock (app/.../autolock/) -------------------------------------
     //
-    // Thin passthroughs: the Settings UI reads/writes SettingsStore directly through these
-    // (no UiState copy) because the values are otherwise only ever consumed in the
-    // background, by AutoLockBluetoothReceiver/AutoLockService reading SettingsStore fresh
-    // on each trigger -- there's no live-recomposition need the way seat flags have with the
-    // climate pebble.
+    // Thin passthroughs: Settings reads/writes SettingsStore directly (no UiState copy), since these
+    // values are only consumed in the background by the auto-lock receiver/service.
 
     /** Live per-car evaluation state (detection phase + grace countdown), for the Settings
      *  section to show "watching…" / "locking in 12s" / "locked" while a test or a real

@@ -335,7 +335,7 @@ internal fun SecretRow(label: String, value: String) {
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier.weight(1f),
         )
-        Spacer(Modifier.width(12.dp))
+        Spacer(Modifier.width(GapGroup))
         Text(
             if (show) value else "•".repeat(value.length.coerceIn(4, 10)),
             fontWeight = FontWeight.Medium,

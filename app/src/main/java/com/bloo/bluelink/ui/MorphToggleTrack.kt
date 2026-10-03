@@ -115,7 +115,7 @@ internal fun SeatConfigRow(
             maxLines = 2,
             overflow = TextOverflow.Ellipsis,
         )
-        Spacer(Modifier.width(8.dp))
+        Spacer(Modifier.width(GapRow))
         // A group, so pressing Heat takes width from Cool rather than shoving it -- the pair is
         // exactly the "several buttons in one space" case, and it was a plain Row.
         ExpressiveButtonRow(spacing = GapRow) {

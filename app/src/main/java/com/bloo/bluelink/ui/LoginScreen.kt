@@ -59,7 +59,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
-import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
@@ -105,11 +104,8 @@ internal fun LoginScreen(
     var pin by remember { mutableStateOf("") }
     var showPassword by remember { mutableStateOf(false) }
     var showPin by remember { mutableStateOf(false) }
-    // Region gates which 3 brands the segmented picker below offers, rather
-    // than cramming all 6 US+Canada entries into one row -- Hyundai/Genesis/
-    // Kia Canada run on a completely different backend (see CanadaApi) with
-    // its own sign-in shape, so switching region also resets `brand` to that
-    // region's first entry.
+    // Region picks which 3 brands the segmented picker offers; the Canadian ones run on a different
+    // backend (see CanadaApi), so switching region also resets `brand` to its first entry.
     var region by remember { mutableStateOf("US") }
     var brand by remember { mutableStateOf(Brand.HYUNDAI) }
     val scheme = MaterialTheme.colorScheme
@@ -376,11 +372,8 @@ internal fun LoginScreen(
                 }
             }
         }
-        // Nothing above scrolls under a system inset the way the garage/settings
-        // scrollers do, but the hero wordmark's own Column has no top inset padding
-        // (deliberate -- see its own layout above), so it draws right up under the
-        // status bar just like they do. Same scrim, same cover-screen exclusion as
-        // every other call site (StatusBarScrim itself excludes multi-window).
+        // The hero wordmark has no top inset padding (deliberate), so it draws under the status bar:
+        // same scrim and cover-screen exclusion as every other call site.
         if (!isCompactCoverScreen()) StatusBarScrim(hazeState = hazeState)
     }
 }

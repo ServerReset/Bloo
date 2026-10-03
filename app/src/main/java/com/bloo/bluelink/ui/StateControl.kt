@@ -236,7 +236,7 @@ internal fun StateControl(
             }
         }
         // 12dp spacing between text and buttons to match the previous spacedBy arrangement
-        Spacer(Modifier.width(12.dp))
+        Spacer(Modifier.width(GapGroup))
         val haptics = LocalHaptics.current
         // Any extra icon actions (horn/lights) plus the lock/unlock button
         // form one Material 3 "connected" button group -- a single Row (one

@@ -190,7 +190,7 @@ internal fun SettingsSearchResults(
                             size = 28.dp,
                             iconSize = 15.dp,
                         )
-                        Spacer(Modifier.width(12.dp))
+                        Spacer(Modifier.width(GapGroup))
                         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(GapRow)) {
                             TitleSmallText(e.title)
                             e.content()
@@ -215,7 +215,7 @@ internal fun SettingsSearchResults(
                         size = 28.dp,
                         iconSize = 15.dp,
                     )
-                    Spacer(Modifier.width(12.dp))
+                    Spacer(Modifier.width(GapGroup))
                     Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(GapHairline)) {
                         TitleSmallText(cmd.title)
                         Text(cmd.description, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -326,7 +326,7 @@ internal fun SettingsSearchResults(
             Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(GapRow)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(Icons.Filled.Bolt, contentDescription = null, modifier = Modifier.size(18.dp))
-                    Spacer(Modifier.width(8.dp))
+                    Spacer(Modifier.width(GapRow))
                     TitleSmallText("Action")
                 }
                 Text(
@@ -380,7 +380,7 @@ internal fun SettingsSearchResults(
                 Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(GapRow)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Icon(Icons.Filled.Bolt, contentDescription = null, modifier = Modifier.size(18.dp))
-                        Spacer(Modifier.width(8.dp))
+                        Spacer(Modifier.width(GapRow))
                         TitleSmallText("Did you mean?")
                     }
                     Text(
@@ -454,7 +454,7 @@ internal fun SettingsSearchResults(
                 Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(GapRow)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Icon(Icons.Filled.AutoAwesome, contentDescription = null, modifier = Modifier.size(18.dp))
-                        Spacer(Modifier.width(8.dp))
+                        Spacer(Modifier.width(GapRow))
                         TitleSmallText("AI answer")
                     }
                     if (reply != null) {

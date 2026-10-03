@@ -73,7 +73,7 @@ fun WearCompanionRow(
             tint = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.size(18.dp),
         )
-        Spacer(Modifier.width(8.dp))
+        Spacer(Modifier.width(GapRow))
         Icon(
             Icons.Filled.Watch,
             contentDescription = null,
@@ -133,7 +133,7 @@ fun CompanionActionRow(label: String, caption: String, modifier: Modifier = Modi
             tint = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.size(18.dp),
         )
-        Spacer(Modifier.width(8.dp))
+        Spacer(Modifier.width(GapRow))
         Column(Modifier.weight(1f)) {
             SafeMorphTextButton(label, onClick = onClick, icon = Icons.Filled.Watch)
             LabelSmallText(caption)

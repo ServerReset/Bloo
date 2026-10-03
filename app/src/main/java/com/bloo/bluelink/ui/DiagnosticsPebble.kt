@@ -204,7 +204,7 @@ internal fun DiagnosticsPebble(v: Vehicle, status: VehicleStatus?, state: UiStat
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
-                    Spacer(Modifier.width(8.dp))
+                    Spacer(Modifier.width(GapRow))
                     Text(
                         row.value,
                         style = MaterialTheme.typography.bodyMedium,

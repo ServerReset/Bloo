@@ -172,7 +172,7 @@ private fun DialogCard(
                 modifier = Modifier.weight(1f),
             )
             if (titleTrailing != null) {
-                Spacer(Modifier.width(8.dp))
+                Spacer(Modifier.width(GapRow))
                 titleTrailing()
             }
         }

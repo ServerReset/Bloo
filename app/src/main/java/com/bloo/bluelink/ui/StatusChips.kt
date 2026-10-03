@@ -104,7 +104,7 @@ internal fun MetaChip(text: String, modifier: Modifier = Modifier, icon: ImageVe
         ) {
             if (icon != null) {
                 Icon(icon, contentDescription = null, modifier = Modifier.size(12.dp))
-                Spacer(Modifier.width(4.dp))
+                Spacer(Modifier.width(GapHairline))
             }
             Text(
                 text,

@@ -115,7 +115,7 @@ internal fun FrostMessage(message: String, modifier: Modifier = Modifier) {
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Icon(AppIcons.Lock, contentDescription = null, tint = scheme.primary, modifier = Modifier.size(18.dp))
-        Spacer(Modifier.width(8.dp))
+        Spacer(Modifier.width(GapRow))
         Text(
             message,
             style = MaterialTheme.typography.labelLarge,

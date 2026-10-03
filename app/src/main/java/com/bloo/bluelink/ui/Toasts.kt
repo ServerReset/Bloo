@@ -219,7 +219,7 @@ private fun ToastCard(toast: Toast, onDismiss: () -> Unit, hazeState: HazeState,
             verticalAlignment = Alignment.CenterVertically,
         ) {
             IconBadge(icon = icon, tint = accent, size = 36.dp, iconSize = 20.dp)
-            Spacer(Modifier.width(12.dp))
+            Spacer(Modifier.width(GapGroup))
             SelectionContainer(Modifier.weight(1f)) {
                 Text(
                     toast.message,

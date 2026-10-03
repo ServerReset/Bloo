@@ -152,7 +152,7 @@ internal fun ClimateControlsSection(
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
             )
-            Spacer(Modifier.width(8.dp))
+            Spacer(Modifier.width(GapRow))
             // RollingNumber, not StepRow's built-in roll: StepRow's AnimatedContent
             // always slides the same direction regardless of which way the value
             // moved, which reads oddly on a slider you're actively dragging both

@@ -204,7 +204,7 @@ internal fun StatusHeaderRow(icon: ImageVector, tint: Color, title: String, stat
                 Icon(i, contentDescription = null, tint = animTint, modifier = Modifier.size(22.dp))
             }
         }
-        Spacer(Modifier.width(12.dp))
+        Spacer(Modifier.width(GapGroup))
         Column {
             TitleSmallText(title)
             AnimatedContent(
@@ -266,7 +266,7 @@ internal fun SettingsHeroCard(state: UiState, vm: AppViewModel, compact: Boolean
                     size = if (compact) 40.dp else 48.dp,
                     iconSize = 24.dp,
                 )
-                Spacer(Modifier.width(12.dp))
+                Spacer(Modifier.width(GapGroup))
                 Column(Modifier.weight(1f)) {
                     Text(
                         "Bloo",
@@ -280,7 +280,7 @@ internal fun SettingsHeroCard(state: UiState, vm: AppViewModel, compact: Boolean
                     )
                 }
                 UpdateStatusChip(state)
-                Spacer(Modifier.width(4.dp))
+                Spacer(Modifier.width(GapHairline))
                 MorphExpandButton(
                     expanded = expanded,
                     onToggle = { vm.togglePebble(SettingsPseudoVehicle, "Updates") },

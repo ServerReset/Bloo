@@ -75,7 +75,7 @@ private fun RemoteActionItem(action: RemoteAction, use24Hour: Boolean) {
                 .size(6.dp)
                 .background(statusColor(action.status), CircleShape),
         )
-        Spacer(Modifier.width(8.dp))
+        Spacer(Modifier.width(GapRow))
         Text(
             text = action.action,
             style = MaterialTheme.typography.labelMedium,
@@ -99,7 +99,7 @@ private fun RemoteActionItem(action: RemoteAction, use24Hour: Boolean) {
         } else {
             Spacer(Modifier.weight(1f))
         }
-        Spacer(Modifier.width(8.dp))
+        Spacer(Modifier.width(GapRow))
         Text(
             text = shortTime(action.timestamp, use24Hour),
             style = MaterialTheme.typography.labelSmall,

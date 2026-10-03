@@ -258,7 +258,7 @@ internal fun StatusRow(label: String, value: String, valueMono: Boolean = false)
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
         )
-        Spacer(Modifier.width(8.dp))
+        Spacer(Modifier.width(GapRow))
         // Right-aligning Box that owns whatever the label's natural width left over
         // (weight(1f), the row's only remaining weighted child, now that the label
         // above measures at its own content width instead of a forced half-share)
@@ -324,7 +324,7 @@ internal fun StepRow(label: String, value: String, valueColor: Color = Color.Uns
             maxLines = 2,
             overflow = TextOverflow.Ellipsis,
         )
-        Spacer(Modifier.width(8.dp))
+        Spacer(Modifier.width(GapRow))
         // Roll the value when it changes (e.g. dragging a slider).
         AnimatedContent(
             targetState = value,
