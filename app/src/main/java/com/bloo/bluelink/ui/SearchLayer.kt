@@ -131,6 +131,10 @@ internal fun SearchLayer(
     // guaranteed Saver path; this changes twice a gesture, so the boxing doesn't matter.
     @Suppress("AutoboxingStateCreation")
     var dragX by rememberSaveable { mutableStateOf(Float.NaN) }
+    // Normal (phone) layout only: which of three docks the bubble sits in, and how fast the last drag move was.
+    var dockName by rememberSaveable { mutableStateOf(SearchDock.RIGHT.name) }
+    val dock = SearchDock.valueOf(dockName)
+    var lastDx by remember { mutableFloatStateOf(0f) }
     @Suppress("AutoboxingStateCreation")
     var dragY by rememberSaveable { mutableStateOf(Float.NaN) }
     // True only between finger-down and finger-up on the bubble. The position
@@ -219,7 +223,7 @@ internal fun SearchLayer(
         val pillW = minOf(if (compact) 132.dp else 168.dp, barW)
         val form = when {
             open -> SearchForm.BAR
-            onSettings -> SearchForm.PILL
+            onSettings || (!compact && dock == SearchDock.CENTER) -> SearchForm.PILL
             else -> SearchForm.BUBBLE
         }
 
@@ -262,7 +266,9 @@ internal fun SearchLayer(
         // Plain arithmetic rather than androidx.compose.ui.unit.lerp -- two
         // multiplies don't need an import.
         LaunchedEffect(Unit) {
-            if (dragX.isNaN()) {
+            if (!compact) {
+                vm.searchBubblePosition()?.let { (xFrac, _) -> dockName = SearchDock.fromFrac(xFrac).name }
+            } else if (dragX.isNaN()) {
                 vm.searchBubblePosition()?.let { (xFrac, yFrac) ->
                     dragX = (minX + (maxX - minX) * xFrac).value
                     dragY = (minY + (maxY - minY) * yFrac).value
@@ -286,6 +292,8 @@ internal fun SearchLayer(
         val bubbleX = when {
             dockedX != null -> dockedX.dp
             compact && !dragX.isNaN() -> dragX.dp.coerceIn(minX, maxX)
+            !compact && dragging && !dragX.isNaN() -> dragX.dp.coerceIn(minX, maxX)
+            !compact && dock == SearchDock.LEFT -> minX
             else -> restX
         }
         val bubbleY = when {
@@ -300,7 +308,12 @@ internal fun SearchLayer(
             SearchForm.BUBBLE -> bubble
         }
         val targetH = if (form == SearchForm.BUBBLE) bubble else barH
-        val targetX = if (form == SearchForm.BUBBLE) bubbleX else (maxWidth - targetW) / 2
+        val targetX = when {
+            form == SearchForm.BUBBLE -> bubbleX
+            // A pill being carried follows the finger; at rest it is centred.
+            !compact && dragging && !dragX.isNaN() -> dragX.dp.coerceIn(minX, (maxWidth - targetW - edge).coerceAtLeast(minX))
+            else -> (maxWidth - targetW) / 2
+        }
         val targetY = if (form == SearchForm.BUBBLE) bubbleY else maxHeight - barH - edge - bottomInset
 
         // Two springs: SIZE overshoots a little so the pill arrives with some give, POSITION stays
@@ -429,18 +442,34 @@ internal fun SearchLayer(
             // Docked into a camera band, there is nowhere to drag it TO --
             // the whole point of the fixed spot is that it's the one place
             // guaranteed not to cover something else.
-            onDrag = if (form == SearchForm.BUBBLE && compact && band == null) {
-                { dx, dy ->
+            onDrag = when {
+                form == SearchForm.BUBBLE && compact && band == null -> { dx, dy ->
                     dragX = ((if (dragX.isNaN()) bubbleX else dragX.dp) + dx).coerceIn(minX, maxX).value
                     dragY = ((if (dragY.isNaN()) bubbleY else dragY.dp) + dy).coerceIn(minY, maxY).value
                 }
-            } else null,
-            onDragStart = { dragging = true },
+                // Normal layout: the bubble (or the open-out pill) is carried sideways along the bottom.
+                !compact && form != SearchForm.BAR -> { dx, _ ->
+                    dragX = ((if (dragX.isNaN()) x else dragX.dp) + dx).coerceIn(minX, maxX).value
+                    lastDx = dx.value
+                }
+                else -> null
+            },
+            onDragStart = {
+                dragging = true
+                if (!compact) { dragX = Float.NaN; lastDx = 0f }
+            },
             onDragEnd = {
-                // Snaps to the NEAREST of the four edges: free to park anywhere ALONG an edge, but never
-                // resting in the open middle of the screen where it would cover what is there. Only the
-                // axis perpendicular to the chosen edge moves; the position along it is where the drag
-                // ended, so "a third of the way down the left edge" is a remembered resting place.
+                if (!compact) {
+                    // Land in a dock: thrown the way it was flung, or dropped where it was let go.
+                    val widthNow = if (form == SearchForm.PILL) pillW else bubble
+                    val center = (if (dragX.isNaN()) x else dragX.dp) + widthNow / 2
+                    val next = SearchDock.landing((center / maxWidth).coerceIn(0f, 1f), lastDx, dock)
+                    dockName = next.name
+                    dragX = Float.NaN
+                    vm.setSearchBubblePosition(next.xFrac, 1f)
+                } else
+                // Snaps to the NEAREST of the four edges (compact/cover): free to park anywhere ALONG an
+                // edge, never in the open middle. Only the axis perpendicular to the chosen edge moves.
                 if (!dragX.isNaN() && !dragY.isNaN()) {
                     val cx = dragX.dp
                     val cy = dragY.dp
