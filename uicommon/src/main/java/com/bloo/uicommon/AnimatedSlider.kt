@@ -5,6 +5,7 @@ import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.Canvas
+import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.layout.Box
@@ -300,7 +301,7 @@ fun AnimatedSlider(
             // inactive colour, then the accent drawn over it, masked to everything left of the handle.
             drawRoundRect(inactiveColor, topLeft = Offset(0f, top), size = Size(size.width, th), cornerRadius = radius)
             if (thumbX > 0f) {
-                androidx.compose.ui.graphics.drawscope.clipRect(left = 0f, top = 0f, right = thumbX, bottom = size.height) {
+                clipRect(left = 0f, top = 0f, right = thumbX, bottom = size.height) {
                     drawRoundRect(
                         androidx.compose.ui.graphics.Brush.horizontalGradient(
                             listOf(accent.copy(alpha = 0.82f), accent),
