@@ -277,8 +277,8 @@ internal fun ClimatePebble(
             spinning = climateOn,
         ),
     ) {
-        // No cover hero here any more: this pebble's summary ("On · driving" / "On" / "Off")
-        // is the identical expression, and CoverTile now renders it as the tile's headline.
+        // No hero here: this pebble's summary ("On · driving" / "On" / "Off") is the
+        // identical expression, and it already renders as the tile headline.
         // Two lines saying "On" ten dp apart was the duplication, not the glance.
         if (driving) {
             if (climateOn) {

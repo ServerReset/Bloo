@@ -4,7 +4,7 @@ A durable reference for the Bloo codebase. Start with **[ARCHITECTURE.md](ARCHIT
 
 Each per-file doc follows a consistent structure: Purpose · Public surface · Internal structure · Data & types · State & concurrency · Collaborators & data flow · Invariants & assumptions · Gotchas & sharp edges.
 
-> **Note:** the per-file deep-dives were written when the app still had a Wear OS companion, a home-screen widget, and Quick Settings tiles. Those subsystems were removed; where a deep-dive still describes them (`WearSync`, `WearBridge`, `TileCommandRunner`, `BlooTile*`, `BlooWidget`), treat it as historical. The top-level map in [ARCHITECTURE.md](ARCHITECTURE.md) and the entries above reflect the current app.
+> **Note:** the per-file deep-dives were written when the app still had a Wear OS companion, a home-screen widget, Quick Settings tiles, and the flip-phone cover-screen layout (`CompactGarage`, `CoverTile`, `CoverHero`, `coverScaled`, `isCompactCoverScreen`). Those were removed; where a deep-dive still describes any of them, treat it as historical. The top-level map in [ARCHITECTURE.md](ARCHITECTURE.md) reflects the current app.
 
 > Two load-bearing invariants underpin everything (see ARCHITECTURE §4): **(1)** every car request runs inside `BlueLinkGate.statusMutex`; **(2)** climate-start is gated on `isDriving` on every path. Watch the encoding traps: `plugType` 0=DC/1=AC vs `batteryPlugin` 0=unplugged/1=DC/2=AC; `hasBattery` (user override) not raw `isEv` drives percent/range.
 
@@ -34,7 +34,7 @@ Each per-file doc follows a consistent structure: Purpose · Public surface · I
 | [app/SettingsStore-part1.md](app/SettingsStore-part1.md) | Prefs/appearance/notifications/per-car config accessors + the `appearance` Flow. |
 | [app/SettingsStore-part2-drivesync.md](app/SettingsStore-part2-drivesync.md) | `performDriveSync`, `editTracked`/dirty-key tracking, import/export/merge JSON, embedded photos, climate presets, custom palettes. |
 | [app/Screens-part1-root-login-onboarding.md](app/Screens-part1-root-login-onboarding.md) | `BlooApp` root, nav, login screen, onboarding + car-setup wizard. |
-| [app/Screens-part2-garage-carousel.md](app/Screens-part2-garage-carousel.md) | Garage screen, car carousel/grid, hero tile, compact/cover-screen tiles, pebble-list plumbing. |
+| [app/Screens-part2-garage-carousel.md](app/Screens-part2-garage-carousel.md) | Garage screen, car carousel/grid, hero tile, pebble-list plumbing. (The cover-screen sections are historical, see the Note above.) |
 | [app/Screens-part3-pebbles.md](app/Screens-part3-pebbles.md) | The detail "pebble" composables: charge, fuel, climate, location/map, trips, diagnostics, info, weather. |
 | [app/Screens-part4-settings-search.md](app/Screens-part4-settings-search.md) | Settings screen sections, AI search, and `parseVehicleCommand` (natural-language → car command). |
 | [app/workers-and-update.md](app/workers-and-update.md) | `AlertWorker`, `MainToMainSyncWorker`, `UpdateCheckWorker`, `UpdateChecker`, `UpdateStore`. |

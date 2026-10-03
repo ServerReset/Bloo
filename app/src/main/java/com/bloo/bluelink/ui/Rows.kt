@@ -230,14 +230,11 @@ internal fun StatusRow(label: String, value: String, valueMono: Boolean = false)
             // the value below (still the row's one weighted child) gets everything that
             // labelled width didn't use.
             style = MaterialTheme.typography.bodyMedium,
-            // MutedContentAlpha (0.7) on the phone, where LocalContentColor is usually
-            // full onSurface and 0.7 reads as a deliberately secondary label. On the
-            // cover every pebble's default container is surfaceVariant, whose paired
-            // content tone is ALREADY the dimmer onSurfaceVariant role -- StatusRow is
-            // the single most-reused row in the app (Diagnostics, Trips, Charge,
-            // Weather, ...), so this one compounding was the largest contributor to
-            // "flip mode is a contrast nightmare". 0.92 on the cover, unchanged
-            // elsewhere: same fix CoverTile's own subtitle already got.
+            // MutedContentAlpha (0.7) where LocalContentColor is full onSurface reads as a
+            // deliberately secondary label. StatusRow is the single most-reused row in the
+            // app (Diagnostics, Trips, Charge, Weather, ...), but a forced-open context
+            // (LocalForceExpanded) is already the emphasized reading, so 0.92 there: the
+            // important half shouldn't be barely distinguishable from its caption.
             color = LocalContentColor.current.copy(
                 alpha = if (LocalForceExpanded.current) 0.92f else MutedContentAlpha,
             ),

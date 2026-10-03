@@ -97,11 +97,8 @@ internal fun ExpandedGaragePage(
                 // release -- in practice it lagged the scale/alpha response
                 // behind the actual continuous drag position for the whole
                 // gesture (the spring has to visibly catch up to "unsettled"
-                // right as the drag starts), which is what made this pager's
-                // swipe read as less smooth than the cover screen's equivalent
-                // (CompactGarage), which never had that extra layer. Matching
-                // it here: the raw continuous offset drives the transform
-                // directly, no secondary spring in between.
+                // right as the drag starts). The raw continuous offset drives
+                // the transform directly, no secondary spring in between.
                 // No blur, no rotationZ tilt -- tried both a position-driven
                 // and later a velocity-driven blur here, and the tilt on top
                 // of the fade/scale, and all of it together read as worse

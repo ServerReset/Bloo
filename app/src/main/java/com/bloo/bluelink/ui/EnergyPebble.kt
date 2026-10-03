@@ -120,17 +120,10 @@ internal fun ChargePebble(v: Vehicle, status: VehicleStatus?, enabled: Boolean, 
             activeContent = Color.White,
         ),
     ) {
-        // Charge limits are EDITABLE on every surface now, the flip cover included. The
-        // cover pebble used to show them read-only (after an earlier pass replaced the
-        // ChargeFuelBar -- the same bar the cover's own hero tile draws -- with plain AC/DC
-        // rows), which meant the cover could not actually set a limit the way the phone can.
-        // Reported directly: "the flip phone charge pebble doesn't let you set limits just
-        // view them, the flip phone should be the same as the normal pebbles in function."
-        // The two pills ARE the phone's own control, unchanged; the cover tile scrolls
-        // internally (LocalCoverScrollState), so there is no clipping to worry about.
-        // No ChargeFuelBar on the cover: the hero tile already shows the charge %, and
-        // repeating it was the duplication this replaced -- EXCEPT for a brand that cannot
-        // report limits at all (Canada), where there would otherwise be nothing here.
+        // Charge limits are EDITABLE here (see the AC/DC pills below, which replaced
+        // an earlier read-only ChargeFuelBar state). ChargeFuelBar itself only renders
+        // in a forced-open context for a brand that cannot report limits at all
+        // (Canada) -- there would otherwise be nothing to show.
         if (LocalForceExpanded.current && !v.brand.supportsChargeLimits) {
             ChargeFuelBar(
                 status,
@@ -195,15 +188,9 @@ internal fun FuelPebble(v: Vehicle, status: VehicleStatus?, state: UiState, vm: 
         v, "fuel", "Fuel", Icons.Filled.LocalGasStation, state, vm, modifier,
         summary = summary,
     ) {
-        // COVER SCREEN only: lead with a big fuel-% hero so the gas tile gets the same
-        // glance treatment the EV Charge tile gets from ChargeFuelBar (it previously
-        // fell straight to two dim StatusRows). Gated on LocalForceExpanded → phone
-        // untouched.
-        if (LocalForceExpanded.current && status != null) {
-            // No cover hero: the pebble summary is already "84% · 120 mi" and CoverTile
-            // renders it as the headline, with the two StatusRows below carrying the detail.
-            // The percentage used to appear three times on this tile.
-        }
+        // The old cover hero repeated the pebble summary ("84% · 120 mi") that the
+        // headline already carries, with the two StatusRows below carrying the detail --
+        // the percentage used to appear three times on this tile.
         when {
             status == null && state.refreshing -> Text("Fetching live status…")
             status == null -> Text("No status yet.")

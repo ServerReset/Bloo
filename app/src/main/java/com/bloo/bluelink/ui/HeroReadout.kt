@@ -293,8 +293,8 @@ internal fun HeroNumbers(
     fillWidth: Boolean = false,
     // The status line's own fade -- see the top-level `statusAlpha` this defaults from for
     // why it isn't just `t`. Defaults to `t` so the collapsed anchor (which calls this with
-    // t = 0f and never shows the line at all, see the `t > 0.01f` guard below) and the
-    // CoverTile call site need no changes.
+    // t = 0f and never shows the line at all, see the `t > 0.01f` guard below) needs no
+    // changes at its call site.
     statusAlpha: Float = t,
     /** Vertical alignment for the numbers themselves. The EXPANDED copy
      *  bottom-aligns (the range and the status line stack under the pct);

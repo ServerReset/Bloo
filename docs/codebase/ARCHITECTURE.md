@@ -4,7 +4,7 @@
 
 ## 1. What Bloo is
 
-An unofficial Android app that remotely controls **real** Hyundai, Genesis and Kia vehicles over their live connected-car APIs — lock/unlock, remote climate, charging and charge limits, GPS location, status, EV trips, weather — plus an on-device AI layer (Gemini Nano summaries and natural-language commands) and a walk-away **AutoLock**. It runs on phone, foldable (including flip-phone cover screens) and tablet. It is not on the Play Store; it self-updates from GitHub Releases.
+An unofficial Android app that remotely controls **real** Hyundai, Genesis and Kia vehicles over their live connected-car APIs — lock/unlock, remote climate, charging and charge limits, GPS location, status, EV trips, weather — plus an on-device AI layer (Gemini Nano summaries and natural-language commands) and a walk-away **AutoLock**. It runs on phone, foldable and tablet (and a paired Wear OS watch as an auxiliary remote). It is not on the Play Store; it self-updates from GitHub Releases.
 
 There is **no mock/simulated path** — every call hits production OEM servers, so command correctness is safety-relevant.
 

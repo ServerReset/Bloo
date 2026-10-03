@@ -146,8 +146,8 @@ internal fun DiagnosticsPebble(v: Vehicle, status: VehicleStatus?, state: UiStat
         // mode, as an earlier pass did, just removed the ability to collapse a long list
         // that most people only want to check occasionally.
     ) {
-        // No cover hero: the verdict it rendered is now the pebble's own summary, which
-        // CoverTile shows as the tile headline. See diagSummary above.
+        // The old cover hero's verdict is now the pebble's own summary, rendered as
+        // the tile headline. See diagSummary above.
         if (rows.isEmpty()) {
             Text(
                 "No diagnostics yet.",
@@ -157,18 +157,14 @@ internal fun DiagnosticsPebble(v: Vehicle, status: VehicleStatus?, state: UiStat
         }
         rows.forEach { row ->
             if (row.indent) {
-                // DiagnosticsPebble has no cover-vs-phone split of its own -- this whole
-                // ~12-row list renders on the cover too, below the health-verdict hero.
-                // The label stayed at the fixed dim onSurfaceVariant role there, same
-                // class of issue StatusRow's label had; boosted on the cover the same
-                // way. The value used to be entirely unstyled (inheriting the pebble's
+                // The value used to be entirely unstyled (inheriting the pebble's
                 // own ambient onSurfaceVariant content color) rather than pinned to a
                 // legible tone the way StatusRow's own value already is -- an indented
                 // sub-row's VALUE is still the thing a user is actually checking.
                 // onSurfaceVariant is already full-alpha as a raw theme color -- its
                 // dimness is the ROLE itself (a lower-contrast RGB against the
-                // surface), not an alpha multiply, so unlike StatusRow/CoverHero this
-                // needed a color swap, not an alpha bump, to actually read stronger.
+                // surface), not an alpha multiply, so unlike StatusRow this needed a
+                // color swap, not an alpha bump, to actually read stronger.
                 val indentLabelColor = if (LocalForceExpanded.current) {
                     MaterialTheme.colorScheme.onSurface.copy(alpha = 0.85f)
                 } else {

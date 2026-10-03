@@ -206,19 +206,8 @@ internal fun LocationPebble(v: Vehicle, state: UiState, vm: AppViewModel, modifi
                 Column(
                     verticalArrangement = Arrangement.spacedBy(GapGroup)
                 ) {
-                // COVER SCREEN: lead with the place-name hero (the cover drops the header
-                // where the place summary otherwise shows), and shrink the map so hero +
-                // map + coords + weather + button fit without overflowing the ~1-inch tile.
-                if (glance) {
-                    // The subline used to always be the raw coordinate string, even
-                    // once `place` had resolved into the headline right next to it --
-                    // showing an address and its own coordinates in the same glance.
-                    // Only fall back to coordinates here while nothing better exists
-                    // yet; once an address resolves, it's the only thing shown.
-                    // No cover hero: `place` is already the tile's summary and therefore its
-                    // headline. This tile rendered the address three times at once -- headline,
-                    // hero and the map stripe's caption.
-                }
+                // The old cover hero repeated `place`, already the tile's headline: the
+                // address rendered three times at once (headline, hero, map caption).
                 // A live CarMap, visible in the pebble at all times -- NOT a
                 // placeholder. Sharing expandedMap.mapStateFor(v.vin) with the
                 // full-screen overlay (ExpandableMapLayer, in GarageScreen) means

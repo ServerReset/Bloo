@@ -95,7 +95,7 @@ internal fun TripsPebble(v: Vehicle, state: UiState, vm: AppViewModel, modifier:
 
 @Composable
 internal fun TripRow(trip: EvTrip, metric: Boolean = false) {
-    // TripsPebble renders this list straight under the cover's CoverHero with no
+    // TripsPebble renders this list under the pebble's own hero with no
     // color override of its own, so every Text below inherits whatever the
     // pebble's own container hands out -- surfaceVariant's onSurfaceVariant by
     // default. Pinning the primary date/distance line to full onSurface (it was

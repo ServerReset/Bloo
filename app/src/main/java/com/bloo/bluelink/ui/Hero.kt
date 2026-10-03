@@ -284,11 +284,6 @@ internal fun HeroHeader(
         // frame, on all three pages beyondViewportPageCount keeps live. (Verified in the
         // resolved artifact: SharedBoundsNode implements ApproachLayoutModifierNode.)
         //
-        // That is exactly why the flip cover's swipe was smooth while the phone's was
-        // not: PebbleShell returns through CoverTile BEFORE it ever creates the scope, so
-        // the cover path never pays for this at all. A travelling charge bar is not worth
-        // the one gesture the user makes most.
-        //
         // The original ask -- the percentage and range rendered twice -- stays fixed, and
         // at the level that actually mattered: ONE [ChargeReadout] derivation feeds both
         // densities, so they cannot drift and only one is ever on screen.

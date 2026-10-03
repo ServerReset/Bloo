@@ -144,9 +144,8 @@ internal fun StaggeredRevealColumn(
     // Takes `content` with the same ColumnScope receiver PebbleShell's own body always has
     // (every pebble's content lambda is already typed that way), via NoOpColumnScope below --
     // real Column.weight is a no-op here regardless of that shim, because it only redistributes
-    // space in a HEIGHT-BOUNDED Column, and this container has always been wrap-content (the
-    // one place PebbleShell bounds its height, fillHeight+expanded, returns through CoverTile
-    // before it ever reaches this code). The shim exists purely so `content` type-checks against
+    // space in a HEIGHT-BOUNDED Column, and this container has always been wrap-content. The
+    // shim exists purely so `content` type-checks against
     // callers written for `ColumnScope`, not to add real weight/align support.
     Layout(content = { NoOpColumnScope.content() }, modifier = modifier) { measurables, constraints ->
         val childConstraints = constraints.copy(minWidth = 0, minHeight = 0)

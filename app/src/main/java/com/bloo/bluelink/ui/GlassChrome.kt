@@ -161,8 +161,8 @@ internal fun Modifier.glassRim(shape: Shape): Modifier =
  *
  * Same root cause as [glassDropShadow], and the two STACK, which is why this is the
  * other half of the "black halo behind floating elements" report rather than a separate
- * issue: [FloatingIcon] (Widgets.kt) and the cover screen's camera band
- * (CoverGarage.kt) chain this ON a [GlassSurface], so a 48dp floating button was
+ * issue: [FloatingIcon] (Widgets.kt) chains this ON a [GlassSurface], so a
+ * 48dp floating button was
  * carrying 0.38-alpha black offset below it AND 0.30-alpha black on all four sides,
  * neither gated on the theme, under a fill of 0.02-0.12 alpha. In light mode that is two
  * black layers and no button. [HeaderContentClearance]'s own doc already describes the

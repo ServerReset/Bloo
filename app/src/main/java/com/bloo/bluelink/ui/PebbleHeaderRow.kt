@@ -78,10 +78,6 @@ internal fun PebbleHeaderRow(
 ) {
     val haptics = LocalHaptics.current
     val density = LocalDensity.current
-    // Phone only. The cover screen never reaches here: PebbleShell
-    // returns above, through CoverTile, so a pebble on the cover is
-    // the same template as every other page there. What follows is
-    // the collapsible header + animated body card.
     // Header: tap anywhere to toggle, long-press to drag-reorder. The
     // action button and chevron handle their own clicks. Fixed min height
     // so every collapsed pebble lines up.

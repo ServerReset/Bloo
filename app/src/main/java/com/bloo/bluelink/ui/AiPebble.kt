@@ -82,18 +82,9 @@ internal fun AiPebble(v: Vehicle, state: UiState, vm: AppViewModel, modifier: Mo
         // summary paragraph and a footnote, not a single setting, and the flag costs it its
         // chevron entirely.
     ) {
-        // On the flip cover this tile fills the screen; two short text lines centred
-        // in it read as a big empty purple void. Lead with a proper glance hero (big
-        // icon + heading + status line) like the other cover tiles, then the copy.
-        if (LocalForceExpanded.current) {
-            // Shared CoverHero rhythm (converged 34dp icon + headline + status subline),
-            // so the AI tile matches Climate/Info/Diagnostics/etc instead of its old
-            // ad-hoc 48dp centered column.
-            // No cover hero: its value was the tile TITLE verbatim ("AI summary") and its
-            // subline was the tile subtitle verbatim ("On-device Gemini Nano"). Four lines
-            // carrying two strings, before a word of the actual summary. CoverTile's headline
-            // covers it; what follows is the summary itself, which is the point of the tile.
-        }
+        // Its old glance hero repeated the tile's own title and subtitle verbatim --
+        // four lines carrying two strings before a word of the actual summary. The
+        // summary IS the point of the tile, so it leads.
         if (summary != null) {
             // Bulleted, not one raw string: the model's own prompt asks for a "* " bullet per
             // fact, and drawing that straight through showed the literal asterisk as text --

@@ -118,9 +118,9 @@ import com.bloo.bluelink.data.settingsMode
  *  sequence the way [staggeredAdvancedVisible]'s own doc warns against. */
 
 /**
- * Always a page inside a car pager now (GarageScreen's collapsed block/window pager,
- * or CompactGarage's cover pager -- via CoverSettingsGate there), always the one right
- * after the last real page (a car, or the status card with none). There is no
+ * Always a page inside a car pager now (GarageScreen's collapsed block/window pager),
+ * always the one right after the last real page (a car, or the status card with none).
+ * There is no
  * standalone Settings route or screen any more, for any vehicle count -- swiping IS
  * how you reach it and how you leave it. Swiping to a car IS "back", so this skips the
  * screen-navigation chrome that only ever made sense standalone (a floating "back to
@@ -135,8 +135,7 @@ internal fun SettingsScreen(
     vm: AppViewModel,
     /** GarageScreen passes its own shared instance (the same one its car pages
      *  get) so the floating search bar/results panel hosted ABOVE it gets one
-     *  real blur source regardless of which page is actually showing. Cover
-     *  callers (CoverSettingsGate) get their own fresh default instead. */
+     *  real blur source regardless of which page is actually showing. */
     hazeState: HazeState = remember { HazeState() },
 ) {
     val appearance = LocalAppearance.current
@@ -421,7 +420,7 @@ internal fun SettingsScreen(
         // SettingsHeroCard now; it just scrolls off with the rest of the grid.
         //
         // No StatusBarScrim or floating back-arrow here at all any more: this page always
-        // sits inside GarageScreen's/CompactGarage's own HorizontalPager now, which already
+        // sits inside GarageScreen's own HorizontalPager now, which already
         // draws its own StatusBarScrim on top of every page in it (cars and the status card
         // included) -- a second one here stacked as a subtly darker/hazier status-bar band
         // than every other page beside it. A back arrow makes even less sense: reaching this

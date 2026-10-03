@@ -44,8 +44,8 @@ import kotlin.math.max
 // --- Garage status card -----------------------------------------------
 
 /**
- * Folded into the garage's own pager (GarageScreen.kt's collapsed pager,
- * CompactGarage's cover pager) as a page in place of a car when there are
+ * Folded into the garage's own pager (GarageScreen.kt's collapsed pager) as
+ * a page in place of a car when there are
  * none -- exactly the way Settings is folded in as the page after it. Used
  * to be a full standalone screen (`Screen.Empty`) with its own "Bloo" title
  * bar, floating Reload/Settings icons, and buttons that jumped to a separate
@@ -54,7 +54,7 @@ import kotlin.math.max
  * card like the rest of them," reached and left the same way every other
  * page in the pager is: swipe, not a button, a menu, or a back press.
  *
- * GarageScreen/CompactGarage already provide the Aurora backdrop, status-bar
+ * GarageScreen already provides the Aurora backdrop, status-bar
  * scrim, and blur source this card sits on top of, so this composable is
  * only the card's own content -- the same division VehicleDetailContent and
  * CompactCar keep for a real car page. [Refreshable] (Pebbles.kt) supplies

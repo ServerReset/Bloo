@@ -78,7 +78,7 @@ internal fun InfoPebble(v: Vehicle, status: VehicleStatus?, state: UiState, vm: 
     // Tri-state: null (unknown -- no status yet, or the car hasn't reported lock state) must
     // NOT read as "Unlocked". A null summary is omitted by Pebble, so the header simply carries
     // no lock word until we actually know -- rather than asserting a state as fact in visible
-    // text and to TalkBack. Matches CoverMainTile / StateControl, which already handle unknown.
+    // text and to TalkBack. Matches StateControl, which already handles unknown.
     val infoSummary = status?.doorLock?.let { if (it) "Locked" else "Unlocked" }
     val glance = LocalForceExpanded.current
     // NOT alwaysExpandedInSimpleMode: that flag is for pebbles with a single setting
@@ -86,13 +86,9 @@ internal fun InfoPebble(v: Vehicle, status: VehicleStatus?, state: UiState, vm: 
     // This one renders ~15 info rows (below), so forcing it always open in simple
     // mode just removed the ability to collapse it.
     Pebble(v, "info", "Car info", Icons.Filled.Info, state, vm, modifier, summary = infoSummary) {
-        // COVER SCREEN only: lead with a big lock-state hero. On the cover the info
-        // tile drops its header (so the "Locked/Unlocked" summary is otherwise
-        // buried as one row among ~15). A large icon + word makes it the glance
-        // value. Phone is untouched (glance = LocalForceExpanded, false there).
-        // No cover hero: this pebble's summary is already "Locked"/"Unlocked" and CoverTile
-        // renders it as the tile's headline. The lock state used to appear THREE times on one
-        // tile -- as the summary, as this hero, and again as the "Doors" status row below.
+        // The old cover hero repeated the summary, already the tile headline: the lock
+        // state used to appear THREE times on one tile -- summary, hero, and the "Doors"
+        // row below.
         when {
             status == null && state.refreshing -> Text("Fetching live status…")
             status == null -> Text("No status yet.")

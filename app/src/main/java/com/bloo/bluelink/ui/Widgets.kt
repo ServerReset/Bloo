@@ -74,15 +74,11 @@ internal var inMultiWindowMode by mutableStateOf(false)
 /**
  * A soft blurred scrim behind the status bar so scrolling content underneath
  * (a car photo, Aurora, dense text) doesn't fight the system clock/battery
- * icons drawn on top of it. Not the normal (non-cover-screen) layouts -- the
- * cover screen already reserves real space above its content instead of
- * drawing under the status bar at all, so it has nothing to scrim -- and not
- * [inMultiWindowMode] ("floating"), where this app doesn't draw behind the
- * status bar at all (see that flag's own doc). Callers still gate the
- * cover-screen case themselves (`if (!isCompactCoverScreen()) StatusBarScrim()`)
- * since that check is already cheap and in scope at every call site; the
- * multi-window check lives HERE instead of being repeated at each one, since
- * it is a single process-wide flag every caller should honour identically.
+ * icons drawn on top of it -- everywhere except [inMultiWindowMode]
+ * ("floating"), where this app doesn't draw behind the status bar at all (see
+ * that flag's own doc). That check lives HERE instead of being repeated at
+ * each call site, because it is a single process-wide flag every caller
+ * should honour identically.
  *
  * The blur is always active when [hazeState] and hardware capability
  * ([canBlurBackdrops]) allow it -- there used to be an `active: Boolean`
@@ -369,10 +365,6 @@ internal fun FloatingIcon(
 
 
 /**
- * When true (cover-screen tiles), pebbles render permanently open with no
- * collapse chevron or drag handle - collapsing a full-screen tile makes no sense.
- */
-/**
  * The current [SettingsStore.Appearance], provided once at the app root (see
  * BlooApp) so pebbles/tiles read it via LocalAppearance.current instead of each
  * opening its own vm.appearance.collectAsStateWithLifecycle() coroutine collector. ~20 hot
@@ -383,6 +375,12 @@ internal fun FloatingIcon(
 internal val LocalAppearance = staticCompositionLocalOf { SettingsStore.Appearance() }
 
 
+/**
+ * When true (these days: the pinned pebbles and full-screen/car-glance contexts,
+ * PebbleHotspot and PebbleShell), pebbles render permanently open with no
+ * collapse chevron or drag handle -- collapsing a context that has nowhere to
+ * collapse TO makes no sense.
+ */
 internal val LocalForceExpanded = staticCompositionLocalOf { false }
 
 

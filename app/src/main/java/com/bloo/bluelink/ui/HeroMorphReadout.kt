@@ -49,8 +49,7 @@ internal fun HeroMorphReadout(
      *  positioning so it stays a valid anchor, and stops painting. */
     numbersHoisted: Boolean = false,
     /** The status line's own fade, on its own delayed clock -- see the caller's
-     *  `statusAlpha` for why it isn't just `t`. Defaults to `t` so the CoverTile call
-     *  site (a fixed t = 1f, nothing animating) keeps behaving exactly as before. */
+     *  `statusAlpha` for why it isn't just `t`. */
     statusAlpha: Float = t,
 ) {
     val type = MaterialTheme.typography

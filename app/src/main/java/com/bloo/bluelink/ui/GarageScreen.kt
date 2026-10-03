@@ -40,18 +40,17 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 /**
- * Top-level garage screen: picks between three fundamentally different
- * layouts based on screen size/shape and dispatches to the right one, then
- * (for the "normal phone" case) owns the pager(s) that let the user swipe
- * between cars.
+ * Top-level garage screen: picks between two fundamentally different
+ * layouts based on screen size and dispatches to the right one, then
+ * owns the pager(s) that let the user swipe between cars.
  *
  * Layout selection:
- *  - `compact` (a folding phone's small cover screen, see
- *    [isCompactCoverScreen]) short-circuits straight to [CompactGarage] and
- *    returns early -- none of the pager/expand logic below applies there.
  *  - `large` (wide enough for [perPage] > 1 car side by side) enables the
  *    dual/multi-column view and "expand one car to fill the screen" gesture.
- *  - Otherwise, the default single-column swipe-between-cars view.
+ *  - Otherwise, the default single-column swipe-between-cars view
+ *    ([CollapsedGaragePager] handles every width; the old three-way split that
+ *    short-circuited a folding phone's small cover screen is gone with the
+ *    cover screens themselves).
  *
  * State plumbing specific to this screen:
  *  - `pullFractionState` plus the floating registry's chrome targets drive how the

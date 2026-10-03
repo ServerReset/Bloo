@@ -190,14 +190,6 @@ internal fun SearchLayer(
         // handled at the source: AuroraBackground's `paused`, which the root
         // drives from this layer's `onOpenChanged`.)
         val edge = 16.dp
-        // On the cover, a camera band beside the island (see coverCutoutBand)
-        // is real, unoccluded space with nothing else fixed in it once the
-        // name has taken its share -- a better home for search than a corner
-        // it would otherwise float over. Docked there it's a fixed CoverBand-
-        // SearchDock circle, matching the reservation CompactGarage's own
-        // band Row leaves for it; undocked (no band, or not compact) it's the
-        // free-floating, draggable circle this always was. "Fixed when the
-        // space is there, floating when it isn't."
         val bubble = 52.dp
         val barW = minOf(maxWidth - edge * 2, 640.dp)
         val barH = 52.dp
@@ -219,14 +211,6 @@ internal fun SearchLayer(
         val maxY = (maxHeight - bubble - edge - bottomInset).coerceAtLeast(edge)
         val restX = maxX
         val restY = maxY
-        // This Box sits inside BlooApp's own `.padding(padding)` (the
-        // Scaffold's safeDrawing content padding), while coverCutoutBand()
-        // reports coordinates in the WINDOW's own space -- the same gap
-        // CompactGarage's band Row doesn't have to close because it draws
-        // full-bleed, ignoring that padding entirely (see its own comment).
-        // Subtracting the same inset back out here is what puts this bubble
-        // in the same coordinate space as that Row, so the two agree on
-        // where the band actually is.
         LaunchedEffect(Unit) {
             vm.searchBubblePosition()?.let { (xFrac, _) -> dockName = SearchDock.fromFrac(xFrac).name }
         }
