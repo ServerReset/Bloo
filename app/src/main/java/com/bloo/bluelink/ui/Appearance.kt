@@ -320,16 +320,16 @@ internal fun ColorPickerCanvas(
                     awaitEachGesture {
                         val down = awaitFirstDown()
                         down.consume()
-                        sat = (down.position.x / size.width).coerceIn(0.02f, 1f)
-                        value = 1f - (down.position.y / size.height).coerceIn(0f, 0.98f)
+                        sat = snapStep((down.position.x / size.width).coerceIn(0.1f, 1f), 0.1f).coerceIn(0.1f, 1f)
+                        value = snapStep(1f - (down.position.y / size.height).coerceIn(0f, 1f), 0.1f).coerceIn(0.3f, 1f)
                         update()
                         while (true) {
                             val ev = awaitPointerEvent()
                             val ch = ev.changes.firstOrNull() ?: break
                             if (!ch.pressed) break
                             ch.consume()
-                            sat = (ch.position.x / size.width).coerceIn(0.02f, 1f)
-                            value = 1f - (ch.position.y / size.height).coerceIn(0f, 0.98f)
+                            sat = snapStep((ch.position.x / size.width).coerceIn(0.1f, 1f), 0.1f).coerceIn(0.1f, 1f)
+                            value = snapStep(1f - (ch.position.y / size.height).coerceIn(0f, 1f), 0.1f).coerceIn(0.3f, 1f)
                             update()
                         }
                     }
@@ -356,14 +356,14 @@ internal fun ColorPickerCanvas(
                     awaitEachGesture {
                         val down = awaitFirstDown()
                         down.consume()
-                        hue = ((down.position.x / size.width) * 360f).coerceIn(0f, 359.9f)
+                        hue = snapStep((down.position.x / size.width) * 360f, 15f).coerceIn(0f, 345f)
                         update()
                         while (true) {
                             val ev = awaitPointerEvent()
                             val ch = ev.changes.firstOrNull() ?: break
                             if (!ch.pressed) break
                             ch.consume()
-                            hue = ((ch.position.x / size.width) * 360f).coerceIn(0f, 359.9f)
+                            hue = snapStep((ch.position.x / size.width) * 360f, 15f).coerceIn(0f, 345f)
                             update()
                         }
                     }
@@ -401,3 +401,7 @@ internal fun ColorPickerCanvas(
         )
     }
 }
+
+
+/** Rounds [v] to the nearest multiple of [step]: the colour picker only offers fixed values, never free ones. */
+private fun snapStep(v: Float, step: Float): Float = Math.round(v / step) * step

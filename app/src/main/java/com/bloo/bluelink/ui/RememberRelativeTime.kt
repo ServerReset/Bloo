@@ -104,7 +104,8 @@ internal fun AnimatedSlider(
     value: Float,
     onValueChange: (Float) -> Unit,
     valueRange: ClosedFloatingPointRange<Float>,
-    steps: Int = 0,
+    // No default and never zero: every slider in the app picks from fixed values, none are free.
+    steps: Int,
     accent: Color = MaterialTheme.colorScheme.primary,
     // Fired once, with the final value, when the drag/tap settles — for callers
     // whose real commit is expensive (see the Vibrancy/UI-scale sliders, which
@@ -122,7 +123,7 @@ internal fun AnimatedSlider(
         value = value,
         onValueChange = { latestValue = it; onValueChange(it) },
         valueRange = valueRange,
-        steps = steps,
+        steps = steps.coerceAtLeast(1),
         accent = accent,
         inactiveColor = scheme.surfaceContainerHighest,
         dotOnActive = scheme.onPrimary.copy(alpha = 0.7f),

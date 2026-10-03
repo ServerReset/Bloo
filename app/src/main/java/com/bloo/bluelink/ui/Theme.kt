@@ -18,6 +18,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.Font
@@ -110,27 +111,43 @@ private fun Color.extractHue(): Float {
  * they follow the same delta as primary (preserving the expressive offset).
  */
 internal fun ColorScheme.applyCustomPalette(p: CustomPaletteData): ColorScheme {
+    // The picked colours' own hue AND saturation drive the accent roles (the old version only rotated the
+    // base scheme's hue, so a deep navy and a pastel blue came out the same). Lightness is NOT taken from
+    // the pick: each role sits at a fixed tone for the theme, which is what keeps text readable on it.
+    val dark = surface.luminance() < 0.5f
+    val (pri, onPri, priCont, onPriCont) = accentRoles(p.primaryArgb, dark)
+    // Secondary and tertiary: their own colour when the palette has one, otherwise the base scheme's own
+    // roles carried round to the primary's hue (so a one-colour palette still reads as one family).
     val primaryDelta = Color(p.primaryArgb.toLong() and 0xFFFFFFFFL).extractHue() - BasePaletteHue
-    fun Color.rp() = rotateHue(primaryDelta)
-
-    val secDelta = p.secondaryArgb
-        ?.let { Color(it.toLong() and 0xFFFFFFFFL).extractHue() - secondary.extractHue() }
-        ?: primaryDelta
-    fun Color.rs() = rotateHue(secDelta)
-
-    val tertDelta = p.tertiaryArgb
-        ?.let { Color(it.toLong() and 0xFFFFFFFFL).extractHue() - tertiary.extractHue() }
-        ?: primaryDelta
-    fun Color.rt() = rotateHue(tertDelta)
-
+    val sec = p.secondaryArgb?.let { accentRoles(it, dark) }
+    val ter = p.tertiaryArgb?.let { accentRoles(it, dark) }
     return copy(
-        primary = primary.rp(), onPrimary = onPrimary.rp(),
-        primaryContainer = primaryContainer.rp(), onPrimaryContainer = onPrimaryContainer.rp(),
-        secondary = secondary.rs(), onSecondary = onSecondary.rs(),
-        secondaryContainer = secondaryContainer.rs(), onSecondaryContainer = onSecondaryContainer.rs(),
-        tertiary = tertiary.rt(), onTertiary = onTertiary.rt(),
-        tertiaryContainer = tertiaryContainer.rt(), onTertiaryContainer = onTertiaryContainer.rt(),
+        primary = pri, onPrimary = onPri, primaryContainer = priCont, onPrimaryContainer = onPriCont,
+        secondary = sec?.get(0) ?: secondary.rotateHue(primaryDelta),
+        onSecondary = sec?.get(1) ?: onSecondary.rotateHue(primaryDelta),
+        secondaryContainer = sec?.get(2) ?: secondaryContainer.rotateHue(primaryDelta),
+        onSecondaryContainer = sec?.get(3) ?: onSecondaryContainer.rotateHue(primaryDelta),
+        tertiary = ter?.get(0) ?: tertiary.rotateHue(primaryDelta),
+        onTertiary = ter?.get(1) ?: onTertiary.rotateHue(primaryDelta),
+        tertiaryContainer = ter?.get(2) ?: tertiaryContainer.rotateHue(primaryDelta),
+        onTertiaryContainer = ter?.get(3) ?: onTertiaryContainer.rotateHue(primaryDelta),
     )
+}
+
+/** The four roles of one accent (colour, on-colour, container, on-container) at the theme's fixed tones. */
+private fun accentRoles(argb: Int, dark: Boolean): List<Color> {
+    fun role(tone: Float, satScale: Float): Color {
+        val hsl = FloatArray(3)
+        androidx.core.graphics.ColorUtils.colorToHSL(argb, hsl)
+        hsl[1] = (hsl[1].coerceIn(0.25f, 0.9f) * satScale).coerceIn(0f, 1f)
+        hsl[2] = tone
+        return Color(androidx.core.graphics.ColorUtils.HSLToColor(hsl))
+    }
+    return if (dark) {
+        listOf(role(0.78f, 1f), role(0.14f, 0.7f), role(0.28f, 0.8f), role(0.88f, 0.9f))
+    } else {
+        listOf(role(0.38f, 1f), role(0.98f, 0.5f), role(0.88f, 0.9f), role(0.12f, 0.8f))
+    }
 }
 
 
