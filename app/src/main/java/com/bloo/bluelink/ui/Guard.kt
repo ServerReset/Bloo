@@ -202,6 +202,10 @@ internal fun LockOverlay(vm: AppViewModel, opaqueBackdrop: Boolean = false) {
     // Pattern for "pick the PIN route": tapping "Use PIN" once; a failed
     // biometric prompt stays on the biometric UI; PIN always returns here on
     // the next lock anyway (fresh overlay remounts at the default mode).
+    // The lock screen follows the app theme: a dark veil with light text in dark mode, a pale one with
+    // dark text in light mode (it used to force white-on-black either way).
+    val lockBg = MaterialTheme.colorScheme.background
+    val lockFg = MaterialTheme.colorScheme.onBackground
     val haptics = LocalHaptics.current
     val showBiometric = bioAvailable && !usePinMode
     // The backdrop animates between fully opaque (the first frames of a cold start, before
@@ -222,7 +226,7 @@ internal fun LockOverlay(vm: AppViewModel, opaqueBackdrop: Boolean = false) {
             // underneath has finished composing) this is fully opaque instead: a 45% scrim
             // over a sharp garage would show car names, plates and status through the lock
             // screen, which is the one thing it exists to prevent.
-            .background(Color.Black.copy(alpha = backdropAlpha))
+            .background(lockBg.copy(alpha = backdropAlpha))
             .noRippleClickable {},
     ) {
         // Floating back arrow -> login: the same FloatingIcon every other floating
@@ -233,8 +237,8 @@ internal fun LockOverlay(vm: AppViewModel, opaqueBackdrop: Boolean = false) {
             icon = Icons.AutoMirrored.Filled.ArrowBack,
             description = "Back to login",
             onClick = { haptics?.click(); vm.lockToLogin() },
-            containerColor = Color.White.copy(alpha = 0.16f),
-            contentColor = Color.White,
+            containerColor = lockFg.copy(alpha = 0.16f),
+            contentColor = lockFg,
             modifier = Modifier
                 .align(Alignment.TopStart)
                 .statusBarsPadding(),
@@ -253,20 +257,20 @@ internal fun LockOverlay(vm: AppViewModel, opaqueBackdrop: Boolean = false) {
                     Icons.Filled.Fingerprint,
                     contentDescription = null,
                     modifier = Modifier.size(if (compact) 44.dp else 72.dp),
-                    tint = Color.White,
+                    tint = lockFg,
                 )
                 Spacer(Modifier.height(if (compact) 10.dp else 18.dp))
                 Text(
                     "Bloo is locked",
                     style = if (compact) MaterialTheme.typography.titleLarge else MaterialTheme.typography.headlineSmall,
                     fontWeight = FontWeight.Bold,
-                    color = Color.White,
+                    color = lockFg,
                 )
                 Spacer(Modifier.height(GapHairline))
                 Text(
                     if (appState.appPinSet) "Confirm it's you, or use your PIN." else "Confirm it's you to reach your vehicles.",
                     style = MaterialTheme.typography.bodyMedium,
-                    color = Color.White.copy(alpha = 0.85f),
+                    color = lockFg.copy(alpha = 0.85f),
                 )
                 Spacer(Modifier.height(if (compact) 16.dp else 28.dp))
                 // White pill for maximum contrast over the dimmed blur.
@@ -275,8 +279,8 @@ internal fun LockOverlay(vm: AppViewModel, opaqueBackdrop: Boolean = false) {
                     onClick = { authenticateBiometric() },
                     modifier = Modifier.height(if (compact) 56.dp else ControlHeight),
                     interactionSource = unlockSource,
-                    containerColor = Color.White,
-                    contentColor = Color.Black,
+                    containerColor = lockFg,
+                    contentColor = lockBg,
                     contentPadding = PaddingValues(horizontal = 40.dp, vertical = 18.dp),
                     expressive = true,
                     fillOnPress = true,
@@ -292,8 +296,8 @@ internal fun LockOverlay(vm: AppViewModel, opaqueBackdrop: Boolean = false) {
                     SafeMorphTextButton(
                         "Use PIN",
                         onClick = { haptics?.click(); usePinMode = true },
-                        containerColor = Color.White.copy(alpha = 0.10f),
-                        contentColor = Color.White,
+                        containerColor = lockFg.copy(alpha = 0.10f),
+                        contentColor = lockFg,
                     )
                 }
             } else if (appState.appPinSet) {
@@ -393,20 +397,20 @@ internal fun LockOverlay(vm: AppViewModel, opaqueBackdrop: Boolean = false) {
                     Icons.Filled.Lock,
                     contentDescription = null,
                     modifier = Modifier.size(if (compact) 44.dp else 72.dp),
-                    tint = Color.White,
+                    tint = lockFg,
                 )
                 Spacer(Modifier.height(GapSection))
                 Text(
                     "Bloo is locked",
                     style = MaterialTheme.typography.headlineSmall,
                     fontWeight = FontWeight.Bold,
-                    color = Color.White,
+                    color = lockFg,
                 )
                 Spacer(Modifier.height(GapHairline))
                 Text(
                     "Please try opening Bloo again.",
                     style = MaterialTheme.typography.bodyMedium,
-                    color = Color.White.copy(alpha = 0.85f),
+                    color = lockFg.copy(alpha = 0.85f),
                 )
             }
         }

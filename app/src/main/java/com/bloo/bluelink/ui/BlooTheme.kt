@@ -36,6 +36,21 @@ fun BlooTheme(
         ThemeMode.SYSTEM -> isSystemInDarkTheme()
     }
 
+    // The system bars follow the APP's theme, not the phone's: SystemBarStyle.auto (MainActivity) only
+    // sees the system setting, so an app forced Dark on a light phone had dark status icons on a dark
+    // screen (and the reverse).
+    val barsView = androidx.compose.ui.platform.LocalView.current
+    if (!barsView.isInEditMode) {
+        androidx.compose.runtime.SideEffect {
+            var ctx = barsView.context
+            while (ctx is android.content.ContextWrapper && ctx !is android.app.Activity) ctx = ctx.baseContext
+            val window = (ctx as? android.app.Activity)?.window ?: return@SideEffect
+            val controller = androidx.core.view.WindowCompat.getInsetsController(window, barsView)
+            controller.isAppearanceLightStatusBars = !dark
+            controller.isAppearanceLightNavigationBars = !dark
+        }
+    }
+
     val context = LocalContext.current
     // The STATIC scheme is cheap and is what the FIRST frame paints. The dynamic (Material You)
     // scheme extracts the user's wallpaper colours -- a synchronous binder call that can take
