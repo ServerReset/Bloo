@@ -36,7 +36,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -213,7 +212,7 @@ private fun CreditRow(entry: CreditEntry) {
             // target doesn't stretch across empty space to the card's far edge.
             Row(
                 Modifier
-                    .clip(RoundedCornerShape(6.dp))
+                    .clip(TinyShape)
                     .hapticClickable { openUrl(context, entry.url) }
                     .wrapContentWidth(),
                 verticalAlignment = Alignment.CenterVertically,

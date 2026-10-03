@@ -14,7 +14,6 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Security
@@ -62,7 +61,7 @@ private fun DebugInfoItem(
             .fillMaxWidth()
             .then(
                 if (info.copyable && onCopy != null) {
-                    Modifier.clip(RoundedCornerShape(6.dp)).hapticClickable { onCopy(info.value) }
+                    Modifier.clip(TinyShape).hapticClickable { onCopy(info.value) }
                 } else {
                     Modifier
                 }

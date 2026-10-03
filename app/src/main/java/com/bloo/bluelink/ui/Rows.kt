@@ -36,7 +36,6 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.onClick
 import androidx.compose.ui.semantics.heading
@@ -147,7 +146,7 @@ internal fun CropScreen(vin: String, uriString: String, onCancel: () -> Unit, on
                         Modifier
                             .fillMaxWidth()
                             .aspectRatio(16f / 9f)
-                            .clip(RoundedCornerShape(18.dp))
+                            .clip(StandardShape)
                             .onSizeChanged { frame = it }
                             .pointerInput(image) {
                                 detectTransformGestures { _, pan, zoom, _ ->

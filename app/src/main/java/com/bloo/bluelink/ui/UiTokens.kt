@@ -174,6 +174,7 @@ internal val SettingsCardGap: Dp @Composable get() = SpaceUnit * 2.5f
 //
 // Common corner radius values used throughout the app, extracted for consistency.
 // When a shape needs updating, only change it here instead of across 12+ files.
+internal val TinyShape = RoundedCornerShape(8.dp)    // Inline tap targets, swatches
 internal val SmallShape = RoundedCornerShape(12.dp)   // Smaller components, chips
 internal val StandardShape = RoundedCornerShape(16.dp) // Buttons, most cards
 internal val LargeShape = RoundedCornerShape(20.dp)   // Large cards, sheets

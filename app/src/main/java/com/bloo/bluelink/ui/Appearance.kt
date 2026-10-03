@@ -29,7 +29,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
@@ -381,7 +380,7 @@ internal fun ColorPickerCanvas(
             Modifier
                 .fillMaxWidth()
                 .height(36.dp)
-                .clip(RoundedCornerShape(8.dp))
+                .clip(TinyShape)
                 .background(picked)
         )
 

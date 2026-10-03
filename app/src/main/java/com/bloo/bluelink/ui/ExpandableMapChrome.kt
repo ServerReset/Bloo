@@ -311,7 +311,7 @@ internal fun MapTopBar(
         label = "mapBarPop",
     )
     GlassSurface(
-        shape = RoundedCornerShape(24.dp),
+        shape = LargeShape,
         modifier = modifier.fillMaxWidth()
             .pointerInput(Unit) {
                 awaitEachGesture {

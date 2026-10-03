@@ -24,7 +24,6 @@ import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Fullscreen
 import androidx.compose.material.icons.filled.LocationOn
@@ -248,7 +247,7 @@ internal fun LocationPebble(v: Vehicle, state: UiState, vm: AppViewModel, modifi
                         Modifier
                             .fillMaxWidth()
                             .height(if (coverGlance) 130.dp else 220.dp)
-                            .clip(RoundedCornerShape(18.dp))
+                            .clip(StandardShape)
                             .onGloballyPositioned {
                                 expandedMap.originBoundsFor(v.vin).value = Rect(it.positionOnScreen(), it.size.toSize())
                                 expandedMap.locationFor(v.vin).value = loc
@@ -276,7 +275,7 @@ internal fun LocationPebble(v: Vehicle, state: UiState, vm: AppViewModel, modifi
                         Modifier
                             .fillMaxWidth()
                             .height(if (coverGlance) 130.dp else 220.dp)
-                            .clip(RoundedCornerShape(18.dp))
+                            .clip(StandardShape)
                             .onGloballyPositioned { mapOriginBounds = Rect(it.positionOnScreen(), it.size.toSize()) },
                         state = remember { CarMapState() },
                         deviceLocation = state.deviceLocation,
