@@ -1,5 +1,7 @@
 package com.bloo.bluelink.wear
 
+import androidx.core.content.edit
+
 import android.content.Context
 import com.bloo.bluelink.data.SnapshotStore
 import com.bloo.bluelink.data.WatchSyncProtocol
@@ -60,7 +62,9 @@ object WatchPresence {
                 .addOnSuccessListener { info ->
                     val present = info.nodes.isNotEmpty()
                     _hasApp.value = present
-                    app.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putBoolean(KEY_APP, present).apply()
+                    app.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit {
+                        putBoolean(KEY_APP, present)
+                    }
                 }
         }
         runCatching {

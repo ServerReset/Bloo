@@ -11,6 +11,7 @@ data class PairedDevice(val name: String, val address: String)
  *  paired device is my car". Ported from i5-AutoLock's `BluetoothDevices`. */
 object BluetoothDevices {
     fun hasPermission(context: Context): Boolean =
+        @Suppress("InlinedApi") // gated by the minSdk arg on the next line
         context.hasPermission(Manifest.permission.BLUETOOTH_CONNECT, android.os.Build.VERSION_CODES.S)
 
     fun bondedDevices(context: Context): List<PairedDevice> {

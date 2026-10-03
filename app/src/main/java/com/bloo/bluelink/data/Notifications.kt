@@ -104,6 +104,7 @@ object Notifications {
      * narrower question than the one being asked.
      */
     fun hasPermission(context: Context, channelId: String = CHANNEL): Boolean {
+        @Suppress("InlinedApi") // gated by the minSdk arg below
         val runtimeGranted = context.hasPermission(
             Manifest.permission.POST_NOTIFICATIONS, Build.VERSION_CODES.TIRAMISU,
         )

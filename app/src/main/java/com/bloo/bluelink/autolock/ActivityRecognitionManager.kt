@@ -36,6 +36,7 @@ object ActivityRecognitionManager {
     }
 
     private fun hasPermission(context: Context): Boolean =
+        @Suppress("InlinedApi") // gated by the minSdk arg on the next line
         context.hasPermission(Manifest.permission.ACTIVITY_RECOGNITION, Build.VERSION_CODES.Q)
 
     /** Call once per evaluation that wants confirmation; pair with exactly one [stop] call

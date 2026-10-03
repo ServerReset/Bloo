@@ -151,11 +151,11 @@ internal fun MapFeatureRow(
 @Composable
 internal fun MapTopBar(
     vehicleName: String,
+    mapHazeState: HazeState,
+    dragModifier: Modifier,
+    modifier: Modifier = Modifier,
     /** "88% · 415 km": the car's charge and range, under its name. Null leaves the name alone. */
     statusLine: String? = null,
-    mapHazeState: HazeState,
-    modifier: Modifier = Modifier,
-    dragModifier: Modifier,
     onRefreshLocation: (() -> Unit)? = null,
     /** True while a refresh this bar's own [onRefreshLocation] kicked off is
      *  still in flight -- the real command-pending flag from the caller
