@@ -184,7 +184,7 @@ internal fun PinDialogs(
                     // Same conversion as the "finish" pair below, and for the same reason:
                     // Modifier.weight is a Row's parent data and means nothing to this group.
                     modifier = Modifier.fillMaxWidth(),
-                    spacing = 8.dp,
+                    spacing = GapRow,
                     equalWidths = true,
                 ) {
                     MorphTextButton("Cancel", onDismiss)
@@ -209,7 +209,7 @@ internal fun PinDialogs(
                         // their labels. See ExpressiveButtons.kt.
                         ExpressiveButtonRow(
                             modifier = Modifier.fillMaxWidth(),
-                            spacing = 8.dp,
+                            spacing = GapRow,
                             equalWidths = true,
                         ) {
                             MorphTextButton("Keep PIN", onDismiss)

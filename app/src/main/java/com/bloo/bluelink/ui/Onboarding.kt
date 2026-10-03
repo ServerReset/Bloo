@@ -461,7 +461,7 @@ internal fun OnboardingScreen(vm: AppViewModel, mode: OnboardingMode = Onboardin
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 12.dp),
             ) {
                 Column(Modifier.fillMaxWidth().padding(12.dp), verticalArrangement = Arrangement.spacedBy(GapHairline)) {
-                    ExpressiveButtonRow(modifier = Modifier.fillMaxWidth(), spacing = 12.dp) {
+                    ExpressiveButtonRow(modifier = Modifier.fillMaxWidth(), spacing = GapGroup) {
                         if (pageIndex > 0) {
                             SafeMorphTextButton(text = "Back", onClick = { goBack() })
                         }

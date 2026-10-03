@@ -82,7 +82,7 @@ private fun AccountPanel(creds: Credentials, vm: AppViewModel) {
                 modifier = Modifier.fillMaxWidth(),
             )
         }
-        ExpressiveButtonRow(modifier = Modifier.fillMaxWidth(), spacing = 8.dp) {
+        ExpressiveButtonRow(modifier = Modifier.fillMaxWidth(), spacing = GapRow) {
             if (creds.brand.requiresPin && pin.isNotBlank() && pin != creds.pin) {
                 SafeMorphTextButton("Update PIN", onClick = { vm.updatePin(creds.brand, pin) })
             }

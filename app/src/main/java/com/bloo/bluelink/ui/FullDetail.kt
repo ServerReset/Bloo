@@ -292,7 +292,7 @@ internal fun ExpandedCar(
                         .widthIn(max = 960.dp)
                         .fillMaxWidth()
                         .padding(horizontal = 16.dp),
-                    horizontalArrangement = Arrangement.spacedBy(16.dp),
+                    horizontalArrangement = Arrangement.spacedBy(GapSection),
                 ) {
                     Column(
                         Modifier.weight(1f).fillMaxHeight().verticalScroll(leftScroll),

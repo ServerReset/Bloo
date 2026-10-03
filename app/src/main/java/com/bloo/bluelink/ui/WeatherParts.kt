@@ -58,7 +58,7 @@ internal fun WeatherStripe(weather: Weather, fahrenheit: Boolean, caption: Strin
             .fillMaxWidth()
             .outlinedPanel(14.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        horizontalArrangement = Arrangement.spacedBy(GapGroup),
     ) {
         Icon(weatherIcon(weather.condition, weather.isDay), contentDescription = null, tint = tint, modifier = Modifier.size(30.dp))
         Column(Modifier.weight(1f)) {
@@ -97,7 +97,7 @@ internal fun WeatherDetail(weather: Weather, fahrenheit: Boolean, metric: Boolea
     Column(verticalArrangement = Arrangement.spacedBy(GapGroup)) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(16.dp),
+            horizontalArrangement = Arrangement.spacedBy(GapSection),
         ) {
             Icon(
                 weatherIcon(weather.condition, weather.isDay),

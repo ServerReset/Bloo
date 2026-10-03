@@ -204,7 +204,7 @@ internal fun ClimatePresetSection(
                 items = presets,
                 keyOf = { it.id },
                 onReorder = onReorder,
-                spacing = 8.dp,
+                spacing = GapRow,
                 modifier = Modifier.fillMaxWidth(),
             ) { preset, itemDragHandle, _ ->
                 AnimatedVisibility(

@@ -120,7 +120,7 @@ internal fun CarSettingsCard(
                 )
             }
             // A group, not a plain Row: the buttons share the row's width and press against each other.
-            ExpressiveButtonRow(spacing = 8.dp) {
+            ExpressiveButtonRow(spacing = GapRow) {
                 MorphTextButton(if (hasPhoto) "Change photo" else "Choose photo", onClick = onPickPhoto)
                 if (hasPhoto) MorphTextButton("Clear", onClick = { vm.setVehicleImage(v.vin, "") })
             }
@@ -177,7 +177,7 @@ internal fun CarSettingsCard(
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                 )
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Row(horizontalArrangement = Arrangement.spacedBy(GapRow)) {
                     MilesField(state.lastServiceMiles[v.vin], "Last service (mi)", Modifier.weight(1f)) {
                         vm.setLastServiceMiles(v.vin, it)
                     }

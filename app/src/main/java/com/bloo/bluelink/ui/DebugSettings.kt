@@ -226,7 +226,7 @@ fun DebugSettingsPanel(
             item {
                 Spacer(Modifier.height(GapRow))
                 Row(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(GapRow),
                     verticalAlignment = Alignment.Top,
                 ) {
                     Icon(

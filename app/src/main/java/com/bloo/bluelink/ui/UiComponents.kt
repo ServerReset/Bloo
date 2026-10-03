@@ -221,7 +221,7 @@ internal fun IconLeadRow(
     Row(
         modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        horizontalArrangement = Arrangement.spacedBy(GapGroup),
     ) {
         IconBadge(icon, tint, containerColor = containerColor, size = badgeSize)
         Column(Modifier.weight(1f)) {

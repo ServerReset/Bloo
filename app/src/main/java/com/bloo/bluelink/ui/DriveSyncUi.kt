@@ -109,7 +109,7 @@ private fun SyncDevicesContent(state: UiState, vm: AppViewModel) {
         // Dropped in a new order → the new TOP device becomes primary. setPrimaryDevice
         // persists it + triggers a sync so every device converges on the choice.
         onReorder = { reordered -> reordered.firstOrNull()?.let { vm.setPrimaryDevice(it.id) } },
-        spacing = 8.dp,
+        spacing = GapRow,
     ) { device, itemDragHandle, dragging ->
         // A Column, not loose children: a ReorderColumn item slot stacks its children on top of
         // each other, which drew the watch row and "Set up watch" straight over the phone row.
@@ -192,7 +192,7 @@ private fun SyncDevicesContent(state: UiState, vm: AppViewModel) {
         )
     }
 
-    ExpressiveButtonRow(modifier = Modifier.fillMaxWidth(), spacing = 12.dp) {
+    ExpressiveButtonRow(modifier = Modifier.fillMaxWidth(), spacing = GapGroup) {
         SafeMorphTextButton(text = "Sync now", icon = AppIcons.Refresh, onClick = { vm.syncNow() })
     }
 

@@ -219,7 +219,7 @@ internal fun OwnerLinks(v: Vehicle, state: UiState, context: Context) {
         SectionLabel(title)
         ExpressiveButtonRow(
             modifier = Modifier.fillMaxWidth(),
-            spacing = 8.dp,
+            spacing = GapRow,
             lineSpacing = 8.dp,
             content = content,
         )

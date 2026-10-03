@@ -121,7 +121,7 @@ internal fun ToastHost(
             .fillMaxWidth()
             .imePadding()
             .padding(horizontal = 16.dp, vertical = 8.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(GapRow),
     ) {
         state.items.forEach { toast ->
             key(toast.id) { ToastItem(toast, state, hazeState, onCopy) }

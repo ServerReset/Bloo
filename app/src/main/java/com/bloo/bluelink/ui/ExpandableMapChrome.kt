@@ -111,7 +111,7 @@ internal fun MapFeatureRow(
 ) {
     ExpressiveButtonRow(
         modifier = modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = GapRow),
-        spacing = 8.dp,
+        spacing = GapRow,
     ) {
         features.forEach { feature ->
             MorphActionButton(

@@ -190,7 +190,7 @@ private fun PaletteChooser(appearance: SettingsStore.Appearance, vm: AppViewMode
     var showEditor by remember { mutableStateOf(false) }
     Column(verticalArrangement = Arrangement.spacedBy(GapRow)) {
         LabelText("Built-in palettes")
-        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(GapRow)) {
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(GapRow), verticalArrangement = Arrangement.spacedBy(GapRow)) {
             ColorPalette.entries.forEach { palette ->
                 PaletteSwatch(
                     palette = palette,
@@ -200,7 +200,7 @@ private fun PaletteChooser(appearance: SettingsStore.Appearance, vm: AppViewMode
             }
         }
         LabelText("Custom palettes")
-        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(GapRow)) {
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(GapRow), verticalArrangement = Arrangement.spacedBy(GapRow)) {
             appearance.customPalettes.forEach { palette ->
                 CustomPaletteSwatch(
                     palette = palette,

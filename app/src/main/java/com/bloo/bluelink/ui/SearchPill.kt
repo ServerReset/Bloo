@@ -415,7 +415,7 @@ internal fun SearchSuggestions(state: UiState, compact: Boolean = false, onPick:
         // onSurface instead.
         color = MaterialTheme.colorScheme.onSurface,
     )
-    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(GapRow)) {
+    FlowRow(horizontalArrangement = Arrangement.spacedBy(GapRow), verticalArrangement = Arrangement.spacedBy(GapRow)) {
         // Same staggered pop as the search RESULT cards (staggeredResultVisible), reused
         // as-is: this list is just as much a "search UI" element as the results below it,
         // and giving one a cascade while the other snaps in flat is exactly the kind of

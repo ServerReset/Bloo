@@ -164,7 +164,7 @@ internal fun CropScreen(vin: String, uriString: String, onCancel: () -> Unit, on
                     else -> LoadingIndicator()
                 }
             }
-            ExpressiveButtonRow(spacing = 12.dp) {
+            ExpressiveButtonRow(spacing = GapGroup) {
                 SafeMorphTextButton(
                     "Cancel",
                     onClick = onCancel,

@@ -66,7 +66,7 @@ internal fun CarsCardContent(state: UiState, vm: AppViewModel, pick: (String) ->
                             items = state.vehicles,
                             keyOf = { it.vin },
                             onReorder = { vm.reorderVehicles(it) },
-                            spacing = 8.dp,
+                            spacing = GapRow,
                         ) { v, itemDragHandle, dragging ->
                             CarSettingsCard(
                                 v = v, state = state, vm = vm,

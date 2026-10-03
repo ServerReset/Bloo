@@ -155,7 +155,7 @@ internal fun SecurityCardContent(
                     if (canBio) "A 4-8 digit PIN that works as a backup when biometrics aren't available."
                     else "This device has no biometrics, so the app unlocks with this PIN.",
                 )
-                ExpressiveButtonRow(modifier = Modifier.fillMaxWidth(), spacing = 8.dp) {
+                ExpressiveButtonRow(modifier = Modifier.fillMaxWidth(), spacing = GapRow) {
                     MorphActionButton(
                         label = if (pinSet) "Change PIN" else "Set up PIN",
                         icon = if (pinSet) Icons.Filled.LockReset else AppIcons.Lock,

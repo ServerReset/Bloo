@@ -167,7 +167,7 @@ internal fun StateControl(
                     if (pending) {
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            horizontalArrangement = Arrangement.spacedBy(GapRow),
                         ) {
                             LoadingIndicator(Modifier.size(22.dp))
                             Text(
@@ -194,7 +194,7 @@ internal fun StateControl(
                         ) { (ic, label) ->
                             Row(
                                 verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                horizontalArrangement = Arrangement.spacedBy(GapRow),
                             ) {
                                 // null, not `label`: the Text right after already
                                 // carries the same words, so a non-null

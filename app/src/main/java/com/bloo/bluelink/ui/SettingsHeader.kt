@@ -310,7 +310,7 @@ internal fun SettingsHeroCard(state: UiState, vm: AppViewModel, compact: Boolean
                     // pills: the in-app checker (primary) and the GitHub Releases page (a
                     // second source that still works when the checker says up-to-date or
                     // GitHub's API is flaky).
-                    ExpressiveButtonRow(modifier = Modifier.fillMaxWidth(), spacing = 8.dp) {
+                    ExpressiveButtonRow(modifier = Modifier.fillMaxWidth(), spacing = GapRow) {
                         SafeMorphTextButton(
                             "Check",
                             onClick = { vm.checkForUpdateManually() },

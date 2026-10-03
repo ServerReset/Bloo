@@ -97,7 +97,7 @@ internal fun SetupWatchDialog(phoneName: String, onDismiss: () -> Unit) {
                 WatchSetupStep.Pair -> {
                     BodyMediumText("Type in what the watch's \"Pair new device\" screen shows.")
                     SetupField(host, { host = it }, "Watch IP address", KeyboardType.Uri)
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(GapRow)) {
                         SetupField(pairPort, { pairPort = it.filter(Char::isDigit) }, "Pairing port", KeyboardType.Number, Modifier.weight(1f))
                         SetupField(code, { code = it.filter(Char::isDigit).take(6) }, "Pairing code", KeyboardType.Number, Modifier.weight(1f))
                     }

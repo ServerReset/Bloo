@@ -116,7 +116,7 @@ internal fun AiPebble(v: Vehicle, state: UiState, vm: AppViewModel, modifier: Mo
             Column(verticalArrangement = Arrangement.spacedBy(GapHairline)) {
                 summary.lineSequence().map { it.trim() }.filter { it.isNotEmpty() }.forEach { line ->
                     val bulleted = line.startsWith("* ") || line.startsWith("- ")
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(GapRow)) {
                         if (bulleted) {
                             Text(
                                 "•",

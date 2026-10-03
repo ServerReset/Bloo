@@ -102,7 +102,7 @@ internal fun HotspotSlot(
 
     // 12dp between the two slots, the SAME gap every other pair of pebbles in this view sits
     // at (ReorderColumn's own default spacing for the pebble list, and ExpandedCar's
-    // `spacedBy(12.dp)` for the column this slot lives in). It was 2.dp, which is the one
+    // `spacedBy(GapGroup)` for the column this slot lives in). It was 2.dp, which is the one
     // spacing in the multi-column layout that made the pinned pebbles read as a stuck-together
     // pair of a different kind from the cards around them -- part of the same report that the
     // controls pebble looks unlike every other pebble there. The INNER column below keeps its

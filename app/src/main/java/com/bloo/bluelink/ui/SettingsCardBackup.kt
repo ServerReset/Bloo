@@ -122,7 +122,7 @@ internal fun BackupSyncCardContent(
                         onSelect = { vm.setSyncWifiOnly(it == "wifi") },
                     )
                     val disable = rememberConfirmArm()
-                    ExpressiveButtonRow(modifier = Modifier.fillMaxWidth(), spacing = 8.dp) {
+                    ExpressiveButtonRow(modifier = Modifier.fillMaxWidth(), spacing = GapRow) {
                         SafeMorphTextButton("Change Drive file", onClick = { showDriveDialog = true })
                         SafeMorphTextButton(
                             text = if (disable.armed) "Tap again to disable" else "Disable",
@@ -172,7 +172,7 @@ private fun SyncDiagnostics(state: UiState, vm: AppViewModel) {
             // Two phones truly on the SAME Drive file show the same code. If they differ they picked
             // different files (Drive allows duplicate names), the usual reason sync doesn't converge.
             state.syncFileFingerprint?.let { StatusRow("File ID", it, valueMono = true) }
-            ExpressiveButtonRow(modifier = Modifier.fillMaxWidth(), spacing = 8.dp) {
+            ExpressiveButtonRow(modifier = Modifier.fillMaxWidth(), spacing = GapRow) {
                 // A non-destructive round trip through the real provider, to confirm sync works.
                 SafeMorphTextButton("Test sync", onClick = { vm.testSync() })
                 // Adopt the primary's full settings -- only when a primary exists and it isn't this
@@ -193,7 +193,7 @@ private fun ManualBackup(vm: AppViewModel, context: Context) {
     }
     SettingsGroup("Manual backup") {
         BodySmallText("A one-time snapshot file. Credentials are never included.")
-        ExpressiveButtonRow(modifier = Modifier.fillMaxWidth(), spacing = 8.dp) {
+        ExpressiveButtonRow(modifier = Modifier.fillMaxWidth(), spacing = GapRow) {
             SafeMorphTextButton("Export", onClick = { vm.exportSettings(context) })
             SafeMorphTextButton("Restore", onClick = { importLauncher.launch("application/json") })
         }

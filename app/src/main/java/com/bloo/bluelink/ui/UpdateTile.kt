@@ -279,7 +279,7 @@ internal fun UpdateAvailableTile(
             if (state.updatePendingDismiss) {
                 Row(
                     Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(GapRow),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Text(
@@ -296,7 +296,7 @@ internal fun UpdateAvailableTile(
                     )
                 }
             } else {
-                ExpressiveButtonRow(modifier = Modifier.fillMaxWidth(), spacing = 8.dp) {
+                ExpressiveButtonRow(modifier = Modifier.fillMaxWidth(), spacing = GapRow) {
                     MorphTextButton(
                         "Remind me",
                         onClick = { vm.snoozeUpdate() },
