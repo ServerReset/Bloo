@@ -296,46 +296,33 @@ fun AnimatedSlider(
             // Inactive track: from just past the thumb's right edge (thumbX + cut) to
             // the far right end of the control. Only drawn if there's room left --
             // i.e. the thumb isn't already sitting at (or past) the far right edge.
-            val inStart = (thumbX + cut).coerceAtMost(size.width)
-            if (inStart < size.width) {
-                drawRoundRect(
-                    inactiveColor,
-                    topLeft = Offset(inStart, top),
-                    size = Size(size.width - inStart, th),
-                    cornerRadius = radius,
-                )
+            // ONE continuous track behind the handle (no gap cut around it): the whole pill in the
+            // inactive colour, then the accent drawn over it, masked to everything left of the handle.
+            drawRoundRect(inactiveColor, topLeft = Offset(0f, top), size = Size(size.width, th), cornerRadius = radius)
+            if (thumbX > 0f) {
+                androidx.compose.ui.graphics.drawscope.clipRect(left = 0f, top = 0f, right = thumbX, bottom = size.height) {
+                    drawRoundRect(
+                        androidx.compose.ui.graphics.Brush.horizontalGradient(
+                            listOf(accent.copy(alpha = 0.82f), accent),
+                            startX = 0f,
+                            endX = thumbX.coerceAtLeast(1f),
+                        ),
+                        topLeft = Offset(0f, top),
+                        size = Size(size.width, th),
+                        cornerRadius = radius,
+                    )
+                }
             }
-            // Active (traveled) track: from the left edge of the control up to just
-            // before the thumb's left edge (thumbX - cut). Mirror of the inactive
-            // segment above, only drawn if there's room left before the thumb.
-            val acEnd = (thumbX - cut).coerceAtLeast(0f)
-            if (acEnd > 0f) {
-                // Fades in as it grows past a pill's own width, so at the minimum there is no stub.
-                val grow = (acEnd / th).coerceIn(0f, 1f)
-                drawRoundRect(
-                    androidx.compose.ui.graphics.Brush.horizontalGradient(
-                        listOf(accent.copy(alpha = 0.78f * grow), accent.copy(alpha = grow)),
-                        startX = 0f,
-                        endX = acEnd,
-                    ),
-                    topLeft = Offset(0f, top),
-                    size = Size(acEnd, th),
-                    cornerRadius = radius,
-                )
-            }
-            // Step dots: one at each snap position plus the two endpoints (n = steps
-            // + 2), evenly spaced across the full travel distance. A dot within `cut`
-            // pixels of the thumb is skipped entirely so it doesn't peek out from
-            // underneath the thumb; each remaining dot is tinted "already passed"
-            // (dotOnActive) or "still ahead" (dotOnInactive) based on which side of
-            // thumbX it falls on.
             if (steps > 0) {
                 val n = steps + 2
                 val rPx = dotR.toPx()
+                // A crowded slider draws every k-th dot so the track never turns into a dotted line.
+                val every = ((n * (dotR.toPx() * 5f)) / size.width.coerceAtLeast(1f)).toInt().coerceAtLeast(1)
                 for (i in 0 until n) {
+                    if (i % every != 0 && i != n - 1) continue
                     val tf = i.toFloat() / (n - 1)
                     val x = padPx + travel * tf
-                    if (abs(x - thumbX) < cut) continue
+                    if (abs(x - thumbX) < halfThumb + 4.dp.toPx()) continue
                     // Near the thumb the dots swell while it is held, like they are being pulled along.
                     val near = (1f - abs(x - thumbX) / (padPx * 4f)).coerceIn(0f, 1f)
                     drawCircle(if (x <= thumbX) dotOnActive else dotOnInactive, rPx * (1f + 0.7f * near * press), Offset(x, cy))
@@ -361,12 +348,6 @@ fun AnimatedSlider(
                 accent,
                 topLeft = Offset(thumbX - twPx / 2f, -2.dp.toPx() * press),
                 size = Size(twPx, size.height + 4.dp.toPx() * press),
-                cornerRadius = CornerRadius(twPx / 2f),
-            )
-            drawRoundRect(
-                Color.White.copy(alpha = 0.35f),
-                topLeft = Offset(thumbX - twPx / 2f + twPx * 0.2f, 4.dp.toPx()),
-                size = Size(twPx * 0.25f, size.height * 0.4f),
                 cornerRadius = CornerRadius(twPx / 2f),
             )
         }

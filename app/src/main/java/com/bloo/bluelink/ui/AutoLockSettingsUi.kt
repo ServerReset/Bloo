@@ -119,8 +119,8 @@ internal fun AutoLockSettingsGroup(v: Vehicle, vm: AppViewModel) {
                 value = current.graceSeconds.toFloat(),
                 onValueChange = { updateLocal(current.copy(graceSeconds = it.roundToInt())) },
                 onValueSettled = { update(current.copy(graceSeconds = it.roundToInt())) },
-                valueRange = 5f..120f,
-                steps = 22,
+                valueRange = 10f..120f,
+                steps = 10,
             )
             LabelSmallText(
                 "Wait this long before locking. Taps \"Lock now\" to skip the countdown.",
