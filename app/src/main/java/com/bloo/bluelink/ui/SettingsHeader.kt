@@ -410,34 +410,32 @@ internal fun SettingsHeroCard(state: UiState, vm: AppViewModel, compact: Boolean
                         // cannot disagree about what the update flow is currently offering.
                         val act = updateAction(state, updateInfo, seamless)
                         val updateSource = remember { MutableInteractionSource() }
-                        MorphButton(
-                            onClick = { runUpdateAction(state, vm, updateInfo, context) },
-                            active = act.ready,
-                            activeContainerColor = ChargeGreen,
-                            activeContentColor = Color.White,
-                            enabled = !state.updateInstalling && !state.updateDownloading,
-                            interactionSource = updateSource,
-                            expressive = true,
-                            fillOnPress = true,
-                            groupWeight = GroupWeightProportional,
-                        ) {
-                            MorphButtonLabel(act.icon, act.label, pending = false)
+                        // Download and "Not now" share one row, the way every pair of actions does.
+                        ExpressiveButtonRow(modifier = Modifier.fillMaxWidth(), spacing = GapRow) {
+                            MorphButton(
+                                onClick = { runUpdateAction(state, vm, updateInfo, context) },
+                                active = act.ready,
+                                activeContainerColor = ChargeGreen,
+                                activeContentColor = Color.White,
+                                enabled = !state.updateInstalling && !state.updateDownloading,
+                                interactionSource = updateSource,
+                                expressive = true,
+                                fillOnPress = true,
+                                groupWeight = GroupWeightProportional,
+                            ) {
+                                MorphButtonLabel(act.icon, act.label, pending = false)
+                            }
+                            SafeMorphTextButton(
+                                "Not now",
+                                onClick = vm::dismissUpdate,
+                                enabled = !state.updateDownloading && !state.updateInstalling,
+                            )
                         }
                         // Shared with the update pebble -- see UpdateReleaseNotes. The two
                         // used to keep a copy each, identical but for the excerpt length and
                         // one of them forgetting FLAG_ACTIVITY_NEW_TASK on the intent.
                         Spacer(Modifier.height(GapRow))
                         UpdateReleaseNotes(updateInfo, maxLines = 3)
-                        Spacer(Modifier.height(GapRow))
-                        // Left-aligned like every other lone button in the app. It used to
-                        // sit in a Row with a leading weight(1f) Spacer to push it to the
-                        // right edge, which was the one right-aligned button in Settings and
-                        // read as a different kind of control from the action above it.
-                        SafeMorphTextButton(
-                            "Not now",
-                            onClick = vm::dismissUpdate,
-                            enabled = !state.updateDownloading && !state.updateInstalling,
-                        )
                         }
                         }
                     }

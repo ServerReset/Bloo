@@ -40,13 +40,16 @@ internal fun AccountsCardContent(state: UiState, vm: AppViewModel) {
             if (accounts.isEmpty()) {
                 BodyMediumText("Not signed in", color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
-            accounts.forEach { AccountPanel(it, vm) }
-            SafeMorphTextButton(
-                text = if (accounts.isEmpty()) "Sign in" else "Add another account",
-                onClick = { vm.beginAddAccount() },
-                icon = Icons.Filled.PersonAdd,
-                emphasis = if (accounts.isEmpty()) ButtonEmphasis.Primary else ButtonEmphasis.Tonal,
-            )
+            // "Add another account" rides in the LAST account's button row, next to its Sign out.
+            accounts.forEachIndexed { i, creds -> AccountPanel(creds, vm, addAnother = i == accounts.lastIndex) }
+            if (accounts.isEmpty()) {
+                SafeMorphTextButton(
+                    text = "Sign in",
+                    onClick = { vm.beginAddAccount() },
+                    icon = Icons.Filled.PersonAdd,
+                    emphasis = ButtonEmphasis.Primary,
+                )
+            }
             if (accounts.any { it.brand.requiresPin }) {
                 BodySmallText("Wrong-PIN attempts lock the service PIN for a few minutes. Fix it here if commands fail.")
             }
@@ -56,7 +59,7 @@ internal fun AccountsCardContent(state: UiState, vm: AppViewModel) {
 
 /** One signed-in account: who it is, its password and service PIN, and signing it out. */
 @Composable
-private fun AccountPanel(creds: Credentials, vm: AppViewModel) {
+private fun AccountPanel(creds: Credentials, vm: AppViewModel, addAnother: Boolean) {
     val signOut = rememberConfirmArm()
     Column(
         Modifier.fillMaxWidth().outlinedPanel(14.dp),
@@ -91,6 +94,13 @@ private fun AccountPanel(creds: Credentials, vm: AppViewModel) {
                 onClick = { if (signOut.armed) vm.logout(creds.brand) else signOut.arm() },
                 emphasis = ButtonEmphasis.Destructive,
             )
+            if (addAnother) {
+                SafeMorphTextButton(
+                    text = "Add another account",
+                    onClick = { vm.beginAddAccount() },
+                    icon = Icons.Filled.PersonAdd,
+                )
+            }
         }
     }
 }

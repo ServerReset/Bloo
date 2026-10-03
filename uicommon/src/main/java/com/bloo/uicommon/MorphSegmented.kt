@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -125,16 +126,23 @@ fun MorphSegmented(
     }
     val visualIndex = dragIndex ?: pendingIndex ?: if (indicatorVisible) selectedIndex else -1
 
-    // One spring-driven weight per segment: the chosen one stretches, the others squash.
+    // ONE spring drives everything: the highlight's position along the track (0..n-1, fractional while
+    // it travels). The segment widths and the highlight are both derived from it every frame, so the
+    // highlight is literally the stretched segment sliding to its neighbour, never two things animating.
     val ratio = stretchRatio(n)
-    val weights = remember(n) { List(n) { Animatable(1f) } }
+    val pos = remember(n) { Animatable(selectedIndex.toFloat()) }
+    val shown = remember(n) { Animatable(if (visualIndex >= 0) 1f else 0f) }
     LaunchedEffect(visualIndex, n) {
-        weights.forEachIndexed { i, w ->
-            val target = if (i == visualIndex) ratio else 1f
-            scope.launch {
-                w.animateTo(target, spring(dampingRatio = 0.55f, stiffness = Spring.StiffnessMediumLow))
-            }
+        if (visualIndex >= 0) {
+            launch { shown.animateTo(1f, spring(stiffness = Spring.StiffnessMedium)) }
+            pos.animateTo(visualIndex.toFloat(), spring(dampingRatio = 0.62f, stiffness = Spring.StiffnessMediumLow))
+        } else {
+            shown.animateTo(0f, spring(stiffness = Spring.StiffnessMedium))
         }
+    }
+    /** Each segment's share of the width at the current position: 1, plus a stretch where the highlight is. */
+    fun weightsNow(): FloatArray = FloatArray(n) { i ->
+        1f + (ratio - 1f) * shown.value * (1f - abs(pos.value - i)).coerceAtLeast(0f)
     }
 
     val gap = 4.dp
@@ -147,10 +155,11 @@ fun MorphSegmented(
         /** Which segment sits under x right now, using the live (mid-spring) widths. */
         fun indexAt(x: Float): Int {
             val free = (trackWidthPx - gapPx * (n - 1)).coerceAtLeast(1f)
-            val total = weights.sumOf { it.value.toDouble() }.toFloat().coerceAtLeast(0.01f)
+            val ws = weightsNow()
+            val total = ws.sum().coerceAtLeast(0.01f)
             var left = 0f
             for (i in 0 until n) {
-                val w = free * weights[i].value / total
+                val w = free * ws[i] / total
                 if (x < left + w + gapPx / 2f) return i
                 left += w + gapPx
             }
@@ -159,12 +168,13 @@ fun MorphSegmented(
 
         SegmentTrack(
             n = n,
-            weights = { FloatArray(n) { weights[it].value } },
+            weights = ::weightsNow,
+            position = { pos.value },
+            shown = { shown.value },
             gap = gap,
             height = trackHeight,
             onWidth = { trackWidthPx = it },
             // The chosen segment's fill is painted behind the labels at that segment's live size.
-            selectedIndex = { visualIndex },
             indicatorColor = indicatorColor,
             segmentShape = segmentShape,
             modifier = Modifier
@@ -235,6 +245,7 @@ fun MorphSegmented(
             )
             Box(
                 modifier = Modifier
+                    .fillMaxSize()
                     .clip(segmentShape)
                     .semantics {
                         contentDescription = opt.label
@@ -289,7 +300,8 @@ private fun SegmentTrack(
     gap: Dp,
     height: Dp,
     onWidth: (Float) -> Unit,
-    selectedIndex: () -> Int,
+    position: () -> Float,
+    shown: () -> Float,
     indicatorColor: Color,
     segmentShape: RoundedCornerShape,
     modifier: Modifier,
@@ -300,19 +312,33 @@ private fun SegmentTrack(
         modifier = modifier
             .height(height)
             .drawBehind {
-                val sel = selectedIndex()
-                if (sel !in 0 until n) return@drawBehind
+                val vis = shown()
+                if (vis <= 0.01f) return@drawBehind
                 val g = gap.toPx()
                 val w = weights()
                 val total = w.sum().coerceAtLeast(0.01f)
                 val free = size.width - g * (n - 1)
-                var left = 0f
-                for (i in 0 until sel) left += free * w[i] / total + g
-                val width = free * w[sel] / total
+                // Left and right edge of every segment at this instant.
+                val lefts = FloatArray(n)
+                val rights = FloatArray(n)
+                var x = 0f
+                for (i in 0 until n) {
+                    lefts[i] = x
+                    x += free * w[i] / total
+                    rights[i] = x
+                    x += g
+                }
+                // The highlight: edges blended between the two segments it is travelling across.
+                val p = position().coerceIn(0f, (n - 1).toFloat())
+                val i = p.toInt().coerceAtMost(n - 1)
+                val j = (i + 1).coerceAtMost(n - 1)
+                val f = p - i
+                val l = lefts[i] + (lefts[j] - lefts[i]) * f
+                val r = rights[i] + (rights[j] - rights[i]) * f
                 drawRoundRect(
-                    indicatorColor,
-                    topLeft = Offset(left, 0f),
-                    size = Size(width, size.height),
+                    indicatorColor.copy(alpha = indicatorColor.alpha * vis),
+                    topLeft = Offset(l, 0f),
+                    size = Size((r - l).coerceAtLeast(0f), size.height),
                     cornerRadius = CornerRadius(12.dp.toPx()),
                 )
             },
