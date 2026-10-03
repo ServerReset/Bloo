@@ -170,7 +170,7 @@ internal fun StatusBarScrim(
                     // one shape this scrim actually needs, unlike a small floating chip
                     // (appHazeEffect's own default), which reads better with a flat,
                     // uniformly full-strength blur instead.
-                    Modifier.appGlassEffect(hazeState, RoundedCornerShape(0.dp), fadeOut = true)
+                    Modifier.fadeOutBottom().appGlassEffect(hazeState, RoundedCornerShape(0.dp), fadeOut = true)
                 } else {
                     Modifier
                 },

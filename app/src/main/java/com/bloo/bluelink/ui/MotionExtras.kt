@@ -158,3 +158,18 @@ internal fun Modifier.sparkleBurst(on: Boolean, color: Color = MaterialTheme.col
         }
     }
 }
+
+
+/**
+ * Fades everything this modifier's content draws to nothing at the bottom edge, so the effect gets
+ * weaker the further down it goes (the status bar's glass). Place it BEFORE the effect it should fade.
+ */
+internal fun Modifier.fadeOutBottom(): Modifier = this
+    .graphicsLayer { compositingStrategy = androidx.compose.ui.graphics.CompositingStrategy.Offscreen }
+    .drawWithContent {
+        drawContent()
+        drawRect(
+            Brush.verticalGradient(listOf(Color.Black, Color.Black.copy(alpha = 0.55f), Color.Transparent)),
+            blendMode = androidx.compose.ui.graphics.BlendMode.DstIn,
+        )
+    }

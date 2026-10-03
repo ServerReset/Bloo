@@ -354,18 +354,8 @@ internal fun SettingsScreen(
             }
             item {
 
-            // Display: theme, colour, units, size
-            DisplayCardContent(appearance, advanced, vm)
-            }
-            item {
-
-            // Font
-            // SIMPLE, not advanced. This card is where Atkinson Hyperlegible
-            // lives -- a typeface designed for low vision -- and an
-            // accessibility choice behind a mode called "advanced" is a
-            // choice the people who need it are least likely to find. The
-            // rest of the card costs nothing to show alongside it.
-            FontCardContent(appearance, vm)
+            // Visuals: theme, colour, font, units, size
+            VisualsCardContent(appearance, advanced, vm)
             }
             item {
 

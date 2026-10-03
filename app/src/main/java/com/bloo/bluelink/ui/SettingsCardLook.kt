@@ -12,7 +12,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.only
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Style
-import androidx.compose.material.icons.filled.TextFields
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.ui.semantics.onClick
 import androidx.compose.runtime.Composable
@@ -48,17 +47,20 @@ import com.bloo.bluelink.data.setHapticsEnabled
 import com.bloo.bluelink.data.setPebbleOutline
 import com.bloo.bluelink.data.setThemeMode
 
-/** The "Display" card: theme and colour, units, text scale, the search bubble, and the welcome cards. */
+/** The "Visuals" card: theme and colour, font, units, text scale, the search bubble, and the welcome cards. */
 @Composable
-internal fun DisplayCardContent(appearance: SettingsStore.Appearance, advanced: Boolean, vm: AppViewModel) {
+internal fun VisualsCardContent(appearance: SettingsStore.Appearance, advanced: Boolean, vm: AppViewModel) {
     SettingsCard(
-        "Display",
+        "Visuals",
         Icons.Filled.Palette,
         vm,
         status = displayStatus(appearance),
     ) {
         Column(verticalArrangement = Arrangement.spacedBy(GapGroup)) {
             ThemeGroups(appearance, advanced, vm)
+            // SIMPLE, not advanced: Atkinson Hyperlegible is a typeface for low vision, and an accessibility
+            // choice behind "advanced" is the one the people who need it are least likely to find.
+            FontGroup(appearance, vm)
             SettingsGroup("Units") {
                 UnitSystemRow(appearance, vm)
                 PopVisible(visible = advanced) {
@@ -99,28 +101,17 @@ private fun displayStatus(appearance: SettingsStore.Appearance): String = listOf
     if (appearance.unitSystem == "metric") "Metric" else "Imperial",
 ).joinToString(" · ")
 
-/** The "Font" card: which typeface the app is set in. */
+/** The "Font" group of the Visuals card: which typeface the app is set in. */
 @Composable
-internal fun FontCardContent(appearance: SettingsStore.Appearance, vm: AppViewModel) {
+private fun FontGroup(appearance: SettingsStore.Appearance, vm: AppViewModel) {
     val labels = mapOf(
         FontChoice.SYSTEM to "System default",
         FontChoice.ATKINSON to "Atkinson Hyperlegible",
         FontChoice.GOOGLE_SANS to "Google Sans",
     )
-    SettingsCard(
-        "Font",
-        Icons.Filled.TextFields,
-        vm,
-        status = when (appearance.fontChoice) {
-            FontChoice.ATKINSON -> "Atkinson"
-            FontChoice.GOOGLE_SANS -> "Google Sans"
-            else -> "System"
-        },
-    ) {
-        Column(verticalArrangement = Arrangement.spacedBy(GapRow)) {
-            FontChoice.entries.forEach { choice ->
-                ChoiceRow(labels.getValue(choice), appearance.fontChoice == choice) { vm.setFontChoice(choice) }
-            }
+    SettingsGroup("Font") {
+        FontChoice.entries.forEach { choice ->
+            ChoiceRow(labels.getValue(choice), appearance.fontChoice == choice) { vm.setFontChoice(choice) }
         }
     }
 }

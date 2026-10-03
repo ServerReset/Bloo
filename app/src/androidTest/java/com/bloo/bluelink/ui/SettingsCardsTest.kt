@@ -74,19 +74,9 @@ class SettingsCardsTest {
         LocationCardContent(appearance, vm)
     }
 
-    @Test fun display() = checkCard("Display", "Show welcome cards") { vm ->
+    @Test fun visuals() = checkCard("Visuals", "Show welcome cards") { vm ->
         val appearance by vm.appearance.collectAsState()
-        DisplayCardContent(appearance, advanced = true, vm = vm)
-    }
-
-    @Test fun theme() = checkCard("Theme", "Mode") { vm ->
-        val appearance by vm.appearance.collectAsState()
-        ThemeCardContent(appearance, advanced = true, vm = vm)
-    }
-
-    @Test fun font() = checkCard("Font", "System default") { vm ->
-        val appearance by vm.appearance.collectAsState()
-        FontCardContent(appearance, vm)
+        VisualsCardContent(appearance, advanced = true, vm = vm)
     }
 
     @Test fun security() = checkCard("Security", "Set up PIN") { vm ->

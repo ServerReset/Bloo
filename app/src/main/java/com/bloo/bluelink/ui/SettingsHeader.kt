@@ -17,10 +17,8 @@ package com.bloo.bluelink.ui
 import android.content.Intent
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
-import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -296,7 +294,11 @@ internal fun SettingsHeroCard(state: UiState, vm: AppViewModel) {
             // The build number is the app's real version here (versionName stays
             // "0.1" on purpose), so it carries the hero stat the same way a car's
             // charge % or range does -- with the full label as its caption.
-            Row(verticalAlignment = Alignment.Bottom) {
+            val headline = state.updateAvailable?.takeIf { !state.updateTileDismissed }
+            if (headline != null) {
+                // Update waiting: the version jump IS the headline (2463 to 2464), not a second line below it.
+                UpdateDeltaHero(vm.currentBuildNumber, headline.run.runNumber)
+            } else Row(verticalAlignment = Alignment.Bottom) {
                 RollingNumber(
                     text = if (number > 0) "$number" else "dev",
                     style = MaterialTheme.typography.displaySmall,
@@ -350,106 +352,55 @@ internal fun SettingsHeroCard(state: UiState, vm: AppViewModel) {
                     // install -- rendered through the shared UpdateStatusLine so neither
                     // surface can drift.
                     val updateInfo = state.updateAvailable
-                    // PopVisible, not a bare `if`: this used to just appear the instant a
-                    // manual "Check" landed on a hit, which was jarring right in the middle
-                    // of an already-open card -- every other piece of content that arrives
-                    // into an open card (a weather stripe, a status line) pops in, and this
-                    // was the one exception. sizeAnimated = true because the card ABOVE this
-                    // (a car's own detail page, or another Settings card below it in the
-                    // grid) needs to make room for the height this adds, not just fade/scale
-                    // in place. Column, not a bare PopVisible body: PopVisible measures its
-                    // content as ONE child, and this emits a Spacer + a Surface as two
-                    // siblings -- see WeatherDetail's own history for exactly this bug
-                    // (AnimatedVisibility stacks multiple un-grouped children on top of each
-                    // other instead of one after another).
                     PopVisible(visible = updateInfo != null && !state.updateTileDismissed, sizeAnimated = true) {
-                    if (updateInfo != null) {
-                    Column {
-                        Spacer(Modifier.height(GapGroup))
-                        // Its own outlined container, separate from the check/GitHub/Shizuku
-                        // controls above -- marks where "current state" ends and "here's
-                        // what's new" begins. Outlined, not filled: UpdateReleaseNotes below
-                        // already fills with surfaceContainerHighest, and nesting two
-                        // same-tone fills inside each other would read as flat padding
-                        // rather than a real boundary.
-                        Surface(
-                            modifier = Modifier.fillMaxWidth(),
-                            shape = StandardShape,
-                            color = Color.Transparent,
-                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-                        ) {
-                        Column(Modifier.padding(14.dp)) {
-                        Text(
-                            "Update available",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onSurface,
-                        )
-                        val newLabel = com.bloo.bluelink.data.buildLabel(updateInfo.run.runNumber)
-                        val deltaLabel = if (vm.currentBuildNumber > 0) {
-                            "${com.bloo.bluelink.data.buildLabel(vm.currentBuildNumber)} → $newLabel"
-                        } else newLabel
-                        val seamless = appearance.seamlessInstallShizuku && state.shizukuAvailable
-                        Spacer(Modifier.height(GapHairline))
-                        // Same tonal Surface the update PEBBLE wraps this exact shared
-                        // composable in (UpdateTile.kt) -- same shared composable, same
-                        // chrome around it, in both places.
-                        UpdateDeltaHero(vm.currentBuildNumber, updateInfo.run.runNumber)
-                        val settingsDownloadProgress by vm.updateDownloadProgress.collectAsStateWithLifecycle()
-                        UpdateDownloadBar(visible = state.updateDownloading, progress = settingsDownloadProgress)
-                        Spacer(Modifier.height(GapRow))
-                        Surface(
-                            modifier = Modifier.fillMaxWidth(),
-                            shape = SmallShape,
-                            color = MaterialTheme.colorScheme.surfaceContainerHighest,
-                            contentColor = MaterialTheme.colorScheme.onSurface,
-                        ) {
-                            Column(Modifier.padding(12.dp)) {
-                                UpdateStatusLine(
-                                    deltaLabel, seamless, state, vm,
-                                    // The heading two rows up already says "Update
-                                    // available", not the delta, so unlike the pebble
-                                    // this surface always has room for it.
-                                    showDelta = true,
-                                )
-                            }
-                        }
-                        Spacer(Modifier.height(GapGroup))
-                        // Label, glyph and branch all come from the shared updateAction /
-                        // runUpdateAction, so this button and the pebble's header action
-                        // cannot disagree about what the update flow is currently offering.
-                        val act = updateAction(state, updateInfo, seamless)
-                        val updateSource = remember { MutableInteractionSource() }
-                        // Download and "Not now" share one row, the way every pair of actions does.
-                        ExpressiveButtonRow(modifier = Modifier.fillMaxWidth(), spacing = GapRow) {
-                            MorphButton(
-                                onClick = { runUpdateAction(state, vm, updateInfo, context) },
-                                active = act.ready,
-                                activeContainerColor = ChargeGreen,
-                                activeContentColor = Color.White,
-                                enabled = !state.updateInstalling && !state.updateDownloading,
-                                interactionSource = updateSource,
-                                expressive = true,
-                                fillOnPress = true,
-                                groupWeight = GroupWeightProportional,
+                        if (updateInfo != null) {
+                            val seamless = appearance.seamlessInstallShizuku && state.shizukuAvailable
+                            val act = updateAction(state, updateInfo, seamless)
+                            val newLabel = com.bloo.bluelink.data.buildLabel(updateInfo.run.runNumber)
+                            val deltaLabel = if (vm.currentBuildNumber > 0) {
+                                "${com.bloo.bluelink.data.buildLabel(vm.currentBuildNumber)} → $newLabel"
+                            } else newLabel
+                            Spacer(Modifier.height(GapGroup))
+                            // One tinted panel, no second outline inside the card's own: the version jump is
+                            // already the big number at the top, so this holds only what you do about it.
+                            Column(
+                                Modifier
+                                    .fillMaxWidth()
+                                    .clip(StandardShape)
+                                    .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.28f))
+                                    .padding(14.dp),
+                                verticalArrangement = Arrangement.spacedBy(GapRow),
                             ) {
-                                MorphButtonLabel(act.icon, act.label, pending = false)
+                                Text(
+                                    "Update available",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                )
+                                // The status line carries the download's own progress bar.
+                                UpdateStatusLine(deltaLabel, seamless, state, vm, showDelta = false)
+                                // Both actions full width, one under the other: side by side they fought
+                                // over a narrow row and the download button collapsed to a bare icon.
+                                MorphButton(
+                                    onClick = { runUpdateAction(state, vm, updateInfo, context) },
+                                    modifier = Modifier.fillMaxWidth(),
+                                    active = act.ready,
+                                    activeContainerColor = ChargeGreen,
+                                    activeContentColor = Color.White,
+                                    enabled = !state.updateInstalling && !state.updateDownloading,
+                                    expressive = true,
+                                ) {
+                                    MorphButtonLabel(act.icon, act.label, pending = false)
+                                }
+                                SafeMorphTextButton(
+                                    "Not now",
+                                    onClick = vm::dismissUpdate,
+                                    enabled = !state.updateDownloading && !state.updateInstalling,
+                                    modifier = Modifier.fillMaxWidth(),
+                                )
+                                UpdateReleaseNotes(updateInfo, maxLines = 3)
                             }
-                            SafeMorphTextButton(
-                                "Not now",
-                                onClick = vm::dismissUpdate,
-                                enabled = !state.updateDownloading && !state.updateInstalling,
-                            )
                         }
-                        // Shared with the update pebble -- see UpdateReleaseNotes. The two
-                        // used to keep a copy each, identical but for the excerpt length and
-                        // one of them forgetting FLAG_ACTIVITY_NEW_TASK on the intent.
-                        Spacer(Modifier.height(GapRow))
-                        UpdateReleaseNotes(updateInfo, maxLines = 3)
-                        }
-                        }
-                    }
-                    }
                     }
                 }
             }
