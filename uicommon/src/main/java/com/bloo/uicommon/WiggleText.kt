@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.text.BasicText
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
@@ -108,8 +109,29 @@ fun WiggleText(
 }
 
 /**
- * Animates value changes with a fade + vertical slide, using [WiggleText] for
- * rendering so its fun-number bounce works inside the transition.
+ * Animates value changes with the app's rolling-number language, using
+ * [WiggleText] for rendering so its fun-number bounce works inside the
+ * transition.
+ *
+ * THE standard animation for any value that can change: every caller that
+ * shows a refreshed quantity routes through this, directly (phone `StatusRow`,
+ * the climate setpoint readout, the watch's ring-gauge label) or through the
+ * phone's big-headline `RollingNumber`, which is a thin alias of this one.
+ *
+ * Two behaviours, chosen per value so the animation never breaks layout:
+ *
+ * COMPACT (single line, short, contains digits): split into runs of digits and
+ * static text ([RollingTokenRow]). Each digit run rolls VERTICALLY in the
+ * direction the number moved -- up when it grew, down when it shrank -- and
+ * static runs crossfade separately: "84%" becomes "85%" with the digits
+ * sliding between the unmoving "%"; "4 min ago" becomes "12 min ago" with the
+ * 4 rolling up and the caption fading. Rolling the whole string instead read
+ * as the entire readout lifting off.
+ *
+ * EVERYTHING ELSE (long, multi-line, or digit-free): a fade + vertical slide
+ * of the whole string, the right shape for a value that changed wholesale (a
+ * locked state, a VIN, a plate) and the path that keeps two-line wrapping
+ * working -- the tokenized path is a Row, which does not wrap.
  *
  * [reduceMotion] has no default, deliberately. It used to default to false, and
  * three of the four live call sites took that default: the phone's [StatusRow] --
@@ -137,14 +159,88 @@ fun AnimatedValue(
     // modifier, since it's the top-level thing this function emits.
     modifier: Modifier = Modifier,
 ) {
-    AnimatedContent(
-        targetState = value,
-        modifier = modifier,
-        transitionSpec = {
-            if (reduceMotion) fadeIn(tween(1)) togetherWith fadeOut(tween(1))
-            else (fadeIn(tween(200)) + slideInVertically(tween(200)) { -it / 3 }) togetherWith
-                (fadeOut(tween(150)) + slideOutVertically(tween(150)) { it / 3 })
-        },
-        label = "animVal",
-    ) { v -> WiggleText(v, style = style, maxLines = maxLines, reduceMotion = reduceMotion) }
+    if (reduceMotion || maxLines > 1 || value.length > RollTokenMaxChars ||
+        !value.any { it.isDigit() } || value.contains('\n')
+    ) {
+        AnimatedContent(
+            targetState = value,
+            modifier = modifier,
+            transitionSpec = {
+                if (reduceMotion) fadeIn(tween(1)) togetherWith fadeOut(tween(1))
+                else (fadeIn(tween(200)) + slideInVertically(tween(200)) { -it / 3 }) togetherWith
+                    (fadeOut(tween(150)) + slideOutVertically(tween(150)) { it / 3 })
+            },
+            label = "animVal",
+        ) { v -> WiggleText(v, style = style, maxLines = maxLines, reduceMotion = reduceMotion) }
+        return
+    }
+    RollingTokenRow(value, style, modifier)
 }
+
+/** Longest value still eligible for the tokenized digit-roll path. */
+private const val RollTokenMaxChars = 24
+
+/** Roll timings, local to :uicommon on purpose (it cannot reach :app's tokens;
+ *  these match :app's MotionShort-side values and :app's own digit roll). */
+private const val RollFadeIn = 180
+private const val RollFadeOut = 150
+
+/**
+ * One token of a to-be-rolled value: a digit run (rolls vertically,
+ * directionally) or a static run (crossfades). See [RollingTokenRow].
+ */
+internal data class RollToken(val digits: Boolean, val text: String)
+
+/** Splits [value] into digit runs and static runs, in order. */
+internal fun rollingTokens(value: String): List<RollToken> {
+    val tokens = ArrayList<RollToken>()
+    val sb = StringBuilder()
+    for (c in value) {
+        if (sb.isNotEmpty() && c.isDigit() != sb[0].isDigit()) {
+            tokens.add(RollToken(sb[0].isDigit(), sb.toString()))
+            sb.clear()
+        }
+        sb.append(c)
+    }
+    if (sb.isNotEmpty()) tokens.add(RollToken(sb[0].isDigit(), sb.toString()))
+    return tokens
+}
+
+/**
+ * The tokenized roll itself: one [AnimatedContent] per token, digit runs
+ * sliding directionally, static runs fading. Baseline alignment keeps the
+ * seams between tokens invisible across different heights, and 0dp spacing
+ * keeps the rendered value letter-for-letter identical to a plain Text --
+ * parity that matters most for a component this widely applied.
+ */
+@Composable
+private fun RollingTokenRow(
+    value: String,
+    style: TextStyle,
+    modifier: Modifier = Modifier,
+) {
+    // Direction is derived from AnimatedContent's own initialState/targetState
+    // per digit run, the same way :app's original roll did (and NOT from a
+    // separately-tracked "previous value"): the derived direction can never lag
+    // the actual change. token * static-token runs never reach this; only
+    // digit runs, which toLongOrNull resolves.
+    Row(modifier = modifier, verticalAlignment = Alignment.CenterVertically) {
+        for (t in rollingTokens(value)) {
+            AnimatedContent(
+                targetState = t.text,
+                transitionSpec = {
+                    if (t.digits) {
+                        val dir =
+                            if ((targetState.toLongOrNull() ?: 0L) >= (initialState.toLongOrNull() ?: 0L)) 1 else -1
+                        (fadeIn(tween(RollFadeIn)) + slideInVertically(tween(RollFadeIn)) { dir * it / 2 }) togetherWith
+                            (fadeOut(tween(RollFadeOut)) + slideOutVertically(tween(RollFadeOut)) { -dir * it / 2 })
+                    } else {
+                        fadeIn(tween(RollFadeIn)) togetherWith fadeOut(tween(RollFadeOut))
+                    }
+                },
+                label = if (t.digits) "rollDigit" else "rollStatic",
+            ) { s -> WiggleText(s, style = style, maxLines = 1, reduceMotion = false) }
+        }
+    }
+}
+

@@ -230,20 +230,17 @@ internal fun MapTopBar(
             ) {
                 Icon(AppIcons.DirectionsCar, contentDescription = null, modifier = Modifier.size(24.dp))
                 Column {
-                    Text(
+                    RollingNumber(
                         vehicleName,
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
                     )
                     if (statusLine != null) {
-                        Text(
+                        RollingNumber(
                             statusLine,
                             style = MaterialTheme.typography.labelLarge,
+                            fontWeight = FontWeight.Medium,
                             color = LocalContentColor.current.copy(alpha = MutedContentAlpha),
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
                         )
                     }
                 }

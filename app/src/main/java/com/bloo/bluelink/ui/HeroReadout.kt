@@ -335,7 +335,7 @@ internal fun HeroNumbers(
             // Charging shows in the COLOUR while collapsed: that row has no space for
             // the word, and the expanded readout spells it out in its state line, so
             // the cue fades back to the ordinary content colour as the card opens.
-            if (data.charging) lerp(ChargeGreen, LocalContentColor.current, t)
+            color = if (data.charging) lerp(ChargeGreen, LocalContentColor.current, t)
             else LocalContentColor.current,
         )
         Spacer(Modifier.width(lerp(8.dp, 14.dp, t)))
@@ -377,11 +377,11 @@ internal fun HeroNumbers(
                     val statusColor by androidx.compose.animation.animateColorAsState(
                         data.statusColor, animationSpec = tween(MotionMedium), label = "statusLineColor",
                     )
-                    Text(
+                    RollingNumber(
                         data.statusLine,
                         style = type.labelLarge,
+                        fontWeight = FontWeight.Medium,
                         color = statusColor,
-                        maxLines = 1,
                         modifier = Modifier.graphicsLayer { alpha = statusAlpha.coerceIn(0f, 1f) },
                     )
                 }

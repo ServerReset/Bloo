@@ -120,12 +120,11 @@ internal fun SyncDeviceRow(
                 }
                 val line = listOf(device.model.takeIf { it.isNotBlank() && !it.equals(device.name, ignoreCase = true) }, seen, device.appVersion.takeIf { it.isNotBlank() }?.let { "v$it" })
                     .filterNotNull().joinToString(" · ")
-                Text(
+                RollingNumber(
                     line,
                     style = MaterialTheme.typography.labelSmall,
+                    fontWeight = FontWeight.Medium,
                     color = if (health == DeviceHealth.STALE) scheme.error else scheme.onSurfaceVariant,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
                 )
             }
             if (health == DeviceHealth.STALE) {

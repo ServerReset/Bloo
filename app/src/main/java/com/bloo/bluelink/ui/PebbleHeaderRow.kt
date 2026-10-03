@@ -29,6 +29,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LocalContentColor
@@ -185,17 +186,12 @@ internal fun PebbleHeaderRow(
                     targetState = summary,
                     transitionSpec = { expandContentTransform() },
                     label = "pebbleSummary",
-                ) { s ->
-                    Text(
-                        s,
-                        style = MaterialTheme.typography.labelMedium,
-                        color = LocalContentColor.current.copy(alpha = MutedContentAlpha),
-                        maxLines = 1,
-                        // Ellipsize a long summary ("Set a location")
-                        // instead of hard-clipping it to "Set a…".
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                }
+                ) { s -> RollingNumber(
+                    s,
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.Medium,
+                    color = LocalContentColor.current.copy(alpha = MutedContentAlpha),
+                ) }
             }
             headerContent?.invoke()
         }

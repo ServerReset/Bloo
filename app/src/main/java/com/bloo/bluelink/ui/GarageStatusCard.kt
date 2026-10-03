@@ -168,11 +168,10 @@ internal fun GarageStatusCard(state: State<UiState>, vm: AppViewModel, hazeState
                         size = 64.dp,
                         iconSize = 32.dp,
                     )
-                    Text(
+                    RollingNumber(
                         headline,
-                        style = MaterialTheme.typography.headlineSmall,
+                        style = MaterialTheme.typography.headlineSmall.copy(textAlign = TextAlign.Center),
                         fontWeight = FontWeight.SemiBold,
-                        textAlign = TextAlign.Center,
                     )
                     Text(
                         body,

@@ -1,6 +1,7 @@
 package com.bloo.bluelink.ui
 
 import androidx.compose.foundation.background
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -83,12 +84,11 @@ fun WearCompanionRow(
                 Text("Companion", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
             }
             if (detail.isNotBlank()) {
-                Text(
+                RollingNumber(
                     detail,
                     style = MaterialTheme.typography.labelSmall,
+                    fontWeight = FontWeight.Medium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
                 )
             }
         }

@@ -44,6 +44,21 @@ internal fun AnimatedText(
     softWrap: Boolean = true,
     overflow: TextOverflow = TextOverflow.Clip,
 ) {
+    // COMPACT changing values (single line, short, contains digits) route through
+    // the standard rolling component instead of this fade, so every refreshed
+    // quantity (chip captions like "Updated 4 min ago", status readouts) rolls in
+    // the same digit language everywhere. Long / wrapping / digit-free text keeps
+    // this fade, which is the right shape for wholesale changes.
+    if (maxLines == 1 && text.length <= 24 && text.any { it.isDigit() } && !text.contains('\n')) {
+        RollingNumber(
+            text,
+            style = style,
+            fontWeight = fontWeight ?: FontWeight.Normal,
+            color = color,
+            modifier = modifier,
+        )
+        return
+    }
     val fade = remember { Animatable(1f) }
     var first by remember { androidx.compose.runtime.mutableStateOf(true) }
     LaunchedEffect(text) {

@@ -351,7 +351,7 @@ internal fun LockOverlay(vm: AppViewModel, opaqueBackdrop: Boolean = false) {
                             keyboardActions = KeyboardActions(onDone = { attemptPin() }),
                             supportingText = {
                                 when {
-                                    rejected -> Text(
+                                    rejected -> AnimatedText(
                                         "Too many attempts. Try again in ${formatLockoutSeconds(remainingMs)}",
                                         color = MaterialTheme.colorScheme.error,
                                     )

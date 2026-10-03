@@ -78,12 +78,11 @@ private fun DebugInfoItem(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 fontWeight = FontWeight.SemiBold,
             )
-            Text(
-                text = info.value,
-                style = MaterialTheme.typography.labelMedium,
+            RollingNumber(
+                info.value,
+                style = MaterialTheme.typography.labelMedium.copy(fontFamily = FontFamily.Monospace),
+                fontWeight = FontWeight.Normal,
                 color = MaterialTheme.colorScheme.onSurface,
-                fontFamily = FontFamily.Monospace,
-                modifier = Modifier.padding(top = 2.dp),
             )
         }
 

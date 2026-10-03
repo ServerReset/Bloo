@@ -126,7 +126,7 @@ internal fun MetaChip(text: String, modifier: Modifier = Modifier, icon: ImageVe
  */
 @Composable
 internal fun StatusChip(text: String, tint: Color, modifier: Modifier = Modifier, icon: ImageVector? = null) {
-    StatusChip(tint = tint, modifier = modifier, icon = icon) { Text(text) }
+    StatusChip(tint = tint, modifier = modifier, icon = icon) { AnimatedText(text) }
 }
 
 /**

@@ -44,15 +44,16 @@ internal fun UpdateDeltaHero(currentBuild: Int, newBuild: Int, modifier: Modifie
         horizontalArrangement = Arrangement.spacedBy(GapRow),
     ) {
         if (currentBuild > 0) {
-            Text(
+            RollingNumber(
                 "$currentBuild",
                 style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Normal,
                 color = scheme.onSurfaceVariant,
                 modifier = Modifier.padding(bottom = 4.dp),
             )
             Icon(AppIcons.ArrowForward, contentDescription = "to", tint = scheme.onSurfaceVariant, modifier = Modifier.size(18.dp).padding(bottom = 2.dp))
         }
-        Text(
+        RollingNumber(
             "$newBuild",
             style = MaterialTheme.typography.displaySmall,
             fontWeight = FontWeight.Bold,

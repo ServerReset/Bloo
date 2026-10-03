@@ -162,13 +162,19 @@ fun WearHero(
 ) {
     val text: @Composable () -> Unit = {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Text(
-                value,
-                style = MaterialTheme.typography.displaySmall,
-                fontWeight = FontWeight.Bold,
-                color = tint,
-                textAlign = TextAlign.Center,
+            // The standard rolling value, entered through :uicommon's AnimatedValue
+            // so the watch's hero (battery %, lock state) rolls like the phone's.
+            com.bloo.uicommon.AnimatedValue(
+                value = value,
+                style = MaterialTheme.typography.displaySmall.merge(
+                    androidx.compose.ui.text.TextStyle(
+                        fontWeight = FontWeight.Bold,
+                        color = tint,
+                        textAlign = TextAlign.Center,
+                    ),
+                ),
                 maxLines = 1,
+                reduceMotion = false,
             )
             Text(
                 caption,
