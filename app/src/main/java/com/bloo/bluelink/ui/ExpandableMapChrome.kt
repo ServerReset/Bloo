@@ -363,6 +363,10 @@ internal fun Modifier.pullDownToDismiss(
 
 
 /** "88% · 415 km": a car's charge and range for the map pill, or null when it has neither yet. */
+// chargeReadoutOf is @Composable (it reads MaterialTheme/LocalContentColor for the state-colour
+// pair it derives), so this wrapper must be too -- not for composition itself, but because a
+// plain function cannot resolve those locals.
+@Composable
 internal fun mapStatusLine(state: UiState, v: com.bloo.bluelink.data.Vehicle, metric: Boolean): String? {
     val r = chargeReadoutOf(state.statusFor(v), state.hasBattery(v), state.hasFuel(v), state.drivingLabel(v), metric)
     return listOfNotNull(r.pctText.takeIf { it.isNotBlank() }, r.rangeText?.takeIf { it.isNotBlank() })

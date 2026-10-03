@@ -258,8 +258,9 @@ internal fun SettingsHeroCard(state: UiState, vm: AppViewModel) {
         color = MaterialTheme.colorScheme.surfaceContainerHigh,
     ) {
         Column(Modifier.padding(20.dp)) {
-            // Narrow (a split pane, a cover screen): the update chip drops its words so the title keeps its room.
-            androidx.compose.foundation.layout.BoxWithConstraints(Modifier.fillMaxWidth()) {
+            // Used to gate the update chip on a measured width (a narrow pane dropped the
+            // chip's words); BoxWithConstraints was a SubcomposeLayout pass for a branch that
+            // no longer exists -- the chip's own compactness is handled by MorphButtonLabel.
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 IconBadge(
                     AppIcons.Settings,
@@ -287,7 +288,6 @@ internal fun SettingsHeroCard(state: UiState, vm: AppViewModel) {
                     expanded = expanded,
                     onToggle = { vm.togglePebble(SettingsPseudoVehicle, "Updates") },
                 )
-            }
             }
             Spacer(Modifier.height(16.dp))
             // The build number is the app's real version here (versionName stays
