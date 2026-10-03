@@ -134,6 +134,7 @@ fun BlooApp(vm: AppViewModel) {
     // search with nothing to blur regardless of which one was on screen.
     val searchHazeState = remember { HazeState() }
     val backdropHaze = remember { HazeState() }
+    val globalRefresh = remember { GlobalRefresh() }
     val toasts = remember { ToastState() }
     val scope = rememberCoroutineScope()
     // LocalClipboard (the non-deprecated spelling): its set API is SUSPEND, so
@@ -202,6 +203,7 @@ fun BlooApp(vm: AppViewModel) {
         LocalDialogHost provides dialogHost,
         LocalToasts provides toasts,
         LocalBackdropHaze provides backdropHaze,
+        LocalGlobalRefresh provides globalRefresh,
         LocalHaptics provides haptics,
         // Provided once here (the app root already collects `appearance` above) so
         // every pebble/tile reads LocalAppearance.current instead of opening its own
@@ -425,6 +427,8 @@ fun BlooApp(vm: AppViewModel) {
     }
     }
     }
+        // The one refresh indicator for the whole app, above every page.
+        GlobalRefreshOverlay(globalRefresh)
         // Biometric lock overlay, drawn over the blurred app; fades out on unlock.
         LockAlphaOverlay(locked = locked, vm = vm, opaqueBackdrop = !contentSettled)
     

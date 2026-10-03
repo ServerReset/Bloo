@@ -70,8 +70,22 @@ internal fun Refreshable(
 
     // Publish the pull distance so GarageScreen's overlays track the pull live.
     val pullFractionState = LocalPullFraction.current
+    // The ONE app-wide indicator (see GlobalRefresh): this page reports into it and draws nothing itself.
+    val global = LocalGlobalRefresh.current
+    val refreshKey = androidx.compose.runtime.remember { Any() }
+    androidx.compose.runtime.DisposableEffect(global, refreshKey) {
+        onDispose { global?.setRefreshing(refreshKey, false) }
+    }
+    LaunchedEffect(refreshing, global) { global?.setRefreshing(refreshKey, refreshing) }
     LaunchedEffect(ptrState) {
-        snapshotFlow { ptrState.distanceFraction }.collect { pullFractionState.value = it }
+        var last = 0f
+        snapshotFlow { ptrState.distanceFraction }.collect {
+            pullFractionState.value = it
+            // Only write while this page is actually being pulled (or just let go), so a page that is
+            // merely composing never stomps another page's pull.
+            if (it != 0f || last != 0f) global?.pull = it
+            last = it
+        }
     }
 
     // Material 3 EXPRESSIVE pull-to-refresh: [PullToRefreshDefaults.LoadingIndicator] is the
