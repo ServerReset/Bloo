@@ -36,6 +36,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -89,6 +90,9 @@ internal fun CoverCar(
     }
 }
 
+/** Lets a UI test find the cover's home card. */
+internal const val COVER_HOME_TAG = "coverHomeCard"
+
 /** The cover's home card: identity on top, readout in the middle, actions along the bottom. */
 @Composable
 private fun CoverHomeCard(v: Vehicle, state: State<UiState>, vm: AppViewModel, modifier: Modifier) {
@@ -110,7 +114,7 @@ private fun CoverHomeCard(v: Vehicle, state: State<UiState>, vm: AppViewModel, m
     val band = coverCutoutBand()
     val tiny = coverIsTiny()
 
-    Box(modifier.clip(LargeShape)) {
+    Box(modifier.clip(LargeShape).testTag(COVER_HOME_TAG)) {
         HeroPhotoBackdrop(v, imageUrl, height = 0.dp, corner = PebbleCornerExpanded, fill = true)
         CompositionLocalProvider(LocalContentColor provides onCard) {
             Column(
