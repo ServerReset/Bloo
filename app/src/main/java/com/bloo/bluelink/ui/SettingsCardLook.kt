@@ -11,7 +11,6 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.only
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Straighten
 import androidx.compose.material.icons.filled.Style
 import androidx.compose.material.icons.filled.TextFields
 import androidx.compose.material.icons.filled.Search
@@ -49,16 +48,17 @@ import com.bloo.bluelink.data.setHapticsEnabled
 import com.bloo.bluelink.data.setPebbleOutline
 import com.bloo.bluelink.data.setThemeMode
 
-/** The "Display" card: units, text scale, the search bubble, and the welcome cards. */
+/** The "Display" card: theme and colour, units, text scale, the search bubble, and the welcome cards. */
 @Composable
 internal fun DisplayCardContent(appearance: SettingsStore.Appearance, advanced: Boolean, vm: AppViewModel) {
     SettingsCard(
         "Display",
-        Icons.Filled.Straighten,
+        Icons.Filled.Palette,
         vm,
-        status = if (appearance.unitSystem == "metric") "Metric" else "Imperial",
+        status = displayStatus(appearance),
     ) {
         Column(verticalArrangement = Arrangement.spacedBy(GapGroup)) {
+            ThemeGroups(appearance, advanced, vm)
             SettingsGroup("Units") {
                 UnitSystemRow(appearance, vm)
                 PopVisible(visible = advanced) {
@@ -87,6 +87,17 @@ internal fun DisplayCardContent(appearance: SettingsStore.Appearance, advanced: 
         }
     }
 }
+
+/** "Dark · Aurora · Metric": the Display card's one-line summary. */
+private fun displayStatus(appearance: SettingsStore.Appearance): String = listOfNotNull(
+    when (appearance.themeMode) {
+        ThemeMode.SYSTEM -> "System"
+        ThemeMode.LIGHT -> "Light"
+        ThemeMode.DARK -> "Dark"
+    },
+    if (appearance.auroraBackground) "Aurora" else null,
+    if (appearance.unitSystem == "metric") "Metric" else "Imperial",
+).joinToString(" · ")
 
 /** The "Font" card: which typeface the app is set in. */
 @Composable
@@ -125,16 +136,10 @@ internal fun SoundsVibrationCardContent(appearance: SettingsStore.Appearance, vm
     ) {}
 }
 
-/** The "Theme" card: light or dark, the background, and colour. The finer controls are advanced. */
+/** The theme groups of the Display card: light or dark, the background, colour and style. The finer controls are advanced. */
 @Composable
-internal fun ThemeCardContent(appearance: SettingsStore.Appearance, advanced: Boolean, vm: AppViewModel) {
-    val mode = when (appearance.themeMode) {
-        ThemeMode.SYSTEM -> "System"
-        ThemeMode.LIGHT -> "Light"
-        ThemeMode.DARK -> "Dark"
-    }
-    SettingsCard("Theme", Icons.Filled.Palette, vm, status = if (appearance.auroraBackground) "$mode · Aurora" else mode) {
-        Column(verticalArrangement = Arrangement.spacedBy(GapGroup)) {
+private fun ThemeGroups(appearance: SettingsStore.Appearance, advanced: Boolean, vm: AppViewModel) {
+    Column(verticalArrangement = Arrangement.spacedBy(GapGroup)) {
             SettingsGroup("Mode") {
                 SettingsSegmentedRow(
                     label = "Appearance",
@@ -180,7 +185,6 @@ internal fun ThemeCardContent(appearance: SettingsStore.Appearance, advanced: Bo
                 }
             }
         }
-    }
 }
 
 /** Built-in and custom colour palettes, and the editor for the custom ones. */

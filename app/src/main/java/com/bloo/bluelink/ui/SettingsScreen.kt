@@ -354,7 +354,7 @@ internal fun SettingsScreen(
             }
             item {
 
-            // Display scale
+            // Display: theme, colour, units, size
             DisplayCardContent(appearance, advanced, vm)
             }
             item {
@@ -396,11 +396,6 @@ internal fun SettingsScreen(
             // switch on the right, no chevron and nothing to expand into. See SettingsCard's
             // inlineSetting.
             SoundsVibrationCardContent(appearance, vm)
-            }
-            item {
-
-            // Theme
-            ThemeCardContent(appearance, advanced, vm)
             }
         }
             item {
