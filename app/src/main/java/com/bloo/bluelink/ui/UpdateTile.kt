@@ -174,6 +174,8 @@ internal fun UpdateAvailableTile(
             ),
         ) {
             val scheme = MaterialTheme.colorScheme
+            UpdateDeltaHero(current, info.run.runNumber)
+            UpdateDownloadBar(visible = state.updateDownloading, progress = downloadProgress)
             // ONE state-driven status line (icon + text), replacing the old duplicated
             // delta row + scattered downloading/seamless/installing rows. The build
             // delta already lives in the header summary; here we say what's happening
