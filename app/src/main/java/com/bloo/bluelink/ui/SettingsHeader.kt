@@ -260,7 +260,6 @@ internal fun SettingsHeroCard(state: UiState, vm: AppViewModel) {
         Column(Modifier.padding(20.dp)) {
             // Narrow (a split pane, a cover screen): the update chip drops its words so the title keeps its room.
             androidx.compose.foundation.layout.BoxWithConstraints(Modifier.fillMaxWidth()) {
-            val narrow = maxWidth < 340.dp
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 IconBadge(
                     AppIcons.Settings,
@@ -284,8 +283,6 @@ internal fun SettingsHeroCard(state: UiState, vm: AppViewModel) {
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
-                UpdateStatusChip(state, compact = narrow)
-                Spacer(Modifier.width(GapHairline))
                 MorphExpandButton(
                     expanded = expanded,
                     onToggle = { vm.togglePebble(SettingsPseudoVehicle, "Updates") },

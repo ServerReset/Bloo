@@ -38,10 +38,8 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.activity.compose.BackHandler
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -55,15 +53,9 @@ import androidx.compose.ui.input.pointer.pointerInput
 import kotlinx.coroutines.launch
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.Dialog
-import androidx.compose.ui.window.DialogProperties
-import androidx.compose.ui.window.DialogWindowProvider
-import androidx.core.graphics.drawable.toDrawable
 import dev.chrisbanes.haze.HazeState
 import com.bloo.bluelink.data.GeoLocation
 import kotlinx.coroutines.flow.first
@@ -125,133 +117,6 @@ internal fun MapFeatureRow(
 }
 
 /**
- * The map, expanded into a bottom sheet -- reached from [CarMap]'s own corner button.
- * Its own [CarMapState] ([rememberCarMapState]), independent of whatever the small
- * inline map is panned/zoomed to: expanding is a bigger canvas to look at the SAME
- * car on, not a continuation of one specific gesture.
- *
- * A hand-rolled overlay on a plain [Dialog], NOT [androidx.compose.material3.ModalBottomSheet]
- * -- that was the SECOND attempt here (the first was a hand-rolled [Dialog] driving
- * its own `graphicsLayer` scale/translate from a captured on-screen rect, reported as
- * not actually seamless, not full screen, and covering its own close button).
- * `ModalBottomSheet` fixed all of that, but turned out to have a problem of its own
- * that no configuration can reach: it is *itself* implemented as a `Dialog` under the
- * hood, and Android/Compose Dialogs adapt to large screens by centering themselves
- * and capping their width (`sheetMaxWidth`) -- so on a tablet or unfolded foldable
- * this rendered as a boxed, dialog-shaped card floating in the middle of the screen
- * with the app visible on all four sides, including BELOW its own bottom edge.
- * Reported directly from a screenshot: "why does it float like that? That's wrong."
- * `ModalBottomSheetProperties` exposes no override for that adaptive centering --
- * it's baked into the Dialog underneath, not a configurable behaviour of the sheet.
- *
- * So this goes one level lower: a plain [Dialog] with `usePlatformDefaultWidth =
- * false` gets NONE of that adaptive treatment -- it's just a full-screen surface this
- * draws its own true bottom-anchored, full-width sheet onto, identically regardless
- * of how wide the window is. Everything `ModalBottomSheet` used to give for free now
- * lives here instead: [visible] (an [Animatable] the sheet's whole lifecycle runs on,
- * 0 = slid fully off the bottom edge, 1 = at rest) drives the slide-in/out and the
- * scrim's fade together, a tap on the scrim dismisses, and the drag handle (not the
- * whole sheet -- the map area already owns pan/pinch of its own) supports drag-to-
- * dismiss via [dragPx]. The one thing genuinely lost versus `ModalBottomSheet` is its
- * built-in fling-velocity dismiss; a plain distance threshold stands in for it below.
- *
- * [CarMap] itself still grows in from [originBounds] (see `morph`'s own doc, now
- * folded into [visible]) so opening reads as the map continuing to expand rather than
- * a flat cut.
- *
- * The bottom [MapFeatureRow] is deliberately sparse today (recentre, open in the
- * system Maps app) -- see [MapFeature]'s own doc. This sheet, not a new screen in the
- * app's own navigation, is the FRAMEWORK request this shipped alongside: a
- * self-contained expanded surface future map features can build against (a drawn
- * route, live traffic, nearby search, saved places) without first having to plumb a
- * new destination through the rest of the app.
- */
-@Composable
-internal fun CarMapSheet(
-    location: GeoLocation,
-    vehicleName: String,
-    deviceLocation: GeoLocation?,
-    /**
-     * The small map's own on-screen rect (absolute screen coordinates -- see the
-     * call site's own doc) at the moment it was tapped. The sheet's own map area
-     * morphs from this rect to its natural size/position (a `graphicsLayer` scale +
-     * translate driven by one shared [Animatable]) instead of just fading/scaling in
-     * from its own centre -- reported directly as wanting the card to expand FROM
-     * the map pebble, not materialise over the bottom of the screen. Null (measured
-     * too late, or the caller has no origin to offer) falls back to the plain
-     * scale-from-a-touch-under-full-size CarMapSheet always had.
-     */
-    originBounds: Rect?,
-    /** Null (the default) omits the refresh icon entirely -- see [MapTopBar]'s
-     *  own doc. */
-    onRefreshLocation: (() -> Unit)? = null,
-    /** See [MapTopBar]'s own doc -- the real command-pending flag, not a guess. */
-    refreshing: Boolean = false,
-    deviceRequest: DeviceLocationRequest? = null,
-    onDismiss: () -> Unit,
-) {
-    // The Dialog-based fallback for hosts that don't provide a LocalExpandedMap
-    // (the flip-cover screen) -- see ExpandedMapState's own doc. A genuinely
-    // separate CarMap/CarMapState of its own, not the compact map's, since there's
-    // no shared state to reach here.
-    Dialog(
-        // A fallback only -- CarMapSheetBody's own BackHandler intercepts system
-        // back first and runs its animated close() before this ever fires. Direct,
-        // with no animation, since close() itself lives inside CarMapSheetBody and
-        // isn't reachable from here.
-        onDismissRequest = onDismiss,
-        // false: a full-screen canvas, not a Dialog sized/positioned by the
-        // platform's own adaptive rules -- see CarMapSheetBody's own doc for why
-        // ModalBottomSheet (itself a Dialog) couldn't avoid that. decorFitsSystemWindows
-        // = false so this draws genuinely edge-to-edge and positions its own content
-        // (the map area's own insets/padding already handle the status/nav bars)
-        // rather than having the window itself carve out a smaller content area.
-        properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false),
-    ) {
-        // As in GlassAlertDialog: this Dialog owns its own platform Window, entirely
-        // separate from the main Activity window, so the platform's own default
-        // dim/background behind it has to be turned off explicitly -- CarMapSheetBody
-        // draws its own scrim instead. Also why hazeState is null here: Haze can only
-        // blur content that's actually in the SAME window/composition as its source,
-        // and this Dialog's window is not that -- see ExpandedMapState's own doc.
-        val dialogView = LocalView.current
-        SideEffect {
-            val window = (dialogView.parent as? DialogWindowProvider)?.window
-            window?.setDimAmount(0f)
-            window?.setBackgroundDrawable(android.graphics.Color.TRANSPARENT.toDrawable())
-        }
-        CarMapSheetBody(
-            location, vehicleName, deviceLocation,
-            mapState = rememberCarMapState(),
-            originBounds = originBounds,
-            hazeState = null,
-            onRefreshLocation = onRefreshLocation,
-            refreshing = refreshing,
-            deviceRequest = deviceRequest,
-            onDismiss = onDismiss,
-        )
-    }
-}
-
-/**
- * THE single CarMap instance, repositionable between pebble and full-screen.
- * Literally one Box growing from the pebble location to a SHEET -- the bottom
- * 85% of the screen, not the whole thing -- with the top 15% left showing the
- * blurred/dimmed app behind it, same shape [CarMapSheetBody] always used.
- * Reported directly: the sheet was covering the entire screen edge to edge,
- * and its drag handle sat glued to the literal top of the screen instead of
- * near the top of the sheet itself.
- *
- * Getting the "grow from the pebble, no distortion" morph right against a
- * TARGET smaller than the full screen means the map's own Box must already,
- * for real (not via a graphicsLayer trick), be laid out at that final 85%-
- * height/bottom-anchored size -- exactly [CarMapSheetBody]'s own technique.
- * A graphicsLayer scale toward a box whose OWN natural size is the full
- * screen (this composable's very first version) can only ever reach 1.0,
- * i.e. the full screen, at rest -- there is no way to "scale down" to a
- * smaller resting size without visibly squashing the map along the way.
- */
-/**
  * Everything that used to float over the top of an expanded map sheet as three
  * separate glass pills -- the vehicle-name pill (top-left), the drag handle
  * (top-center), and the refresh chip (top-right) -- consolidated into ONE bar
@@ -283,6 +148,8 @@ internal fun CarMapSheet(
 @Composable
 internal fun MapTopBar(
     vehicleName: String,
+    /** "88% · 415 km": the car's charge and range, under its name. Null leaves the name alone. */
+    statusLine: String? = null,
     mapHazeState: HazeState,
     modifier: Modifier = Modifier,
     dragModifier: Modifier,
@@ -311,7 +178,8 @@ internal fun MapTopBar(
         label = "mapBarPop",
     )
     GlassSurface(
-        shape = LargeShape,
+        // A true pill, like the toasts and the search bar.
+        shape = CircleShape,
         modifier = modifier.fillMaxWidth()
             .pointerInput(Unit) {
                 awaitEachGesture {
@@ -347,8 +215,8 @@ internal fun MapTopBar(
                 // one line -- the old two-row layout (a 14dp handle strip stacked
                 // above a name/refresh row) took noticeably more vertical space for
                 // the same content.
-                .height(48.dp)
-                .padding(horizontal = 16.dp),
+                .height(60.dp)
+                .padding(horizontal = 18.dp),
         ) {
             // Name and bigger, titleLarge (was titleMedium) -- reported directly as
             // wanting bigger text. Reserves room on the end for the refresh icon
@@ -359,16 +227,35 @@ internal fun MapTopBar(
             // "refresh button is in the incorrect place, not equal" report: the circle
             // sat 8dp closer to the edge than the space carved out for it implied, so it
             // read as off-centre against its own reserved slot.
-            Text(
-                vehicleName,
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.Bold,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier
+            // The car icon, its name, and under it the charge and range: the pill says which car this map
+            // is and how it is doing, not just what it is called.
+            Row(
+                Modifier
                     .align(Alignment.CenterStart)
-                    .padding(end = if (onRefreshLocation != null) 40.dp else 0.dp),
-            )
+                    .padding(end = if (onRefreshLocation != null) 48.dp else 0.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(GapGroup),
+            ) {
+                Icon(AppIcons.DirectionsCar, contentDescription = null, modifier = Modifier.size(24.dp))
+                Column {
+                    Text(
+                        vehicleName,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    if (statusLine != null) {
+                        Text(
+                            statusLine,
+                            style = MaterialTheme.typography.labelLarge,
+                            color = LocalContentColor.current.copy(alpha = MutedContentAlpha),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                }
+            }
             // The drag handle nub -- purely visual now, no pointerInput of its own:
             // the pop above already tracks press for the whole pill, so a second,
             // separate press-tracker here would just be redundant (and, worse, could
@@ -377,8 +264,9 @@ internal fun MapTopBar(
             // meant to avoid).
             Box(
                 Modifier
-                    .align(Alignment.Center)
-                    .size(width = 32.dp, height = 4.dp)
+                    .align(Alignment.TopCenter)
+                    .padding(top = 5.dp)
+                    .size(width = 28.dp, height = 3.dp)
                     // The bar's own inherited content tone, halved -- not a fixed
                     // white. It sits inside the GlassSurface above, whose
                     // CompositionLocalProvider already resolved the one colour that
@@ -468,4 +356,12 @@ internal fun Modifier.pullDownToDismiss(
         },
         onDragCancel = { scope.launch { dragPx.animateTo(0f, spring) } },
     )
+}
+
+
+/** "88% · 415 km": a car's charge and range for the map pill, or null when it has neither yet. */
+internal fun mapStatusLine(state: UiState, v: com.bloo.bluelink.data.Vehicle, metric: Boolean): String? {
+    val r = chargeReadoutOf(state.statusFor(v), state.hasBattery(v), state.hasFuel(v), state.drivingLabel(v), metric)
+    return listOfNotNull(r.pctText.takeIf { it.isNotBlank() }, r.rangeText?.takeIf { it.isNotBlank() })
+        .joinToString(" · ").ifBlank { null }
 }

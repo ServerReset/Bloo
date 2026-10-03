@@ -316,6 +316,7 @@ internal fun GarageScreen(
                 originBounds = originBounds,
                 location = expandedLocation,
                 vehicleName = expandedVehicle.name,
+                statusLine = mapStatusLine(state.value, expandedVehicle, appearance.metricDistance),
                 deviceLocation = deviceLocation,
                 mapState = expandedMap.mapStateFor(expandedVehicle.vin),
                 hazeState = hazeState,

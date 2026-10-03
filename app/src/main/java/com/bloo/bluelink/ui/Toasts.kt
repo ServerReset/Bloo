@@ -8,6 +8,7 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -199,13 +200,14 @@ private fun ToastCard(toast: Toast, onDismiss: () -> Unit, hazeState: HazeState,
                         clip = true
                         val full = Rect(0f, 0f, size.width, size.height)
                         val start = Rect(o.left - tl.x, o.top - tl.y, o.right - tl.x, o.bottom - tl.y)
-                        shape = BlobShape(lerp(start, full, e), 0.5f + (0.36f - 0.5f) * e)
+                        shape = BlobShape(lerp(start, full, e), 0.5f)
                     }
                 }
             },
     ) {
     GlassSurface(
-        shape = LargeShape,
+        // A pill, like the search bar it came out of.
+        shape = CircleShape,
         hazeState = hazeState,
         // Mostly clear: the glass does the work (refraction over a barely-there tint), but enough tint
         // that the words read the instant it lands.

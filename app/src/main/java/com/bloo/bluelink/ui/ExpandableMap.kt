@@ -83,6 +83,7 @@ internal fun ExpandableMapLayer(
     originBounds: Rect,
     location: GeoLocation,
     vehicleName: String,
+    statusLine: String? = null,
     deviceLocation: GeoLocation?,
     mapState: CarMapState,
     hazeState: HazeState?,
@@ -248,6 +249,7 @@ internal fun ExpandableMapLayer(
             if (isExpanded && expandFraction.value > 0.1f) {
                 MapTopBar(
                     vehicleName = vehicleName,
+                    statusLine = statusLine,
                     mapHazeState = mapHazeState,
                     onRefreshLocation = onRefreshLocation,
                     refreshing = refreshing,

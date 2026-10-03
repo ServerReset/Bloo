@@ -36,7 +36,6 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -268,42 +267,22 @@ internal fun LocationPebble(v: Vehicle, state: UiState, vm: AppViewModel, modifi
                         ),
                     )
                 } else {
-                    var showMapSheet by remember { mutableStateOf(false) }
-                    var mapOriginBounds by remember { mutableStateOf<Rect?>(null) }
+                    // Not inside the garage's expandable map host: a plain map, with no expand to offer.
                     CarMap(
                         loc,
                         Modifier
                             .fillMaxWidth()
                             .height(if (glance) 130.dp else 220.dp)
-                            .clip(StandardShape)
-                            .onGloballyPositioned { mapOriginBounds = Rect(it.positionOnScreen(), it.size.toSize()) },
+                            .clip(StandardShape),
                         state = remember { CarMapState() },
                         deviceLocation = state.deviceLocation,
                     )
                     MapFeatureRow(
                         features = listOf(
-                            MapFeature(Icons.Filled.Fullscreen, "Expand") { showMapSheet = true },
                             MapFeature(Icons.Filled.Map, "Open in Maps") { openInExternalMaps(context, loc, v.name) },
                         ),
                     )
-                    if (showMapSheet) {
-                        CarMapSheet(
-                            loc, v.name, state.deviceLocation, mapOriginBounds,
-                            // Same "Locate" entry point the pebble's own header action
-                            // uses -- this flip-cover fallback sheet had no refresh
-                            // action at all before; wiring it up matches the primary
-                            // (LocalExpandedMap) path instead of leaving it behind.
-                            onRefreshLocation = { locateWithPermission() },
-                            refreshing = locating,
-                            deviceRequest = deviceRequest,
-                        ) { showMapSheet = false }
-                    }
                 }
-                // Same reasoning as the cover hero above: a resolved address is
-                // already the pebble's header/summary, so a permanent raw-coordinate
-                // row here was redundant with it every single time -- exactly what
-                // "should be an address, not coordinates" was pointing at. Only shown
-                // as a fallback while geocoding hasn't (yet, or ever) resolved a name.
                 if (!glance && place == null) StatusRow("Location", loc.coordString())
                 // How far the phone is from the car right now -- the phone's own
                 // last-known fix (kept live app-wide via AppViewModel.beginLiveDeviceLocation)

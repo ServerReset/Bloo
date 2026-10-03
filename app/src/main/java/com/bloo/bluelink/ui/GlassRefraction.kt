@@ -51,19 +51,19 @@ private fun glassStyle(shape: RoundedCornerShape, backing: Color, blur: androidx
     backgroundColor(backing)
     optics(
         GlassOptics(
-            refractionStrength = 1f,
+            refractionStrength = 0.85f,
             refractionHeightFraction = 0.35f,
-            refractionDisplacement = 24.dp,
+            refractionDisplacement = 18.dp,
             depth = OpticalSizeValue.Fixed(1f),
             blurRadius = OpticalSizeValue.Fixed(blur),
             refractionDetailIntensity = 0.7f,
-            refractionProfile = RefractionProfile.Edge(18.dp),
+            refractionProfile = RefractionProfile.Edge(16.dp),
             // The status-bar scrim: full strength at the top, thinning to nothing at its bottom edge.
             progressive = if (fadeOut) dev.chrisbanes.haze.HazeProgressive.verticalGradient(startIntensity = 1f, endIntensity = 0f) else null,
         ),
     )
     // A visible colour fringe along the edge, where the glass bends the light.
-    chromaticAberrationStrength(0.12f)
+    chromaticAberrationStrength(0.4f)
     chromaticAberrationMode(ChromaticAberrationMode.Simple)
     specularIntensity(0.7f)
     ambientResponse(0.45f)
