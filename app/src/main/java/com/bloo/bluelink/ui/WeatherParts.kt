@@ -125,6 +125,25 @@ internal fun WeatherDetail(weather: Weather, fahrenheit: Boolean, metric: Boolea
 
 
 /**
+ * The one safe Activity launch.
+ *
+ * `startActivity` from a non-Activity Context (`Application`, a `BroadcastReceiver`) throws
+ * unless `FLAG_ACTIVITY_NEW_TASK` is set, and throws again when no app can serve the intent —
+ * so every open-a-thing helper used to hand-roll the same `addFlags` + `runCatching` pair, of
+ * which the codebase had accumulated several (maps, custom tabs, dial, share, release pages,
+ * the OTA installer). All of them route through this now, so "can I open this" is answered
+ * exactly once and a new external-intent surface can't silently skip the guard.
+ *
+ * True when something actually launched, so callers that need to know fell-back from served
+ * (the update tile's "you must dismiss it yourself" path) can tell the difference; silently
+ * ignoring a failed open is how an action button starts reading as dead.
+ */
+internal fun Context.tryStart(intent: Intent): Boolean = runCatching {
+    if (this !is android.app.Activity) intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+    startActivity(intent)
+}.isSuccess
+
+/**
  * Opens the car's location in the device's default Maps app -- a `geo:` intent
  * rather than hardcoding Google Maps, since the OS resolves it to whatever the user
  * actually has set. Shared by [LocationPebble]'s own "Open in maps" button and
@@ -136,9 +155,7 @@ internal fun openInExternalMaps(context: Context, location: GeoLocation, label: 
         "geo:${location.latitude},${location.longitude}" +
             "?q=${location.latitude},${location.longitude}($label)"
     ).toUri()
-    runCatching {
-        context.startActivity(Intent(Intent.ACTION_VIEW, uri).apply { addFlags(Intent.FLAG_ACTIVITY_NEW_TASK) })
-    }
+    context.tryStart(Intent(Intent.ACTION_VIEW, uri))
 }
 
 /**
@@ -149,36 +166,32 @@ internal fun openInExternalMaps(context: Context, location: GeoLocation, label: 
  */
 internal fun shareLocation(context: Context, location: GeoLocation, label: String) {
     val text = "$label: https://maps.google.com/?q=${location.latitude},${location.longitude}"
-    runCatching {
-        val send = Intent(Intent.ACTION_SEND).apply {
-            type = "text/plain"
-            putExtra(Intent.EXTRA_TEXT, text)
-        }
-        context.startActivity(
-            Intent.createChooser(send, "Share location").apply { addFlags(Intent.FLAG_ACTIVITY_NEW_TASK) },
-        )
-    }
+    context.tryStart(
+        Intent.createChooser(
+            Intent(Intent.ACTION_SEND).apply {
+                type = "text/plain"
+                putExtra(Intent.EXTRA_TEXT, text)
+            },
+            "Share location",
+        ),
+    )
 }
 
 internal fun openUrl(context: Context, url: String) {
     val uri = url.toUri()
     runCatching { CustomTabsIntent.Builder().build().launchUrl(context, uri) }
-        .onFailure {
-            runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, uri).apply { addFlags(Intent.FLAG_ACTIVITY_NEW_TASK) }) }
-        }
+        .onFailure { context.tryStart(Intent(Intent.ACTION_VIEW, uri)) }
 }
 
 internal fun openApp(context: Context, packages: List<String>, fallbackUrl: String) {
     for (p in packages) {
         context.packageManager.getLaunchIntentForPackage(p)?.let {
-            runCatching { context.startActivity(it) }.onSuccess { return }
+            if (context.tryStart(it)) return
         }
     }
     openUrl(context, fallbackUrl)
 }
 
 internal fun dial(context: Context, number: String) {
-    runCatching {
-        context.startActivity(Intent(Intent.ACTION_DIAL, "tel:$number".toUri()).apply { addFlags(Intent.FLAG_ACTIVITY_NEW_TASK) })
-    }
+    context.tryStart(Intent(Intent.ACTION_DIAL, "tel:$number".toUri()))
 }

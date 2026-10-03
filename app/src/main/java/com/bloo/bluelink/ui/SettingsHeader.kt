@@ -329,12 +329,9 @@ internal fun SettingsHeroCard(state: UiState, vm: AppViewModel) {
                         SafeMorphTextButton(
                             "GitHub",
                             onClick = {
-                                runCatching {
-                                    context.startActivity(
-                                        Intent(Intent.ACTION_VIEW, com.bloo.bluelink.data.UpdateApi.RELEASES_URL.toUri())
-                                            .apply { addFlags(Intent.FLAG_ACTIVITY_NEW_TASK) },
-                                    )
-                                }
+                                context.tryStart(
+                                    Intent(Intent.ACTION_VIEW, com.bloo.bluelink.data.UpdateApi.RELEASES_URL.toUri()),
+                                )
                             },
                         )
                     }

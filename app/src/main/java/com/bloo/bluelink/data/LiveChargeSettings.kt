@@ -1,5 +1,7 @@
 package com.bloo.bluelink.data
 
+import com.bloo.bluelink.ui.tryStart
+
 import android.content.Context
 import android.content.Intent
 import android.os.Build
@@ -29,14 +31,14 @@ fun LiveCharge.openLiveUpdateSettings(context: Context) {
             putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         }
-        if (runCatching { context.startActivity(intent); true }.getOrDefault(false)) return
+        if (context.tryStart(intent)) return
     }
     // Fallback: the app's general notification settings page (works on any OS version).
     val fallback = Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).apply {
         putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)
         addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
     }
-    runCatching { context.startActivity(fallback) }
+    context.tryStart(fallback)
 }
 
 /**
@@ -64,7 +66,7 @@ fun LiveCharge.openLiveUpdateSettings(context: Context) {
 fun LiveCharge.openDeveloperOptions(context: Context) {
     val intent = Intent(Settings.ACTION_APPLICATION_DEVELOPMENT_SETTINGS)
         .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-    runCatching { context.startActivity(intent) }
+    context.tryStart(intent)
 }
 
 /**
@@ -119,8 +121,8 @@ fun LiveCharge.requestBackgroundUnrestricted(context: Context) {
     val intent = Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS)
         .setData("package:${context.packageName}".toUri())
         .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-    if (runCatching { context.startActivity(intent); true }.getOrDefault(false)) return
+    if (context.tryStart(intent)) return
     val fallback = Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS)
         .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-    runCatching { context.startActivity(fallback) }
+    context.tryStart(fallback)
 }

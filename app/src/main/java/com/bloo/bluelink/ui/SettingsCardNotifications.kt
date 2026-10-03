@@ -129,14 +129,12 @@ internal fun NotificationsCardContent(
                             SafeMorphTextButton(
                                 "Hide watcher notification",
                                 onClick = {
-                                    runCatching {
-                                        context.startActivity(
-                                            Intent(android.provider.Settings.ACTION_CHANNEL_NOTIFICATION_SETTINGS).apply {
-                                                putExtra(android.provider.Settings.EXTRA_APP_PACKAGE, context.packageName)
-                                                putExtra(android.provider.Settings.EXTRA_CHANNEL_ID, AutoLockNotification.CHANNEL_ID)
-                                            },
-                                        )
-                                    }
+                                    context.tryStart(
+                                        Intent(android.provider.Settings.ACTION_CHANNEL_NOTIFICATION_SETTINGS).apply {
+                                            putExtra(android.provider.Settings.EXTRA_APP_PACKAGE, context.packageName)
+                                            putExtra(android.provider.Settings.EXTRA_CHANNEL_ID, AutoLockNotification.CHANNEL_ID)
+                                        },
+                                    )
                                 },
                                 contentColor = MaterialTheme.colorScheme.primary,
                                 icon = Icons.Filled.NotificationsOff,
@@ -172,14 +170,12 @@ internal fun NotificationsCardContent(
                 }
                 if (alarmsBlocked) {
                     AttentionRow("AutoLock may lock late", "Allow alarms & reminders") {
-                        runCatching {
-                            context.startActivity(
-                                Intent(
-                                    android.provider.Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM,
-                                    "package:${context.packageName}".toUri(),
-                                ),
-                            )
-                        }
+                        context.tryStart(
+                            Intent(
+                                android.provider.Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM,
+                                "package:${context.packageName}".toUri(),
+                            ),
+                        )
                     }
                 }
                 if (chipBlocked) {

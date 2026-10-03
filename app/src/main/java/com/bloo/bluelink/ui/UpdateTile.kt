@@ -164,9 +164,9 @@ internal fun UpdateAvailableTile(
                             // Dismiss ONLY if the page really opened. Swallowing an
                             // ActivityNotFoundException and dismissing anyway meant a
                             // tap did visibly nothing AND cost the user the tile.
-                            val opened = runCatching {
-                                context.startActivity(Intent(Intent.ACTION_VIEW, info.run.htmlUrl.toUri()))
-                            }.isSuccess
+                            val opened = context.tryStart(
+                                Intent(Intent.ACTION_VIEW, info.run.htmlUrl.toUri()),
+                            )
                             if (opened) vm.dismissUpdate() else vm.reportError("Couldn't open the release page.")
                         }
                     }
@@ -352,12 +352,9 @@ internal fun runUpdateAction(
         state.updateApkReady -> vm.installDownloadedUpdate()
         info.run.phoneApkUrl != null -> vm.downloadUpdateInBackground()
         else -> {
-            val opened = runCatching {
-                context.startActivity(
-                    Intent(Intent.ACTION_VIEW, info.run.htmlUrl.toUri())
-                        .apply { addFlags(Intent.FLAG_ACTIVITY_NEW_TASK) },
-                )
-            }.isSuccess
+            val opened = context.tryStart(
+                Intent(Intent.ACTION_VIEW, info.run.htmlUrl.toUri()),
+            )
             if (opened) vm.dismissUpdate() else vm.reportError("Couldn't open the release page.")
         }
     }
