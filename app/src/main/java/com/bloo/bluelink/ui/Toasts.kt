@@ -4,7 +4,6 @@ import android.os.SystemClock
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.MutableTransitionState
-import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.Arrangement
@@ -28,6 +27,13 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.layout.positionInRoot
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.geometry.lerp
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.Spring
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableLongStateOf
@@ -145,7 +151,7 @@ private fun ToastItem(toast: Toast, state: ToastState, hazeState: HazeState, onC
     }
     AnimatedVisibility(
         visibleState = toast.visible,
-        enter = expandEnterSized(Alignment.Bottom) + fadeIn(),
+        enter = expandEnterSized(Alignment.Bottom),
         exit = expandExitSized(Alignment.Bottom) + fadeOut(),
     ) {
         ToastCard(toast, onDismiss = { state.dismiss(toast) }, hazeState = hazeState, onCopy = onCopy)
@@ -168,12 +174,41 @@ private fun ToastCard(toast: Toast, onDismiss: () -> Unit, hazeState: HazeState,
     val scope = rememberCoroutineScope()
     val dismissPx = with(LocalDensity.current) { 110.dp.toPx() }
     val offsetX by remember { derivedStateOf { if (dragging) dragPx.floatValue else settle.value } }
+    // The toast BLOBS OUT of the search bubble: it starts as a disc exactly over the bubble and swells,
+    // corners easing from a circle to a card, into its slot. [origin] is the bubble's last known place
+    // (null when search isn't on screen, and then the toast simply appears).
+    val registry = LocalFloatingRegistry.current
+    val origin = remember(toast.id) { registry.boundsOf(FloatingIds.Search) }
+    val emerge = remember(toast.id) { Animatable(if (origin == null) 1f else 0f) }
+    LaunchedEffect(toast.id) {
+        emerge.animateTo(1f, spring(dampingRatio = 0.62f, stiffness = Spring.StiffnessLow))
+    }
+    var slotTopLeft by remember(toast.id) { mutableStateOf<Offset?>(null) }
+    Box(
+        Modifier
+            .onGloballyPositioned { slotTopLeft = it.positionInRoot() }
+            .graphicsLayer {
+                val e = emerge.value
+                val o = origin
+                val tl = slotTopLeft
+                if (o != null && e < 1f) {
+                    if (tl == null) {
+                        alpha = 0f
+                    } else {
+                        clip = true
+                        val full = Rect(0f, 0f, size.width, size.height)
+                        val start = Rect(o.left - tl.x, o.top - tl.y, o.right - tl.x, o.bottom - tl.y)
+                        shape = BlobShape(lerp(start, full, e), 0.5f + (0.36f - 0.5f) * e)
+                    }
+                }
+            },
+    ) {
     GlassSurface(
         shape = LargeShape,
         hazeState = hazeState,
-        // High alpha even over a real blur: a toast reports something that just happened and has to
-        // read the instant it appears rather than melt into the screen behind it.
-        tint = scheme.surfaceContainerHigh.copy(alpha = if (canBlurBackdrops()) 0.82f else 0.96f),
+        // Mostly clear: the glass does the work (refraction over a barely-there tint), but enough tint
+        // that the words read the instant it lands.
+        tint = scheme.surface.copy(alpha = if (canBlurBackdrops()) 0.16f else 0.96f),
         modifier = Modifier
             .fillMaxWidth()
             // Announced by TalkBack without the user hunting for it.
@@ -215,7 +250,10 @@ private fun ToastCard(toast: Toast, onDismiss: () -> Unit, hazeState: HazeState,
             },
     ) {
         Row(
-            Modifier.padding(start = 12.dp, end = 4.dp, top = 8.dp, bottom = 8.dp),
+            Modifier
+                // The words arrive once the blob is most of the way out.
+                .graphicsLayer { alpha = ((emerge.value - 0.45f) / 0.55f).coerceIn(0f, 1f) }
+                .padding(start = 12.dp, end = 4.dp, top = 8.dp, bottom = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             IconBadge(icon = icon, tint = accent, size = 36.dp, iconSize = 20.dp)
@@ -237,5 +275,21 @@ private fun ToastCard(toast: Toast, onDismiss: () -> Unit, hazeState: HazeState,
                 Icon(AppIcons.Close, contentDescription = "Dismiss")
             }
         }
+    }
+    }
+}
+
+
+/** A rounded rectangle at [rect] whose corner radius is [cornerFraction] of its shorter side: the blob. */
+private class BlobShape(private val rect: Rect, private val cornerFraction: Float) : androidx.compose.ui.graphics.Shape {
+    override fun createOutline(
+        size: androidx.compose.ui.geometry.Size,
+        layoutDirection: androidx.compose.ui.unit.LayoutDirection,
+        density: androidx.compose.ui.unit.Density,
+    ): androidx.compose.ui.graphics.Outline {
+        val r = minOf(rect.width, rect.height) * cornerFraction
+        return androidx.compose.ui.graphics.Outline.Rounded(
+            androidx.compose.ui.geometry.RoundRect(rect, androidx.compose.ui.geometry.CornerRadius(r, r)),
+        )
     }
 }
