@@ -106,7 +106,7 @@ internal fun MetaChip(text: String, modifier: Modifier = Modifier, icon: ImageVe
                 Icon(icon, contentDescription = null, modifier = Modifier.size(12.dp))
                 Spacer(Modifier.width(GapHairline))
             }
-            Text(
+            AnimatedText(
                 text,
                 style = MaterialTheme.typography.labelMedium,
                 maxLines = 1,

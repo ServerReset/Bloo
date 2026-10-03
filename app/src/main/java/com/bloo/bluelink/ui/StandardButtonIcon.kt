@@ -53,7 +53,6 @@ import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.LocalContentColor
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -171,19 +170,25 @@ private fun MorphButtonGlyph(
                 angle.snapTo(0f)
             }
         }
-        Icon(
-            icon,
-            contentDescription = null,
-            // Unspecified means "whatever the content colour is", which is Icon's own default.
-            // It cannot simply be passed through: Icon treats Unspecified as "draw the vector's
-            // own colours", which is a different thing entirely.
-            tint = if (tint.isSpecified) tint else LocalContentColor.current,
-            // Draw-phase read. This one matters most of the three: `angle` is a
-            // continuously-running spin (the pending/refresh indicator loops
-            // `while (true)`), so reading it through Modifier.rotate()'s argument
-            // recomposed this Icon on EVERY FRAME for as long as the spinner ran.
+        // The glyph cross-fades when it changes (lock to unlock, play to stop); the spin is on the
+        // wrapper, in the draw phase: `angle` loops `while (true)` while pending, so reading it
+        // through Modifier.rotate() recomposed the Icon on EVERY FRAME for as long as it ran.
+        androidx.compose.animation.Crossfade(
+            targetState = icon,
             modifier = Modifier.size(iconSize).graphicsLayer { rotationZ = angle.value },
-        )
+            animationSpec = tween(MotionShort),
+            label = "buttonGlyph",
+        ) { glyph ->
+            Icon(
+                glyph,
+                contentDescription = null,
+                // Unspecified means "whatever the content colour is", which is Icon's own default.
+                // It cannot simply be passed through: Icon treats Unspecified as "draw the vector's
+                // own colours", which is a different thing entirely.
+                tint = if (tint.isSpecified) tint else LocalContentColor.current,
+                modifier = Modifier.size(iconSize),
+            )
+        }
     }
 }
 
@@ -240,7 +245,7 @@ fun MorphButtonLabel(
             // The one button label style, shared with MorphTextButton -- this pair is the
             // reference the rest of the app standardises on, so the size lives in a token
             // rather than being whatever each button happened to inherit.
-            Text(
+            AnimatedText(
                 label,
                 style = ButtonLabelStyle,
                 fontWeight = FontWeight.SemiBold,

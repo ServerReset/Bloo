@@ -273,7 +273,10 @@ internal fun Modifier.hapticClickable(
     onClick: () -> Unit,
 ): Modifier {
     val haptics = LocalHaptics.current
-    return blockPageSwipe().noRippleClickable(onClickLabel) { haptics?.click(); onClick() }
+    val source = remember { MutableInteractionSource() }
+    return blockPageSwipe()
+        .pressScale(source)
+        .clickable(interactionSource = source, indication = null, onClickLabel = onClickLabel) { haptics?.click(); onClick() }
 }
 
 

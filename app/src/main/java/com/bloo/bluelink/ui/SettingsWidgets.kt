@@ -282,7 +282,7 @@ internal fun SettingsCard(
     // left composition -- "extra space between the cards, then it snaps". Living on this
     // wrapper instead means the gap sits INSIDE that same outer AnimatedVisibility and
     // shrinks away with the card.
-    Box(Modifier.settingsCardSlot()) {
+    Box(Modifier.entrance("settings:$title").settingsCardSlot()) {
         PebbleShell(
             expanded = expanded,
             onToggle = { if (!inline) vm.togglePebble(SettingsPseudoVehicle, title) },
@@ -291,7 +291,7 @@ internal fun SettingsCard(
             canToggle = !inline,
             titleTrailing = inlineSetting ?: status?.takeIf { it.isNotBlank() }?.let {
                 {
-                    Text(
+                    AnimatedText(
                         it,
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
