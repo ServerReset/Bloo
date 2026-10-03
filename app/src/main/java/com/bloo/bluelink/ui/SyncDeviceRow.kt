@@ -118,7 +118,7 @@ internal fun SyncDeviceRow(
                     isSelf || health == DeviceHealth.ACTIVE -> "Active now"
                     else -> com.bloo.bluelink.data.relativeLabel(device.lastSeenMs).ifBlank { "Never synced" }
                 }
-                val line = listOf(device.model.takeIf { it.isNotBlank() }, seen, device.appVersion.takeIf { it.isNotBlank() }?.let { "v$it" })
+                val line = listOf(device.model.takeIf { it.isNotBlank() && !it.equals(device.name, ignoreCase = true) }, seen, device.appVersion.takeIf { it.isNotBlank() }?.let { "v$it" })
                     .filterNotNull().joinToString(" · ")
                 Text(
                     line,
