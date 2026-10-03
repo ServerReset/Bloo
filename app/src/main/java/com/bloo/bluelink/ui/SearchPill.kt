@@ -285,7 +285,7 @@ internal fun SearchPill(
                     // contents admitted they were moving. The old content
                     // leaving quickly and the new one arriving over the top,
                     // while the shape carries the motion, is the whole effect.
-                    fadeIn(tween(140)) togetherWith fadeOut(tween(90))
+                    fadeIn(tween(MotionFast)) togetherWith fadeOut(tween(90))
                 },
                 label = "searchContentMorph",
             ) { (shape, isOpen) ->

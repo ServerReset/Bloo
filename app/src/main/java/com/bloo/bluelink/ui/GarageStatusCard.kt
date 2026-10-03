@@ -127,7 +127,7 @@ internal fun GarageStatusCard(state: State<UiState>, vm: AppViewModel, hazeState
     val contentAlpha = remember { Animatable(0f) }
     val contentOffset = remember { Animatable(16f) }
     LaunchedEffect(Unit) {
-        launch { contentAlpha.animateTo(1f, tween(400)) }
+        launch { contentAlpha.animateTo(1f, tween(MotionLong)) }
         launch { contentOffset.animateTo(0f, spring(dampingRatio = 0.7f, stiffness = Spring.StiffnessMediumLow)) }
     }
 

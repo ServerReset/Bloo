@@ -355,7 +355,7 @@ internal fun AuroraBackground(
     // part of "launch feels jittery." Cheap to animate -- alpha is read in drawBehind below, same
     // draw-phase-only convention as explodeAlpha, so it costs nothing beyond what already redraws.
     val appear = remember { Animatable(0f) }
-    LaunchedEffect(Unit) { appear.animateTo(1f, tween(320)) }
+    LaunchedEffect(Unit) { appear.animateTo(1f, tween(MotionMedium)) }
     // Defer the blur itself past the first frame, not just the blob alpha (`appear` above).
     // The blobs are at alpha 0 for the first ~320ms, so a full-screen 44dp blur of a flat
     // surface on the very first frame is pure wasted GPU work -- and on a cold start that

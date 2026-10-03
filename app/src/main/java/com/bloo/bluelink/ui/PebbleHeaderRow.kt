@@ -229,8 +229,8 @@ internal fun PebbleHeaderRow(
         // they're just not rendered while `visible` is false.
         AnimatedVisibility(
             visible = !forceExpanded && (headerAction != null || canToggle),
-            enter = fadeIn(tween(180)) + expandHorizontally(tween(180)),
-            exit = fadeOut(tween(140)) + shrinkHorizontally(tween(140)),
+            enter = fadeIn(tween(MotionShort)) + expandHorizontally(tween(MotionShort)),
+            exit = fadeOut(tween(MotionFast)) + shrinkHorizontally(tween(MotionFast)),
         ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
         // The gap between the header's text column and whatever control ends the

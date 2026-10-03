@@ -116,7 +116,7 @@ internal fun HeroHeader(
     val heroOffset = remember { Animatable(if (playIntro) 16f else 0f) }
     LaunchedEffect(v.vin) {
         if (!playIntro) return@LaunchedEffect
-        launch { heroAlpha.animateTo(1f, tween(400)) }
+        launch { heroAlpha.animateTo(1f, tween(MotionLong)) }
         launch { heroOffset.animateTo(0f, spring(dampingRatio = 0.7f, stiffness = Spring.StiffnessMediumLow)) }
     }
     // On the flip cover this hero is one full-screen tile. Unlike every other

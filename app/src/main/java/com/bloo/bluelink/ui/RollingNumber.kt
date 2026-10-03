@@ -63,8 +63,8 @@ internal fun RollingNumber(
                 // previous value a LaunchedEffect wrote one frame later --
                 // rolling UP on a number that had just gone DOWN).
                 val dir = if ((targetState.toIntOrNull() ?: 0) >= (initialState.toIntOrNull() ?: 0)) 1 else -1
-                (fadeIn(tween(180)) + slideInVertically { dir * it / 2 }) togetherWith
-                    (fadeOut(tween(120)) + slideOutVertically { -dir * it / 2 })
+                (fadeIn(tween(MotionShort)) + slideInVertically { dir * it / 2 }) togetherWith
+                    (fadeOut(tween(MotionFast)) + slideOutVertically { -dir * it / 2 })
             },
             label = "num",
         ) { t -> WiggleText(t, style = style, fontWeight = fontWeight, color = color) }

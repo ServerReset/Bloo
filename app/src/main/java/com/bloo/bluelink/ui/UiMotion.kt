@@ -189,7 +189,7 @@ internal val PebbleBounceStiffness = Spring.StiffnessLow
  * tiles, or sections become visible. Matches the update pebble's animation language.
  */
 internal fun expandEnter(expandFrom: Alignment.Vertical = Alignment.Top): EnterTransition =
-    fadeIn(tween(180)) + slideInVertically {
+    fadeIn(tween(MotionShort)) + slideInVertically {
         if (expandFrom == Alignment.Top) -it / 3 else it / 3
     }
 
@@ -203,7 +203,7 @@ internal fun expandEnter(expandFrom: Alignment.Vertical = Alignment.Top): EnterT
  * per-row fades (e.g., StaggeredRevealColumn rows with individual fade animations).
  */
 internal fun expandExit(shrinkTowards: Alignment.Vertical = Alignment.Top, fade: Boolean = true): ExitTransition =
-    (if (fade) fadeOut(tween(120)) else ExitTransition.None) + slideOutVertically {
+    (if (fade) fadeOut(tween(MotionFast)) else ExitTransition.None) + slideOutVertically {
         if (shrinkTowards == Alignment.Top) -it / 3 else it / 3
     }
 

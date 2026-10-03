@@ -176,7 +176,7 @@ internal fun LoginScreen(
                         targetState = brandSubtitle,
                         transitionSpec = {
                             (fadeIn(tween(280)) + slideInVertically(tween(280)) { it / 3 }) togetherWith
-                                (fadeOut(tween(160)) + slideOutVertically(tween(160)) { -it / 3 })
+                                (fadeOut(tween(MotionShort)) + slideOutVertically(tween(MotionShort)) { -it / 3 })
                         },
                         label = "loginSubtitle",
                     ) { subtitle ->
@@ -193,7 +193,7 @@ internal fun LoginScreen(
             AnimatedVisibility(
                 visible = formVisible,
                 enter = slideInVertically(tween(420, easing = LinearOutSlowInEasing)) { it / 3 } +
-                    fadeIn(tween(380)),
+                    fadeIn(tween(MotionLong)),
             ) {
                 Column(
                     Modifier
@@ -248,7 +248,7 @@ internal fun LoginScreen(
                     AnimatedContent(
                         targetState = emailLabel,
                         transitionSpec = {
-                            fadeIn(tween(220)) togetherWith fadeOut(tween(160))
+                            fadeIn(tween(220)) togetherWith fadeOut(tween(MotionShort))
                         },
                         label = "emailLabel",
                     ) { label ->
@@ -364,7 +364,7 @@ internal fun LoginScreen(
                         targetState = brand.label,
                         // Same duration as this form's other two brand-driven crossfades
                         // (the email label and the sign-in button label) -- see there.
-                        transitionSpec = { fadeIn(tween(220)) togetherWith fadeOut(tween(160)) },
+                        transitionSpec = { fadeIn(tween(220)) togetherWith fadeOut(tween(MotionShort)) },
                         label = "privacyNote",
                     ) { label ->
                         Text(

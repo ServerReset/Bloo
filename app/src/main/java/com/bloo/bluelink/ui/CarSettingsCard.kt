@@ -72,7 +72,7 @@ internal fun CarSettingsCard(
     val cardBg by androidx.compose.animation.animateColorAsState(
         if (dragging) MaterialTheme.colorScheme.secondaryContainer
         else MaterialTheme.colorScheme.surfaceVariant,
-        animationSpec = tween(200),
+        animationSpec = tween(MotionShort),
         label = "carCardBg",
     )
     // The exact same collapsible pebble every car's own pebble list on the

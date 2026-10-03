@@ -181,7 +181,7 @@ internal fun StateControl(
                         AnimatedContent(
                             targetState = Pair(stateIcon, stateText),
                             transitionSpec = {
-                                (fadeIn(tween(200)) + scaleIn(initialScale = 0.85f, animationSpec = tween(200))) togetherWith
+                                (fadeIn(tween(MotionShort)) + scaleIn(initialScale = 0.85f, animationSpec = tween(MotionShort))) togetherWith
                                 (fadeOut(tween(150)) + scaleOut(targetScale = 1.1f, animationSpec = tween(150)))
                             },
                             // Default is TopStart: "Locked"/"Unlocked" render at

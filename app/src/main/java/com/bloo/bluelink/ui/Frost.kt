@@ -50,7 +50,7 @@ internal fun Modifier.frosted(
     /** False for a button: just soften and fade it, leaving its own (morphing) shape alone. */
     veil: Boolean = true,
 ): Modifier {
-    val amount by animateFloatAsState(if (active) 1f else 0f, tween(420), label = "frost")
+    val amount by animateFloatAsState(if (active) 1f else 0f, tween(MotionLong), label = "frost")
     if (amount <= 0.001f) return this
     val dark = appIsDarkTheme()
     val canBlur = canBlurBackdrops()

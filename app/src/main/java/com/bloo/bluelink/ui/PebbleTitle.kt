@@ -305,7 +305,7 @@ internal fun PebbleTitleRow(
         Box(modifier = titleBaseModifier, contentAlignment = Alignment.CenterStart) {
         Crossfade(
             targetState = atRestScale,
-            animationSpec = tween(140),
+            animationSpec = tween(MotionFast),
             label = "heroTitleRestSwap",
         ) { atRest ->
             Text(
@@ -440,8 +440,8 @@ internal fun PebbleTitleRow(
     if (titleTrailing != null) lastTitleTrailing = titleTrailing
     AnimatedVisibility(
         visible = titleTrailing != null,
-        enter = fadeIn(tween(180)) + scaleIn(tween(180), initialScale = 0.85f),
-        exit = fadeOut(tween(140)) + scaleOut(tween(140), targetScale = 0.85f),
+        enter = fadeIn(tween(MotionShort)) + scaleIn(tween(MotionShort), initialScale = 0.85f),
+        exit = fadeOut(tween(MotionFast)) + scaleOut(tween(MotionFast), targetScale = 0.85f),
     ) {
         lastTitleTrailing?.let { Box { it() } }
     }

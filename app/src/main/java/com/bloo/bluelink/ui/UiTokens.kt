@@ -348,3 +348,13 @@ internal const val HairlineAlpha = 0.14f
 @androidx.compose.runtime.Composable
 internal fun hairlineColor(): androidx.compose.ui.graphics.Color =
     androidx.compose.material3.MaterialTheme.colorScheme.onSurface.copy(alpha = HairlineAlpha)
+
+
+// ---- Motion durations (ms) -------------------------------------------------------
+//
+// The handful of tween lengths the UI uses, so the same kind of transition takes the same time
+// everywhere. Springs set their own timing; these are for fades, slides and colour changes.
+internal const val MotionFast = 140    // micro feedback, hints leaving
+internal const val MotionShort = 180   // fades and small slides
+internal const val MotionMedium = 320  // panels, cards, colour sweeps
+internal const val MotionLong = 400    // large or emphasised moves

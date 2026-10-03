@@ -211,7 +211,7 @@ internal fun LockOverlay(vm: AppViewModel, opaqueBackdrop: Boolean = false) {
     // hand-off to the blurred garage imperceptible.
     val backdropAlpha by animateFloatAsState(
         targetValue = if (opaqueBackdrop) 1f else 0.45f,
-        animationSpec = tween(320),
+        animationSpec = tween(MotionMedium),
         label = "lockBackdropAlpha",
     )
     Box(

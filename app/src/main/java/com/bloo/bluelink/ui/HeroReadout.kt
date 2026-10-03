@@ -377,7 +377,7 @@ internal fun HeroNumbers(
             ) {
                 if (t > 0.01f) {
                     val statusColor by androidx.compose.animation.animateColorAsState(
-                        data.statusColor, animationSpec = tween(300), label = "statusLineColor",
+                        data.statusColor, animationSpec = tween(MotionMedium), label = "statusLineColor",
                     )
                     Text(
                         data.statusLine,
