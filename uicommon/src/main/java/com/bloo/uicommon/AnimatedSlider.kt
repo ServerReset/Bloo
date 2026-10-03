@@ -130,13 +130,13 @@ fun AnimatedSlider(
     fun trackTo(x: Float) {
         val raw = rawForX(x)
         val span = (valueRange.endInclusive - valueRange.start)
-        // Past either end the handle keeps going, but it has to work for it: a rubber band whose pull
-        // eases off the further you drag, and the track stretches with it (see the Canvas's layer).
-        val over = span * 0.07f
-        fun rubber(extra: Float) = over * (1f - 1f / (1f + extra / over))
+        // Past either end the handle keeps going, but it has to work for it: the shared
+        // asymptotic rubber band (see [rubberBand]), whose pull eases off the further
+        // you drag, and the track stretches with it (see the Canvas's layer).
+        val over = span * EdgeOverscrollFraction
         val visual = when {
-            raw < valueRange.start -> valueRange.start - rubber(valueRange.start - raw)
-            raw > valueRange.endInclusive -> valueRange.endInclusive + rubber(raw - valueRange.endInclusive)
+            raw < valueRange.start -> valueRange.start - rubberBand(valueRange.start - raw, over)
+            raw > valueRange.endInclusive -> valueRange.endInclusive + rubberBand(raw - valueRange.endInclusive, over)
             else -> raw
         }
         scope.launch { anim.snapTo(visual) }

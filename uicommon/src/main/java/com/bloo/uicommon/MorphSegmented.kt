@@ -186,7 +186,22 @@ fun MorphSegmented(
     // Equal widths while dragging, so the highlight is the same size under the finger all the way along;
     // the stretch springs back in on release.
     val stretch = remember { Animatable(1f) }
-    fun posNow(): Float = if (dragFrac.isNaN()) pos.value else (dragFrac - lag.value).coerceIn(0f, (n - 1).toFloat())
+    // The elastic budget at the first/last option, in option units: same fraction of the range
+    // the slider uses (see [EdgeOverscrollFraction]), so pulling past the end of either control
+    // stretches by the same proportion. Zero on a single-option track (nothing to overscroll to).
+    val edgeOver = if (n > 1) (n - 1) * EdgeOverscrollFraction else 0f
+    // Physics-driven edge bounce, not a hard clamp: past the first/last option the highlight keeps
+    // moving under the finger but works for it (the shared asymptotic rubber band), and letting go
+    // hands it to the settle spring below, which carries it back with a little overshoot. This is
+    // the same "hit the edge" feel the slider's own ends have.
+    fun posNow(): Float {
+        val raw = if (dragFrac.isNaN()) pos.value else (dragFrac - lag.value)
+        return when {
+            raw < 0f -> -rubberBand(-raw, edgeOver)
+            raw > (n - 1).toFloat() -> (n - 1).toFloat() + rubberBand(raw - (n - 1).toFloat(), edgeOver)
+            else -> raw
+        }
+    }
     fun weightsNow(): FloatArray = segmentWeights(n, posNow(), shown.value * stretch.value, ratio)
 
     val gap = 4.dp

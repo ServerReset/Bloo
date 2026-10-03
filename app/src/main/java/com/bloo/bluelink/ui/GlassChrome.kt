@@ -291,7 +291,7 @@ internal fun glassTint(blurred: Boolean): Color {
         // When blurred: lighter alpha (blur provides softness)
         // When not blurred: stronger alpha (need more visual weight)
         val surfaceColor = scheme.surfaceContainer
-        val alpha = if (blurred) 0.08f else 0.12f
+        val alpha = if (blurred) 0.06f else 0.09f
         surfaceColor.copy(alpha = alpha)
     }
 }
@@ -360,8 +360,10 @@ internal val LocalBackdropHaze = androidx.compose.runtime.staticCompositionLocal
 
 
 /** How much of its colour a glass card keeps over the blur: enough tint to read text on, little
- *  enough that the backdrop shows through as frosted glass. */
-private const val GlassCardTintAlpha = 0.42f
+ *  enough that the backdrop shows through as frosted glass. Lowered from 0.42 -- reported as
+ *  carrying too much of its own colour, so the cards read as flat panels rather than glass; the
+ *  backdrop blurs through much more clearly now. */
+private const val GlassCardTintAlpha = 0.26f
 
 
 /**
@@ -371,9 +373,9 @@ private const val GlassCardTintAlpha = 0.42f
  */
 internal fun Modifier.glassSheen(): Modifier = this.background(
     androidx.compose.ui.graphics.Brush.linearGradient(
-        0f to Color.White.copy(alpha = 0.13f),
-        0.45f to Color.White.copy(alpha = 0.02f),
-        1f to Color.White.copy(alpha = 0.06f),
+        0f to Color.White.copy(alpha = 0.09f),
+        0.45f to Color.White.copy(alpha = 0.01f),
+        1f to Color.White.copy(alpha = 0.04f),
     ),
 )
 
@@ -392,7 +394,7 @@ internal fun Modifier.glassCardFill(shape: Shape, tint: Color): Modifier {
             .background(tint.copy(alpha = GlassCardTintAlpha))
             .glassSheen()
     } else {
-        this.background(tint.copy(alpha = 0.9f), shape)
+        this.background(tint.copy(alpha = 0.82f), shape)
     }
 }
 
