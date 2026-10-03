@@ -1,6 +1,5 @@
 package com.bloo.bluelink.ui
 
-import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
@@ -29,7 +28,11 @@ import androidx.compose.ui.unit.dp
  * a card that first appears. One place, so every surface that uses them moves the same way.
  */
 
-/** Text that cross-fades when [text] changes, instead of swapping in a frame. */
+/**
+ * Text that fades in when [text] changes, instead of swapping in a frame. One plain Text and one alpha
+ * (no cross-fade, which composes both strings at once): this sits inside every button label, so it has
+ * to be close to free when nothing is changing.
+ */
 @Composable
 internal fun AnimatedText(
     text: String,
@@ -41,14 +44,23 @@ internal fun AnimatedText(
     softWrap: Boolean = true,
     overflow: TextOverflow = TextOverflow.Clip,
 ) {
-    Crossfade(
-        targetState = text,
-        modifier = modifier,
-        animationSpec = tween(MotionShort),
-        label = "animatedText",
-    ) { t ->
-        Text(t, style = style, color = color, fontWeight = fontWeight, maxLines = maxLines, softWrap = softWrap, overflow = overflow)
+    val fade = remember { Animatable(1f) }
+    var first by remember { androidx.compose.runtime.mutableStateOf(true) }
+    LaunchedEffect(text) {
+        if (first) { first = false; return@LaunchedEffect }
+        fade.snapTo(0.2f)
+        fade.animateTo(1f, tween(MotionShort))
     }
+    Text(
+        text,
+        modifier = modifier.graphicsLayer { alpha = fade.value },
+        style = style,
+        color = color,
+        fontWeight = fontWeight,
+        maxLines = maxLines,
+        softWrap = softWrap,
+        overflow = overflow,
+    )
 }
 
 /**

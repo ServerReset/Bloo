@@ -51,6 +51,8 @@ internal class LabelHintState {
     /** True while the button is showing only its symbol. Written from placement. */
     var collapsed: Boolean = false
     var shown by mutableStateOf(false)
+    /** True from the moment the bubble is up until its exit animation ends. */
+    var present by mutableStateOf(false)
 
     fun describe(label: String, icon: ImageVector) { this.label = label; this.icon = icon }
 
@@ -69,21 +71,27 @@ internal val LocalLabelHint = androidx.compose.runtime.staticCompositionLocalOf<
  */
 @Composable
 internal fun LabelHintPopup(state: LabelHintState) {
+    // Nothing is composed (no animation state, no effect) until the hint is actually shown: every
+    // MorphButton in the app hosts one of these, and nearly all of them never open.
+    if (state.shown || state.present) ActiveLabelHint(state)
+}
+
+@Composable
+private fun ActiveLabelHint(state: LabelHintState) {
     val t = remember { Animatable(0f) }
-    var present by remember { mutableStateOf(false) }
     LaunchedEffect(state.shown) {
         if (state.shown) {
-            present = true
+            state.present = true
             val hide = launch { delay(HINT_SHOW_MS); state.shown = false }
             t.animateTo(1f, spring(dampingRatio = 0.5f, stiffness = Spring.StiffnessMedium))
             hide.join()
-        } else if (present) {
-            t.animateTo(0f, tween(170))
-            present = false
+        } else {
+            t.animateTo(0f, tween(MotionFast))
+            state.present = false
         }
     }
     val icon = state.icon
-    if (present && icon != null) {
+    if (icon != null) {
         Popup(
             popupPositionProvider = remember { AboveAnchorPositionProvider },
             properties = PopupProperties(focusable = false, clippingEnabled = false),
