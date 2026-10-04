@@ -369,6 +369,17 @@ private fun ExpressiveContent(enabled: Boolean, content: @Composable () -> Unit)
     if (enabled) {
         content()
     } else {
-        Box(Modifier.semantics(mergeDescendants = true) { disabled() }) { content() }
+        // propagateMinConstraints = true, matching the enabled branch: enabled, `content()` is
+        // emitted straight into the caller's scope and inherits the button GROUP's minimum
+        // width (ExpressiveGroupData / propagateMinConstraints); disabled, this Box used to
+        // DROP that propagation, so the label measured against a minWidth of 0 and the button
+        // collapsed toward its icon-only fallback -- the reported "buttons shrink when iced
+        // out". Passing the constraints through makes the disabled measure identical to the
+        // enabled one; only the visual (frost) differs.
+        Box(
+            Modifier
+                .semantics(mergeDescendants = true) { disabled() },
+            propagateMinConstraints = true,
+        ) { content() }
     }
 }
