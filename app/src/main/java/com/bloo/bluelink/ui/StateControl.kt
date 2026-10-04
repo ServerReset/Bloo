@@ -116,7 +116,10 @@ internal fun StateControl(
     Row(
         Modifier
             .fillMaxWidth()
-            .height(ControlHeight)
+            // heightIn(min), not a fixed height: this row carries a label (and the button's
+            // own text) that outgrows ControlHeight at a large font. A minimum keeps the
+            // standard collapsed size but lets it grow rather than clip.
+            .heightIn(min = ControlHeight)
             .onSizeChanged { rowWidthDp = with(density) { it.width.toDp() } },
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.Start,

@@ -5,6 +5,7 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.only
@@ -202,9 +203,12 @@ internal fun ControlsPebble(v: Vehicle, state: UiState, vm: AppViewModel, modifi
     ) {
         Column(Modifier.fillMaxWidth()) {
             // Asymmetric padding to match pebble header alignment: more left, less right.
-            // Height stays pinned here (not on the Surface) so the pebble keeps its exact
-            // resting silhouette and only grows when the history is actually showing.
-            Box(Modifier.fillMaxWidth().height(ControlHeight).padding(start = 12.dp, end = 4.dp)) {
+            // Height stays HERE (not on the Surface) so the pebble keeps its resting
+            // silhouette and only grows when the history is actually showing. heightIn(min),
+            // not a fixed height: the header beside it grows with a large accessibility font
+            // (see Pebbles.kt's own header), so this has to be able to grow WITH it rather than
+            // pinning to 76dp and clipping the controls.
+            Box(Modifier.fillMaxWidth().heightIn(min = ControlHeight).padding(start = 12.dp, end = 4.dp)) {
                 // PrimaryActions' own default start padding (26.dp) plus this
                 // Box's 12.dp put the lock icon noticeably further right than
                 // every other pebble's header icon (Charge, Climate, ...), which

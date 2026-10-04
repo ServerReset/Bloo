@@ -1,6 +1,7 @@
 package com.bloo.bluelink.ui
 
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -175,7 +176,11 @@ internal fun PebbleList(
             // when the real body fills in, and carries the drag handle so ReorderColumn's
             // item is fully formed. Below the fold, so this transient state is never
             // seen or interacted with.
-            Box(Modifier.fillMaxWidth().height(PebbleHeaderHeight).then(itemDragHandle))
+            // heightIn(min), not a fixed height: a pebble header carries a title plus an
+            // optional summary line, and at a large accessibility font that stacked text is
+            // taller than ControlHeight -- a hard 76dp clipped it. A minimum keeps the shared
+            // collapsed size while letting the header grow when the font demands it.
+            Box(Modifier.fillMaxWidth().heightIn(min = PebbleHeaderHeight).then(itemDragHandle))
         }
     }
 }

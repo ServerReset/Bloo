@@ -12,6 +12,7 @@ import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.waitForUpOrCancellation
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
@@ -206,7 +207,11 @@ internal fun MapTopBar(
                 // one line -- the old two-row layout (a 14dp handle strip stacked
                 // above a name/refresh row) took noticeably more vertical space for
                 // the same content.
-                .height(60.dp)
+                // heightIn(min), not a fixed 60dp: the bar stacks the car name over its
+                // charge/range status line, and at a large font that two-line block is taller
+                // than 60dp -- a hard height clipped the status line. A minimum keeps the
+                // single-line look while letting the bar grow with the text.
+                .heightIn(min = 60.dp)
                 .padding(horizontal = 18.dp),
         ) {
             // Name and bigger, titleLarge (was titleMedium) -- reported directly as
