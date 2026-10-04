@@ -12,6 +12,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
@@ -147,6 +148,12 @@ internal fun ToastHost(
     val searchRect = remember(bottomId) {
         if (bottomId == null) null else registry.boundsOf(FloatingIds.Search)
     }
+    // MIDDLE search: the whole STACK sits above the pill, so the lift is a bottom spacer on the
+    // column (nothing behind any toast), not a per-toast pad. Corner search: only the bottom
+    // toast is shortened to slot beside the pill; the ones above it stay full width.
+    val liftPx = if (dock == SearchDock.CENTER && searchRect != null) {
+        with(density) { (searchRect.height.toDp() + GapRow + GapRow) }
+    } else 0.dp
 
     Column(
         modifier
@@ -163,8 +170,10 @@ internal fun ToastHost(
     ) {
         state.items.forEach { toast ->
             key(toast.id) {
-                // Only the bottom toast sits on the search's row, so only it is reshaped.
-                val box = if (toast.id == bottomId) {
+                // Only the bottom toast sits on the search's row, so only IT is reshaped when
+                // the search is docked in a corner. Middle search is handled by the column's
+                // own bottom lift below.
+                val box = if (toast.id == bottomId && (dock == SearchDock.LEFT || dock == SearchDock.RIGHT)) {
                     Modifier.searchClearance(dock, searchRect, baseEdgePx, gapPx)
                 } else {
                     Modifier
@@ -172,6 +181,9 @@ internal fun ToastHost(
                 Box(box) { ToastItem(toast, state, hazeState, onCopy) }
             }
         }
+        // The middle-search lift, as the LAST column child so it sits below every toast and
+        // pushes the whole stack up clear of the centred pill. Absent (0dp) otherwise.
+        if (liftPx > 0.dp) Spacer(Modifier.height(liftPx))
     }
 }
 
@@ -187,9 +199,13 @@ private fun Modifier.searchClearance(dock: SearchDock?, rect: Rect?, baseEdgePx:
     if (dock == null || rect == null) return this
     val d = LocalDensity.current
     return when (dock) {
+        // Pad the START so the toast begins just right of a LEFT-docked pill (beside it, same row).
         SearchDock.LEFT -> this.padding(start = with(d) { (rect.right - baseEdgePx + gapPx).coerceAtLeast(0f).toDp() })
+        // Pad the END so it ends just left of a RIGHT-docked pill.
         SearchDock.RIGHT -> this.padding(end = with(d) { (baseEdgePx - rect.left + gapPx).coerceAtLeast(0f).toDp() })
-        SearchDock.CENTER -> this.padding(bottom = with(d) { (rect.height + gapPx).toDp() })
+        // CENTER is handled by the host's own bottom lift (the whole stack goes above the pill),
+        // not here -- this is only ever called for the corner docks.
+        SearchDock.CENTER -> this
     }
 }
 
@@ -267,7 +283,9 @@ private fun ToastCard(toast: Toast, onDismiss: () -> Unit, hazeState: HazeState,
         // like a sliver of text wrapped in a lozenge. The blob STILL emerges from the search
         // circle (see `origin`/`BlobShape`, which morphs rect -> full over `emerge`), so the
         // "it came out of search" read is unchanged; only the resting shape is.
-        shape = RoundedCornerShape(24.dp),
+        // A pill (fully rounded ends), not a fixed 24dp corner: the toasts read as smooth
+        // rounded pills, the app's floating-chrome language.
+        shape = RoundedCornerShape(50),
         hazeState = hazeState,
         // Mostly clear: the glass does the work (refraction over a barely-there tint), but enough tint
         // that the words read the instant it lands.
