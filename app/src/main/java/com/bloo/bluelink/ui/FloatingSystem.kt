@@ -154,6 +154,14 @@ class FloatingRegistry {
     fun boundsOf(id: FloatingId): Rect? = bounds[id]
 
     /**
+     * Where the search element is docked (or null when it isn't on screen). Published by
+     * [SearchLayer] so a floater that wants to sit BESIDE the search pill (the toasts) can tell a
+     * corner dock from the centred one without reaching into the search layer's own state. A
+     * CENTER dock means "above it"; LEFT/RIGHT mean "beside it".
+     */
+    internal var searchDock by mutableStateOf<SearchDock?>(null)
+
+    /**
      * Does anything else registered overlap [rect]? [marginPx] pads the OTHER element, so two
      * things that merely come close still count as colliding -- a name ellipsizing right up
      * against the dots reads as a collision long before the rectangles actually intersect.

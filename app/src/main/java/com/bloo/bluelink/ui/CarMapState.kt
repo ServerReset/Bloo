@@ -68,6 +68,9 @@ internal class CarMapState {
      *  same direction as the drag; see CarMap's own originX/originY, which
      *  subtract this to shift what's visible. */
     fun pan(dx: Float, dy: Float) {
+        // A pinch frame reports a pure pan with (0,0); skip the writes entirely rather than
+        // invalidating panX/panY (and every layout lambda reading them) for no movement.
+        if (dx == 0f && dy == 0f) return
         userAdjusted = true
         panX += dx
         panY += dy
@@ -79,6 +82,10 @@ internal class CarMapState {
      *  PIXELS at the OLD zoom, and a zoom step doubles/halves how many pixels the
      *  same world distance covers. */
     fun pinch(ratio: Float) {
+        // A drag reports ratio 1f; there is nothing to fold in, and running the while-loops +
+        // coerce + scale write on every pan frame was pure overhead (and a needless scale
+        // invalidation for a value that did not change).
+        if (ratio == 1f) return
         userAdjusted = true
         scale *= ratio
         while (scale >= 2f && zoom < CarMapMaxZoom) {

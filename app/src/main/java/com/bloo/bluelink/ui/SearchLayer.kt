@@ -37,6 +37,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
@@ -201,6 +202,13 @@ internal fun SearchLayer(
             onSettings || dock == SearchDock.CENTER -> SearchForm.PILL
             else -> SearchForm.BUBBLE
         }
+        // Publish where search is docked so the toast stack can negotiate with it: beside a
+        // corner bubble, above the centred pill. Withdrawn (null) while the search is hidden or
+        // open as the full bar, when there is nothing to sit beside. SideEffect, not a bare
+        // write: this runs after composition, and the registry is state other composables read.
+        val floatingRegistry = LocalFloatingRegistry.current
+        SideEffect { floatingRegistry.searchDock = if (!open) dock else null }
+        DisposableEffect(Unit) { onDispose { floatingRegistry.searchDock = null } }
 
         // Resting corner for the bubble, and the drag bounds that keep it on
         // screen no matter where it was left.

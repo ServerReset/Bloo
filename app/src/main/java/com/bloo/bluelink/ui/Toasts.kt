@@ -125,6 +125,20 @@ internal fun ToastHost(
     onCopy: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    // Negotiate with the search element: the BOTTOM toast (the one on the search's own row)
+    // clears it, every toast stacked above stays full width. Reads the search's published bounds
+    // and dock from the floating registry -- see FloatingRegistry.searchDock. Recomposes when the
+    // search moves/docks, which is fine (it is off during a drag that would matter).
+    val registry = LocalFloatingRegistry.current
+    val dock = registry.searchDock
+    val searchRect = registry.boundsOf(FloatingIds.Search)
+    val density = LocalDensity.current
+    val gapPx = with(density) { GapRow.toPx() }
+    val baseEdgePx = with(density) { 16.dp.toPx() }
+
+    val visible = state.items.filter { it.visible.targetState }
+    val bottomId = visible.lastOrNull()?.id
+
     Column(
         modifier
             .fillMaxWidth()
@@ -139,8 +153,34 @@ internal fun ToastHost(
         verticalArrangement = Arrangement.spacedBy(GapRow),
     ) {
         state.items.forEach { toast ->
-            key(toast.id) { ToastItem(toast, state, hazeState, onCopy) }
+            key(toast.id) {
+                // Only the bottom toast sits on the search's row, so only it is reshaped.
+                val box = if (toast.id == bottomId) {
+                    Modifier.searchClearance(dock, searchRect, baseEdgePx, gapPx)
+                } else {
+                    Modifier
+                }
+                Box(box) { ToastItem(toast, state, hazeState, onCopy) }
+            }
         }
+    }
+}
+
+/**
+ * The padding the bottom toast needs to clear the search element, per where search is docked:
+ *  - corner LEFT: pad the START so the toast begins just right of the pill (same row, beside it);
+ *  - corner RIGHT: pad the END so the toast ends just left of the pill;
+ *  - CENTER: pad the BOTTOM so the toast sits directly ABOVE the centred pill, not on it.
+ * Full-width (no padding) when search isn't on screen, or its bounds aren't known yet.
+ */
+@Composable
+private fun Modifier.searchClearance(dock: SearchDock?, rect: Rect?, baseEdgePx: Float, gapPx: Float): Modifier {
+    if (dock == null || rect == null) return this
+    val d = LocalDensity.current
+    return when (dock) {
+        SearchDock.LEFT -> this.padding(start = with(d) { (rect.right - baseEdgePx + gapPx).coerceAtLeast(0f).toDp() })
+        SearchDock.RIGHT -> this.padding(end = with(d) { (baseEdgePx - rect.left + gapPx).coerceAtLeast(0f).toDp() })
+        SearchDock.CENTER -> this.padding(bottom = with(d) { (rect.height + gapPx).toDp() })
     }
 }
 
