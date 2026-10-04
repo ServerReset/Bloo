@@ -393,6 +393,5 @@ class CanadaApi(private val brand: Brand) {
     }
 
     internal fun parseJson(text: String, code: Int): JsonElement =
-        runCatching { json.parseToJsonElement(text) }
-            .getOrElse { throw BlueLinkException(friendly(code, text), code = code) }
+        parseJsonOrThrow(json, text, code, friendly(code, text))
 }

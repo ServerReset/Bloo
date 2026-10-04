@@ -12,6 +12,8 @@ import androidx.compose.animation.togetherWith
 import androidx.compose.animation.core.LinearOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.material.icons.automirrored.filled.OpenInNew
+import androidx.compose.material.icons.filled.SystemUpdate
 import androidx.compose.material.icons.filled.MailOutline
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
@@ -87,6 +89,14 @@ internal fun LoginScreen(
     loading: Boolean,
     onLogin: (String, String, String, Brand) -> Unit,
     onCancel: (() -> Unit)? = null,
+    /** The app's own update flow, offered on the logged-out screen too: a user stuck on an old
+     *  build (e.g. one that can no longer sign in) otherwise has no way to update from inside the
+     *  app, since the update surface lives in Settings behind sign-in. */
+    onCheckForUpdates: () -> Unit = {},
+    updateChecking: Boolean = false,
+    /** Set once a check finds a newer build; the button then reads "Update available" and opens
+     *  the release page. */
+    updateAvailableUrl: String? = null,
 ) {
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
@@ -356,6 +366,36 @@ internal fun LoginScreen(
                             "Sent only to $label's servers; stored encrypted on this device.",
                             style = MaterialTheme.typography.bodySmall,
                             color = scheme.onSurfaceVariant,
+                        )
+                    }
+
+                    // Update affordance, available WITHOUT signing in. Reads "Update available"
+                    // and opens the release page once a check finds a build; otherwise it checks
+                    // (or re-checks) on tap. A logged-out user on an old build could not reach the
+                    // Settings update surface at all before this.
+                    Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                        SafeMorphTextButton(
+                            text = when {
+                                updateChecking -> "Checking…"
+                                updateAvailableUrl != null -> "Update available"
+                                else -> "Check for updates"
+                            },
+                            onClick = {
+                                val url = updateAvailableUrl
+                                if (url != null) {
+                                    context.startActivity(Intent(Intent.ACTION_VIEW, url.toUri()))
+                                } else {
+                                    onCheckForUpdates()
+                                }
+                            },
+                            icon = if (updateAvailableUrl != null) {
+                                Icons.AutoMirrored.Filled.OpenInNew
+                            } else {
+                                Icons.Filled.SystemUpdate
+                            },
+                            enabled = !updateChecking,
+                            pending = updateChecking,
+                            contentColor = scheme.onSurfaceVariant,
                         )
                     }
                 }

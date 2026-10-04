@@ -421,8 +421,7 @@ class KiaUsaApi {
      * letting a raw SerializationException/IOException crash the app.
      */
     internal fun parseJson(text: String, code: Int): JsonElement =
-        runCatching { json.parseToJsonElement(text) }
-            .getOrElse { throw BlueLinkException(friendly(code, text), code = code) }
+        parseJsonOrThrow(json, text, code, friendly(code, text))
 
     /** RFC 4122 v5 (name-based, SHA-1) UUID in the DNS namespace — matches the iOS app. */
     internal fun uuid5FromDns(name: String): String {

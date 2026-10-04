@@ -62,9 +62,7 @@ import androidx.compose.ui.unit.dp
 import androidx.core.net.toUri
 import com.bloo.bluelink.update.UpdateInfo
 import com.bloo.bluelink.data.Weather
-import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.material.icons.automirrored.filled.OpenInNew
-import androidx.compose.ui.platform.LocalDensity
 
 /**
  * The release notes block: "What's new", an excerpt, and a link to the full notes.
@@ -106,51 +104,36 @@ internal fun UpdateReleaseNotes(
         shadow = false,
     ) {
         Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(GapRow)) {
-            // "What's new" on the left, the actions ("Show more"/"Show less" + "GitHub") on ONE
-            // line at the right -- never wrapped to a second line. When the row is too narrow for
-            // both action labels, GitHub collapses to just its glyph rather than wrapping or
-            // squeezing the title into a column. A BoxWithConstraints here is fine: this header
-            // is a small fixed block, not a hot list.
-            BoxWithConstraints(Modifier.fillMaxWidth()) {
-                val looksLong =
-                    notes.count { it == '\n' } >= collapsedLines || notes.length > collapsedLines * 48
-                val showToggle = looksLong || expanded
-                // Decide GitHub's label from the room actually available, in Dp -- no pixel
-                // conversion, and Dp already tracks the font scale, so a huge font tightens the
-                // threshold too. Title (~74dp) + the toggle button (~96dp) + GitHub's full label
-                // (~92dp) plus two gaps; below that, GitHub drops to its glyph only.
-                val needed = 74.dp + GapRow + (if (showToggle) 96.dp + GapRow else 0.dp) + 92.dp
-                val githubLabel = maxWidth >= needed
-                Row(
-                    Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(GapRow),
-                ) {
-                    Text(
-                        "What's new",
-                        style = MaterialTheme.typography.labelSmall,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 1,
-                        modifier = Modifier.weight(1f, fill = false),
-                    )
-                    if (showToggle) {
-                        SafeMorphTextButton(
-                            if (expanded) "Show less" else "Show more",
-                            onClick = { expanded = !expanded },
-                            fillOnPress = false,
-                        )
-                    }
+            // No "What's new" label any more -- reported as clutter. Just the two actions,
+            // right-aligned on ONE line, guaranteed never to overflow: "Show more" takes its
+            // natural width, and GitHub is given the LAST of the row's space via weight, so when
+            // the row is short IT is the one squeezed -- and the button framework's own fit rule
+            // then drops its label to the glyph alone. No magic width estimates to get wrong.
+            val looksLong =
+                notes.count { it == '\n' } >= collapsedLines || notes.length > collapsedLines * 48
+            val showToggle = looksLong || expanded
+            Row(
+                Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(GapRow),
+            ) {
+                if (showToggle) {
                     SafeMorphTextButton(
-                        // Icon-only when the row is tight: standardButtonIcon maps "GitHub" to
-                        // the open-in-new glyph, and showIcon=false would print the word inside
-                        // the collapsed pill -- so pass the glyph and blank the label instead.
-                        text = if (githubLabel) "GitHub" else "",
-                        onClick = { context.tryStart(Intent(Intent.ACTION_VIEW, info.run.htmlUrl.toUri())) },
-                        icon = Icons.AutoMirrored.Filled.OpenInNew,
+                        if (expanded) "Show less" else "Show more",
+                        onClick = { expanded = !expanded },
                         fillOnPress = false,
                     )
                 }
+                Spacer(Modifier.weight(1f))
+                SafeMorphTextButton(
+                    "GitHub",
+                    onClick = { context.tryStart(Intent(Intent.ACTION_VIEW, info.run.htmlUrl.toUri())) },
+                    icon = Icons.AutoMirrored.Filled.OpenInNew,
+                    fillOnPress = false,
+                    // The last of the row's space, so a tight row squeezes THIS button and the
+                    // framework drops its label to the glyph rather than overflowing.
+                    modifier = Modifier.weight(1f, fill = false),
+                )
             }
             Text(
                 notes,

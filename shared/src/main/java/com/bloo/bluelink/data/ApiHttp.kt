@@ -46,3 +46,13 @@ object ApiHttp {
         )
         .build()
 }
+
+/**
+ * Parse a response body to JSON, converting a malformed/empty/non-JSON body (a WAF HTML
+ * block page, a gateway 5xx, a truncated response) into a [BlueLinkException] — which the
+ * repository layer already catches — instead of letting a raw SerializationException/IOException
+ * crash the app. Shared by every brand client; they had this identical block once each.
+ */
+fun parseJsonOrThrow(json: Json, text: String, code: Int, message: String): kotlinx.serialization.json.JsonElement =
+    runCatching { json.parseToJsonElement(text) }
+        .getOrElse { throw BlueLinkException(message, code = code) }

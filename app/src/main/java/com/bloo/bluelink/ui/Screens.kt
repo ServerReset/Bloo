@@ -339,10 +339,18 @@ fun BlooApp(vm: AppViewModel) {
                 }
                 Screen.Login -> Box(Modifier.padding(padding)) {
                     com.bloo.bluelink.data.StartupTrace.once("screen-login", "screen: Login composed")
+                    val loginUpdateAvailable by remember { derivedStateOf { stateHolder.value.updateAvailable } }
+                    val loginUpdateChecking by remember { derivedStateOf { stateHolder.value.updateChecking } }
                     LoginScreen(
                         loading = loading,
                         onLogin = vm::login,
                         onCancel = if (accounts.isNotEmpty()) ({ vm.cancelAddAccount() }) else null,
+                        // A logged-out user has no Settings to reach the update surface, so the
+                        // login screen offers its own: force a check (bypassing the background
+                        // debounce) and surface the result.
+                        onCheckForUpdates = { vm.checkForUpdate(force = true, surfaceResult = true) },
+                        updateChecking = loginUpdateChecking,
+                        updateAvailableUrl = loginUpdateAvailable?.run?.htmlUrl,
                     )
                     kiaOtp?.let { otp -> KiaOtpDialog(otp, loading = loading, vm = vm) }
                     canadaOtp?.let { otp -> CanadaOtpDialog(otp, loading = loading, vm = vm) }
