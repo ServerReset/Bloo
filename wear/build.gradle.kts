@@ -17,7 +17,7 @@ android {
         // Same as the phone: a plain incrementing number, since Bloo ships from
         // GitHub releases rather than the Play Store.
         versionCode = 2
-        versionName = "0.1"
+        versionName = "1.0"
         // Same CI run number as the phone, so the watch can tell whether the phone is
         // advertising a newer watch build than the one it is running.
         buildConfigField("int", "BUILD_RUN_NUMBER", System.getenv("GITHUB_RUN_NUMBER") ?: "0")

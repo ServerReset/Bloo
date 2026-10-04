@@ -11,7 +11,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.NotificationsOff
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.LaunchedEffect
@@ -136,7 +135,10 @@ internal fun NotificationsCardContent(
                                         },
                                     )
                                 },
-                                contentColor = MaterialTheme.colorScheme.primary,
+                                // No explicit contentColor: forcing `primary` (a blue) onto the
+                                // tonal button's grey container was the "blue on grey, impossible
+                                // to read" report. The tonal emphasis already pairs the container
+                                // with its own legible on-colour; letting it do that is the fix.
                                 icon = Icons.Filled.NotificationsOff,
                             )
                         }
@@ -209,7 +211,9 @@ private fun AttentionRow(problem: String, action: String, onClick: () -> Unit) {
     SafeMorphTextButton(
         action,
         onClick = onClick,
-        contentColor = MaterialTheme.colorScheme.primary,
+        // No forced `primary` content colour: the tonal button's own on-container colour is
+        // the legible pairing, and forcing a blue overrode it into the "blue on grey,
+        // impossible to read" the watcher button was reported as.
         icon = AppIcons.Warning,
     )
 }

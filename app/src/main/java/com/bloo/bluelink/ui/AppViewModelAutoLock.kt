@@ -68,8 +68,19 @@ fun AppViewModel.pairedBluetoothDevices(): List<com.bloo.bluelink.autolock.Paire
     com.bloo.bluelink.autolock.BluetoothDevices.bondedDevices(getApplication())
 
 /** "Simulate leaving" test button: runs the exact same evaluation a real Bluetooth
- *  disconnect would, without needing to actually drive off and walk away. */
+ *  disconnect would, without needing to actually drive off and walk away.
+ *
+ *  It must go through [AutoLockTrigger.onCarDisconnected] (or call the controller itself),
+ *  NOT just [AutoLockService.start]: the service is only the progress-notification wrapper,
+ *  and it deliberately does not start an evaluation (see its own "No onTriggerFired here any
+ *  more" note). This used to call only `.start(...)`, so the Test button showed a brief
+ *  "Confirming" notification and then nothing -- the evaluation had never been started, which
+ *  is exactly the "AutoLock never fires" it was reported as. The trigger starts the evaluation
+ *  AND the service, which is what a real disconnect does. */
 fun AppViewModel.simulateAutoLockLeaving(v: Vehicle) {
-    com.bloo.bluelink.autolock.AutoLockService.start(getApplication(), v.vin)
-    AppLog.log("AutoLock: simulated leaving ${v.name}.")
+    viewModelScope.launch {
+        val config = settingsStore.autoLockConfig(v.vin)
+        com.bloo.bluelink.autolock.AutoLockTrigger.onCarDisconnected(getApplication(), v.vin, config, log = false)
+        AppLog.log("AutoLock: simulated leaving ${v.name}.")
+    }
 }

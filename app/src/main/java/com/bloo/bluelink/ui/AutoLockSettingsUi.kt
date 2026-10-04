@@ -68,8 +68,9 @@ internal fun AutoLockSettingsGroup(v: Vehicle, vm: AppViewModel) {
     val bluetoothConnectLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission(),
     ) { granted -> if (granted) showDevicePicker = true }
-    // Motion confirmation is mandatory (not a toggle), so ACTIVITY_RECOGNITION is requested
-    // right alongside the other permissions AutoLock needs the moment it's turned on.
+    // Motion is a soft confirmation (it promotes the evaluation early when it fires, and is
+    // simply skipped when it doesn't -- see AutoLockController), so ACTIVITY_RECOGNITION is
+    // requested alongside the other permissions but is not gating.
     val corePermissions = remember {
         buildList {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) add(Manifest.permission.BLUETOOTH_CONNECT)

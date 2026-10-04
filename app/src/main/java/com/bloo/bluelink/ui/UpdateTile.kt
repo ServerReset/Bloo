@@ -231,6 +231,18 @@ internal fun UpdateAvailableTile(
                         shadow = false,
                     ) {
                         Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(GapHairline)) {
+                            // Without Shizuku the OS installer gets in the way EVERY time, and
+                            // the player-protect sheet is folded shut by default, so an update
+                            // looks like it failed when the real answer is "expand it, then tap
+                            // Install anyway". Spell that out up front rather than only after
+                            // someone reports it as broken.
+                            if (!state.shizukuAvailable || !LocalAppearance.current.seamlessInstallShizuku) {
+                                Text(
+                                    "Shizuku is off, so Android asks you to confirm each update. On the next screen tap \"More details\" to expand it, then \"Install anyway\".",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
                             Text(
                                 if (hasDirectDownload) "1. Tap \"Update\", then \"Install\" once it downloads" else "1. Download the APK, then open it",
                                 style = MaterialTheme.typography.bodySmall,

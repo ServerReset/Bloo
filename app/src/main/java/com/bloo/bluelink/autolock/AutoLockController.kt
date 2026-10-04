@@ -166,13 +166,19 @@ object AutoLockController {
                 _state.first { (it[vin]?.detection ?: DetectionState.IDLE) != DetectionState.CONFIRMING }
             }
             if (leftConfirming == null) {
-                // Timed out still CONFIRMING: walking confirmation is always required, so this
-                // means it never arrived in time -- skip rather than lock on the Bluetooth
-                // disconnect alone.
+                // Timed out still CONFIRMING. The previous behaviour SKIPPED here unless a
+                // walking transition had arrived -- but Activity Recognition is unreliable
+                // (often no ENTER event for a short walk to the door, and never at all if the
+                // ACTIVITY_RECOGNITION permission is missing), so in practice AutoLock almost
+                // never reached the lock step and was reported as "doesn't even fire". The
+                // Bluetooth disconnect is the primary signal; motion is a confirmatory extra.
+                // So now: confirm if we got it, and otherwise PROCEED to the grace countdown
+                // rather than abort -- the user still gets the full grace window and the
+                // safety checks in LockPolicy (already-locked / engine on / door or window
+                // open all still skip). Only a permaless device is treated as "can't confirm",
+                // which is logged for support.
                 if (!walkAwayConfirmed.contains(vin)) {
-                    _state.update { it + (vin to AutoLockEvalState(detection = DetectionState.SKIPPED)) }
-                    AppLog.log("AutoLock: no walk-away confirmation for $vin — not locking.")
-                    return@withLock
+                    AppLog.log("AutoLock: no walk-away confirmation for $vin — proceeding on the Bluetooth disconnect alone.")
                 }
                 advance(vin, DetectionState.GRACE)
             }

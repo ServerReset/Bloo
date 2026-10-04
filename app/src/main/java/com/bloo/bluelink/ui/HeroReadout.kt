@@ -345,7 +345,17 @@ internal fun HeroNumbers(
         )
         Spacer(Modifier.width(lerp(8.dp, 14.dp, t)))
         Column(horizontalAlignment = Alignment.End) {
-            RollingNumber(data.rangeText ?: "--", rangeStyle, FontWeight.Bold)
+            // LocalContentColor explicitly, exactly like the percentage beside it (see
+            // that call's own comment): the range left its colour UNSPECIFIED, so over the
+            // expanded hero it did not pick up the on-photo colour the local provider
+            // travels to as the card opens -- the percentage read light in light mode while
+            // "the miles" beside it stayed dark. Same provider, same colour, both numbers.
+            RollingNumber(
+                data.rangeText ?: "--",
+                rangeStyle,
+                FontWeight.Bold,
+                color = LocalContentColor.current,
+            )
             // The status line ("Parked", "Charging - 25 min - DC") travels WITH the
             // numbers, under the range, right-aligned to it.
             //
