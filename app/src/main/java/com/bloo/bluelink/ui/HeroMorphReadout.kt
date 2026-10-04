@@ -183,6 +183,9 @@ internal fun HeroMorphReadout(
             // backdrop is dark in light mode and light in dark mode -- the "won't charge
             // past here" zone has to follow, or it paints the wrong tone in one of them.
             darkBackdrop = !appIsDarkTheme(),
+            // Darken the remaining track while the card is collapsed (the compact bar),
+            // so the coloured fill reads against it; expanded keeps the lighter track.
+            collapsed = t < 0.5f,
         )
     }
 }

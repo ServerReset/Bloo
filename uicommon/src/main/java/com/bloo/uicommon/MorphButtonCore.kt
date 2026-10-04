@@ -29,7 +29,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.unit.dp
 import kotlin.math.roundToInt
 
@@ -119,9 +118,6 @@ fun MorphButtonCore(
      *  without the comment history this file's predecessors needed. */
     morphSpring: SpringSpec<Float> = spring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessLow),
     colorSpring: FiniteAnimationSpec<Color> = spring(stiffness = Spring.StiffnessMediumLow),
-    /** Non-null scales the whole button down to this factor while pressed --
-     *  the press-punch the watch used to supply; kept for a caller that wants it. */
-    pressScale: Float? = null,
     content: @Composable RowScope.() -> Unit,
 ) {
     val pressed by interactionSource.collectIsPressedAsState()
@@ -180,7 +176,6 @@ fun MorphButtonCore(
             border = border,
             morphSpring = morphSpring,
             colorSpring = colorSpring,
-            pressScale = pressScale,
             enabled = enabled,
             onLongClick = onLongClick,
             onClick = onClick,
@@ -216,7 +211,6 @@ private fun BoxScope.MorphChrome(
     border: BorderStroke?,
     morphSpring: SpringSpec<Float>,
     colorSpring: FiniteAnimationSpec<Color>,
-    pressScale: Float?,
     enabled: Boolean,
     onLongClick: (() -> Unit)?,
     onClick: () -> Unit,
@@ -249,11 +243,6 @@ private fun BoxScope.MorphChrome(
         targetValue = if (active) activeContainerColor else containerColor,
         animationSpec = colorSpring,
         label = "morphBg",
-    )
-    val scale by animateFloatAsState(
-        targetValue = if (pressed && pressScale != null) pressScale else 1f,
-        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessHigh),
-        label = "morphPressScale",
     )
     val fill = if (!enabled && disabledContainerColor != null) disabledContainerColor else bg
     val resolvedBorder = if (!enabled) (disabledBorder ?: border) else border
@@ -291,16 +280,6 @@ private fun BoxScope.MorphChrome(
             //   - In unbounded heights, chrome measures the Row's actual height
             //     (not Infinity) and draws the background correctly
             .matchParentSize()
-            .graphicsLayer {
-                // Squash and stretch, tuned down hard (0.7/1.2 -> 0.35/0.6 -> 0.2/0.35 ->
-                // here): at the original values the pill squashed to about 76% of its height,
-                // which read as the button melting rather than pressing. Widening stays smaller
-                // than the height dip so the shape reads as "pressed in", and at this size it is
-                // barely a hint.
-                val dip = 1f - scale
-                scaleX = 1f + dip * 0.12f
-                scaleY = 1f - dip * 0.22f
-            }
             .clip(shape)
             .then(
                 if (resolvedBorder != null) {

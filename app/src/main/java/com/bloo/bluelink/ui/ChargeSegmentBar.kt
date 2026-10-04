@@ -106,10 +106,14 @@ internal fun ChargeSegmentBar(
      *  backdrop behind it follows the theme -- neither can be inferred from
      *  the other, which is exactly why this override exists. */
     darkBackdrop: Boolean = false,
+    /** True while the hero card is COLLAPSED (the small readout). The remaining/trailing
+     *  track is drawn darker then, so the coloured fill reads clearly against it on the
+     *  compact bar; expanded, the longer bar keeps the lighter track it always had. */
+    collapsed: Boolean = false,
 ) {
     val scheme = MaterialTheme.colorScheme
     val limit = limitPct?.takeIf { it in 1..99 }
-    val trackColor = scheme.onSurface.copy(alpha = 0.16f)
+    val trackColor = scheme.onSurface.copy(alpha = if (collapsed) 0.28f else 0.16f)
     // The past-the-limit zone. It used to be a genuinely darker BACKDROP (fixed
     // black, deliberately not a theme colour, on the "a black scrim is what
     // already keeps text legible over the photo" argument) -- but that made it

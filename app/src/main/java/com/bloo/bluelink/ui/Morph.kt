@@ -29,6 +29,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.LaunchedEffect
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.collectLatest
 import androidx.compose.foundation.interaction.PressInteraction
 import androidx.compose.runtime.CompositionLocalProvider
@@ -171,19 +172,32 @@ fun MorphButton(
     } else {
         Modifier
     }
-    // Press and hold a symbol-only button and the phone builds a vibration until the name pops out:
-    // ticks that come faster and then harder, so the pop is felt coming.
+    // Press and hold a symbol-only button: after a short hold it EXPANDS IN PLACE to show its
+    // name (hint.onHoldStart -> the label layout reports its full width -> the button's own
+    // animateContentSize springs wider), and collapses back the moment the finger lifts. The
+    // phone also builds a vibration during the hold so the expansion is felt coming. This
+    // replaces the old glass BUBBLE that popped up above the button and auto-hid on a timer --
+    // reported directly as wanting the control to grow where it is instead of a popup.
     if (enabled && onLongClick == null) {
         LaunchedEffect(interactionSource) {
             interactionSource.interactions.collectLatest { interaction ->
-                if (interaction is PressInteraction.Press && hint.collapsed) {
-                    delay(120)
-                    var gap = 85L
-                    repeat(6) { i ->
-                        if (i < 3) haptics?.tick() else haptics?.click()
-                        delay(gap)
-                        gap = (gap * 0.8f).toLong().coerceAtLeast(30L)
+                when (interaction) {
+                    is PressInteraction.Press -> {
+                        if (!hint.collapsed) return@collectLatest
+                        val built = launch {
+                            delay(120)
+                            var gap = 85L
+                            repeat(6) { i ->
+                                if (i < 3) haptics?.tick() else haptics?.click()
+                                delay(gap)
+                                gap = (gap * 0.8f).toLong().coerceAtLeast(30L)
+                            }
+                        }
+                        delay(HOLD_TO_EXPAND_MS)
+                        hint.onHoldStart()
+                        built.join()
                     }
+                    is PressInteraction.Release, is PressInteraction.Cancel -> hint.onHoldEnd()
                 }
             }
         }
@@ -242,13 +256,12 @@ fun MorphButton(
                 disabledContainerColor = glassTint(canBlurBackdrops()),
                 disabledBorder = BorderStroke(1.dp, hairlineColor()),
                 interactionSource = interactionSource,
-                onLongClick = onLongClick ?: hint::onLongPress,
+                onLongClick = onLongClick,
                 pillCornerPercent = pillCornerPercent,
                 morphedCornerPercent = morphedCornerPercent,
                 shapeForCorner = shapeForCorner,
                 content = {
                     content()
-                    LabelHintPopup(hint)
                 },
             )
         }

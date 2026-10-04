@@ -78,8 +78,6 @@ internal fun GlassSurface(
     Box(
         modifier = modifier
             .glassEdge(shape, shadow = shadow)
-            // A tappable glass chip squashes and stretches like every other tappable.
-            .then(if (onClick != null) Modifier.pressScale(interaction) else Modifier)
             .then(
                 if (onClick != null) {
                     Modifier

@@ -11,7 +11,6 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
@@ -124,7 +123,6 @@ internal fun SearchPill(
         }
     }
     val interaction = remember { MutableInteractionSource() }
-    val pressed by interaction.collectIsPressedAsState()
     // Springs in on first appearance; because SearchLayer keys the animations
     // on the layout mode, "first appearance" includes arriving from a different
     // docked position. The ball lands in its corner rather than sliding to it.
@@ -136,22 +134,14 @@ internal fun SearchPill(
     // control) read as noticeably more bounce than either spring alone would suggest --
     // reported as "overly bouncy," and this is the same lesson the pebble bounce work
     // already paid for: 0.5 reads as a lot on a real device, repeatedly, not occasionally.
-    // Entrance keeps some spring (it plays once, arriving) but now on the literal shared
+    // Entrance keeps some spring (it plays once, arriving) on the literal shared
     // PebbleBounceDamping/Stiffness tokens rather than its own separately-tuned numbers --
     // an "arrival" pop is the same kind of event a pebble opening is, so it gets the exact
-    // same spring, not a lookalike. Press feedback drops nearly all bounce (PebbleCloseDamping,
-    // i.e. no overshoot) and stays on its own fast StiffnessHigh -- a frequent, repeated
-    // micro-interaction is exactly where extra bounce stops feeling playful and starts
-    // feeling like noise, and it no longer compounds with the entrance spring above it.
+    // same spring, not a lookalike.
     val entrance by animateFloatAsState(
         targetValue = if (appeared) 1f else 0.55f,
         animationSpec = lowPowerAwareSpring(dampingRatio = PebbleBounceDamping, stiffness = PebbleBounceStiffness),
         label = "searchEntrance",
-    )
-    val pressScale by animateFloatAsState(
-        targetValue = if (pressed) 0.97f else 1f,
-        animationSpec = lowPowerAwareSpring(dampingRatio = PebbleCloseDamping, stiffness = Spring.StiffnessHigh),
-        label = "searchPress",
     )
     // No ambient glow. This used to carry a travelling-hotspot bloom that
     // swept the pill's rim and breathed continuously the entire time the
@@ -166,9 +156,8 @@ internal fun SearchPill(
     val latestDragEnd = androidx.compose.runtime.rememberUpdatedState(onDragEnd)
     Box(
         modifier.size(width, height).graphicsLayer {
-            val k = pressScale * entrance
-            scaleX = k
-            scaleY = k
+            scaleX = entrance
+            scaleY = entrance
         }
             // Publishes wherever this ended up -- dragged to an edge, docked in a camera band,
             // or spanning the screen as a bar -- so other floating chrome can avoid it. Bounds
@@ -239,7 +228,14 @@ internal fun SearchPill(
                 // with no light/dark gate, which on a light theme is the smudge in the
                 // screenshots). One call now, so the next change to what a floating edge
                 // looks like reaches this pill too instead of stopping one file short.
-                .glassEdge(pillShape)
+                //
+                // shadow = !expanded: a small floating pill wants the contact shadow that
+                // separates it from an arbitrary backdrop, but the EXPANDED bar spans the
+                // screen, and a full-width shadow at that size reads as the whole background
+                // behind the bar being darkened, not as the bar's own depth -- reported as
+                // "the background is darker behind the tint of the search bar". The rim stays
+                // either way; only the bar's shadow is dropped.
+                .glassEdge(pillShape, shadow = !expanded)
                 // appHazeEffect, clipped to pillShape explicitly -- this whole
                 // modifier chain runs BEFORE Surface's own internal shape-clip
                 // (Surface appends that itself, after everything the caller

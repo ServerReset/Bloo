@@ -1,14 +1,10 @@
 package com.bloo.bluelink.ui
 
-import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.offset
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.ui.semantics.contentDescription
@@ -17,7 +13,6 @@ import androidx.compose.ui.semantics.onLongClick
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
-import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -29,11 +24,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.drawBehind
-import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.layout.layout
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -69,29 +60,6 @@ fun MorphIconButton(
     content: @Composable () -> Unit,
 ) {
     val haptics = LocalHaptics.current
-    val pressed by interactionSource.collectIsPressedAsState()
-    // Already optimal, and worth a note so nobody "fixes" it: `by` here costs nothing, because
-    // what decides the phase of a snapshot read is WHERE the getter runs, not whether the
-    // property is delegated. `scale` is referenced only inside the graphicsLayer BLOCK below,
-    // so the read happens when Compose invokes that block -- composition and layout are
-    // skipped. Google's own guidance shows exactly this shape (`val color by animateColorBetween(...)`
-    // read inside `drawBehind { }`).
-    //
-    // I briefly rewrote this to `val scale = animateFloatAsState(...)` plus `scale.value`,
-    // believing the delegated form forced a composition read. It does not; the two are
-    // identical here. Reverted, because a comment asserting a difference that does not exist
-    // teaches the next reader a false rule.
-    //
-    // The real audit question for the ~61 `by animate*AsState` sites in this project is not
-    // `by` vs `=`. It is whether the value is read in the composable BODY (recomposes every
-    // frame -- e.g. passed to `Modifier.padding(...)`, a `TextStyle`, or a size) or inside a
-    // lambda modifier like `graphicsLayer {}` / `offset {}` / `drawBehind {}` (already
-    // deferred, nothing to do). This site is the second kind.
-    val scale by animateFloatAsState(
-        targetValue = if (pressed) 0.97f else 1f,
-        animationSpec = lowPowerAwareSpring(dampingRatio = SoftDamping, stiffness = Spring.StiffnessMedium),
-        label = "morphIconPress",
-    )
     var everInert by remember { mutableStateOf(!enabled) }
     SideEffect { if (!enabled) everInert = true }
     val frost = if (everInert || !enabled) {
@@ -102,18 +70,7 @@ fun MorphIconButton(
     val body: @Composable () -> Unit = {
         IconButton(
             onClick = { haptics?.click(); onClick() },
-            // On the button, not the icon: scaling the icon alone shrinks the glyph
-            // inside a target that stays put, which reads as a glitch rather than a
-            // press.
-            modifier = modifier.graphicsLayer {
-                // The family's squash, tuned down three times now (0.5/0.9 -> 0.3/0.5 ->
-                // 0.25/0.5 -> here) and the dip softened to 0.97: at this point it is a
-                // hint of give under the finger, not a visible squash.
-                val dip = 1f - scale
-                scaleX = 1f + dip * 0.15f
-                scaleY = 1f - dip * 0.3f
-            }
-                .then(frost),
+            modifier = modifier.then(frost),
             enabled = enabled,
             interactionSource = interactionSource,
             content = content,

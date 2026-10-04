@@ -1,12 +1,7 @@
 package com.bloo.bluelink.ui
 
 import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -76,26 +71,6 @@ internal fun AnimatedText(
         softWrap = softWrap,
         overflow = overflow,
     )
-}
-
-/**
- * The app's squash for anything tappable that isn't a button. [amount] tuned down repeatedly
- * (0.04 -> 0.025 -> 0.02 -> 0.012) and the height multiplier from 1.3 to 1.0: the release
- * rebound at the original values was visibly taller and narrower than the rest, and even the
- * gentler passes still read as more motion than a press needs. Now a hint of give only.
- */
-@Composable
-internal fun Modifier.pressScale(source: MutableInteractionSource, amount: Float = 0.012f): Modifier {
-    val isPressed by source.collectIsPressedAsState()
-    val p by animateFloatAsState(
-        targetValue = if (isPressed) 1f else 0f,
-        animationSpec = spring(dampingRatio = 0.6f, stiffness = Spring.StiffnessMedium),
-        label = "squashStretch",
-    )
-    return this.graphicsLayer {
-        scaleX = 1f + amount * 0.5f * p
-        scaleY = 1f - amount * p
-    }
 }
 
 /** Names of the things that have already played their entrance this session. */
