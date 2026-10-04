@@ -323,6 +323,21 @@ internal fun CarMap(
             Modifier
                 .fillMaxSize()
                 .graphicsLayer {
+                    // PAN as one layer translation, not N per-tile/per-pin offsets: every child
+                    // below is placed at its PAN-INDEPENDENT position, and pan moves the whole
+                    // layer in one shot. Before this, every visible tile AND both pins carried
+                    // their own `offset { ... state.panX ... }` lambda, so a drag re-ran a dozen
+                    // layout lambdas per frame for a single rigid translation -- the exact shape
+                    // of "laggy to scroll around". One layer transform, read in the draw phase,
+                    // is the whole cost now.
+                    // * scale, not the raw pan: the layer scales each child's position by
+                    // `scale`, so the pan (which lives in TILE space, pre-scale) has to be
+                    // brought into the same parent space to keep the 1:1 finger tracking the
+                    // gesture divides by `scale` for. Previously each tile's own offset did
+                    // this implicitly (its pan term sat INSIDE the scaled child), so the net
+                    // screen motion was scale*pan; this reproduces exactly that.
+                    translationX = state.panX * state.scale
+                    translationY = state.panY * state.scale
                     scaleX = state.scale
                     scaleY = state.scale
                 },
@@ -385,9 +400,13 @@ internal fun CarMap(
                             // offset(x=,y=): reads the live pan fresh every frame
                             // without ever recomposing this AsyncImage -- see
                             // `range`'s own doc above for why that matters.
+                            // Pan-INDEPENDENT placement: the container's own graphicsLayer
+                            // applies panX/panY, so this only ever encodes where the tile sits
+                            // in tile space relative to the car-centred origin. No state read,
+                            // so a drag never re-runs it.
                             .offset {
-                                val originX = xTileF * tilePx - wPx / 2f - state.panX
-                                val originY = yTileF * tilePx - hPx / 2f - state.panY
+                                val originX = xTileF * tilePx - wPx / 2f
+                                val originY = yTileF * tilePx - hPx / 2f
                                 IntOffset(
                                     (tx * tilePx - originX).roundToInt(),
                                     (ty * tilePx - originY).roundToInt(),
@@ -435,7 +454,7 @@ internal fun CarMap(
                 tint = lerp(pinColor, deviceLocationColor, 0.5f),
                 modifier = Modifier
                     .align(Alignment.Center)
-                    .offset { IntOffset((state.panX + dx / 2f).roundToInt(), (state.panY + dy / 2f).roundToInt()) }
+                    .offset { IntOffset((dx / 2f).roundToInt(), (dy / 2f).roundToInt()) }
                     .size(40.dp)
                     .offset(y = (-20).dp),
             )
@@ -450,7 +469,8 @@ internal fun CarMap(
                 tint = pinColor,
                 modifier = Modifier
                     .align(Alignment.Center)
-                    .offset { IntOffset(state.panX.roundToInt(), state.panY.roundToInt()) }
+                    // The car is the map's pan origin, so the container's own translation
+                    // already puts it dead-centre -- no per-frame offset here any more.
                     .size(40.dp)
                     .offset(y = (-20).dp),
             )
@@ -470,7 +490,7 @@ internal fun CarMap(
             Box(
                 Modifier
                     .align(Alignment.Center)
-                    .offset { IntOffset((state.panX + dx).roundToInt(), (state.panY + dy).roundToInt()) }
+                    .offset { IntOffset(dx.roundToInt(), dy.roundToInt()) }
                     .size(16.dp)
                     .background(Color.White, CircleShape)
                     .padding(3.dp)
