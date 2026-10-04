@@ -123,6 +123,9 @@ fun BlooApp(vm: AppViewModel) {
     val searchHazeState = remember { HazeState() }
     val backdropHaze = remember { HazeState() }
     val toasts = remember { ToastState() }
+    // The ONE pull-to-refresh indicator for the whole app -- every Refreshable feeds it,
+    // PullRefreshIndicatorHost (mounted below, above the content) draws it.
+    val refreshIndicator = remember { RefreshIndicatorState() }
     val scope = rememberCoroutineScope()
     // LocalClipboard (the non-deprecated spelling): its set API is SUSPEND, so
     // the copy call below hops through this screen's existing `scope` rather
@@ -189,6 +192,7 @@ fun BlooApp(vm: AppViewModel) {
         LocalFloatingRegistry provides floatingRegistry,
         LocalDialogHost provides dialogHost,
         LocalToasts provides toasts,
+        LocalRefreshIndicator provides refreshIndicator,
         LocalBackdropHaze provides backdropHaze,
         LocalHaptics provides haptics,
         // Provided once here (the app root already collects `appearance` above) so
@@ -411,6 +415,15 @@ fun BlooApp(vm: AppViewModel) {
     // that blobbed out of the search bubble then slid behind the very panel it came
     // from. Still above them sits the lock overlay and the dialogs (drawn below,
     // outside this Box): a toast is informational, a dialog is modal.
+    // The one universal pull-to-refresh indicator: a liquid-glass disc floating above all
+    // app content (it is drawn here, at the root, after the Scaffold/SearchLayer), below the
+    // toasts and dialogs. One instance for the entire app, fed by whichever Refreshable is on
+    // screen. hazeState = searchHazeState: the same backdrop source the app's other floating
+    // glass uses, so the disc refracts what is really behind it, not a flat tint.
+    PullRefreshIndicatorHost(
+        state = refreshIndicator,
+        hazeState = searchHazeState,
+    )
     Box(Modifier.fillMaxSize()) {
         ToastHost(
             state = toasts,

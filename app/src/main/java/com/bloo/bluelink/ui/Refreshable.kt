@@ -5,7 +5,9 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -42,12 +44,25 @@ internal fun Refreshable(
     val haptics = LocalHaptics.current
 
     // Publish the pull distance so GarageScreen's floating chrome tracks the pull live.
-    // The pull draws nothing itself; only the gesture and its chrome shift remain.
+    // The pull draws nothing itself; the app's ONE indicator (PullRefreshIndicatorHost,
+    // mounted at the root) draws it.
     val pullFractionState = LocalPullFraction.current
+    // The one app-wide indicator: this page feeds it and draws nothing of its own.
+    val indicator = LocalRefreshIndicator.current
     LaunchedEffect(ptrState) {
         snapshotFlow { ptrState.distanceFraction }.collect {
             pullFractionState.value = it
+            indicator?.pull?.value = it
         }
+    }
+    // One stable key per Refreshable instance, so this page's own in-flight flag contributes to
+    // the app-wide OR without clearing a DIFFERENT page's (neighbour car pages stay composed).
+    val indicatorKey = remember { Any() }
+    LaunchedEffect(refreshing, indicator) {
+        indicator?.setRefreshing(indicatorKey, refreshing)
+    }
+    DisposableEffect(indicator, indicatorKey) {
+        onDispose { indicator?.setRefreshing(indicatorKey, false) }
     }
 
     PullToRefreshBox(
@@ -55,7 +70,7 @@ internal fun Refreshable(
         onRefresh = { haptics?.diceRoll(); onRefresh() },
         state = ptrState,
         modifier = Modifier.fillMaxSize(),
-        // No indicator: the gesture and onRefresh still fire, nothing is drawn.
+        // No per-page indicator: the one app-wide disc is drawn by PullRefreshIndicatorHost.
         indicator = {},
     ) {
         // Content stays full-size and edge-to-edge; never shifted down.
