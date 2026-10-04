@@ -142,52 +142,28 @@ internal fun ToastHost(
     val visible = state.items.filter { it.visible.targetState }
     val bottomId = visible.lastOrNull()?.id
 
-    // Read the search bounds ONLY when a toast is on screen (see this host's own doc): the
-    // registry's bounds are a snapshot state MAP, so a plain read in the body subscribes this
-    // host to every write -- and the search bubble writes its bounds on EVERY frame of a drag.
-    // With no toast up (the common case) nothing needs the rect, so gating on `bottomId` takes
-    // the toast host off the per-frame path of dragging the search entirely. `remember(bottomId)`
-    // snapshots it once per toast-set change rather than per drag frame.
-    // Live read while a toast is up (null when none, so the common no-toast case stays off the
-    // registry entirely). LIVE, not a one-shot `remember(bottomId)`: the search pill can register
-    // or move AFTER a toast mounts.
+    // The search's live rect, read ONLY while a toast is up (null otherwise, so the common
+    // no-toast case never subscribes to the registry's bounds map -- which the search bubble
+    // writes on every drag frame). LIVE, not snapshotted: the pill can register or move AFTER a
+    // toast mounts, and a frozen rect left the clearance stuck at "none".
     val searchRect = if (bottomId == null) null else registry.boundsOf(FloatingIds.Search)
-    // Where the search element actually is, decided from its RECT geometry rather than trusting
-    // the separately-published dock flag alone: the rect is always present when the pill is on
-    // screen, so this cannot silently fall through to "no clearance" the way a null dock did.
-    // Its horizontal CENTRE vs the window width picks middle (lift above) from a corner (slot
-    // beside the nearer edge).
-    val windowWpx = with(density) { LocalWindowInfo.current.containerSize.width.toFloat() }
-    val dock: SearchDock? = when {
-        searchRect == null -> null
-        else -> {
-            val cx = (searchRect.left + searchRect.right) / 2f
-            when {
-                cx < windowWpx * 0.34f -> SearchDock.LEFT
-                cx > windowWpx * 0.66f -> SearchDock.RIGHT
-                else -> SearchDock.CENTER
-            }
-        }
-    }
-    // MIDDLE search: the whole STACK sits ABOVE the pill, so the lift is a bottom spacer on the
-    // column (nothing behind any toast), not a per-toast pad. Corner search: only the bottom
-    // toast is shortened to slot beside the pill; the ones above it stay full width.
-    //
-    // The lift is measured from the element's own TOP edge down to the BOTTOM of the content
-    // area the toast column actually rests on -- NOT the window bottom. The column already
-    // applies .imePadding() + .navigationBarsPadding(), so its baseline sits above the keyboard
-    // and the gesture bar; measuring to the raw window bottom (the previous version) over-lifted
-    // by exactly those insets whenever the keyboard was up. `contentBottom` = window height minus
-    // the IME and navigation insets is that real baseline, and the spacer is the gap from it up
-    // to the search element's top, plus breathing room.
-    val windowInfo = LocalWindowInfo.current
-    val windowHpx = with(density) { windowInfo.containerSize.height.toFloat() }
-    val imePx = with(density) { WindowInsets.ime.getBottom(density).toFloat() }
-    val navPx = with(density) { WindowInsets.navigationBars.getBottom(density).toFloat() }
-    val contentBottomPx = windowHpx - imePx - navPx
-    val liftPx = if (dock == SearchDock.CENTER && searchRect != null) {
-        with(density) { ((contentBottomPx - searchRect.top).coerceAtLeast(0f) + GapRow.toPx() + GapRow.toPx()).toDp() }
-    } else 0.dp
+    // The one piece of search-negotiation geometry, kept pure and unit-tested (see
+    // ToastClearanceTest): given the search's rect and the window, it says where the BOTTOM
+    // toast's content box must be inset (start/end) and how far the whole stack must lift
+    // (bottom), in pixels. Everything below just applies it.
+    val windowSize = LocalWindowInfo.current.containerSize
+    val imeBottomPx = with(density) { WindowInsets.ime.getBottom(density).toFloat() }
+    val navBottomPx = with(density) { WindowInsets.navigationBars.getBottom(density).toFloat() }
+    val clearance = toastClearance(
+        searchRect = searchRect,
+        windowWidthPx = windowSize.width.toFloat(),
+        windowHeightPx = windowSize.height.toFloat(),
+        imeBottomPx = imeBottomPx,
+        navBottomPx = navBottomPx,
+        baseEdgePx = baseEdgePx,
+        gapPx = gapPx,
+    )
+    val liftPx = with(density) { clearance.bottomLiftPx.toDp() }
 
     Column(
         modifier
@@ -204,11 +180,14 @@ internal fun ToastHost(
     ) {
         state.items.forEach { toast ->
             key(toast.id) {
-                // Only the bottom toast sits on the search's row, so only IT is reshaped when
-                // the search is docked in a corner. Middle search is handled by the column's
-                // own bottom lift below.
-                val box = if (toast.id == bottomId && (dock == SearchDock.LEFT || dock == SearchDock.RIGHT)) {
-                    Modifier.searchClearance(dock, searchRect, baseEdgePx, gapPx, windowWpx)
+                // Only the bottom toast sits on the search's own row, so only IT is inset
+                // (start OR end) to slot beside a corner-docked pill; the ones above it stay
+                // full width. A centred pill is handled by the column lift below instead.
+                val box = if (toast.id == bottomId) {
+                    Modifier.padding(
+                        start = with(density) { clearance.startInsetPx.toDp() },
+                        end = with(density) { clearance.endInsetPx.toDp() },
+                    )
                 } else {
                     Modifier
                 }
@@ -218,43 +197,6 @@ internal fun ToastHost(
         // The middle-search lift, as the LAST column child so it sits below every toast and
         // pushes the whole stack up clear of the centred pill. Absent (0dp) otherwise.
         if (liftPx > 0.dp) Spacer(Modifier.height(liftPx))
-    }
-}
-
-/**
- * The padding the bottom toast needs to clear the search element, per where search is docked:
- *  - corner LEFT: pad the START so the toast begins just right of the pill (same row, beside it);
- *  - corner RIGHT: pad the END so the toast ends just left of the pill;
- *  - CENTER: pad the BOTTOM so the toast sits directly ABOVE the centred pill, not on it.
- * Full-width (no padding) when search isn't on screen, or its bounds aren't known yet.
- */
-@Composable
-private fun Modifier.searchClearance(
-    dock: SearchDock?,
-    rect: Rect?,
-    baseEdgePx: Float,
-    gapPx: Float,
-    windowWpx: Float,
-): Modifier {
-    if (dock == null || rect == null) return this
-    val d = LocalDensity.current
-    // The toast's own content box spans baseEdgePx..windowW-baseEdgePx in root coords (the column
-    // pads 16dp each side), which is what these paddings are relative to. The old version compared
-    // the pill's raw root left/right against baseEdgePx alone, so a pill parked near an edge made
-    // the term NEGATIVE and coerced to 0 -- no padding at all, the reported "doesn't form around
-    // it".
-    return when (dock) {
-        // Beside a LEFT-docked pill: begin just right of it.
-        SearchDock.LEFT -> this.padding(
-            start = with(d) { (rect.right + gapPx - baseEdgePx).coerceAtLeast(0f).toDp() },
-        )
-        // Beside a RIGHT-docked pill: end just left of it (the toast's own right edge is at
-        // windowW - baseEdgePx).
-        SearchDock.RIGHT -> this.padding(
-            end = with(d) { ((windowWpx - baseEdgePx) - (rect.left - gapPx)).coerceAtLeast(0f).toDp() },
-        )
-        // CENTER is handled by the host's own bottom lift -- only corners reach here.
-        SearchDock.CENTER -> this
     }
 }
 
@@ -437,6 +379,61 @@ private class BlobShape(private val rect: Rect, private val cornerFraction: Floa
         val r = minOf(rect.width, rect.height) * cornerFraction
         return androidx.compose.ui.graphics.Outline.Rounded(
             androidx.compose.ui.geometry.RoundRect(rect, androidx.compose.ui.geometry.CornerRadius(r, r)),
+        )
+    }
+}
+
+/**
+ * The bottom toast's inset and the stack's lift, from where the search element is.
+ *
+ * Pure and JVM-testable (see ToastClearanceTest) so the arithmetic that decides "slot beside
+ * the pill / lift above it / leave it alone" cannot silently regress the way it did when it was
+ * inline and compared raw root coordinates against the wrong edge.
+ *
+ * Rules:
+ *  - No search rect -> all zeros (full width, no lift).
+ *  - Search centre in the middle third -> [bottomLiftPx] lifts the whole stack above it (the
+ *    lift is measured from the rect's TOP up to the content bottom, i.e. excluding the IME/nav
+ *    insets the toast column already pads by).
+ *  - Search centre left/right -> the bottom toast is inset on that side so it ends clear of the
+ *    pill (start for LEFT, end for RIGHT).
+ */
+internal data class ToastClearance(val startInsetPx: Float, val endInsetPx: Float, val bottomLiftPx: Float)
+
+internal fun toastClearance(
+    searchRect: Rect?,
+    windowWidthPx: Float,
+    windowHeightPx: Float,
+    imeBottomPx: Float,
+    navBottomPx: Float,
+    baseEdgePx: Float,
+    gapPx: Float,
+): ToastClearance {
+    if (searchRect == null || windowWidthPx <= 0f) return ToastClearance(0f, 0f, 0f)
+    val dock = SearchDock.fromFrac(((searchRect.left + searchRect.right) / 2f) / windowWidthPx)
+    return when (dock) {
+        // Beside a LEFT-docked pill: the toast's content box starts at baseEdgePx, so pad the
+        // start so it begins just right of the pill.
+        SearchDock.LEFT -> ToastClearance(
+            startInsetPx = (searchRect.right + gapPx - baseEdgePx).coerceAtLeast(0f),
+            endInsetPx = 0f,
+            bottomLiftPx = 0f,
+        )
+        // Beside a RIGHT-docked pill: the content box ends at windowWidth - baseEdgePx, so pad
+        // the end so it ends just left of the pill.
+        SearchDock.RIGHT -> ToastClearance(
+            startInsetPx = 0f,
+            endInsetPx = ((windowWidthPx - baseEdgePx) - (searchRect.left - gapPx)).coerceAtLeast(0f),
+            bottomLiftPx = 0f,
+        )
+        // Middle: lift the whole stack above the pill, measured from the pill's top up to the
+        // content bottom (window minus the IME and nav insets the column already pads by), plus
+        // two rows of breathing room.
+        SearchDock.CENTER -> ToastClearance(
+            startInsetPx = 0f,
+            endInsetPx = 0f,
+            bottomLiftPx = ((windowHeightPx - imeBottomPx - navBottomPx) - searchRect.top)
+                .coerceAtLeast(0f) + gapPx + gapPx,
         )
     }
 }
