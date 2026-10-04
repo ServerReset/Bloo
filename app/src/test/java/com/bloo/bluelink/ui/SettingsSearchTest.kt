@@ -1,7 +1,7 @@
 package com.bloo.bluelink.ui
 
 import com.bloo.bluelink.data.SettingsStore
-import com.bloo.bluelink.data.TileCommandRunner
+import com.bloo.bluelink.data.VehicleCommandRunner
 import com.bloo.bluelink.data.Vehicle
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -21,7 +21,7 @@ import kotlin.test.assertTrue
  *
  * The command tests matter beyond "does this string parse right": a false
  * positive here means [parseVehicleCommand] fires a real command against a
- * real car through [TileCommandRunner] that the user never actually asked
+ * real car through [VehicleCommandRunner] that the user never actually asked
  * for, and a false negative silently drops one they did.
  */
 class SettingsSearchTest {
@@ -86,14 +86,14 @@ class SettingsSearchTest {
         assertEquals("climate_off", parseVehicleCommand("stop the climate")?.cmd)
         val withTemp = parseVehicleCommand("start climate at 68")
         assertEquals("climate_on", withTemp?.cmd)
-        assertEquals(TileCommandRunner.TEMP_PREFIX + "68", withTemp?.climateTarget)
+        assertEquals(VehicleCommandRunner.TEMP_PREFIX + "68", withTemp?.climateTarget)
     }
 
     @Test
     fun command_defrost() {
         val cmd = parseVehicleCommand("defrost the windshield")
         assertEquals("climate_on", cmd?.cmd)
-        assertTrue(cmd?.climateTarget?.endsWith(TileCommandRunner.DEFROST_SUFFIX) == true)
+        assertTrue(cmd?.climateTarget?.endsWith(VehicleCommandRunner.DEFROST_SUFFIX) == true)
     }
 
     @Test
@@ -129,21 +129,21 @@ class SettingsSearchTest {
     fun command_bareHeatToTemperature() {
         val cmd = parseVehicleCommand("heat civic to 80")
         assertEquals("climate_on", cmd?.cmd)
-        assertEquals(TileCommandRunner.TEMP_PREFIX + "80", cmd?.climateTarget)
+        assertEquals(VehicleCommandRunner.TEMP_PREFIX + "80", cmd?.climateTarget)
     }
 
     @Test
     fun command_bareCoolToTemperature() {
         val cmd = parseVehicleCommand("cool civic to 65")
         assertEquals("climate_on", cmd?.cmd)
-        assertEquals(TileCommandRunner.TEMP_PREFIX + "65", cmd?.climateTarget)
+        assertEquals(VehicleCommandRunner.TEMP_PREFIX + "65", cmd?.climateTarget)
     }
 
     @Test
     fun command_bareWarmToTemperature() {
         val cmd = parseVehicleCommand("warm the ioniq to 72")
         assertEquals("climate_on", cmd?.cmd)
-        assertEquals(TileCommandRunner.TEMP_PREFIX + "72", cmd?.climateTarget)
+        assertEquals(VehicleCommandRunner.TEMP_PREFIX + "72", cmd?.climateTarget)
     }
 
     @Test

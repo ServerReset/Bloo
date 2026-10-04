@@ -11,7 +11,7 @@ import com.bloo.bluelink.data.setAiEnabled
 // --- On-device AI (Gemini Nano): summaries, free-form questions, command resolution (extracted from AppViewModel) --
 
 /** The only actions [AppViewModel.aiResolveCommand] may return -- exactly the
- *  ids TileCommandRunner has a case for. Deliberately NOT derived from a
+ *  ids VehicleCommandRunner has a case for. Deliberately NOT derived from a
  *  broader list: if the runner cannot execute it, the model must not be able to
  *  name it. */
 private val AI_COMMANDS = setOf(

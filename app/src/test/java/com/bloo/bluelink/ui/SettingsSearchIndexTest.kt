@@ -13,7 +13,7 @@ import kotlin.test.assertTrue
  * expandToken, searchScore).
  *
  * These are the helpers a false positive is expensive: the search feeds
- * [TileCommandRunner] for command queries, and the ranking helpers feed
+ * [VehicleCommandRunner] for command queries, and the ranking helpers feed
  * [SettingsSearchResults] which a user reads at a glance. Both were private to
  * SettingsScreen.kt for most of their lives -- documented by eye, never
  * pinned -- and both are pure string math with no Compose dependency, so they

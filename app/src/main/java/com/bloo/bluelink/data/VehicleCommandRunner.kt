@@ -10,7 +10,7 @@ import kotlinx.coroutines.sync.withLock
  * the climate command honours the caller's chosen target (a saved preset, smart
  * climate, or basic). Shared by the settings search's command execution.
  */
-object TileCommandRunner {
+object VehicleCommandRunner {
 
     /** Marks a climate target that carries an explicit temperature, e.g.
      *  "temp:64". See [runClimateStart]. */
@@ -401,8 +401,8 @@ object TileCommandRunner {
         return "Starting climate"
     }
 
-    /** The snapshot a tile command is expected to produce, for instant feedback.
-     *  Delegates to [CarCommandRunner.optimistic] (mapping the tile's own
+    /** The snapshot a command is expected to produce, for instant feedback.
+     *  Delegates to [CarCommandRunner.optimistic] (mapping this runner's own
      *  "doors"/"lock"/"unlock"/"charge"/"charge_on"/"charge_off"/"climate"/
      *  "climate_on"/"climate_off" vocabulary onto [CarAction]) instead of
      *  re-deriving the same lock/charge/climate flips independently -- this used

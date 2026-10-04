@@ -7,7 +7,7 @@ import androidx.compose.runtime.setValue
 import com.bloo.bluelink.data.CHARGE_LIMIT_RANGE
 import com.bloo.bluelink.data.CLIMATE_TEMP_RANGE_F
 import com.bloo.bluelink.data.degValue
-import com.bloo.bluelink.data.TileCommandRunner
+import com.bloo.bluelink.data.VehicleCommandRunner
 import com.bloo.bluelink.data.degLabel
 import kotlin.math.max
 
@@ -30,7 +30,7 @@ internal fun parseVehicleCommand(query: String, metric: Boolean = false): Parsed
         // Checked first: "open Bluelink"/"open the app"/"open Kia Access" is a
         // request to launch the OEM companion app (OwnerLinks' own "<appName>
         // app" button, see InfoPebble.kt), not a car command -- it has no
-        // TileCommandRunner id at all, so it's dispatched separately in
+        // VehicleCommandRunner id at all, so it's dispatched separately in
         // SearchResults.kt via openApp() using the target vehicle's own
         // BrandLinks. Every brand's app name/aliases are matched generically
         // rather than hard-coded per-brand, so a new brand only needs its
@@ -50,7 +50,7 @@ internal fun parseVehicleCommand(query: String, metric: Boolean = false): Parsed
             val f = temp ?: CLIMATE_TEMP_RANGE_F.last
             ParsedVehicleCommand(
                 "climate_on",
-                TileCommandRunner.TEMP_PREFIX + f + TileCommandRunner.DEFROST_SUFFIX,
+                VehicleCommandRunner.TEMP_PREFIX + f + VehicleCommandRunner.DEFROST_SUFFIX,
                 "Defrosting",
             )
         }
@@ -60,7 +60,7 @@ internal fun parseVehicleCommand(query: String, metric: Boolean = false): Parsed
             if (temp != null) {
                 ParsedVehicleCommand(
                     "climate_on",
-                    TileCommandRunner.TEMP_PREFIX + temp,
+                    VehicleCommandRunner.TEMP_PREFIX + temp,
                     "Starting climate at $tempLabel for",
                 )
             } else {
@@ -75,7 +75,7 @@ internal fun parseVehicleCommand(query: String, metric: Boolean = false): Parsed
         // so a bare "heat" with no number attached still isn't a command here
         // either -- it needs a real "to/at N" or "N degrees" alongside it.
         temp != null && RxHeatCoolVerb.containsMatchIn(q) ->
-            ParsedVehicleCommand("climate_on", TileCommandRunner.TEMP_PREFIX + temp, "Starting climate at $tempLabel for")
+            ParsedVehicleCommand("climate_on", VehicleCommandRunner.TEMP_PREFIX + temp, "Starting climate at $tempLabel for")
         // Charge LIMIT before charge start/stop: "set the charge limit to 80"
         // contains "charg", and the limit is the more specific request.
         RxChargeLimit

@@ -149,7 +149,7 @@ class ClimateExtendWorker(ctx: Context, params: WorkerParameters) : CoroutineWor
          *
          * Now reached from every remaining stop path: the ones that go through
          * CarCommandRunner.execute do it via [com.bloo.bluelink.data.runCarCommand], and
-         * TileCommandRunner, which calls the repo directly, via its own
+         * VehicleCommandRunner, which calls the repo directly, via its own
          * stopClimateAndChain. Adding separate cancel calls at each call site was the
          * alternative, and several copies of one rule is how this drifted in the first
          * place.

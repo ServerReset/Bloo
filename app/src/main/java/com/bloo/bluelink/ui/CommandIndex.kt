@@ -16,7 +16,7 @@ import com.bloo.bluelink.data.Vehicle
  * Commands are organized by category and support multiple natural language
  * variations for each action. The search system can:
  * - Recognize commands by partial matching and synonyms
- * - Execute commands through TileCommandRunner
+ * - Execute commands through VehicleCommandRunner
  * - Track recently used commands for quick access
  * - Provide suggestions based on vehicle capabilities
  *

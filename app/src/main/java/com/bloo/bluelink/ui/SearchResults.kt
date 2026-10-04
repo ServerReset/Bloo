@@ -43,7 +43,7 @@ import com.bloo.bluelink.data.Vehicle
 import com.bloo.bluelink.data.brand
 import com.bloo.bluelink.data.links
 import com.bloo.bluelink.data.SettingsStore
-import com.bloo.bluelink.data.TileCommandRunner
+import com.bloo.bluelink.data.VehicleCommandRunner
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import com.bloo.bluelink.data.aiEnabled
@@ -215,7 +215,7 @@ internal fun SettingsSearchResults(
     }
 
     // A recognised command ("lock my Ioniq", "start smart climate", "stop
-    // charging") actually runs -- reuses TileCommandRunner, the same
+    // charging") actually runs -- reuses VehicleCommandRunner, the same
     // execution path used elsewhere in the app, so this isn't a separate,
     // untested way of sending vehicle commands. If the query doesn't name a
     // specific car, this falls back to a single car (unambiguous) or asks
@@ -286,14 +286,14 @@ internal fun SettingsSearchResults(
                 if (resolvedCommand.cmd == "open_app") {
                     // Not a car command -- launches the OEM companion app
                     // (same action as OwnerLinks' own "<appName> app" button)
-                    // rather than going through TileCommandRunner.
+                    // rather than going through VehicleCommandRunner.
                     val links = targetVehicle.brand.links
                     openApp(ctx, listOf(links.appPackage), links.playStoreUrl)
                     actionResult = "Opening ${links.appName}"
                     commandExecuted = true
                 } else {
                     actionRunning = true
-                    val result = runCatching { TileCommandRunner.run(ctx, targetVehicle.vin, resolvedCommand.cmd, resolvedCommand.climateTarget) }.getOrNull()
+                    val result = runCatching { VehicleCommandRunner.run(ctx, targetVehicle.vin, resolvedCommand.cmd, resolvedCommand.climateTarget) }.getOrNull()
                     actionResult = result?.message ?: "Command failed"
                     actionRunning = false
                     vm.refreshStatus(targetVehicle)
@@ -397,7 +397,7 @@ internal fun SettingsSearchResults(
                                 running = true
                                 scope.launch {
                                     val r = runCatching {
-                                        TileCommandRunner.run(ctx, car.vin, p.first, "default")
+                                        VehicleCommandRunner.run(ctx, car.vin, p.first, "default")
                                     }.getOrNull()
                                     ran = r?.message ?: "Command failed"
                                     running = false

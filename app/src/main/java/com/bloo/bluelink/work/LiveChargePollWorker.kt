@@ -76,7 +76,7 @@ class LiveChargePollWorker(context: Context, params: WorkerParameters) : Corouti
         // run every 5 minutes for the entire length of a charge just to
         // re-fetch the same fleet list this worker already has cached, doubling
         // the outbound calls this chain makes. Same snap.toVehicle() rebuild
-        // TileCommandRunner/CarCommandRunner already use for the identical
+        // VehicleCommandRunner/CarCommandRunner already use for the identical
         // reason. A car added/removed mid-charge is picked up on the next
         // foreground refresh (AppViewModel's own saveVehiclesKeepingStatus),
         // same as it always was for anything this worker missed.

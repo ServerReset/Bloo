@@ -16,7 +16,7 @@ import com.bloo.bluelink.data.ambientFahrenheit
 import com.bloo.bluelink.data.CLIMATE_TEMP_RANGE_F
 import com.bloo.bluelink.data.SeatConfig
 import com.bloo.bluelink.data.SettingsStore
-import com.bloo.bluelink.data.TileCommandRunner
+import com.bloo.bluelink.data.VehicleCommandRunner
 import com.bloo.bluelink.data.Vehicle
 import com.bloo.bluelink.data.aiEnabled
 import com.bloo.bluelink.data.setAiEnabled
@@ -372,7 +372,7 @@ internal fun searchScore(tokens: List<String>, e: SearchEntry, fuzzy: Boolean): 
 
 
 /** A vehicle command recognised in a free-form search query. [cmd]/[climateTarget]
- *  map directly onto [com.bloo.bluelink.data.TileCommandRunner]'s own command
+ *  map directly onto [com.bloo.bluelink.data.VehicleCommandRunner]'s own command
  *  vocabulary, so search runs commands through the exact same path the Quick
  *  Settings tiles use. */
 internal class ParsedVehicleCommand(val cmd: String, val climateTarget: String = "default", val label: String)
