@@ -104,6 +104,17 @@ fun BlooApp(vm: AppViewModel) {
     // the root (and, through it, the screen it is showing).
     val screen by remember { derivedStateOf { state.screen } }
     val locked by remember { derivedStateOf { state.locked } }
+    // Latches true the first time the app is NOT locked -- i.e. the user has unlocked at least
+    // once this session (or had no lock configured, which reads as unlocked immediately). Only
+    // the COLD-START lock defers composing the garage (see the Screen.Garage branch); once this
+    // has latched, a later re-lock (backgrounding, timing) composes the garage behind the lock
+    // as before, since its content is already built and just needs the blur.
+    var unlockedThisSession by remember { mutableStateOf(false) }
+    // SideEffect, not a bare body write: this codebase's own convention (see BlooApp's haptics
+    // write) -- mutating state during composition can be discarded or re-ordered, so it runs
+    // after a successful (re)composition instead. Latching the instant a non-locked frame is
+    // composed is what lets the garage start building on that very frame.
+    SideEffect { if (!locked) unlockedThisSession = true }
     val loading by remember { derivedStateOf { state.loading } }
     val refreshing by remember { derivedStateOf { state.refreshing } }
     val message by remember { derivedStateOf { state.message } }
@@ -352,7 +363,20 @@ fun BlooApp(vm: AppViewModel) {
                         // redrawing the blurred backdrop underneath at ~12fps --
                         // real contention on exactly the frames search is using.
                         if (appearance.auroraBackground) AuroraBackground(Modifier.matchParentSize().hazeSource(backdropHaze), appearance, refreshing = refreshing, paused = searchOpen)
-                        GarageScreen(stateHolder, vm, hazeState = searchHazeState)
+                        // COLD-START LOCK DEFERRAL: while a returning user's lock screen is up
+                        // before they've unlocked, do NOT compose the full garage -- it is a
+                        // pager of complete car pages, each with a hero photo decode and a
+                        // first-map tile fetch. Composing and then BLURRING all of that behind a
+                        // screen the user hasn't unlocked yet was the biggest cold-start frame
+                        // cost in a real trace (dozens of 33-50ms frames, heap 26->46MB). The
+                        // lock overlay already covers the screen, and the aurora above is the
+                        // backdrop it blurs, so nothing needs the garage yet. The instant the
+                        // user unlocks, `locked` flips and the garage composes for real --
+                        // the two-frame `contentSettled` gate the lock blur already uses keeps
+                        // that first real frame from being the one that flashes.
+                        if (!(locked && !unlockedThisSession)) {
+                            GarageScreen(stateHolder, vm, hazeState = searchHazeState)
+                        }
                     }
                 }
             }
