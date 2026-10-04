@@ -20,7 +20,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
@@ -242,7 +241,7 @@ internal fun LockOverlay(vm: AppViewModel, opaqueBackdrop: Boolean = false) {
                 // The same liquid glass as the rest of the app, over the force-blurred app behind it: the blur
                 // (LockBlurLayer) is what keeps data from leaking, the glass is what makes this one of us.
                 GlassSurface(
-                    shape = RoundedCornerShape(28.dp),
+                    shape = ExtraLargeShape,
                     modifier = Modifier.fillMaxWidth(),
                     hazeState = LocalBackdropHaze.current,
                 ) {
@@ -308,7 +307,7 @@ internal fun LockOverlay(vm: AppViewModel, opaqueBackdrop: Boolean = false) {
                 // appGlassRim's shared gradient one and Ambient.kt's now-removed
                 // dialog override) -- no more per-site exceptions.
                 GlassSurface(
-                    shape = RoundedCornerShape(28.dp),
+                    shape = ExtraLargeShape,
                     modifier = Modifier.fillMaxWidth(),
                     hazeState = LocalBackdropHaze.current,
                 ) {

@@ -30,7 +30,6 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
@@ -298,7 +297,7 @@ internal fun SearchLayer(
             modifier = Modifier.align(Alignment.BottomCenter)
                 .padding(bottom = barH + edge + bottomInset + 10.dp),
         ) {
-            val panelShape = RoundedCornerShape(28.dp)
+            val panelShape = ExtraLargeShape
             // GlassSurface (GlassChrome.kt): the one shared fill/rim/shadow, replacing
             // this panel's own one-off alpha and its own separately-hand-rolled flat
             // BorderStroke rim (yet another divergent one, next to appGlassRim's shared

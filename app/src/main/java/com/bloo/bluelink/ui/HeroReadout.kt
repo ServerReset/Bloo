@@ -123,11 +123,15 @@ internal fun chargeReadoutOf(
         statusColor = when {
             charging -> ChargeGreen
             drivingLabel == "Driving" || drivingLabel == "Running" -> MaterialTheme.colorScheme.primary
-            // "Parked" is a real state, not a caption -- it was rendering in the muted
-            // MutedContentAlpha caption tone, so the one word that says what the car is
-            // doing was the dimmest thing in the readout. Full-strength content colour
-            // instead; "Battery"/"Fuel" (the fallback descriptors) keep the muted tone.
-            drivingLabel == "Parked" -> LocalContentColor.current
+            // "Parked" is a real state, not a caption, and it sits on the hero's photo when
+            // the card is open. It reads the SAME colour the title and the numbers use on
+            // that photo -- heroOnPhoto(), which is near-WHITE in light mode and near-black in
+            // dark mode -- rather than LocalContentColor. LocalContentColor is right when the
+            // card is open but equals the card's own onSurface while collapsed, and the parked
+            // line is the one piece the user called out as needing to stay light over the photo
+            // in light mode specifically ("because of the contrast"). "Battery"/"Fuel" (the
+            // fallback descriptors) keep the muted tone.
+            drivingLabel == "Parked" -> heroOnPhoto()
             else -> {
                 // The inherited content colour, muted -- NOT a surface role or a raw
                 // isSystemInDarkTheme() test. Reading LocalContentColor tracks the active

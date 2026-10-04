@@ -46,7 +46,6 @@ import kotlinx.coroutines.launch
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import dev.chrisbanes.haze.HazeState
 import com.bloo.bluelink.data.GeoLocation
@@ -245,28 +244,29 @@ internal fun MapTopBar(
                     }
                 }
             }
-            // The drag handle nub -- purely visual now, no pointerInput of its own:
-            // the pop above already tracks press for the whole pill, so a second,
-            // separate press-tracker here would just be redundant (and, worse, could
-            // read a DIFFERENT pressed state than the pill around it if the two ever
-            // drifted, which is exactly the "parts of the pill disagree" look this is
-            // meant to avoid).
-            Box(
-                Modifier
-                    .align(Alignment.TopCenter)
-                    .padding(top = 5.dp)
-                    .size(width = 28.dp, height = 3.dp)
-                    // The bar's own inherited content tone, halved -- not a fixed
-                    // white. It sits inside the GlassSurface above, whose
-                    // CompositionLocalProvider already resolved the one colour that
-                    // reads against this backdrop in both themes, so the nub cannot
-                    // disagree with the name and the refresh glyph either side of it
-                    // (a fixed white nub survived the contentColor fix above as a
-                    // pale smudge on a light map). Same idiom as ChargeSegmentBar's
-                    // own track tints (HeroReadout.kt): inherit the reader's colour
-                    // and mute it, rather than guessing a colour here.
-                    .background(LocalContentColor.current.copy(alpha = 0.5f), RoundedCornerShape(2.dp)),
-            )
+            // The drag handle: a frosted glass pill, the same GlassSurface treatment as the
+            // refresh circle at the other end of the row, so the whole header reads as one
+            // glass material. It replaces a flat 28x3dp muted bar pinned to TopCenter, which
+            // was reported as too small, misaligned against the name and refresh circle (both
+            // vertically centred), and missing the frost the rest of the chrome has.
+            //
+            // CENTRE-aligned so its middle lines up with the name block and the refresh
+            // circle's centre; 44x18dp with a 24x4dp inner bar, a real handle silhouette
+            // rather than a hairline. Purely visual -- the pop and the drag are the whole
+            // bar's (see `dragModifier` and the press tracker above), so this carries no
+            // pointerInput of its own.
+            GlassSurface(
+                shape = RoundedCornerShape(50),
+                modifier = Modifier.align(Alignment.Center).size(width = 44.dp, height = 18.dp),
+                hazeState = mapHazeState,
+                shadow = false,
+            ) {
+                Box(
+                    Modifier
+                        .size(width = 24.dp, height = 4.dp)
+                        .background(LocalContentColor.current.copy(alpha = 0.55f), RoundedCornerShape(2.dp)),
+                )
+            }
             if (onRefreshLocation != null) {
                 // Icon-only (was a text chip: "Updated Xm ago" / "Refresh" beside a
                 // static icon) -- reported directly as wanting a refresh INDICATOR,
