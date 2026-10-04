@@ -149,8 +149,7 @@ internal fun HeroMorphReadout(
             // statusColor's own doc), and the comment right above here already said
             // "same reasoning as the state line" while the code did the opposite.
             // This row is expanded-only, which means it is always over the hero's car
-            // photo + dark scrim (the ChargeSegmentBar directly below it passes
-            // darkBackdrop = true for exactly that reason), and onSurfaceVariant is a
+            // photo + scrim, and onSurfaceVariant is a
             // SURFACE role: on a light-themed app it drew "Fuel 40%" and its pump glyph
             // in near-black over a dark photo, invisible, while the percentage and range
             // beside it -- both painted from the hero's LocalContentColor provider, which
@@ -178,11 +177,6 @@ internal fun HeroMorphReadout(
             limitPct = data.limitPct,
             stuckAtLimit = data.stuckAtLimit,
             charging = data.charging,
-            // This readout's bar sits over the hero's photo + scrim when the card is
-            // open. The scrim (and the on-photo text) now INVERT with the theme, so the
-            // backdrop is dark in light mode and light in dark mode -- the "won't charge
-            // past here" zone has to follow, or it paints the wrong tone in one of them.
-            darkBackdrop = !appIsDarkTheme(),
             // Darken the remaining track while the card is collapsed (the compact bar),
             // so the coloured fill reads against it; expanded keeps the lighter track.
             collapsed = t < 0.5f,

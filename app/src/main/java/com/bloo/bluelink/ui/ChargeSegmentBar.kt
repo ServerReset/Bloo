@@ -98,14 +98,6 @@ internal fun ChargeSegmentBar(
     stuckAtLimit: Boolean,
     charging: Boolean,
     modifier: Modifier = Modifier,
-    /** True when the segment sits on a genuinely dark backdrop (the hero's
-     *  photo + scrim in light mode, the cover tile): the "won't charge past
-     *  here" zone then paints LIGHT so it stays legible. The LocalContentColor
-     *  heuristic this used got the hero wrong, because the hero's on-photo
-     *  content colour (heroOnPhoto) is INVERTED against the theme while the
-     *  backdrop behind it follows the theme -- neither can be inferred from
-     *  the other, which is exactly why this override exists. */
-    darkBackdrop: Boolean = false,
     /** True while the hero card is COLLAPSED (the small readout). The remaining/trailing
      *  track is drawn darker then, so the coloured fill reads clearly against it on the
      *  compact bar; expanded, the longer bar keeps the lighter track it always had. */
@@ -128,7 +120,15 @@ internal fun ChargeSegmentBar(
     // whatever the backdrop behind the segment actually is (the hero photo
     // scrim, a pebble card, the cover tile) because it inherits the reader's
     // own text colour rather than guessing a colour itself.
-    val heavyScrim = darkBackdrop || LocalContentColor.current.luminance() < 0.5f
+    // Which tone the trailing zone is, decided HERE from the actual colour on top of the
+    // backdrop: LocalContentColor is what every surrounding element already resolved for
+    // whatever is behind the bar (heroOnPhoto -- white in light mode, near-black in dark
+    // mode -- over the hero photo, onSurface on a flat card), so a luminance test on it
+    // inverts the trailing zone the right way for ANY backdrop without the caller having to
+    // describe it. The old `darkBackdrop` override forced one answer for every theme state
+    // and had to be kept in sync by each call site with the theme-inverted scrim; reading
+    // the colour cannot drift from the colour it is reading.
+    val heavyScrim = LocalContentColor.current.luminance() < 0.5f
     val farBackdropColor = if (heavyScrim) Color.White.copy(alpha = 0.30f) else Color.Black.copy(alpha = 0.24f)
     val trackDimColor = if (heavyScrim) Color.White.copy(alpha = 0.13f) else scheme.onSurface.copy(alpha = 0.14f)
     // Sprung, not a plain `if`: this used to pick the two-item colour list outright,
