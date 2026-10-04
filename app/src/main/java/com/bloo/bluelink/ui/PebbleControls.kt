@@ -241,7 +241,7 @@ internal fun ControlsPebble(v: Vehicle, state: UiState, vm: AppViewModel, modifi
  * The lock/unlock [StateControl] plus its brand-conditional grouped
  * Flash-lights/Horn-and-lights icon actions -- shared by every place a
  * car's primary quick-action needs to render (the dual-column critical
- * column, [ControlsPebble], and the cover screen's main tile), each
+ * column, [ControlsPebble], and a fill-height glance context), each
  * supplying its own [contentPadding] to line the icon up with that
  * particular container's own inset convention.
  */

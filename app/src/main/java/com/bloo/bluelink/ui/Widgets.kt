@@ -288,8 +288,8 @@ internal val HeaderContentClearance = 12.dp
 /** A small translucent circular icon button used as a floating overlay control.
  *  [outerPadding] is the breathing room around the [HeaderButtonSize] circle -
  *  the default ([HeaderCornerGap], a 72dp footprint) suits free-floating
- *  overlay corners; tight rows (the cover screen's title row, at 2dp) keep
- *  that footprint down to 52dp on a ~260dp-tall screen. */
+ *  overlay corners; a tight row can pass a smaller value (2dp keeps the
+ *  whole footprint down to 52dp). */
 @Composable
 internal fun FloatingIcon(
     icon: ImageVector,

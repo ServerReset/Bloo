@@ -356,7 +356,7 @@ internal fun PebbleShell(
             // could not sit under the header before this.
             Box(Modifier.fillMaxWidth()) {
                 background?.invoke(this)
-                // No animateContentSize here (cover-screen tiles fill instead) --
+                // No animateContentSize here (a fill-height glance context fills instead) --
                 // the body below is already wrapped in its own AnimatedVisibility
                 // with expandVertically/shrinkVertically, which smoothly animates
                 // that exact same height delta on its own. Wrapping this Column in

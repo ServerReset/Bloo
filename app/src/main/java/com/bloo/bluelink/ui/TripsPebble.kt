@@ -81,12 +81,10 @@ internal fun TripsPebble(v: Vehicle, state: UiState, vm: AppViewModel, modifier:
             trips.isEmpty() -> Text("No recent trips reported by this car.")
             else -> Column(verticalArrangement = Arrangement.spacedBy(GapRow)) {
                 val tMetric = LocalAppearance.current.metricDistance
-                // COVER SCREEN: a small "Recent trips" header + only the 3 most recent,
-                // so the tile fits the small square without scrolling and you land at
-                // the top. Phone keeps up to 8 with no header. Gated on forceExpanded.
+                // In a forced-open/glance context only the 3 most recent trips show, so the
+                // tile fits without scrolling and you land at the top; the full pebble keeps
+                // up to 8. Gated on LocalForceExpanded (pinned pebbles / full-screen glance).
                 val glance = LocalForceExpanded.current
-                // No cover hero: the summary already says "3 recent" and is now the tile's
-                // headline. The same count in two different words helped nobody.
                 trips.take(if (glance) 3 else 8).forEach { TripRow(it, metric = tMetric) }
             }
         }

@@ -125,9 +125,9 @@ internal fun SearchPill(
     }
     val interaction = remember { MutableInteractionSource() }
     val pressed by interaction.collectIsPressedAsState()
-    // Springs in on first appearance -- and because SearchLayer keys the
-    // animations on the layout mode, "first appearance" includes arriving on
-    // the cover screen. The ball lands in its corner rather than sliding to it.
+    // Springs in on first appearance; because SearchLayer keys the animations
+    // on the layout mode, "first appearance" includes arriving from a different
+    // docked position. The ball lands in its corner rather than sliding to it.
     var appeared by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) { appeared = true }
     // DampingRatioMediumBouncy (0.5) on BOTH of these compounded badly: they multiply into
