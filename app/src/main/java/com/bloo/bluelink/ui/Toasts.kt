@@ -130,14 +130,23 @@ internal fun ToastHost(
     // and dock from the floating registry -- see FloatingRegistry.searchDock. Recomposes when the
     // search moves/docks, which is fine (it is off during a drag that would matter).
     val registry = LocalFloatingRegistry.current
-    val dock = registry.searchDock
-    val searchRect = registry.boundsOf(FloatingIds.Search)
     val density = LocalDensity.current
     val gapPx = with(density) { GapRow.toPx() }
     val baseEdgePx = with(density) { 16.dp.toPx() }
 
     val visible = state.items.filter { it.visible.targetState }
     val bottomId = visible.lastOrNull()?.id
+
+    // Read the search bounds ONLY when a toast is on screen (see this host's own doc): the
+    // registry's bounds are a snapshot state MAP, so a plain read in the body subscribes this
+    // host to every write -- and the search bubble writes its bounds on EVERY frame of a drag.
+    // With no toast up (the common case) nothing needs the rect, so gating on `bottomId` takes
+    // the toast host off the per-frame path of dragging the search entirely. `remember(bottomId)`
+    // snapshots it once per toast-set change rather than per drag frame.
+    val dock = registry.searchDock
+    val searchRect = remember(bottomId) {
+        if (bottomId == null) null else registry.boundsOf(FloatingIds.Search)
+    }
 
     Column(
         modifier
