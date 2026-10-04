@@ -18,6 +18,10 @@ import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.snap
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.only
@@ -47,7 +51,6 @@ import androidx.compose.runtime.Composable
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -90,7 +93,6 @@ internal fun UpdateReleaseNotes(
     // so a long note can be read fully without leaving the app. "GitHub" stays as the
     // escape hatch to the formatted release page.
     var expanded by rememberSaveable(info.run.runNumber) { mutableStateOf(false) }
-    var overflowed by remember(info.run.runNumber) { mutableStateOf(false) }
     // Glass surface with unified blur styling. shadow = false -- shared by the
     // pebble body AND SettingsHeroCard's expanded body (this composable's own doc),
     // both of which already nest this inside another elevated card/group; see
@@ -102,17 +104,32 @@ internal fun UpdateReleaseNotes(
         shadow = false,
     ) {
         Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(GapRow)) {
-            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            // Header + actions in a FlowRow, not a weighted Row: at a huge font the two action
+            // buttons plus the title no longer fit one line, and a `weight(1f)` title squeezed
+            // between them collapsed/clipped instead of the row simply wrapping. FlowRow lets
+            // the actions drop to their own line when they must.
+            FlowRow(
+                Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(GapHairline),
+                horizontalArrangement = Arrangement.spacedBy(GapRow),
+                itemVerticalAlignment = Alignment.CenterVertically,
+            ) {
                 Text(
                     "What's new",
                     style = MaterialTheme.typography.labelSmall,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.weight(1f),
+                    modifier = Modifier.weight(1f, fill = false),
                 )
-                // Only offered when the note is actually longer than the collapsed view --
-                // a "Show more" over three short lines does nothing and reads as broken.
-                if (overflowed || expanded) {
+                // Deterministic, not onTextLayout-dependent: `hasVisualOverflow` from a
+                // single-line-clamped Text is unreliable (it can arrive a pass late or not at
+                // all for the ellipsized case), which is what made the old "Show more" appear
+                // and disappear unpredictably. A plain estimate -- more newlines than the
+                // collapsed view shows, OR more characters than a collapsed view could hold --
+                // is stable the moment we have the text, so the affordance is always right.
+                val looksLong =
+                    notes.count { it == '\n' } >= collapsedLines || notes.length > collapsedLines * 48
+                if (looksLong || expanded) {
                     SafeMorphTextButton(
                         if (expanded) "Show less" else "Show more",
                         onClick = { expanded = !expanded },
@@ -129,12 +146,18 @@ internal fun UpdateReleaseNotes(
                 notes,
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                // Collapsed: capped at [collapsedLines], ellipsized. Expanded: no cap, so the
-                // whole changelog shows inline. onTextLayout tells us whether it was clipped,
-                // which is what gates the "Show more" affordance above.
+                modifier = if (expanded) {
+                    // Expanded: the whole changelog inline, but BOUNDED and scrollable so a very
+                    // long release note can't grow the card to several screens tall and push the
+                    // buttons off the bottom. The height is generous but finite.
+                    Modifier.fillMaxWidth().heightIn(max = 320.dp).verticalScroll(rememberScrollState())
+                } else {
+                    Modifier.fillMaxWidth()
+                },
+                // Collapsed: capped at [collapsedLines], ellipsized. Expanded: no line cap (the
+                // scroll bound above is what limits it), so the changelog reads fully.
                 maxLines = if (expanded) Int.MAX_VALUE else collapsedLines,
                 overflow = TextOverflow.Ellipsis,
-                onTextLayout = { if (!expanded) overflowed = it.hasVisualOverflow },
             )
         }
     }

@@ -86,18 +86,18 @@ fun BlooTheme(
         }
     }
 
-    // Deliberately NOT density.fontScale * uiScale any more. That multiplied the
-    // device's own accessibility font-scale setting through, so a phone set to a
-    // large system font blew straight past every fixed-size floating overlay this
-    // app draws over its own content (the identity pill, Settings' header row) --
-    // those aren't real text flow that reflows around a bigger font, they're
-    // absolutely-positioned copies tracking a specific pixel spot, and they only
-    // stayed aligned at the font size they were tuned against. 100% is this app's
-    // own baseline regardless of what the device is set to; uiScale (the app's own
-    // "make everything bigger" preference, set inside Bloo itself, independent of
-    // the OS setting) is the only thing still allowed to scale text from here.
+    // Honour the device's own accessibility font-scale setting, but CLAMP and combine it
+    // with the app's uiScale, rather than either ignoring it (the old `Density(density,
+    // uiScale)`, which dropped the OS setting entirely) or multiplying it through unbounded
+    // (which blew past every fixed-size floating overlay -- the identity pill, Settings'
+    // header row -- since those track a pixel spot rather than reflowing). So:
+    //   effective = clamp(deviceFontScale, 1..MaxFontScale) * uiScale
+    // gives "huge fonts actually get bigger" while capping the blow-up at a point the fixed
+    // overlays and the space scale were tuned to survive. Spacing follows the SAME effective
+    // scale (see spaceScaleFor), so a bigger font gets breathing room, not clipping.
     val density = LocalDensity.current
-    val scaledDensity = Density(density.density, uiScale)
+    val effectiveFontScale = density.fontScale.coerceIn(1f, MaxFontScale) * uiScale
+    val scaledDensity = Density(density.density, effectiveFontScale)
 
     // Keyed on the resolver rather than un-keyed, and read through a process-wide cache: this
     // is a synchronous binder IPC to the settings provider, and it sat on the first-frame path
@@ -127,7 +127,7 @@ fun BlooTheme(
             LocalReduceMotion provides reduceMotion,
             // The vertical gap scale follows the display scale (damped -- see spaceScaleFor),
             // so every gap/inset in the app breathes with the font-size setting together.
-            LocalSpaceScale provides spaceScaleFor(uiScale),
+            LocalSpaceScale provides spaceScaleFor(effectiveFontScale),
             LocalContentColor provides scheme.onBackground,
             content = content,
         )

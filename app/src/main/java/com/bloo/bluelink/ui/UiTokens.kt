@@ -180,7 +180,12 @@ internal val ScreenGutter = 16.dp
 internal val LocalSpaceScale = androidx.compose.runtime.compositionLocalOf { 1f }
 
 /** Display scale → gap scale: gaps breathe with the app's display scale at half its swing. */
-internal fun spaceScaleFor(uiScale: Float): Float = 1f + (uiScale - 1f) * 0.5f
+internal fun spaceScaleFor(scale: Float): Float = 1f + (scale - 1f) * 0.5f
+
+/** The most the app will scale text: past this, the device's font setting is clamped.
+ *  Big enough for "huge" accessibility sizes to read as huge, small enough that the fixed
+ *  floating overlays (which track a pixel spot, not reflowing text) still fit their bounds. */
+internal const val MaxFontScale = 1.8f
 
 /** The one spacing unit (4dp at 1.0 scale). Everything below is a multiple of it. */
 internal val SpaceUnit: Dp @Composable get() = 4.dp * LocalSpaceScale.current
