@@ -32,6 +32,18 @@ data class EuSession(
     val refreshToken: String?,
     val deviceId: String,
     val pin: String?,
+    // --- OneApp/CCI token set (Hyundai EU) ---
+    // Hyundai's WAF now blocks the legacy IDPConnect authorize/signin by client_id, so
+    // sign-in goes through the OneApp client_id + cci-api-eu.hyundai.com, which mint a
+    // CCS-usable access token AND a set of CCI tokens. The CCI set is what a token
+    // REFRESH needs (the CCS token can't be refreshed on its own), so it has to be
+    // carried here and persisted. Null for any non-CCI path.
+    val cciAccessToken: String? = null,
+    val exchangeableToken: String? = null,
+    val exchangeableRefreshToken: String? = null,
+    val nonCcsToken: String? = null,
+    val nonCcsRefreshToken: String? = null,
+    val idToken: String? = null,
 )
 
 /** A Europe-account vehicle summary. [id] is the CCAPI `vehicleId`; [ccs2] is the
@@ -78,6 +90,21 @@ class EuApi(private val brand: Brand) {
     // redirect_uri .../oauth2/redirect for Kia).
     internal val loginFormHost get() = "https://idpconnect-eu.hyundai.com"
     internal val redirectUri get() = userApi + "oauth2/token"
+
+    // --- OneApp/CCI login (Hyundai EU) --------------------------------------
+    // Hyundai's WAF blocks the LEGACY IDPConnect authorize by client_id, so the old
+    // sign-in returns 403. The OneApp client_id is NOT on the block list; its authorize
+    // succeeds, and the resulting code is exchanged at cci-api-eu.hyundai.com for a CCI
+    // token set, then token-exchanged for a CCS token the legacy ccapi:8080 endpoints
+    // still accept. Ported from hyundai_kia_connect_api KiaUvoApiEU._login_with_password_cci.
+    internal val oneAppClientId get() = "4f4953b5-02e1-4dbc-8599-87e983ee1be5"
+    internal val oneAppRedirectUri get() = "https://oneapp.hyundai.com/redirect"
+    internal val cciApiUrl get() = "https://cci-api-eu.hyundai.com"
+    private val cciPackageId get() = "com.hyundai.oneapp.eu"
+    private val cciClientName get() = "hyundai"
+    private val cciClientVersion get() = "1.3.3"
+    private val cciClientOsVersion get() = "18.7"
+    private val cciNotificationProvider get() = "APNS"
 
     companion object {
         private const val USER_AGENT_OKHTTP = "okhttp/3.12.0"

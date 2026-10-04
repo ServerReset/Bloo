@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
@@ -283,6 +284,9 @@ private fun ToastCard(toast: Toast, onDismiss: () -> Unit, hazeState: HazeState,
         tint = scheme.surface.copy(alpha = if (canBlurBackdrops()) 0.16f else 0.96f),
         modifier = Modifier
             .fillMaxWidth()
+            // Same height as the search pill (SearchLayer's barH), so a toast and the bar it
+            // emerges from read as the same-sized element rather than a taller one.
+            .heightIn(min = 52.dp)
             // Announced by TalkBack without the user hunting for it.
             .semantics { liveRegion = LiveRegionMode.Polite }
             .offset { IntOffset(offsetX.roundToInt(), 0) }
