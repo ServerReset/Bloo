@@ -74,6 +74,19 @@ internal fun NotificationsCardContent(
                 notif.charging,
                 description = "A live notification with progress, the charge limit and a Stop button; on Android 16+ it also shows in the status bar.",
             ) { vm.setNotifyCharging(it) }
+            // The troubleshooting lives WITH the live notification it is about -- in the same
+            // "Charging" group, right under the toggle that turns it on -- not tucked at the
+            // bottom of the card behind advanced mode. Someone whose live bar isn't showing is
+            // looking at this exact switch; the "why isn't it showing" steps belong here.
+            PopVisible(visible = notif.charging) {
+                var showTroubleshoot by remember { mutableStateOf(false) }
+                SafeMorphTextButton(
+                    "Live notification not showing?",
+                    onClick = { showTroubleshoot = true },
+                    icon = AppIcons.Info,
+                )
+                if (showTroubleshoot) LiveUpdateTroubleshootDialog(onDismiss = { showTroubleshoot = false })
+            }
             ToggleRow("Charge complete", notif.chargeComplete) { vm.setNotifyChargeComplete(it) }
             val hasWatchApp by com.bloo.bluelink.wear.WatchPresence.hasApp.collectAsStateWithLifecycle()
             PopVisible(visible = hasWatchApp) {
@@ -188,18 +201,6 @@ internal fun NotificationsCardContent(
             }
         }
 
-        // The troubleshooting tools are for when it's not working, so they live in advanced.
-        PopVisible(visible = advanced && notif.charging) {
-            var showTroubleshoot by remember { mutableStateOf(false) }
-            Column {
-                SafeMorphTextButton(
-                    "Charging troubleshooting",
-                    onClick = { showTroubleshoot = true },
-                    icon = AppIcons.Info,
-                )
-                if (showTroubleshoot) LiveUpdateTroubleshootDialog(onDismiss = { showTroubleshoot = false })
-            }
-        }
       }
     }
 }

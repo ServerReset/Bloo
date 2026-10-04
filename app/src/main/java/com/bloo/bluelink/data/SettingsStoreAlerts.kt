@@ -192,6 +192,10 @@ suspend fun SettingsStore.setGlassClarity(value: Float) {
     editTracked { it[SettingsStore.Keys.GLASS_CLARITY] = value.coerceIn(0f, 1f).toString() }
 }
 
+suspend fun SettingsStore.setUltraGlass(value: Boolean) {
+    editTracked { it[SettingsStore.Keys.ULTRA_GLASS] = value.toString() }
+}
+
 suspend fun SettingsStore.setVibrancy(value: Float) {
     editTracked { it[SettingsStore.Keys.VIBRANCY] = value.toString() }
 }

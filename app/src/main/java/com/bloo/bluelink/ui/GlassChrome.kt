@@ -388,7 +388,16 @@ internal fun Modifier.glassSheen(): Modifier = this.background(
 @Composable
 internal fun Modifier.glassCardFill(shape: Shape, tint: Color): Modifier {
     val haze = LocalBackdropHaze.current
-    return if (haze != null && canBlurBackdrops()) {
+    val ultra = LocalAppearance.current.ultraGlass
+    // Ultra glass: even a card gets the real LIQUID glass (refraction + rim), the same material
+    // the floating chrome uses, instead of the flat blur-and-tint veil -- so "glass everywhere"
+    // is literal. It needs a backdrop to refract, so ultra without a haze source still falls
+    // back (there would be nothing behind the card to bend).
+    return if (ultra && haze != null && canBlurBackdrops()) {
+        this.clip(shape)
+            .appGlassEffect(haze, shape)
+            .glassSheen()
+    } else if (haze != null && canBlurBackdrops()) {
         this.clip(shape)
             .appHazeEffect(haze, cheap = true)
             .background(tint.copy(alpha = GlassCardTintAlpha))

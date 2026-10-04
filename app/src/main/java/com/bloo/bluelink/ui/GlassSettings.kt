@@ -30,6 +30,14 @@ internal fun GlassClaritySlider(appearance: SettingsStore.Appearance, vm: AppVie
         },
     )
     BodySmallText("How see-through the backing of floating glass is, from solid to nothing but the bending edge.")
+    // Ultra glass: glass on EVERY surface, not just the floating chrome -- cards and panels
+    // become the same refracting material too. Off by default because it costs a real blur per
+    // card, but it is the "make it glass everywhere" switch.
+    ToggleRow(
+        "Ultra glass",
+        appearance.ultraGlass,
+        description = "Glass on every card and panel, not just the floating chrome. Heavy on older devices.",
+    ) { vm.setUltraGlass(it) }
 }
 
 /** One fixed stop on the glass slider: its name and how transparent the backing is (0 = solid, 1 = none). */
@@ -38,8 +46,8 @@ internal class GlassStop(val name: String, val transparency: Float)
 internal val GlassStops = listOf(
     GlassStop("Solid", 0f),
     GlassStop("Frosted", 0.25f),
-    GlassStop("Misted", 0.70f),
-    GlassStop("Clear", 0.90f),
+    GlassStop("Misted", 0.72f),
+    GlassStop("Clear", 0.95f),
     GlassStop("Crystal", 1f),
 )
 

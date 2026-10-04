@@ -57,6 +57,7 @@ class SettingsStore(internal val context: Context) {
         val UI_SCALE = stringPreferencesKey("ui_scale")
         val VIBRANCY = stringPreferencesKey("vibrancy")
         val GLASS_CLARITY = stringPreferencesKey("glass_clarity")
+        val ULTRA_GLASS = stringPreferencesKey("ultra_glass")
         val HAPTICS = stringPreferencesKey("haptics_enabled")
         val PEBBLE_OUTLINE = stringPreferencesKey("pebble_outline")
         val SEAMLESS_INSTALL_SHIZUKU = stringPreferencesKey("seamless_install_shizuku")
@@ -129,7 +130,10 @@ class SettingsStore(internal val context: Context) {
         /** How transparent the backing of floating glass is: 0 = solid, 1 = none (one of
          *  [com.bloo.bluelink.ui.GlassStops]). Defaults to "Clear" (0.90) -- the second
          *  clearest stop, so the glass reads as glass out of the box. Was "Misted" (0.70). */
-        val glassClarity: Float = 0.90f,
+        val glassClarity: Float = 0.95f,
+        /** Ultra glass: glass on EVERY surface, not just the floating chrome -- cards and
+         *  panels included. See GlassChrome.glassCardFill. */
+        val ultraGlass: Boolean = false,
         /** Show an aurora gradient as the app background instead of solid surface. */
         val auroraBackground: Boolean = false,
         /** Aurora motion mode: "off", "static", "motion". */
@@ -188,7 +192,8 @@ class SettingsStore(internal val context: Context) {
             // user out of Settings, so a bad stored value can never take effect.
             uiScale = (prefs[Keys.UI_SCALE]?.toFloatOrNull() ?: 1f).coerceIn(0.85f, 1.3f),
             vibrancy = (prefs[Keys.VIBRANCY]?.toFloatOrNull() ?: 1f).coerceIn(0.5f, 1.6f),
-            glassClarity = (prefs[Keys.GLASS_CLARITY]?.toFloatOrNull() ?: 0.90f).coerceIn(0f, 1f),
+            glassClarity = (prefs[Keys.GLASS_CLARITY]?.toFloatOrNull() ?: 0.95f).coerceIn(0f, 1f),
+            ultraGlass = prefs[Keys.ULTRA_GLASS]?.toBooleanStrictOrNull() ?: false,
             hapticsEnabled = prefs[Keys.HAPTICS]?.toBooleanStrictOrNull() ?: true,
             auroraBackground = prefs[Keys.AURORA]?.toBooleanStrictOrNull() ?: false,
             auroraMotion = prefs[Keys.AURORA_MOTION] ?: "static",

@@ -49,10 +49,17 @@ internal fun Modifier.appGlassEffect(
     // hole where the backdrop has nothing to show (light mode especially).
     // The user's clarity setting drives both the backing's opacity and how much it blurs: frosted is a
     // thick soft pane, clear is a thin one with the refraction showing.
-    val clarity = LocalAppearance.current.glassClarity
+    val appearance = LocalAppearance.current
+    // Ultra glass: no backing at all (pure refraction) and the clearest possible blur, so the
+    // material reads as bare glass over whatever is behind it. Clarity is still respected for
+    // the blur radius's lower bound in normal mode; ultra just pins it to its clearest end.
+    val ultra = appearance.ultraGlass
+    val clarity = if (ultra) 1f else appearance.glassClarity
     val backing = MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 0.97f * (1f - clarity))
     val blur = (18f - 16.5f * clarity).dp
-    val style = remember(shape, backing, blur, fadeOut, edgeWarp) { glassStyle(shape, backing, blur, fadeOut, edgeWarp) }
+    val style = remember(shape, backing, blur, fadeOut, edgeWarp, ultra) {
+        glassStyle(shape, backing, blur, fadeOut, edgeWarp, ultra)
+    }
     return this.hazeGlass(input = HazeInput.Sources(state), style = style)
 }
 
@@ -63,6 +70,7 @@ private fun glassStyle(
     blur: androidx.compose.ui.unit.Dp,
     fadeOut: Boolean,
     edgeWarp: Boolean,
+    ultra: Boolean,
 ): GlassStyle = GlassStyle.clear.then {
     // Liquid glass: nearly clear in the middle (a whisper of blur, no milky white lift), with the
     // bending riding the material and a specular glint on top. Starts from Haze's "clear" material,
@@ -71,7 +79,9 @@ private fun glassStyle(
     backgroundColor(backing)
     optics(
         GlassOptics(
-            refractionStrength = if (edgeWarp) 0.85f else 1f,
+            // Ultra pushes the refraction to its ceiling even on the edge profile, so the
+            // bending reads strongly across a small chip too, not just at its rim.
+            refractionStrength = if (ultra) 1f else if (edgeWarp) 0.85f else 1f,
             // Surface profile scales its refraction by this fraction of the SHORTEST side, so on a
             // ~status-bar-height strip a large fraction is what makes the warp read across the whole
             // bar instead of a faint ripple. Edge ignores it for refraction (lighting only).
