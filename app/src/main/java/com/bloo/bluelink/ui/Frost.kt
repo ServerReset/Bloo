@@ -30,6 +30,13 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 
+// The frost's own cool-ice accents, named so the three cannot drift apart as bare hex.
+// A deliberately separate, cold-white family from the brand palette: frost is about a frozen
+// surface, not the app's accent colour, so these stay their own small set.
+private val FrostIceVeil = Color(0xFFDCEBFF)
+private val FrostIceRim = Color(0xFFBFE3FF)
+private val FrostIceEdge = Color(0xFF8FD8FF)
+
 /**
  * The app's one "this is switched off right now" look: frost. Not a grey wash. The content goes soft
  * behind a clear, cool veil of ice, brighter at the top and clearing toward the bottom, with a thin
@@ -54,8 +61,8 @@ internal fun Modifier.frosted(
     if (amount <= 0.001f) return this
     val dark = appIsDarkTheme()
     val canBlur = canBlurBackdrops()
-    val veilTop = if (dark) Color(0xFFDCEBFF) else Color.White
-    val rimColor = if (dark) Color(0xFFBFE3FF) else Color(0xFFFFFFFF)
+    val veilTop = if (dark) FrostIceVeil else Color.White
+    val rimColor = if (dark) FrostIceRim else Color.White
     val veilAlpha = if (dark) 0.20f else 0.46f
     return this
         .then(if (veil) Modifier.clip(shape) else Modifier)
@@ -92,7 +99,7 @@ internal fun Modifier.frosted(
                     Brush.linearGradient(
                         0f to rimColor.copy(alpha = 0.55f * amount),
                         0.5f to rimColor.copy(alpha = 0.12f * amount),
-                        1f to Color(0xFF8FD8FF).copy(alpha = 0.35f * amount),
+                        1f to FrostIceEdge.copy(alpha = 0.35f * amount),
                     ),
                     shape,
                 )
