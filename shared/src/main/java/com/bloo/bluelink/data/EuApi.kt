@@ -13,13 +13,11 @@ import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
-import okhttp3.logging.HttpLoggingInterceptor
 import java.math.BigInteger
 import java.security.KeyFactory
 import java.security.spec.RSAPublicKeySpec
 import java.util.Base64
 import java.util.UUID
-import java.util.concurrent.TimeUnit
 import javax.crypto.Cipher
 
 /**
@@ -99,17 +97,8 @@ class EuApi(private val brand: Brand) {
 
         private val sharedJson = Json { ignoreUnknownKeys = true; isLenient = true; coerceInputValues = true }
 
-        internal val sharedClient: OkHttpClient = OkHttpClient.Builder()
-            .connectTimeout(30, TimeUnit.SECONDS)
-            .readTimeout(60, TimeUnit.SECONDS)
-            // BASIC level logs the request/response line only (no bodies), so the
-            // password / PIN / tokens in auth bodies are never written to the log.
-            .addInterceptor(
-                HttpLoggingInterceptor { line -> AppLog.log(line) }.apply {
-                    level = HttpLoggingInterceptor.Level.BASIC
-                },
-            )
-            .build()
+        // The one shared OkHttp stack -- see [ApiHttp].
+        internal val sharedClient: OkHttpClient get() = ApiHttp.client
     }
 
     internal val json get() = sharedJson

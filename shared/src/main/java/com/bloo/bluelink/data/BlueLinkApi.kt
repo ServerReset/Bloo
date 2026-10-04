@@ -10,7 +10,6 @@ import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import okhttp3.logging.HttpLoggingInterceptor
 import kotlinx.coroutines.delay
-import java.util.concurrent.TimeUnit
 
 /**
  * Thin client over the real Hyundai Blue Link US telematics API.
@@ -50,34 +49,13 @@ class BlueLinkApi(private val brand: Brand = Brand.HYUNDAI) {
         // paths got ZERO TLS or connection reuse: a full TCP + TLS handshake for
         // every single command. OkHttpClient is explicitly designed to be shared
         // and is thread-safe; so is Json.
-        private val sharedJson = Json {
-            // The real API's payloads evolve (new fields, generation-specific
-            // quirks) faster than this client's models are updated, so unknown
-            // keys are ignored instead of throwing.
-            ignoreUnknownKeys = true
-            // Some fields the API sometimes sends as a type our model doesn't
-            // expect (numbers where a string is modeled, etc.) get coerced to a
-            // best-effort value instead of failing the whole decode.
-            coerceInputValues = true
-            isLenient = true
-        }
-
-        private val sharedClient: OkHttpClient = OkHttpClient.Builder()
-            .connectTimeout(30, TimeUnit.SECONDS)
-            .readTimeout(60, TimeUnit.SECONDS)
-            .addInterceptor(
-                // BASIC level logs the request line + response line only (no bodies),
-                // so the password in the auth body is never written to the log.
-                HttpLoggingInterceptor { line -> AppLog.log(line) }.apply {
-                    level = HttpLoggingInterceptor.Level.BASIC
-                }
-            )
-            .build()
+        // Both the OkHttp stack and the Json parser are the one shared pair --
+        // see [ApiHttp].
     }
 
-    internal val json get() = sharedJson
+    internal val json get() = ApiHttp.json
 
-    internal val client: OkHttpClient get() = sharedClient
+    internal val client: OkHttpClient get() = ApiHttp.client
 
     // The two request-body content types this API's endpoints expect: plain
     // JSON for most commands, and form-urlencoded specifically for

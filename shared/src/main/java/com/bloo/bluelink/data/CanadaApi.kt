@@ -15,11 +15,9 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import okhttp3.Response
-import okhttp3.logging.HttpLoggingInterceptor
 import java.util.Base64
 import java.util.Locale
 import java.util.UUID
-import java.util.concurrent.TimeUnit
 
 /**
  * A signed-in Hyundai/Genesis/Kia Canada session. [pin] is the account's
@@ -99,19 +97,9 @@ class CanadaApi(private val brand: Brand) {
         /** A fresh, stable device id (persist it; the 90-day mfaYn grant is bound to it). */
         fun newDeviceId(): String = UUID.randomUUID().toString().uppercase(Locale.US)
 
-        // Process-wide, same reasoning as BlueLinkApi/KiaUsaApi's shared pair —
-        // this class is constructed per call on hot command paths.
-        private val sharedJson = Json { ignoreUnknownKeys = true; isLenient = true; coerceInputValues = true }
-
-        private val sharedClient: OkHttpClient = OkHttpClient.Builder()
-            .connectTimeout(30, TimeUnit.SECONDS)
-            .readTimeout(60, TimeUnit.SECONDS)
-            .addInterceptor(
-                HttpLoggingInterceptor { line -> AppLog.log(line) }.apply {
-                    level = HttpLoggingInterceptor.Level.BASIC
-                },
-            )
-            .build()
+        // The one shared OkHttp/Json stack -- see [ApiHttp]. This class is
+        // constructed per call on hot command paths, so a per-call client would
+        // cost a fresh TCP + TLS handshake every time.
 
         // Celsius half-degree lookup tables the hex-encoded setpoint indexes
         // into — pre-2020 model-year vehicles report a narrower range. Mirrors
@@ -121,11 +109,11 @@ class CanadaApi(private val brand: Brand) {
         internal const val TEMP_RANGE_MODEL_YEAR = 2020
     }
 
-    internal val json get() = sharedJson
+    internal val json get() = ApiHttp.json
 
     internal val jsonMedia = "application/json;charset=UTF-8".toMediaType()
 
-    internal val client: OkHttpClient get() = sharedClient
+    internal val client: OkHttpClient get() = ApiHttp.client
 
     // --- Headers -----------------------------------------------------------
 

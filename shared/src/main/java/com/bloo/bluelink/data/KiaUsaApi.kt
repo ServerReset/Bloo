@@ -15,13 +15,11 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import okhttp3.Response
-import okhttp3.logging.HttpLoggingInterceptor
 import java.security.MessageDigest
 import java.text.SimpleDateFormat
 import java.util.Locale
 import java.util.TimeZone
 import java.util.UUID
-import java.util.concurrent.TimeUnit
 
 /**
  * A Kia US session. The [sid] is the session token (sent as the `sid` header);
@@ -77,22 +75,10 @@ class KiaUsaApi {
         /** A fresh, stable device id (persist it; the rmtoken is bound to it). */
         fun newDeviceId(): String = UUID.randomUUID().toString().uppercase(Locale.US)
 
-        // Process-wide — same reasoning as BlueLinkApi's shared pair: this class
-        // is constructed per call on the hot command paths (notification actions,
-        // AutoLock, climate auto-extend), and a per-call OkHttpClient means a
-        // fresh TCP + TLS handshake every time. Both types are thread-safe and
-        // meant to be shared.
-        private val sharedJson = Json { ignoreUnknownKeys = true; isLenient = true; coerceInputValues = true }
-
-        private val sharedClient: OkHttpClient = OkHttpClient.Builder()
-            .connectTimeout(30, TimeUnit.SECONDS)
-            .readTimeout(60, TimeUnit.SECONDS)
-            .addInterceptor(
-                HttpLoggingInterceptor { line -> AppLog.log(line) }.apply {
-                    level = HttpLoggingInterceptor.Level.BASIC
-                },
-            )
-            .build()
+        // The one shared OkHttp/Json stack -- see [ApiHttp]. This class is
+        // constructed per call on the hot command paths (notification actions,
+        // AutoLock, climate auto-extend), and a per-call OkHttpClient would mean
+        // a fresh TCP + TLS handshake every time.
 
         /** Shared because SimpleDateFormat construction parses the pattern and
          *  loads locale DateFormatSymbols, and this runs on EVERY Kia request.
@@ -104,11 +90,11 @@ class KiaUsaApi {
         }
     }
 
-    internal val json get() = sharedJson
+    internal val json get() = ApiHttp.json
 
     internal val jsonMedia = "application/json;charset=utf-8".toMediaType()
 
-    internal val client: OkHttpClient get() = sharedClient
+    internal val client: OkHttpClient get() = ApiHttp.client
 
     // --- Headers ---------------------------------------------------------
 
