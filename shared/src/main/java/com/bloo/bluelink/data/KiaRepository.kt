@@ -66,13 +66,13 @@ class KiaRepository(
     // conversion when reading it back out.
     private suspend fun save(session: KiaSession, username: String, pin: String) {
         store.save(
-            SessionStore.Session(
+            SessionStore.Session.of(
                 accessToken = session.sid,
                 refreshToken = session.rmtoken,
+                deviceId = session.deviceId,
                 username = username,
                 pin = pin,
                 brand = Brand.KIA,
-                deviceId = session.deviceId,
             )
         )
     }

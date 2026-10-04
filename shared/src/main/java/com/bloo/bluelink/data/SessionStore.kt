@@ -33,7 +33,34 @@ class SessionStore(private val context: Context) {
         val brand: Brand = Brand.HYUNDAI,
         /** Kia US only: the rmtoken is bound to this device id, so it must persist. */
         val deviceId: String? = null,
-    )
+    ) {
+        companion object {
+            /**
+             * Build a [Session] from a brand API's own logged-in session.
+             *
+             * Every brand API (Blue Link, Canada, Europe, Kia US) exposes a session type
+             * carrying the same access/refresh/device fields, and each repository used to
+             * hand-build this six-field [Session] inline -- byte-identical copies, one per
+             * brand's `save(...)`. Taking those fields plus the login `username`/`pin`/`brand`
+             * here keeps the mapping in one place.
+             */
+            fun of(
+                accessToken: String,
+                refreshToken: String?,
+                deviceId: String?,
+                username: String,
+                pin: String,
+                brand: Brand,
+            ): Session = Session(
+                accessToken = accessToken,
+                refreshToken = refreshToken,
+                username = username,
+                pin = pin,
+                brand = brand,
+                deviceId = deviceId,
+            )
+        }
+    }
 
     // Namespaces every stored field by brand, e.g. key(KIA, "access") -> "KIA_access",
     // so each brand's session fields live under distinct DataStore keys in the same file.

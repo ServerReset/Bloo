@@ -36,13 +36,13 @@ class EuRepository(
 
     private suspend fun save(session: EuSession, username: String, pin: String) {
         store.save(
-            SessionStore.Session(
+            SessionStore.Session.of(
                 accessToken = session.accessToken,
                 refreshToken = session.refreshToken,
+                deviceId = session.deviceId,
                 username = username,
                 pin = pin,
                 brand = brand,
-                deviceId = session.deviceId,
             ),
         )
     }
