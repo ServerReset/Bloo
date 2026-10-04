@@ -18,7 +18,6 @@ import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.snap
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.heightIn
@@ -63,6 +62,8 @@ import androidx.compose.ui.unit.dp
 import androidx.core.net.toUri
 import com.bloo.bluelink.update.UpdateInfo
 import com.bloo.bluelink.data.Weather
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.material.icons.automirrored.filled.OpenInNew
 
 /**
  * The release notes block: "What's new", an excerpt, and a link to the full notes.
@@ -104,43 +105,51 @@ internal fun UpdateReleaseNotes(
         shadow = false,
     ) {
         Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(GapRow)) {
-            // Header + actions in a FlowRow, not a weighted Row: at a huge font the two action
-            // buttons plus the title no longer fit one line, and a `weight(1f)` title squeezed
-            // between them collapsed/clipped instead of the row simply wrapping. FlowRow lets
-            // the actions drop to their own line when they must.
-            FlowRow(
-                Modifier.fillMaxWidth(),
-                verticalArrangement = Arrangement.spacedBy(GapHairline),
-                horizontalArrangement = Arrangement.spacedBy(GapRow),
-                itemVerticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text(
-                    "What's new",
-                    style = MaterialTheme.typography.labelSmall,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.weight(1f, fill = false),
-                )
-                // Deterministic, not onTextLayout-dependent: `hasVisualOverflow` from a
-                // single-line-clamped Text is unreliable (it can arrive a pass late or not at
-                // all for the ellipsized case), which is what made the old "Show more" appear
-                // and disappear unpredictably. A plain estimate -- more newlines than the
-                // collapsed view shows, OR more characters than a collapsed view could hold --
-                // is stable the moment we have the text, so the affordance is always right.
+            // "What's new" on the left, the actions ("Show more"/"Show less" + "GitHub") on ONE
+            // line at the right -- never wrapped to a second line. When the row is too narrow for
+            // both action labels, GitHub collapses to just its glyph rather than wrapping or
+            // squeezing the title into a column. A BoxWithConstraints here is fine: this header
+            // is a small fixed block, not a hot list.
+            BoxWithConstraints(Modifier.fillMaxWidth()) {
                 val looksLong =
                     notes.count { it == '\n' } >= collapsedLines || notes.length > collapsedLines * 48
-                if (looksLong || expanded) {
+                val showToggle = looksLong || expanded
+                // Decide GitHub's label from the room actually available, in Dp -- no pixel
+                // conversion, and Dp already tracks the font scale, so a huge font tightens the
+                // threshold too. Title (~74dp) + the toggle button (~96dp) + GitHub's full label
+                // (~92dp) plus two gaps; below that, GitHub drops to its glyph only.
+                val needed = 74.dp + GapRow + (if (showToggle) 96.dp + GapRow else 0.dp) + 92.dp
+                val githubLabel = maxWidth >= needed
+                Row(
+                    Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(GapRow),
+                ) {
+                    Text(
+                        "What's new",
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        modifier = Modifier.weight(1f, fill = false),
+                    )
+                    if (showToggle) {
+                        SafeMorphTextButton(
+                            if (expanded) "Show less" else "Show more",
+                            onClick = { expanded = !expanded },
+                            fillOnPress = false,
+                        )
+                    }
                     SafeMorphTextButton(
-                        if (expanded) "Show less" else "Show more",
-                        onClick = { expanded = !expanded },
+                        // Icon-only when the row is tight: standardButtonIcon maps "GitHub" to
+                        // the open-in-new glyph, and showIcon=false would print the word inside
+                        // the collapsed pill -- so pass the glyph and blank the label instead.
+                        text = if (githubLabel) "GitHub" else "",
+                        onClick = { context.tryStart(Intent(Intent.ACTION_VIEW, info.run.htmlUrl.toUri())) },
+                        icon = Icons.AutoMirrored.Filled.OpenInNew,
                         fillOnPress = false,
                     )
                 }
-                SafeMorphTextButton(
-                    "GitHub",
-                    onClick = { context.tryStart(Intent(Intent.ACTION_VIEW, info.run.htmlUrl.toUri())) },
-                    fillOnPress = false,
-                )
             }
             Text(
                 notes,

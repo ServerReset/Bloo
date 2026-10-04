@@ -202,12 +202,17 @@ internal fun SearchLayer(
             onSettings || dock == SearchDock.CENTER -> SearchForm.PILL
             else -> SearchForm.BUBBLE
         }
-        // Publish where search is docked so the toast stack can negotiate with it: beside a
-        // corner bubble, above the centred pill. Withdrawn (null) while the search is hidden or
-        // open as the full bar, when there is nothing to sit beside. SideEffect, not a bare
-        // write: this runs after composition, and the registry is state other composables read.
+        // Publish where the search element is so the toast stack can clear it: a corner dock
+        // (beside the bubble) or CENTER (above the pill OR the open bottom bar). While the
+        // search is HIDDEN, null. Crucially the OPEN bar publishes CENTER too -- it used to
+        // publish null here, so an open bottom search bar got no clearance at all and a toast
+        // landed right over it. The bar is a bottom-centered element just like the pill, so
+        // CENTER is the correct clearance for both. SideEffect, not a bare write: this runs
+        // after composition, and the registry is state other composables read.
         val floatingRegistry = LocalFloatingRegistry.current
-        SideEffect { floatingRegistry.searchDock = if (!open) dock else null }
+        SideEffect {
+            floatingRegistry.searchDock = if (open) SearchDock.CENTER else dock
+        }
         DisposableEffect(Unit) { onDispose { floatingRegistry.searchDock = null } }
 
         // Resting corner for the bubble, and the drag bounds that keep it on
