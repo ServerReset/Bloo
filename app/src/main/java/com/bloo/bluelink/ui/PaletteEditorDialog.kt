@@ -46,15 +46,15 @@ internal fun PaletteEditorDialog(
     val paletteId = remember(editing) { editing?.id ?: UUID.randomUUID().toString() }
     var name by remember(editing) { mutableStateOf(editing?.name ?: "Custom") }
     var primaryColor by remember(editing) {
-        mutableStateOf(editing?.primaryArgb?.let { Color(it.toLong() and 0xFFFFFFFFL) } ?: Color(0xFF005AC1))
+        mutableStateOf(editing?.primaryArgb?.let { Color(it.toLong() and 0xFFFFFFFFL) } ?: ColorPalette.BLUE.swatch)
     }
     var useSecondary by remember(editing) { mutableStateOf(editing?.secondaryArgb != null) }
     var secondaryColor by remember(editing) {
-        mutableStateOf(editing?.secondaryArgb?.let { Color(it.toLong() and 0xFFFFFFFFL) } ?: Color(0xFF7B4DFF))
+        mutableStateOf(editing?.secondaryArgb?.let { Color(it.toLong() and 0xFFFFFFFFL) } ?: ColorPalette.VIOLET.swatch)
     }
     var useTertiary by remember(editing) { mutableStateOf(editing?.tertiaryArgb != null) }
     var tertiaryColor by remember(editing) {
-        mutableStateOf(editing?.tertiaryArgb?.let { Color(it.toLong() and 0xFFFFFFFFL) } ?: Color(0xFF00696E))
+        mutableStateOf(editing?.tertiaryArgb?.let { Color(it.toLong() and 0xFFFFFFFFL) } ?: ColorPalette.TEAL.swatch)
     }
     // Was a single un-confirmed tap that permanently deleted a saved custom
     // palette -- same "tap again to confirm" + 4s auto-reset pattern as the

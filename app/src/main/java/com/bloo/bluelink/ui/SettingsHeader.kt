@@ -377,13 +377,11 @@ internal fun SettingsHeroCard(state: UiState, vm: AppViewModel) {
                                 ) {
                                     MorphButtonLabel(act.icon, act.label, pending = false)
                                 }
-                                SafeMorphTextButton(
-                                    "Not now",
-                                    onClick = vm::dismissUpdate,
-                                    enabled = !state.updateDownloading && !state.updateInstalling,
-                                    modifier = Modifier.fillMaxWidth(),
-                                )
-                                UpdateReleaseNotes(updateInfo, maxLines = 3)
+                                // Shared dismissal row -- gives the Settings card the SAME
+                                // undo window the app tile has (it had only "Not now" and no way
+                                // back, which read as "dismissal doesn't work here").
+                                UpdateDismissRow(state, vm)
+                                UpdateReleaseNotes(updateInfo, collapsedLines = 3)
                             }
                         }
                     }

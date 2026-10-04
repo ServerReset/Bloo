@@ -14,10 +14,8 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
@@ -208,7 +206,7 @@ internal fun UpdateAvailableTile(
             // release page when there's more than we show. One shared block -- see
             // UpdateReleaseNotes for why the Settings card no longer keeps its own copy.
             PopVisible(visible = info.run.releaseNotes != null) {
-                UpdateReleaseNotes(info, maxLines = 5, hazeState = hazeState)
+                UpdateReleaseNotes(info, collapsedLines = 5, hazeState = hazeState)
             }
             // Progressive install help: only in the tap-through (non-seamless) path, and
             // only as an opt-in disclosure — the Play-Protect steps are scaffolding, not
@@ -268,49 +266,11 @@ internal fun UpdateAvailableTile(
             // "too much content/too busy". Only "Keep it" has no other home: it
             // exists purely for the pending-dismiss undo window, so it is the one
             // piece that stays.
-            if (state.updatePendingDismiss) {
-                SafeMorphTextButton(
-                    "Keep it",
-                    onClick = vm::undoDismissUpdate,
-                )
-                Spacer(Modifier.height(GapHairline))
-            }
-            // Dismiss / undo / remind — hierarchy: during the undo window "Keep it" is
-            // the recoverable emphasis; otherwise "Remind me" (deferral) is emphasized
-            // over the plainer "Not now".
-            if (state.updatePendingDismiss) {
-                Row(
-                    Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(GapRow),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Text(
-                        "Dismissing…",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.weight(1f),
-                    )
-                    MorphTextButton(
-                        "Keep it",
-                        onClick = { vm.undoDismissUpdate() },
-                        enabled = !state.updateDownloading,
-                        emphasis = ButtonEmphasis.Primary,
-                    )
-                }
-            } else {
-                ExpressiveButtonRow(modifier = Modifier.fillMaxWidth(), spacing = GapRow) {
-                    MorphTextButton(
-                        "Remind me",
-                        onClick = { vm.snoozeUpdate() },
-                        enabled = !state.updateDownloading,
-                    )
-                    SafeMorphTextButton(
-                        "Not now",
-                        onClick = vm::dismissUpdate,
-                        enabled = !state.updateDownloading,
-                    )
-                }
-            }
+            // Dismiss / undo / remind -- one shared row (UpdateDismissRow), so the app tile
+            // and the Settings card can never drift. This used to stack a lone "Keep it" on
+            // its own line ABOVE a second "Keep it" inside the row -- the reported "it says
+            // keep it but it's on a different line, it's terrible".
+            UpdateDismissRow(state, vm)
         }
         }
     }

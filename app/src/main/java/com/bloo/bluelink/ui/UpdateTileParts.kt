@@ -46,6 +46,9 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -74,13 +77,20 @@ import com.bloo.bluelink.data.Weather
 @Composable
 internal fun UpdateReleaseNotes(
     info: UpdateInfo,
-    /** 5 in the pebble, which has the room; 3 in the Settings card, which does not. */
-    maxLines: Int = 5,
+    /** Lines shown while COLLAPSED. 5 in the pebble, which has the room; 3 in the
+     *  Settings card, which does not. Tapping "Show more" expands in place to the whole
+     *  note, so a long changelog is readable in the app instead of forcing a GitHub trip. */
+    collapsedLines: Int = 5,
     hazeState: dev.chrisbanes.haze.HazeState? = null,
 ) {
     val notes = info.run.releaseNotes?.trim().orEmpty()
     if (notes.isBlank()) return
     val context = LocalContext.current
+    // Expanded in place: held across the card's own recompositions (keyed on the build),
+    // so a long note can be read fully without leaving the app. "GitHub" stays as the
+    // escape hatch to the formatted release page.
+    var expanded by rememberSaveable(info.run.runNumber) { mutableStateOf(false) }
+    var overflowed by remember(info.run.runNumber) { mutableStateOf(false) }
     // Glass surface with unified blur styling. shadow = false -- shared by the
     // pebble body AND SettingsHeroCard's expanded body (this composable's own doc),
     // both of which already nest this inside another elevated card/group; see
@@ -92,9 +102,6 @@ internal fun UpdateReleaseNotes(
         shadow = false,
     ) {
         Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(GapRow)) {
-            // "Full notes" rides in the section header rather than taking a whole row of its
-            // own below the excerpt -- one less stacked block in a tile that already carries
-            // status, notes and two dismissals.
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 Text(
                     "What's new",
@@ -103,11 +110,18 @@ internal fun UpdateReleaseNotes(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.weight(1f),
                 )
+                // Only offered when the note is actually longer than the collapsed view --
+                // a "Show more" over three short lines does nothing and reads as broken.
+                if (overflowed || expanded) {
+                    SafeMorphTextButton(
+                        if (expanded) "Show less" else "Show more",
+                        onClick = { expanded = !expanded },
+                        fillOnPress = false,
+                    )
+                }
                 SafeMorphTextButton(
-                    "Full notes",
-                    onClick = {
-                        context.tryStart(Intent(Intent.ACTION_VIEW, info.run.htmlUrl.toUri()))
-                    },
+                    "GitHub",
+                    onClick = { context.tryStart(Intent(Intent.ACTION_VIEW, info.run.htmlUrl.toUri())) },
                     fillOnPress = false,
                 )
             }
@@ -115,8 +129,62 @@ internal fun UpdateReleaseNotes(
                 notes,
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = maxLines,
+                // Collapsed: capped at [collapsedLines], ellipsized. Expanded: no cap, so the
+                // whole changelog shows inline. onTextLayout tells us whether it was clipped,
+                // which is what gates the "Show more" affordance above.
+                maxLines = if (expanded) Int.MAX_VALUE else collapsedLines,
                 overflow = TextOverflow.Ellipsis,
+                onTextLayout = { if (!expanded) overflowed = it.hasVisualOverflow },
+            )
+        }
+    }
+}
+
+/**
+ * The update card's dismissal row, shared by the app tile and the Settings card so the two
+ * behave and read identically (they used to differ: the Settings card had only "Not now" and no
+ * undo at all, and the app tile stacked a second "Keep it" on its own line above the real row).
+ *
+ * Idle: "Remind me" (a deferral) and "Not now" (dismiss). During the undo window after a
+ * dismiss: a single row -- "Dismissing…" with a prominent "Keep it" -- instead of the old
+ * two-row jumble.
+ */
+@Composable
+internal fun UpdateDismissRow(
+    state: UiState,
+    vm: AppViewModel,
+    modifier: Modifier = Modifier,
+) {
+    val busy = state.updateDownloading || state.updateInstalling
+    if (state.updatePendingDismiss) {
+        Row(
+            modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(GapRow),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                "Dismissing…",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.weight(1f),
+            )
+            MorphTextButton(
+                "Keep it",
+                onClick = { vm.undoDismissUpdate() },
+                emphasis = ButtonEmphasis.Primary,
+            )
+        }
+    } else {
+        ExpressiveButtonRow(modifier = modifier.fillMaxWidth(), spacing = GapRow) {
+            MorphTextButton(
+                "Remind me",
+                onClick = { vm.snoozeUpdate() },
+                enabled = !busy,
+            )
+            SafeMorphTextButton(
+                "Not now",
+                onClick = vm::dismissUpdate,
+                enabled = !busy,
             )
         }
     }

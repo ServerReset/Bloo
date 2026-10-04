@@ -230,6 +230,10 @@ class BlooApplication : Application(), Configuration.Provider, coil.ImageLoaderF
         // "no watch paired" and the push is a no-op.
         Thread {
             runCatching { com.bloo.bluelink.wear.WatchPresence.start(applicationContext) }
+            // Housekeeping: drop any staged update APK from a previous session -- it is
+            // only ever read in the same session that downloaded it, so it is dead weight
+            // (multi-MB) between sessions. See UpdateCleanup's own doc.
+            runCatching { com.bloo.bluelink.update.UpdateCleanup.clearStagedDownloads(applicationContext) }
         }.apply { priority = Thread.MIN_PRIORITY }.start()
         StartupTrace.mark("Application.onCreate: end")
         Thread.setDefaultUncaughtExceptionHandler { thread, throwable ->
