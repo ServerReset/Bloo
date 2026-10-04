@@ -27,15 +27,7 @@ import kotlinx.coroutines.launch
 internal fun AppViewModel.refreshDeviceLocation() {
     viewModelScope.launch {
         val loc = com.bloo.bluelink.autolock.LocationHelper.currentLocation(getApplication()) ?: return@launch
-        _state.update {
-            it.copy(
-                deviceLocation = GeoLocation(
-                    loc.latitude,
-                    loc.longitude,
-                    if (loc.hasSpeed()) loc.speed.toDouble() else null,
-                ),
-            )
-        }
+        _state.update { it.copy(deviceLocation = loc.toDeviceGeoLocation()) }
         // Hands this SAME fused-location fix to the weather-follows-device path
         // (its own persisted flag, checked inside) rather than letting it do its
         // own separate LocationManager fetch -- see
@@ -76,3 +68,18 @@ fun AppViewModel.setMapExpanded(value: Boolean) {
 fun AppViewModel.setWeatherPlace(query: String) = weather.setWeatherPlace(query)
 
 fun AppViewModel.useDeviceLocationForWeather() = weather.useDeviceLocationForWeather()
+
+/**
+ * A device GPS fix as a [GeoLocation]: lat/lon plus speed when the fix carries one.
+ *
+ * Both places that publish the phone's own location -- [refreshDeviceLocation] and the
+ * live-tracking collector in AppViewModelCommands -- built this identical three-line
+ * `GeoLocation(...)` inline, including the same `hasSpeed()` guard. One mapping so the two
+ * can't drift on whether a fix has a speed (which drives "is the DEVICE moving").
+ */
+internal fun android.location.Location.toDeviceGeoLocation(): GeoLocation =
+    GeoLocation(
+        latitude,
+        longitude,
+        if (hasSpeed()) speed.toDouble() else null,
+    )

@@ -82,15 +82,15 @@ internal class Toast(val id: Long, val message: String, val type: String, expire
     val visible = MutableTransitionState(false).apply { targetState = true }
 }
 
+/** The app's one toast stack, for any composable that needs to tell the user something. */
+internal val LocalToasts = androidx.compose.runtime.staticCompositionLocalOf<ToastState?> { null }
+
 /**
  * The stack of live toasts, oldest at the top and newest at the bottom. Each toast expires on
  * its own clock, but never before the one above it -- so they always go oldest to newest, however
  * long each message happens to be. A repeat of the newest message refreshes it instead of
  * stacking an identical copy.
  */
-/** The app's one toast stack, for any composable that needs to tell the user something. */
-internal val LocalToasts = androidx.compose.runtime.staticCompositionLocalOf<ToastState?> { null }
-
 @Stable
 internal class ToastState {
     val items = mutableStateListOf<Toast>()

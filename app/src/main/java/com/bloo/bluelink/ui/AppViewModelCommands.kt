@@ -4,7 +4,6 @@ import androidx.lifecycle.viewModelScope
 import com.bloo.bluelink.data.AppLog
 import com.bloo.bluelink.data.BlueLinkException
 import com.bloo.bluelink.data.ClimateRequest
-import com.bloo.bluelink.data.GeoLocation
 import com.bloo.bluelink.data.ReservChargeInfos
 import com.bloo.bluelink.data.TargetSOC
 import com.bloo.bluelink.data.VehicleStatus
@@ -75,15 +74,7 @@ fun AppViewModel.beginLiveDeviceLocation(restart: Boolean = false) {
             if (tooSoonAndTooClose) return@collect
             lastPublished = loc
             lastPublishedAtMs = now
-            _state.update {
-                it.copy(
-                    deviceLocation = GeoLocation(
-                        loc.latitude,
-                        loc.longitude,
-                        if (loc.hasSpeed()) loc.speed.toDouble() else null,
-                    ),
-                )
-            }
+            _state.update { it.copy(deviceLocation = loc.toDeviceGeoLocation()) }
             weather.refreshDeviceLocationForWeather(loc)
         }
     }
