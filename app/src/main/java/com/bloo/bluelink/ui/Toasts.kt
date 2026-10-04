@@ -52,6 +52,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
@@ -145,14 +146,23 @@ internal fun ToastHost(
     // the toast host off the per-frame path of dragging the search entirely. `remember(bottomId)`
     // snapshots it once per toast-set change rather than per drag frame.
     val dock = registry.searchDock
-    val searchRect = remember(bottomId) {
-        if (bottomId == null) null else registry.boundsOf(FloatingIds.Search)
-    }
-    // MIDDLE search: the whole STACK sits above the pill, so the lift is a bottom spacer on the
+    // Live read while a toast is up (null when none, so the common no-toast case stays off the
+    // registry entirely). It must be LIVE, not a one-shot `remember(bottomId)`: the search pill
+    // can register or move AFTER a toast mounts, and a snapshotted rect then stayed null/stale
+    // and the lift never applied -- exactly "it still covers it".
+    val searchRect = if (bottomId == null) null else registry.boundsOf(FloatingIds.Search)
+    // MIDDLE search: the whole STACK sits ABOVE the pill, so the lift is a bottom spacer on the
     // column (nothing behind any toast), not a per-toast pad. Corner search: only the bottom
     // toast is shortened to slot beside the pill; the ones above it stay full width.
+    //
+    // The lift is measured from the pill's own TOP edge to the BOTTOM of the window, NOT its
+    // height alone: the centred pill floats well above the screen bottom (nav bar + edge inset),
+    // so clearing only `rect.height` left the toasts sitting right on top of it -- the reported
+    // "it still covers it". `searchRect` is in root (window) coordinates, so window height minus
+    // its top is exactly the space the stack must keep clear, plus a row of breathing room.
+    val windowHpx = with(density) { LocalWindowInfo.current.containerSize.height.toFloat() }
     val liftPx = if (dock == SearchDock.CENTER && searchRect != null) {
-        with(density) { (searchRect.height.toDp() + GapRow + GapRow) }
+        with(density) { ((windowHpx - searchRect.top) + GapRow.toPx() + GapRow.toPx()).toDp() }
     } else 0.dp
 
     Column(
