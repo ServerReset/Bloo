@@ -86,17 +86,22 @@ internal fun PullRefreshIndicatorHost(
     if (t <= 0.01f) return
 
     val density = LocalDensity.current
-    val settlePx = with(density) { 12.dp.toPx() }
+    // How far below the top edge the disc comes to rest. Was 12dp, which left it hugging the
+    // very top edge; it now sits clear of the status bar so it reads as its own floating thing,
+    // and the drop travel from off-screen is correspondingly longer.
+    val settlePx = with(density) { 30.dp.toPx() }
+    val travelPx = with(density) { 84.dp.toPx() }
     Box(modifier.fillMaxSize()) {
         // The one glass disc: floating chrome, so real liquid glass (refraction + a specular rim).
+        // 64dp (was 52) with a 36dp spinner (was 24): the shape read as a small dot at the top.
         GlassSurface(
             shape = androidx.compose.foundation.shape.CircleShape,
             modifier = Modifier
                 .align(Alignment.TopCenter)
-                .size(52.dp)
+                .size(64.dp)
                 .graphicsLayer {
-                    // Drops from OFF the top edge as the pull grows, lands just below it at rest.
-                    translationY = (t - 1f) * 56.dp.toPx() + t * settlePx
+                    // Drops from OFF the top edge as the pull grows, lands clear of the status bar.
+                    translationY = (t - 1f) * travelPx + t * settlePx
                     alpha = t.coerceIn(0f, 1f)
                     val k = 0.6f + 0.4f * t.coerceIn(0f, 1f)
                     scaleX = k
@@ -106,13 +111,13 @@ internal fun PullRefreshIndicatorHost(
             shadow = true,
         ) {
             if (state.refreshing) {
-                LoadingIndicator(Modifier.size(24.dp))
+                LoadingIndicator(Modifier.size(36.dp))
             } else {
                 // While dragging, the spinner's own progress follows the pull, so the ring draws
                 // itself as you pull and is ready to spin the instant the gesture commits.
                 LoadingIndicator(
                     progress = { state.pull.value.coerceIn(0f, 1f) },
-                    modifier = Modifier.size(24.dp),
+                    modifier = Modifier.size(36.dp),
                 )
             }
         }
