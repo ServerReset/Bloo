@@ -370,7 +370,9 @@ internal fun LockOverlay(vm: AppViewModel, opaqueBackdrop: Boolean = false) {
                         val pinUnlockSource = remember { MutableInteractionSource() }
                         MorphButton(
                             onClick = { attemptPin() },
-                            modifier = Modifier.fillMaxWidth().height(52.dp),
+                            // heightIn(min), not a fixed 52dp: the "Unlock" label grows past
+                            // this at a large accessibility font, and a hard height clipped it.
+                            modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp),
                             interactionSource = pinUnlockSource,
                             enabled = !rejected && pin.length in PinCrypto.PIN_MIN_DIGITS..PinCrypto.PIN_MAX_DIGITS,
                             expressive = true,
