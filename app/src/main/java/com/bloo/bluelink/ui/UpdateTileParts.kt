@@ -64,6 +64,7 @@ import com.bloo.bluelink.update.UpdateInfo
 import com.bloo.bluelink.data.Weather
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.material.icons.automirrored.filled.OpenInNew
+import androidx.compose.ui.platform.LocalDensity
 
 /**
  * The release notes block: "What's new", an excerpt, and a link to the full notes.
