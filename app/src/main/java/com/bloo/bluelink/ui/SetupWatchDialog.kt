@@ -102,8 +102,14 @@ internal fun SetupWatchDialog(phoneName: String, onDismiss: () -> Unit) {
                     }
                 }
                 WatchSetupStep.Install -> {
-                    BodyMediumText("Paired. Back on the Wireless debugging screen, enter the port shown under the IP address. It isn't the pairing port.")
+                    BodyMediumText("Paired. Back on the Wireless debugging screen, enter the port shown under the IP address (it is NOT the pairing port).")
                     SetupField(connectPort, { connectPort = it.filter(Char::isDigit) }, "Connection port", KeyboardType.Number)
+                    BodySmallText(
+                        "If connecting fails: keep the Wireless debugging screen open (the port changes " +
+                            "when you leave it), and make sure the watch and phone are on the same Wi‑Fi — a " +
+                            "watch on its own mobile/Bluetooth network can't be reached this way.",
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
                 }
                 WatchSetupStep.Done -> BodyMediumText("Bloo is installed on the watch. Open it there and it will connect to $phoneName. You can turn Wireless debugging off again.")
             }
